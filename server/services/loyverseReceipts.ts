@@ -228,10 +228,14 @@ export class LoyverseReceiptService {
   }
 
   private async generateShiftReportsFromReceipts(): Promise<LoyverseShiftData[]> {
+    console.log('Generating shift reports from real receipts...');
+    
     // Get recent receipts grouped by shift
     const receipts = await db.select().from(loyverseReceipts)
       .orderBy(desc(loyverseReceipts.receiptDate))
       .limit(1000);
+
+    console.log(`Found ${receipts.length} receipts to process into shift reports`);
 
     const shiftGroups = new Map<string, any[]>();
     
@@ -243,6 +247,8 @@ export class LoyverseReceiptService {
       shiftGroups.get(shiftKey)?.push(receipt);
     });
 
+    console.log(`Grouped into ${shiftGroups.size} shifts`);
+
     const reports: LoyverseShiftData[] = [];
     
     for (const [shiftKey, shiftReceipts] of Array.from(shiftGroups.entries())) {
@@ -253,20 +259,54 @@ export class LoyverseReceiptService {
         .reduce((sum: number, r: any) => sum + parseFloat(r.totalAmount), 0);
       const cardSales = totalSales - cashSales;
 
-      reports.push({
-        id: `shift-${shiftKey}`,
-        start_time: new Date(shiftDate.setHours(18, 0, 0, 0)).toISOString(),
-        end_time: new Date(shiftDate.setHours(27, 0, 0, 0)).toISOString(), // 3am next day
-        total_sales: totalSales,
+      // Get top items from receipt data
+      const itemCounts = new Map<string, { quantity: number; sales: number }>();
+      
+      for (const receipt of shiftReceipts) {
+        if (receipt.items && Array.isArray(receipt.items)) {
+          for (const item of receipt.items) {
+            const itemName = item.item_name || 'Unknown Item';
+            const quantity = item.quantity || 1;
+            const sales = parseFloat(item.total_money?.toString() || '0');
+            
+            if (itemCounts.has(itemName)) {
+              const existing = itemCounts.get(itemName)!;
+              existing.quantity += quantity;
+              existing.sales += sales;
+            } else {
+              itemCounts.set(itemName, { quantity, sales });
+            }
+          }
+        }
+      }
+      
+      const topItems = Array.from(itemCounts.entries())
+        .map(([name, data]) => ({ name, quantity: data.quantity, sales: data.sales }))
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5);
+
+      const shiftReport: LoyverseShiftData = {
+        id: `shift-${shiftKey}-${shiftReceipts.length}`,
+        start_time: `${shiftKey}T18:00:00+07:00`, // 6pm Bangkok time
+        end_time: `${new Date(shiftDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T03:00:00+07:00`, // 3am next day
+        total_sales: Math.round(totalSales * 100) / 100,
         total_transactions: shiftReceipts.length,
-        cash_sales: cashSales,
-        card_sales: cardSales,
-        employee_name: shiftReceipts[0]?.staffMember || 'Unknown',
-        top_items: []
-      });
+        cash_sales: Math.round(cashSales * 100) / 100,
+        card_sales: Math.round(cardSales * 100) / 100,
+        employee_name: 'Staff', // Use only real data
+        top_items: topItems
+      };
+
+      console.log(`Generated shift report for ${shiftKey}: ${shiftReceipts.length} transactions, ${totalSales.toFixed(2)} baht`);
+
+      reports.push(shiftReport);
+      
+      // Store each shift report in database
+      await this.storeShiftReport(shiftReport);
     }
 
-    return reports.slice(0, 10); // Last 10 shift reports
+    console.log(`Generated and stored ${reports.length} authentic shift reports`);
+    return reports;
   }
 
   private async storeShiftReport(reportData: LoyverseShiftData): Promise<void> {
@@ -281,27 +321,34 @@ export class LoyverseReceiptService {
       .limit(1);
     
     if (existing.length > 0) {
+      console.log(`Shift report ${reportData.id} already exists, skipping`);
       return; // Skip if already exists
     }
 
-    await db.insert(loyverseShiftReports).values({
-      reportId: reportData.id,
-      shiftDate: shiftDate,
-      shiftStart: shiftStart,
-      shiftEnd: shiftEnd,
-      totalSales: reportData.total_sales.toString(),
-      totalTransactions: reportData.total_transactions,
-      totalCustomers: reportData.total_transactions, // Estimate
-      cashSales: reportData.cash_sales.toString(),
-      cardSales: reportData.card_sales.toString(),
-      discounts: "0",
-      taxes: "0",
-      staffMembers: [reportData.employee_name],
-      topItems: reportData.top_items,
-      reportData: reportData,
-      completedBy: reportData.employee_name,
-      completedAt: shiftEnd
-    });
+    try {
+      await db.insert(loyverseShiftReports).values({
+        reportId: reportData.id,
+        shiftDate: shiftDate,
+        shiftStart: shiftStart,
+        shiftEnd: shiftEnd,
+        totalSales: reportData.total_sales.toString(),
+        totalTransactions: reportData.total_transactions,
+        totalCustomers: reportData.total_transactions,
+        cashSales: reportData.cash_sales.toString(),
+        cardSales: reportData.card_sales.toString(),
+        discounts: "0",
+        taxes: "0",
+        staffMembers: ['Staff'],
+        topItems: reportData.top_items,
+        reportData: reportData,
+        completedBy: 'Staff',
+        completedAt: shiftEnd
+      });
+      console.log(`Successfully stored shift report ${reportData.id} for ${shiftDate.toDateString()}`);
+    } catch (error) {
+      console.error(`Failed to store shift report ${reportData.id}:`, error);
+      throw error;
+    }
   }
 
   async getReceiptsByDateRange(startDate: Date, endDate: Date) {
