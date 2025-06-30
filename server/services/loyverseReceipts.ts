@@ -292,14 +292,64 @@ export class LoyverseReceiptService {
       .orderBy(desc(loyverseReceipts.receiptDate));
   }
 
-  async searchReceipts(query: string) {
-    return await db.select().from(loyverseReceipts)
-      .where(or(
+  async searchReceipts(query: string, startDate?: Date, endDate?: Date) {
+    let whereConditions = [
+      or(
         like(loyverseReceipts.receiptNumber, `%${query}%`),
-        like(loyverseReceipts.receiptId, `%${query}%`)
-      ))
+        like(loyverseReceipts.receiptId, `%${query}%`),
+        like(loyverseReceipts.staffMember, `%${query}%`),
+        like(loyverseReceipts.totalAmount, `%${query}%`)
+      )
+    ];
+
+    if (startDate && endDate) {
+      whereConditions.push(
+        gte(loyverseReceipts.receiptDate, startDate),
+        lte(loyverseReceipts.receiptDate, endDate)
+      );
+    }
+
+    return await db.select().from(loyverseReceipts)
+      .where(and(...whereConditions))
       .orderBy(desc(loyverseReceipts.receiptDate))
-      .limit(50);
+      .limit(100);
+  }
+
+  async getAllReceipts(limit: number = 50) {
+    return await db.select().from(loyverseReceipts)
+      .orderBy(desc(loyverseReceipts.receiptDate))
+      .limit(limit);
+  }
+
+  async getShiftBalanceAnalysis(limit: number = 5) {
+    const recentShifts = await db.select().from(loyverseShiftReports)
+      .orderBy(desc(loyverseShiftReports.shiftDate))
+      .limit(limit);
+
+    return recentShifts.map(shift => {
+      const totalSales = parseFloat(shift.totalSales);
+      const cashSales = parseFloat(shift.cashSales);
+      const cardSales = parseFloat(shift.cardSales);
+      const calculatedTotal = cashSales + cardSales;
+      const variance = Math.abs(totalSales - calculatedTotal);
+      const isBalanced = variance <= 30; // 30 baht tolerance
+
+      return {
+        id: shift.id,
+        shiftDate: shift.shiftDate,
+        shiftStart: shift.shiftStart,
+        shiftEnd: shift.shiftEnd,
+        totalSales,
+        cashSales,
+        cardSales,
+        calculatedTotal,
+        variance,
+        isBalanced,
+        staffMembers: shift.staffMembers,
+        totalTransactions: shift.totalTransactions,
+        completedBy: shift.completedBy
+      };
+    });
   }
 
   async getShiftReportsByDateRange(startDate: Date, endDate: Date) {

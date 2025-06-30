@@ -317,6 +317,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/loyverse/shift-balance-analysis", async (req, res) => {
+    try {
+      const analysis = await loyverseReceiptService.getShiftBalanceAnalysis();
+      res.json(analysis);
+    } catch (error) {
+      console.error("Failed to get shift balance analysis:", error);
+      res.status(500).json({ error: "Failed to get shift balance analysis" });
+    }
+  });
+
   // POS/Loyverse endpoints
   app.post("/api/pos/analyze-receipt", async (req, res) => {
     try {

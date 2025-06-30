@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import KPICard from "@/components/KPICard";
 import SalesChart from "@/components/SalesChart";
+import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
