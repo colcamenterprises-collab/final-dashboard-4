@@ -3,8 +3,8 @@ import { loyverseReceipts, loyverseShiftReports } from "@shared/schema";
 import { eq, desc, and, gte, lte, like, or } from "drizzle-orm";
 
 interface LoyverseReceiptData {
-  id: string;
-  number: string;
+  receipt_number: string;
+  order?: string;
   created_at: string;
   total_money: number;
   receipt_type: string;
@@ -16,16 +16,12 @@ interface LoyverseReceiptData {
     total_money: number;
   }>;
   payments: Array<{
+    name: string;
     type: string;
-    amount: number;
+    money_amount: number;
   }>;
-  employee?: {
-    name: string;
-  };
-  customer?: {
-    name: string;
-    email: string;
-  };
+  employee_id?: string;
+  customer_id?: string;
 }
 
 interface LoyverseShiftData {
@@ -84,10 +80,10 @@ export class LoyverseReceiptService {
       for (const receipt of receipts) {
         try {
           // Skip receipts with missing essential data
-          if (!receipt.id || !receipt.number) {
-            console.log('Skipping receipt with missing id/number:', {
-              id: receipt.id,
-              number: receipt.number
+          if (!receipt.receipt_number || !receipt.created_at) {
+            console.log('Skipping receipt with missing receipt_number/created_at:', {
+              receipt_number: receipt.receipt_number,
+              created_at: receipt.created_at
             });
             continue;
           }
@@ -95,7 +91,7 @@ export class LoyverseReceiptService {
           await this.storeReceipt(receipt);
           processed++;
         } catch (error) {
-          console.error(`Failed to store receipt ${receipt.id}:`, error);
+          console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
         }
       }
 
@@ -109,10 +105,9 @@ export class LoyverseReceiptService {
 
   private async storeReceipt(receiptData: LoyverseReceiptData): Promise<void> {
     // Validate required fields - skip receipts with missing essential data
-    if (!receiptData.id || !receiptData.number || !receiptData.created_at) {
+    if (!receiptData.receipt_number || !receiptData.created_at) {
       console.log('Skipping receipt with missing required fields:', {
-        id: receiptData.id,
-        number: receiptData.number,
+        receipt_number: receiptData.receipt_number,
         created_at: receiptData.created_at
       });
       return;
@@ -123,10 +118,11 @@ export class LoyverseReceiptService {
     
     const totalAmount = receiptData.total_money || 0;
     const paymentMethod = receiptData.payments?.[0]?.type || 'CASH';
+    const receiptId = receiptData.order || receiptData.receipt_number;
     
     // Check if receipt already exists
     const existing = await db.select().from(loyverseReceipts)
-      .where(eq(loyverseReceipts.receiptId, receiptData.id))
+      .where(eq(loyverseReceipts.receiptId, receiptId))
       .limit(1);
     
     if (existing.length > 0) {
@@ -135,23 +131,23 @@ export class LoyverseReceiptService {
 
     try {
       await db.insert(loyverseReceipts).values({
-        receiptId: receiptData.id,
-        receiptNumber: receiptData.number,
+        receiptId: receiptId,
+        receiptNumber: receiptData.receipt_number,
         receiptDate: receiptDate,
         totalAmount: totalAmount.toString(),
         paymentMethod: paymentMethod,
-        customerInfo: receiptData.customer || null,
+        customerInfo: receiptData.customer_id ? { id: receiptData.customer_id } : null,
         items: receiptData.line_items || [],
         taxAmount: "0",
         discountAmount: "0",
-        staffMember: receiptData.employee?.name || null,
+        staffMember: receiptData.employee_id || null,
         tableNumber: null,
         shiftDate: shiftDate,
         rawData: receiptData
       });
-      console.log(`Successfully stored receipt ${receiptData.id}`);
+      console.log(`Successfully stored receipt ${receiptData.receipt_number}`);
     } catch (insertError) {
-      console.error(`Database insert failed for receipt ${receiptData.id}:`, insertError);
+      console.error(`Database insert failed for receipt ${receiptData.receipt_number}:`, insertError);
       throw insertError;
     }
   }
