@@ -1,0 +1,53 @@
+Restaurant Management Dashboard
+Overview
+A comprehensive restaurant management dashboard with AI-powered analytics, integrating Loyverse POS, OpenAI, and Gemini for automated sales analysis and inventory reviews. The system provides real-time tracking of sales, expenses, inventory, and automated purchasing workflows with intelligent anomaly detection.
+Key Components
+Core Pages
+Home Dashboard: Daily sales overview, profit metrics, key performance indicators
+Daily Stock & Sales: Staff shift reporting form with inventory tracking
+Shopping List: Automated procurement management and supplier orders
+Finance: POS vs staff report comparison, profit/loss analysis
+Expenses: Business expense tracking with categorization
+POS Loyverse: AI-powered sales receipt analysis and anomaly detection
+AI-Powered Features
+Automated ingredient usage calculation from sales receipts
+Anomaly detection in sales transactions
+Intelligent stock reordering suggestions
+Financial variance analysis between POS and staff reports
+Database Layer
+Storage: In-memory storage for development with interface for future database
+Schema Design: Complete data models for restaurants operations
+Data Types: Daily sales, expenses, suppliers, menu items, shopping lists
+
+External Dependencies
+AI Integration (Ready for Implementation)
+OpenAI API: Receipt analysis, ingredient calculation, anomaly detection
+Gemini API: Alternative AI analysis, multimodal receipt processing
+Loyverse POS API: Real-time sales data import and synchronization
+Color Palette
+Primary: #F5D016 (Distinctive yellow accent matching reference)
+Background: Pure white (#FFFFFF)
+Gray Scale: Professional gray palette for text and borders
+Status Colors: Green (success), Red (errors), Yellow (warnings)
+Typography
+Font: Inter (Google Fonts)
+Weights: 400 (normal), 500 (medium), 600 (semibold), 700 (bold)
+Scale: Responsive font sizes with consistent line heights
+Component Standards
+Cards: White background, subtle shadows, rounded corners
+Buttons: Primary (yellow), Secondary (dark), consistent hover states
+Forms: Clean inputs with proper validation styling
+Navigation: Top horizontal nav matching reference design exactly
+API Key Requirements
+OpenAI API Key: For advanced sales analysis and ingredient calculation
+Gemini API Key: For multimodal receipt processing and AI insights
+Loyverse API Access: For real-time POS data integration
+
+User Preferences
+Communication Style: Simple, everyday language
+Design Requirements: Exact match to reference dashboard styling
+Critical Features: AI-powered analysis, Loyverse integration, automated workflows
+Priority: Sleek minimalistic design with comprehensive functionality
+
+Status: Complete restaurant management dashboard with deployment fixes applied, ready for production deployment.
+
