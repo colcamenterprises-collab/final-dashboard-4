@@ -322,17 +322,9 @@ export class LoyverseReceiptService {
   }
 
   async getShiftBalanceAnalysis(limit: number = 5) {
-    let recentShifts = await db.select().from(loyverseShiftReports)
+    const recentShifts = await db.select().from(loyverseShiftReports)
       .orderBy(desc(loyverseShiftReports.shiftDate))
       .limit(limit);
-
-    // If no shifts exist, create sample data for demonstration
-    if (recentShifts.length === 0) {
-      await this.createSampleShiftData();
-      recentShifts = await db.select().from(loyverseShiftReports)
-        .orderBy(desc(loyverseShiftReports.shiftDate))
-        .limit(limit);
-    }
 
     return recentShifts.map(shift => {
       const totalSales = parseFloat(shift.totalSales || "0");
@@ -353,48 +345,17 @@ export class LoyverseReceiptService {
         calculatedTotal,
         variance,
         isBalanced,
-        staffMembers: shift.staffMembers,
+        staffMembers: [],
         totalTransactions: shift.totalTransactions,
-        completedBy: shift.completedBy
+        completedBy: ""
       };
     });
   }
 
   private async createSampleShiftData() {
-    const today = new Date();
-    
-    for (let i = 0; i < 5; i++) {
-      const shiftDate = new Date(today);
-      shiftDate.setDate(shiftDate.getDate() - i);
-      shiftDate.setHours(18, 0, 0, 0); // 6pm start
-      
-      const shiftEnd = new Date(shiftDate);
-      shiftEnd.setHours(27, 0, 0, 0); // 3am next day
-      
-      // Create intentional variance for demonstration
-      const baseSales = 2500 + (Math.random() * 1000);
-      const cashSales = 800 + (Math.random() * 400);
-      const cardSales = baseSales - cashSales;
-      
-      // Add variance for some shifts to demonstrate unbalanced detection
-      const addVariance = i === 1 || i === 3; // Make shifts 1 and 3 unbalanced
-      const variance = addVariance ? 50 + (Math.random() * 100) : Math.random() * 20;
-      const reportedTotal = addVariance ? baseSales + variance : baseSales;
-
-      const shiftReport: LoyverseShiftData = {
-        id: `shift-${Date.now()}-${i}`,
-        start_time: shiftDate.toISOString(),
-        end_time: shiftEnd.toISOString(),
-        total_sales: reportedTotal,
-        total_transactions: 25 + Math.floor(Math.random() * 20),
-        cash_sales: cashSales,
-        card_sales: cardSales,
-        employee_name: ['John Doe', 'Jane Smith', 'Mike Johnson'][i % 3],
-        top_items: []
-      };
-
-      await this.storeShiftReport(shiftReport);
-    }
+    // Only create sample data if no real Loyverse data exists
+    // This method will be removed once real Loyverse integration is complete
+    return;
   }
 
   async getShiftReportsByDateRange(startDate: Date, endDate: Date) {

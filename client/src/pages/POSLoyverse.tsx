@@ -250,10 +250,16 @@ export default function POSLoyverse() {
                         <div className="flex justify-between items-start mb-6">
                           <div>
                             <div className="font-medium text-lg">
-                              Shift: {formatDateTime(report.shiftStart)} - {formatDateTime(report.shiftEnd)}
+                              Shift Closed: {new Date(report.shiftEnd).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
-                              Staff: {report.completedBy}
+                              Transactions: {report.totalTransactions}
                             </div>
                           </div>
                           <div className="text-right">
