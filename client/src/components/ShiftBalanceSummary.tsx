@@ -59,7 +59,7 @@ export default function ShiftBalanceSummary() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between text-lg font-semibold text-gray-900">
           <span className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Last 5 Shift Reports

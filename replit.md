@@ -130,6 +130,9 @@ Changelog:
 - June 30, 2025. Implemented Loyverse POS receipt capture and archival system
 - June 30, 2025. Added automated daily scheduling at 4am for receipt processing
 - June 30, 2025. Created shift report management with complete audit trail
+- June 30, 2025. Removed placeholder data and staff names, integrated real Loyverse data only
+- June 30, 2025. Updated shift report format to show actual closing dates and transaction counts
+- June 30, 2025. Standardized heading typography across dashboard components
 ```
 
 ## User Preferences
