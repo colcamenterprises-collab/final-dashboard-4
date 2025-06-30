@@ -46,14 +46,31 @@ const PACKAGING_ITEMS = [
   'Plastic Carry Bags', 'Packaging Labels'
 ];
 
+// Define line item types
+const wageEntrySchema = z.object({
+  name: z.string(),
+  amount: z.number().min(0),
+  notes: z.string().optional()
+});
+
+const shoppingEntrySchema = z.object({
+  item: z.string(),
+  amount: z.number().min(0),
+  notes: z.string().optional()
+});
+
 const formSchema = insertDailyStockSalesSchema.extend({
   foodItems: z.record(z.number().min(0)),
   drinkStock: z.record(z.number().min(0)),
   kitchenItems: z.record(z.number().min(0)),
-  packagingItems: z.record(z.number().min(0))
+  packagingItems: z.record(z.number().min(0)),
+  wageEntries: z.array(wageEntrySchema).default([]),
+  shoppingEntries: z.array(shoppingEntrySchema).default([])
 });
 
 type FormData = z.infer<typeof formSchema>;
+type WageEntry = z.infer<typeof wageEntrySchema>;
+type ShoppingEntry = z.infer<typeof shoppingEntrySchema>;
 
 export default function DailyStockSales() {
   const { toast } = useToast();
@@ -78,6 +95,8 @@ export default function DailyStockSales() {
       gasExpense: "0",
       totalExpenses: "0",
       expenseDescription: "",
+      wageEntries: [],
+      shoppingEntries: [],
       burgerBunsStock: 0,
       rollsOrderedCount: 0,
       meatWeight: "0",
@@ -394,54 +413,183 @@ export default function DailyStockSales() {
             <CardHeader>
               <CardTitle>Expenses</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Wages Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Salary / Wages</h3>
+                <p className="text-sm text-gray-600 mb-3">Please list each staff member individually</p>
+                
+                <div className="space-y-3">
+                  <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
+                    <div className="col-span-4">Name</div>
+                    <div className="col-span-3">Amount</div>
+                    <div className="col-span-4">Notes</div>
+                    <div className="col-span-1">Action</div>
+                  </div>
+                  
+                  {form.watch('wageEntries').map((_, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-3">
+                      <FormField
+                        control={form.control}
+                        name={`wageEntries.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-4">
+                            <FormControl>
+                              <Input {...field} placeholder="Cameron" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`wageEntries.${index}.amount`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                step="0.01" 
+                                placeholder="1000"
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`wageEntries.${index}.notes`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-4">
+                            <FormControl>
+                              <Input {...field} placeholder="Paid 100 overtime" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <div className="col-span-1">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const current = form.getValues('wageEntries');
+                            form.setValue('wageEntries', current.filter((_, i) => i !== index));
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const current = form.getValues('wageEntries');
+                      form.setValue('wageEntries', [...current, { name: '', amount: 0, notes: '' }]);
+                    }}
+                  >
+                    Add Wage Entry
+                  </Button>
+                  
+                  <div className="text-right">
+                    <strong>Total Wages: ${form.watch('wageEntries').reduce((sum, entry) => sum + entry.amount, 0).toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shopping Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Shopping</h3>
+                <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
+                
+                <div className="space-y-3">
+                  <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
+                    <div className="col-span-4">Item</div>
+                    <div className="col-span-3">Amount</div>
+                    <div className="col-span-4">Notes</div>
+                    <div className="col-span-1">Action</div>
+                  </div>
+                  
+                  {form.watch('shoppingEntries').map((_, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-3">
+                      <FormField
+                        control={form.control}
+                        name={`shoppingEntries.${index}.item`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-4">
+                            <FormControl>
+                              <Input {...field} placeholder="Bin Bags" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`shoppingEntries.${index}.amount`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                step="0.01" 
+                                placeholder="300"
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`shoppingEntries.${index}.notes`}
+                        render={({ field }) => (
+                          <FormItem className="col-span-4">
+                            <FormControl>
+                              <Input {...field} placeholder="Notes" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <div className="col-span-1">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const current = form.getValues('shoppingEntries');
+                            form.setValue('shoppingEntries', current.filter((_, i) => i !== index));
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const current = form.getValues('shoppingEntries');
+                      form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '' }]);
+                    }}
+                  >
+                    Add Shopping Item
+                  </Button>
+                  
+                  <div className="text-right">
+                    <strong>Total Shopping: ${form.watch('shoppingEntries').reduce((sum, entry) => sum + entry.amount, 0).toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gas Expense and Total */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="salaryWages"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Salary / Wages</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalExpenses, 100);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="shopping"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shopping</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalExpenses, 100);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="gasExpense"
@@ -454,10 +602,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalExpenses, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -472,27 +616,25 @@ export default function DailyStockSales() {
                     <FormItem>
                       <FormLabel>Total Expenses</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" readOnly className="bg-gray-50" />
+                        <Input 
+                          {...field} 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          readOnly 
+                          className="bg-gray-50"
+                          value={
+                            form.watch('wageEntries').reduce((sum, entry) => sum + entry.amount, 0) +
+                            form.watch('shoppingEntries').reduce((sum, entry) => sum + entry.amount, 0) +
+                            parseFloat(form.watch('gasExpense') || '0')
+                          }
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="expenseDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description of All Items</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Enter description of expenses..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 

@@ -178,6 +178,8 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   shopping: decimal("shopping", { precision: 10, scale: 2 }).notNull(),
   gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).notNull(),
   totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).notNull(),
+  wageEntries: jsonb("wage_entries").notNull().default('[]'), // Array of {name, amount, notes}
+  shoppingEntries: jsonb("shopping_entries").notNull().default('[]'), // Array of {item, amount, notes}
   expenseDescription: text("expense_description"),
   
   // Stock Counts
