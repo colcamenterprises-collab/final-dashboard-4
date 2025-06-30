@@ -180,7 +180,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Shift Balance Summary */}
+        <ShiftBalanceSummary />
+        
         {/* Recent Transactions */}
         <Card className="restaurant-card">
           <CardHeader>
