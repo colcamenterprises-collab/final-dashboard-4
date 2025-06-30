@@ -111,6 +111,49 @@ export const staffShifts = pgTable("staff_shifts", {
   reportedSales: decimal("reported_sales", { precision: 10, scale: 2 }).notNull(),
 });
 
+// Loyverse Receipts table
+export const loyverseReceipts = pgTable("loyverse_receipts", {
+  id: serial("id").primaryKey(),
+  receiptId: text("receipt_id").notNull().unique(),
+  receiptNumber: text("receipt_number").notNull(),
+  receiptDate: timestamp("receipt_date").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  customerInfo: jsonb("customer_info"),
+  items: jsonb("items").notNull(), // Array of receipt items
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  staffMember: text("staff_member"),
+  tableNumber: integer("table_number"),
+  shiftDate: timestamp("shift_date").notNull(), // Date of the shift (6pm-3am cycle)
+  rawData: jsonb("raw_data"), // Full Loyverse API response
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Loyverse Shift Reports table
+export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
+  id: serial("id").primaryKey(),
+  reportId: text("report_id").notNull().unique(),
+  shiftDate: timestamp("shift_date").notNull(),
+  shiftStart: timestamp("shift_start").notNull(),
+  shiftEnd: timestamp("shift_end").notNull(),
+  totalSales: decimal("total_sales", { precision: 12, scale: 2 }).notNull(),
+  totalTransactions: integer("total_transactions").notNull(),
+  totalCustomers: integer("total_customers"),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }),
+  cardSales: decimal("card_sales", { precision: 10, scale: 2 }),
+  discounts: decimal("discounts", { precision: 10, scale: 2 }),
+  taxes: decimal("taxes", { precision: 10, scale: 2 }),
+  staffMembers: jsonb("staff_members"), // Array of staff who worked the shift
+  topItems: jsonb("top_items"), // Best selling items for the shift
+  reportData: jsonb("report_data").notNull(), // Full shift report data
+  completedBy: text("completed_by"), // Staff member who completed the report
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true });
@@ -122,6 +165,8 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({ i
 export const insertAiInsightSchema = createInsertSchema(aiInsights).omit({ id: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true });
 export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({ id: true });
+export const insertLoyverseReceiptSchema = createInsertSchema(loyverseReceipts).omit({ id: true });
+export const insertLoyverseShiftReportSchema = createInsertSchema(loyverseShiftReports).omit({ id: true });
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -144,3 +189,7 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type StaffShift = typeof staffShifts.$inferSelect;
 export type InsertStaffShift = z.infer<typeof insertStaffShiftSchema>;
+export type LoyverseReceipt = typeof loyverseReceipts.$inferSelect;
+export type InsertLoyverseReceipt = z.infer<typeof insertLoyverseReceiptSchema>;
+export type LoyverseShiftReport = typeof loyverseShiftReports.$inferSelect;
+export type InsertLoyverseShiftReport = z.infer<typeof insertLoyverseShiftReportSchema>;
