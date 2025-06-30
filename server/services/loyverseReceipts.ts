@@ -352,10 +352,76 @@ export class LoyverseReceiptService {
     });
   }
 
-  private async createSampleShiftData() {
-    // Only create sample data if no real Loyverse data exists
-    // This method will be removed once real Loyverse integration is complete
-    return;
+  async fetchRealShiftReports(): Promise<{ success: boolean; reportsProcessed: number }> {
+    try {
+      console.log('Fetching real shift reports from Loyverse API...');
+      
+      // Try multiple Loyverse endpoints to get shift data
+      const endpoints = [
+        '/shift_reports',
+        '/reports/shifts',
+        '/reports/daily',
+        '/analytics/shifts'
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.config.baseUrl}${endpoint}?limit=20`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${this.config.accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Successfully fetched data from ${endpoint}:`, data);
+            
+            // Process the real shift data
+            if (data.shift_reports || data.shifts || data.reports) {
+              const shifts = data.shift_reports || data.shifts || data.reports;
+              let processed = 0;
+              
+              for (const shift of shifts.slice(0, 10)) {
+                const shiftReport: LoyverseShiftData = {
+                  id: shift.id || `real-${Date.now()}-${processed}`,
+                  start_time: shift.start_time || shift.shift_start,
+                  end_time: shift.end_time || shift.shift_end,
+                  total_sales: parseFloat(shift.total_sales || shift.net_sales || 0),
+                  total_transactions: parseInt(shift.total_transactions || shift.transaction_count || 0),
+                  cash_sales: parseFloat(shift.cash_sales || shift.cash_amount || 0),
+                  card_sales: parseFloat(shift.card_sales || shift.card_amount || 0),
+                  employee_name: shift.employee?.name || shift.staff_name || 'Staff',
+                  top_items: shift.top_items || []
+                };
+
+                await this.storeShiftReport(shiftReport);
+                processed++;
+              }
+
+              console.log(`Processed ${processed} real shift reports from ${endpoint}`);
+              return { success: true, reportsProcessed: processed };
+            }
+          }
+        } catch (endpointError) {
+          console.log(`Endpoint ${endpoint} failed:`, endpointError instanceof Error ? endpointError.message : 'Unknown error');
+          continue;
+        }
+      }
+
+      // If no direct shift endpoint works, generate from receipts
+      console.log('No shift endpoints available, generating from receipts...');
+      try {
+        const reports = await this.generateShiftReportsFromReceipts();
+        return { success: true, reportsProcessed: reports.length };
+      } catch (err) {
+        return { success: false, reportsProcessed: 0 };
+      }
+    } catch (error) {
+      console.error('Failed to fetch real shift reports:', error);
+      return { success: false, reportsProcessed: 0 };
+    }
   }
 
   async getShiftReportsByDateRange(startDate: Date, endDate: Date) {

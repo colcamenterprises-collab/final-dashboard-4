@@ -424,14 +424,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual sync endpoint
+  // Manual sync endpoint - fetch real Loyverse data
   app.post("/api/loyverse/sync", async (req, res) => {
     try {
-      const result = await schedulerService.triggerManualSync();
+      console.log("Starting manual sync with real Loyverse API...");
+      
+      // Fetch real receipts and shift reports from Loyverse
+      const receiptsResult = await loyverseReceiptService.fetchAndStoreReceipts();
+      const shiftsResult = await loyverseReceiptService.fetchRealShiftReports();
+      
+      const result = {
+        success: receiptsResult.success && shiftsResult.success,
+        receiptsProcessed: receiptsResult.receiptsProcessed,
+        shiftsProcessed: shiftsResult.reportsProcessed,
+        message: `Processed ${receiptsResult.receiptsProcessed} receipts and ${shiftsResult.reportsProcessed} shift reports`
+      };
+      
+      console.log("Manual sync completed:", result);
       res.json(result);
     } catch (error) {
       console.error("Error during manual sync:", error);
-      res.status(500).json({ error: "Failed to sync data" });
+      res.status(500).json({ error: "Failed to sync data", details: error.message });
     }
   });
 
