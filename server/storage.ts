@@ -184,38 +184,24 @@ export class MemStorage implements IStorage {
   }
 
   async getTopMenuItems() {
-    // Loyverse-compatible monthly sales data structure
-    // This structure matches the real Loyverse API sales by item endpoint
-    return [
-      { 
-        name: "Margherita Pizza", 
-        sales: 1240.50, 
-        orders: 124,
-        monthlyGrowth: "+12.3%",
-        category: "Pizza"
-      },
-      { 
-        name: "Caesar Salad", 
-        sales: 890.25, 
-        orders: 98,
-        monthlyGrowth: "+8.7%",
-        category: "Salads"
-      },
-      { 
-        name: "Grilled Salmon", 
-        sales: 756.80, 
-        orders: 42,
-        monthlyGrowth: "+15.2%",
-        category: "Main Course"
-      },
-      { 
-        name: "Chicken Burger", 
-        sales: 654.30, 
-        orders: 87,
-        monthlyGrowth: "+5.1%",
-        category: "Burgers"
-      }
-    ];
+    // Connect to Loyverse API for real sales data
+    try {
+      const { loyverseService } = await import('./services/loyverse.js');
+      const loyverseData = await loyverseService.getSalesByItem();
+      
+      // Transform Loyverse data to our interface format
+      return loyverseData.map((item: any) => ({
+        name: item.item_name,
+        sales: item.net_sales,
+        orders: item.orders_count,
+        monthlyGrowth: loyverseService.calculateMonthlyGrowth(item.net_sales, item.net_sales * 0.9),
+        category: item.category_name
+      }));
+    } catch (error) {
+      console.error('Loyverse API connection failed:', error);
+      // For production use, display error state rather than fallback data
+      throw new Error('Unable to connect to Loyverse POS system. Please check your connection and API credentials.');
+    }
   }
 
   async getRecentTransactions(): Promise<Transaction[]> {

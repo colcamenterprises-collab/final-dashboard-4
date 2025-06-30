@@ -16,7 +16,7 @@ export default function Dashboard() {
     queryFn: api.getDashboardKPIs
   });
 
-  const { data: topMenuItems } = useQuery({
+  const { data: topMenuItems, isLoading: topMenuItemsLoading, error: topMenuItemsError } = useQuery({
     queryKey: ["/api/dashboard/top-menu-items"],
     queryFn: api.getTopMenuItems
   });
@@ -120,34 +120,61 @@ export default function Dashboard() {
             <p className="text-sm text-gray-500 mt-1">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topMenuItems?.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      index === 0 ? 'bg-primary' : 
-                      index === 1 ? 'bg-yellow-400' : 
-                      index === 2 ? 'bg-green-400' : 'bg-gray-400'
-                    }`} />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                      {item.category && (
-                        <div className="text-xs text-gray-500">{item.category}</div>
-                      )}
+            {topMenuItemsError ? (
+              <div className="text-center py-8">
+                <div className="text-red-500 text-sm font-medium mb-2">Loyverse Connection Error</div>
+                <div className="text-gray-600 text-xs">Unable to connect to Loyverse POS system. Please check your API credentials.</div>
+              </div>
+            ) : topMenuItemsLoading ? (
+              <div className="space-y-4">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="flex items-center justify-between animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-gray-200 rounded-full" />
+                      <div className="h-4 bg-gray-200 rounded w-32" />
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="h-4 bg-gray-200 rounded w-16" />
+                      <div className="h-3 bg-gray-200 rounded w-20" />
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-gray-900">${item.sales.toFixed(2)}</div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">{item.orders} orders</span>
-                      {item.monthlyGrowth && (
-                        <span className="text-xs text-green-600 font-medium">{item.monthlyGrowth}</span>
-                      )}
+                ))}
+              </div>
+            ) : topMenuItems && topMenuItems.length > 0 ? (
+              <div className="space-y-4">
+                {topMenuItems.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        index === 0 ? 'bg-primary' : 
+                        index === 1 ? 'bg-yellow-400' : 
+                        index === 2 ? 'bg-green-400' : 'bg-gray-400'
+                      }`} />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                        {item.category && (
+                          <div className="text-xs text-gray-500">{item.category}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-gray-900">${item.sales.toFixed(2)}</div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">{item.orders} orders</span>
+                        {item.monthlyGrowth && (
+                          <span className="text-xs text-green-600 font-medium">{item.monthlyGrowth}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-500 text-sm">No sales data available</div>
+                <div className="text-gray-400 text-xs mt-1">Connect to Loyverse to view sales data</div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
