@@ -11,6 +11,8 @@ export interface TopMenuItem {
   name: string;
   sales: number;
   orders: number;
+  monthlyGrowth?: string;
+  category?: string;
 }
 
 export interface Transaction {

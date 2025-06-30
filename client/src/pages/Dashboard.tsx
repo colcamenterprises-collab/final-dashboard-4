@@ -113,10 +113,11 @@ export default function Dashboard() {
           <SalesChart />
         </div>
 
-        {/* Top Menu Items */}
+        {/* Top Sales Items */}
         <Card className="restaurant-card">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">Top Menu Items</CardTitle>
+            <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -128,11 +129,21 @@ export default function Dashboard() {
                       index === 1 ? 'bg-yellow-400' : 
                       index === 2 ? 'bg-green-400' : 'bg-gray-400'
                     }`} />
-                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                      {item.category && (
+                        <div className="text-xs text-gray-500">{item.category}</div>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold text-gray-900">${item.sales}</div>
-                    <div className="text-xs text-gray-500">{item.orders} orders</div>
+                    <div className="text-sm font-semibold text-gray-900">${item.sales.toFixed(2)}</div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">{item.orders} orders</span>
+                      {item.monthlyGrowth && (
+                        <span className="text-xs text-green-600 font-medium">{item.monthlyGrowth}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
