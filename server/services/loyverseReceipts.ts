@@ -83,6 +83,15 @@ export class LoyverseReceiptService {
       let processed = 0;
       for (const receipt of receipts) {
         try {
+          // Skip receipts with missing essential data
+          if (!receipt.id || !receipt.number) {
+            console.log('Skipping receipt with missing id/number:', {
+              id: receipt.id,
+              number: receipt.number
+            });
+            continue;
+          }
+          
           await this.storeReceipt(receipt);
           processed++;
         } catch (error) {
@@ -99,11 +108,21 @@ export class LoyverseReceiptService {
   }
 
   private async storeReceipt(receiptData: LoyverseReceiptData): Promise<void> {
+    // Validate required fields - skip receipts with missing essential data
+    if (!receiptData.id || !receiptData.number || !receiptData.created_at) {
+      console.log('Skipping receipt with missing required fields:', {
+        id: receiptData.id,
+        number: receiptData.number,
+        created_at: receiptData.created_at
+      });
+      return;
+    }
+
     const receiptDate = new Date(receiptData.created_at);
     const shiftDate = this.getShiftDate(receiptDate);
     
-    const totalAmount = receiptData.total_money / 100; // Convert from cents
-    const paymentMethod = receiptData.payments?.[0]?.type || 'unknown';
+    const totalAmount = receiptData.total_money || 0;
+    const paymentMethod = receiptData.payments?.[0]?.type || 'CASH';
     
     // Check if receipt already exists
     const existing = await db.select().from(loyverseReceipts)
@@ -114,21 +133,27 @@ export class LoyverseReceiptService {
       return; // Skip if already exists
     }
 
-    await db.insert(loyverseReceipts).values({
-      receiptId: receiptData.id,
-      receiptNumber: receiptData.number,
-      receiptDate: receiptDate,
-      totalAmount: totalAmount.toString(),
-      paymentMethod: paymentMethod,
-      customerInfo: receiptData.customer || null,
-      items: receiptData.line_items,
-      taxAmount: "0", // Calculate if tax info available
-      discountAmount: "0", // Calculate if discount info available
-      staffMember: receiptData.employee?.name || null,
-      tableNumber: null, // Extract if available in receipt data
-      shiftDate: shiftDate,
-      rawData: receiptData
-    });
+    try {
+      await db.insert(loyverseReceipts).values({
+        receiptId: receiptData.id,
+        receiptNumber: receiptData.number,
+        receiptDate: receiptDate,
+        totalAmount: totalAmount.toString(),
+        paymentMethod: paymentMethod,
+        customerInfo: receiptData.customer || null,
+        items: receiptData.line_items || [],
+        taxAmount: "0",
+        discountAmount: "0",
+        staffMember: receiptData.employee?.name || null,
+        tableNumber: null,
+        shiftDate: shiftDate,
+        rawData: receiptData
+      });
+      console.log(`Successfully stored receipt ${receiptData.id}`);
+    } catch (insertError) {
+      console.error(`Database insert failed for receipt ${receiptData.id}:`, insertError);
+      throw insertError;
+    }
   }
 
   async fetchAndStoreShiftReports(): Promise<{ success: boolean; reportsProcessed: number }> {
@@ -322,9 +347,19 @@ export class LoyverseReceiptService {
   }
 
   async getShiftBalanceAnalysis(limit: number = 5) {
-    const recentShifts = await db.select().from(loyverseShiftReports)
+    // First try to fetch from database
+    let recentShifts = await db.select().from(loyverseShiftReports)
       .orderBy(desc(loyverseShiftReports.shiftDate))
       .limit(limit);
+
+    // If no shifts in database, try to fetch real data from Loyverse
+    if (recentShifts.length === 0) {
+      console.log('No shifts in database, fetching from Loyverse API...');
+      await this.fetchRealShiftReports();
+      recentShifts = await db.select().from(loyverseShiftReports)
+        .orderBy(desc(loyverseShiftReports.shiftDate))
+        .limit(limit);
+    }
 
     return recentShifts.map(shift => {
       const totalSales = parseFloat(shift.totalSales || "0");
