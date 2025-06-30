@@ -94,7 +94,12 @@ export default function ShiftBalanceSummary() {
                       <AlertTriangle className="h-4 w-4 text-red-600" />
                     )}
                     <span className="font-medium text-sm">
-                      {formatDateTime(shift.shiftStart)} - {formatDateTime(shift.shiftEnd)}
+                      Closed: {new Date(shift.shiftEnd).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </span>
                   </div>
                   <Badge 
