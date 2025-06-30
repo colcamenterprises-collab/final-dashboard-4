@@ -135,24 +135,73 @@ export class LoyverseReceiptService {
     try {
       console.log('Fetching shift reports from Loyverse API...');
       
-      // For now, generate shift reports from receipt data
-      // In production, this would fetch actual shift reports from Loyverse
+      // Fetch POS sessions (shift reports) from Loyverse API
+      const response = await fetch(`${this.config.baseUrl}/pos_sessions?limit=5&order=created_at`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.log(`Loyverse API response: ${response.status} - ${response.statusText}`);
+        // Fallback to generating reports from existing receipt data
+        return await this.generateShiftReportsFromExistingData();
+      }
+
+      const data = await response.json();
+      const sessions = data.pos_sessions || [];
+      
+      let processed = 0;
+      for (const session of sessions.slice(0, 5)) { // Latest 5 shift reports
+        try {
+          const shiftReport: LoyverseShiftData = {
+            id: session.id,
+            start_time: session.opened_at,
+            end_time: session.closed_at || new Date().toISOString(),
+            total_sales: (session.total_money || 0) / 100, // Convert from cents
+            total_transactions: session.receipts_count || 0,
+            cash_sales: (session.cash_payments || 0) / 100,
+            card_sales: ((session.total_money || 0) - (session.cash_payments || 0)) / 100,
+            employee_name: session.employee?.name || 'Staff Member',
+            top_items: []
+          };
+          
+          await this.storeShiftReport(shiftReport);
+          processed++;
+        } catch (error) {
+          console.error(`Failed to store shift report ${session.id}:`, error);
+        }
+      }
+
+      console.log(`Processed ${processed} shift reports from Loyverse API`);
+      return { success: true, reportsProcessed: processed };
+    } catch (error) {
+      console.error('Failed to fetch shift reports from Loyverse:', error);
+      // Fallback to generating reports from existing data
+      return await this.generateShiftReportsFromExistingData();
+    }
+  }
+
+  private async generateShiftReportsFromExistingData(): Promise<{ success: boolean; reportsProcessed: number }> {
+    try {
+      console.log('Generating shift reports from existing receipt data...');
       const reports = await this.generateShiftReportsFromReceipts();
       
       let processed = 0;
-      for (const report of reports) {
+      for (const report of reports.slice(0, 5)) { // Latest 5 reports
         try {
           await this.storeShiftReport(report);
           processed++;
         } catch (error) {
-          console.error(`Failed to store shift report:`, error);
+          console.error(`Failed to store generated shift report:`, error);
         }
       }
 
-      console.log(`Processed ${processed} shift reports`);
       return { success: true, reportsProcessed: processed };
     } catch (error) {
-      console.error('Failed to process shift reports:', error);
+      console.error('Failed to generate shift reports:', error);
       throw error;
     }
   }

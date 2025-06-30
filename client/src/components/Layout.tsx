@@ -32,7 +32,7 @@ export default function Layout({ children }: LayoutProps) {
             {/* Logo */}
             <div className="flex items-center space-x-2">
               <img 
-                src="@assets/Yellow Circle - Black Logo_1751274091742.png" 
+                src="@assets/Yellow Circle - Black Logo_1751290442753.png" 
                 alt="RestaurantOS Logo" 
                 className="w-8 h-8 rounded-full object-contain"
               />
