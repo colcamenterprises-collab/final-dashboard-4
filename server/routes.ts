@@ -14,6 +14,7 @@ import {
   generateStockRecommendations,
   analyzeFinancialVariance
 } from "./services/ai";
+import { loyverseReceiptService } from "./services/loyverseReceipts";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoints
@@ -236,6 +237,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(suppliers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch suppliers" });
+    }
+  });
+
+  // Loyverse POS Receipt Management endpoints
+  app.get("/api/loyverse/receipts", async (req, res) => {
+    try {
+      const { startDate, endDate, search } = req.query;
+      
+      let receipts;
+      if (search) {
+        receipts = await loyverseReceiptService.searchReceipts(search as string);
+      } else if (startDate && endDate) {
+        receipts = await loyverseReceiptService.getReceiptsByDateRange(
+          new Date(startDate as string),
+          new Date(endDate as string)
+        );
+      } else {
+        // Get today's shift receipts by default
+        const today = new Date();
+        const shiftStart = new Date(today);
+        shiftStart.setHours(18, 0, 0, 0); // 6pm today
+        if (today.getHours() < 18) {
+          shiftStart.setDate(shiftStart.getDate() - 1); // Yesterday's shift if before 6pm
+        }
+        const shiftEnd = new Date(shiftStart);
+        shiftEnd.setHours(27, 0, 0, 0); // 3am next day
+        
+        receipts = await loyverseReceiptService.getReceiptsByDateRange(shiftStart, shiftEnd);
+      }
+      
+      res.json(receipts);
+    } catch (error) {
+      console.error("Failed to fetch receipts:", error);
+      res.status(500).json({ error: "Failed to fetch receipts" });
+    }
+  });
+
+  app.post("/api/loyverse/receipts/sync", async (req, res) => {
+    try {
+      const result = await loyverseReceiptService.fetchAndStoreReceipts();
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to sync receipts:", error);
+      res.status(500).json({ error: "Failed to sync receipts from Loyverse" });
+    }
+  });
+
+  app.get("/api/loyverse/shift-reports", async (req, res) => {
+    try {
+      const { startDate, endDate, limit } = req.query;
+      
+      let reports;
+      if (startDate && endDate) {
+        reports = await loyverseReceiptService.getShiftReportsByDateRange(
+          new Date(startDate as string),
+          new Date(endDate as string)
+        );
+      } else {
+        reports = await loyverseReceiptService.getLatestShiftReports(
+          limit ? parseInt(limit as string) : 10
+        );
+      }
+      
+      res.json(reports);
+    } catch (error) {
+      console.error("Failed to fetch shift reports:", error);
+      res.status(500).json({ error: "Failed to fetch shift reports" });
+    }
+  });
+
+  app.post("/api/loyverse/shift-reports/sync", async (req, res) => {
+    try {
+      const result = await loyverseReceiptService.fetchAndStoreShiftReports();
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to sync shift reports:", error);
+      res.status(500).json({ error: "Failed to sync shift reports" });
     }
   });
 
