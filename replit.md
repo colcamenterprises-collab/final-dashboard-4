@@ -36,7 +36,7 @@ This is a comprehensive restaurant management dashboard application built with a
 3. **Shopping List**: Automated procurement management with supplier integration
 4. **Finance**: POS vs staff report comparison and P&L analysis
 5. **Expenses**: Business expense tracking with categorization
-6. **POS Loyverse**: AI-powered receipt analysis and anomaly detection
+6. **POS Loyverse**: Comprehensive receipt capture, shift reports, and AI-powered analysis
 
 ### AI-Powered Features
 - **Receipt Analysis**: OpenAI GPT-4o integration for parsing receipt images
@@ -54,6 +54,8 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Expenses**: Business expense categorization
 - **Transactions**: Detailed sales transaction records
 - **AI Insights**: Machine learning-generated recommendations
+- **Loyverse Receipts**: Complete receipt archival with search capabilities
+- **Loyverse Shift Reports**: Daily shift summaries with sales analytics
 
 ## Data Flow
 
@@ -107,11 +109,27 @@ This is a comprehensive restaurant management dashboard application built with a
 - Modular AI services can be scaled independently
 - Frontend built for responsive design across devices
 
+### Loyverse POS Receipt Management
+- **Receipt Capture**: Automated daily receipt sync from Loyverse API (6pm-3am shifts)
+- **Shift Reports**: Daily shift summaries with sales analytics and staff tracking
+- **Archival System**: Complete receipt storage with search by date, receipt number, and amount
+- **Automated Processing**: Daily 4am scheduled tasks for receipt and report generation
+- **Real-time Sync**: Manual sync capabilities for immediate data refresh
+
+## Operational Schedule
+- **Shift Hours**: 6pm - 3am daily
+- **Staff Reporting**: 2am - 3am (shift end reports)
+- **Automated Sync**: 4am daily (receipts and shift reports)
+- **Data Retention**: All receipts and reports permanently archived and searchable
+
 ## Changelog
 
 ```
 Changelog:
-- June 30, 2025. Initial setup
+- June 30, 2025. Initial setup with comprehensive restaurant management features
+- June 30, 2025. Implemented Loyverse POS receipt capture and archival system
+- June 30, 2025. Added automated daily scheduling at 4am for receipt processing
+- June 30, 2025. Created shift report management with complete audit trail
 ```
 
 ## User Preferences
