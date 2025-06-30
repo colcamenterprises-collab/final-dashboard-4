@@ -285,7 +285,7 @@ export default function DailyStockSales() {
                   name="foodPandaSales"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Food Panda Sales</FormLabel>
+                      <FormLabel>Direct Sales</FormLabel>
                       <FormControl>
                         <Input 
                           {...field} 
@@ -504,130 +504,132 @@ export default function DailyStockSales() {
                 Stock Counts
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="burgerBunsStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Burger Buns In Stock</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        min="0" 
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <CardContent className="space-y-6">
+              {/* Basic Stock Items */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Basic Stock</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="burgerBunsStock"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Burger Buns In Stock</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="rollsOrderedCount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rolls Ordered</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        min="0" 
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="rollsOrderedCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rolls Ordered</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="meatWeight"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Meat Weight (kg)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                  <FormField
+                    control={form.control}
+                    name="meatWeight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Meat Weight (kg)</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
 
-          {/* Food Items */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
-                Food Items Required
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {FOOD_ITEMS.map((item) => (
-                <FormField
-                  key={item}
-                  control={form.control}
-                  name={`foodItems.${item}` as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">{item}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          min="0" 
-                          className="h-8"
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </CardContent>
-          </Card>
+              {/* Food Items */}
+              <div>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Utensils className="h-4 w-4" />
+                  Food Items Required
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {FOOD_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`foodItems.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
 
-          {/* Drink Stock */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wine className="h-5 w-5" />
-                Drink Stock Count
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {DRINK_ITEMS.map((item) => (
-                <FormField
-                  key={item}
-                  control={form.control}
-                  name={`drinkStock.${item}` as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">{item}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          min="0" 
-                          className="h-8"
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
+              {/* Drink Stock */}
+              <div>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Wine className="h-4 w-4" />
+                  Drink Stock Count
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {DRINK_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`drinkStock.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
