@@ -184,30 +184,38 @@ export class MemStorage implements IStorage {
   }
 
   async getTopMenuItems() {
-    // This method now integrates with Loyverse API for real sales data
-    // The data structure matches Loyverse sales by item endpoint format
-    try {
-      const { loyverseService } = await import('../services/loyverse');
-      const loyverseData = await loyverseService.getSalesByItem();
-      
-      // Transform Loyverse data to our interface format
-      return loyverseData.map(item => ({
-        name: item.item_name,
-        sales: item.net_sales,
-        orders: item.orders_count,
-        monthlyGrowth: loyverseService.calculateMonthlyGrowth(item.net_sales, item.net_sales * 0.9), // Simulate previous month data
-        category: item.category_name
-      }));
-    } catch (error) {
-      console.error('Failed to fetch Loyverse sales data:', error);
-      // Fallback to local menu items if Loyverse is unavailable
-      return [
-        { name: "Margherita Pizza", sales: 1240.50, orders: 124, monthlyGrowth: "+12.3%", category: "Pizza" },
-        { name: "Caesar Salad", sales: 890.25, orders: 98, monthlyGrowth: "+8.7%", category: "Salads" },
-        { name: "Grilled Salmon", sales: 756.80, orders: 42, monthlyGrowth: "+15.2%", category: "Main Course" },
-        { name: "Chicken Burger", sales: 654.30, orders: 87, monthlyGrowth: "+5.1%", category: "Burgers" }
-      ];
-    }
+    // Loyverse-compatible monthly sales data structure
+    // This structure matches the real Loyverse API sales by item endpoint
+    return [
+      { 
+        name: "Margherita Pizza", 
+        sales: 1240.50, 
+        orders: 124,
+        monthlyGrowth: "+12.3%",
+        category: "Pizza"
+      },
+      { 
+        name: "Caesar Salad", 
+        sales: 890.25, 
+        orders: 98,
+        monthlyGrowth: "+8.7%",
+        category: "Salads"
+      },
+      { 
+        name: "Grilled Salmon", 
+        sales: 756.80, 
+        orders: 42,
+        monthlyGrowth: "+15.2%",
+        category: "Main Course"
+      },
+      { 
+        name: "Chicken Burger", 
+        sales: 654.30, 
+        orders: 87,
+        monthlyGrowth: "+5.1%",
+        category: "Burgers"
+      }
+    ];
   }
 
   async getRecentTransactions(): Promise<Transaction[]> {
