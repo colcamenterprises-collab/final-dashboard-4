@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(45, 93%, 52%);
+  --primary-foreground: hsl(20, 14.3%, 4.1%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Custom restaurant colors */
+  --restaurant-primary: hsl(45, 93%, 52%);
+  --restaurant-primary-dark: hsl(45, 85%, 47%);
+  --restaurant-gray-50: hsl(0, 0%, 98%);
+  --restaurant-gray-100: hsl(0, 0%, 96%);
+  --restaurant-gray-200: hsl(0, 0%, 90%);
+  --restaurant-gray-300: hsl(0, 0%, 83%);
+  --restaurant-gray-400: hsl(0, 0%, 64%);
+  --restaurant-gray-500: hsl(0, 0%, 45%);
+  --restaurant-gray-600: hsl(0, 0%, 32%);
+  --restaurant-gray-700: hsl(0, 0%, 25%);
+  --restaurant-gray-800: hsl(0, 0%, 15%);
+  --restaurant-gray-900: hsl(0, 0%, 9%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(45, 93%, 52%);
+  --primary-foreground: hsl(20, 14.3%, 4.1%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-inter antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-inter {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Custom restaurant styling */
+.restaurant-primary {
+  background-color: #F5D016;
+  color: hsl(20, 14.3%, 4.1%);
+}
+
+.restaurant-primary:hover {
+  background-color: #E6C014;
+}
+
+.restaurant-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  border: 1px solid hsl(20, 5.9%, 90%);
+}
+
+.restaurant-nav {
+  background-color: hsl(0, 0%, 98%);
+  border-bottom: 1px solid hsl(20, 5.9%, 90%);
+}
+
+.chart-container {
+  position: relative;
+  height: 320px;
+  width: 100%;
+}

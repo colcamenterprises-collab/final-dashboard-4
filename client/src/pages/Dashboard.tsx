@@ -1,0 +1,258 @@
+import { useQuery } from "@tanstack/react-query";
+import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import KPICard from "@/components/KPICard";
+import SalesChart from "@/components/SalesChart";
+import { api, mutations } from "@/lib/api";
+import { useRealTimeData } from "@/hooks/useRealTimeData";
+import { useMutation } from "@tanstack/react-query";
+
+export default function Dashboard() {
+  const { data: kpis, isLoading: kpisLoading } = useQuery({
+    queryKey: ["/api/dashboard/kpis"],
+    queryFn: api.getDashboardKPIs
+  });
+
+  const { data: topMenuItems } = useQuery({
+    queryKey: ["/api/dashboard/top-menu-items"],
+    queryFn: api.getTopMenuItems
+  });
+
+  const { data: recentTransactions } = useRealTimeData(
+    ["/api/dashboard/recent-transactions"],
+    api.getRecentTransactions,
+    30000
+  );
+
+  const { data: aiInsights } = useRealTimeData(
+    ["/api/dashboard/ai-insights"],
+    api.getAiInsights,
+    10000
+  );
+
+  const resolveInsightMutation = useMutation({
+    mutationFn: mutations.resolveAiInsight
+  });
+
+  const handleResolveInsight = (id: number) => {
+    resolveInsightMutation.mutate(id);
+  };
+
+  if (kpisLoading) {
+    return <div className="flex justify-center items-center h-64">Loading...</div>;
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex items-center space-x-4">
+          <Select defaultValue="7days">
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7days">Last 7 days</SelectItem>
+              <SelectItem value="30days">Last 30 days</SelectItem>
+              <SelectItem value="3months">Last 3 months</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button className="restaurant-primary">
+            <Bot className="mr-2 h-4 w-4" />
+            AI Analysis
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <KPICard
+          title="Today's Sales"
+          value={`$${kpis?.todaySales.toLocaleString() || '0'}`}
+          change="+12.5%"
+          changeType="positive"
+          icon={DollarSign}
+          iconColor="text-primary"
+          iconBgColor="bg-primary/20"
+        />
+        <KPICard
+          title="Orders Completed"
+          value={kpis?.ordersCount || 0}
+          change="+8.2%"
+          changeType="positive"
+          icon={ShoppingCart}
+          iconColor="text-green-600"
+          iconBgColor="bg-green-100"
+        />
+        <KPICard
+          title="Inventory Value"
+          value={`$${((kpis?.inventoryValue || 0) / 1000).toFixed(2)}K`}
+          change="Low Stock Alert"
+          changeType="neutral"
+          icon={Package}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
+        />
+        <KPICard
+          title="AI Anomalies"
+          value={kpis?.anomaliesCount || 0}
+          change="Requires Review"
+          changeType="negative"
+          icon={AlertTriangle}
+          iconColor="text-red-600"
+          iconBgColor="bg-red-100"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Sales Chart */}
+        <div className="lg:col-span-2">
+          <SalesChart />
+        </div>
+
+        {/* Top Menu Items */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">Top Menu Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {topMenuItems?.map((item, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      index === 0 ? 'bg-primary' : 
+                      index === 1 ? 'bg-yellow-400' : 
+                      index === 2 ? 'bg-green-400' : 'bg-gray-400'
+                    }`} />
+                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-gray-900">${item.sales}</div>
+                    <div className="text-xs text-gray-500">{item.orders} orders</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Transactions */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg font-semibold text-gray-900">Recent Transactions</CardTitle>
+              <Button variant="ghost" className="text-primary hover:text-primary-dark text-sm font-medium">
+                View All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentTransactions?.slice(0, 3).map((transaction, index) => (
+                <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      transaction.paymentMethod === 'Credit Card' ? 'bg-green-100' : 
+                      transaction.paymentMethod === 'Cash' ? 'bg-yellow-100' : 'bg-red-100'
+                    }`}>
+                      {transaction.paymentMethod === 'Credit Card' ? (
+                        <CreditCard className="text-green-600 text-sm" />
+                      ) : transaction.paymentMethod === 'Cash' ? (
+                        <DollarSign className="text-yellow-600 text-sm" />
+                      ) : (
+                        <Truck className="text-red-600 text-sm" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{transaction.orderId}</p>
+                      <p className="text-xs text-gray-500">
+                        {transaction.tableNumber ? `Table ${transaction.tableNumber}` : 'Supplier Payment'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${
+                      parseFloat(transaction.amount) > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {parseFloat(transaction.amount) > 0 ? '+' : ''}${Math.abs(parseFloat(transaction.amount)).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">{transaction.paymentMethod}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Insights */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg font-semibold text-gray-900">
+                <Bot className="inline mr-2 text-primary" />
+                AI Insights
+              </CardTitle>
+              <Badge variant="secondary" className="restaurant-primary text-xs">Live</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {aiInsights?.slice(0, 3).map((insight) => (
+                <div 
+                  key={insight.id}
+                  className={`p-4 rounded-lg border ${
+                    insight.severity === 'high' ? 'bg-red-50 border-red-200' :
+                    insight.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    {insight.severity === 'high' ? (
+                      <AlertTriangle className="text-red-600 mt-1" />
+                    ) : insight.severity === 'medium' ? (
+                      <AlertTriangle className="text-yellow-600 mt-1" />
+                    ) : (
+                      <TrendingUp className="text-blue-600 mt-1" />
+                    )}
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${
+                        insight.severity === 'high' ? 'text-red-800' :
+                        insight.severity === 'medium' ? 'text-yellow-800' :
+                        'text-blue-800'
+                      }`}>
+                        {insight.title}
+                      </p>
+                      <p className={`text-sm ${
+                        insight.severity === 'high' ? 'text-red-700' :
+                        insight.severity === 'medium' ? 'text-yellow-700' :
+                        'text-blue-700'
+                      }`}>
+                        {insight.description}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => handleResolveInsight(insight.id)}
+                        disabled={resolveInsightMutation.isPending}
+                      >
+                        <CheckCircle className="mr-1 h-3 w-3" />
+                        Resolve
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
