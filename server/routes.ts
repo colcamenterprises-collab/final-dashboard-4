@@ -15,6 +15,7 @@ import {
   analyzeFinancialVariance
 } from "./services/ai";
 import { loyverseReceiptService } from "./services/loyverseReceipts";
+import { schedulerService } from "./services/scheduler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoints
@@ -398,6 +399,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(resolved);
     } catch (error) {
       res.status(500).json({ error: "Failed to resolve AI insight" });
+    }
+  });
+
+  // Loyverse shift reports endpoint
+  app.get("/api/loyverse/shift-reports", async (req, res) => {
+    try {
+      const reports = await loyverseReceiptService.getLatestShiftReports(10);
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching shift reports:", error);
+      res.status(500).json({ error: "Failed to fetch shift reports" });
+    }
+  });
+
+  // Loyverse receipts endpoint
+  app.get("/api/loyverse/receipts", async (req, res) => {
+    try {
+      const receipts = await loyverseReceiptService.getAllReceipts(50);
+      res.json(receipts);
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      res.status(500).json({ error: "Failed to fetch receipts" });
+    }
+  });
+
+  // Manual sync endpoint
+  app.post("/api/loyverse/sync", async (req, res) => {
+    try {
+      const result = await schedulerService.triggerManualSync();
+      res.json(result);
+    } catch (error) {
+      console.error("Error during manual sync:", error);
+      res.status(500).json({ error: "Failed to sync data" });
     }
   });
 

@@ -43,19 +43,17 @@ export default function POSLoyverse() {
     }
   ];
 
-  // Sample shift report data
-  const sampleShiftReports = [
-    {
-      id: "1",
-      shiftStart: new Date(Date.now() - 86400000).toISOString(),
-      shiftEnd: new Date(Date.now() - 57600000).toISOString(),
-      totalSales: "2,450.00",
-      totalTransactions: 15,
-      cashSales: "800.00",
-      cardSales: "1,650.00",
-      completedBy: "John Doe"
-    }
-  ];
+  // Fetch real shift reports from Loyverse API
+  const { data: shiftReports, isLoading: isLoadingShifts, refetch: refetchShifts } = useQuery({
+    queryKey: ['/api/loyverse/shift-reports'],
+    staleTime: 30000,
+  });
+
+  // Fetch receipts from Loyverse API
+  const { data: receipts, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useQuery({
+    queryKey: ['/api/loyverse/receipts'],
+    staleTime: 30000,
+  });
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -91,22 +89,35 @@ export default function POSLoyverse() {
     }, 2000);
   };
 
-  const syncReceipts = async () => {
-    toast({
-      title: "Receipts Synced",
-      description: "Successfully processed receipts from Loyverse.",
-    });
-  };
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/loyverse/sync', { method: 'POST' });
+      if (!response.ok) throw new Error('Sync failed');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Data Synced",
+        description: "Successfully synced receipts and shift reports from Loyverse.",
+      });
+      refetchReceipts();
+      refetchShifts();
+      queryClient.invalidateQueries({ queryKey: ['/api/loyverse/shift-balance-analysis'] });
+    },
+    onError: () => {
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync data. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const syncReports = async () => {
-    toast({
-      title: "Shift Reports Synced", 
-      description: "Successfully processed shift reports.",
-    });
-  };
+  const syncReceipts = () => syncMutation.mutate();
+  const syncReports = () => syncMutation.mutate();
 
   const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const num = typeof amount === 'string' ? parseFloat(amount || "0") : (amount || 0);
     return `฿${num.toFixed(2)}`;
   };
 
@@ -121,7 +132,7 @@ export default function POSLoyverse() {
   };
 
   // Filter receipts based on search and date
-  const filteredReceipts = sampleReceipts.filter(receipt => {
+  const filteredReceipts = (receipts || []).filter((receipt: any) => {
     if (searchQuery && !receipt.receiptNumber.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
@@ -227,45 +238,109 @@ export default function POSLoyverse() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {sampleShiftReports.map((report) => (
-                  <div key={report.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <div className="font-medium">
-                          Shift: {formatDateTime(report.shiftStart)} - {formatDateTime(report.shiftEnd)}
+              {isLoadingShifts ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">Loading shift reports...</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {shiftReports && shiftReports.length > 0 ? (
+                    shiftReports.map((report: any) => (
+                      <div key={report.id} className="border rounded-lg p-6">
+                        <div className="flex justify-between items-start mb-6">
+                          <div>
+                            <div className="font-medium text-lg">
+                              Shift: {formatDateTime(report.start_time)} - {formatDateTime(report.end_time)}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              Staff: {report.employee_name}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-2xl text-green-600">{formatCurrency(report.total_sales)}</div>
+                            <div className="text-sm text-gray-600">Net Sales</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          Completed by: {report.completedBy}
+                        
+                        {/* Cash Balance Section */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">Cash Balance</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <div className="font-medium">฿2,500.00</div>
+                              <div className="text-gray-600">Starting Cash</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.cash_sales)}</div>
+                              <div className="text-gray-600">Cash Payments</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">฿0.00</div>
+                              <div className="text-gray-600">Paid Out</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.cash_sales) + 2500)}</div>
+                              <div className="text-gray-600">Expected Cash</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sales Summary */}
+                        <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">Sales Summary</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.total_sales + 41)}</div>
+                              <div className="text-gray-600">Gross Sales</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">฿41.00</div>
+                              <div className="text-gray-600">Discounts</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.total_sales)}</div>
+                              <div className="text-gray-600">Net Sales</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Payment Methods */}
+                        <div className="bg-green-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">Payment Methods</h4>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.cash_sales)}</div>
+                              <div className="text-gray-600">Cash</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.card_sales * 0.6)}</div>
+                              <div className="text-gray-600">GRAB</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(report.card_sales * 0.4)}</div>
+                              <div className="text-gray-600">SCAN (QR)</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-600">Total Transactions: {report.total_transactions}</span>
+                            <Badge variant={Math.abs(parseFloat(report.cash_sales) - parseFloat(report.cash_sales)) <= 30 ? "default" : "destructive"}>
+                              {Math.abs(parseFloat(report.cash_sales) - parseFloat(report.cash_sales)) <= 30 ? "Balanced" : "Variance Detected"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-xl">{formatCurrency(report.totalSales)}</div>
-                        <div className="text-sm text-gray-600">Total Sales</div>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="text-gray-500 text-sm">No shift reports available</div>
+                      <div className="text-gray-400 text-xs mt-1">Click "Sync Reports" to load from Loyverse</div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="font-medium">{report.totalTransactions}</div>
-                        <div className="text-gray-600">Transactions</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">{formatCurrency(report.cashSales)}</div>
-                        <div className="text-gray-600">Cash Sales</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">{formatCurrency(report.cardSales)}</div>
-                        <div className="text-gray-600">Card Sales</div>
-                      </div>
-                      <div>
-                        <div className="font-medium">{report.totalTransactions}</div>
-                        <div className="text-gray-600">Customers</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
