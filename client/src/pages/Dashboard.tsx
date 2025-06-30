@@ -117,7 +117,7 @@ export default function Dashboard() {
         <Card className="restaurant-card">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+            <p className="text-sm text-gray-500 mt-1">December 2024</p>
           </CardHeader>
           <CardContent>
             {topMenuItemsError ? (
