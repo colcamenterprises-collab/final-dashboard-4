@@ -127,7 +127,8 @@ export default function POSLoyverse() {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Bangkok'
     });
   };
 
@@ -255,7 +256,8 @@ export default function POSLoyverse() {
                                 month: 'short', 
                                 day: 'numeric',
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                timeZone: 'Asia/Bangkok'
                               })}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
