@@ -15,6 +15,104 @@ import {
   analyzeFinancialVariance
 } from "./services/ai";
 import { loyverseReceiptService } from "./services/loyverseReceipts";
+
+// Drink minimum stock levels with package sizes
+const DRINK_REQUIREMENTS = {
+  'Coke': { minStock: 30, packageSize: 6, unit: 'cans' },
+  'Coke Zero': { minStock: 24, packageSize: 6, unit: 'cans' },
+  'Sprite': { minStock: 20, packageSize: 6, unit: 'cans' },
+  'Schweppes Manow': { minStock: 20, packageSize: 6, unit: 'cans' },
+  'Fanta Orange': { minStock: 20, packageSize: 6, unit: 'cans' },
+  'Fanta Strawberry': { minStock: 20, packageSize: 6, unit: 'cans' },
+  'Kids Orange': { minStock: 20, packageSize: 8, unit: 'cans' },
+  'Kids Apple': { minStock: 20, packageSize: 8, unit: 'cans' },
+  'Soda Water': { minStock: 16, packageSize: 6, unit: 'bottles' },
+  'Bottled Water': { minStock: 24, packageSize: 16, unit: 'bottles' }
+};
+
+async function generateShoppingListFromStockForm(formData: any) {
+  try {
+    // Process food items (anything with quantity > 0 needs to be purchased)
+    const foodItems = formData.foodItems || {};
+    
+    for (const [itemName, quantity] of Object.entries(foodItems)) {
+      if (typeof quantity === 'number' && quantity > 0) {
+        await storage.createShoppingListItem({
+          itemName,
+          quantity: quantity.toString(),
+          unit: 'each',
+          supplier: 'Food Supplier',
+          pricePerUnit: '0',
+          priority: 'medium',
+          selected: false,
+          aiGenerated: false
+        });
+      }
+    }
+
+    // Process drinks based on minimum stock requirements
+    const drinkStock = formData.drinkStock || {};
+    
+    for (const [drinkName, currentStock] of Object.entries(drinkStock)) {
+      const requirement = DRINK_REQUIREMENTS[drinkName as keyof typeof DRINK_REQUIREMENTS];
+      if (requirement && typeof currentStock === 'number') {
+        if (currentStock < requirement.minStock) {
+          // Calculate packages needed to reach minimum stock
+          const packagesNeeded = Math.ceil((requirement.minStock - currentStock) / requirement.packageSize);
+          
+          await storage.createShoppingListItem({
+            itemName: `${drinkName} (${requirement.packageSize} ${requirement.unit} pack)`,
+            quantity: packagesNeeded.toString(),
+            unit: 'packages',
+            supplier: 'Beverage Supplier',
+            pricePerUnit: '0',
+            priority: 'high',
+            selected: false,
+            aiGenerated: true
+          });
+        }
+      }
+    }
+
+    // Process kitchen items
+    const kitchenItems = formData.kitchenItems || {};
+    for (const [itemName, quantity] of Object.entries(kitchenItems)) {
+      if (typeof quantity === 'number' && quantity > 0) {
+        await storage.createShoppingListItem({
+          itemName,
+          quantity: quantity.toString(),
+          unit: 'each',
+          supplier: 'Kitchen Supplies',
+          pricePerUnit: '0',
+          priority: 'low',
+          selected: false,
+          aiGenerated: false
+        });
+      }
+    }
+
+    // Process packaging items
+    const packagingItems = formData.packagingItems || {};
+    for (const [itemName, quantity] of Object.entries(packagingItems)) {
+      if (typeof quantity === 'number' && quantity > 0) {
+        await storage.createShoppingListItem({
+          itemName,
+          quantity: quantity.toString(),
+          unit: 'each',
+          supplier: 'Packaging Supplier',
+          pricePerUnit: '0',
+          priority: 'medium',
+          selected: false,
+          aiGenerated: false
+        });
+      }
+    }
+
+    console.log('Generated shopping list items from daily stock form');
+  } catch (error) {
+    console.error('Error generating shopping list from stock form:', error);
+  }
+}
 import { schedulerService } from "./services/scheduler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -445,6 +543,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error during manual sync:", error);
       res.status(500).json({ error: "Failed to sync data", details: error.message });
+    }
+  });
+
+  // Daily Stock and Sales endpoints
+  app.get('/api/daily-stock-sales', async (req, res) => {
+    try {
+      const dailyStockSales = await storage.getDailyStockSales();
+      res.json(dailyStockSales);
+    } catch (error) {
+      console.error('Error fetching daily stock sales:', error);
+      res.status(500).json({ error: 'Failed to fetch daily stock sales' });
+    }
+  });
+
+  app.post('/api/daily-stock-sales', async (req, res) => {
+    try {
+      const dailyStockSales = await storage.createDailyStockSales(req.body);
+      
+      // After creating the form, generate shopping list items based on requirements
+      await generateShoppingListFromStockForm(req.body);
+      
+      res.json(dailyStockSales);
+    } catch (error) {
+      console.error('Error creating daily stock sales:', error);
+      res.status(500).json({ error: 'Failed to create daily stock sales' });
     }
   });
 

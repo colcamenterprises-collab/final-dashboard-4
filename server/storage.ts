@@ -83,6 +83,7 @@ export class MemStorage implements IStorage {
   private suppliers: Map<number, Supplier> = new Map();
   private staffShifts: Map<number, StaffShift> = new Map();
   private dailySales: Map<number, DailySales> = new Map();
+  private dailyStockSales: Map<number, DailyStockSales> = new Map();
   private currentId: number = 1;
 
   constructor() {
@@ -365,6 +366,24 @@ export class MemStorage implements IStorage {
     const staffShift: StaffShift = { ...shift, id };
     this.staffShifts.set(id, staffShift);
     return staffShift;
+  }
+
+  async getDailyStockSales(): Promise<DailyStockSales[]> {
+    return Array.from(this.dailyStockSales.values()).sort((a, b) => 
+      new Date(b.shiftDate).getTime() - new Date(a.shiftDate).getTime()
+    );
+  }
+
+  async createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales> {
+    const id = this.currentId++;
+    const dailyStockSalesRecord: DailyStockSales = { 
+      ...data, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.dailyStockSales.set(id, dailyStockSalesRecord);
+    return dailyStockSalesRecord;
   }
 }
 
