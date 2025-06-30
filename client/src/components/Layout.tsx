@@ -31,9 +31,12 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center space-x-8">
             {/* Logo */}
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center">
-                <Utensils className="text-white text-sm" />
-              </div>
+              <img 
+                src="@assets/Yellow Circle - Black Logo_1751274091742.png" 
+                alt="RestaurantOS Logo" 
+                className="w-8 h-8 rounded-full object-contain"
+              />
+              <span className="text-xl font-bold text-gray-900">RestaurantOS</span>
             </div>
             
             {/* Navigation Items */}
