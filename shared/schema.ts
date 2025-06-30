@@ -154,6 +154,54 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
+// Daily Stock and Sales Form table
+export const dailyStockSales = pgTable("daily_stock_sales", {
+  id: serial("id").primaryKey(),
+  completedBy: text("completed_by").notNull(),
+  shiftType: text("shift_type").notNull(), // Night Shift, Day Shift
+  shiftDate: timestamp("shift_date").notNull(),
+  
+  // Cash Management
+  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).notNull(),
+  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).notNull(),
+  
+  // Sales Data
+  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).notNull(),
+  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).notNull(),
+  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).notNull(),
+  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).notNull(),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).notNull(),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).notNull(),
+  
+  // Expenses
+  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).notNull(),
+  shopping: decimal("shopping", { precision: 10, scale: 2 }).notNull(),
+  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).notNull(),
+  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).notNull(),
+  expenseDescription: text("expense_description"),
+  
+  // Stock Counts
+  burgerBunsStock: integer("burger_buns_stock").notNull(),
+  rollsOrderedCount: integer("rolls_ordered_count").notNull(),
+  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).notNull(), // in kg
+  
+  // Food Items (quantities needed)
+  foodItems: jsonb("food_items").notNull(), // Contains all food item requirements
+  
+  // Drink Stock Counts
+  drinkStock: jsonb("drink_stock").notNull(), // Current drink inventory
+  
+  // Kitchen & Packaging Requirements
+  kitchenItems: jsonb("kitchen_items").notNull(),
+  packagingItems: jsonb("packaging_items").notNull(),
+  
+  // Confirmation
+  rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true });
@@ -167,6 +215,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: tru
 export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({ id: true });
 export const insertLoyverseReceiptSchema = createInsertSchema(loyverseReceipts).omit({ id: true });
 export const insertLoyverseShiftReportSchema = createInsertSchema(loyverseShiftReports).omit({ id: true });
+export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -193,3 +242,5 @@ export type LoyverseReceipt = typeof loyverseReceipts.$inferSelect;
 export type InsertLoyverseReceipt = z.infer<typeof insertLoyverseReceiptSchema>;
 export type LoyverseShiftReport = typeof loyverseShiftReports.$inferSelect;
 export type InsertLoyverseShiftReport = z.infer<typeof insertLoyverseShiftReportSchema>;
+export type DailyStockSales = typeof dailyStockSales.$inferSelect;
+export type InsertDailyStockSales = z.infer<typeof insertDailyStockSalesSchema>;

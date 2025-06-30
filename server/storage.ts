@@ -1,11 +1,12 @@
 import { 
   users, menuItems, inventory, shoppingList, expenses, transactions, 
-  aiInsights, suppliers, staffShifts, dailySales,
+  aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
   type AiInsight, type InsertAiInsight, type Supplier, type InsertSupplier,
-  type StaffShift, type InsertStaffShift, type DailySales, type InsertDailySales
+  type StaffShift, type InsertStaffShift, type DailySales, type InsertDailySales,
+  type DailyStockSales, type InsertDailyStockSales
 } from "@shared/schema";
 
 export interface IStorage {
@@ -65,6 +66,10 @@ export interface IStorage {
   // Staff Shifts
   getStaffShifts(): Promise<StaffShift[]>;
   createStaffShift(shift: InsertStaffShift): Promise<StaffShift>;
+  
+  // Daily Stock and Sales
+  getDailyStockSales(): Promise<DailyStockSales[]>;
+  createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
 }
 
 export class MemStorage implements IStorage {
