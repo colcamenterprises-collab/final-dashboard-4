@@ -427,7 +427,7 @@ export default function DailyStockSales() {
                     <div className="col-span-1">Action</div>
                   </div>
                   
-                  {form.watch('wageEntries').map((_, index) => (
+                  {(form.watch('wageEntries') || []).map((_, index) => (
                     <div key={index} className="grid grid-cols-12 gap-3">
                       <FormField
                         control={form.control}
@@ -496,7 +496,7 @@ export default function DailyStockSales() {
                   </Button>
                   
                   <div className="text-right">
-                    <strong>Total Wages: ${form.watch('wageEntries').reduce((sum, entry) => sum + entry.amount, 0).toFixed(2)}</strong>
+                    <strong>Total Wages: ${(form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -514,7 +514,7 @@ export default function DailyStockSales() {
                     <div className="col-span-1">Action</div>
                   </div>
                   
-                  {form.watch('shoppingEntries').map((_, index) => (
+                  {(form.watch('shoppingEntries') || []).map((_, index) => (
                     <div key={index} className="grid grid-cols-12 gap-3">
                       <FormField
                         control={form.control}
@@ -583,7 +583,7 @@ export default function DailyStockSales() {
                   </Button>
                   
                   <div className="text-right">
-                    <strong>Total Shopping: ${form.watch('shoppingEntries').reduce((sum, entry) => sum + entry.amount, 0).toFixed(2)}</strong>
+                    <strong>Total Shopping: ${(form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -624,8 +624,8 @@ export default function DailyStockSales() {
                           readOnly 
                           className="bg-gray-50"
                           value={
-                            form.watch('wageEntries').reduce((sum, entry) => sum + entry.amount, 0) +
-                            form.watch('shoppingEntries').reduce((sum, entry) => sum + entry.amount, 0) +
+                            (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
+                            (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
                             parseFloat(form.watch('gasExpense') || '0')
                           }
                         />
