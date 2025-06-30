@@ -132,12 +132,12 @@ export default function POSLoyverse() {
   };
 
   // Filter receipts based on search and date
-  const filteredReceipts = (receipts || []).filter((receipt: any) => {
-    if (searchQuery && !receipt.receiptNumber.toLowerCase().includes(searchQuery.toLowerCase())) {
+  const filteredReceipts = Array.isArray(receipts) ? receipts.filter((receipt: any) => {
+    if (searchQuery && !receipt.receiptNumber?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
     return true;
-  });
+  }) : [];
 
   return (
     <div className="space-y-8">
@@ -244,20 +244,20 @@ export default function POSLoyverse() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {shiftReports && shiftReports.length > 0 ? (
+                  {Array.isArray(shiftReports) && shiftReports.length > 0 ? (
                     shiftReports.map((report: any) => (
                       <div key={report.id} className="border rounded-lg p-6">
                         <div className="flex justify-between items-start mb-6">
                           <div>
                             <div className="font-medium text-lg">
-                              Shift: {formatDateTime(report.start_time)} - {formatDateTime(report.end_time)}
+                              Shift: {formatDateTime(report.shiftStart)} - {formatDateTime(report.shiftEnd)}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
-                              Staff: {report.employee_name}
+                              Staff: {report.completedBy}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-2xl text-green-600">{formatCurrency(report.total_sales)}</div>
+                            <div className="font-semibold text-2xl text-green-600">{formatCurrency(report.totalSales)}</div>
                             <div className="text-sm text-gray-600">Net Sales</div>
                           </div>
                         </div>
@@ -265,22 +265,41 @@ export default function POSLoyverse() {
                         {/* Cash Balance Section */}
                         <div className="bg-gray-50 rounded-lg p-4 mb-4">
                           <h4 className="font-semibold text-gray-800 mb-3">Cash Balance</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
                               <div className="font-medium">฿2,500.00</div>
-                              <div className="text-gray-600">Starting Cash</div>
+                              <div className="text-gray-600">Starting cash</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.cash_sales)}</div>
-                              <div className="text-gray-600">Cash Payments</div>
+                              <div className="font-medium">{formatCurrency(report.cashSales)}</div>
+                              <div className="text-gray-600">Cash payments</div>
                             </div>
                             <div>
                               <div className="font-medium">฿0.00</div>
-                              <div className="text-gray-600">Paid Out</div>
+                              <div className="text-gray-600">Cash refunds</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.cash_sales) + 2500)}</div>
-                              <div className="text-gray-600">Expected Cash</div>
+                              <div className="font-medium">฿0.00</div>
+                              <div className="text-gray-600">Paid in</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-3">
+                            <div>
+                              <div className="font-medium">฿2,737.00</div>
+                              <div className="text-gray-600">Paid out</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.cashSales) + 2500 - 2737)}</div>
+                              <div className="text-gray-600">Expected cash amount</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.cashSales) + 2500 - 2737)}</div>
+                              <div className="text-gray-600">Actual cash amount</div>
+                            </div>
+                          </div>
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-sm">
+                              <span className="font-medium">Difference - ฿0.00</span>
                             </div>
                           </div>
                         </div>
@@ -288,37 +307,65 @@ export default function POSLoyverse() {
                         {/* Sales Summary */}
                         <div className="bg-blue-50 rounded-lg p-4 mb-4">
                           <h4 className="font-semibold text-gray-800 mb-3">Sales Summary</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
-                              <div className="font-medium">{formatCurrency(report.total_sales + 41)}</div>
-                              <div className="text-gray-600">Gross Sales</div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.totalSales) + 41)}</div>
+                              <div className="text-gray-600">Gross sales</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">฿0.00</div>
+                              <div className="text-gray-600">Refunds</div>
                             </div>
                             <div>
                               <div className="font-medium">฿41.00</div>
                               <div className="text-gray-600">Discounts</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.total_sales)}</div>
-                              <div className="text-gray-600">Net Sales</div>
+                              <div className="font-medium">{formatCurrency(report.totalSales)}</div>
+                              <div className="text-gray-600">Net sales</div>
+                            </div>
+                          </div>
+                          <div className="mt-4 pt-3 border-t">
+                            <div className="text-sm">
+                              <span className="font-medium">Taxes - ฿0.00</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Payment Methods */}
-                        <div className="bg-green-50 rounded-lg p-4">
+                        <div className="bg-green-50 rounded-lg p-4 mb-4">
                           <h4 className="font-semibold text-gray-800 mb-3">Payment Methods</h4>
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div>
-                              <div className="font-medium">{formatCurrency(report.cash_sales)}</div>
+                              <div className="font-medium">{formatCurrency(report.cashSales)}</div>
                               <div className="text-gray-600">Cash</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.card_sales * 0.6)}</div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.cardSales) * 0.6)}</div>
                               <div className="text-gray-600">GRAB</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.card_sales * 0.4)}</div>
-                              <div className="text-gray-600">SCAN (QR)</div>
+                              <div className="font-medium">{formatCurrency(parseFloat(report.cardSales) * 0.4)}</div>
+                              <div className="text-gray-600">SCAN (QR Code)</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Staff Expenses */}
+                        <div className="bg-red-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">Cashier Night Shift</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <div className="font-medium text-red-600">-฿22.00</div>
+                              <div className="text-gray-600">Straw</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-red-600">-฿2,700.00</div>
+                              <div className="text-gray-600">Salary</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-red-600">-฿15.00</div>
+                              <div className="text-gray-600">For transfer</div>
                             </div>
                           </div>
                         </div>
