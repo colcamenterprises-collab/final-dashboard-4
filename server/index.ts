@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
@@ -6,6 +7,9 @@ import { schedulerService } from "./services/scheduler";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Serve static files from attached_assets folder
+app.use('/attached_assets', express.static(path.resolve(process.cwd(), 'attached_assets')));
 
 app.use((req, res, next) => {
   const start = Date.now();
