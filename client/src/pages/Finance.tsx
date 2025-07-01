@@ -30,11 +30,11 @@ export default function Finance() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Finance</h1>
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Finance</h1>
+        <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
           <Select defaultValue="today">
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full xs:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -43,15 +43,16 @@ export default function Finance() {
               <SelectItem value="month">This Month</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="restaurant-primary">
+          <Button className="restaurant-primary w-full xs:w-auto">
             <Download className="mr-2 h-4 w-4" />
-            Export Report
+            <span className="hidden xs:inline">Export Report</span>
+            <span className="xs:hidden">Export</span>
           </Button>
         </div>
       </div>
 
       {/* POS vs Staff Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-6 lg:mb-8">
         <Card className="restaurant-card">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-gray-900">POS System Data</CardTitle>

@@ -145,40 +145,42 @@ export default function ShoppingList() {
             <CardContent>
               <div className="space-y-4">
                 {shoppingList?.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center space-x-4">
+                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors space-y-3 sm:space-y-0">
+                    <div className="flex items-center space-x-3 sm:space-x-4">
                       <Checkbox
                         checked={item.selected}
                         onCheckedChange={(checked) => handleCheckboxChange(item.id, checked as boolean)}
                       />
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                           {getItemIcon(item.itemName)}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
-                          <p className="text-xs text-gray-500">{item.supplier}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
+                          <p className="text-xs text-gray-500 truncate">{item.supplier}</p>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
+                    <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4">
+                      <div className="text-left sm:text-right">
                         <p className="text-sm font-medium text-gray-900">{item.quantity} {item.unit}</p>
                         <p className="text-xs text-gray-500">${item.pricePerUnit}/{item.unit}</p>
                       </div>
-                      <Badge variant="secondary" className={`text-xs ${getPriorityColor(item.priority)}`}>
-                        {item.priority === 'high' ? 'High Priority' : 
-                         item.priority === 'medium' ? 'Medium' : 'Low'}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-gray-400 hover:text-red-600"
-                        disabled={deleteItemMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <Badge variant="secondary" className={`text-xs ${getPriorityColor(item.priority)}`}>
+                          {item.priority === 'high' ? 'High' : 
+                           item.priority === 'medium' ? 'Med' : 'Low'}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-gray-400 hover:text-red-600"
+                          disabled={deleteItemMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
