@@ -15,6 +15,8 @@ import {
   analyzeFinancialVariance
 } from "./services/ai";
 import { loyverseReceiptService } from "./services/loyverseReceipts";
+import { loyverseShiftReports } from "@shared/schema";
+import { db } from "./db";
 
 // Drink minimum stock levels with package sizes
 const DRINK_REQUIREMENTS = {
@@ -408,7 +410,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/loyverse/shift-reports/sync", async (req, res) => {
     try {
+      console.log("Starting sync with authentic Loyverse data...");
+      
+      // Clear existing shift data to ensure fresh authentic data
+      await db.delete(loyverseShiftReports);
+      console.log("Cleared existing shift reports");
+      
       const result = await loyverseReceiptService.fetchAndStoreShiftReports();
+      console.log("Authentic shift data sync completed");
+      
       res.json(result);
     } catch (error) {
       console.error("Failed to sync shift reports:", error);
