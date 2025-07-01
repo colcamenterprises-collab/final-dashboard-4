@@ -819,25 +819,7 @@ export default function DailyStockSales() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="drinkStockCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Drinks (Drink Stock Count)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          min="0" 
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
               </div>
 
               {/* Drink Stock Inventory within Stock Counts */}
