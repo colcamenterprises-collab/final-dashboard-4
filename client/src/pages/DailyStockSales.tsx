@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -9,11 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { insertDailyStockSalesSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Calculator, Package, Utensils, Wine, Wrench, Box } from "lucide-react";
+import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText } from "lucide-react";
 import { z } from "zod";
+import type { DailyStockSales } from "@shared/schema";
 
 // Food items from your form
 const FOOD_ITEMS = [
@@ -75,6 +79,21 @@ type ShoppingEntry = z.infer<typeof shoppingEntrySchema>;
 export default function DailyStockSales() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedForm, setSelectedForm] = useState<DailyStockSales | null>(null);
+
+  // Search query for completed forms
+  const { data: completedForms = [], isLoading: searchLoading } = useQuery({
+    queryKey: ['/api/daily-stock-sales/search', searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) params.append('q', searchQuery);
+      
+      const response = await fetch(`/api/daily-stock-sales/search?${params}`);
+      if (!response.ok) throw new Error('Failed to search forms');
+      return response.json();
+    }
+  });
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -144,6 +163,10 @@ export default function DailyStockSales() {
   };
 
   // Auto-calculate total expenses
+  const formatCurrency = (value: string | number) => {
+    return `$${parseFloat(value.toString()).toFixed(2)}`;
+  };
+
   const calculateTotalExpenses = () => {
     const salary = parseFloat(form.getValues('salaryWages') || '0');
     const shopping = parseFloat(form.getValues('shopping') || '0');
@@ -161,10 +184,17 @@ export default function DailyStockSales() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center gap-2 mb-6">
         <Calculator className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Daily Stock and Sales Form</h1>
+        <h1 className="text-2xl font-bold">Daily Stock and Sales</h1>
       </div>
 
-      <Form {...form}>
+      <Tabs defaultValue="new-form" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="new-form">New Form</TabsTrigger>
+          <TabsTrigger value="search">Search Completed Forms</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="new-form" className="space-y-6">
+          <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           
           {/* Basic Information */}
@@ -877,8 +907,175 @@ export default function DailyStockSales() {
               {createMutation.isPending ? "Submitting..." : "Submit Form"}
             </Button>
           </div>
-        </form>
-      </Form>
+          </form>
+        </Form>
+        </TabsContent>
+
+        <TabsContent value="search" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Search Completed Forms</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Search by staff name, date, notes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={() => {}} className="flex items-center space-x-2">
+                    <Search className="h-4 w-4" />
+                    <span>Search</span>
+                  </Button>
+                </div>
+
+                {searchLoading ? (
+                  <div className="text-center py-8">
+                    <p>Searching forms...</p>
+                  </div>
+                ) : selectedForm ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">Form Details</h3>
+                      <Button variant="outline" onClick={() => setSelectedForm(null)}>
+                        Back to Results
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <p className="text-sm text-gray-600">Completed By</p>
+                          <p className="font-medium">{selectedForm.completedBy}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div>
+                          <p className="text-sm text-gray-600">Shift Date</p>
+                          <p className="font-medium">{format(new Date(selectedForm.shiftDate), 'PPP')}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={selectedForm.shiftType === 'Night Shift' ? 'secondary' : 'outline'}>
+                          {selectedForm.shiftType}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <div>
+                              <p className="text-sm text-gray-600">Total Sales</p>
+                              <p className="font-bold text-green-600">{formatCurrency(selectedForm.totalSales)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <div>
+                              <p className="text-sm text-gray-600">Total Expenses</p>
+                              <p className="font-bold text-red-600">{formatCurrency(selectedForm.totalExpenses)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <div>
+                              <p className="text-sm text-gray-600">Starting Cash</p>
+                              <p className="font-medium">{formatCurrency(selectedForm.startingCash)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <div>
+                              <p className="text-sm text-gray-600">Ending Cash</p>
+                              <p className="font-medium">{formatCurrency(selectedForm.endingCash)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Search Results ({completedForms.length} forms found)</h3>
+                    {completedForms.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">No forms found matching your search criteria</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {completedForms.map((form: DailyStockSales) => (
+                          <div key={form.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-4 mb-2">
+                                  <h4 className="font-medium">{form.completedBy}</h4>
+                                  <Badge variant={form.shiftType === 'Night Shift' ? 'secondary' : 'outline'}>
+                                    {form.shiftType}
+                                  </Badge>
+                                  <span className="text-sm text-gray-600">
+                                    {format(new Date(form.shiftDate), 'MMM dd, yyyy')}
+                                  </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-600">Sales: </span>
+                                    <span className="font-medium text-green-600">{formatCurrency(form.totalSales)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Expenses: </span>
+                                    <span className="font-medium text-red-600">{formatCurrency(form.totalExpenses)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Wages: </span>
+                                    <span className="font-medium">{(form.wageEntries as any[] || []).length} entries</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Shopping: </span>
+                                    <span className="font-medium">{(form.shoppingEntries as any[] || []).length} items</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setSelectedForm(form)}
+                                className="flex items-center space-x-1"
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span>View</span>
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
