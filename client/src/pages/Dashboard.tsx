@@ -48,11 +48,11 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
           <Select defaultValue="7days">
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full xs:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -61,9 +61,10 @@ export default function Dashboard() {
               <SelectItem value="3months">Last 3 months</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="restaurant-primary">
+          <Button className="restaurant-primary w-full xs:w-auto">
             <Bot className="mr-2 h-4 w-4" />
-            AI Analysis
+            <span className="hidden xs:inline">AI Analysis</span>
+            <span className="xs:hidden">AI</span>
           </Button>
         </div>
       </div>
@@ -108,7 +109,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Sales Chart */}
         <div className="lg:col-span-2">
           <SalesChart />
@@ -180,7 +181,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
