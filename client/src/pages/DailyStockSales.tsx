@@ -839,6 +839,39 @@ export default function DailyStockSales() {
                   )}
                 />
               </div>
+
+              {/* Drink Stock Inventory within Stock Counts */}
+              <div className="mt-6">
+                <h4 className="text-md font-medium mb-3 flex items-center gap-2">
+                  <Wine className="h-4 w-4" />
+                  Drink Stock Inventory
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {DRINK_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`drinkStock.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -1182,42 +1215,7 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          {/* Drink Stock */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wine className="h-5 w-5" />
-                Drink Stock Inventory
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {DRINK_ITEMS.map((item) => (
-                  <FormField
-                    key={item}
-                    control={form.control}
-                    name={`drinkStock.${item}` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">{item}</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* Kitchen Items */}
           <Card>
