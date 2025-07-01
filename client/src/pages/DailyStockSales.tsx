@@ -27,8 +27,7 @@ const FRESH_FOOD_ITEMS = [
 
 // Frozen Food items
 const FROZEN_FOOD_ITEMS = [
-  'Bacon Short', 'Bacon Long', 'Cheese', 'Sweet Potato Fries', 
-  'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
+  'Cheese', 'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
 ];
 
 // Shelf Items (non-perishable items)
