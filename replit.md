@@ -133,6 +133,11 @@ Changelog:
 - June 30, 2025. Removed placeholder data and staff names, integrated real Loyverse data only
 - June 30, 2025. Updated shift report format to show actual closing dates and transaction counts
 - June 30, 2025. Standardized heading typography across dashboard components
+- July 2, 2025. Fixed React error where receipt items array was being rendered directly as objects
+- July 2, 2025. Implemented authentic cash balance validation with 40 baht variance tolerance
+- July 2, 2025. Updated shift 537 with exact figures from authentic Loyverse report
+- July 2, 2025. Fixed Bangkok timezone handling (UTC+7) for all shift reports
+- July 2, 2025. Confirmed data sources: All figures from authentic Loyverse shift data only
 ```
 
 ## User Preferences
