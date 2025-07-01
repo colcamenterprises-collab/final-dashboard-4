@@ -426,74 +426,6 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          {/* Sales and Expenses Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                Sales and Expenses Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="totalSales"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Sales Amount</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" readOnly className="bg-gray-50" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="totalExpenses"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Expenses</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00" 
-                          readOnly 
-                          className="bg-gray-50"
-                          value={
-                            (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
-                            (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="endingCash"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cash in Register at End of Shift</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-
-            </CardContent>
-          </Card>
-
           {/* Expenses */}
           <Card>
             <CardHeader>
@@ -695,6 +627,72 @@ export default function DailyStockSales() {
                             (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
                           }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Sales and Expenses Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Sales and Expenses Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="totalSales"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Sales Amount</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="0.00" readOnly className="bg-gray-50" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalExpenses"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Expenses</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          readOnly 
+                          className="bg-gray-50"
+                          value={
+                            (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
+                            (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endingCash"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cash in Register at End of Shift</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
