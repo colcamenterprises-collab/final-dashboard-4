@@ -196,16 +196,16 @@ export default function DailyStockSales() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Calculator className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Daily Stock and Sales</h1>
+    <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6">
+        <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
+        <h1 className="text-xl sm:text-2xl font-bold">Daily Stock and Sales</h1>
       </div>
 
       <Tabs defaultValue="new-form" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="new-form">New Form</TabsTrigger>
-          <TabsTrigger value="search">Search Completed Forms</TabsTrigger>
+          <TabsTrigger value="new-form" className="text-sm sm:text-base">New Form</TabsTrigger>
+          <TabsTrigger value="search" className="text-sm sm:text-base">Search Forms</TabsTrigger>
         </TabsList>
         
         <TabsContent value="new-form" className="space-y-6">
@@ -220,7 +220,7 @@ export default function DailyStockSales() {
                 Who is Completing Form
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="completedBy"
@@ -283,7 +283,7 @@ export default function DailyStockSales() {
             <CardHeader>
               <CardTitle>Cash Management</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="startingCash"
@@ -308,7 +308,7 @@ export default function DailyStockSales() {
               <CardTitle>Sales Data</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="grabSales"
