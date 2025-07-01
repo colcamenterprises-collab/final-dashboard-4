@@ -19,22 +19,29 @@ import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
-// Fresh Food items as specified by user
+// Fresh Food items 
 const FRESH_FOOD_ITEMS = [
   'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
-  'Bacon Short', 'Bacon Long', 'Cheese', 'Milk', 'Butter'
+  'Milk', 'Butter'
+];
+
+// Frozen Food items
+const FROZEN_FOOD_ITEMS = [
+  'Bacon Short', 'Bacon Long', 'Cheese', 'Sweet Potato Fries', 
+  'Chicken Nuggets', 'Onion Rings', 'French Fries'
 ];
 
 // Shelf Items (non-perishable items)
 const SHELF_ITEMS = [
   'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
-  'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Sweet Potato Fries', 
-  'Chicken Nuggets', 'Onion Rings', 'French Fries', 'Jalapenos', 'Ketchup',
+  'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup',
   'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'BBQ Sauce', 'Pepper', 'Salt'
 ];
 
-// Legacy food items (excluding fresh food items to avoid duplication)
+// Legacy food items (all combined for compatibility)
 const LEGACY_FOOD_ITEMS = [
+  ...FRESH_FOOD_ITEMS,
+  ...FROZEN_FOOD_ITEMS,
   ...SHELF_ITEMS
 ];
 
@@ -130,6 +137,9 @@ export default function DailyStockSales() {
       rollsOrderedCount: 0,
       meatWeight: "0",
       rollsOrderedConfirmed: false,
+      freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
+      frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
+      shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
       foodItems: Object.fromEntries(LEGACY_FOOD_ITEMS.map(item => [item, 0])),
       drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
       kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
@@ -1124,6 +1134,36 @@ export default function DailyStockSales() {
                       Add Other Fresh Food Item
                     </Button>
                   </div>
+                </div>
+              </div>
+
+              {/* Frozen Food */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Frozen Food</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {FROZEN_FOOD_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`frozenFood.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
                 </div>
               </div>
 

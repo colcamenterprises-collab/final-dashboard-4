@@ -188,8 +188,9 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).notNull(), // in kg
   drinkStockCount: integer("drink_stock_count").notNull(),
   
-  // Food Items Required - organized into Fresh Food and Shelf Items
+  // Food Items Required - organized into Fresh Food, Frozen, and Shelf Items
   freshFood: jsonb("fresh_food").notNull().default('{}'), // Fresh food items (Salad, Tomatos, etc.) with otherItems array
+  frozenFood: jsonb("frozen_food").notNull().default('{}'), // Frozen food items (Bacon, Cheese, etc.)
   shelfItems: jsonb("shelf_items").notNull().default('{}'), // Shelf stable items
   
   // Keep existing food items for backward compatibility
