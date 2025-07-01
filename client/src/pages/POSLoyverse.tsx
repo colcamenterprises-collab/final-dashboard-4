@@ -212,8 +212,18 @@ export default function POSLoyverse() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                       <span>Staff: {receipt.staffMember}</span>
-                      <span>Table: {receipt.tableNumber}</span>
-                      <span>{Array.isArray(receipt.items) ? receipt.items.length : 0} items</span>
+                      <span>Table: {receipt.tableNumber || 'N/A'}</span>
+                      <span>{(() => {
+                        try {
+                          if (Array.isArray(receipt.items)) return receipt.items.length;
+                          if (receipt.items && typeof receipt.items === 'string') {
+                            return JSON.parse(receipt.items).length;
+                          }
+                          return 0;
+                        } catch {
+                          return 0;
+                        }
+                      })()} items</span>
                     </div>
                   </div>
                 ))}
