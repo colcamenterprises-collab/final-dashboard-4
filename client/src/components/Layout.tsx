@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bell, Search, Menu, X, DollarSign } from "lucide-react";
+// import logoImage from "@assets/Restaurant Hub Customli_1751389710505.png";
 
 // Currency Context
 const CurrencyContext = createContext<{
@@ -57,7 +58,7 @@ export default function Layout({ children }: LayoutProps) {
               {/* Logo */}
               <div className="flex items-center">
                 <img 
-                  src="@assets/Restaurant Hub Customli_1751389710505.png" 
+                  src="/attached_assets/Restaurant Hub Customli_1751389710505.png" 
                   alt="Restaurant Hub Customli Logo" 
                   className="h-[35px] w-auto object-contain"
                 />
