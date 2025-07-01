@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { insertDailyStockSalesSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText } from "lucide-react";
+import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText, Users } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
