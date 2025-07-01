@@ -350,7 +350,7 @@ export default function POSLoyverse() {
                               <div className="text-gray-600">Discounts</div>
                             </div>
                             <div>
-                              <div className="font-medium">฿{report.totalSales.toFixed(2)}</div>
+                              <div className="font-medium">฿{parseFloat(report.totalSales).toFixed(2)}</div>
                               <div className="text-gray-600">Net sales</div>
                             </div>
                           </div>
@@ -380,31 +380,47 @@ export default function POSLoyverse() {
                           </div>
                         </div>
 
-                        {/* Staff Expenses */}
+                        {/* Pay in / Pay out */}
                         <div className="bg-red-50 rounded-lg p-3 sm:p-4">
-                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Cashier Night Shift</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
+                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Pay in / Pay out</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
-                              <div className="font-medium text-red-600">-฿22.00</div>
-                              <div className="text-gray-600">Straw</div>
+                              <div className="font-medium text-red-600">-฿152.00</div>
+                              <div className="text-gray-600">08:14 PM - Butter</div>
                             </div>
                             <div>
-                              <div className="font-medium text-red-600">-฿2,700.00</div>
-                              <div className="text-gray-600">Salary</div>
+                              <div className="font-medium text-red-600">-฿697.00</div>
+                              <div className="text-gray-600">12:51 AM - Give back to cashbox</div>
                             </div>
                             <div>
                               <div className="font-medium text-red-600">-฿15.00</div>
-                              <div className="text-gray-600">For transfer</div>
+                              <div className="text-gray-600">12:52 AM - For transfer</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-red-600">-฿2,025.00</div>
+                              <div className="text-gray-600">02:06 AM - Salary</div>
                             </div>
                           </div>
                         </div>
 
                         <div className="mt-4 pt-4 border-t">
                           <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Total Transactions: {report.total_transactions}</span>
-                            <Badge variant={Math.abs(parseFloat(report.cash_sales) - parseFloat(report.cash_sales)) <= 30 ? "default" : "destructive"}>
-                              {Math.abs(parseFloat(report.cash_sales) - parseFloat(report.cash_sales)) <= 30 ? "Balanced" : "Variance Detected"}
-                            </Badge>
+                            <span className="text-gray-600">Total Transactions: {report.totalTransactions}</span>
+                            {(() => {
+                              const expectedCash = report.reportData?.expected_cash || 4311.00;
+                              const actualCash = report.reportData?.actual_cash || 4311.00;
+                              const difference = Math.abs(expectedCash - actualCash);
+                              const isBalanced = difference <= 40; // 40 baht variance tolerance
+                              
+                              return (
+                                <Badge 
+                                  variant={isBalanced ? "default" : "destructive"}
+                                  className={isBalanced ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300"}
+                                >
+                                  {isBalanced ? "✓ Balanced" : "⚠ Variance Warning"}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
