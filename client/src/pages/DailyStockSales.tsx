@@ -712,7 +712,7 @@ export default function DailyStockSales() {
             </CardHeader>
             <CardContent>
               <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="space-y-2">
+                <div className="text-center">
                   {(() => {
                     const startingCash = parseFloat(form.watch('startingCash') || '0');
                     const cashSales = parseFloat(form.watch('cashSales') || '0');
@@ -724,31 +724,18 @@ export default function DailyStockSales() {
                     const isBalanced = variance <= 20; // 20 baht variance tolerance
 
                     return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Expected Cash in Register</p>
-                          <p className="text-lg font-medium">฿{expectedCash.toFixed(2)}</p>
-                          <p className="text-xs text-gray-500">
-                            (Start: ฿{startingCash.toFixed(2)} + Cash Sales: ฿{cashSales.toFixed(2)} - Expenses: ฿{totalExpenses.toFixed(2)})
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Balance Status</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                              isBalanced 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {isBalanced ? 'Balanced' : 'Not Balanced'}
-                            </span>
-                            {variance > 0 && (
-                              <span className="text-xs text-gray-500">
-                                (Variance: ฿{variance.toFixed(2)})
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-2">Cash Balance Status</p>
+                        <span className={`inline-flex px-4 py-2 rounded-full text-lg font-medium ${
+                          isBalanced 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {isBalanced ? 'Balanced' : 'Not Balanced'}
+                        </span>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Detailed calculations available to management after form submission
+                        </p>
                       </div>
                     );
                   })()}
