@@ -111,25 +111,25 @@ export default function ShoppingList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Shopping List</h1>
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Shopping List</h1>
+        <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
           <Button 
-            className="restaurant-primary"
+            className="restaurant-primary w-full xs:w-auto"
             onClick={handleGenerateList}
             disabled={generateListMutation.isPending}
           >
             <Bot className="mr-2 h-4 w-4" />
             Auto Generate
           </Button>
-          <Button className="bg-green-600 text-white hover:bg-green-700">
+          <Button className="bg-green-600 text-white hover:bg-green-700 w-full xs:w-auto">
             <Send className="mr-2 h-4 w-4" />
             Send Orders
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Shopping List */}
         <div className="lg:col-span-2">
           <Card className="restaurant-card">

@@ -660,7 +660,7 @@ export default function DailyStockSales() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="totalSales"
@@ -832,7 +832,7 @@ export default function DailyStockSales() {
                   <Wine className="h-4 w-4" />
                   Drink Stock Inventory
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4">
                   {DRINK_ITEMS.map((item) => (
                     <FormField
                       key={item}
@@ -873,7 +873,7 @@ export default function DailyStockSales() {
               {/* Fresh Food */}
               <div>
                 <h3 className="text-lg font-medium mb-3">Fresh Food</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   <FormField
                     control={form.control}
                     name="freshFood.salad"
@@ -1082,7 +1082,7 @@ export default function DailyStockSales() {
               {/* Shelf Items */}
               <div>
                 <h3 className="text-lg font-medium mb-3">Shelf Items</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {SHELF_ITEMS.map((item) => (
                     <FormField
                       key={item}
@@ -1112,7 +1112,7 @@ export default function DailyStockSales() {
               {/* Frozen Food */}
               <div>
                 <h3 className="text-lg font-medium mb-3">Frozen Food</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {FROZEN_FOOD_ITEMS.map((item) => (
                     <FormField
                       key={item}
