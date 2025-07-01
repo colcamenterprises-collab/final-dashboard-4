@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -7,10 +8,36 @@ interface SalesChartProps {
   labels?: string[];
 }
 
+interface ShiftReport {
+  id: number;
+  shiftDate: string;
+  totalSales: string;
+  totalTransactions: number;
+}
+
 export default function SalesChart({ 
-  data = [1200, 1900, 1500, 2100, 2400, 1800],
-  labels = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN']
+  data,
+  labels
 }: SalesChartProps) {
+  // Get real Loyverse shift data
+  const { data: shiftReports, isLoading } = useQuery<ShiftReport[]>({
+    queryKey: ["/api/loyverse/shift-reports"],
+    queryFn: () => fetch("/api/loyverse/shift-reports?limit=7").then(res => res.json())
+  });
+
+  // Process real Loyverse data
+  const chartData = data || (shiftReports ? 
+    shiftReports.slice(0, 6).reverse().map(report => parseFloat(report.totalSales)) : 
+    []
+  );
+  
+  const chartLabels = labels || (shiftReports ? 
+    shiftReports.slice(0, 6).reverse().map(report => {
+      const date = new Date(report.shiftDate);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }) : 
+    []
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

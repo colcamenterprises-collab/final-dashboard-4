@@ -182,14 +182,30 @@ export class MemStorage implements IStorage {
   }
 
   async getDashboardKPIs() {
-    const todaySales = 2478.36;
-    const ordersCount = 127;
-    const inventoryValue = Array.from(this.inventory.values())
-      .reduce((total, item) => total + (parseFloat(item.quantity) * parseFloat(item.pricePerUnit)), 0);
-    const anomaliesCount = Array.from(this.aiInsights.values())
-      .filter(insight => insight.type === 'anomaly' && !insight.resolved).length;
+    try {
+      // Get real sales data from Loyverse shift reports
+      const { loyverseReceiptService } = await import('./services/loyverseReceipts.js');
+      const shiftReports = await loyverseReceiptService.getLatestShiftReports(5);
+      
+      // Calculate today's sales from latest shift report
+      const todaySales = shiftReports.length > 0 ? parseFloat(shiftReports[0].totalSales) : 0;
+      
+      // Get orders count from latest shift report
+      const ordersCount = shiftReports.length > 0 ? shiftReports[0].totalTransactions : 0;
+      
+      // Calculate inventory value
+      const inventoryValue = Array.from(this.inventory.values())
+        .reduce((total, item) => total + (parseFloat(item.quantity) * parseFloat(item.pricePerUnit)), 0);
+      
+      // Count unresolved AI insights
+      const anomaliesCount = Array.from(this.aiInsights.values())
+        .filter(insight => insight.type === 'anomaly' && !insight.resolved).length;
 
-    return { todaySales, ordersCount, inventoryValue, anomaliesCount };
+      return { todaySales, ordersCount, inventoryValue, anomaliesCount };
+    } catch (error) {
+      console.error('Failed to get real KPI data from Loyverse:', error);
+      throw new Error('Unable to fetch real sales data from Loyverse POS system');
+    }
   }
 
   async getTopMenuItems() {
@@ -214,9 +230,28 @@ export class MemStorage implements IStorage {
   }
 
   async getRecentTransactions(): Promise<Transaction[]> {
-    return Array.from(this.transactions.values())
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-      .slice(0, 10);
+    try {
+      // Get real receipt data from Loyverse
+      const { loyverseReceiptService } = await import('./services/loyverseReceipts.js');
+      const receipts = await loyverseReceiptService.getReceiptsByDateRange(
+        new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+        new Date()
+      );
+      
+      // Transform Loyverse receipts to Transaction format
+      return receipts.slice(0, 10).map((receipt: any) => ({
+        id: receipt.id,
+        orderId: receipt.receiptNumber,
+        tableNumber: receipt.tableNumber ? parseInt(receipt.tableNumber) : undefined,
+        amount: receipt.totalAmount,
+        paymentMethod: receipt.paymentMethod,
+        timestamp: receipt.receiptDate,
+        staffMember: receipt.staffMember
+      }));
+    } catch (error) {
+      console.error('Failed to get real transaction data from Loyverse:', error);
+      throw new Error('Unable to fetch real transaction data from Loyverse POS system');
+    }
   }
 
   async getAiInsights(): Promise<AiInsight[]> {
