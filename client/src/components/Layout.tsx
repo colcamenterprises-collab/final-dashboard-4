@@ -55,14 +55,12 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center space-x-4 sm:space-x-8">
               {/* Logo */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center">
                 <img 
                   src="@assets/Restaurant Hub Customli_1751389710505.png" 
-                  alt="Restaurant Hub Logo" 
-                  className="w-[30px] h-[30px] object-contain"
+                  alt="Restaurant Hub Customli Logo" 
+                  className="h-[35px] w-auto object-contain"
                 />
-                <span className="text-lg sm:text-xl font-black text-gray-900 hidden sm:block">Restaurant Hub</span>
-                <span className="text-lg sm:text-xl font-black text-gray-900 sm:hidden">RH</span>
               </div>
             
             {/* Desktop Navigation Items */}
