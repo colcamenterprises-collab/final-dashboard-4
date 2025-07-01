@@ -247,8 +247,8 @@ export class LoyverseReceiptService {
       {
         shiftNumber: 537,
         date: 'Jul 1, 2025',
-        openingTime: '7/1/25 5:39 PM',
-        closingTime: '7/2/25 2:07 AM',
+        openingTime: '2025-07-01T17:39:00+07:00', // 5:39 PM Bangkok time
+        closingTime: '2025-07-02T02:07:00+07:00', // 2:07 AM Bangkok time
         totalSales: 10877.00,  // Net sales from authentic shift report
         grossSales: 11097.00,  // Gross sales from authentic shift report
         refunds: 220.00,       // Refunds from authentic shift report
@@ -267,9 +267,9 @@ export class LoyverseReceiptService {
       },
       {
         shiftNumber: 536,
-        date: 'Jun 30, 03:00 AM',
-        openingTime: '6/30/25 5:51 PM',
-        closingTime: '7/1/25 2:05 AM',
+        date: 'Jun 30, 2025',
+        openingTime: '2025-06-30T17:51:00+07:00', // 5:51 PM Bangkok time
+        closingTime: '2025-07-01T02:05:00+07:00', // 2:05 AM Bangkok time
         totalSales: 1351.00,  // From your image
         cashSales: 4446.00,   // From your image
         cardSales: 6905.00,   // From your image
@@ -279,9 +279,9 @@ export class LoyverseReceiptService {
       },
       {
         shiftNumber: 535,
-        date: 'Jun 29, 03:00 AM',
-        openingTime: '6/29/25 5:45 PM',
-        closingTime: '6/30/25 2:14 AM',
+        date: 'Jun 29, 2025',
+        openingTime: '2025-06-29T17:45:00+07:00', // 5:45 PM Bangkok time
+        closingTime: '2025-06-30T02:14:00+07:00', // 2:14 AM Bangkok time
         totalSales: 2364.20,  // From your image
         cashSales: 6547.00,   // From your image
         cardSales: 5817.20,   // From your image
@@ -291,9 +291,9 @@ export class LoyverseReceiptService {
       },
       {
         shiftNumber: 534,
-        date: 'Jun 28, 03:00 AM',
-        openingTime: '6/28/25 6:01 PM',
-        closingTime: '6/29/25 2:25 AM',
+        date: 'Jun 28, 2025',
+        openingTime: '2025-06-28T18:01:00+07:00', // 6:01 PM Bangkok time
+        closingTime: '2025-06-29T02:25:00+07:00', // 2:25 AM Bangkok time
         totalSales: 6739.00,  // From your image
         cashSales: 2771.00,   // From your image
         cardSales: 3968.00,   // From your image
