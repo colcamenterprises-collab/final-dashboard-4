@@ -58,7 +58,7 @@ export default function Layout({ children }: LayoutProps) {
               {/* Logo */}
               <div className="flex items-center">
                 <img 
-                  src="/attached_assets/Restaurant Hub Customli_1751389710505.png" 
+                  src="/attached_assets/Restaurant%20Hub%20Customli_1751389710505.png" 
                   alt="Restaurant Hub Customli Logo" 
                   className="h-[35px] w-auto object-contain"
                 />
