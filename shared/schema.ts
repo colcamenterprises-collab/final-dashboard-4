@@ -186,14 +186,15 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   burgerBunsStock: integer("burger_buns_stock").notNull(),
   rollsOrderedCount: integer("rolls_ordered_count").notNull(),
   meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).notNull(), // in kg
+  drinkStockCount: integer("drink_stock_count").notNull(),
   
-  // Food Items (quantities needed)
+  // Food Items Required - organized into Fresh Food and Shelf Items
+  freshFood: jsonb("fresh_food").notNull().default('{}'), // Fresh food items (Salad, Tomatos, etc.) with otherItems array
+  shelfItems: jsonb("shelf_items").notNull().default('{}'), // Shelf stable items
+  
+  // Keep existing food items for backward compatibility
   foodItems: jsonb("food_items").notNull(), // Contains all food item requirements
-  
-  // Drink Stock Counts
   drinkStock: jsonb("drink_stock").notNull(), // Current drink inventory
-  
-  // Kitchen & Packaging Requirements
   kitchenItems: jsonb("kitchen_items").notNull(),
   packagingItems: jsonb("packaging_items").notNull(),
   
