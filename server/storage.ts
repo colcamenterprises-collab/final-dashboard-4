@@ -90,6 +90,7 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.seedData();
+    this.seedDailyStockSalesData();
   }
 
   private seedData() {
@@ -420,6 +421,92 @@ export class MemStorage implements IStorage {
 
   async getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined> {
     return this.dailyStockSales.get(id);
+  }
+
+  private seedDailyStockSalesData() {
+    // Create sample daily stock sales forms
+    const sampleForms = [
+      {
+        completedBy: "John Smith",
+        shiftType: "Night Shift",
+        shiftDate: new Date('2024-12-28'),
+        startingCash: "500.00",
+        endingCash: "1250.00",
+        grabSales: "1200.00",
+        foodPandaSales: "0.00",
+        aroiDeeSales: "850.00",
+        qrScanSales: "300.00",
+        cashSales: "450.00",
+        totalSales: "2800.00",
+        salaryWages: "1000.00",
+        shopping: "300.00",
+        gasExpense: "50.00",
+        totalExpenses: "1350.00",
+        expenseDescription: "Standard shift expenses",
+        wageEntries: [
+          { name: "John Smith", amount: 800, notes: "Regular shift" },
+          { name: "Sarah Connor", amount: 200, notes: "Overtime" }
+        ],
+        shoppingEntries: [
+          { item: "Burger Buns", amount: 150, notes: "Weekly supply" },
+          { item: "Cleaning Supplies", amount: 150, notes: "Monthly restock" }
+        ],
+        burgerBunsStock: 50,
+        rollsOrderedCount: 100,
+        meatWeight: "25.5",
+        foodItems: { patties: 80, cheese: 60, lettuce: 40 },
+        drinkStock: { coke: 45, cokeZero: 30, sprite: 25 },
+        kitchenItems: { oil: 5, salt: 10 },
+        packagingItems: { containers: 200, bags: 150 },
+        rollsOrderedConfirmed: true
+      },
+      {
+        completedBy: "Alice Johnson",
+        shiftType: "Night Shift", 
+        shiftDate: new Date('2024-12-27'),
+        startingCash: "600.00",
+        endingCash: "1100.00",
+        grabSales: "900.00",
+        foodPandaSales: "0.00",
+        aroiDeeSales: "650.00",
+        qrScanSales: "200.00",
+        cashSales: "350.00",
+        totalSales: "2100.00",
+        salaryWages: "900.00",
+        shopping: "250.00",
+        gasExpense: "40.00",
+        totalExpenses: "1190.00",
+        expenseDescription: "End of week shift",
+        wageEntries: [
+          { name: "Alice Johnson", amount: 750, notes: "Full shift" },
+          { name: "Mike Wilson", amount: 150, notes: "Part time" }
+        ],
+        shoppingEntries: [
+          { item: "Vegetables", amount: 120, notes: "Fresh delivery" },
+          { item: "Napkins", amount: 80, notes: "Customer area supplies" },
+          { item: "Bin Bags", amount: 50, notes: "Kitchen waste" }
+        ],
+        burgerBunsStock: 35,
+        rollsOrderedCount: 75,
+        meatWeight: "18.2",
+        foodItems: { patties: 60, cheese: 45, lettuce: 30 },
+        drinkStock: { coke: 28, cokeZero: 18, sprite: 15 },
+        kitchenItems: { oil: 3, salt: 8 },
+        packagingItems: { containers: 150, bags: 100 },
+        rollsOrderedConfirmed: true
+      }
+    ];
+
+    sampleForms.forEach(formData => {
+      const id = this.currentId++;
+      const form: DailyStockSales = {
+        ...formData,
+        id,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.dailyStockSales.set(id, form);
+    });
   }
 }
 

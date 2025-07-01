@@ -13,6 +13,7 @@ interface LayoutProps {
 const navigationItems = [
   { path: "/", label: "Dashboard" },
   { path: "/daily-stock-sales", label: "Daily Stock & Sales" },
+  { path: "/daily-stock-sales/search", label: "Search Forms" },
   { path: "/shopping-list", label: "Shopping List" },
   { path: "/finance", label: "Finance" },
   { path: "/expenses", label: "Expenses" },
