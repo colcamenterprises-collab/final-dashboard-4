@@ -38,12 +38,8 @@ const SHELF_ITEMS = [
   'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'BBQ Sauce', 'Pepper', 'Salt'
 ];
 
-// Legacy food items (all combined for compatibility)
-const LEGACY_FOOD_ITEMS = [
-  ...FRESH_FOOD_ITEMS,
-  ...FROZEN_FOOD_ITEMS,
-  ...SHELF_ITEMS
-];
+// Legacy food items (empty - all items moved to appropriate sections)
+const LEGACY_FOOD_ITEMS: string[] = [];
 
 // Drink items with current requirements
 const DRINK_ITEMS = [
@@ -140,7 +136,7 @@ export default function DailyStockSales() {
       freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
       frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
       shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
-      foodItems: Object.fromEntries(LEGACY_FOOD_ITEMS.map(item => [item, 0])),
+      foodItems: {},
       drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
       kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
       packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
@@ -1201,42 +1197,7 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          {/* Additional Inventory Sections for Compatibility */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
-                All Food Items (Legacy)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {LEGACY_FOOD_ITEMS.map((item) => (
-                  <FormField
-                    key={item}
-                    control={form.control}
-                    name={`foodItems.${item}` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">{item}</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
 
 
 
