@@ -37,23 +37,33 @@ export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currency, setCurrency] = useState("THB");
+
+  const formatCurrency = (amount: number) => {
+    if (currency === "THB") {
+      return `฿${amount.toFixed(2)}`;
+    } else {
+      return `$${amount.toFixed(2)}`;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white font-inter">
-      {/* Navigation Header */}
-      <nav className="restaurant-nav px-4 sm:px-6 py-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center space-x-4 sm:space-x-8">
-            {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <img 
-                src="@assets/2_1751385817217.png" 
-                alt="Restaurant Operations Hub Logo" 
-                className="w-[30px] h-[30px] object-contain"
-              />
-              <span className="text-lg sm:text-xl font-black text-gray-900 hidden sm:block">Restaurant Hub</span>
-              <span className="text-lg sm:text-xl font-black text-gray-900 sm:hidden">RH</span>
-            </div>
+    <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
+      <div className="min-h-screen bg-white font-inter">
+        {/* Navigation Header */}
+        <nav className="restaurant-nav px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center space-x-4 sm:space-x-8">
+              {/* Logo */}
+              <div className="flex items-center space-x-2">
+                <img 
+                  src="@assets/2_1751385817217.png" 
+                  alt="Restaurant Hub Logo" 
+                  className="w-[30px] h-[30px] object-contain"
+                />
+                <span className="text-lg sm:text-xl font-black text-gray-900 hidden sm:block">Restaurant Hub</span>
+                <span className="text-lg sm:text-xl font-black text-gray-900 sm:hidden">RH</span>
+              </div>
             
             {/* Desktop Navigation Items */}
             <div className="hidden lg:flex space-x-4 xl:space-x-6">
@@ -91,6 +101,20 @@ export default function Layout({ children }: LayoutProps) {
             <Button variant="ghost" size="icon" className="md:hidden">
               <Search className="h-5 w-5 text-gray-400" />
             </Button>
+            
+            {/* Currency Selector */}
+            <div className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4 text-gray-400 hidden sm:block" />
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="w-20 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="THB">THB</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             
             {/* Notifications */}
             <Button variant="ghost" size="icon" className="relative">
@@ -160,12 +184,13 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           </div>
         )}
-      </nav>
+        </nav>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        {children}
-      </main>
-    </div>
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          {children}
+        </main>
+      </div>
+    </CurrencyContext.Provider>
   );
 }
