@@ -251,10 +251,10 @@ export default function POSLoyverse() {
                 <div className="space-y-4">
                   {Array.isArray(shiftReports) && shiftReports.length > 0 ? (
                     shiftReports.map((report: any) => (
-                      <div key={report.id} className="border rounded-lg p-6">
-                        <div className="flex justify-between items-start mb-6">
+                      <div key={report.id} className="border rounded-lg p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0 mb-4 sm:mb-6">
                           <div>
-                            <div className="font-medium text-lg">
+                            <div className="font-medium text-base sm:text-lg">
                               Shift Closed: {new Date(report.shiftEnd).toLocaleDateString('en-US', { 
                                 year: 'numeric', 
                                 month: 'short', 
@@ -264,20 +264,20 @@ export default function POSLoyverse() {
                                 timeZone: 'Asia/Bangkok'
                               })}
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">
+                            <div className="text-xs sm:text-sm text-gray-600 mt-1">
                               Transactions: {report.totalTransactions}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-2xl text-green-600">{formatCurrency(report.totalSales)}</div>
-                            <div className="text-sm text-gray-600">Net Sales</div>
+                          <div className="flex sm:flex-col items-start sm:items-end sm:text-right">
+                            <div className="font-semibold text-xl sm:text-2xl text-green-600">{formatCurrency(report.totalSales)}</div>
+                            <div className="text-xs sm:text-sm text-gray-600 ml-2 sm:ml-0">Net Sales</div>
                           </div>
                         </div>
                         
                         {/* Cash Balance Section */}
-                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                          <h4 className="font-semibold text-gray-800 mb-3">Cash Balance</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4">
+                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Cash Balance</h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
                               <div className="font-medium">฿2,500.00</div>
                               <div className="text-gray-600">Starting cash</div>
@@ -295,7 +295,7 @@ export default function POSLoyverse() {
                               <div className="text-gray-600">Paid in</div>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm mt-3">
                             <div>
                               <div className="font-medium">฿2,737.00</div>
                               <div className="text-gray-600">Paid out</div>
@@ -317,9 +317,9 @@ export default function POSLoyverse() {
                         </div>
 
                         {/* Sales Summary */}
-                        <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                          <h4 className="font-semibold text-gray-800 mb-3">Sales Summary</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div className="bg-blue-50 rounded-lg p-3 sm:p-4 mb-4">
+                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Sales Summary</h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
                               <div className="font-medium">{formatCurrency(parseFloat(report.totalSales) + 41)}</div>
                               <div className="text-gray-600">Gross sales</div>
@@ -345,9 +345,9 @@ export default function POSLoyverse() {
                         </div>
 
                         {/* Payment Methods */}
-                        <div className="bg-green-50 rounded-lg p-4 mb-4">
-                          <h4 className="font-semibold text-gray-800 mb-3">Payment Methods</h4>
-                          <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="bg-green-50 rounded-lg p-3 sm:p-4 mb-4">
+                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Payment Methods</h4>
+                          <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
                             <div>
                               <div className="font-medium">{formatCurrency(report.cashSales)}</div>
                               <div className="text-gray-600">Cash</div>
@@ -364,9 +364,9 @@ export default function POSLoyverse() {
                         </div>
 
                         {/* Staff Expenses */}
-                        <div className="bg-red-50 rounded-lg p-4">
-                          <h4 className="font-semibold text-gray-800 mb-3">Cashier Night Shift</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                        <div className="bg-red-50 rounded-lg p-3 sm:p-4">
+                          <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Cashier Night Shift</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
                               <div className="font-medium text-red-600">-฿22.00</div>
                               <div className="text-gray-600">Straw</div>
