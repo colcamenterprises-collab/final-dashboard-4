@@ -141,34 +141,36 @@ export default function POSLoyverse() {
   }) : [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Loyverse POS</h1>
-        <p className="text-gray-500 mt-2">Receipt capture, shift reports, and AI-powered analysis</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Loyverse POS</h1>
+        <p className="text-gray-500 mt-2 text-sm sm:text-base">Receipt capture, shift reports, and AI-powered analysis</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="receipts">Receipt Capture</TabsTrigger>
-          <TabsTrigger value="shift-reports">Shift Reports</TabsTrigger>
-          <TabsTrigger value="analysis">AI Analysis</TabsTrigger>
+          <TabsTrigger value="receipts" className="text-xs sm:text-sm">Receipt</TabsTrigger>
+          <TabsTrigger value="shift-reports" className="text-xs sm:text-sm">Shifts</TabsTrigger>
+          <TabsTrigger value="analysis" className="text-xs sm:text-sm">AI Analysis</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receipts" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
                 <span className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Shift Receipts (6pm - 3am)
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-base sm:text-lg">Shift Receipts (6pm - 3am)</span>
                 </span>
                 <Button 
                   onClick={syncReceipts}
                   variant="outline"
                   size="sm"
+                  className="w-full sm:w-auto"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync Receipts
+                  <span className="hidden xs:inline">Sync Receipts</span>
+                  <span className="xs:hidden">Sync</span>
                 </Button>
               </CardTitle>
             </CardHeader>
@@ -183,7 +185,7 @@ export default function POSLoyverse() {
                   />
                 </div>
                 <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by date" />
                   </SelectTrigger>
                   <SelectContent>
@@ -197,18 +199,18 @@ export default function POSLoyverse() {
 
               <div className="space-y-4">
                 {filteredReceipts.map((receipt) => (
-                  <div key={receipt.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex justify-between items-start mb-2">
+                  <div key={receipt.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0 mb-2">
                       <div>
-                        <div className="font-medium">Receipt #{receipt.receiptNumber}</div>
-                        <div className="text-sm text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
+                        <div className="font-medium text-sm sm:text-base">Receipt #{receipt.receiptNumber}</div>
+                        <div className="text-xs sm:text-sm text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-lg">{formatCurrency(receipt.totalAmount)}</div>
-                        <Badge variant="outline">{receipt.paymentMethod}</Badge>
+                      <div className="flex sm:flex-col items-start sm:items-end sm:text-right space-x-2 sm:space-x-0">
+                        <div className="font-semibold text-base sm:text-lg">{formatCurrency(receipt.totalAmount)}</div>
+                        <Badge variant="outline" className="text-xs">{receipt.paymentMethod}</Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                       <span>Staff: {receipt.staffMember}</span>
                       <span>Table: {receipt.tableNumber}</span>
                       <span>{receipt.items} items</span>
@@ -223,18 +225,20 @@ export default function POSLoyverse() {
         <TabsContent value="shift-reports" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
                 <span className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Daily Shift Reports
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-base sm:text-lg">Daily Shift Reports</span>
                 </span>
                 <Button 
                   onClick={syncReports}
                   variant="outline"
                   size="sm"
+                  className="w-full sm:w-auto"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync Reports
+                  <span className="hidden xs:inline">Sync Reports</span>
+                  <span className="xs:hidden">Sync</span>
                 </Button>
               </CardTitle>
             </CardHeader>

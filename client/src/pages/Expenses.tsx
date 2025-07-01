@@ -95,14 +95,14 @@ export default function Expenses() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
-        <div className="flex items-center space-x-4">
-          <Button className="restaurant-primary">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Expenses</h1>
+        <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
+          <Button className="restaurant-primary w-full xs:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Add Expense
           </Button>
-          <Button variant="outline" className="bg-gray-600 text-white hover:bg-gray-700">
+          <Button variant="outline" className="bg-gray-600 text-white hover:bg-gray-700 w-full xs:w-auto">
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
@@ -110,7 +110,7 @@ export default function Expenses() {
       </div>
 
       {/* Expense Categories Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <KPICard
           title="Food & Supplies"
           value={`$${(expensesByCategory?.['Food & Supplies'] || 1245.80).toLocaleString()}`}
