@@ -33,9 +33,8 @@ const SHELF_ITEMS = [
   'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'BBQ Sauce', 'Pepper', 'Salt'
 ];
 
-// Keep original food items for compatibility
-const FOOD_ITEMS = [
-  ...FRESH_FOOD_ITEMS,
+// Legacy food items (excluding fresh food items to avoid duplication)
+const LEGACY_FOOD_ITEMS = [
   ...SHELF_ITEMS
 ];
 
@@ -131,7 +130,7 @@ export default function DailyStockSales() {
       rollsOrderedCount: 0,
       meatWeight: "0",
       rollsOrderedConfirmed: false,
-      foodItems: Object.fromEntries(FOOD_ITEMS.map(item => [item, 0])),
+      foodItems: Object.fromEntries(LEGACY_FOOD_ITEMS.map(item => [item, 0])),
       drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
       kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
       packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
@@ -1170,7 +1169,7 @@ export default function DailyStockSales() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {FOOD_ITEMS.map((item) => (
+                {LEGACY_FOOD_ITEMS.map((item) => (
                   <FormField
                     key={item}
                     control={form.control}
