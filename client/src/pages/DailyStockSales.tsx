@@ -1081,60 +1081,7 @@ export default function DailyStockSales() {
                   />
                 </div>
 
-                {/* Other Fresh Food Items */}
-                <div className="mt-4">
-                  <h4 className="text-md font-medium mb-2">Other items not listed</h4>
-                  <div className="space-y-2">
-                    {(form.watch('freshFood.otherItems') || []).map((item, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <Input
-                          placeholder="Item name"
-                          value={item.name || ''}
-                          onChange={(e) => {
-                            const current = form.getValues('freshFood.otherItems') || [];
-                            current[index] = { ...current[index], name: e.target.value };
-                            form.setValue('freshFood.otherItems', current);
-                          }}
-                          className="flex-1"
-                        />
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="Quantity"
-                          value={item.quantity || ''}
-                          onChange={(e) => {
-                            const current = form.getValues('freshFood.otherItems') || [];
-                            current[index] = { ...current[index], quantity: parseInt(e.target.value) || 0 };
-                            form.setValue('freshFood.otherItems', current);
-                          }}
-                          className="w-24"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const current = form.getValues('freshFood.otherItems') || [];
-                            form.setValue('freshFood.otherItems', current.filter((_, i) => i !== index));
-                          }}
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => {
-                        const current = form.getValues('freshFood.otherItems') || [];
-                        form.setValue('freshFood.otherItems', [...current, { name: '', quantity: 0 }]);
-                      }}
-                    >
-                      Add Other Fresh Food Item
-                    </Button>
-                  </div>
-                </div>
+
               </div>
 
               {/* Shelf Items */}
@@ -1194,6 +1141,61 @@ export default function DailyStockSales() {
                       )}
                     />
                   ))}
+                </div>
+              </div>
+
+              {/* Other Items Not Listed */}
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-3">Other items not listed</h3>
+                <div className="space-y-2">
+                  {(form.watch('freshFood.otherItems') || []).map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <Input
+                        placeholder="Item name"
+                        value={item.name || ''}
+                        onChange={(e) => {
+                          const current = form.getValues('freshFood.otherItems') || [];
+                          current[index] = { ...current[index], name: e.target.value };
+                          form.setValue('freshFood.otherItems', current);
+                        }}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="Quantity"
+                        value={item.quantity || ''}
+                        onChange={(e) => {
+                          const current = form.getValues('freshFood.otherItems') || [];
+                          current[index] = { ...current[index], quantity: parseInt(e.target.value) || 0 };
+                          form.setValue('freshFood.otherItems', current);
+                        }}
+                        className="w-24"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const current = form.getValues('freshFood.otherItems') || [];
+                          form.setValue('freshFood.otherItems', current.filter((_, i) => i !== index));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const current = form.getValues('freshFood.otherItems') || [];
+                      form.setValue('freshFood.otherItems', [...current, { name: '', quantity: 0 }]);
+                    }}
+                  >
+                    Add Other Fresh Food Item
+                  </Button>
                 </div>
               </div>
             </CardContent>
