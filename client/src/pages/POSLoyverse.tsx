@@ -213,7 +213,7 @@ export default function POSLoyverse() {
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                       <span>Staff: {receipt.staffMember}</span>
                       <span>Table: {receipt.tableNumber}</span>
-                      <span>{receipt.items} items</span>
+                      <span>{Array.isArray(receipt.items) ? receipt.items.length : 0} items</span>
                     </div>
                   </div>
                 ))}
