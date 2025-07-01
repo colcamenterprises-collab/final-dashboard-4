@@ -57,11 +57,20 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center space-x-4 sm:space-x-8">
               {/* Logo */}
               <div className="flex items-center">
-                <img 
-                  src="/attached_assets/Restaurant%20Hub%20Customli_1751389710505.png" 
-                  alt="Restaurant Hub Customli Logo" 
-                  className="h-[35px] w-auto object-contain"
-                />
+                {/* Custom SVG Logo inspired by your design */}
+                <svg width="35" height="35" viewBox="0 0 100 100" className="object-contain">
+                  <defs>
+                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" style={{stopColor:'#7C3AED', stopOpacity:1}} />
+                      <stop offset="100%" style={{stopColor:'#5B21B6', stopOpacity:1}} />
+                    </linearGradient>
+                  </defs>
+                  <rect width="100" height="100" rx="20" fill="url(#logoGradient)"/>
+                  <path d="M25 25 L75 25 L75 45 L45 45 L45 75 L25 75 Z" fill="white" opacity="0.9"/>
+                  <path d="M55 35 L75 35 L75 75 L55 75 Z" fill="white" opacity="0.7"/>
+                  <circle cx="35" cy="35" r="8" fill="white" opacity="0.8"/>
+                </svg>
+                <span className="text-lg font-black text-gray-900 ml-2">Restaurant Hub</span>
               </div>
             
             {/* Desktop Navigation Items */}
