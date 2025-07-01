@@ -197,12 +197,12 @@ export default function DailyStockSales() {
           <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           
-          {/* Basic Information */}
+          {/* Who is Completing Form */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Utensils className="h-5 w-5" />
-                Basic Information
+                Who is Completing Form
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -274,7 +274,7 @@ export default function DailyStockSales() {
                 name="startingCash"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cash at Start of Shift</FormLabel>
+                    <FormLabel>Cash in Register at Start of Shift</FormLabel>
                     <FormControl>
                       <Input {...field} type="number" step="0.01" placeholder="0.00" />
                     </FormControl>
@@ -283,19 +283,7 @@ export default function DailyStockSales() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="endingCash"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Total Cash in Register</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
             </CardContent>
           </Card>
 
@@ -533,7 +521,7 @@ export default function DailyStockSales() {
 
               {/* Shopping Section */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Shopping</h3>
+                <h3 className="text-lg font-medium mb-3">Shopping & Other Expenses</h3>
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
                 <div className="space-y-3">
@@ -613,37 +601,18 @@ export default function DailyStockSales() {
                   </Button>
                   
                   <div className="text-right">
-                    <strong>Total Shopping: ${(form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
+                    <strong>Total Shopping & Other: ${(form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
 
-              {/* Gas Expense and Total */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="gasExpense"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Gas Expense</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+              {/* Total Expenses */}
+              <div className="flex justify-end">
                 <FormField
                   control={form.control}
                   name="totalExpenses"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-full md:w-1/2">
                       <FormLabel>Total Expenses</FormLabel>
                       <FormControl>
                         <Input 
@@ -655,8 +624,7 @@ export default function DailyStockSales() {
                           className="bg-gray-50"
                           value={
                             (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
-                            (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
-                            parseFloat(form.watch('gasExpense') || '0')
+                            (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
                           }
                         />
                       </FormControl>
