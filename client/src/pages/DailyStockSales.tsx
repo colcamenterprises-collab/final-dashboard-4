@@ -1137,15 +1137,15 @@ export default function DailyStockSales() {
                 </div>
               </div>
 
-              {/* Frozen Food */}
+              {/* Shelf Items */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Frozen Food</h3>
+                <h3 className="text-lg font-medium mb-3">Shelf Items</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {FROZEN_FOOD_ITEMS.map((item) => (
+                  {SHELF_ITEMS.map((item) => (
                     <FormField
                       key={item}
                       control={form.control}
-                      name={`frozenFood.${item}` as any}
+                      name={`shelfItems.${item}` as any}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm">{item}</FormLabel>
@@ -1167,15 +1167,15 @@ export default function DailyStockSales() {
                 </div>
               </div>
 
-              {/* Shelf Items */}
+              {/* Frozen Food */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Shelf Items</h3>
+                <h3 className="text-lg font-medium mb-3">Frozen Food</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {SHELF_ITEMS.map((item) => (
+                  {FROZEN_FOOD_ITEMS.map((item) => (
                     <FormField
                       key={item}
                       control={form.control}
-                      name={`shelfItems.${item}` as any}
+                      name={`frozenFood.${item}` as any}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm">{item}</FormLabel>
