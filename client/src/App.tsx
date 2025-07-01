@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import DailyStockSales from "@/pages/DailyStockSales";
+import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
 import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import Expenses from "@/pages/Expenses";

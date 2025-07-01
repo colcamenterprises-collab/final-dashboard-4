@@ -70,6 +70,8 @@ export interface IStorage {
   // Daily Stock and Sales
   getDailyStockSales(): Promise<DailyStockSales[]>;
   createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
+  searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]>;
+  getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -384,6 +386,40 @@ export class MemStorage implements IStorage {
     };
     this.dailyStockSales.set(id, dailyStockSalesRecord);
     return dailyStockSalesRecord;
+  }
+
+  async searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]> {
+    const allForms = Array.from(this.dailyStockSales.values());
+    
+    return allForms.filter(form => {
+      // Date range filter
+      if (startDate && form.shiftDate < startDate) return false;
+      if (endDate && form.shiftDate > endDate) return false;
+      
+      // Text search filter
+      if (query.trim()) {
+        const searchLower = query.toLowerCase();
+        const wageEntries = (form.wageEntries as any[] || []).map(entry => `${entry.name || ''} ${entry.notes || ''}`);
+        const shoppingEntries = (form.shoppingEntries as any[] || []).map(entry => `${entry.item || ''} ${entry.notes || ''}`);
+        
+        const searchableText = [
+          form.completedBy,
+          form.shiftType,
+          form.shiftDate.toISOString().split('T')[0], // Date as YYYY-MM-DD
+          form.expenseDescription || '',
+          ...wageEntries,
+          ...shoppingEntries
+        ].join(' ').toLowerCase();
+        
+        return searchableText.includes(searchLower);
+      }
+      
+      return true;
+    }).sort((a, b) => b.shiftDate.getTime() - a.shiftDate.getTime()); // Sort by date desc
+  }
+
+  async getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined> {
+    return this.dailyStockSales.get(id);
   }
 }
 

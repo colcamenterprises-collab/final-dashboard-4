@@ -557,6 +557,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/daily-stock-sales/search', async (req, res) => {
+    try {
+      const { q, startDate, endDate } = req.query;
+      const query = (q as string) || '';
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const result = await storage.searchDailyStockSales(query, start, end);
+      res.json(result);
+    } catch (error) {
+      console.error('Error searching daily stock sales:', error);
+      res.status(500).json({ error: 'Failed to search daily stock sales' });
+    }
+  });
+
+  app.get('/api/daily-stock-sales/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      
+      const result = await storage.getDailyStockSalesById(id);
+      if (!result) {
+        return res.status(404).json({ error: 'Daily stock sales form not found' });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching daily stock sales by ID:', error);
+      res.status(500).json({ error: 'Failed to fetch daily stock sales' });
+    }
+  });
+
   app.post('/api/daily-stock-sales', async (req, res) => {
     try {
       const dailyStockSales = await storage.createDailyStockSales(req.body);
