@@ -25,18 +25,18 @@ export default function SalesChart({
     queryFn: () => fetch("/api/loyverse/shift-reports?limit=7").then(res => res.json())
   });
 
-  // Process real Loyverse data
-  const chartData = data || (shiftReports ? 
+  // Process real Loyverse data with fallback
+  const chartData = data || (shiftReports && shiftReports.length > 0 ? 
     shiftReports.slice(0, 6).reverse().map(report => parseFloat(report.totalSales)) : 
-    []
+    [0, 0, 0, 0, 0, 0]
   );
   
-  const chartLabels = labels || (shiftReports ? 
+  const chartLabels = labels || (shiftReports && shiftReports.length > 0 ? 
     shiftReports.slice(0, 6).reverse().map(report => {
       const date = new Date(report.shiftDate);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }) : 
-    []
+    ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6']
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -61,8 +61,8 @@ export default function SalesChart({
     const height = canvas.offsetHeight - padding * 2;
 
     // Data processing
-    const maxValue = Math.max(...data);
-    const minValue = Math.min(...data);
+    const maxValue = Math.max(...chartData);
+    const minValue = Math.min(...chartData);
     const range = maxValue - minValue;
 
     // Draw grid lines
@@ -79,8 +79,8 @@ export default function SalesChart({
     // Plot data points and lines
     const points: Array<{x: number, y: number}> = [];
     
-    data.forEach((value, index) => {
-      const x = padding + (width / (data.length - 1)) * index;
+    chartData.forEach((value, index) => {
+      const x = padding + (width / (chartData.length - 1)) * index;
       const y = padding + height - ((value - minValue) / range) * height;
       points.push({ x, y });
     });
@@ -121,12 +121,12 @@ export default function SalesChart({
     ctx.fillStyle = '#666';
     ctx.font = '12px Inter';
     ctx.textAlign = 'center';
-    labels.forEach((label, index) => {
-      const x = padding + (width / (labels.length - 1)) * index;
+    chartLabels.forEach((label, index) => {
+      const x = padding + (width / (chartLabels.length - 1)) * index;
       ctx.fillText(label, x, padding + height + 20);
     });
 
-  }, [data, labels]);
+  }, [chartData, chartLabels]);
 
   return (
     <Card className="restaurant-card">

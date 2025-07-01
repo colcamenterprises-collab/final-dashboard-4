@@ -1,10 +1,24 @@
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Search, Menu, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bell, Search, Menu, X, DollarSign } from "lucide-react";
+
+// Currency Context
+const CurrencyContext = createContext<{
+  currency: string;
+  setCurrency: (currency: string) => void;
+  formatCurrency: (amount: number) => string;
+}>({
+  currency: 'THB',
+  setCurrency: () => {},
+  formatCurrency: (amount: number) => `฿${amount.toFixed(2)}`
+});
+
+export const useCurrency = () => useContext(CurrencyContext);
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -37,8 +51,8 @@ export default function Layout({ children }: LayoutProps) {
                 alt="Restaurant Operations Hub Logo" 
                 className="w-[30px] h-[30px] object-contain"
               />
-              <span className="text-lg sm:text-xl font-bold text-gray-900 hidden sm:block">Restaurant Operations Hub</span>
-              <span className="text-lg sm:text-xl font-bold text-gray-900 sm:hidden">ROH</span>
+              <span className="text-lg sm:text-xl font-black text-gray-900 hidden sm:block">Restaurant Hub</span>
+              <span className="text-lg sm:text-xl font-black text-gray-900 sm:hidden">RH</span>
             </div>
             
             {/* Desktop Navigation Items */}
