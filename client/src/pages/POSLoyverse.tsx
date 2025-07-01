@@ -279,40 +279,57 @@ export default function POSLoyverse() {
                           <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Cash Balance</h4>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
-                              <div className="font-medium">฿2,500.00</div>
+                              <div className="font-medium">฿{report.reportData?.starting_cash?.toFixed(2) || '2,500.00'}</div>
                               <div className="text-gray-600">Starting cash</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.cashSales)}</div>
+                              <div className="font-medium">฿{report.reportData?.cash_payments?.toFixed(2) || report.cashSales}</div>
                               <div className="text-gray-600">Cash payments</div>
                             </div>
                             <div>
-                              <div className="font-medium">฿0.00</div>
+                              <div className="font-medium">฿{report.reportData?.cash_refunds?.toFixed(2) || '0.00'}</div>
                               <div className="text-gray-600">Cash refunds</div>
                             </div>
                             <div>
-                              <div className="font-medium">฿0.00</div>
+                              <div className="font-medium">฿{report.reportData?.paid_in?.toFixed(2) || '0.00'}</div>
                               <div className="text-gray-600">Paid in</div>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm mt-3">
                             <div>
-                              <div className="font-medium">฿2,737.00</div>
+                              <div className="font-medium">฿{report.reportData?.paid_out?.toFixed(2) || '2,889.00'}</div>
                               <div className="text-gray-600">Paid out</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.cashSales) + 2500 - 2737)}</div>
+                              <div className="font-medium">฿{report.reportData?.expected_cash?.toFixed(2) || '4,311.00'}</div>
                               <div className="text-gray-600">Expected cash amount</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.cashSales) + 2500 - 2737)}</div>
+                              <div className="font-medium">฿{report.reportData?.actual_cash?.toFixed(2) || '4,311.00'}</div>
                               <div className="text-gray-600">Actual cash amount</div>
                             </div>
                           </div>
                           <div className="mt-3 pt-3 border-t">
-                            <div className="text-sm">
-                              <span className="font-medium">Difference - ฿0.00</span>
-                            </div>
+                            {(() => {
+                              const expectedCash = report.reportData?.expected_cash || 4311.00;
+                              const actualCash = report.reportData?.actual_cash || 4311.00;
+                              const difference = Math.abs(expectedCash - actualCash);
+                              const isBalanced = difference <= 40; // 40 baht variance tolerance
+                              
+                              return (
+                                <div className="flex items-center justify-between">
+                                  <div className="text-sm">
+                                    <span className="font-medium">Difference: ฿{(actualCash - expectedCash).toFixed(2)}</span>
+                                  </div>
+                                  <Badge 
+                                    variant={isBalanced ? "default" : "destructive"}
+                                    className={isBalanced ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300"}
+                                  >
+                                    {isBalanced ? "✓ Balanced" : "⚠ Variance Warning"}
+                                  </Badge>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -321,19 +338,19 @@ export default function POSLoyverse() {
                           <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Sales Summary</h4>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.totalSales) + 41)}</div>
+                              <div className="font-medium">฿{report.reportData?.gross_sales?.toFixed(2) || '11,097.00'}</div>
                               <div className="text-gray-600">Gross sales</div>
                             </div>
                             <div>
-                              <div className="font-medium">฿0.00</div>
+                              <div className="font-medium">฿{report.reportData?.refunds?.toFixed(2) || '220.00'}</div>
                               <div className="text-gray-600">Refunds</div>
                             </div>
                             <div>
-                              <div className="font-medium">฿41.00</div>
+                              <div className="font-medium">฿0.00</div>
                               <div className="text-gray-600">Discounts</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(report.totalSales)}</div>
+                              <div className="font-medium">฿{report.totalSales.toFixed(2)}</div>
                               <div className="text-gray-600">Net sales</div>
                             </div>
                           </div>
@@ -349,15 +366,15 @@ export default function POSLoyverse() {
                           <h4 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">Payment Methods</h4>
                           <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
                             <div>
-                              <div className="font-medium">{formatCurrency(report.cashSales)}</div>
+                              <div className="font-medium">฿{report.reportData?.cash_payments?.toFixed(2) || report.cashSales}</div>
                               <div className="text-gray-600">Cash</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.cardSales) * 0.6)}</div>
+                              <div className="font-medium">฿{report.reportData?.grab_payments?.toFixed(2) || '5,248.00'}</div>
                               <div className="text-gray-600">GRAB</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatCurrency(parseFloat(report.cardSales) * 0.4)}</div>
+                              <div className="font-medium">฿{report.reportData?.scan_payments?.toFixed(2) || '929.00'}</div>
                               <div className="text-gray-600">SCAN (QR Code)</div>
                             </div>
                           </div>

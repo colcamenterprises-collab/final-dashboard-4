@@ -29,9 +29,21 @@ interface LoyverseShiftData {
   start_time: string;
   end_time: string;
   total_sales: number;
+  gross_sales?: number;
+  refunds?: number;
   total_transactions: number;
   cash_sales: number;
   card_sales: number;
+  grab_payments?: number;
+  scan_payments?: number;
+  starting_cash?: number;
+  cash_payments?: number;
+  cash_refunds?: number;
+  paid_in?: number;
+  paid_out?: number;
+  expected_cash?: number;
+  actual_cash?: number;
+  cash_difference?: number;
   employee_name: string;
   top_items: Array<{
     name: string;
@@ -230,19 +242,28 @@ export class LoyverseReceiptService {
   private async generateAuthenticShiftReports(): Promise<LoyverseShiftData[]> {
     console.log('Generating authentic shift reports from CSV data...');
     
-    // Authentic Loyverse shift data from CSV and your image
+    // Authentic Loyverse shift data from shift 537 report
     const authenticShifts = [
       {
         shiftNumber: 537,
-        date: 'Jul 1, 03:00 AM',
+        date: 'Jul 1, 2025',
         openingTime: '7/1/25 5:39 PM',
         closingTime: '7/2/25 2:07 AM',
-        totalSales: 3821.00,  // From your image
-        cashSales: 1407.00,   // From your image  
-        cardSales: 2414.00,   // From your image
-        csvCashPayments: 4700.00,
-        csvPaidOut: 2889.00,
-        difference: 0.00
+        totalSales: 10877.00,  // Net sales from authentic shift report
+        grossSales: 11097.00,  // Gross sales from authentic shift report
+        refunds: 220.00,       // Refunds from authentic shift report
+        cashSales: 4700.00,    // Cash payments from authentic shift report
+        cardSales: 6177.00,    // GRAB (5248) + SCAN (929) from authentic shift report
+        grabPayments: 5248.00, // GRAB payments from authentic shift report
+        scanPayments: 929.00,  // SCAN (QR Code) payments from authentic shift report
+        startingCash: 2500.00, // Starting cash from authentic shift report
+        cashPayments: 4700.00, // Cash payments from authentic shift report
+        cashRefunds: 0.00,     // Cash refunds from authentic shift report
+        paidIn: 0.00,          // Paid in from authentic shift report
+        paidOut: 2889.00,      // Paid out from authentic shift report
+        expectedCash: 4311.00, // Expected cash amount from authentic shift report
+        actualCash: 4311.00,   // Actual cash amount from authentic shift report
+        difference: 0.00       // Difference from authentic shift report
       },
       {
         shiftNumber: 536,
@@ -307,9 +328,21 @@ export class LoyverseReceiptService {
         start_time: shiftStart.toISOString(),
         end_time: shiftEnd.toISOString(),
         total_sales: shift.totalSales,
+        gross_sales: shift.grossSales,
+        refunds: shift.refunds,
         total_transactions: Math.floor(shift.totalSales / 180), // Estimate based on burger restaurant average
         cash_sales: shift.cashSales,
         card_sales: shift.cardSales,
+        grab_payments: shift.grabPayments,
+        scan_payments: shift.scanPayments,
+        starting_cash: shift.startingCash,
+        cash_payments: shift.cashPayments,
+        cash_refunds: shift.cashRefunds,
+        paid_in: shift.paidIn,
+        paid_out: shift.paidOut,
+        expected_cash: shift.expectedCash,
+        actual_cash: shift.actualCash,
+        cash_difference: shift.difference,
         employee_name: 'Cashier Night Shift',
         top_items: []
       };
