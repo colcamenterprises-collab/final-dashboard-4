@@ -490,51 +490,7 @@ export default function DailyStockSales() {
                 />
               </div>
 
-              {/* Cash Balance Calculation */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-3">Cash Balance Status</h4>
-                <div className="space-y-2">
-                  {(() => {
-                    const startingCash = parseFloat(form.watch('startingCash') || '0');
-                    const cashSales = parseFloat(form.watch('cashSales') || '0');
-                    const totalExpenses = (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
-                                        (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
-                    const expectedCash = startingCash + cashSales - totalExpenses;
-                    const actualCash = parseFloat(form.watch('endingCash') || '0');
-                    const variance = Math.abs(expectedCash - actualCash);
-                    const isBalanced = variance <= 20; // 20 baht variance tolerance
 
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Expected Cash in Register</p>
-                          <p className="text-lg font-medium">฿{expectedCash.toFixed(2)}</p>
-                          <p className="text-xs text-gray-500">
-                            (Start: ฿{startingCash.toFixed(2)} + Cash Sales: ฿{cashSales.toFixed(2)} - Expenses: ฿{totalExpenses.toFixed(2)})
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Balance Status</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                              isBalanced 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {isBalanced ? 'Balanced' : 'Not Balanced'}
-                            </span>
-                            {variance > 0 && (
-                              <span className="text-xs text-gray-500">
-                                (Variance: ฿{variance.toFixed(2)})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -744,6 +700,61 @@ export default function DailyStockSales() {
                     </FormItem>
                   )}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cash Balance Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Cash Balance Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <div className="space-y-2">
+                  {(() => {
+                    const startingCash = parseFloat(form.watch('startingCash') || '0');
+                    const cashSales = parseFloat(form.watch('cashSales') || '0');
+                    const totalExpenses = (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
+                                        (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
+                    const expectedCash = startingCash + cashSales - totalExpenses;
+                    const actualCash = parseFloat(form.watch('endingCash') || '0');
+                    const variance = Math.abs(expectedCash - actualCash);
+                    const isBalanced = variance <= 20; // 20 baht variance tolerance
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Expected Cash in Register</p>
+                          <p className="text-lg font-medium">฿{expectedCash.toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">
+                            (Start: ฿{startingCash.toFixed(2)} + Cash Sales: ฿{cashSales.toFixed(2)} - Expenses: ฿{totalExpenses.toFixed(2)})
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Balance Status</p>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                              isBalanced 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {isBalanced ? 'Balanced' : 'Not Balanced'}
+                            </span>
+                            {variance > 0 && (
+                              <span className="text-xs text-gray-500">
+                                (Variance: ฿{variance.toFixed(2)})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </CardContent>
           </Card>
