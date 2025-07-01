@@ -19,13 +19,24 @@ import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
-// Food items from your form
-const FOOD_ITEMS = [
-  'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 'Mayonnaise',
-  'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 'Crispy Fried Onions',
-  'BBQ Sauce (Smokey)', 'Bacon Short', 'Bacon Long', 'Sweet Potato Fries', 'Cheese',
+// Fresh Food items as specified by user
+const FRESH_FOOD_ITEMS = [
+  'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
+  'Bacon Short', 'Bacon Long', 'Cheese', 'Milk', 'Butter'
+];
+
+// Shelf Items (non-perishable items)
+const SHELF_ITEMS = [
+  'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
+  'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Sweet Potato Fries', 
   'Chicken Nuggets', 'Onion Rings', 'French Fries', 'Jalapenos', 'Ketchup',
   'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'BBQ Sauce', 'Pepper', 'Salt'
+];
+
+// Keep original food items for compatibility
+const FOOD_ITEMS = [
+  ...FRESH_FOOD_ITEMS,
+  ...SHELF_ITEMS
 ];
 
 // Drink items with current requirements
@@ -1105,9 +1116,179 @@ export default function DailyStockSales() {
               {/* Shelf Items */}
               <div>
                 <h3 className="text-lg font-medium mb-3">Shelf Items</h3>
-                <div className="text-sm text-gray-600 mb-4">
-                  Shelf items section - please specify which items should be included here.
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {SHELF_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`shelfItems.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Additional Inventory Sections for Compatibility */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="h-5 w-5" />
+                All Food Items (Legacy)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {FOOD_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`foodItems.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Drink Stock */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wine className="h-5 w-5" />
+                Drink Stock Inventory
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {DRINK_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`drinkStock.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Kitchen Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Kitchen Requirements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {KITCHEN_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`kitchenItems.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Packaging Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Box className="h-5 w-5" />
+                Packaging & Supplies
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {PACKAGING_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`packagingItems.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
               </div>
             </CardContent>
           </Card>
