@@ -726,35 +726,68 @@ export default function DailyStockSales() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="text-center">
-                  {(() => {
-                    const startingCash = parseFloat(form.watch('startingCash') || '0');
-                    const cashSales = parseFloat(form.watch('cashSales') || '0');
-                    const totalExpenses = (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
-                                        (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
-                    const expectedCash = startingCash + cashSales - totalExpenses;
-                    const actualCash = parseFloat(form.watch('endingCash') || '0');
-                    const variance = Math.abs(expectedCash - actualCash);
-                    const isBalanced = variance <= 20; // 20 baht variance tolerance
+              <div className="space-y-4">
+                {(() => {
+                  const startingCash = parseFloat(form.watch('startingCash') || '0');
+                  const cashSales = parseFloat(form.watch('cashSales') || '0');
+                  const totalExpenses = (form.watch('wageEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) +
+                                      (form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
+                  const expectedCash = startingCash + cashSales - totalExpenses;
+                  const actualCash = parseFloat(form.watch('endingCash') || '0');
+                  const variance = Math.abs(expectedCash - actualCash);
+                  const isBalanced = variance <= 20; // 20 baht variance tolerance
+                  const cashToBeBanked = Math.max(0, actualCash - startingCash); // Cash to bank = Total cash - Starting float
 
-                    return (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">Cash Balance Status</p>
-                        <span className={`inline-flex px-4 py-2 rounded-full text-lg font-medium ${
-                          isBalanced 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {isBalanced ? 'Balanced' : 'Not Balanced'}
-                        </span>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Detailed calculations available to management after form submission
-                        </p>
+                  return (
+                    <>
+                      {/* Balance Status */}
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600 mb-2">Cash Balance Status</p>
+                          <span className={`inline-flex px-4 py-2 rounded-full text-lg font-medium ${
+                            isBalanced 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {isBalanced ? 'Balanced' : 'Not Balanced'}
+                          </span>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Detailed calculations available to management after form submission
+                          </p>
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
+
+                      {/* Two Result Boxes */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Total Cash Balance */}
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-600 mb-1">Total Cash in Register</p>
+                            <p className="text-2xl font-bold text-green-700">
+                              ฿{actualCash.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Includes starting float of ฿{startingCash.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Cash to be Banked */}
+                        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-600 mb-1">Cash to be Banked</p>
+                            <p className="text-2xl font-bold text-yellow-700">
+                              ฿{cashToBeBanked.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Excludes starting float for next shift
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
