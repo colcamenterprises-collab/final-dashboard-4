@@ -27,14 +27,14 @@ const FRESH_FOOD_ITEMS = [
 
 // Frozen Food items
 const FROZEN_FOOD_ITEMS = [
-  'Cheese', 'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
+  'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
 ];
 
 // Shelf Items (non-perishable items)
 const SHELF_ITEMS = [
   'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
   'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup',
-  'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'BBQ Sauce', 'Pepper', 'Salt'
+  'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'
 ];
 
 // Legacy food items (empty - all items moved to appropriate sections)
