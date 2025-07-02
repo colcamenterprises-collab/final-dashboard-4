@@ -11,6 +11,7 @@ import SalesByPaymentType from "@/components/SalesByPaymentType";
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
+import customliLogo from "@assets/Restaurant Hub Customli_1751464938261.png";
 
 export default function Dashboard() {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -52,7 +53,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
+    <div className="relative">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Restaurant Operations Hub</h1>
         <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
@@ -303,6 +304,15 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+      
+      {/* Customli Logo - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-10">
+        <img 
+          src={customliLogo} 
+          alt="Customli" 
+          className="h-5 w-auto opacity-80 hover:opacity-100 transition-opacity"
+        />
       </div>
     </div>
   );
