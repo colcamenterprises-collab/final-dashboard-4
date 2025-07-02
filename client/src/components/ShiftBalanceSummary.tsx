@@ -60,17 +60,9 @@ export default function ShiftBalanceSummary() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-lg font-semibold text-gray-900">
-          <span className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Last 5 Shift Reports
-          </span>
-          {unbalancedCount > 0 && (
-            <Badge variant="destructive" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              {unbalancedCount} Unbalanced
-            </Badge>
-          )}
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+          <Calendar className="h-5 w-5" />
+          Last 5 Shift Reports
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -106,38 +98,20 @@ export default function ShiftBalanceSummary() {
                   </div>
                   <Badge 
                     variant={shift.isBalanced ? "default" : "destructive"}
-                    className="text-xs"
+                    className={shift.isBalanced ? "text-xs bg-green-100 text-green-800 border-green-300" : "text-xs bg-red-100 text-red-800 border-red-300"}
                   >
                     {shift.isBalanced ? "Balanced" : `฿${shift.variance.toFixed(2)} variance`}
                   </Badge>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <div className="text-gray-600">Total Sales</div>
-                    <div className="font-semibold">{formatCurrency(shift.totalSales)}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-600">Cash</div>
-                    <div className="font-medium">{formatCurrency(shift.cashSales)}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-600">Card</div>
-                    <div className="font-medium">{formatCurrency(shift.cardSales)}</div>
+                <div className="text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Total Sales</span>
+                    <span className="font-semibold">{formatCurrency(shift.totalSales)}</span>
                   </div>
                 </div>
 
-                {!shift.isBalanced && (
-                  <div className="mt-2 p-2 bg-red-100 rounded text-xs">
-                    <div className="flex items-center gap-1 text-red-700">
-                      <DollarSign className="h-3 w-3" />
-                      <span className="font-medium">Balance Issue:</span>
-                      Expected: {formatCurrency(shift.calculatedTotal)} | 
-                      Actual: {formatCurrency(shift.totalSales)} | 
-                      Variance: {formatCurrency(shift.variance)} ({">"} ฿30 tolerance)
-                    </div>
-                  </div>
-                )}
+
               </div>
             ))}
           </div>
