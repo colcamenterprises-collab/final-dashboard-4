@@ -306,8 +306,8 @@ export default function Dashboard() {
         </Card>
       </div>
       
-      {/* Customli Logo - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-10">
+      {/* Customli Logo - Bottom Right */}
+      <div className="fixed bottom-4 right-4 z-10">
         <img 
           src={customliLogo} 
           alt="Customli" 
