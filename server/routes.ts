@@ -436,6 +436,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/loyverse/sales-by-payment-type", async (req, res) => {
+    try {
+      const paymentData = await loyverseReceiptService.getSalesByPaymentType();
+      res.json(paymentData);
+    } catch (error) {
+      console.error("Failed to get sales by payment type:", error);
+      res.status(500).json({ error: "Failed to get sales by payment type" });
+    }
+  });
+
   // POS/Loyverse endpoints
   app.post("/api/pos/analyze-receipt", async (req, res) => {
     try {
