@@ -35,6 +35,10 @@ export default function Dashboard() {
     10000
   );
 
+  const { data: mtdExpenses } = useQuery<{ total: number }>({
+    queryKey: ["/api/expenses/month-to-date"],
+  });
+
   const resolveInsightMutation = useMutation({
     mutationFn: mutations.resolveAiInsight
   });
@@ -100,13 +104,13 @@ export default function Dashboard() {
           iconBgColor="bg-blue-100"
         />
         <KPICard
-          title="AI Anomalies"
-          value={kpis?.anomaliesCount || 0}
-          change="Requires Review"
-          changeType="negative"
-          icon={AlertTriangle}
-          iconColor="text-red-600"
-          iconBgColor="bg-red-100"
+          title="MTD Expenses"
+          value={`$${mtdExpenses?.total?.toLocaleString() || '0'}`}
+          change="This Month"
+          changeType="neutral"
+          icon={CreditCard}
+          iconColor="text-orange-600"
+          iconBgColor="bg-orange-100"
         />
       </div>
 

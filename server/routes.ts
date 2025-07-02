@@ -283,6 +283,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/expenses/month-to-date", async (req, res) => {
+    try {
+      const mtdTotal = await storage.getMonthToDateExpenses();
+      res.json({ total: mtdTotal });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch month-to-date expenses" });
+    }
+  });
+
+  app.get("/api/expenses/by-month", async (req, res) => {
+    try {
+      const { month, year } = req.query;
+      const monthlyExpenses = await storage.getExpensesByMonth(
+        parseInt(month as string), 
+        parseInt(year as string)
+      );
+      res.json(monthlyExpenses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch monthly expenses" });
+    }
+  });
+
+  // Expense Suppliers endpoints
+  app.get("/api/expense-suppliers", async (req, res) => {
+    try {
+      const suppliers = await storage.getExpenseSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch expense suppliers" });
+    }
+  });
+
+  app.post("/api/expense-suppliers", async (req, res) => {
+    try {
+      const validatedData = insertExpenseSupplierSchema.parse(req.body);
+      const supplier = await storage.createExpenseSupplier(validatedData);
+      res.json(supplier);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid expense supplier data" });
+    }
+  });
+
+  // Expense Categories endpoints
+  app.get("/api/expense-categories", async (req, res) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch expense categories" });
+    }
+  });
+
+  app.post("/api/expense-categories", async (req, res) => {
+    try {
+      const validatedData = insertExpenseCategorySchema.parse(req.body);
+      const category = await storage.createExpenseCategory(validatedData);
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid expense category data" });
+    }
+  });
+
   // Staff Shifts endpoints
   app.get("/api/staff-shifts", async (req, res) => {
     try {
