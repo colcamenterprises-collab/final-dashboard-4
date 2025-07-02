@@ -468,7 +468,7 @@ export default function DailyStockSales() {
                         render={({ field }) => (
                           <FormItem className="col-span-4">
                             <FormControl>
-                              <Input {...field} placeholder="Cameron" />
+                              <Input {...field} placeholder="Staff Name" />
                             </FormControl>
                           </FormItem>
                         )}
@@ -496,7 +496,7 @@ export default function DailyStockSales() {
                         render={({ field }) => (
                           <FormItem className="col-span-4">
                             <FormControl>
-                              <Input {...field} placeholder="Paid 100 overtime" />
+                              <Input {...field} placeholder="Wages & list overtime etc" />
                             </FormControl>
                           </FormItem>
                         )}
