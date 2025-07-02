@@ -308,11 +308,18 @@ export default function Dashboard() {
       
       {/* Restaurant Hub Logo and Copyright */}
       <div className="flex flex-col items-end mt-8 mb-4">
-        <img 
-          src={restaurantHubLogo} 
-          alt="Restaurant Hub" 
-          className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2"
-        />
+        <a 
+          href="https://www.customli.io" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <img 
+            src={restaurantHubLogo} 
+            alt="Restaurant Hub" 
+            className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2 cursor-pointer"
+          />
+        </a>
         <p className="text-xs text-gray-500 text-right">
           Copyright 2025 - www.customli.io - Restaurant Marketing & Management
         </p>
