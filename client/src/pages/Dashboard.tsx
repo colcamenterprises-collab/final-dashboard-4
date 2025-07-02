@@ -11,7 +11,7 @@ import SalesByPaymentType from "@/components/SalesByPaymentType";
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
-import customliLogo from "@assets/Restaurant Hub Customli_1751464938261.png";
+import restaurantHubLogo from "@assets/Restuarant Hub (1)_1751479223695.png";
 
 export default function Dashboard() {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -306,12 +306,12 @@ export default function Dashboard() {
         </Card>
       </div>
       
-      {/* Customli Logo and Copyright */}
+      {/* Restaurant Hub Logo and Copyright */}
       <div className="flex flex-col items-end mt-8 mb-4">
         <img 
-          src={customliLogo} 
-          alt="Customli" 
-          className="h-6 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2"
+          src={restaurantHubLogo} 
+          alt="Restaurant Hub" 
+          className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2"
         />
         <p className="text-xs text-gray-500 text-right">
           Copyright 2025 - www.customli.io - Restaurant Marketing & Management
