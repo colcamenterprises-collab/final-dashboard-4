@@ -683,7 +683,7 @@ export class LoyverseReceiptService {
         console.log("No receipts found, using authentic July 1-2 payment data");
         return [
           { name: 'Cash', value: 43.2, amount: 4700.00, color: '#22c55e' },
-          { name: 'Grab', value: 46.9, amount: 5248.00, color: '#ef4444' },
+          { name: 'Grab', value: 48.3, amount: 5248.00, color: '#ef4444' },
           { name: 'QR Code', value: 8.5, amount: 929.00, color: '#3b82f6' }
         ];
       }
@@ -697,12 +697,13 @@ export class LoyverseReceiptService {
         let displayName = paymentMethod;
         if (paymentMethod.toLowerCase().includes('grab')) {
           displayName = 'Grab';
-        } else if (paymentMethod.toLowerCase().includes('qr') || paymentMethod.toLowerCase().includes('scan')) {
+        } else if (paymentMethod.toLowerCase().includes('qr') || paymentMethod.toLowerCase().includes('scan') || paymentMethod.toLowerCase().includes('other')) {
           displayName = 'QR Code';
         } else if (paymentMethod.toLowerCase().includes('cash')) {
           displayName = 'Cash';
-        } else if (paymentMethod.toLowerCase().includes('card') || paymentMethod.toLowerCase().includes('credit')) {
-          displayName = 'Card';
+        } else {
+          // All other payment methods get categorized as QR Code
+          displayName = 'QR Code';
         }
 
         acc[displayName] = (acc[displayName] || 0) + amount;

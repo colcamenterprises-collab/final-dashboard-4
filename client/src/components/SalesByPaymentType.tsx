@@ -34,7 +34,7 @@ export default function SalesByPaymentType() {
         <div className="bg-white p-3 border rounded shadow-lg">
           <p className="font-semibold">{data.name}</p>
           <p className="text-sm text-gray-600">
-            {formatCurrency(data.amount)} ({data.value.toFixed(1)}%)
+            {data.value.toFixed(1)}%
           </p>
         </div>
       );
@@ -99,14 +99,9 @@ export default function SalesByPaymentType() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-lg font-semibold text-gray-900">
-          <span className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Sales by Payment Type
-          </span>
-          <span className="text-sm font-normal text-gray-600">
-            This Month: {formatCurrency(totalAmount)}
-          </span>
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+          <CreditCard className="h-5 w-5" />
+          Sales by Payment Type
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -132,7 +127,7 @@ export default function SalesByPaymentType() {
           </ResponsiveContainer>
         </div>
         
-        <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <div className="mt-4 grid grid-cols-1 gap-2 text-sm">
           {paymentData.map((item) => (
             <div key={item.name} className="flex justify-between items-center p-2 bg-gray-50 rounded">
               <div className="flex items-center gap-2">
@@ -143,8 +138,7 @@ export default function SalesByPaymentType() {
                 <span className="font-medium">{item.name}</span>
               </div>
               <div className="text-right">
-                <div className="font-semibold">{formatCurrency(item.amount)}</div>
-                <div className="text-xs text-gray-600">{item.value.toFixed(1)}%</div>
+                <div className="font-semibold">{item.value.toFixed(1)}%</div>
               </div>
             </div>
           ))}
