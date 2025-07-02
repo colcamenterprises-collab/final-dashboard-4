@@ -306,13 +306,16 @@ export default function Dashboard() {
         </Card>
       </div>
       
-      {/* Customli Logo - Bottom Right */}
-      <div className="fixed bottom-4 right-4 z-10">
+      {/* Customli Logo and Copyright */}
+      <div className="flex flex-col items-end mt-8 mb-4">
         <img 
           src={customliLogo} 
           alt="Customli" 
-          className="h-5 w-auto opacity-80 hover:opacity-100 transition-opacity"
+          className="h-6 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2"
         />
+        <p className="text-xs text-gray-500 text-right">
+          Copyright 2025 - www.customli.io - Restaurant Marketing & Management
+        </p>
       </div>
     </div>
   );
