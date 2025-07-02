@@ -11,6 +11,7 @@ import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import Expenses from "@/pages/Expenses";
 import POSLoyverse from "@/pages/POSLoyverse";
+import RecipeManagement from "@/pages/RecipeManagement";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/finance" component={Finance} />
         <Route path="/expenses" component={Expenses} />
         <Route path="/pos-loyverse" component={POSLoyverse} />
+        <Route path="/recipe-management" component={RecipeManagement} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

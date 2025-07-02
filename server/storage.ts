@@ -1,7 +1,7 @@
 import { 
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
-  expenseSuppliers, expenseCategories,
+  expenseSuppliers, expenseCategories, ingredients, recipes, recipeIngredients,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
@@ -9,7 +9,10 @@ import {
   type StaffShift, type InsertStaffShift, type DailySales, type InsertDailySales,
   type DailyStockSales, type InsertDailyStockSales,
   type ExpenseSupplier, type InsertExpenseSupplier,
-  type ExpenseCategory, type InsertExpenseCategory
+  type ExpenseCategory, type InsertExpenseCategory,
+  type Ingredient, type InsertIngredient,
+  type Recipe, type InsertRecipe,
+  type RecipeIngredient, type InsertRecipeIngredient
 } from "@shared/schema";
 
 export interface IStorage {
@@ -85,6 +88,27 @@ export interface IStorage {
   createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
   searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]>;
   getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined>;
+  
+  // Ingredients
+  getIngredients(): Promise<Ingredient[]>;
+  createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
+  updateIngredient(id: number, updates: Partial<Ingredient>): Promise<Ingredient>;
+  deleteIngredient(id: number): Promise<void>;
+  getIngredientsByCategory(category: string): Promise<Ingredient[]>;
+  
+  // Recipes
+  getRecipes(): Promise<Recipe[]>;
+  createRecipe(recipe: InsertRecipe): Promise<Recipe>;
+  updateRecipe(id: number, updates: Partial<Recipe>): Promise<Recipe>;
+  deleteRecipe(id: number): Promise<void>;
+  getRecipeById(id: number): Promise<Recipe | undefined>;
+  
+  // Recipe Ingredients
+  getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]>;
+  addRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient>;
+  updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient>;
+  removeRecipeIngredient(id: number): Promise<void>;
+  calculateRecipeCost(recipeId: number): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -101,6 +125,9 @@ export class MemStorage implements IStorage {
   private staffShifts: Map<number, StaffShift> = new Map();
   private dailySales: Map<number, DailySales> = new Map();
   private dailyStockSales: Map<number, DailyStockSales> = new Map();
+  private ingredients: Map<number, Ingredient> = new Map();
+  private recipes: Map<number, Recipe> = new Map();
+  private recipeIngredients: Map<number, RecipeIngredient> = new Map();
   private currentId: number = 1;
 
   constructor() {
@@ -663,6 +690,186 @@ export class MemStorage implements IStorage {
       };
       this.dailyStockSales.set(id, form);
     });
+    
+    // Seed initial ingredients
+    this.seedIngredients();
+  }
+
+  private seedIngredients() {
+    // Real Loyverse ingredients data from CSV
+    const ingredientData: (InsertIngredient & {id: number})[] = [
+      { id: 1, name: "Bacon Long", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "strip", supplier: "Makro", notes: "Long bacon strips" },
+      { id: 2, name: "Bacon Short", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "strip", supplier: "Makro", notes: "Short bacon strips" },
+      { id: 3, name: "Burger Bun", category: "Ingredients", unitPrice: "8.00", packageSize: "1", unit: "bun", supplier: "Bakery", notes: "Burger buns" },
+      { id: 4, name: "Butter", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Butter portions" },
+      { id: 5, name: "Cajun Seasoning", category: "Ingredients", unitPrice: "7.00", packageSize: "1", unit: "portion", supplier: "Spice Shop", notes: "Cajun seasoning mix" },
+      { id: 6, name: "Cheese Slice", category: "Ingredients", unitPrice: "4.30", packageSize: "1", unit: "slice", supplier: "Dairy Supplier", notes: "American cheese slices" },
+      { id: 7, name: "Chicken Fillet", category: "Ingredients", unitPrice: "20.00", packageSize: "1", unit: "piece", supplier: "Meat Supplier", notes: "Chicken breast fillet" },
+      { id: 8, name: "Chipotle Sauce", category: "Ingredients", unitPrice: "1.80", packageSize: "1", unit: "portion", supplier: "Sauce Co", notes: "Chipotle sauce" },
+      { id: 9, name: "Fries", category: "Ingredients", unitPrice: "9.10", packageSize: "130", unit: "g", supplier: "Frozen Foods", notes: "French fries portion" },
+      { id: 10, name: "Jalapeños", category: "Ingredients", unitPrice: "3.65", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Pickled jalapeños" },
+      { id: 11, name: "Ketchup", category: "Ingredients", unitPrice: "1.00", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Tomato ketchup" },
+      { id: 12, name: "Mayonnaise", category: "Ingredients", unitPrice: "1.80", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Mayonnaise" },
+      { id: 13, name: "Meat Patty", category: "Ingredients", unitPrice: "30.00", packageSize: "1", unit: "patty", supplier: "Meat Supplier", notes: "Beef patty 100g" },
+      { id: 14, name: "Mustard", category: "Ingredients", unitPrice: "1.50", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Yellow mustard" },
+      { id: 15, name: "Onion", category: "Ingredients", unitPrice: "69.00", packageSize: "1", unit: "kg", supplier: "Fresh Market", notes: "Fresh onions" },
+      { id: 16, name: "Pickles", category: "Ingredients", unitPrice: "2.25", packageSize: "1", unit: "portion", supplier: "Pickle Co", notes: "Dill pickles" },
+      { id: 17, name: "Red Cabbage", category: "Ingredients", unitPrice: "7.45", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Shredded red cabbage" },
+      { id: 18, name: "Salad", category: "Ingredients", unitPrice: "2.00", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Mixed salad greens" },
+      { id: 19, name: "Tomato", category: "Ingredients", unitPrice: "2.25", packageSize: "1", unit: "slice", supplier: "Fresh Market", notes: "Fresh tomato slices" },
+      { id: 20, name: "Original Burger Sauce", category: "Ingredients", unitPrice: "2.50", packageSize: "1", unit: "portion", supplier: "House Made", notes: "Signature burger sauce blend" }
+    ];
+
+    ingredientData.forEach(ingredient => {
+      const ingredientWithTimestamp: Ingredient = {
+        ...ingredient,
+        lastUpdated: new Date(),
+        createdAt: new Date(),
+        notes: ingredient.notes || null
+      };
+      this.ingredients.set(ingredient.id, ingredientWithTimestamp);
+    });
+
+    // Update current ID
+    this.currentId = Math.max(this.currentId, ...ingredientData.map(i => i.id)) + 1;
+  }
+
+  // Ingredient methods
+  async getIngredients(): Promise<Ingredient[]> {
+    return Array.from(this.ingredients.values());
+  }
+
+  async createIngredient(ingredient: InsertIngredient): Promise<Ingredient> {
+    const id = this.currentId++;
+    const ingredientRecord: Ingredient = {
+      ...ingredient,
+      id,
+      lastUpdated: new Date(),
+      createdAt: new Date()
+    };
+    this.ingredients.set(id, ingredientRecord);
+    return ingredientRecord;
+  }
+
+  async updateIngredient(id: number, updates: Partial<Ingredient>): Promise<Ingredient> {
+    const ingredient = this.ingredients.get(id);
+    if (!ingredient) {
+      throw new Error("Ingredient not found");
+    }
+    const updatedIngredient: Ingredient = {
+      ...ingredient,
+      ...updates,
+      id,
+      lastUpdated: new Date()
+    };
+    this.ingredients.set(id, updatedIngredient);
+    return updatedIngredient;
+  }
+
+  async deleteIngredient(id: number): Promise<void> {
+    this.ingredients.delete(id);
+  }
+
+  async getIngredientsByCategory(category: string): Promise<Ingredient[]> {
+    return Array.from(this.ingredients.values()).filter(ingredient => ingredient.category === category);
+  }
+
+  // Recipe methods
+  async getRecipes(): Promise<Recipe[]> {
+    return Array.from(this.recipes.values());
+  }
+
+  async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
+    const id = this.currentId++;
+    const recipeRecord: Recipe = {
+      ...recipe,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.recipes.set(id, recipeRecord);
+    return recipeRecord;
+  }
+
+  async updateRecipe(id: number, updates: Partial<Recipe>): Promise<Recipe> {
+    const recipe = this.recipes.get(id);
+    if (!recipe) {
+      throw new Error("Recipe not found");
+    }
+    const updatedRecipe: Recipe = {
+      ...recipe,
+      ...updates,
+      id,
+      updatedAt: new Date()
+    };
+    this.recipes.set(id, updatedRecipe);
+    return updatedRecipe;
+  }
+
+  async deleteRecipe(id: number): Promise<void> {
+    this.recipes.delete(id);
+    // Also remove associated recipe ingredients
+    Array.from(this.recipeIngredients.values())
+      .filter(ri => ri.recipeId === id)
+      .forEach(ri => this.recipeIngredients.delete(ri.id));
+  }
+
+  async getRecipeById(id: number): Promise<Recipe | undefined> {
+    return this.recipes.get(id);
+  }
+
+  // Recipe Ingredient methods
+  async getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]> {
+    return Array.from(this.recipeIngredients.values()).filter(ri => ri.recipeId === recipeId);
+  }
+
+  async addRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
+    const id = this.currentId++;
+    const recipeIngredientRecord: RecipeIngredient = {
+      ...recipeIngredient,
+      id
+    };
+    this.recipeIngredients.set(id, recipeIngredientRecord);
+    return recipeIngredientRecord;
+  }
+
+  async updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient> {
+    const recipeIngredient = this.recipeIngredients.get(id);
+    if (!recipeIngredient) {
+      throw new Error("Recipe ingredient not found");
+    }
+    const updatedRecipeIngredient: RecipeIngredient = {
+      ...recipeIngredient,
+      ...updates,
+      id
+    };
+    this.recipeIngredients.set(id, updatedRecipeIngredient);
+    return updatedRecipeIngredient;
+  }
+
+  async removeRecipeIngredient(id: number): Promise<void> {
+    this.recipeIngredients.delete(id);
+  }
+
+  async calculateRecipeCost(recipeId: number): Promise<number> {
+    const recipeIngredients = await this.getRecipeIngredients(recipeId);
+    let totalCost = 0;
+
+    for (const ri of recipeIngredients) {
+      const ingredient = this.ingredients.get(ri.ingredientId);
+      if (ingredient) {
+        const unitPrice = parseFloat(ingredient.unitPrice);
+        const packageSize = parseFloat(ingredient.packageSize);
+        const quantity = parseFloat(ri.quantity);
+        
+        // Calculate cost per unit
+        const costPerUnit = unitPrice / packageSize;
+        const ingredientCost = costPerUnit * quantity;
+        totalCost += ingredientCost;
+      }
+    }
+
+    return totalCost;
   }
 }
 

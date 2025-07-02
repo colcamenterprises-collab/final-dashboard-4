@@ -226,6 +226,46 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
+// Ingredients table
+export const ingredients = pgTable("ingredients", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  packageSize: text("package_size").notNull(),
+  unit: text("unit").notNull(),
+  supplier: text("supplier").notNull(),
+  notes: text("notes"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Recipes table
+export const recipes = pgTable("recipes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  servingSize: integer("serving_size").notNull(),
+  preparationTime: integer("preparation_time"),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Recipe Ingredients junction table
+export const recipeIngredients = pgTable("recipe_ingredients", {
+  id: serial("id").primaryKey(),
+  recipeId: integer("recipe_id").notNull().references(() => recipes.id),
+  ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unit: text("unit").notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true });
@@ -242,6 +282,9 @@ export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({ id:
 export const insertLoyverseReceiptSchema = createInsertSchema(loyverseReceipts).omit({ id: true });
 export const insertLoyverseShiftReportSchema = createInsertSchema(loyverseShiftReports).omit({ id: true });
 export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -274,3 +317,9 @@ export type LoyverseShiftReport = typeof loyverseShiftReports.$inferSelect;
 export type InsertLoyverseShiftReport = z.infer<typeof insertLoyverseShiftReportSchema>;
 export type DailyStockSales = typeof dailyStockSales.$inferSelect;
 export type InsertDailyStockSales = z.infer<typeof insertDailyStockSalesSchema>;
+export type Ingredient = typeof ingredients.$inferSelect;
+export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+export type Recipe = typeof recipes.$inferSelect;
+export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
+export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
+export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;

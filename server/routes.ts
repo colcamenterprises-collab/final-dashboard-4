@@ -7,7 +7,10 @@ import {
   insertExpenseCategorySchema,
   insertShoppingListSchema, 
   insertStaffShiftSchema,
-  insertTransactionSchema 
+  insertTransactionSchema,
+  insertIngredientSchema,
+  insertRecipeSchema,
+  insertRecipeIngredientSchema
 } from "@shared/schema";
 import { 
   analyzeReceipt, 
@@ -638,6 +641,219 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching daily stock sales:', error);
       res.status(500).json({ error: 'Failed to fetch daily stock sales' });
+    }
+  });
+
+  // Ingredients routes
+  app.get('/api/ingredients', async (req, res) => {
+    try {
+      const { category } = req.query;
+      if (category) {
+        const ingredients = await storage.getIngredientsByCategory(category as string);
+        res.json(ingredients);
+      } else {
+        const ingredients = await storage.getIngredients();
+        res.json(ingredients);
+      }
+    } catch (error) {
+      console.error('Error fetching ingredients:', error);
+      res.status(500).json({ error: 'Failed to fetch ingredients' });
+    }
+  });
+
+  app.post('/api/ingredients', async (req, res) => {
+    try {
+      const parsed = insertIngredientSchema.parse(req.body);
+      const ingredient = await storage.createIngredient(parsed);
+      res.json(ingredient);
+    } catch (error) {
+      console.error('Error creating ingredient:', error);
+      res.status(400).json({ error: 'Failed to create ingredient' });
+    }
+  });
+
+  app.put('/api/ingredients/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const ingredient = await storage.updateIngredient(id, req.body);
+      res.json(ingredient);
+    } catch (error) {
+      console.error('Error updating ingredient:', error);
+      res.status(500).json({ error: 'Failed to update ingredient' });
+    }
+  });
+
+  app.delete('/api/ingredients/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      await storage.deleteIngredient(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting ingredient:', error);
+      res.status(500).json({ error: 'Failed to delete ingredient' });
+    }
+  });
+
+  // Recipes routes
+  app.get('/api/recipes', async (req, res) => {
+    try {
+      const recipes = await storage.getRecipes();
+      res.json(recipes);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+      res.status(500).json({ error: 'Failed to fetch recipes' });
+    }
+  });
+
+  app.get('/api/recipes/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const recipe = await storage.getRecipeById(id);
+      if (!recipe) {
+        return res.status(404).json({ error: 'Recipe not found' });
+      }
+      res.json(recipe);
+    } catch (error) {
+      console.error('Error fetching recipe:', error);
+      res.status(500).json({ error: 'Failed to fetch recipe' });
+    }
+  });
+
+  app.post('/api/recipes', async (req, res) => {
+    try {
+      const parsed = insertRecipeSchema.parse(req.body);
+      const recipe = await storage.createRecipe(parsed);
+      res.json(recipe);
+    } catch (error) {
+      console.error('Error creating recipe:', error);
+      res.status(400).json({ error: 'Failed to create recipe' });
+    }
+  });
+
+  app.put('/api/recipes/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const recipe = await storage.updateRecipe(id, req.body);
+      res.json(recipe);
+    } catch (error) {
+      console.error('Error updating recipe:', error);
+      res.status(500).json({ error: 'Failed to update recipe' });
+    }
+  });
+
+  app.delete('/api/recipes/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      await storage.deleteRecipe(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting recipe:', error);
+      res.status(500).json({ error: 'Failed to delete recipe' });
+    }
+  });
+
+  // Recipe Ingredients routes
+  app.get('/api/recipes/:id/ingredients', async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      if (isNaN(recipeId)) {
+        return res.status(400).json({ error: 'Invalid recipe ID format' });
+      }
+      const ingredients = await storage.getRecipeIngredients(recipeId);
+      res.json(ingredients);
+    } catch (error) {
+      console.error('Error fetching recipe ingredients:', error);
+      res.status(500).json({ error: 'Failed to fetch recipe ingredients' });
+    }
+  });
+
+  app.post('/api/recipe-ingredients', async (req, res) => {
+    try {
+      const parsed = insertRecipeIngredientSchema.parse(req.body);
+      const recipeIngredient = await storage.addRecipeIngredient(parsed);
+      
+      // Recalculate recipe cost
+      const totalCost = await storage.calculateRecipeCost(parsed.recipeId);
+      await storage.updateRecipe(parsed.recipeId, { totalCost: totalCost.toString() });
+      
+      res.json(recipeIngredient);
+    } catch (error) {
+      console.error('Error adding recipe ingredient:', error);
+      res.status(400).json({ error: 'Failed to add recipe ingredient' });
+    }
+  });
+
+  app.put('/api/recipe-ingredients/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const recipeIngredient = await storage.updateRecipeIngredient(id, req.body);
+      
+      // Recalculate recipe cost
+      const totalCost = await storage.calculateRecipeCost(recipeIngredient.recipeId);
+      await storage.updateRecipe(recipeIngredient.recipeId, { totalCost: totalCost.toString() });
+      
+      res.json(recipeIngredient);
+    } catch (error) {
+      console.error('Error updating recipe ingredient:', error);
+      res.status(500).json({ error: 'Failed to update recipe ingredient' });
+    }
+  });
+
+  app.delete('/api/recipe-ingredients/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      
+      // Get the recipe ingredient first to know which recipe to update
+      const recipeIngredients = Array.from((storage as any).recipeIngredients.values());
+      const recipeIngredient = recipeIngredients.find((ri: any) => ri.id === id);
+      
+      await storage.removeRecipeIngredient(id);
+      
+      // Recalculate recipe cost if we found the recipe ingredient
+      if (recipeIngredient) {
+        const totalCost = await storage.calculateRecipeCost(recipeIngredient.recipeId);
+        await storage.updateRecipe(recipeIngredient.recipeId, { totalCost: totalCost.toString() });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error removing recipe ingredient:', error);
+      res.status(500).json({ error: 'Failed to remove recipe ingredient' });
+    }
+  });
+
+  app.get('/api/recipes/:id/cost', async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      if (isNaN(recipeId)) {
+        return res.status(400).json({ error: 'Invalid recipe ID format' });
+      }
+      const cost = await storage.calculateRecipeCost(recipeId);
+      res.json({ cost });
+    } catch (error) {
+      console.error('Error calculating recipe cost:', error);
+      res.status(500).json({ error: 'Failed to calculate recipe cost' });
     }
   });
 
