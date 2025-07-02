@@ -11,7 +11,7 @@ import SalesByPaymentType from "@/components/SalesByPaymentType";
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
-import restaurantHubLogo from "@assets/Restuarant Hub (1)_1751479223695.png";
+import restaurantHubLogo from "@assets/Restuarant Hub (2)_1751479657885.png";
 
 export default function Dashboard() {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
