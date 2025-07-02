@@ -112,7 +112,7 @@ export default function ShiftBalanceSummary() {
                   </Badge>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <div className="text-gray-600">Total Sales</div>
                     <div className="font-semibold">{formatCurrency(shift.totalSales)}</div>
@@ -124,10 +124,6 @@ export default function ShiftBalanceSummary() {
                   <div>
                     <div className="text-gray-600">Card</div>
                     <div className="font-medium">{formatCurrency(shift.cardSales)}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-600">Staff</div>
-                    <div className="font-medium">{shift.completedBy}</div>
                   </div>
                 </div>
 

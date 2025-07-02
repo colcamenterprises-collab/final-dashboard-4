@@ -536,9 +536,20 @@ export class LoyverseReceiptService {
       const totalSales = parseFloat(shift.totalSales || "0");
       const cashSales = parseFloat(shift.cashSales || "0");
       const cardSales = parseFloat(shift.cardSales || "0");
-      const calculatedTotal = cashSales + cardSales;
-      const variance = Math.abs(totalSales - calculatedTotal);
-      const isBalanced = variance <= 30; // 30 baht tolerance
+      
+      // Use authentic cash balance data from report_data if available
+      const reportData = shift.reportData || {};
+      let expectedCash = (reportData as any)?.expected_cash || 0;
+      let actualCash = (reportData as any)?.actual_cash || 0;
+      let cashVariance = Math.abs(expectedCash - actualCash);
+      
+      // If no authentic cash data, fall back to sales calculation
+      if (expectedCash === 0 && actualCash === 0) {
+        const calculatedTotal = cashSales + cardSales;
+        cashVariance = Math.abs(totalSales - calculatedTotal);
+      }
+      
+      const isBalanced = cashVariance <= 40; // 40 baht variance tolerance
 
       return {
         id: shift.id,
@@ -548,12 +559,14 @@ export class LoyverseReceiptService {
         totalSales,
         cashSales,
         cardSales,
-        calculatedTotal,
-        variance,
+        calculatedTotal: cashSales + cardSales,
+        variance: cashVariance,
         isBalanced,
         staffMembers: [],
         totalTransactions: shift.totalTransactions,
-        completedBy: ""
+        completedBy: "",
+        expectedCash,
+        actualCash
       };
     });
   }
