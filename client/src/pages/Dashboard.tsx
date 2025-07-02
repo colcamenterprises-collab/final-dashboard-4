@@ -120,7 +120,7 @@ export default function Dashboard() {
         <Card className="restaurant-card">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">June 2025</p>
+            <p className="text-sm text-gray-500 mt-1">July 2025</p>
           </CardHeader>
           <CardContent>
             {topMenuItemsError ? (
@@ -185,6 +185,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
+        
+        {/* Sales by Payment Type */}
+        <SalesByPaymentType />
         
         {/* Recent Transactions */}
         <Card className="restaurant-card">
