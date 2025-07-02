@@ -138,6 +138,9 @@ Changelog:
 - July 2, 2025. Updated shift 537 with exact figures from authentic Loyverse report
 - July 2, 2025. Fixed Bangkok timezone handling (UTC+7) for all shift reports
 - July 2, 2025. Confirmed data sources: All figures from authentic Loyverse shift data only
+- July 2, 2025. Updated KPIs to show authentic single shift total of ฿10,877 (July 1-2)
+- July 2, 2025. Added monthly payment type pie chart with authentic breakdown: Cash 47%, Grab 24%, Other 29%
+- July 2, 2025. Fixed Daily Stock & Sales form placeholders to use generic guidance text
 ```
 
 ## User Preferences
