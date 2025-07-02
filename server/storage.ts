@@ -93,6 +93,8 @@ export class MemStorage implements IStorage {
   private inventory: Map<number, Inventory> = new Map();
   private shoppingList: Map<number, ShoppingList> = new Map();
   private expenses: Map<number, Expense> = new Map();
+  private expenseSuppliers: Map<number, ExpenseSupplier> = new Map();
+  private expenseCategories: Map<number, ExpenseCategory> = new Map();
   private transactions: Map<number, Transaction> = new Map();
   private aiInsights: Map<number, AiInsight> = new Map();
   private suppliers: Map<number, Supplier> = new Map();
@@ -130,6 +132,46 @@ export class MemStorage implements IStorage {
       { name: "BakingPro Supplies", category: "Baking & Dry Goods", contactInfo: { email: "sales@bakingpro.com", phone: "555-0456", address: "456 Baker Ave" }, deliveryTime: "2-3 days", status: "available" }
     ];
     supplierData.forEach(supplier => this.createSupplier(supplier));
+
+    // Seed expense suppliers
+    const expenseSupplierData: InsertExpenseSupplier[] = [
+      { name: "Other", isDefault: true },
+      { name: "Mr DIY", isDefault: true },
+      { name: "Bakery", isDefault: true },
+      { name: "Makro", isDefault: true },
+      { name: "Supercheap", isDefault: true },
+      { name: "Lazada", isDefault: true },
+      { name: "Lotus", isDefault: true },
+      { name: "Big C", isDefault: true },
+      { name: "Landlord - Rent", isDefault: true },
+      { name: "Printing Shop", isDefault: true },
+      { name: "Company Expenses", isDefault: true },
+      { name: "Wages", isDefault: true },
+      { name: "Wages - Bonus", isDefault: true },
+      { name: "GO Wholesale", isDefault: true },
+      { name: "Director - Personal", isDefault: true },
+      { name: "Utilities - GAS/ Electric/Phone", isDefault: true }
+    ];
+    expenseSupplierData.forEach(supplier => this.createExpenseSupplier(supplier));
+
+    // Seed expense categories
+    const expenseCategoryData: InsertExpenseCategory[] = [
+      { name: "Food", isDefault: true },
+      { name: "Beverage", isDefault: true },
+      { name: "Wages", isDefault: true },
+      { name: "Rent", isDefault: true },
+      { name: "Utilities", isDefault: true },
+      { name: "Kitchen Supplies & Packaging", isDefault: true },
+      { name: "Administration", isDefault: true },
+      { name: "Marketing", isDefault: true },
+      { name: "Printing", isDefault: true },
+      { name: "Staff Expenses (from account)", isDefault: true },
+      { name: "Travel", isDefault: true },
+      { name: "Personal (director)", isDefault: true },
+      { name: "Maintenance", isDefault: true },
+      { name: "Company Expense", isDefault: true }
+    ];
+    expenseCategoryData.forEach(category => this.createExpenseCategory(category));
 
     // Seed transactions to make the data more realistic
     const transactionData: InsertTransaction[] = [
@@ -353,7 +395,17 @@ export class MemStorage implements IStorage {
 
   async createExpense(expense: InsertExpense): Promise<Expense> {
     const id = this.currentId++;
-    const expenseRecord: Expense = { ...expense, id };
+    const currentDate = new Date();
+    const expenseRecord: Expense = { 
+      ...expense, 
+      id,
+      date: expense.date || currentDate,
+      month: expense.month || currentDate.getMonth() + 1,
+      year: expense.year || currentDate.getFullYear(),
+      items: expense.items || null,
+      notes: expense.notes || null,
+      createdAt: currentDate
+    };
     this.expenses.set(id, expenseRecord);
     return expenseRecord;
   }
@@ -368,6 +420,52 @@ export class MemStorage implements IStorage {
     });
     
     return categories;
+  }
+
+  async getExpensesByMonth(month: number, year: number): Promise<Expense[]> {
+    const expenses = Array.from(this.expenses.values());
+    return expenses.filter(expense => expense.month === month && expense.year === year);
+  }
+
+  async getMonthToDateExpenses(): Promise<number> {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    const monthlyExpenses = await this.getExpensesByMonth(currentMonth, currentYear);
+    return monthlyExpenses.reduce((total, expense) => total + parseFloat(expense.amount), 0);
+  }
+
+  async getExpenseSuppliers(): Promise<ExpenseSupplier[]> {
+    return Array.from(this.expenseSuppliers.values());
+  }
+
+  async createExpenseSupplier(supplier: InsertExpenseSupplier): Promise<ExpenseSupplier> {
+    const id = this.currentId++;
+    const supplierRecord: ExpenseSupplier = { 
+      ...supplier, 
+      id,
+      isDefault: supplier.isDefault || null,
+      createdAt: new Date()
+    };
+    this.expenseSuppliers.set(id, supplierRecord);
+    return supplierRecord;
+  }
+
+  async getExpenseCategories(): Promise<ExpenseCategory[]> {
+    return Array.from(this.expenseCategories.values());
+  }
+
+  async createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory> {
+    const id = this.currentId++;
+    const categoryRecord: ExpenseCategory = { 
+      ...category, 
+      id,
+      isDefault: category.isDefault || null,
+      createdAt: new Date()
+    };
+    this.expenseCategories.set(id, categoryRecord);
+    return categoryRecord;
   }
 
   async getTransactions(): Promise<Transaction[]> {

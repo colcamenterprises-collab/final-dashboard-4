@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertExpenseSchema, 
+  insertExpenseSupplierSchema,
+  insertExpenseCategorySchema,
   insertShoppingListSchema, 
   insertStaffShiftSchema,
   insertTransactionSchema 
