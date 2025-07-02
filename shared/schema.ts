@@ -58,11 +58,31 @@ export const shoppingList = pgTable("shopping_list", {
 // Expenses table
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
-  description: text("description").notNull(),
+  date: timestamp("date").notNull().defaultNow(),
+  supplier: text("supplier").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
-  date: timestamp("date").notNull(),
-  paymentMethod: text("payment_method").notNull(),
+  items: text("items"),
+  notes: text("notes"),
+  month: integer("month").notNull(), // For month-by-month analysis
+  year: integer("year").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Expense Suppliers table
+export const expenseSuppliers = pgTable("expense_suppliers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Expense Categories table
+export const expenseCategories = pgTable("expense_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Transactions table
@@ -212,7 +232,9 @@ export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertExpenseSupplierSchema = createInsertSchema(expenseSuppliers).omit({ id: true, createdAt: true });
+export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true });
 export const insertAiInsightSchema = createInsertSchema(aiInsights).omit({ id: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true });
@@ -234,6 +256,10 @@ export type ShoppingList = typeof shoppingList.$inferSelect;
 export type InsertShoppingList = z.infer<typeof insertShoppingListSchema>;
 export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type ExpenseSupplier = typeof expenseSuppliers.$inferSelect;
+export type InsertExpenseSupplier = z.infer<typeof insertExpenseSupplierSchema>;
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type AiInsight = typeof aiInsights.$inferSelect;

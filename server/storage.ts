@@ -1,12 +1,15 @@
 import { 
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
+  expenseSuppliers, expenseCategories,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
   type AiInsight, type InsertAiInsight, type Supplier, type InsertSupplier,
   type StaffShift, type InsertStaffShift, type DailySales, type InsertDailySales,
-  type DailyStockSales, type InsertDailyStockSales
+  type DailyStockSales, type InsertDailyStockSales,
+  type ExpenseSupplier, type InsertExpenseSupplier,
+  type ExpenseCategory, type InsertExpenseCategory
 } from "@shared/schema";
 
 export interface IStorage {
@@ -49,6 +52,16 @@ export interface IStorage {
   getExpenses(): Promise<Expense[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
   getExpensesByCategory(): Promise<Record<string, number>>;
+  getExpensesByMonth(month: number, year: number): Promise<Expense[]>;
+  getMonthToDateExpenses(): Promise<number>;
+  
+  // Expense Suppliers
+  getExpenseSuppliers(): Promise<ExpenseSupplier[]>;
+  createExpenseSupplier(supplier: InsertExpenseSupplier): Promise<ExpenseSupplier>;
+  
+  // Expense Categories
+  getExpenseCategories(): Promise<ExpenseCategory[]>;
+  createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
   
   // Transactions
   getTransactions(): Promise<Transaction[]>;
