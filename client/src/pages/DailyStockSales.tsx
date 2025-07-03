@@ -283,11 +283,16 @@ export default function DailyStockSales() {
   };
 
   const onSubmit = (data: FormData) => {
+    console.log("Form submission attempt:", data);
+    console.log("Shopping entries:", data.shoppingEntries);
+    console.log("Receipt photos:", receiptPhotos);
+    
     // Check if shopping entries exist but no receipt photos uploaded
     const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
     const hasReceiptPhotos = receiptPhotos.length > 0;
     
     if (hasShoppingItems && !hasReceiptPhotos) {
+      console.log("Blocking submission - shopping items exist but no receipt photos");
       toast({
         title: "Receipt Photo Required",
         description: "Please upload at least one receipt photo when shopping expenses are listed.",
@@ -296,6 +301,7 @@ export default function DailyStockSales() {
       return;
     }
     
+    console.log("Proceeding with form submission");
     const submissionData = { ...data, isDraft: false, receiptPhotos };
     createMutation.mutate(submissionData);
   };
@@ -315,7 +321,14 @@ export default function DailyStockSales() {
         
         <TabsContent value="new-form" className="space-y-6">
           <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          console.log("Form validation errors:", errors);
+          toast({
+            title: "Form Validation Error",
+            description: "Please check all required fields and fix any errors before submitting.",
+            variant: "destructive"
+          });
+        })} className="space-y-6">
           
           {/* Who is Completing Form */}
           <Card>
@@ -1650,10 +1663,16 @@ export default function DailyStockSales() {
             
             <Button 
               type="submit" 
-              disabled={createMutation.isPending}
-              className="min-w-[200px]"
+              disabled={createMutation.isPending || ((form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0)}
+              className={`min-w-[200px] ${
+                (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              }`}
             >
-              {createMutation.isPending ? "Submitting..." : "Submit Form"}
+              {createMutation.isPending ? "Submitting..." : 
+               (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 ? "Receipt Photo Required" :
+               "Submit Form"}
             </Button>
           </div>
           </form>
