@@ -153,6 +153,7 @@ Changelog:
 - July 3, 2025. Integrated Smash Bros Burgers (Rawai) store data from authentic Loyverse POS system
 - July 3, 2025. Resolved Replit environment variable caching issues for stable API connectivity 
 - July 3, 2025. Added compact Loyverse connection status widget to main dashboard for real-time monitoring
+- July 3, 2025. Replaced inventory value KPI card with integrated Loyverse POS connection status showing real-time sync status
 ```
 
 ## User Preferences

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot } from "lucide-react";
+import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot, Wifi } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,7 @@ import KPICard from "@/components/KPICard";
 import SalesChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
-import LoyverseConnectionStatus from "@/components/LoyverseConnectionStatus";
+
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
@@ -39,6 +39,12 @@ export default function Dashboard() {
 
   const { data: mtdExpenses } = useQuery<{ total: number }>({
     queryKey: ["/api/expenses/month-to-date"],
+  });
+
+  // Add Loyverse status query
+  const { data: status } = useQuery<{ connected: boolean; message: string }>({
+    queryKey: ["/api/loyverse/live/status"],
+    refetchInterval: 10000, // Check every 10 seconds
   });
 
   const resolveInsightMutation = useMutation({
@@ -97,13 +103,13 @@ export default function Dashboard() {
           iconBgColor="bg-green-100"
         />
         <KPICard
-          title="Inventory Value"
-          value={`$${((kpis?.inventoryValue || 0) / 1000).toFixed(2)}K`}
-          change="Low Stock Alert"
-          changeType="neutral"
-          icon={Package}
-          iconColor="text-blue-600"
-          iconBgColor="bg-blue-100"
+          title="Loyverse POS"
+          value={status?.connected ? "Connected" : "Disconnected"}
+          change={status?.connected ? "Live Sync Active" : "Connection Failed"}
+          changeType={status?.connected ? "positive" : "negative"}
+          icon={Wifi}
+          iconColor={status?.connected ? "text-green-600" : "text-red-600"}
+          iconBgColor={status?.connected ? "bg-green-100" : "bg-red-100"}
         />
         <KPICard
           title="MTD Expenses"
@@ -116,10 +122,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Loyverse Connection Status */}
-      <div className="mb-6">
-        <LoyverseConnectionStatus compact={true} />
-      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Sales Chart */}
