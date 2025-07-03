@@ -77,7 +77,7 @@ export default function RecipeManagement() {
 
   // Mutations
   const createRecipeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/recipes', { method: 'POST', body: JSON.stringify(data) }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/recipes', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       setIsCreateDialogOpen(false);
@@ -87,7 +87,7 @@ export default function RecipeManagement() {
   });
 
   const addIngredientMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/recipe-ingredients', { method: 'POST', body: JSON.stringify(data) }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/recipe-ingredients', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
@@ -99,7 +99,7 @@ export default function RecipeManagement() {
 
   const updateIngredientMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => 
-      apiRequest(`/api/recipe-ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      apiRequest('PUT', `/api/recipe-ingredients/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
@@ -109,7 +109,7 @@ export default function RecipeManagement() {
   });
 
   const removeIngredientMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/recipe-ingredients/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/recipe-ingredients/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
@@ -118,7 +118,7 @@ export default function RecipeManagement() {
   });
 
   const deleteRecipeMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/recipes/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/recipes/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       setSelectedRecipe(null);
@@ -133,7 +133,7 @@ export default function RecipeManagement() {
   const onAddIngredient = (data: any) => {
     if (!selectedRecipe) return;
     
-    const selectedIngredient = ingredients.find(ing => ing.id === parseInt(data.ingredientId));
+    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === parseInt(data.ingredientId));
     if (!selectedIngredient) return;
 
     addIngredientMutation.mutate({
@@ -154,8 +154,8 @@ export default function RecipeManagement() {
 
   const calculateRecipeCost = () => {
     let totalCost = 0;
-    recipeIngredients.forEach((ri: RecipeIngredient) => {
-      const ingredient = ingredients.find(ing => ing.id === ri.ingredientId);
+    (recipeIngredients as RecipeIngredient[]).forEach((ri: RecipeIngredient) => {
+      const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ri.ingredientId);
       if (ingredient) {
         const unitPrice = parseFloat(ingredient.unitPrice);
         const packageSize = parseFloat(ingredient.packageSize);
@@ -168,12 +168,12 @@ export default function RecipeManagement() {
   };
 
   const getIngredientName = (ingredientId: number) => {
-    const ingredient = ingredients.find(ing => ing.id === ingredientId);
+    const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
     return ingredient?.name || "Unknown";
   };
 
   const getIngredientCost = (ingredientId: number, quantity: string) => {
-    const ingredient = ingredients.find(ing => ing.id === ingredientId);
+    const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
     if (!ingredient) return "0.00";
     
     const unitPrice = parseFloat(ingredient.unitPrice);
@@ -341,14 +341,14 @@ export default function RecipeManagement() {
         {/* Recipes List */}
         <Card>
           <CardHeader>
-            <CardTitle>Recipes ({recipes.length})</CardTitle>
+            <CardTitle>Recipes ({(recipes as Recipe[]).length})</CardTitle>
             <CardDescription>
               Manage your restaurant's recipes and their costs
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recipes.map((recipe: Recipe) => (
+              {(recipes as Recipe[]).map((recipe: Recipe) => (
                 <div
                   key={recipe.id}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -378,7 +378,7 @@ export default function RecipeManagement() {
                 </div>
               ))}
               
-              {recipes.length === 0 && (
+              {(recipes as Recipe[]).length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <ChefHat className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No recipes yet. Create your first recipe!</p>
@@ -449,7 +449,7 @@ export default function RecipeManagement() {
                 {/* Ingredients Section */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Ingredients ({recipeIngredients.length})</h3>
+                    <h3 className="font-medium">Ingredients ({(recipeIngredients as RecipeIngredient[]).length})</h3>
                     <Dialog open={isAddIngredientDialogOpen} onOpenChange={setIsAddIngredientDialogOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm">
@@ -479,7 +479,7 @@ export default function RecipeManagement() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {ingredients.map((ingredient: Ingredient) => (
+                                      {(ingredients as Ingredient[]).map((ingredient: Ingredient) => (
                                         <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
                                           {ingredient.name} (฿{ingredient.unitPrice}/{ingredient.unit})
                                         </SelectItem>
@@ -524,7 +524,7 @@ export default function RecipeManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    {recipeIngredients.map((ri: RecipeIngredient) => (
+                    {(recipeIngredients as RecipeIngredient[]).map((ri: RecipeIngredient) => (
                       <div key={ri.id} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex-1">
                           <span className="font-medium">{getIngredientName(ri.ingredientId)}</span>
@@ -554,7 +554,7 @@ export default function RecipeManagement() {
                       </div>
                     ))}
 
-                    {recipeIngredients.length === 0 && (
+                    {(recipeIngredients as RecipeIngredient[]).length === 0 && (
                       <div className="text-center py-4 text-gray-500">
                         <Calculator className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No ingredients added yet</p>
@@ -562,7 +562,7 @@ export default function RecipeManagement() {
                     )}
                   </div>
 
-                  {recipeIngredients.length > 0 && (
+                  {(recipeIngredients as RecipeIngredient[]).length > 0 && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">Total Recipe Cost:</span>
