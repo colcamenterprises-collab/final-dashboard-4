@@ -203,28 +203,28 @@ export default function ExpensesMerged() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="container mx-auto p-4 space-y-6 max-w-7xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Expense Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Expense Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Comprehensive expense tracking with AI-powered bank statement analysis
           </p>
         </div>
         <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Add Expense
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Expense</DialogTitle>
             </DialogHeader>
             <Form {...expenseForm}>
               <form onSubmit={expenseForm.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={expenseForm.control}
                     name="description"
@@ -381,7 +381,7 @@ export default function ExpensesMerged() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
@@ -433,7 +433,7 @@ export default function ExpensesMerged() {
           <CardTitle>Search and Filter</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -445,9 +445,9 @@ export default function ExpensesMerged() {
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="All months" />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,7 +460,7 @@ export default function ExpensesMerged() {
                 </SelectContent>
               </Select>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -486,7 +486,7 @@ export default function ExpensesMerged() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <Input
               type="file"
               accept=".pdf,.csv,.xlsx"
@@ -540,44 +540,83 @@ export default function ExpensesMerged() {
               <p className="text-muted-foreground">No expenses found.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Supplier</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredExpenses.map((expense: any) => (
-                    <TableRow key={expense.id}>
-                      <TableCell>
-                        {format(new Date(expense.date), "MMM dd, yyyy")}
-                      </TableCell>
-                      <TableCell className="font-medium">{expense.description}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{expense.category}</Badge>
-                      </TableCell>
-                      <TableCell className="font-mono">฿{parseFloat(expense.amount).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{expense.paymentMethod}</Badge>
-                      </TableCell>
-                      <TableCell>{expense.supplier || "—"}</TableCell>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Supplier</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses.map((expense: any) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>
+                          {format(new Date(expense.date), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell className="font-medium">{expense.description}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{expense.category}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono">฿{parseFloat(expense.amount).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{expense.paymentMethod}</Badge>
+                        </TableCell>
+                        <TableCell>{expense.supplier || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-4">
+                {filteredExpenses.map((expense: any) => (
+                  <Card key={expense.id}>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm">{expense.description}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(expense.date), "MMM dd, yyyy")}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-sm">
+                            ฿{parseFloat(expense.amount).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <Badge variant="outline" className="text-xs">
+                          {expense.category}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {expense.paymentMethod}
+                        </Badge>
+                        {expense.supplier && (
+                          <Badge variant="outline" className="text-xs">
+                            {expense.supplier}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Quick Actions */}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
           <DialogTrigger asChild>
             <Button variant="outline">
