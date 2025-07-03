@@ -185,7 +185,7 @@ export default function DailyStockSales() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', data),
+    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', { ...data, receiptPhotos }),
     onSuccess: () => {
       toast({
         title: "Form Submitted Successfully",
@@ -279,11 +279,14 @@ export default function DailyStockSales() {
   
   const saveDraft = () => {
     const formData = form.getValues();
+    console.log("Saving draft with data:", formData);
+    console.log("Receipt photos for draft:", receiptPhotos);
     saveDraftMutation.mutate(formData);
   };
 
   const onSubmit = (data: FormData) => {
     console.log("Form submission attempt:", data);
+    console.log("Form validation errors:", form.formState.errors);
     console.log("Shopping entries:", data.shoppingEntries);
     console.log("Receipt photos:", receiptPhotos);
     
