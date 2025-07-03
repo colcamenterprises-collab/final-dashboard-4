@@ -158,6 +158,9 @@ Changelog:
 - July 3, 2025. Integrated sophisticated financial analysis prompt for comparing bank statements against internal expense records
 - July 3, 2025. Added AI-powered expense-to-bank-transaction matching with predefined categories (Inventory, Wages, Utilities, Rent, Supplies, Marketing, Other)
 - July 3, 2025. Implemented structured JSON output for AI analysis including matched/unmatched expenses, suspect transactions, and category totals
+- July 3, 2025. Merged separate expense pages into unified ExpensesMerged page with Add Expenses form prominently positioned at top
+- July 3, 2025. Combined basic expense tracking with enhanced AI-powered bank statement analysis in single comprehensive interface
+- July 3, 2025. Streamlined navigation by removing duplicate expense entries and consolidating all expense functionality
 ```
 
 ## User Preferences
