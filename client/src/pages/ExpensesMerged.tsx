@@ -19,17 +19,14 @@ import { useToast } from "@/hooks/use-toast";
 import { insertExpenseSchema, insertExpenseSupplierSchema, insertExpenseCategorySchema } from "@shared/schema";
 import type { Expense, ExpenseSupplier, ExpenseCategory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { z } from "zod";
 
-type ExpenseFormData = {
-  description: string;
-  amount: string;
-  category: string;
-  date: string;
-  paymentMethod: string;
-  supplier?: string;
-  items?: string;
-  notes?: string;
-};
+// Create a form-specific schema that uses string for date (from HTML input)
+const expenseFormSchema = insertExpenseSchema.extend({
+  date: z.string().min(1, "Date is required")
+});
+
+type ExpenseFormData = z.infer<typeof expenseFormSchema>;
 
 interface BankStatement {
   id: number;
@@ -77,7 +74,7 @@ export default function ExpensesMerged() {
 
   // Forms
   const expenseForm = useForm<ExpenseFormData>({
-    resolver: zodResolver(insertExpenseSchema),
+    resolver: zodResolver(expenseFormSchema),
     defaultValues: {
       description: "",
       amount: "",
@@ -109,11 +106,11 @@ export default function ExpensesMerged() {
   // Mutations
   const addExpenseMutation = useMutation({
     mutationFn: (data: ExpenseFormData) => {
-      return fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const transformedData = {
+        ...data,
+        date: new Date(data.date), // Convert string to Date object
+      };
+      return apiRequest("/api/expenses", "POST", transformedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -124,6 +121,14 @@ export default function ExpensesMerged() {
       toast({
         title: "Expense added successfully",
         description: "The expense has been recorded.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error adding expense:", error);
+      toast({
+        title: "Error adding expense",
+        description: error.message || "Failed to add expense. Please try again.",
+        variant: "destructive",
       });
     },
   });
