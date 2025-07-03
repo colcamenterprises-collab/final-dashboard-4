@@ -329,10 +329,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", async (req, res) => {
     try {
-      const validatedData = insertExpenseSchema.parse(req.body);
+      const { date, amount, category, supplier, items, notes } = req.body;
+      
+      // Calculate month and year from date
+      const expenseDate = new Date(date);
+      const month = expenseDate.getMonth() + 1;
+      const year = expenseDate.getFullYear();
+      
+      const expenseData = {
+        date: expenseDate,
+        amount: String(amount),
+        category,
+        supplier,
+        items: items || null,
+        notes: notes || null,
+        month,
+        year
+      };
+      
+      const validatedData = insertExpenseSchema.parse(expenseData);
       const expense = await storage.createExpense(validatedData);
       res.json(expense);
     } catch (error) {
+      console.error("Expense creation error:", error);
       res.status(400).json({ error: "Invalid expense data" });
     }
   });
