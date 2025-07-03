@@ -1034,6 +1034,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Live Loyverse API integration endpoints
+  app.get('/api/loyverse/live/status', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const isConnected = await loyverseAPI.testConnection();
+      
+      res.json({ 
+        connected: isConnected,
+        message: isConnected ? 'Loyverse API connected successfully' : 'Loyverse API connection failed'
+      });
+    } catch (error) {
+      console.error('Loyverse status check error:', error);
+      res.status(500).json({ connected: false, message: 'Connection test failed' });
+    }
+  });
+
+  app.post('/api/loyverse/live/sync-receipts', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const receiptCount = await loyverseAPI.syncTodaysReceipts();
+      
+      res.json({ 
+        success: true, 
+        receiptsCount: receiptCount,
+        message: `Successfully synced ${receiptCount} receipts from today`
+      });
+    } catch (error) {
+      console.error('Receipt sync error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to sync receipts: ${error.message}` 
+      });
+    }
+  });
+
+  app.post('/api/loyverse/live/sync-items', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const itemCount = await loyverseAPI.syncAllItems();
+      
+      res.json({ 
+        success: true, 
+        itemsCount: itemCount,
+        message: `Successfully synced ${itemCount} menu items`
+      });
+    } catch (error) {
+      console.error('Items sync error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to sync items: ${error.message}` 
+      });
+    }
+  });
+
+  app.post('/api/loyverse/live/sync-customers', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const customerCount = await loyverseAPI.syncCustomers();
+      
+      res.json({ 
+        success: true, 
+        customersCount: customerCount,
+        message: `Successfully synced ${customerCount} customers`
+      });
+    } catch (error) {
+      console.error('Customer sync error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to sync customers: ${error.message}` 
+      });
+    }
+  });
+
+  app.get('/api/loyverse/live/stores', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const storesData = await loyverseAPI.getStores();
+      
+      res.json(storesData);
+    } catch (error) {
+      console.error('Stores fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch stores' });
+    }
+  });
+
+  app.get('/api/loyverse/live/items', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const limit = parseInt(req.query.limit as string) || 50;
+      const cursor = req.query.cursor as string;
+      
+      const itemsData = await loyverseAPI.getItems({ limit, cursor });
+      
+      res.json(itemsData);
+    } catch (error) {
+      console.error('Items fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch items' });
+    }
+  });
+
+  app.get('/api/loyverse/live/receipts', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const startTime = req.query.start_time as string;
+      const endTime = req.query.end_time as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const cursor = req.query.cursor as string;
+      
+      const receiptsData = await loyverseAPI.getReceipts({
+        start_time: startTime,
+        end_time: endTime,
+        limit,
+        cursor
+      });
+      
+      res.json(receiptsData);
+    } catch (error) {
+      console.error('Receipts fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch receipts' });
+    }
+  });
+
+  app.post('/api/loyverse/live/start-realtime', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const intervalMinutes = parseInt(req.body.intervalMinutes) || 5;
+      
+      // Start real-time sync (non-blocking)
+      loyverseAPI.startRealtimeSync(intervalMinutes);
+      
+      res.json({ 
+        success: true, 
+        message: `Real-time sync started with ${intervalMinutes} minute intervals`
+      });
+    } catch (error) {
+      console.error('Real-time sync start error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to start real-time sync: ${error.message}` 
+      });
+    }
+  });
+
   // Test endpoint for email service
   app.post('/api/test-email', async (req, res) => {
     try {
