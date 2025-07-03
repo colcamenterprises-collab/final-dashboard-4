@@ -22,7 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
 
 // Create a form-specific schema that uses string for date (from HTML input)
-const expenseFormSchema = insertExpenseSchema.extend({
+const expenseFormSchema = insertExpenseSchema.omit({ date: true }).extend({
   date: z.string().min(1, "Date is required")
 });
 
