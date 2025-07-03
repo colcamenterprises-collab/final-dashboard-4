@@ -86,8 +86,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KPICard
           title="Today's Sales"
-          value={`$${kpis?.todaySales.toLocaleString() || '0'}`}
-          change="+12.5%"
+          value={`฿${kpis?.todaySales.toLocaleString() || '0'}`}
+          change="July 3rd Shift Net Sales"
           changeType="positive"
           icon={DollarSign}
           iconColor="text-primary"
@@ -113,7 +113,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="MTD Expenses"
-          value={`$${mtdExpenses?.total?.toLocaleString() || '0'}`}
+          value={`฿${mtdExpenses?.total?.toLocaleString() || '0'}`}
           change="This Month"
           changeType="neutral"
           icon={CreditCard}

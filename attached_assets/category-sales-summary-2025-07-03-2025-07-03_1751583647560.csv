@@ -1,0 +1,5 @@
+Category,Items sold,Gross sales,Items refunded,Refunds,Discounts,Net sales,Cost of goods,Gross profit,Margin,Taxes
+Drinks,3.000,120.00,0.000,0.00,0.00,120.00,39.02,80.98,67.48%,0.00
+Side Orders,8.000,843.00,0.000,0.00,0.00,843.00,133.18,709.82,84.20%,0.00
+Smash Burger Sets (Meal Deals),9.000,2711.00,0.000,0.00,255.20,2455.80,1045.75,1410.05,57.42%,0.00
+Smash Burgers,21.000,4726.00,1.000,220.00,0.00,4506.00,1793.63,2712.37,60.19%,0.00
