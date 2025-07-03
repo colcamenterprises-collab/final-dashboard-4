@@ -147,6 +147,10 @@ Changelog:
 - July 3, 2025. Implemented Gmail email notification system for Daily Stock & Sales management summaries
 - July 3, 2025. Created automated email triggers with professional HTML templates, cash balance validation, and receipt attachments
 - July 3, 2025. Added comprehensive email content including sales breakdowns, expense tracking, and shopping list generation
+- July 3, 2025. Built comprehensive live Loyverse POS API integration with real-time data synchronization
+- July 3, 2025. Created LoyverseLive management interface for connection status, manual sync controls, and real-time automation
+- July 3, 2025. Added API endpoints for receipts, menu items, customers, stores with proper authentication handling
+- July 3, 2025. Integrated Smash Bros Burgers (Rawai) store data from authentic Loyverse POS system
 ```
 
 ## User Preferences

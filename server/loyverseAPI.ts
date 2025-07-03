@@ -137,6 +137,8 @@ class LoyverseAPI {
       accessToken: process.env.LOYVERSE_ACCESS_TOKEN || ''
     };
 
+    console.log('🔧 Loyverse API initialized with token:', this.config.accessToken ? `${this.config.accessToken.substring(0, 8)}...` : 'NOT SET');
+    
     if (!this.config.accessToken) {
       console.warn('⚠️ Loyverse access token not configured');
     }

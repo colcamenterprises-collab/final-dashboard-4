@@ -1050,6 +1050,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
   app.post('/api/loyverse/live/sync-receipts', async (req, res) => {
     try {
       const { loyverseAPI } = await import('./loyverseAPI');
