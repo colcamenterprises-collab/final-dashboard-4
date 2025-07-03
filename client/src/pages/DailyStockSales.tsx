@@ -143,22 +143,20 @@ export default function DailyStockSales() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', data),
     onSuccess: () => {
       toast({
         title: "Form Submitted Successfully",
         description: "Daily stock and sales data has been saved and shopping list generated."
       });
       queryClient.invalidateQueries({ queryKey: ['/api/shopping-list'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
       form.reset();
     },
     onError: (error) => {
       console.error('Error submitting form:', error);
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to submit form. Please try again.",
         variant: "destructive"
       });
