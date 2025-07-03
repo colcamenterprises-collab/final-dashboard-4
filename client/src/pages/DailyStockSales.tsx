@@ -112,12 +112,32 @@ const shoppingEntrySchema = z.object({
 });
 
 const formSchema = insertDailyStockSalesSchema.extend({
-  foodItems: z.record(z.number().min(0)),
-  drinkStock: z.record(z.number().min(0)),
-  kitchenItems: z.record(z.number().min(0)),
-  packagingItems: z.record(z.number().min(0)),
+  foodItems: z.record(z.number().min(0)).optional(),
+  drinkStock: z.record(z.number().min(0)).optional(),
+  kitchenItems: z.record(z.number().min(0)).optional(),
+  packagingItems: z.record(z.number().min(0)).optional(),
   wageEntries: z.array(wageEntrySchema).default([]),
   shoppingEntries: z.array(shoppingEntrySchema).default([])
+}).partial({
+  // Make most fields optional except for the essential ones
+  startingCash: true,
+  endingCash: true,
+  grabSales: true,
+  foodPandaSales: true,
+  aroiDeeSales: true,
+  qrScanSales: true,
+  cashSales: true,
+  totalSales: true,
+  salaryWages: true,
+  shopping: true,
+  gasExpense: true,
+  totalExpenses: true,
+  burgerBunsStock: true,
+  rollsOrderedCount: true,
+  meatWeight: true,
+  drinkStockCount: true,
+  rollsOrderedConfirmed: true,
+  expenseDescription: true
 });
 
 type FormData = z.infer<typeof formSchema>;

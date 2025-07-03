@@ -207,46 +207,46 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   shiftType: text("shift_type").notNull(), // Night Shift, Day Shift
   shiftDate: timestamp("shift_date").notNull(),
   
-  // Cash Management
-  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).notNull(),
-  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).notNull(),
+  // Cash Management - Optional
+  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).default('0'),
+  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).default('0'),
   
-  // Sales Data
-  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).notNull(),
-  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).notNull(),
-  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).notNull(),
-  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).notNull(),
-  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).notNull(),
-  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).notNull(),
+  // Sales Data - Optional
+  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).default('0'),
+  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).default('0'),
+  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).default('0'),
+  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).default('0'),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).default('0'),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default('0'),
   
-  // Expenses
-  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).notNull(),
-  shopping: decimal("shopping", { precision: 10, scale: 2 }).notNull(),
-  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).notNull(),
-  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).notNull(),
+  // Expenses - Optional
+  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).default('0'),
+  shopping: decimal("shopping", { precision: 10, scale: 2 }).default('0'),
+  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).default('0'),
+  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).default('0'),
   wageEntries: jsonb("wage_entries").notNull().default('[]'), // Array of {name, amount, notes}
   shoppingEntries: jsonb("shopping_entries").notNull().default('[]'), // Array of {item, amount, notes, shop, customShop}
   expenseDescription: text("expense_description"),
   
-  // Stock Counts
-  burgerBunsStock: integer("burger_buns_stock").notNull(),
-  rollsOrderedCount: integer("rolls_ordered_count").notNull(),
-  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).notNull(), // in kg
-  drinkStockCount: integer("drink_stock_count").notNull(),
+  // Stock Counts - Optional
+  burgerBunsStock: integer("burger_buns_stock").default(0),
+  rollsOrderedCount: integer("rolls_ordered_count").default(0),
+  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).default('0'), // in kg
+  drinkStockCount: integer("drink_stock_count").default(0),
   
-  // Food Items Required - organized into Fresh Food, Frozen, and Shelf Items
+  // Food Items Required - Optional
   freshFood: jsonb("fresh_food").notNull().default('{}'), // Fresh food items (Salad, Tomatos, etc.) with otherItems array
   frozenFood: jsonb("frozen_food").notNull().default('{}'), // Frozen food items (Bacon, Cheese, etc.)
   shelfItems: jsonb("shelf_items").notNull().default('{}'), // Shelf stable items
   
-  // Keep existing food items for backward compatibility
-  foodItems: jsonb("food_items").notNull(), // Contains all food item requirements
-  drinkStock: jsonb("drink_stock").notNull(), // Current drink inventory
-  kitchenItems: jsonb("kitchen_items").notNull(),
-  packagingItems: jsonb("packaging_items").notNull(),
+  // Keep existing food items for backward compatibility - Optional
+  foodItems: jsonb("food_items").notNull().default('{}'), // Contains all food item requirements
+  drinkStock: jsonb("drink_stock").notNull().default('{}'), // Current drink inventory
+  kitchenItems: jsonb("kitchen_items").notNull().default('{}'),
+  packagingItems: jsonb("packaging_items").notNull().default('{}'),
   
-  // Confirmation
-  rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").notNull(),
+  // Confirmation - Optional
+  rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").default(false),
   
   // Photo receipts
   receiptPhotos: jsonb("receipt_photos").notNull().default('[]'), // Array of {filename, base64Data, uploadedAt}
