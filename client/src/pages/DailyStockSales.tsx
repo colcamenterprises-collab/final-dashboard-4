@@ -40,10 +40,10 @@ const SHELF_ITEMS = [
 // Legacy food items (empty - all items moved to appropriate sections)
 const LEGACY_FOOD_ITEMS: string[] = [];
 
-// Drink items with current requirements
+// Drink items with current requirements (matching backend requirements)
 const DRINK_ITEMS = [
-  'Coke', 'Coke Zero', 'Schweppes Manow', 'Fanta Strawberry', 'Orange Fanta',
-  'Sprite', 'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
+  'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
+  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
 ];
 
 // Kitchen supplies

@@ -23,32 +23,47 @@ import { loyverseReceiptService } from "./services/loyverseReceipts";
 import { loyverseShiftReports } from "@shared/schema";
 import { db } from "./db";
 
-// Drink minimum stock levels with package sizes
+// Drink minimum stock levels with package sizes (based on authentic requirements)
 const DRINK_REQUIREMENTS = {
-  'Coke': { minStock: 30, packageSize: 6, unit: 'cans' },
-  'Coke Zero': { minStock: 24, packageSize: 6, unit: 'cans' },
-  'Sprite': { minStock: 20, packageSize: 6, unit: 'cans' },
-  'Schweppes Manow': { minStock: 20, packageSize: 6, unit: 'cans' },
-  'Fanta Orange': { minStock: 20, packageSize: 6, unit: 'cans' },
-  'Fanta Strawberry': { minStock: 20, packageSize: 6, unit: 'cans' },
-  'Kids Orange': { minStock: 20, packageSize: 8, unit: 'cans' },
-  'Kids Apple': { minStock: 20, packageSize: 8, unit: 'cans' },
-  'Soda Water': { minStock: 16, packageSize: 6, unit: 'bottles' },
-  'Bottled Water': { minStock: 24, packageSize: 16, unit: 'bottles' }
+  'Coke': { minStock: 30, packageSize: 24, unit: 'cans' },
+  'Schweppes Manow': { minStock: 24, packageSize: 4, unit: 'cans' },
+  'Coke Zero': { minStock: 30, packageSize: 6, unit: 'cans' },
+  'Fanta Strawberry': { minStock: 24, packageSize: 6, unit: 'cans' },
+  'Fanta Orange': { minStock: 24, packageSize: 6, unit: 'cans' },
+  'Kids Apple Juice': { minStock: 12, packageSize: 6, unit: 'cans' },
+  'Kids Orange': { minStock: 12, packageSize: 6, unit: 'cans' },
+  'Soda Water': { minStock: 18, packageSize: 6, unit: 'bottles' },
+  'Bottle Water': { minStock: 24, packageSize: 12, unit: 'bottles' }
 };
 
 async function generateShoppingListFromStockForm(formData: any) {
   try {
-    // Process food items (anything with quantity > 0 needs to be purchased)
-    const foodItems = formData.foodItems || {};
-    
-    for (const [itemName, quantity] of Object.entries(foodItems)) {
+    // Process Fresh Food items (anything with quantity > 0 needs to be purchased)
+    const freshFood = formData.freshFood || {};
+    for (const [itemName, quantity] of Object.entries(freshFood)) {
       if (typeof quantity === 'number' && quantity > 0) {
         await storage.createShoppingListItem({
           itemName,
           quantity: quantity.toString(),
           unit: 'each',
-          supplier: 'Food Supplier',
+          supplier: 'Fresh Market',
+          pricePerUnit: '0',
+          priority: 'high',
+          selected: false,
+          aiGenerated: false
+        });
+      }
+    }
+
+    // Process Frozen Food items (anything with quantity > 0 needs to be purchased)
+    const frozenFood = formData.frozenFood || {};
+    for (const [itemName, quantity] of Object.entries(frozenFood)) {
+      if (typeof quantity === 'number' && quantity > 0) {
+        await storage.createShoppingListItem({
+          itemName,
+          quantity: quantity.toString(),
+          unit: 'each',
+          supplier: 'Frozen Foods',
           pricePerUnit: '0',
           priority: 'medium',
           selected: false,
@@ -57,7 +72,24 @@ async function generateShoppingListFromStockForm(formData: any) {
       }
     }
 
-    // Process drinks based on minimum stock requirements
+    // Process Shelf Items (anything with quantity > 0 needs to be purchased)
+    const shelfItems = formData.shelfItems || {};
+    for (const [itemName, quantity] of Object.entries(shelfItems)) {
+      if (typeof quantity === 'number' && quantity > 0) {
+        await storage.createShoppingListItem({
+          itemName,
+          quantity: quantity.toString(),
+          unit: 'each',
+          supplier: 'Pantry Supplier',
+          pricePerUnit: '0',
+          priority: 'low',
+          selected: false,
+          aiGenerated: false
+        });
+      }
+    }
+
+    // Process drinks based on minimum stock requirements (only if current stock < minimum)
     const drinkStock = formData.drinkStock || {};
     
     for (const [drinkName, currentStock] of Object.entries(drinkStock)) {
@@ -79,6 +111,34 @@ async function generateShoppingListFromStockForm(formData: any) {
           });
         }
       }
+    }
+
+    // Process burger buns stock count (only if quantity > 0)
+    if (formData.burgerBunsStock && typeof formData.burgerBunsStock === 'number' && formData.burgerBunsStock > 0) {
+      await storage.createShoppingListItem({
+        itemName: 'Burger Buns',
+        quantity: formData.burgerBunsStock.toString(),
+        unit: 'packs',
+        supplier: 'Bakery',
+        pricePerUnit: '0',
+        priority: 'high',
+        selected: false,
+        aiGenerated: false
+      });
+    }
+
+    // Process meat weight (only if quantity > 0)
+    if (formData.meatWeight && parseFloat(formData.meatWeight) > 0) {
+      await storage.createShoppingListItem({
+        itemName: 'Ground Beef',
+        quantity: formData.meatWeight,
+        unit: 'kg',
+        supplier: 'Meat Supplier',
+        pricePerUnit: '0',
+        priority: 'high',
+        selected: false,
+        aiGenerated: false
+      });
     }
 
     // Process kitchen items
