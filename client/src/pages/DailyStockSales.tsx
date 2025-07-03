@@ -427,7 +427,7 @@ export default function DailyStockSales() {
                 Cash Management
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="startingCash"
@@ -455,7 +455,7 @@ export default function DailyStockSales() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="grabSales"
@@ -603,7 +603,7 @@ export default function DailyStockSales() {
                 <p className="text-sm text-gray-600 mb-3">Please list each staff member individually</p>
                 
                 <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
+                  <div className="hidden md:grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
                     <div className="col-span-4">Name</div>
                     <div className="col-span-3">Amount</div>
                     <div className="col-span-4">Notes</div>
@@ -611,12 +611,13 @@ export default function DailyStockSales() {
                   </div>
                   
                   {(form.watch('wageEntries') || []).map((_, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-3">
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 md:p-0 border md:border-0 rounded-lg md:rounded-none">
                       <FormField
                         control={form.control}
                         name={`wageEntries.${index}.name`}
                         render={({ field }) => (
-                          <FormItem className="col-span-4">
+                          <FormItem className="md:col-span-4">
+                            <FormLabel className="md:hidden text-sm font-medium">Name</FormLabel>
                             <FormControl>
                               <Input {...field} placeholder="Staff Name" />
                             </FormControl>
@@ -627,7 +628,8 @@ export default function DailyStockSales() {
                         control={form.control}
                         name={`wageEntries.${index}.amount`}
                         render={({ field }) => (
-                          <FormItem className="col-span-3">
+                          <FormItem className="md:col-span-3">
+                            <FormLabel className="md:hidden text-sm font-medium">Amount</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
@@ -644,14 +646,15 @@ export default function DailyStockSales() {
                         control={form.control}
                         name={`wageEntries.${index}.notes`}
                         render={({ field }) => (
-                          <FormItem className="col-span-4">
+                          <FormItem className="md:col-span-4">
+                            <FormLabel className="md:hidden text-sm font-medium">Notes</FormLabel>
                             <FormControl>
                               <Input {...field} placeholder="Wages & list overtime etc" />
                             </FormControl>
                           </FormItem>
                         )}
                       />
-                      <div className="col-span-1">
+                      <div className="md:col-span-1 flex justify-end md:justify-center">
                         <Button 
                           type="button" 
                           variant="outline" 
@@ -940,7 +943,7 @@ export default function DailyStockSales() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="totalSales"

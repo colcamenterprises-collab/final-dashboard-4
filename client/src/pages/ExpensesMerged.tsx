@@ -38,7 +38,7 @@ interface BankStatement {
   aiAnalysis: any;
 }
 
-export default function ExpensesMerged() {
+function ExpensesMerged() {
   const { toast } = useToast();
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
@@ -703,3 +703,5 @@ export default function ExpensesMerged() {
     </div>
   );
 }
+
+export default ExpensesMerged;
