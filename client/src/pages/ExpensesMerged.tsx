@@ -110,7 +110,7 @@ function ExpensesMerged() {
         ...data,
         date: new Date(data.date), // Convert string to Date object
       };
-      return apiRequest("/api/expenses", "POST", transformedData);
+      return apiRequest("POST", "/api/expenses", transformedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -134,7 +134,7 @@ function ExpensesMerged() {
   });
 
   const addSupplierMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expense-suppliers", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/expense-suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-suppliers"] });
       setIsAddSupplierOpen(false);
@@ -147,7 +147,7 @@ function ExpensesMerged() {
   });
 
   const addCategoryMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expense-categories", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/expense-categories", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-categories"] });
       setIsAddCategoryOpen(false);
