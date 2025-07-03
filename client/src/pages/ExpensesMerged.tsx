@@ -178,6 +178,7 @@ function ExpensesMerged() {
   });
 
   const onSubmit = (data: ExpenseFormData) => {
+    console.log("Form data being submitted:", data);
     addExpenseMutation.mutate(data);
   };
 
