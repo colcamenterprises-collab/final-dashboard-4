@@ -283,6 +283,19 @@ export default function DailyStockSales() {
   };
 
   const onSubmit = (data: FormData) => {
+    // Check if shopping entries exist but no receipt photos uploaded
+    const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
+    const hasReceiptPhotos = receiptPhotos.length > 0;
+    
+    if (hasShoppingItems && !hasReceiptPhotos) {
+      toast({
+        title: "Receipt Photo Required",
+        description: "Please upload at least one receipt photo when shopping expenses are listed.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const submissionData = { ...data, isDraft: false, receiptPhotos };
     createMutation.mutate(submissionData);
   };
@@ -644,10 +657,19 @@ export default function DailyStockSales() {
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
                 {/* Photo Receipt Section */}
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className={`mb-6 p-4 rounded-lg ${
+                  (form.watch('shoppingEntries') || []).length > 0 
+                    ? 'bg-red-50 border-2 border-red-200' 
+                    : 'bg-blue-50'
+                }`}>
                   <h4 className="flex items-center gap-2 text-md font-medium mb-3">
                     <Camera className="h-4 w-4" />
                     Shopping Receipt Photos
+                    {(form.watch('shoppingEntries') || []).length > 0 && (
+                      <span className="text-red-600 text-sm font-normal">
+                        (Required when shopping items listed)
+                      </span>
+                    )}
                   </h4>
                   <div className="space-y-3">
                     <div className="flex items-center gap-4">
@@ -661,14 +683,30 @@ export default function DailyStockSales() {
                       />
                       <label
                         htmlFor="receipt-photo"
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                          (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
                       >
                         <Camera className="h-4 w-4" />
                         Take Photo
                       </label>
-                      <span className="text-sm text-gray-600">
-                        {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">
+                          {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
+                        </span>
+                        {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 && (
+                          <span className="text-red-600 text-sm font-medium">
+                            ⚠️ Required
+                          </span>
+                        )}
+                        {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length > 0 && (
+                          <span className="text-green-600 text-sm font-medium">
+                            ✓ Complete
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
                     {receiptPhotos.length > 0 && (
@@ -693,6 +731,15 @@ export default function DailyStockSales() {
                       </div>
                     )}
                   </div>
+                  
+                  {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Important:</strong> Receipt photos are required when shopping expenses are listed. 
+                        You cannot submit the form without uploading at least one receipt photo.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-3">
