@@ -964,9 +964,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const dailyStockSales = await storage.createDailyStockSales(dataToSave);
       
-      // Only generate shopping list if this is not a draft
+      // Only generate shopping list and send email if this is not a draft
       if (!formData.isDraft) {
         await generateShoppingListFromStockForm(formData);
+        
+        // Send management summary email
+        try {
+          const { emailService } = await import('./emailService');
+          const shoppingList = await storage.getShoppingList();
+          
+          await emailService.sendManagementSummary({
+            formData: dailyStockSales,
+            shoppingList,
+            receiptPhotos: formData.receiptPhotos || [],
+            submissionTime: new Date()
+          });
+          
+          console.log('Management summary email sent successfully');
+        } catch (emailError) {
+          console.error('Failed to send management summary email:', emailError);
+          // Don't fail the entire request if email fails
+        }
       }
       
       res.json(dailyStockSales);
@@ -1013,6 +1031,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating daily stock sales:', error);
       res.status(500).json({ error: 'Failed to update daily stock sales' });
+    }
+  });
+
+  // Test endpoint for email service
+  app.post('/api/test-email', async (req, res) => {
+    try {
+      const { emailService } = await import('./emailService');
+      
+      // Test with minimal data
+      const testData = {
+        formData: {
+          id: 1,
+          completedBy: 'Test User',
+          shiftType: 'Evening',
+          shiftDate: new Date(),
+          startingCash: '1000',
+          endingCash: '1200',
+          totalSales: '2000',
+          cashSales: '800',
+          grabSales: '500',
+          foodPandaSales: '300',
+          aroiDeeSales: '200',
+          qrScanSales: '200',
+          totalExpenses: '600',
+          salaryWages: '400',
+          shopping: '100',
+          gasExpense: '100',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          receiptPhotos: [],
+          wageEntries: [],
+          isDraft: false
+        },
+        shoppingList: [],
+        receiptPhotos: [],
+        submissionTime: new Date()
+      };
+      
+      const result = await emailService.sendManagementSummary(testData);
+      
+      if (result) {
+        res.json({ success: true, message: 'Test email sent successfully' });
+      } else {
+        res.status(500).json({ success: false, message: 'Failed to send test email' });
+      }
+    } catch (error) {
+      console.error('Test email error:', error);
+      res.status(500).json({ success: false, message: 'Email service error', error: error.message });
     }
   });
 
