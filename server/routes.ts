@@ -953,15 +953,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/daily-stock-sales', async (req, res) => {
     try {
-      const dailyStockSales = await storage.createDailyStockSales(req.body);
+      const formData = req.body;
       
-      // After creating the form, generate shopping list items based on requirements
-      await generateShoppingListFromStockForm(req.body);
+      // Handle photo receipts and draft status
+      const dataToSave = {
+        ...formData,
+        receiptPhotos: formData.receiptPhotos || [],
+        isDraft: formData.isDraft || false
+      };
+      
+      const dailyStockSales = await storage.createDailyStockSales(dataToSave);
+      
+      // Only generate shopping list if this is not a draft
+      if (!formData.isDraft) {
+        await generateShoppingListFromStockForm(formData);
+      }
       
       res.json(dailyStockSales);
     } catch (error) {
       console.error('Error creating daily stock sales:', error);
       res.status(500).json({ error: 'Failed to create daily stock sales' });
+    }
+  });
+  
+  // Get draft forms
+  app.get('/api/daily-stock-sales/drafts', async (req, res) => {
+    try {
+      const drafts = await storage.getDraftForms();
+      res.json(drafts);
+    } catch (error) {
+      console.error('Error fetching draft forms:', error);
+      res.status(500).json({ error: 'Failed to fetch draft forms' });
+    }
+  });
+  
+  // Update an existing form (for converting drafts to final)
+  app.put('/api/daily-stock-sales/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      
+      const formData = req.body;
+      const dataToUpdate = {
+        ...formData,
+        receiptPhotos: formData.receiptPhotos || [],
+        isDraft: formData.isDraft || false
+      };
+      
+      const updatedForm = await storage.updateDailyStockSales(id, dataToUpdate);
+      
+      // Generate shopping list if converting from draft to final
+      if (!formData.isDraft) {
+        await generateShoppingListFromStockForm(formData);
+      }
+      
+      res.json(updatedForm);
+    } catch (error) {
+      console.error('Error updating daily stock sales:', error);
+      res.status(500).json({ error: 'Failed to update daily stock sales' });
     }
   });
 

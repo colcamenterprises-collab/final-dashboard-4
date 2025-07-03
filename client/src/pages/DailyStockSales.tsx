@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { insertDailyStockSalesSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText, Users } from "lucide-react";
+import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText, Users, Camera, ImageIcon, Save } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
@@ -93,6 +93,12 @@ export default function DailyStockSales() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedForm, setSelectedForm] = useState<DailyStockSales | null>(null);
+  
+  // Photo receipt state
+  const [receiptPhotos, setReceiptPhotos] = useState<Array<{filename: string, base64Data: string, uploadedAt: string}>>([]);
+  
+  // Draft functionality state
+  const [isDraft, setIsDraft] = useState(false);
 
   // Search query for completed forms
   const { data: completedForms = [], isLoading: searchLoading } = useQuery({
@@ -189,8 +195,60 @@ export default function DailyStockSales() {
     form.setValue('totalExpenses', total.toFixed(2));
   };
 
+  // Photo capture functionality
+  const handlePhotoCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      const newPhoto = {
+        filename: file.name,
+        base64Data,
+        uploadedAt: new Date().toISOString()
+      };
+      setReceiptPhotos(prev => [...prev, newPhoto]);
+      toast({
+        title: "Photo Added",
+        description: "Receipt photo has been captured and added to the form."
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const removeReceiptPhoto = (index: number) => {
+    setReceiptPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  // Draft saving mutation
+  const saveDraftMutation = useMutation({
+    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', { ...data, isDraft: true, receiptPhotos }),
+    onSuccess: () => {
+      toast({
+        title: "Draft Saved",
+        description: "Your form has been saved as a draft."
+      });
+      setIsDraft(true);
+    },
+    onError: (error) => {
+      console.error('Error saving draft:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const saveDraft = () => {
+    const formData = form.getValues();
+    saveDraftMutation.mutate(formData);
+  };
+
   const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
+    const submissionData = { ...data, isDraft: false, receiptPhotos };
+    createMutation.mutate(submissionData);
   };
 
   return (
@@ -1328,7 +1386,74 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
+          {/* Photo Receipt Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Shopping Receipt Photos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoCapture}
+                    className="hidden"
+                    id="receipt-photo"
+                  />
+                  <label
+                    htmlFor="receipt-photo"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Take Photo
+                  </label>
+                  <span className="text-sm text-gray-600">
+                    {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
+                  </span>
+                </div>
+                
+                {receiptPhotos.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {receiptPhotos.map((photo, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={photo.base64Data}
+                          alt={`Receipt ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeReceiptPhoto(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                        <p className="text-xs text-gray-500 mt-1">{photo.filename}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between">
+            <Button 
+              type="button"
+              onClick={saveDraft}
+              disabled={saveDraftMutation.isPending}
+              variant="outline"
+              className="min-w-[150px]"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saveDraftMutation.isPending ? "Saving..." : "Save as Draft"}
+            </Button>
+            
             <Button 
               type="submit" 
               disabled={createMutation.isPending}

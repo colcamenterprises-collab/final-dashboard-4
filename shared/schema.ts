@@ -222,6 +222,12 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   // Confirmation
   rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").notNull(),
   
+  // Photo receipts
+  receiptPhotos: jsonb("receipt_photos").notNull().default('[]'), // Array of {filename, base64Data, uploadedAt}
+  
+  // Draft status
+  isDraft: boolean("is_draft").notNull().default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });

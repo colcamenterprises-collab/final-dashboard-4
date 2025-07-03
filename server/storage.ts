@@ -88,6 +88,8 @@ export interface IStorage {
   createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
   searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]>;
   getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined>;
+  getDraftForms(): Promise<DailyStockSales[]>;
+  updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales>;
   
   // Ingredients
   getIngredients(): Promise<Ingredient[]>;
@@ -604,6 +606,27 @@ export class MemStorage implements IStorage {
 
   async getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined> {
     return this.dailyStockSales.get(id);
+  }
+  
+  async getDraftForms(): Promise<DailyStockSales[]> {
+    return Array.from(this.dailyStockSales.values()).filter(form => form.isDraft);
+  }
+  
+  async updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales> {
+    const existingForm = this.dailyStockSales.get(id);
+    if (!existingForm) {
+      throw new Error("Form not found");
+    }
+    
+    const updatedForm: DailyStockSales = {
+      ...existingForm,
+      ...data,
+      id,
+      updatedAt: new Date()
+    };
+    
+    this.dailyStockSales.set(id, updatedForm);
+    return updatedForm;
   }
 
   private seedDailyStockSalesData() {
