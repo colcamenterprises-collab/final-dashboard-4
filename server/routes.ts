@@ -1200,6 +1200,23 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Import historical Daily Sales and Stock forms
+  app.post("/api/daily-stock-sales/import-historical", async (req, res) => {
+    try {
+      console.log("Starting import of historical Daily Sales and Stock forms...");
+      
+      // Import from CSV file
+      const { importHistoricalData } = await import('./importHistoricalData');
+      const result = await importHistoricalData();
+      
+      console.log(`Import completed: ${result.imported} records imported`);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to import historical data:", error);
+      res.status(500).json({ error: "Failed to import historical data" });
+    }
+  });
+
   // Live Loyverse API integration endpoints
   app.get('/api/loyverse/live/status', async (req, res) => {
     try {
