@@ -284,22 +284,55 @@ class LoyverseAPI {
     return this.makeRequest<{ shifts: LoyverseShift[]; cursor?: string }>(endpoint);
   }
 
-  // Sync Methods
+  // Sync Methods with Bangkok timezone support (6pm-3am shift cycle)
   async syncTodaysReceipts(): Promise<number> {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-
-      console.log(`📊 Syncing receipts from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+      // Get current shift time range in Bangkok timezone
+      const now = new Date();
+      const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      
+      let shiftStartTime: Date;
+      let shiftEndTime: Date;
+      
+      // If current Bangkok time is between 6pm and 11:59pm, we're in today's shift
+      if (bangkokTime.getHours() >= 18) {
+        // Current shift: 6pm today to 3am tomorrow (Bangkok time)
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      } else if (bangkokTime.getHours() < 6) {
+        // We're in the early morning of ongoing shift from yesterday
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setDate(shiftStartTime.getDate() - 1);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      } else {
+        // Between 6am and 6pm - no active shift, get yesterday's shift
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setDate(shiftStartTime.getDate() - 1);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      }
+      
+      // Convert Bangkok times back to UTC for API call
+      const utcShiftStart = new Date(shiftStartTime.getTime() - (7 * 60 * 60 * 1000));
+      const utcShiftEnd = new Date(shiftEndTime.getTime() - (7 * 60 * 60 * 1000));
+      
+      console.log(`📅 Bangkok Time: ${bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
+      console.log(`🕰️ Shift Period (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
+      console.log(`📊 Syncing receipts from ${utcShiftStart.toISOString()} to ${utcShiftEnd.toISOString()}`);
 
       let allReceipts: LoyverseReceipt[] = [];
       let cursor: string | undefined;
       
       do {
         const response = await this.getReceipts({
-          start_time: startOfDay.toISOString(),
-          end_time: endOfDay.toISOString(),
+          start_time: utcShiftStart.toISOString(),
+          end_time: utcShiftEnd.toISOString(),
           limit: 250,
           cursor
         });
@@ -313,7 +346,7 @@ class LoyverseAPI {
         await this.storeReceiptData(receipt);
       }
 
-      console.log(`✅ Synced ${allReceipts.length} receipts for today`);
+      console.log(`✅ Synced ${allReceipts.length} receipts for current shift`);
       return allReceipts.length;
     } catch (error) {
       console.error('❌ Error syncing receipts:', error);

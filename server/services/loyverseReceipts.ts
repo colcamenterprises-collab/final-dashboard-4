@@ -54,26 +54,73 @@ interface LoyverseShiftData {
 
 export class LoyverseReceiptService {
   private config = {
-    accessToken: process.env.LOYVERSE_ACCESS_TOKEN || '42137934ef75406bb54427c6815e5e79',
+    accessToken: process.env.LOYVERSE_ACCESS_TOKEN || 'c1ba07b4dc304101b8dbff63107a3d87',
     baseUrl: 'https://api.loyverse.com/v1.0'
   };
 
-  // Calculate shift date based on 6pm-3am cycle
+  // Calculate shift date based on 6pm-3am cycle in Bangkok timezone (UTC+7)
   private getShiftDate(timestamp: Date): Date {
-    const shiftStart = new Date(timestamp);
-    // If time is before 6am, this receipt belongs to previous day's shift
-    if (timestamp.getHours() < 6) {
+    // Convert to Bangkok time (UTC+7)
+    const bangkokTime = new Date(timestamp.getTime() + (7 * 60 * 60 * 1000));
+    const shiftStart = new Date(bangkokTime);
+    
+    // If Bangkok time is before 6am, this receipt belongs to previous day's shift
+    if (bangkokTime.getHours() < 6) {
       shiftStart.setDate(shiftStart.getDate() - 1);
     }
-    shiftStart.setHours(18, 0, 0, 0); // Set to 6pm of shift date
-    return shiftStart;
+    
+    // Set to 6pm Bangkok time of shift date, then convert back to UTC
+    shiftStart.setHours(18, 0, 0, 0);
+    const utcShiftStart = new Date(shiftStart.getTime() - (7 * 60 * 60 * 1000));
+    return utcShiftStart;
   }
 
   async fetchAndStoreReceipts(): Promise<{ success: boolean; receiptsProcessed: number }> {
     try {
-      console.log('Fetching receipts from Loyverse API...');
+      console.log('Fetching receipts from Loyverse API with Bangkok timezone filtering...');
       
-      const response = await fetch(`${this.config.baseUrl}/receipts?limit=100`, {
+      // Get current shift time range in Bangkok timezone
+      const now = new Date();
+      const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      
+      let shiftStartTime: Date;
+      let shiftEndTime: Date;
+      
+      // If current Bangkok time is between 6pm and 11:59pm, we're in today's shift
+      if (bangkokTime.getHours() >= 18) {
+        // Current shift: 6pm today to 3am tomorrow (Bangkok time)
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      } else if (bangkokTime.getHours() < 6) {
+        // We're in the early morning of ongoing shift from yesterday
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setDate(shiftStartTime.getDate() - 1);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      } else {
+        // Between 6am and 6pm - no active shift, get yesterday's shift
+        shiftStartTime = new Date(bangkokTime);
+        shiftStartTime.setDate(shiftStartTime.getDate() - 1);
+        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setHours(3, 0, 0, 0);
+      }
+      
+      // Convert Bangkok times back to UTC for API call
+      const utcShiftStart = new Date(shiftStartTime.getTime() - (7 * 60 * 60 * 1000));
+      const utcShiftEnd = new Date(shiftEndTime.getTime() - (7 * 60 * 60 * 1000));
+      
+      console.log(`📅 Bangkok Time: ${bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
+      console.log(`🕰️ Shift Period (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
+      
+      const startTimeStr = utcShiftStart.toISOString().split('.')[0] + 'Z';
+      const endTimeStr = utcShiftEnd.toISOString().split('.')[0] + 'Z';
+      
+      const response = await fetch(`${this.config.baseUrl}/receipts?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}&limit=500`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.config.accessToken}`,

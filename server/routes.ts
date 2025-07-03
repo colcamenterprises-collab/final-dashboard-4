@@ -647,6 +647,27 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  app.get("/api/loyverse/timezone-test", async (req, res) => {
+    try {
+      // Test Bangkok timezone handling
+      const now = new Date();
+      const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      
+      res.json({
+        utc_time: now.toISOString(),
+        bangkok_time: bangkokTime.toISOString(),
+        bangkok_formatted: bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' }),
+        bangkok_hour: bangkokTime.getHours(),
+        shift_determination: bangkokTime.getHours() >= 18 ? "Current shift (6pm-3am)" : 
+                           bangkokTime.getHours() < 6 ? "Early morning of ongoing shift" : 
+                           "No active shift (6am-6pm)"
+      });
+    } catch (error) {
+      console.error("Timezone test failed:", error);
+      res.status(500).json({ error: "Timezone test failed" });
+    }
+  });
+
   app.post("/api/loyverse/receipts/sync", async (req, res) => {
     try {
       const result = await loyverseReceiptService.fetchAndStoreReceipts();
