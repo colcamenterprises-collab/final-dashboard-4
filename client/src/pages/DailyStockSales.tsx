@@ -46,6 +46,20 @@ const DRINK_ITEMS = [
   'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
 ];
 
+// Shop options for shopping entries
+const SHOP_OPTIONS = [
+  'Makro',
+  '7/11', 
+  'Supercheap',
+  'Lotus',
+  'Big C',
+  'Printing Shop',
+  'Bakery',
+  'GO Wholesale',
+  'Gas Supply',
+  '*Other'
+];
+
 // Kitchen supplies
 const KITCHEN_ITEMS = [
   'Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)',
@@ -72,7 +86,9 @@ const wageEntrySchema = z.object({
 const shoppingEntrySchema = z.object({
   item: z.string(),
   amount: z.number().min(0),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  shop: z.string(),
+  customShop: z.string().optional()
 });
 
 const formSchema = insertDailyStockSalesSchema.extend({
@@ -595,84 +611,177 @@ export default function DailyStockSales() {
                 <h3 className="text-lg font-medium mb-3">Shopping & Other Expenses</h3>
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
+                {/* Photo Receipt Section */}
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="flex items-center gap-2 text-md font-medium mb-3">
+                    <Camera className="h-4 w-4" />
+                    Shopping Receipt Photos
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoCapture}
+                        className="hidden"
+                        id="receipt-photo"
+                      />
+                      <label
+                        htmlFor="receipt-photo"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+                      >
+                        <Camera className="h-4 w-4" />
+                        Take Photo
+                      </label>
+                      <span className="text-sm text-gray-600">
+                        {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
+                      </span>
+                    </div>
+                    
+                    {receiptPhotos.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {receiptPhotos.map((photo, index) => (
+                          <div key={index} className="relative">
+                            <img
+                              src={photo.base64Data}
+                              alt={`Receipt ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeReceiptPhoto(index)}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            >
+                              ×
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1 truncate">{photo.filename}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="space-y-3">
                   <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
-                    <div className="col-span-4">Item</div>
-                    <div className="col-span-3">Amount</div>
-                    <div className="col-span-4">Notes</div>
+                    <div className="col-span-3">Item</div>
+                    <div className="col-span-2">Amount</div>
+                    <div className="col-span-2">Shop</div>
+                    <div className="col-span-3">Notes</div>
                     <div className="col-span-1">Action</div>
                   </div>
                   
-                  {(form.watch('shoppingEntries') || []).map((_, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-3">
-                      <FormField
-                        control={form.control}
-                        name={`shoppingEntries.${index}.item`}
-                        render={({ field }) => (
-                          <FormItem className="col-span-4">
-                            <FormControl>
-                              <Input {...field} placeholder="Bin Bags" />
-                            </FormControl>
-                          </FormItem>
+                  {(form.watch('shoppingEntries') || []).map((entry, index) => {
+                    const selectedShop = form.watch(`shoppingEntries.${index}.shop`);
+                    const isOtherShop = selectedShop === '*Other';
+                    
+                    return (
+                      <div key={index} className="grid grid-cols-12 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`shoppingEntries.${index}.item`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-3">
+                              <FormControl>
+                                <Input {...field} placeholder="Bin Bags" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shoppingEntries.${index}.amount`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="number" 
+                                  step="0.01" 
+                                  placeholder="200"
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shoppingEntries.${index}.shop`}
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select shop" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {SHOP_OPTIONS.map((shop) => (
+                                    <SelectItem key={shop} value={shop}>
+                                      {shop}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
+                        {isOtherShop && (
+                          <FormField
+                            control={form.control}
+                            name={`shoppingEntries.${index}.customShop`}
+                            render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormControl>
+                                  <Input {...field} placeholder="Enter shop name" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
                         )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shoppingEntries.${index}.amount`}
-                        render={({ field }) => (
-                          <FormItem className="col-span-3">
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="number" 
-                                step="0.01" 
-                                placeholder="300"
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shoppingEntries.${index}.notes`}
-                        render={({ field }) => (
-                          <FormItem className="col-span-4">
-                            <FormControl>
-                              <Input {...field} placeholder="Notes" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <div className="col-span-1">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            const current = form.getValues('shoppingEntries');
-                            form.setValue('shoppingEntries', current.filter((_, i) => i !== index));
-                          }}
-                        >
-                          ×
-                        </Button>
+                        <FormField
+                          control={form.control}
+                          name={`shoppingEntries.${index}.notes`}
+                          render={({ field }) => (
+                            <FormItem className={isOtherShop ? "col-span-1" : "col-span-3"}>
+                              <FormControl>
+                                <Input {...field} placeholder="Garbage Bags" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <div className="col-span-1">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              const current = form.getValues('shoppingEntries');
+                              form.setValue('shoppingEntries', current.filter((_, i) => i !== index));
+                            }}
+                          >
+                            ×
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => {
                       const current = form.getValues('shoppingEntries');
-                      form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '' }]);
+                      form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '', shop: '', customShop: '' }]);
                     }}
                   >
                     Add Shopping Item
                   </Button>
                   
                   <div className="text-right">
-                    <strong>Total Shopping & Other: ${(form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
+                    <strong>Total Shopping & Other: ฿{(form.watch('shoppingEntries') || []).reduce((sum, entry) => sum + (entry.amount || 0), 0).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
