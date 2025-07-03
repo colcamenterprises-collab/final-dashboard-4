@@ -154,6 +154,10 @@ Changelog:
 - July 3, 2025. Resolved Replit environment variable caching issues for stable API connectivity 
 - July 3, 2025. Added compact Loyverse connection status widget to main dashboard for real-time monitoring
 - July 3, 2025. Replaced inventory value KPI card with integrated Loyverse POS connection status showing real-time sync status
+- July 3, 2025. Enhanced bank statement AI analysis with comprehensive transaction categorization, expense matching, and discrepancy detection
+- July 3, 2025. Integrated sophisticated financial analysis prompt for comparing bank statements against internal expense records
+- July 3, 2025. Added AI-powered expense-to-bank-transaction matching with predefined categories (Inventory, Wages, Utilities, Rent, Supplies, Marketing, Other)
+- July 3, 2025. Implemented structured JSON output for AI analysis including matched/unmatched expenses, suspect transactions, and category totals
 ```
 
 ## User Preferences

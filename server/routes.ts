@@ -329,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", async (req, res) => {
     try {
-      const { date, amount, category, supplier, items, notes } = req.body;
+      const { description, date, amount, category, paymentMethod, supplier, items, notes } = req.body;
       
       // Calculate month and year from date
       const expenseDate = new Date(date);
@@ -337,16 +337,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = expenseDate.getFullYear();
       
       const expenseData = {
+        description,
         date: expenseDate,
         amount: String(amount),
         category,
-        supplier,
+        paymentMethod,
+        supplier: supplier || null,
         items: items || null,
         notes: notes || null,
         month,
         year
       };
       
+      console.log("Expense data before validation:", expenseData);
       const validatedData = insertExpenseSchema.parse(expenseData);
       const expense = await storage.createExpense(validatedData);
       res.json(expense);
@@ -426,6 +429,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: "Invalid expense category data" });
     }
   });
+
+  // Bank statement endpoints
+  app.get("/api/bank-statements", async (req, res) => {
+    try {
+      const statements = await storage.getBankStatements();
+      res.json(statements);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bank statements" });
+    }
+  });
+
+  app.post("/api/bank-statements", async (req, res) => {
+    try {
+      const { filename, fileData, fileSize, mimeType } = req.body;
+      
+      const statement = await storage.createBankStatement({
+        filename,
+        fileData,
+        fileSize,
+        mimeType,
+        uploadDate: new Date(),
+        analysisStatus: 'pending'
+      });
+
+      // Start OpenAI analysis in the background
+      analyzeBankStatementWithOpenAI(statement.id, fileData)
+        .catch(error => console.error('Bank statement analysis failed:', error));
+
+      res.json(statement);
+    } catch (error) {
+      console.error("Bank statement creation error:", error);
+      res.status(400).json({ error: "Failed to upload bank statement" });
+    }
+  });
+
+  // OpenAI bank statement analysis function
+  async function analyzeBankStatementWithOpenAI(statementId: number, fileData: string) {
+    try {
+      // Get current month's expenses for comparison
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
+      const monthlyExpenses = await storage.getExpensesByMonth(currentMonth, currentYear);
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a financial analysis AI integrated into the Smash Brothers Burgers restaurant app.
+
+Your role is to:
+1. Review uploaded bank statements (CSV, PDF, or plain text)
+2. Categorise each transaction into predefined categories (e.g., Inventory, Wages, Utilities, Rent, Supplies, Marketing, Other)
+3. Match each transaction against the listed internal expenses recorded in the system for the same month
+4. Flag any mismatches, missing entries, or duplicated transactions
+5. Raise questions for review if:
+   - A transaction has no matching entry
+   - A transaction is unusually high/low
+   - A transaction is ambiguous or unclear in category
+6. Summarise your findings in a structured JSON format for system review and display
+
+### Output Structure (JSON):
+{
+  "matched_expenses": [...],
+  "unmatched_expenses": [...],
+  "suspect_transactions": [
+    {
+      "date": "",
+      "amount": "",
+      "description": "",
+      "reason_flagged": "No matching entry / Unusual amount / Unknown vendor"
+    }
+  ],
+  "category_totals": {
+    "Wages": 0,
+    "Inventory": 0,
+    "Supplies": 0,
+    "Marketing": 0,
+    "Utilities": 0,
+    "Rent": 0,
+    "Other": 0
+  },
+  "summary": "X% of expenses matched. Y suspect transactions found. Total recorded: $___, Total banked: $___"
+}`
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Analyze this bank statement for ${currentMonth}/${currentYear}. Compare against these internal expenses recorded in our system:
+
+${JSON.stringify(monthlyExpenses, null, 2)}
+
+Focus on restaurant-related transactions and provide detailed analysis with matching recommendations.`
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: fileData }
+                }
+              ]
+            }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      const data = await response.json();
+      const analysis = JSON.parse(data.choices[0].message.content);
+      
+      await storage.updateBankStatementAnalysis(statementId, analysis);
+    } catch (error) {
+      console.error('OpenAI analysis error:', error);
+      await storage.updateBankStatementAnalysis(statementId, { error: 'Analysis failed' });
+    }
+  }
 
   // Staff Shifts endpoints
   app.get("/api/staff-shifts", async (req, res) => {

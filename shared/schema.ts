@@ -58,10 +58,12 @@ export const shoppingList = pgTable("shopping_list", {
 // Expenses table
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
-  date: timestamp("date").notNull().defaultNow(),
-  supplier: text("supplier").notNull(),
+  description: text("description").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
+  date: timestamp("date").notNull().defaultNow(),
+  paymentMethod: text("payment_method").notNull(),
+  supplier: text("supplier"),
   items: text("items"),
   notes: text("notes"),
   month: integer("month").notNull(), // For month-by-month analysis
@@ -82,6 +84,30 @@ export const expenseCategories = pgTable("expense_categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Bank Statements table
+export const bankStatements = pgTable("bank_statements", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  uploadDate: timestamp("upload_date").notNull().defaultNow(),
+  fileSize: integer("file_size").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileData: text("file_data").notNull(), // base64 encoded file data
+  analysisStatus: text("analysis_status").notNull().default("pending"), // pending, processing, completed, failed
+  aiAnalysis: jsonb("ai_analysis").$type<{
+    summary: string;
+    totalAmount: number;
+    transactionCount: number;
+    categorizedExpenses: Array<{
+      description: string;
+      amount: number;
+      category: string;
+      date: string;
+      confidence: number;
+    }>;
+  }>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -278,9 +304,14 @@ export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true }).extend({
+  supplier: z.string().nullable().optional(),
+  items: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
 export const insertExpenseSupplierSchema = createInsertSchema(expenseSuppliers).omit({ id: true, createdAt: true });
 export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({ id: true, createdAt: true });
+export const insertBankStatementSchema = createInsertSchema(bankStatements).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true });
 export const insertAiInsightSchema = createInsertSchema(aiInsights).omit({ id: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true });
@@ -309,6 +340,8 @@ export type ExpenseSupplier = typeof expenseSuppliers.$inferSelect;
 export type InsertExpenseSupplier = z.infer<typeof insertExpenseSupplierSchema>;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
 export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+export type BankStatement = typeof bankStatements.$inferSelect;
+export type InsertBankStatement = z.infer<typeof insertBankStatementSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type AiInsight = typeof aiInsights.$inferSelect;

@@ -1,7 +1,7 @@
 import { 
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
-  expenseSuppliers, expenseCategories, ingredients, recipes, recipeIngredients,
+  expenseSuppliers, expenseCategories, bankStatements, ingredients, recipes, recipeIngredients,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
@@ -10,6 +10,7 @@ import {
   type DailyStockSales, type InsertDailyStockSales,
   type ExpenseSupplier, type InsertExpenseSupplier,
   type ExpenseCategory, type InsertExpenseCategory,
+  type BankStatement, type InsertBankStatement,
   type Ingredient, type InsertIngredient,
   type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient
@@ -65,6 +66,11 @@ export interface IStorage {
   // Expense Categories
   getExpenseCategories(): Promise<ExpenseCategory[]>;
   createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
+  
+  // Bank Statements
+  getBankStatements(): Promise<BankStatement[]>;
+  createBankStatement(statement: InsertBankStatement): Promise<BankStatement>;
+  updateBankStatementAnalysis(id: number, analysis: any): Promise<BankStatement>;
   
   // Transactions
   getTransactions(): Promise<Transaction[]>;
@@ -419,41 +425,55 @@ export class MemStorage implements IStorage {
   }
 
   async getExpenses(): Promise<Expense[]> {
-    return Array.from(this.expenses.values());
+    // Use database for expenses
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    const result = await db.select().from(expenses).orderBy(expenses.date);
+    return result;
   }
 
   async createExpense(expense: InsertExpense): Promise<Expense> {
-    const id = this.currentId++;
-    const currentDate = new Date();
-    const expenseRecord: Expense = { 
-      ...expense, 
-      id,
-      date: expense.date || currentDate,
-      month: expense.month || currentDate.getMonth() + 1,
-      year: expense.year || currentDate.getFullYear(),
-      items: expense.items || null,
-      notes: expense.notes || null,
-      createdAt: currentDate
-    };
-    this.expenses.set(id, expenseRecord);
-    return expenseRecord;
+    // Use database for expenses  
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    
+    const expenseDate = expense.date ? new Date(expense.date) : new Date();
+    const [result] = await db.insert(expenses).values({
+      ...expense,
+      date: expenseDate,
+      month: expense.month || expenseDate.getMonth() + 1,
+      year: expense.year || expenseDate.getFullYear(),
+    }).returning();
+    
+    return result;
   }
 
   async getExpensesByCategory(): Promise<Record<string, number>> {
-    const expenses = Array.from(this.expenses.values());
-    const categories: Record<string, number> = {};
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    const { sql } = await import("drizzle-orm");
     
-    expenses.forEach(expense => {
-      const category = expense.category;
-      categories[category] = (categories[category] || 0) + parseFloat(expense.amount);
+    const result = await db.select({
+      category: expenses.category,
+      total: sql<number>`SUM(${expenses.amount}::numeric)`
+    }).from(expenses).groupBy(expenses.category);
+    
+    const categories: Record<string, number> = {};
+    result.forEach(row => {
+      categories[row.category] = row.total;
     });
     
     return categories;
   }
 
   async getExpensesByMonth(month: number, year: number): Promise<Expense[]> {
-    const expenses = Array.from(this.expenses.values());
-    return expenses.filter(expense => expense.month === month && expense.year === year);
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    const { eq, and } = await import("drizzle-orm");
+    
+    return await db.select().from(expenses)
+      .where(and(eq(expenses.month, month), eq(expenses.year, year)))
+      .orderBy(expenses.date);
   }
 
   async getMonthToDateExpenses(): Promise<number> {
@@ -461,8 +481,16 @@ export class MemStorage implements IStorage {
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
     
-    const monthlyExpenses = await this.getExpensesByMonth(currentMonth, currentYear);
-    return monthlyExpenses.reduce((total, expense) => total + parseFloat(expense.amount), 0);
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    const { sql, eq, and } = await import("drizzle-orm");
+    
+    const result = await db.select({
+      total: sql<number>`COALESCE(SUM(${expenses.amount}::numeric), 0)`
+    }).from(expenses)
+    .where(and(eq(expenses.month, currentMonth), eq(expenses.year, currentYear)));
+    
+    return result[0]?.total || 0;
   }
 
   async getExpenseSuppliers(): Promise<ExpenseSupplier[]> {
@@ -495,6 +523,36 @@ export class MemStorage implements IStorage {
     };
     this.expenseCategories.set(id, categoryRecord);
     return categoryRecord;
+  }
+
+  async getBankStatements(): Promise<BankStatement[]> {
+    const { db } = await import("./db");
+    const { bankStatements } = await import("@shared/schema");
+    return await db.select().from(bankStatements).orderBy(bankStatements.uploadDate);
+  }
+
+  async createBankStatement(statement: InsertBankStatement): Promise<BankStatement> {
+    const { db } = await import("./db");
+    const { bankStatements } = await import("@shared/schema");
+    
+    const [result] = await db.insert(bankStatements).values(statement).returning();
+    return result;
+  }
+
+  async updateBankStatementAnalysis(id: number, analysis: any): Promise<BankStatement> {
+    const { db } = await import("./db");
+    const { bankStatements } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db.update(bankStatements)
+      .set({ 
+        aiAnalysis: analysis,
+        analysisStatus: 'completed'
+      })
+      .where(eq(bankStatements.id, id))
+      .returning();
+    
+    return result;
   }
 
   async getTransactions(): Promise<Transaction[]> {

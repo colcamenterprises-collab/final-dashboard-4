@@ -32,6 +32,7 @@ const navigationItems = [
   { path: "/recipe-management", label: "Recipe Management", icon: ChefHat },
   { path: "/finance", label: "Finance", icon: Calculator },
   { path: "/expenses", label: "Expenses", icon: Receipt },
+  { path: "/enhanced-expenses", label: "Enhanced Expenses", icon: DollarSign },
   { path: "/pos-loyverse", label: "POS Loyverse", icon: BarChart3 },
   { path: "/loyverse-live", label: "Loyverse Live", icon: Activity },
 ];
