@@ -15,7 +15,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { insertDailyStockSalesSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Calculator, Package, Utensils, Wine, Wrench, Box, Search, Eye, FileText, Users, Camera, ImageIcon, Save } from "lucide-react";
+import { 
+  Calculator, 
+  Package, 
+  User, 
+  ShoppingCart, 
+  Wrench, 
+  Box, 
+  Search, 
+  Eye, 
+  FileText, 
+  Users, 
+  Camera, 
+  ImageIcon, 
+  Save,
+  DollarSign,
+  ChefHat,
+  Refrigerator,
+  Coffee,
+  ClipboardList,
+  TrendingUp
+} from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
@@ -288,7 +308,7 @@ export default function DailyStockSales() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
+                <User className="h-5 w-5" />
                 Who is Completing Form
               </CardTitle>
             </CardHeader>
@@ -353,7 +373,10 @@ export default function DailyStockSales() {
           {/* Cash Management */}
           <Card>
             <CardHeader>
-              <CardTitle>Cash Management</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Cash Management
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
@@ -377,7 +400,10 @@ export default function DailyStockSales() {
           {/* Sales Data */}
           <Card>
             <CardHeader>
-              <CardTitle>Sales Data</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Sales Data
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -516,7 +542,10 @@ export default function DailyStockSales() {
           {/* Expenses */}
           <Card>
             <CardHeader>
-              <CardTitle>Expenses</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Expenses
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Wages Section */}
@@ -608,7 +637,10 @@ export default function DailyStockSales() {
 
               {/* Shopping Section */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Shopping & Other Expenses</h3>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Shopping & Other Expenses
+                </h3>
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
                 {/* Photo Receipt Section */}
@@ -1027,7 +1059,7 @@ export default function DailyStockSales() {
               {/* Drink Stock Inventory within Stock Counts */}
               <div className="mt-6">
                 <h4 className="text-md font-medium mb-3 flex items-center gap-2">
-                  <Wine className="h-4 w-4" />
+                  <Coffee className="h-4 w-4" />
                   Drink Stock Inventory
                 </h4>
                 <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4">
@@ -1063,7 +1095,7 @@ export default function DailyStockSales() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
+                <ChefHat className="h-5 w-5" />
                 Food Items Required
               </CardTitle>
             </CardHeader>
@@ -1279,7 +1311,10 @@ export default function DailyStockSales() {
 
               {/* Shelf Items */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Shelf Items</h3>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Refrigerator className="h-5 w-5" />
+                  Shelf Items
+                </h3>
                 <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {SHELF_ITEMS.map((item) => (
                     <FormField
@@ -1339,7 +1374,10 @@ export default function DailyStockSales() {
 
               {/* Other Items Not Listed */}
               <div className="mt-6">
-                <h3 className="text-lg font-medium mb-3">Other items not listed</h3>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Other items not listed
+                </h3>
                 <div className="space-y-2">
                   {(form.watch('freshFood.otherItems') || []).map((item, index) => (
                     <div key={index} className="flex gap-2 items-center">
