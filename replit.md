@@ -161,6 +161,10 @@ Changelog:
 - July 3, 2025. Merged separate expense pages into unified ExpensesMerged page with Add Expenses form prominently positioned at top
 - July 3, 2025. Combined basic expense tracking with enhanced AI-powered bank statement analysis in single comprehensive interface
 - July 3, 2025. Streamlined navigation by removing duplicate expense entries and consolidating all expense functionality
+- July 3, 2025. Completed critical Bangkok timezone (UTC+7) implementation for accurate 6pm-3am shift cycle handling
+- July 3, 2025. Implemented automated 3am Bangkok time daily sync scheduling for receipt processing at shift end
+- July 3, 2025. Fixed timezone discrepancies - "Today's Sales is correct" confirmed by user after Bangkok timezone integration
+- July 3, 2025. Enhanced Loyverse API with intelligent shift period detection based on Bangkok time for accurate receipt filtering
 ```
 
 ## User Preferences

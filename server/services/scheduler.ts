@@ -1,15 +1,15 @@
-import { loyverseReceiptService } from "./loyverseReceipts";
+import { loyverseAPI } from "../loyverseAPI";
 
 export class SchedulerService {
   private intervals: NodeJS.Timeout[] = [];
 
   start() {
-    // Schedule daily receipt sync at 4am
+    // Schedule daily receipt sync at 3am Bangkok time (end of shift)
     this.scheduleDailyTask(() => {
       this.syncReceiptsAndReports();
-    }, 4, 0); // 4:00 AM
+    }, 3, 0); // 3:00 AM Bangkok time
 
-    console.log('Scheduler service started - daily sync at 4am');
+    console.log('Scheduler service started - daily sync at 3am Bangkok time');
   }
 
   stop() {
@@ -21,23 +21,29 @@ export class SchedulerService {
   private scheduleDailyTask(task: () => void, hour: number, minute: number) {
     const scheduleNext = () => {
       const now = new Date();
-      const scheduledTime = new Date();
-      scheduledTime.setHours(hour, minute, 0, 0);
+      const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // Bangkok UTC+7
+      
+      // Create scheduled time in Bangkok timezone
+      const bangkokScheduledTime = new Date(bangkokTime);
+      bangkokScheduledTime.setHours(hour, minute, 0, 0);
 
-      // If the scheduled time has passed today, schedule for tomorrow
-      if (scheduledTime <= now) {
-        scheduledTime.setDate(scheduledTime.getDate() + 1);
+      // If the scheduled time has passed today in Bangkok, schedule for tomorrow
+      if (bangkokScheduledTime <= bangkokTime) {
+        bangkokScheduledTime.setDate(bangkokScheduledTime.getDate() + 1);
       }
 
-      const timeUntilNext = scheduledTime.getTime() - now.getTime();
+      // Convert back to UTC for setTimeout
+      const utcScheduledTime = new Date(bangkokScheduledTime.getTime() - (7 * 60 * 60 * 1000));
+      const timeUntilNext = utcScheduledTime.getTime() - now.getTime();
 
       const timeout = setTimeout(() => {
+        console.log(`🕐 Executing daily sync at ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} Bangkok time`);
         task();
         // Schedule the next occurrence
         scheduleNext();
       }, timeUntilNext);
 
-      console.log(`Next receipt sync scheduled for: ${scheduledTime.toLocaleString()}`);
+      console.log(`Next receipt sync scheduled for: ${bangkokScheduledTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} Bangkok time`);
       return timeout;
     };
 
@@ -46,19 +52,22 @@ export class SchedulerService {
 
   private async syncReceiptsAndReports() {
     try {
-      console.log('Starting daily receipt and shift report sync...');
+      console.log('🔄 Starting daily receipt and shift report sync...');
       
-      // Sync receipts from Loyverse
-      const receiptResult = await loyverseReceiptService.fetchAndStoreReceipts();
-      console.log(`Synced ${receiptResult.receiptsProcessed} receipts`);
+      // Sync receipts from Loyverse using Bangkok timezone-aware API
+      const receiptCount = await loyverseAPI.syncTodaysReceipts();
+      console.log(`✅ Synced ${receiptCount} receipts from completed shift`);
 
-      // Generate and store shift reports
-      const reportResult = await loyverseReceiptService.fetchAndStoreShiftReports();
-      console.log(`Generated ${reportResult.reportsProcessed} shift reports`);
+      // Sync additional data (items, customers, etc.)
+      const itemCount = await loyverseAPI.syncAllItems();
+      console.log(`✅ Synced ${itemCount} menu items`);
 
-      console.log('Daily sync completed successfully');
+      const customerCount = await loyverseAPI.syncCustomers();
+      console.log(`✅ Synced ${customerCount} customers`);
+
+      console.log('🎉 Daily sync completed successfully');
     } catch (error) {
-      console.error('Daily sync failed:', error);
+      console.error('❌ Daily sync failed:', error);
     }
   }
 
