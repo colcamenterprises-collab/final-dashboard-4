@@ -8,6 +8,7 @@ import KPICard from "@/components/KPICard";
 import SalesChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
+import LoyverseConnectionStatus from "@/components/LoyverseConnectionStatus";
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
@@ -113,6 +114,11 @@ export default function Dashboard() {
           iconColor="text-orange-600"
           iconBgColor="bg-orange-100"
         />
+      </div>
+
+      {/* Loyverse Connection Status */}
+      <div className="mb-6">
+        <LoyverseConnectionStatus compact={true} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">

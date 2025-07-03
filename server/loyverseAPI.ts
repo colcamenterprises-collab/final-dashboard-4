@@ -132,9 +132,12 @@ class LoyverseAPI {
   private config: LoyverseConfig;
 
   constructor() {
+    // Temporary fix for Replit environment variable caching issue
+    const correctToken = 'c1ba07b4dc304101b8dbff63107a3d87';
+    
     this.config = {
       baseURL: 'https://api.loyverse.com/v1.0',
-      accessToken: process.env.LOYVERSE_ACCESS_TOKEN || ''
+      accessToken: correctToken
     };
 
     console.log('🔧 Loyverse API initialized with token:', this.config.accessToken ? `${this.config.accessToken.substring(0, 8)}...` : 'NOT SET');
