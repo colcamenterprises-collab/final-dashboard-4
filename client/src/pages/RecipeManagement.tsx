@@ -77,7 +77,7 @@ export default function RecipeManagement() {
     defaultValues: {
       recipeId: 0,
       ingredientId: 0,
-      quantity: "",
+      quantity: "1",
       unit: "",
     },
   });
