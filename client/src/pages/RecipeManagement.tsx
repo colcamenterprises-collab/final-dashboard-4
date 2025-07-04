@@ -23,11 +23,15 @@ const recipeFormSchema = insertRecipeSchema.extend({
   servingSize: z.number().min(1, "Serving size must be at least 1"),
 });
 
-const recipeIngredientFormSchema = insertRecipeIngredientSchema.extend({
+const recipeIngredientFormSchema = z.object({
+  recipeId: z.number(),
+  ingredientId: z.string().min(1, "Please select an ingredient"),
   quantity: z.string().min(1, "Quantity is required").refine((val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Quantity must be a positive number"),
+  unit: z.string().optional(),
+  cost: z.string().optional(),
 });
 
 export default function RecipeManagement() {
@@ -76,9 +80,10 @@ export default function RecipeManagement() {
     resolver: zodResolver(recipeIngredientFormSchema),
     defaultValues: {
       recipeId: 0,
-      ingredientId: 0,
+      ingredientId: "",
       quantity: "1",
       unit: "",
+      cost: "",
     },
   });
 
