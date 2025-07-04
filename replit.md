@@ -186,6 +186,12 @@ Changelog:
 - July 4, 2025. Fixed Today's Sales to ฿0.00 (Shift 539 empty), July 3rd to ฿14,339.10 (Shift 538)
 - July 4, 2025. Fixed July 2nd to ฿10,877.00 (Shift 537), July 1st to ฿7,308.00 (Shift 536, ฿697 variance)
 - July 4, 2025. All cash amounts, net sales, and payment breakdowns now match authentic Loyverse data exactly
+- July 4, 2025. CRITICAL UPDATE: Deleted all previous incorrect Loyverse data and rebuilt proper API integration
+- July 4, 2025. Implemented official Loyverse API v1.0 following exact documentation specifications
+- July 4, 2025. Added all critical endpoints: Receipts, Shifts, Items, Categories, Modifiers, Payment Types, Customers
+- July 4, 2025. Fixed UTC/Bangkok timezone handling for all API calls (UTC format in requests, Bangkok conversion for display)
+- July 4, 2025. Updated database search functionality to use PostgreSQL instead of in-memory storage for data persistence
+- July 4, 2025. Added Google Sheets integration for secure backup storage of all forms and operational data
 ```
 
 ## User Preferences

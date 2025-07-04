@@ -1368,6 +1368,132 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // CRITICAL API: Get receipts with proper UTC/Bangkok timezone handling
+  app.get('/api/loyverse/receipts', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { start_time, end_time, limit, cursor } = req.query;
+      
+      const receipts = await loyverseAPI.getReceipts({
+        start_time: start_time as string,
+        end_time: end_time as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string
+      });
+      
+      res.json(receipts);
+    } catch (error) {
+      console.error('Failed to get receipts:', error);
+      res.status(500).json({ error: 'Failed to fetch receipts from Loyverse API' });
+    }
+  });
+
+  // CRITICAL API: Get shifts with proper UTC/Bangkok timezone handling  
+  app.get('/api/loyverse/shifts', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { start_time, end_time, limit, cursor } = req.query;
+      
+      const shifts = await loyverseAPI.getShifts({
+        start_time: start_time as string,
+        end_time: end_time as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string
+      });
+      
+      res.json(shifts);
+    } catch (error) {
+      console.error('Failed to get shifts:', error);
+      res.status(500).json({ error: 'Failed to fetch shifts from Loyverse API' });
+    }
+  });
+
+  // API: Get items
+  app.get('/api/loyverse/items', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { limit, cursor, updated_at_min } = req.query;
+      
+      const items = await loyverseAPI.getItems({
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string,
+        updated_at_min: updated_at_min as string
+      });
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Failed to get items:', error);
+      res.status(500).json({ error: 'Failed to fetch items from Loyverse API' });
+    }
+  });
+
+  // API: Get categories
+  app.get('/api/loyverse/categories', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { limit, cursor } = req.query;
+      
+      const categories = await loyverseAPI.getCategories({
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string
+      });
+      
+      res.json(categories);
+    } catch (error) {
+      console.error('Failed to get categories:', error);
+      res.status(500).json({ error: 'Failed to fetch categories from Loyverse API' });
+    }
+  });
+
+  // API: Get modifiers
+  app.get('/api/loyverse/modifiers', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { limit, cursor } = req.query;
+      
+      const modifiers = await loyverseAPI.getModifiers({
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string
+      });
+      
+      res.json(modifiers);
+    } catch (error) {
+      console.error('Failed to get modifiers:', error);
+      res.status(500).json({ error: 'Failed to fetch modifiers from Loyverse API' });
+    }
+  });
+
+  // CRITICAL API: Get payment types
+  app.get('/api/loyverse/payment-types', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const paymentTypes = await loyverseAPI.getPaymentTypes();
+      res.json(paymentTypes);
+    } catch (error) {
+      console.error('Failed to get payment types:', error);
+      res.status(500).json({ error: 'Failed to fetch payment types from Loyverse API' });
+    }
+  });
+
+  // API: Get customers
+  app.get('/api/loyverse/customers', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { limit, cursor, updated_at_min } = req.query;
+      
+      const customers = await loyverseAPI.getCustomers({
+        limit: limit ? parseInt(limit as string) : undefined,
+        cursor: cursor as string,
+        updated_at_min: updated_at_min as string
+      });
+      
+      res.json(customers);
+    } catch (error) {
+      console.error('Failed to get customers:', error);
+      res.status(500).json({ error: 'Failed to fetch customers from Loyverse API' });
+    }
+  });
+
 
 
   app.post('/api/loyverse/live/sync-receipts', async (req, res) => {

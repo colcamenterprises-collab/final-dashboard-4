@@ -5,6 +5,12 @@ interface LoyverseConfig {
   accessToken: string;
 }
 
+// Standard UTC date/time format as per Loyverse API docs
+interface LoyverseDateTimeResponse {
+  created_at: string; // UTC ISO 8601 format
+  updated_at: string; // UTC ISO 8601 format
+}
+
 // Receipt interface according to official Loyverse API docs
 interface LoyverseReceipt {
   id: string;
@@ -92,17 +98,15 @@ interface LoyverseItem {
   }>;
 }
 
-// Category interface according to official Loyverse API docs
 interface LoyverseCategory {
   id: string;
   category_name: string;
   color: string;
-  created_at: string; // UTC ISO 8601 format
-  updated_at: string; // UTC ISO 8601 format
-  deleted_at?: string; // UTC ISO 8601 format
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
 }
 
-// Customer interface according to official Loyverse API docs
 interface LoyverseCustomer {
   id: string;
   name: string;
@@ -114,12 +118,11 @@ interface LoyverseCustomer {
   postal_code?: string;
   country_code?: string;
   note?: string;
-  created_at: string; // UTC ISO 8601 format
-  updated_at: string; // UTC ISO 8601 format
-  deleted_at?: string; // UTC ISO 8601 format
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
 }
 
-// Store interface according to official Loyverse API docs
 interface LoyverseStore {
   id: string;
   name: string;
@@ -133,8 +136,8 @@ interface LoyverseStore {
   region?: string;
   country_code?: string;
   timezone: string;
-  created_at: string; // UTC ISO 8601 format
-  updated_at: string; // UTC ISO 8601 format
+  created_at: string;
+  updated_at: string;
 }
 
 // Shift interface according to official Loyverse API docs
@@ -152,6 +155,16 @@ interface LoyverseShift {
   employee_id?: string;
   created_at: string; // UTC ISO 8601 format
   updated_at: string; // UTC ISO 8601 format
+}
+
+// Category interface according to official Loyverse API docs
+interface LoyverseCategory {
+  id: string;
+  category_name: string;
+  color: string;
+  created_at: string; // UTC ISO 8601 format
+  updated_at: string; // UTC ISO 8601 format
+  deleted_at?: string; // UTC ISO 8601 format
 }
 
 // Modifier interface according to official Loyverse API docs
@@ -180,7 +193,7 @@ class LoyverseAPI {
   private config: LoyverseConfig;
 
   constructor() {
-    // Use the correct access token for Smash Bros Burgers (Rawai)
+    // Temporary fix for Replit environment variable caching issue
     const correctToken = 'c1ba07b4dc304101b8dbff63107a3d87';
     
     this.config = {
@@ -198,6 +211,7 @@ class LoyverseAPI {
   // Utility function to convert UTC dates to Bangkok timezone (UTC+7)
   private convertUTCToBangkok(utcDateString: string): Date {
     const utcDate = new Date(utcDateString);
+    // Bangkok is UTC+7
     const bangkokOffset = 7 * 60; // 7 hours in minutes
     const bangkokTime = new Date(utcDate.getTime() + (bangkokOffset * 60 * 1000));
     return bangkokTime;
@@ -237,7 +251,7 @@ class LoyverseAPI {
     return data;
   }
 
-  // CRITICAL API: Get List of Receipts
+  // Receipts API
   async getReceipts(params: {
     start_time?: string;
     end_time?: string;
@@ -255,7 +269,109 @@ class LoyverseAPI {
     return this.makeRequest<{ receipts: LoyverseReceipt[]; cursor?: string }>(endpoint);
   }
 
-  // CRITICAL API: Get List of Shifts
+  async getReceiptById(receiptId: string): Promise<LoyverseReceipt> {
+    return this.makeRequest<LoyverseReceipt>(`/receipts/${receiptId}`);
+  }
+
+  // Items API
+  async getItems(params: {
+    limit?: number;
+    cursor?: string;
+    updated_at_min?: string;
+  } = {}): Promise<{ items: LoyverseItem[]; cursor?: string }> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+    if (params.updated_at_min) queryParams.append('updated_at_min', params.updated_at_min);
+
+    const endpoint = `/items${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return this.makeRequest<{ items: LoyverseItem[]; cursor?: string }>(endpoint);
+  }
+
+  async getItemById(itemId: string): Promise<LoyverseItem> {
+    return this.makeRequest<LoyverseItem>(`/items/${itemId}`);
+  }
+
+  async updateItem(itemId: string, itemData: Partial<LoyverseItem>): Promise<LoyverseItem> {
+    return this.makeRequest<LoyverseItem>(`/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(itemData),
+    });
+  }
+
+  // Customers API
+  async getCustomers(params: {
+    limit?: number;
+    cursor?: string;
+    updated_at_min?: string;
+  } = {}): Promise<{ customers: LoyverseCustomer[]; cursor?: string }> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+    if (params.updated_at_min) queryParams.append('updated_at_min', params.updated_at_min);
+
+    const endpoint = `/customers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return this.makeRequest<{ customers: LoyverseCustomer[]; cursor?: string }>(endpoint);
+  }
+
+  async createCustomer(customerData: {
+    name: string;
+    email?: string;
+    phone_number?: string;
+    address?: string;
+    city?: string;
+    region?: string;
+    postal_code?: string;
+    country_code?: string;
+    note?: string;
+  }): Promise<LoyverseCustomer> {
+    return this.makeRequest<LoyverseCustomer>('/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData),
+    });
+  }
+
+  // Stores API
+  async getStores(): Promise<{ stores: LoyverseStore[] }> {
+    return this.makeRequest<{ stores: LoyverseStore[] }>('/stores');
+  }
+
+  // Categories API - Critical for proper item organization
+  async getCategories(params: {
+    limit?: number;
+    cursor?: string;
+  } = {}): Promise<{ categories: LoyverseCategory[]; cursor?: string }> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const endpoint = `/categories${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return this.makeRequest<{ categories: LoyverseCategory[]; cursor?: string }>(endpoint);
+  }
+
+  // Modifiers API - Critical for accurate sales analysis
+  async getModifiers(params: {
+    limit?: number;
+    cursor?: string;
+  } = {}): Promise<{ modifiers: LoyverseModifier[]; cursor?: string }> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const endpoint = `/modifiers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return this.makeRequest<{ modifiers: LoyverseModifier[]; cursor?: string }>(endpoint);
+  }
+
+  // Payment Types API - Critical for payment analysis
+  async getPaymentTypes(): Promise<{ payment_types: LoyversePaymentType[] }> {
+    return this.makeRequest<{ payment_types: LoyversePaymentType[] }>('/payment_types');
+  }
+
+  // Shifts API
   async getShifts(params: {
     start_time?: string;
     end_time?: string;
@@ -273,97 +389,17 @@ class LoyverseAPI {
     return this.makeRequest<{ shifts: LoyverseShift[]; cursor?: string }>(endpoint);
   }
 
-  // API: Get List of Items
-  async getItems(params: {
-    limit?: number;
-    cursor?: string;
-    updated_at_min?: string;
-  } = {}): Promise<{ items: LoyverseItem[]; cursor?: string }> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.cursor) queryParams.append('cursor', params.cursor);
-    if (params.updated_at_min) queryParams.append('updated_at_min', params.updated_at_min);
-
-    const endpoint = `/items${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-    return this.makeRequest<{ items: LoyverseItem[]; cursor?: string }>(endpoint);
-  }
-
-  // API: Get List of Categories
-  async getCategories(params: {
-    limit?: number;
-    cursor?: string;
-  } = {}): Promise<{ categories: LoyverseCategory[]; cursor?: string }> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.cursor) queryParams.append('cursor', params.cursor);
-
-    const endpoint = `/categories${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-    return this.makeRequest<{ categories: LoyverseCategory[]; cursor?: string }>(endpoint);
-  }
-
-  // API: Get List of Modifiers
-  async getModifiers(params: {
-    limit?: number;
-    cursor?: string;
-  } = {}): Promise<{ modifiers: LoyverseModifier[]; cursor?: string }> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.cursor) queryParams.append('cursor', params.cursor);
-
-    const endpoint = `/modifiers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-    return this.makeRequest<{ modifiers: LoyverseModifier[]; cursor?: string }>(endpoint);
-  }
-
-  // CRITICAL API: Get List of Payment Types
-  async getPaymentTypes(): Promise<{ payment_types: LoyversePaymentType[] }> {
-    return this.makeRequest<{ payment_types: LoyversePaymentType[] }>('/payment_types');
-  }
-
-  // API: Get List of Customers
-  async getCustomers(params: {
-    limit?: number;
-    cursor?: string;
-    updated_at_min?: string;
-  } = {}): Promise<{ customers: LoyverseCustomer[]; cursor?: string }> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.cursor) queryParams.append('cursor', params.cursor);
-    if (params.updated_at_min) queryParams.append('updated_at_min', params.updated_at_min);
-
-    const endpoint = `/customers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-    return this.makeRequest<{ customers: LoyverseCustomer[]; cursor?: string }>(endpoint);
-  }
-
-  // API: Get List of Stores
-  async getStores(): Promise<{ stores: LoyverseStore[] }> {
-    return this.makeRequest<{ stores: LoyverseStore[] }>('/stores');
-  }
-
-  // Test API connection
-  async testConnection(): Promise<boolean> {
-    try {
-      await this.getStores();
-      return true;
-    } catch (error) {
-      console.error('❌ Loyverse connection test failed:', error);
-      return false;
-    }
-  }
-
-  // Sync today's receipts with Bangkok timezone support (6pm-3am shift cycle)
+  // Sync Methods with Bangkok timezone support (6pm-3am shift cycle)
   async syncTodaysReceipts(): Promise<number> {
     try {
+      // Get current shift time range in Bangkok timezone
       const now = new Date();
       const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
       
       let shiftStartTime: Date;
       let shiftEndTime: Date;
       
-      // Calculate current shift period based on Bangkok time
+      // If current Bangkok time is between 6pm and 11:59pm, we're in today's shift
       if (bangkokTime.getHours() >= 18) {
         // Current shift: 6pm today to 3am tomorrow (Bangkok time)
         shiftStartTime = new Date(bangkokTime);
@@ -372,14 +408,14 @@ class LoyverseAPI {
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
         shiftEndTime.setHours(3, 0, 0, 0);
       } else if (bangkokTime.getHours() < 6) {
-        // Early morning of ongoing shift from yesterday
+        // We're in the early morning of ongoing shift from yesterday
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
         shiftStartTime.setHours(18, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setHours(3, 0, 0, 0);
       } else {
-        // Between 6am and 6pm - get yesterday's completed shift
+        // Between 6am and 6pm - no active shift, get yesterday's shift
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
         shiftStartTime.setHours(18, 0, 0, 0);
@@ -387,22 +423,21 @@ class LoyverseAPI {
         shiftEndTime.setHours(3, 0, 0, 0);
       }
       
-      // Convert Bangkok times to UTC for API call
-      const utcShiftStart = this.convertBangkokToUTC(shiftStartTime);
-      const utcShiftEnd = this.convertBangkokToUTC(shiftEndTime);
+      // Convert Bangkok times back to UTC for API call
+      const utcShiftStart = new Date(shiftStartTime.getTime() - (7 * 60 * 60 * 1000));
+      const utcShiftEnd = new Date(shiftEndTime.getTime() - (7 * 60 * 60 * 1000));
       
       console.log(`📅 Bangkok Time: ${bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
       console.log(`🕰️ Shift Period (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
-      console.log(`📊 Syncing receipts from ${utcShiftStart} to ${utcShiftEnd}`);
+      console.log(`📊 Syncing receipts from ${utcShiftStart.toISOString()} to ${utcShiftEnd.toISOString()}`);
 
       let allReceipts: LoyverseReceipt[] = [];
       let cursor: string | undefined;
       
-      // Fetch all receipts using pagination
       do {
         const response = await this.getReceipts({
-          start_time: utcShiftStart,
-          end_time: utcShiftEnd,
+          start_time: utcShiftStart.toISOString(),
+          end_time: utcShiftEnd.toISOString(),
           limit: 250,
           cursor
         });
@@ -411,7 +446,7 @@ class LoyverseAPI {
         cursor = response.cursor;
       } while (cursor);
 
-      // Store receipts in database
+      // Convert and store receipts
       for (const receipt of allReceipts) {
         await this.storeReceiptData(receipt);
       }
@@ -424,7 +459,61 @@ class LoyverseAPI {
     }
   }
 
-  // Store receipt data in database with proper timezone conversion
+  async syncAllItems(): Promise<number> {
+    try {
+      console.log('📦 Syncing all menu items from Loyverse...');
+
+      let allItems: LoyverseItem[] = [];
+      let cursor: string | undefined;
+      
+      do {
+        const response = await this.getItems({
+          limit: 250,
+          cursor
+        });
+        
+        allItems.push(...response.items);
+        cursor = response.cursor;
+      } while (cursor);
+
+      // Convert and store items
+      for (const item of allItems) {
+        await this.storeItemData(item);
+      }
+
+      console.log(`✅ Synced ${allItems.length} menu items`);
+      return allItems.length;
+    } catch (error) {
+      console.error('❌ Error syncing items:', error);
+      throw error;
+    }
+  }
+
+  async syncCustomers(): Promise<number> {
+    try {
+      console.log('👥 Syncing customers from Loyverse...');
+
+      let allCustomers: LoyverseCustomer[] = [];
+      let cursor: string | undefined;
+      
+      do {
+        const response = await this.getCustomers({
+          limit: 250,
+          cursor
+        });
+        
+        allCustomers.push(...response.customers);
+        cursor = response.cursor;
+      } while (cursor);
+
+      console.log(`✅ Synced ${allCustomers.length} customers`);
+      return allCustomers.length;
+    } catch (error) {
+      console.error('❌ Error syncing customers:', error);
+      throw error;
+    }
+  }
+
   private async storeReceiptData(receipt: LoyverseReceipt): Promise<void> {
     try {
       // Convert Loyverse receipt to our transaction format
@@ -432,7 +521,7 @@ class LoyverseAPI {
         orderId: receipt.receipt_number,
         amount: receipt.total_money.toString(),
         paymentMethod: receipt.payments[0]?.payment_type_id || 'Unknown',
-        timestamp: new Date(receipt.receipt_date), // Already in UTC from API
+        timestamp: new Date(receipt.receipt_date),
         items: receipt.line_items.map(item => ({
           itemId: parseInt(item.item_id) || 0,
           quantity: item.quantity,
@@ -443,23 +532,76 @@ class LoyverseAPI {
       };
 
       await storage.createTransaction(transaction);
-      console.log(`📝 Stored receipt ${receipt.receipt_number}: ฿${receipt.total_money}`);
     } catch (error) {
-      console.error('❌ Error storing receipt data:', error);
+      console.error('Error storing receipt data:', error);
+    }
+  }
+
+  private async storeItemData(item: LoyverseItem): Promise<void> {
+    try {
+      // Convert Loyverse item to our menu item format
+      const menuItem = {
+        name: item.item_name,
+        price: item.price.toString(),
+        cost: item.cost.toString(),
+        category: item.category_id || 'Uncategorized',
+        ingredients: [] as string[] // Will need to be populated separately or from description
+      };
+
+      await storage.createMenuItem(menuItem);
+
+      // Also update inventory if tracking
+      const variant = item.variants?.[0];
+      if (variant?.stores?.[0]) {
+        const store = variant.stores[0];
+        const inventory = {
+          name: item.item_name,
+          currentStock: store.current_stock,
+          minStock: store.low_stock || 0,
+          maxStock: store.ideal_stock || 100,
+          unit: 'units',
+          supplier: 'Loyverse POS',
+          costPerUnit: store.cost.toString()
+        };
+
+        // Note: You may want to add createInventory method or update existing
+      }
+    } catch (error) {
+      console.error('Error storing item data:', error);
+    }
+  }
+
+  // Real-time polling method
+  async startRealtimeSync(intervalMinutes: number = 5): Promise<void> {
+    console.log(`🔄 Starting real-time Loyverse sync every ${intervalMinutes} minutes`);
+    
+    const sync = async () => {
+      try {
+        await this.syncTodaysReceipts();
+      } catch (error) {
+        console.error('Real-time sync error:', error);
+      }
+    };
+
+    // Initial sync
+    await sync();
+    
+    // Set up interval
+    setInterval(sync, intervalMinutes * 60 * 1000);
+  }
+
+  // Health check
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.getStores();
+      console.log('✅ Loyverse API connection successful');
+      return true;
+    } catch (error) {
+      console.error('❌ Loyverse API connection failed:', error);
+      return false;
     }
   }
 }
 
-// Export singleton instance
 export const loyverseAPI = new LoyverseAPI();
-
-export type {
-  LoyverseReceipt,
-  LoyverseItem,
-  LoyverseCategory,
-  LoyverseCustomer,
-  LoyverseStore,
-  LoyverseShift,
-  LoyverseModifier,
-  LoyversePaymentType
-};
+export type { LoyverseReceipt, LoyverseItem, LoyverseCustomer, LoyverseStore, LoyverseShift };
