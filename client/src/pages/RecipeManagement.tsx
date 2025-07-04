@@ -135,9 +135,11 @@ export default function RecipeManagement() {
 
   // Marketing content generation mutation
   const generateMarketingMutation = useMutation({
-    mutationFn: ({ recipeId, outputType, notes }: { recipeId: number, outputType: string, notes?: string }) => 
-      apiRequest('POST', `/api/recipes/${recipeId}/generate-marketing`, { outputType, notes }),
-    onSuccess: (data) => {
+    mutationFn: async ({ recipeId, outputType, notes }: { recipeId: number, outputType: string, notes?: string }) => {
+      const response = await apiRequest('POST', `/api/recipes/${recipeId}/generate-marketing`, { outputType, notes });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
       setGeneratedContent(data.content);
       toast({ title: `${marketingOutputType.charAt(0).toUpperCase() + marketingOutputType.slice(1)} content generated successfully!` });
     },
@@ -153,8 +155,12 @@ export default function RecipeManagement() {
   // Query for existing marketing content
   const { data: marketingContentData } = useQuery({
     queryKey: [`/api/recipes/${selectedRecipe?.id}/marketing`, marketingOutputType],
-    queryFn: () => selectedRecipe ? 
-      fetch(`/api/recipes/${selectedRecipe.id}/marketing?type=${marketingOutputType}`).then(res => res.json()) : null,
+    queryFn: async () => {
+      if (!selectedRecipe) return null;
+      const response = await fetch(`/api/recipes/${selectedRecipe.id}/marketing?type=${marketingOutputType}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
     enabled: !!selectedRecipe && isMarketingDialogOpen
   });
 
@@ -165,20 +171,30 @@ export default function RecipeManagement() {
   const onAddIngredient = (data: any) => {
     if (!selectedRecipe) return;
     
-    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === parseInt(data.ingredientId));
-    if (!selectedIngredient) return;
+    const ingredientId = parseInt(data.ingredientId);
+    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
+    if (!selectedIngredient) {
+      toast({ title: "Please select an ingredient", variant: "destructive" });
+      return;
+    }
 
     // Calculate cost for this ingredient
     const unitPrice = parseFloat(selectedIngredient.unitPrice);
     const packageSize = parseFloat(selectedIngredient.packageSize);
     const quantity = parseFloat(data.quantity);
+    
+    if (isNaN(quantity) || quantity <= 0) {
+      toast({ title: "Please enter a valid quantity", variant: "destructive" });
+      return;
+    }
+    
     const costPerUnit = unitPrice / packageSize;
     const totalCost = costPerUnit * quantity;
 
     addIngredientMutation.mutate({
-      ...data,
       recipeId: selectedRecipe.id,
-      ingredientId: parseInt(data.ingredientId),
+      ingredientId: ingredientId,
+      quantity: data.quantity,
       unit: selectedIngredient.unit,
       cost: totalCost.toFixed(2),
     });
