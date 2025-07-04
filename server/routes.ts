@@ -1217,6 +1217,22 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Import authentic Loyverse shifts from CSV
+  app.post("/api/loyverse/import-shifts", async (req, res) => {
+    try {
+      console.log("Starting import of authentic Loyverse shift data...");
+      
+      const { importLoyverseShifts } = await import('./importLoyverseShifts');
+      const result = await importLoyverseShifts();
+      
+      console.log(`Loyverse shift import completed: ${result.imported} records processed`);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to import Loyverse shifts:", error);
+      res.status(500).json({ error: "Failed to import Loyverse shifts" });
+    }
+  });
+
   // Live Loyverse API integration endpoints
   app.get('/api/loyverse/live/status', async (req, res) => {
     try {
