@@ -21,15 +21,17 @@ export class SchedulerService {
   private scheduleDailyTask(task: () => void, hour: number, minute: number) {
     const scheduleNext = () => {
       const now = new Date();
-      const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // Bangkok UTC+7
       
-      // Create scheduled time in Bangkok timezone
-      const bangkokScheduledTime = new Date(bangkokTime);
-      bangkokScheduledTime.setHours(hour, minute, 0, 0);
+      // Get current time in Bangkok timezone using UTC offset method
+      const bangkokNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      
+      // Create next scheduled time in Bangkok timezone
+      const bangkokScheduledTime = new Date(bangkokNow);
+      bangkokScheduledTime.setUTCHours(hour, minute, 0, 0);
 
       // If the scheduled time has passed today in Bangkok, schedule for tomorrow
-      if (bangkokScheduledTime <= bangkokTime) {
-        bangkokScheduledTime.setDate(bangkokScheduledTime.getDate() + 1);
+      if (bangkokScheduledTime <= bangkokNow) {
+        bangkokScheduledTime.setUTCDate(bangkokScheduledTime.getUTCDate() + 1);
       }
 
       // Convert back to UTC for setTimeout
@@ -37,13 +39,23 @@ export class SchedulerService {
       const timeUntilNext = utcScheduledTime.getTime() - now.getTime();
 
       const timeout = setTimeout(() => {
-        console.log(`🕐 Executing daily sync at ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} Bangkok time`);
+        console.log(`🕐 Executing daily sync at ${new Date().toLocaleString('en-US', { 
+          timeZone: 'Asia/Bangkok',
+          dateStyle: 'full',
+          timeStyle: 'medium'
+        })} Bangkok time`);
         task();
         // Schedule the next occurrence
         scheduleNext();
       }, timeUntilNext);
 
-      console.log(`Next receipt sync scheduled for: ${bangkokScheduledTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} Bangkok time`);
+      // Display the actual Bangkok time correctly (bangkokScheduledTime is already in Bangkok timezone)
+      console.log(`Next receipt sync scheduled for: ${bangkokScheduledTime.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+      })} at ${bangkokScheduledTime.getUTCHours().toString().padStart(2, '0')}:${bangkokScheduledTime.getUTCMinutes().toString().padStart(2, '0')} Bangkok time`);
       return timeout;
     };
 

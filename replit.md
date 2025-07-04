@@ -170,6 +170,11 @@ Changelog:
 - July 4, 2025. Updated all shift reports with exact authentic cash amounts from CSV (฿6,889, ฿4,700, ฿1,816, etc.)
 - July 4, 2025. Verified all variance amounts match CSV exactly (฿697 difference for June 30th, ฿0 for others)
 - July 4, 2025. Dashboard now displays 100% authentic data - Current shift (July 3-4) correctly shows ฿0 sales
+- July 4, 2025. TIMEZONE FIX: Corrected all shift times to match authentic CSV data exactly
+- July 4, 2025. Fixed Shift 539: 6:12 PM to 6:13 PM (1-minute empty shift), Shift 538: 5:55 PM to 2:21 AM
+- July 4, 2025. Updated Shift 537: 5:39 PM to 2:07 AM, Shift 536: 5:51 PM to 2:05 AM (all authentic times)
+- July 4, 2025. Fixed scheduler display timezone - Next sync correctly shows "Saturday, July 5, 2025 at 03:00 Bangkok time"
+- July 4, 2025. All time displays now accurate - System shows proper Bangkok timezone (UTC+7) throughout
 ```
 
 ## User Preferences
