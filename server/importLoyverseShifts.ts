@@ -29,7 +29,7 @@ export async function importLoyverseShifts(): Promise<{ success: boolean; import
   try {
     console.log('Starting import of authentic Loyverse shift data...');
     
-    const csvContent = readFileSync('./attached_assets/shifts-2025-06-01-2025-07-04_1751587551783.csv', 'utf-8');
+    const csvContent = readFileSync('./attached_assets/shift summary - REPORT_1751616710426.csv', 'utf-8');
     
     return new Promise((resolve) => {
       parse(csvContent, {
