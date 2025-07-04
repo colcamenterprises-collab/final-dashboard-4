@@ -1638,6 +1638,57 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Google Sheets backup endpoints
+  app.get('/api/google-sheets/status', async (req, res) => {
+    try {
+      const { googleSheetsService } = await import('./googleSheetsService');
+      res.json({
+        configured: googleSheetsService.isConfigured(),
+        spreadsheetUrl: googleSheetsService.getSpreadsheetUrl()
+      });
+    } catch (error) {
+      console.error('Error checking Google Sheets status:', error);
+      res.status(500).json({ error: 'Failed to check Google Sheets status' });
+    }
+  });
+
+  app.post('/api/google-sheets/backup/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+
+      const form = await storage.getDailyStockSalesById(id);
+      if (!form) {
+        return res.status(404).json({ error: 'Form not found' });
+      }
+
+      const { googleSheetsService } = await import('./googleSheetsService');
+      const success = await googleSheetsService.backupDailyStockSales(form);
+      
+      if (success) {
+        res.json({ success: true, message: 'Form backed up to Google Sheets' });
+      } else {
+        res.status(500).json({ error: 'Failed to backup to Google Sheets' });
+      }
+    } catch (error) {
+      console.error('Error backing up to Google Sheets:', error);
+      res.status(500).json({ error: 'Failed to backup to Google Sheets' });
+    }
+  });
+
+  app.get('/api/google-sheets/backup-data', async (req, res) => {
+    try {
+      const { googleSheetsService } = await import('./googleSheetsService');
+      const backupData = await googleSheetsService.getBackupData();
+      res.json(backupData);
+    } catch (error) {
+      console.error('Error retrieving backup data:', error);
+      res.status(500).json({ error: 'Failed to retrieve backup data' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

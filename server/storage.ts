@@ -635,59 +635,96 @@ export class MemStorage implements IStorage {
   }
 
   async getDailyStockSales(): Promise<DailyStockSales[]> {
-    return Array.from(this.dailyStockSales.values()).sort((a, b) => 
-      new Date(b.shiftDate).getTime() - new Date(a.shiftDate).getTime()
-    );
+    // Use database for Daily Stock Sales
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { desc } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(dailyStockSales)
+      .orderBy(desc(dailyStockSales.shiftDate));
   }
 
   async createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales> {
-    const id = this.currentId++;
-    const dailyStockSalesRecord: DailyStockSales = { 
-      ...data, 
-      id,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.dailyStockSales.set(id, dailyStockSalesRecord);
-    return dailyStockSalesRecord;
+    // Use database for Daily Stock Sales  
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    
+    const [result] = await db.insert(dailyStockSales).values({
+      ...data,
+      shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+    }).returning();
+    
+    // Backup to Google Sheets
+    try {
+      const { googleSheetsService } = await import('./googleSheetsService');
+      await googleSheetsService.backupDailyStockSales(result);
+    } catch (error) {
+      console.error('Failed to backup to Google Sheets:', error);
+      // Don't fail the request if backup fails
+    }
+    
+    return result;
   }
 
   async searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]> {
-    const allForms = Array.from(this.dailyStockSales.values());
+    // Use database for Daily Stock Sales search
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { and, gte, lte, or, ilike, desc } = await import("drizzle-orm");
     
-    return allForms.filter(form => {
-      // Date range filter
-      if (startDate && form.shiftDate < startDate) return false;
-      if (endDate && form.shiftDate > endDate) return false;
-      
-      // Text search filter
-      if (query.trim()) {
-        const searchLower = query.toLowerCase();
-        const wageEntries = (form.wageEntries as any[] || []).map(entry => `${entry.name || ''} ${entry.notes || ''}`);
-        const shoppingEntries = (form.shoppingEntries as any[] || []).map(entry => `${entry.item || ''} ${entry.notes || ''}`);
-        
-        const searchableText = [
-          form.completedBy,
-          form.shiftType,
-          form.shiftDate.toISOString().split('T')[0], // Date as YYYY-MM-DD
-          form.expenseDescription || '',
-          ...wageEntries,
-          ...shoppingEntries
-        ].join(' ').toLowerCase();
-        
-        return searchableText.includes(searchLower);
-      }
-      
-      return true;
-    }).sort((a, b) => b.shiftDate.getTime() - a.shiftDate.getTime()); // Sort by date desc
+    let whereConditions: any[] = [];
+    
+    // Date range filters
+    if (startDate) {
+      whereConditions.push(gte(dailyStockSales.shiftDate, startDate));
+    }
+    if (endDate) {
+      whereConditions.push(lte(dailyStockSales.shiftDate, endDate));
+    }
+    
+    // Text search filter
+    if (query.trim()) {
+      const searchPattern = `%${query.toLowerCase()}%`;
+      whereConditions.push(
+        or(
+          ilike(dailyStockSales.completedBy, searchPattern),
+          ilike(dailyStockSales.shiftType, searchPattern),
+          ilike(dailyStockSales.expenseDescription, searchPattern)
+        )
+      );
+    }
+    
+    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    
+    return await db.select()
+      .from(dailyStockSales)
+      .where(whereClause)
+      .orderBy(desc(dailyStockSales.shiftDate));
   }
 
   async getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined> {
-    return this.dailyStockSales.get(id);
+    // Use database for Daily Stock Sales
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db.select()
+      .from(dailyStockSales)
+      .where(eq(dailyStockSales.id, id));
+      
+    return result || undefined;
   }
   
   async getDraftForms(): Promise<DailyStockSales[]> {
-    return Array.from(this.dailyStockSales.values()).filter(form => form.isDraft);
+    // Use database for Daily Stock Sales
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(dailyStockSales)
+      .where(eq(dailyStockSales.isDraft, true));
   }
   
   async updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales> {
