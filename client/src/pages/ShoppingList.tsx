@@ -30,6 +30,11 @@ export default function ShoppingList() {
     queryFn: api.getSuppliers
   });
 
+  const { data: ingredients } = useQuery({
+    queryKey: ["/api/ingredients"],
+    queryFn: () => fetch('/api/ingredients').then(res => res.json())
+  });
+
   const updateItemMutation = useMutation({
     mutationFn: ({ id, updates }: { id: number; updates: any }) => 
       mutations.updateShoppingListItem(id, updates)
@@ -101,8 +106,32 @@ export default function ShoppingList() {
     }
   };
 
+  // Calculate total cost with estimated pricing from ingredient database
+  const getEstimatedCost = (item: any) => {
+    if (item.pricePerUnit && parseFloat(item.pricePerUnit) > 0) {
+      return parseFloat(item.quantity) * parseFloat(item.pricePerUnit);
+    }
+    
+    // Try to find matching ingredient for cost estimation
+    if (Array.isArray(ingredients)) {
+      const matchingIngredient = ingredients.find((ing: any) => 
+        ing.name.toLowerCase().includes(item.itemName.toLowerCase()) ||
+        item.itemName.toLowerCase().includes(ing.name.toLowerCase())
+      );
+      
+      if (matchingIngredient) {
+        const unitPrice = parseFloat(matchingIngredient.unitPrice);
+        const packageSize = parseFloat(matchingIngredient.packageSize) || 1;
+        const pricePerUnit = unitPrice / packageSize;
+        return parseFloat(item.quantity) * pricePerUnit;
+      }
+    }
+    
+    return 0;
+  };
+
   const totalCost = shoppingList?.reduce((total, item) => 
-    total + (parseFloat(item.quantity) * parseFloat(item.pricePerUnit || '0')), 0
+    total + getEstimatedCost(item), 0
   ) || 0;
 
   if (isLoading) {
@@ -164,7 +193,7 @@ export default function ShoppingList() {
                     <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4">
                       <div className="text-left sm:text-right">
                         <p className="text-sm font-medium text-gray-900">{item.quantity} {item.unit}</p>
-                        <p className="text-xs text-gray-500">${item.pricePerUnit}/{item.unit}</p>
+                        <p className="text-xs text-gray-500">฿{item.pricePerUnit || getEstimatedCost(item) / parseFloat(item.quantity || '1')}/{item.unit}</p>
                       </div>
                       <div className="flex items-center space-x-2 sm:space-x-3">
                         <Badge variant="secondary" className={`text-xs ${getPriorityColor(item.priority)}`}>
@@ -189,7 +218,7 @@ export default function ShoppingList() {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold text-gray-900">Total Estimated Cost</span>
-                  <span className="text-xl font-bold text-primary">${totalCost.toFixed(2)}</span>
+                  <span className="text-xl font-bold text-primary">฿{totalCost.toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>

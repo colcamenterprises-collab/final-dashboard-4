@@ -1032,6 +1032,18 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Import ingredient costs from CSV
+  app.post('/api/ingredients/import-costs', async (req, res) => {
+    try {
+      const { importIngredientCosts } = await import('./importIngredientCosts');
+      const result = await importIngredientCosts();
+      res.json(result);
+    } catch (error) {
+      console.error('Error importing ingredient costs:', error);
+      res.status(500).json({ error: 'Failed to import ingredient costs' });
+    }
+  });
+
   // Recipes routes
   app.get('/api/recipes', async (req, res) => {
     try {
