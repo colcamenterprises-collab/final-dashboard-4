@@ -749,21 +749,20 @@ function ExpensesMerged() {
         <CardContent>
           <div className="space-y-4">
             {/* Search and Filters */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search expenses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            <div className="flex flex-col gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search expenses..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-              <div className="flex gap-2">
+              
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="All months" />
                   </SelectTrigger>
                   <SelectContent>
@@ -777,7 +776,7 @@ function ExpensesMerged() {
                 </Select>
 
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
@@ -798,53 +797,99 @@ function ExpensesMerged() {
               <span className="font-semibold">Total: ฿{totalExpenses.toLocaleString()}</span>
             </div>
 
-            {/* Table */}
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredExpenses.length === 0 ? (
+            {/* Responsive Table/Cards */}
+            <div className="space-y-4">
+              {/* Desktop Table */}
+              <div className="hidden md:block border rounded-md">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No expenses found. Start by adding your first expense.
-                      </TableCell>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredExpenses.map((expense: any) => (
-                      <TableRow key={expense.id}>
-                        <TableCell>{format(new Date(expense.date), "MMM dd, yyyy")}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{expense.description}</p>
-                            {expense.items && (
-                              <p className="text-sm text-muted-foreground">{expense.items}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{expense.category}</Badge>
-                        </TableCell>
-                        <TableCell>{expense.supplier || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{expense.paymentMethod}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ฿{parseFloat(expense.amount).toLocaleString()}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No expenses found. Start by adding your first expense.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredExpenses.map((expense: any) => (
+                        <TableRow key={expense.id}>
+                          <TableCell>{format(new Date(expense.date), "MMM dd, yyyy")}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{expense.description}</p>
+                              {expense.items && (
+                                <p className="text-sm text-muted-foreground">{expense.items}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{expense.category}</Badge>
+                          </TableCell>
+                          <TableCell>{expense.supplier || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{expense.paymentMethod}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ฿{parseFloat(expense.amount).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {filteredExpenses.length === 0 ? (
+                  <Card>
+                    <CardContent className="text-center py-8 text-muted-foreground">
+                      No expenses found. Start by adding your first expense.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filteredExpenses.map((expense: any) => (
+                    <Card key={expense.id} className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-sm leading-tight">{expense.description}</h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(expense.date), "MMM dd, yyyy")}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-lg">฿{parseFloat(expense.amount).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        
+                        {expense.items && (
+                          <p className="text-xs text-muted-foreground border-l-2 border-gray-200 pl-2">
+                            {expense.items}
+                          </p>
+                        )}
+                        
+                        <div className="flex flex-wrap gap-2 items-center text-xs">
+                          <Badge variant="secondary" className="text-xs">{expense.category}</Badge>
+                          <Badge variant="outline" className="text-xs">{expense.paymentMethod}</Badge>
+                          {expense.supplier && (
+                            <span className="text-muted-foreground">• {expense.supplier}</span>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
