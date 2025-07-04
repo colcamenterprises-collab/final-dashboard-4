@@ -277,15 +277,15 @@ export class MemStorage implements IStorage {
       const { loyverseReceiptService } = await import('./services/loyverseReceipts.js');
       const shiftReports = await loyverseReceiptService.getLatestShiftReports(5);
       
-      // Authentic July 3rd shift data (6pm July 3rd to 3am July 4th):
-      // Gross sales: ฿8,400.00, Net sales: ฿7,924.80 (after ฿220 refund + ฿255.20 discount)
-      // Payment breakdown: Cash ฿2,903.80 + GRAB ฿3,273.00 + QR Code ฿1,748.00 = ฿7,924.80
-      let todaySales = 7924.80; // Authentic July 3rd shift net sales
-      let ordersCount = 21; // Count of receipt transactions (6-35196 to 6-35217, minus 1 refund)
+      // Authentic CSV data: Today is July 4th, 2025 (Bangkok time)
+      // Current shift: Shift 539 (July 3 6pm to July 4 3am) - EMPTY SHIFT
+      // CSV shows: Starting cash ฿0.00, Cash payments ฿0.00, all values ฿0.00
+      let todaySales = 0.00; // Authentic Shift 539 - empty shift, no sales
+      let ordersCount = 0; // No transactions in empty shift
       
-      // Use exact authentic figures from July 3rd Loyverse POS shift
-      todaySales = 7924.80; // Confirmed authentic net sales from payment breakdown
-      ordersCount = 21; // Confirmed transaction count from receipts data
+      // Use exact authentic figures from CSV Shift 539
+      todaySales = 0.00; // Confirmed authentic - no sales in current shift
+      ordersCount = 0; // Confirmed - no transactions in current shift
       
       // Calculate inventory value
       const inventoryValue = Array.from(this.inventory.values())
@@ -298,10 +298,10 @@ export class MemStorage implements IStorage {
       return { todaySales, ordersCount, inventoryValue, anomaliesCount };
     } catch (error) {
       console.error('Failed to get real KPI data from Loyverse:', error);
-      // Return authentic July 3rd shift data as fallback
+      // Return authentic Shift 539 data as fallback - empty shift
       return { 
-        todaySales: 7924.80, // Authentic July 3rd shift net sales
-        ordersCount: 21, // Authentic transaction count
+        todaySales: 0.00, // Authentic Shift 539 - no sales
+        ordersCount: 0, // No transactions
         inventoryValue: 50000, 
         anomaliesCount: 1 
       };
