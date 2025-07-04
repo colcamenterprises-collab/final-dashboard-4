@@ -24,7 +24,10 @@ const recipeFormSchema = insertRecipeSchema.extend({
 });
 
 const recipeIngredientFormSchema = insertRecipeIngredientSchema.extend({
-  quantity: z.string().min(1, "Quantity is required"),
+  quantity: z.string().min(1, "Quantity is required").refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, "Quantity must be a positive number"),
 });
 
 export default function RecipeManagement() {
@@ -136,19 +139,42 @@ export default function RecipeManagement() {
     const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === parseInt(data.ingredientId));
     if (!selectedIngredient) return;
 
+    // Calculate cost for this ingredient
+    const unitPrice = parseFloat(selectedIngredient.unitPrice);
+    const packageSize = parseFloat(selectedIngredient.packageSize);
+    const quantity = parseFloat(data.quantity);
+    const costPerUnit = unitPrice / packageSize;
+    const totalCost = costPerUnit * quantity;
+
     addIngredientMutation.mutate({
       ...data,
       recipeId: selectedRecipe.id,
       ingredientId: parseInt(data.ingredientId),
       unit: selectedIngredient.unit,
+      cost: totalCost.toFixed(2),
     });
   };
 
   const onUpdateIngredient = (data: any) => {
     if (!editingIngredient) return;
+    
+    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === editingIngredient.ingredientId);
+    if (!selectedIngredient) return;
+
+    // Calculate cost for this ingredient
+    const unitPrice = parseFloat(selectedIngredient.unitPrice);
+    const packageSize = parseFloat(selectedIngredient.packageSize);
+    const quantity = parseFloat(data.quantity);
+    const costPerUnit = unitPrice / packageSize;
+    const totalCost = costPerUnit * quantity;
+
     updateIngredientMutation.mutate({
       id: editingIngredient.id,
-      data: { ...data, quantity: data.quantity }
+      data: { 
+        ...data, 
+        quantity: data.quantity,
+        cost: totalCost.toFixed(2)
+      }
     });
   };
 
