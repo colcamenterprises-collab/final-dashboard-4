@@ -113,7 +113,36 @@ export default function POSLoyverse() {
     },
   });
 
-  const syncReceipts = () => syncMutation.mutate();
+  const syncReceiptsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/loyverse/receipts/sync-live', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          startDate: '2025-07-01', 
+          endDate: '2025-07-04' 
+        })
+      });
+      if (!response.ok) throw new Error('Receipt sync failed');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Receipts Synced",
+        description: `Successfully synced ${data.receiptsProcessed} receipts from Loyverse API.`,
+      });
+      refetchReceipts();
+    },
+    onError: () => {
+      toast({
+        title: "Receipt Sync Failed",
+        description: "Failed to sync receipts from Loyverse. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncReceipts = () => syncReceiptsMutation.mutate();
   const syncReports = () => syncMutation.mutate();
 
   const formatCurrency = (amount: string | number) => {

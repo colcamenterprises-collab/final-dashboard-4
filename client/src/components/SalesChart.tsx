@@ -25,10 +25,10 @@ export default function SalesChart({
   const [endDate, setEndDate] = useState<string>('2025-07-04');
   const [selectedRange, setSelectedRange] = useState<string>('4days');
 
-  // Get real Loyverse shift data with date range
-  const { data: shiftReports, isLoading } = useQuery<ShiftReport[]>({
-    queryKey: ["/api/loyverse/shift-reports", startDate, endDate],
-    queryFn: () => fetch(`/api/loyverse/shift-reports?startDate=${startDate}&endDate=${endDate}&limit=30`).then(res => res.json())
+  // Get real Loyverse sales data by date range
+  const { data: salesData, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/loyverse/sales-summary", startDate, endDate],
+    queryFn: () => fetch(`/api/loyverse/sales-summary?startDate=${startDate}&endDate=${endDate}`).then(res => res.json())
   });
 
   // Handle date range changes
@@ -52,17 +52,17 @@ export default function SalesChart({
     }
   };
 
-  // Process ONLY authentic Loyverse API data - no fallbacks
-  const sortedReports = shiftReports ? [...shiftReports].sort((a, b) => new Date(a.shiftDate).getTime() - new Date(b.shiftDate).getTime()) : [];
+  // Process ONLY authentic Loyverse sales data - no fallbacks
+  const sortedSales = salesData ? [...salesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
   
-  const chartData = data || (sortedReports.length > 0 ? 
-    sortedReports.map(report => parseFloat(report.totalSales)) : // Chronological order
+  const chartData = data || (sortedSales.length > 0 ? 
+    sortedSales.map(sale => parseFloat(sale.totalSales || sale.total || '0')) : // Chronological order
     [] // Empty if no authentic data available
   );
   
-  const chartLabels = labels || (sortedReports.length > 0 ? 
-    sortedReports.map(report => {
-      const date = new Date(report.shiftDate);
+  const chartLabels = labels || (sortedSales.length > 0 ? 
+    sortedSales.map(sale => {
+      const date = new Date(sale.date);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }) : 
     [] // Empty if no authentic data available
@@ -74,13 +74,13 @@ export default function SalesChart({
       console.log("🔍 Sales Chart Debug:", {
         startDate,
         endDate,
-        shiftReports: shiftReports?.length,
+        salesData: salesData?.length,
         isLoading,
         chartData: chartData.length,
         chartLabels: chartLabels.length
       });
     }
-  }, [shiftReports, startDate, endDate, isLoading, chartData, chartLabels]);
+  }, [salesData, startDate, endDate, isLoading, chartData, chartLabels]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function SalesChart({
       ctx.fillText(label, x, padding + height + 20);
     });
 
-  }, [chartData, chartLabels, shiftReports, startDate, endDate]);
+  }, [chartData, chartLabels, salesData, startDate, endDate]);
 
   return (
     <Card className="restaurant-card">

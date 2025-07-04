@@ -598,11 +598,13 @@ export class LoyverseReceiptService {
       
       const isBalanced = cashVariance <= 40; // 40 baht variance tolerance
 
+      console.log(`Processing shift ${shift.id} - Sales: ฿${totalSales}, Cash: ฿${cashSales}, Variance: ฿${cashVariance}, Balanced: ${isBalanced}`);
+      
       return {
         id: shift.id,
-        shiftDate: shift.shiftDate,
-        shiftStart: shift.shiftStart,
-        shiftEnd: shift.shiftEnd,
+        shiftDate: shift.shiftDate.toISOString(),
+        shiftStart: shift.shiftStart.toISOString(),
+        shiftEnd: shift.shiftEnd.toISOString(),
         totalSales,
         cashSales,
         cardSales,
@@ -787,6 +789,115 @@ export class LoyverseReceiptService {
         { name: 'Grab', value: 41.30, amount: 3273.00, color: '#ef4444' },
         { name: 'QR Code', value: 22.06, amount: 1748.00, color: '#3b82f6' }
       ];
+    }
+  }
+
+  async getDailySalesSummary(startDate?: Date, endDate?: Date) {
+    try {
+      console.log('Getting daily sales summary from authentic Loyverse receipts...');
+      
+      // Set default date range if not provided (last 30 days)
+      if (!startDate) {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+      }
+      if (!endDate) {
+        endDate = new Date();
+      }
+
+      // Get receipts from date range
+      const receipts = await db.select().from(loyverseReceipts)
+        .where(and(
+          gte(loyverseReceipts.receiptDate, startDate),
+          lte(loyverseReceipts.receiptDate, endDate)
+        ))
+        .orderBy(loyverseReceipts.receiptDate);
+
+      console.log(`Found ${receipts.length} receipts for date range`);
+
+      // Group receipts by date and calculate daily totals
+      const dailySales = new Map<string, { date: string, totalSales: number, totalTransactions: number }>();
+
+      receipts.forEach(receipt => {
+        const date = receipt.shiftDate.toISOString().split('T')[0]; // Use shift date, not receipt date
+        const amount = parseFloat(receipt.totalAmount);
+        
+        if (!dailySales.has(date)) {
+          dailySales.set(date, {
+            date,
+            totalSales: 0,
+            totalTransactions: 0
+          });
+        }
+        
+        const dayData = dailySales.get(date)!;
+        dayData.totalSales += amount;
+        dayData.totalTransactions += 1;
+      });
+
+      // Convert to array and sort by date
+      const result = Array.from(dailySales.values()).sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+
+      console.log(`Generated daily sales summary for ${result.length} days`);
+      return result;
+
+    } catch (error) {
+      console.error('Error generating daily sales summary:', error);
+      return [];
+    }
+  }
+
+  async fetchReceiptsFromLoyverseAPI(startDate?: Date, endDate?: Date): Promise<{ success: boolean; receiptsProcessed: number }> {
+    try {
+      console.log('Fetching receipts directly from Loyverse API...');
+      
+      // Set default date range if not provided (last 7 days)
+      if (!startDate) {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+      }
+      if (!endDate) {
+        endDate = new Date();
+      }
+
+      const startTime = startDate.toISOString();
+      const endTime = endDate.toISOString();
+
+      const response = await fetch(`${this.config.baseUrl}/receipts?start_time=${startTime}&end_time=${endTime}&limit=100`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Loyverse API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const receipts = data.receipts || [];
+      
+      console.log(`Fetched ${receipts.length} receipts from Loyverse API`);
+
+      let processed = 0;
+      for (const receipt of receipts) {
+        try {
+          await this.storeReceipt(receipt);
+          processed++;
+        } catch (error) {
+          console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+        }
+      }
+
+      console.log(`Successfully processed ${processed} receipts from Loyverse API`);
+      return { success: true, receiptsProcessed: processed };
+
+    } catch (error) {
+      console.error('Error fetching receipts from Loyverse API:', error);
+      return { success: false, receiptsProcessed: 0 };
     }
   }
 }

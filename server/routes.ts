@@ -20,8 +20,10 @@ import {
   analyzeFinancialVariance
 } from "./services/ai";
 import { loyverseReceiptService } from "./services/loyverseReceipts";
-import { loyverseShiftReports } from "@shared/schema";
+import { loyverseAPI } from "./loyverseAPI";
+import { loyverseShiftReports, loyverseReceipts } from "@shared/schema";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Drink minimum stock levels with package sizes (based on authentic requirements)
 const DRINK_REQUIREMENTS = {
@@ -670,11 +672,81 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
 
   app.post("/api/loyverse/receipts/sync", async (req, res) => {
     try {
-      const result = await loyverseReceiptService.fetchAndStoreReceipts();
+      const result = await loyverseReceiptService.fetchReceiptsFromLoyverseAPI();
       res.json(result);
     } catch (error) {
       console.error("Failed to sync receipts:", error);
       res.status(500).json({ error: "Failed to sync receipts from Loyverse" });
+    }
+  });
+
+  app.post("/api/loyverse/receipts/sync-live", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.body;
+      console.log("Syncing receipts from live Loyverse API...");
+      
+      // Use the working loyverseAPI instead
+      const start = startDate ? new Date(startDate).toISOString() : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const end = endDate ? new Date(endDate).toISOString() : new Date().toISOString();
+      
+      const receiptsData = await loyverseAPI.getReceipts({
+        start_time: start,
+        end_time: end,
+        limit: 100
+      });
+      
+      console.log(`Fetched ${receiptsData.receipts.length} receipts from Loyverse API`);
+      
+      let processed = 0;
+      for (const receipt of receiptsData.receipts) {
+        try {
+          // Store receipt directly in database
+          const receiptDate = new Date(receipt.receipt_date);
+          const shiftDate = new Date(receiptDate);
+          
+          // Determine shift date (6pm-3am cycle)
+          if (receiptDate.getHours() < 6) {
+            shiftDate.setDate(shiftDate.getDate() - 1);
+          }
+          shiftDate.setHours(18, 0, 0, 0);
+          
+          const receiptId = receipt.receipt_number;
+          
+          // Check if receipt already exists
+          const existing = await db.select().from(loyverseReceipts)
+            .where(eq(loyverseReceipts.receiptId, receiptId))
+            .limit(1);
+          
+          if (existing.length === 0) {
+            await db.insert(loyverseReceipts).values({
+              receiptId: receiptId,
+              receiptNumber: receipt.receipt_number,
+              receiptDate: receiptDate,
+              totalAmount: receipt.total_money.toString(),
+              paymentMethod: receipt.payments[0]?.type || 'CASH',
+              customerInfo: receipt.customer_id ? { id: receipt.customer_id } : null,
+              items: receipt.line_items || [],
+              taxAmount: receipt.total_tax?.toString() || "0",
+              discountAmount: "0",
+              staffMember: receipt.employee_id || null,
+              tableNumber: null,
+              shiftDate: shiftDate,
+              rawData: receipt
+            });
+            processed++;
+            console.log(`Stored receipt ${receipt.receipt_number}: ฿${receipt.total_money}`);
+          }
+        } catch (error) {
+          console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+        }
+      }
+      
+      console.log(`Successfully processed ${processed} receipts from Loyverse API`);
+      res.json({ success: true, receiptsProcessed: processed });
+      
+    } catch (error) {
+      console.error("Failed to sync live receipts:", error);
+      res.status(500).json({ error: "Failed to sync receipts from live Loyverse API" });
     }
   });
 
@@ -756,6 +828,20 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     } catch (error) {
       console.error("Failed to get sales by payment type:", error);
       res.status(500).json({ error: "Failed to get sales by payment type" });
+    }
+  });
+
+  app.get("/api/loyverse/sales-summary", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const salesSummary = await loyverseReceiptService.getDailySalesSummary(
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(salesSummary);
+    } catch (error) {
+      console.error("Failed to get sales summary:", error);
+      res.status(500).json({ error: "Failed to get sales summary" });
     }
   });
 
