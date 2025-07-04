@@ -44,6 +44,7 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Ingredient Calculation**: Smart ingredient usage tracking from sales data
 - **Stock Recommendations**: AI-driven inventory reordering suggestions
 - **Financial Variance Analysis**: Automated comparison between POS and manual reports
+- **Marketing Content Generation**: AI-powered creation of food descriptions, headlines, and advertising copy for delivery partners (GrabFood, FoodPanda), advertising campaigns, and social media posts using GPT-4o
 
 ### Database Schema
 - **Users**: Authentication and user management
@@ -175,6 +176,12 @@ Changelog:
 - July 4, 2025. Updated Shift 537: 5:39 PM to 2:07 AM, Shift 536: 5:51 PM to 2:05 AM (all authentic times)
 - July 4, 2025. Fixed scheduler display timezone - Next sync correctly shows "Saturday, July 5, 2025 at 03:00 Bangkok time"
 - July 4, 2025. All time displays now accurate - System shows proper Bangkok timezone (UTC+7) throughout
+- July 4, 2025. MAJOR ENHANCEMENT: OpenAI integration for recipe marketing content generation
+- July 4, 2025. Added AI-powered food descriptions, headlines, and advertising copy generation using GPT-4o
+- July 4, 2025. Implemented comprehensive marketing content system with 3 output types: Delivery Partner, Advertising, Social Media
+- July 4, 2025. Enhanced Recipe Management with professional marketing content generation for GrabFood, FoodPanda, advertising campaigns, and social media posts
+- July 4, 2025. Added content versioning system - generates 3 variations per request with copy-to-clipboard functionality
+- July 4, 2025. Integrated authentic ingredient cost system with Thai Baht currency display throughout shopping lists and recipe management
 - July 4, 2025. ACCURACY MILESTONE: Updated all shift data with 100% authentic Loyverse reports
 - July 4, 2025. Fixed Today's Sales to ฿0.00 (Shift 539 empty), July 3rd to ฿14,339.10 (Shift 538)
 - July 4, 2025. Fixed July 2nd to ฿10,877.00 (Shift 537), July 1st to ฿7,308.00 (Shift 536, ฿697 variance)

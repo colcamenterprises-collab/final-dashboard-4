@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertRecipeSchema, insertRecipeIngredientSchema, type Recipe, type Ingredient, type RecipeIngredient } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X } from "lucide-react";
+import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone } from "lucide-react";
 import { z } from "zod";
 
 const recipeFormSchema = insertRecipeSchema.extend({
@@ -37,6 +37,10 @@ export default function RecipeManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddIngredientDialogOpen, setIsAddIngredientDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<RecipeIngredient | null>(null);
+  const [isMarketingDialogOpen, setIsMarketingDialogOpen] = useState(false);
+  const [marketingOutputType, setMarketingOutputType] = useState<'delivery' | 'advertising' | 'social'>('delivery');
+  const [marketingNotes, setMarketingNotes] = useState('');
+  const [generatedContent, setGeneratedContent] = useState<any>(null);
 
   // Queries
   const { data: recipes = [], isLoading: recipesLoading } = useQuery({
@@ -127,6 +131,31 @@ export default function RecipeManagement() {
       setSelectedRecipe(null);
       toast({ title: "Recipe deleted successfully" });
     },
+  });
+
+  // Marketing content generation mutation
+  const generateMarketingMutation = useMutation({
+    mutationFn: ({ recipeId, outputType, notes }: { recipeId: number, outputType: string, notes?: string }) => 
+      apiRequest('POST', `/api/recipes/${recipeId}/generate-marketing`, { outputType, notes }),
+    onSuccess: (data) => {
+      setGeneratedContent(data.content);
+      toast({ title: `${marketingOutputType.charAt(0).toUpperCase() + marketingOutputType.slice(1)} content generated successfully!` });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to generate marketing content", 
+        description: error.details || error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  // Query for existing marketing content
+  const { data: marketingContentData } = useQuery({
+    queryKey: [`/api/recipes/${selectedRecipe?.id}/marketing`, marketingOutputType],
+    queryFn: () => selectedRecipe ? 
+      fetch(`/api/recipes/${selectedRecipe.id}/marketing?type=${marketingOutputType}`).then(res => res.json()) : null,
+    enabled: !!selectedRecipe && isMarketingDialogOpen
   });
 
   const onCreateRecipe = (data: any) => {
@@ -601,6 +630,270 @@ export default function RecipeManagement() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Marketing Content Generation */}
+                <Separator />
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold flex items-center">
+                        <Sparkles className="h-5 w-5 mr-2 text-purple-600" />
+                        AI Marketing Content
+                      </h3>
+                      <p className="text-sm text-gray-600">Generate descriptions, headlines, and ad copy for delivery partners</p>
+                    </div>
+                    <Dialog open={isMarketingDialogOpen} onOpenChange={setIsMarketingDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Megaphone className="h-4 w-4 mr-2" />
+                          Generate Content
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center">
+                            <Sparkles className="h-5 w-5 mr-2 text-purple-600" />
+                            Generate Marketing Content for {selectedRecipe.name}
+                          </DialogTitle>
+                          <DialogDescription>
+                            Create professional marketing content for delivery partners, advertising, and social media
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="space-y-6">
+                          {/* Content Type Selection */}
+                          <div>
+                            <Label className="text-sm font-medium">Content Type</Label>
+                            <div className="flex space-x-2 mt-2">
+                              <Button
+                                variant={marketingOutputType === 'delivery' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setMarketingOutputType('delivery')}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Delivery Partner
+                              </Button>
+                              <Button
+                                variant={marketingOutputType === 'advertising' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setMarketingOutputType('advertising')}
+                              >
+                                <Megaphone className="h-4 w-4 mr-2" />
+                                Advertising
+                              </Button>
+                              <Button
+                                variant={marketingOutputType === 'social' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setMarketingOutputType('social')}
+                              >
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Social Media
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Marketing Notes */}
+                          <div>
+                            <Label htmlFor="marketingNotes" className="text-sm font-medium">
+                              Additional Notes (Optional)
+                            </Label>
+                            <Textarea
+                              id="marketingNotes"
+                              placeholder="Add any special details, unique selling points, or brand voice instructions..."
+                              value={marketingNotes}
+                              onChange={(e) => setMarketingNotes(e.target.value)}
+                              className="mt-2"
+                              rows={3}
+                            />
+                          </div>
+
+                          {/* Generate Button */}
+                          <Button
+                            onClick={() => {
+                              if (selectedRecipe) {
+                                generateMarketingMutation.mutate({
+                                  recipeId: selectedRecipe.id,
+                                  outputType: marketingOutputType,
+                                  notes: marketingNotes
+                                });
+                              }
+                            }}
+                            disabled={generateMarketingMutation.isPending}
+                            className="w-full"
+                          >
+                            {generateMarketingMutation.isPending ? (
+                              <>Generating Content...</>
+                            ) : (
+                              <>
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                Generate {marketingOutputType.charAt(0).toUpperCase() + marketingOutputType.slice(1)} Content
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Generated Content Display */}
+                          {generatedContent && (
+                            <div className="space-y-4">
+                              <Separator />
+                              <h4 className="font-semibold">Generated Content ({marketingOutputType})</h4>
+                              
+                              {/* Version 1 */}
+                              <div className="p-4 border rounded-lg bg-gray-50">
+                                <div className="flex justify-between items-start mb-2">
+                                  <Badge variant="secondary">Version 1</Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        `${generatedContent.version1.headline}\n\n${generatedContent.version1.body}${
+                                          generatedContent.version1.hashtags ? `\n\n${generatedContent.version1.hashtags.join(' ')}` : ''
+                                        }`
+                                      );
+                                      toast({ title: "Content copied to clipboard!" });
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Headline:</p>
+                                    <p className="font-semibold">{generatedContent.version1.headline}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Body:</p>
+                                    <p>{generatedContent.version1.body}</p>
+                                  </div>
+                                  {generatedContent.version1.hashtags && (
+                                    <div>
+                                      <p className="font-medium text-sm text-gray-600">Hashtags:</p>
+                                      <p className="text-blue-600">{generatedContent.version1.hashtags.join(' ')}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Version 2 */}
+                              <div className="p-4 border rounded-lg bg-gray-50">
+                                <div className="flex justify-between items-start mb-2">
+                                  <Badge variant="secondary">Version 2</Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        `${generatedContent.version2.headline}\n\n${generatedContent.version2.body}${
+                                          generatedContent.version2.hashtags ? `\n\n${generatedContent.version2.hashtags.join(' ')}` : ''
+                                        }`
+                                      );
+                                      toast({ title: "Content copied to clipboard!" });
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Headline:</p>
+                                    <p className="font-semibold">{generatedContent.version2.headline}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Body:</p>
+                                    <p>{generatedContent.version2.body}</p>
+                                  </div>
+                                  {generatedContent.version2.hashtags && (
+                                    <div>
+                                      <p className="font-medium text-sm text-gray-600">Hashtags:</p>
+                                      <p className="text-blue-600">{generatedContent.version2.hashtags.join(' ')}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Version 3 */}
+                              <div className="p-4 border rounded-lg bg-gray-50">
+                                <div className="flex justify-between items-start mb-2">
+                                  <Badge variant="secondary">Version 3</Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        `${generatedContent.version3.headline}\n\n${generatedContent.version3.body}${
+                                          generatedContent.version3.hashtags ? `\n\n${generatedContent.version3.hashtags.join(' ')}` : ''
+                                        }`
+                                      );
+                                      toast({ title: "Content copied to clipboard!" });
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Headline:</p>
+                                    <p className="font-semibold">{generatedContent.version3.headline}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Body:</p>
+                                    <p>{generatedContent.version3.body}</p>
+                                  </div>
+                                  {generatedContent.version3.hashtags && (
+                                    <div>
+                                      <p className="font-medium text-sm text-gray-600">Hashtags:</p>
+                                      <p className="text-blue-600">{generatedContent.version3.hashtags.join(' ')}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Existing Content Preview */}
+                          {marketingContentData?.content && !generatedContent && (
+                            <div className="space-y-4">
+                              <Separator />
+                              <h4 className="font-semibold">Previously Generated Content ({marketingOutputType})</h4>
+                              <div className="p-4 border rounded-lg bg-blue-50">
+                                <p className="text-sm text-gray-600 mb-2">Click "Generate Content" to create new versions</p>
+                                <div className="space-y-2">
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Headline:</p>
+                                    <p className="font-semibold">{marketingContentData.content.version1?.headline}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm text-gray-600">Body:</p>
+                                    <p>{marketingContentData.content.version1?.body}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {/* Quick Content Status */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 border rounded-lg text-center">
+                      <FileText className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs font-medium">Delivery Partner</p>
+                      <p className="text-xs text-gray-500">GrabFood, FoodPanda</p>
+                    </div>
+                    <div className="p-3 border rounded-lg text-center">
+                      <Megaphone className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs font-medium">Advertising</p>
+                      <p className="text-xs text-gray-500">Headlines & Body</p>
+                    </div>
+                    <div className="p-3 border rounded-lg text-center">
+                      <Share2 className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                      <p className="text-xs font-medium">Social Media</p>
+                      <p className="text-xs text-gray-500">Instagram, Facebook</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (

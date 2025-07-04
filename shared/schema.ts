@@ -284,6 +284,11 @@ export const recipes = pgTable("recipes", {
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }),
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").default(true),
+  // Marketing content fields
+  deliveryContent: text("delivery_content"), // JSON string for delivery partner content
+  advertisingContent: text("advertising_content"), // JSON string for advertising content
+  socialContent: text("social_content"), // JSON string for social media content
+  marketingNotes: text("marketing_notes"), // Additional notes for marketing content generation
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

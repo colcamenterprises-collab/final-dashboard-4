@@ -24,6 +24,7 @@ import { loyverseAPI } from "./loyverseAPI";
 import { loyverseShiftReports, loyverseReceipts } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { generateMarketingContent } from "./openai";
 
 // Drink minimum stock levels with package sizes (based on authentic requirements)
 const DRINK_REQUIREMENTS = {
@@ -1541,6 +1542,99 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     } catch (error) {
       console.error('Test email error:', error);
       res.status(500).json({ success: false, message: 'Email service error', error: error.message });
+    }
+  });
+
+  // Generate marketing content for recipes
+  app.post("/api/recipes/:id/generate-marketing", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      const { outputType, notes } = req.body;
+      
+      if (!outputType || !['delivery', 'advertising', 'social'].includes(outputType)) {
+        return res.status(400).json({ error: "Invalid output type. Must be 'delivery', 'advertising', or 'social'" });
+      }
+
+      // Get recipe details
+      const recipe = await storage.getRecipeById(recipeId);
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+
+      // Get recipe ingredients
+      const recipeIngredients = await storage.getRecipeIngredients(recipeId);
+      const allIngredients = await storage.getIngredients();
+      const ingredientNames = recipeIngredients.map(ri => {
+        const ingredient = allIngredients.find(ing => ing.id === ri.ingredientId);
+        return ingredient?.name || `Ingredient ${ri.ingredientId}`;
+      });
+
+      // Generate marketing content using OpenAI
+      const marketingContent = await generateMarketingContent(
+        recipe.name,
+        ingredientNames,
+        notes || '',
+        outputType as 'delivery' | 'advertising' | 'social'
+      );
+
+      // Update recipe with generated content
+      const contentField = `${outputType}Content` as 'deliveryContent' | 'advertisingContent' | 'socialContent';
+      await storage.updateRecipe(recipeId, {
+        [contentField]: JSON.stringify(marketingContent),
+        marketingNotes: notes || recipe.marketingNotes
+      });
+
+      res.json({
+        success: true,
+        content: marketingContent,
+        outputType
+      });
+
+    } catch (error: any) {
+      console.error('Marketing content generation error:', error);
+      res.status(500).json({ 
+        error: "Failed to generate marketing content", 
+        details: error.message 
+      });
+    }
+  });
+
+  // Get marketing content for a recipe
+  app.get("/api/recipes/:id/marketing", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      const { type } = req.query;
+
+      const recipe = await storage.getRecipeById(recipeId);
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+
+      let content = null;
+      if (type === 'delivery' && recipe.deliveryContent) {
+        content = JSON.parse(recipe.deliveryContent);
+      } else if (type === 'advertising' && recipe.advertisingContent) {
+        content = JSON.parse(recipe.advertisingContent);
+      } else if (type === 'social' && recipe.socialContent) {
+        content = JSON.parse(recipe.socialContent);
+      }
+
+      res.json({
+        content,
+        marketingNotes: recipe.marketingNotes,
+        hasContent: {
+          delivery: !!recipe.deliveryContent,
+          advertising: !!recipe.advertisingContent,
+          social: !!recipe.socialContent
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Get marketing content error:', error);
+      res.status(500).json({ 
+        error: "Failed to get marketing content", 
+        details: error.message 
+      });
     }
   });
 
