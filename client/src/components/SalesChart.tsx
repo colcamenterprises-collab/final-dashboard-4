@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "lucide-react";
 
 interface SalesChartProps {
   data?: number[];
@@ -19,24 +21,49 @@ export default function SalesChart({
   data,
   labels
 }: SalesChartProps) {
-  // Get real Loyverse shift data
+  const [startDate, setStartDate] = useState<string>('2025-07-01');
+  const [endDate, setEndDate] = useState<string>('2025-07-04');
+  const [selectedRange, setSelectedRange] = useState<string>('4days');
+
+  // Get real Loyverse shift data with date range
   const { data: shiftReports, isLoading } = useQuery<ShiftReport[]>({
-    queryKey: ["/api/loyverse/shift-reports"],
-    queryFn: () => fetch("/api/loyverse/shift-reports?limit=7").then(res => res.json())
+    queryKey: ["/api/loyverse/shift-reports", startDate, endDate],
+    queryFn: () => fetch(`/api/loyverse/shift-reports?startDate=${startDate}&endDate=${endDate}&limit=30`).then(res => res.json())
   });
 
-  // Process real Loyverse data with fallback
+  // Handle date range changes
+  const handleRangeChange = (range: string) => {
+    setSelectedRange(range);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    switch (range) {
+      case '4days':
+        setStartDate('2025-07-01');
+        setEndDate('2025-07-04');
+        break;
+      case '7days':
+        setStartDate('2025-06-28');
+        setEndDate('2025-07-04');
+        break;
+      case 'custom':
+        // Keep current dates for custom range
+        break;
+    }
+  };
+
+  // Process ONLY authentic Loyverse API data - no fallbacks
   const chartData = data || (shiftReports && shiftReports.length > 0 ? 
-    shiftReports.slice(0, 6).reverse().map(report => parseFloat(report.totalSales)) : 
-    [0, 0, 0, 0, 0, 0]
+    shiftReports.map(report => parseFloat(report.totalSales)) : 
+    [] // Empty if no authentic data available
   );
   
   const chartLabels = labels || (shiftReports && shiftReports.length > 0 ? 
-    shiftReports.slice(0, 6).reverse().map(report => {
+    shiftReports.map(report => {
       const date = new Date(report.shiftDate);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }) : 
-    ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6']
+    [] // Empty if no authentic data available
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -94,17 +121,15 @@ export default function SalesChart({
     ctx.closePath();
     ctx.fill();
 
-    // Draw line
+    // Draw line connecting actual data points (no smooth curves)
     ctx.strokeStyle = '#F5D016';
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     points.forEach((point, index) => {
       if (index > 0) {
-        // Create smooth curve
-        const prevPoint = points[index - 1];
-        const cpX = (prevPoint.x + point.x) / 2;
-        ctx.quadraticCurveTo(cpX, prevPoint.y, point.x, point.y);
+        // Draw straight lines between actual data points
+        ctx.lineTo(point.x, point.y);
       }
     });
     ctx.stroke();
@@ -131,27 +156,62 @@ export default function SalesChart({
   return (
     <Card className="restaurant-card">
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-4">
           <CardTitle className="text-lg font-semibold text-gray-900">Sales Overview</CardTitle>
-          <Select defaultValue="6months">
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="6months">Last 6 Months</SelectItem>
-              <SelectItem value="1year">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={selectedRange} onValueChange={handleRangeChange}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="4days">Last 4 Days</SelectItem>
+                <SelectItem value="7days">Last 7 Days</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {selectedRange === 'custom' && (
+          <div className="flex gap-2 mb-4">
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1 border rounded text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 mb-1">End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1 border rounded text-sm"
+              />
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
-        <div className="chart-container">
-          <canvas 
-            ref={canvasRef}
-            className="w-full h-full"
-            style={{ width: '100%', height: '320px' }}
-          />
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-80">
+            <div className="text-gray-500">Loading authentic Loyverse data...</div>
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="flex items-center justify-center h-80">
+            <div className="text-gray-500">No authentic Loyverse data available for this date range</div>
+          </div>
+        ) : (
+          <div className="chart-container">
+            <canvas 
+              ref={canvasRef}
+              className="w-full h-full"
+              style={{ width: '100%', height: '320px' }}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
