@@ -53,18 +53,34 @@ export default function SalesChart({
   };
 
   // Process ONLY authentic Loyverse API data - no fallbacks
-  const chartData = data || (shiftReports && shiftReports.length > 0 ? 
-    shiftReports.map(report => parseFloat(report.totalSales)) : 
+  const sortedReports = shiftReports ? [...shiftReports].sort((a, b) => new Date(a.shiftDate).getTime() - new Date(b.shiftDate).getTime()) : [];
+  
+  const chartData = data || (sortedReports.length > 0 ? 
+    sortedReports.map(report => parseFloat(report.totalSales)) : // Chronological order
     [] // Empty if no authentic data available
   );
   
-  const chartLabels = labels || (shiftReports && shiftReports.length > 0 ? 
-    shiftReports.map(report => {
+  const chartLabels = labels || (sortedReports.length > 0 ? 
+    sortedReports.map(report => {
       const date = new Date(report.shiftDate);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }) : 
     [] // Empty if no authentic data available
   );
+
+  // Debug log to check what data we're getting
+  useEffect(() => {
+    if (chartData && chartLabels) {
+      console.log("🔍 Sales Chart Debug:", {
+        startDate,
+        endDate,
+        shiftReports: shiftReports?.length,
+        isLoading,
+        chartData: chartData.length,
+        chartLabels: chartLabels.length
+      });
+    }
+  }, [shiftReports, startDate, endDate, isLoading, chartData, chartLabels]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -151,7 +167,7 @@ export default function SalesChart({
       ctx.fillText(label, x, padding + height + 20);
     });
 
-  }, [chartData, chartLabels]);
+  }, [chartData, chartLabels, shiftReports, startDate, endDate]);
 
   return (
     <Card className="restaurant-card">
