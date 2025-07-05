@@ -1025,7 +1025,9 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       
       // Aggregate items for shift summary
       itemsList.forEach(item => {
-        const existingItem = shifts[shiftKey].itemsSold.find(i => i.item_name === item.item_name);
+        const existingItem = shifts[shiftKey].itemsSold.find(i => 
+          i.item_name === item.item_name && i.variant_name === item.variant_name
+        );
         if (existingItem) {
           existingItem.quantity += item.quantity;
           existingItem.total_amount += item.total_amount;
@@ -1058,6 +1060,7 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       .map((shift: any) => ({
         ...shift,
         itemsSold: shift.itemsSold.sort((a: any, b: any) => b.quantity - a.quantity),
+        itemsByCategory: groupItemsByCategory(shift.itemsSold),
         modifiersUsed: shift.modifiersUsed.sort((a: any, b: any) => b.count - a.count)
       }));
   }
@@ -1112,6 +1115,46 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     });
     
     return { itemsList, modifiersList };
+  }
+
+  // Helper function to group items by category
+  function groupItemsByCategory(items: any[]) {
+    const categories: { [key: string]: any[] } = {};
+    
+    items.forEach(item => {
+      // Determine category based on item name patterns
+      let category = "OTHER";
+      
+      const itemName = (item.item_name || "").toLowerCase();
+      
+      if (itemName.includes("burger") || itemName.includes("smash")) {
+        category = "BURGERS";
+      } else if (itemName.includes("nugget") || itemName.includes("chicken")) {
+        category = "CHICKEN";
+      } else if (itemName.includes("fries") || itemName.includes("sweet potato")) {
+        category = "SIDES";
+      } else if (itemName.includes("coke") || itemName.includes("sprite") || itemName.includes("drink") || 
+                 itemName.includes("soda") || itemName.includes("water") || itemName.includes("juice")) {
+        category = "BEVERAGES";
+      } else if (itemName.includes("sauce") || itemName.includes("mayo") || itemName.includes("ketchup")) {
+        category = "SAUCES";
+      } else if (itemName.includes("wrap") || itemName.includes("bag") || itemName.includes("container")) {
+        category = "PACKAGING";
+      }
+      
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      
+      categories[category].push(item);
+    });
+    
+    // Sort each category by quantity (highest first)
+    Object.keys(categories).forEach(category => {
+      categories[category].sort((a, b) => b.quantity - a.quantity);
+    });
+    
+    return categories;
   }
 
   app.get("/api/loyverse/sales-summary", async (req, res) => {

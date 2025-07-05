@@ -434,29 +434,36 @@ export default function POSLoyverse() {
 
                       {/* Items and Modifiers Summary */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Items Sold */}
+                        {/* Items Sold by Category */}
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
                           <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
                             <Package className="h-4 w-4" />
-                            Items Sold ({shift.itemsSold.length} types)
+                            Items Sold by Category ({shift.itemsSold.length} types)
                           </h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {shift.itemsSold.slice(0, 10).map((item: any, index: number) => (
-                              <div key={index} className="flex justify-between items-center text-sm">
-                                <span className="font-medium text-gray-700 dark:text-gray-300">
-                                  {item.item_name}
-                                </span>
-                                <div className="text-right">
-                                  <div className="font-semibold">{item.quantity}x</div>
-                                  <div className="text-gray-500 text-xs">{formatCurrency(item.total_amount)}</div>
+                          <div className="space-y-4 max-h-96 overflow-y-auto">
+                            {shift.itemsByCategory && Object.entries(shift.itemsByCategory).map(([category, items]: [string, any]) => (
+                              <div key={category} className="border-l-2 border-blue-300 pl-3">
+                                <h5 className="font-medium text-gray-800 dark:text-gray-200 text-sm mb-2 uppercase tracking-wide">
+                                  {category}
+                                </h5>
+                                <div className="space-y-1">
+                                  {items.map((item: any, index: number) => (
+                                    <div key={index} className="flex justify-between items-center text-sm bg-white dark:bg-gray-800 rounded px-2 py-1">
+                                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                                        {item.item_name}
+                                        {item.variant_name && (
+                                          <span className="text-gray-500 text-xs ml-1">({item.variant_name})</span>
+                                        )}
+                                      </span>
+                                      <div className="text-right">
+                                        <div className="font-semibold text-blue-600">{item.quantity}x</div>
+                                        <div className="text-gray-500 text-xs">{formatCurrency(item.total_amount)}</div>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             ))}
-                            {shift.itemsSold.length > 10 && (
-                              <p className="text-gray-500 text-xs mt-2">
-                                ... and {shift.itemsSold.length - 10} more items
-                              </p>
-                            )}
                           </div>
                         </div>
 

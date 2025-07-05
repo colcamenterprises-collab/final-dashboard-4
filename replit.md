@@ -200,6 +200,10 @@ Changelog:
 - July 5, 2025. Added Month-to-Date (MTD) Sales KPI showing ฿81,569 total July sales from authentic receipt data
 - July 5, 2025. Fixed dashboard to show "Last Shift Sales" and "Orders Completed Last Shift" with accurate shift 540 data (32 orders)
 - July 5, 2025. Enhanced receipt accuracy system with complete item details, Thai menu names, and modifier capture for shift 540
+- July 5, 2025. STOCK PURCHASING ENHANCEMENT: Added complete item visibility (removed truncation) and category grouping system
+- July 5, 2025. Created itemsByCategory grouping with BURGERS, CHICKEN, SIDES, BEVERAGES, SAUCES, PACKAGING, OTHER categories
+- July 5, 2025. Enhanced variant tracking to show specific nugget quantities and other item variants for accurate stock ordering
+- July 5, 2025. Improved shift-based receipt display for inventory management and purchasing decisions
 ```
 
 ## User Preferences
