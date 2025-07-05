@@ -2533,6 +2533,126 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Get ALL items and modifiers from last completed shift
+  app.get("/api/loyverse/last-shift-inventory", async (req, res) => {
+    try {
+      // Import database components
+      const { db } = await import('./db');
+      const { loyverseShiftReports } = await import('../shared/schema');
+      const { desc, eq } = await import('drizzle-orm');
+      
+      // Get the most recent shift
+      const latestShift = await db.select()
+        .from(loyverseShiftReports)
+        .orderBy(desc(loyverseShiftReports.shiftDate))
+        .limit(1);
+      
+      if (!latestShift || latestShift.length === 0) {
+        return res.json({ items: [], modifiers: [], shiftInfo: null });
+      }
+      
+      const shift = latestShift[0];
+      console.log(`📊 Getting inventory for shift ${shift.reportId} (${shift.shiftDate})`);
+      
+      // Get all receipts for this shift
+      const receipts = await loyverseReceiptService.getReceiptsByDateRange(
+        new Date(shift.shiftStart),
+        new Date(shift.shiftEnd)
+      );
+      
+      const allItems: any[] = [];
+      const allModifiers: any[] = [];
+      const itemQuantities: { [key: string]: { name: string, quantity: number, totalSales: number } } = {};
+      const modifierCounts: { [key: string]: { name: string, option: string, count: number, totalAmount: number } } = {};
+      
+      // Process all receipts to extract items and modifiers
+      receipts.forEach((receipt: any) => {
+        let items: any[] = [];
+        try {
+          if (Array.isArray(receipt.items)) {
+            items = receipt.items;
+          } else if (receipt.items && typeof receipt.items === 'string') {
+            items = JSON.parse(receipt.items);
+          } else if (receipt.rawData?.line_items) {
+            items = receipt.rawData.line_items;
+          }
+        } catch (error) {
+          console.error('Error parsing receipt items:', error);
+        }
+        
+        items.forEach((item: any) => {
+          const itemKey = item.item_name || item.name;
+          const quantity = parseInt(item.quantity || '1');
+          const totalMoney = parseFloat(item.total_money || item.gross_total_money || item.price || '0');
+          
+          // Aggregate item quantities
+          if (itemQuantities[itemKey]) {
+            itemQuantities[itemKey].quantity += quantity;
+            itemQuantities[itemKey].totalSales += totalMoney;
+          } else {
+            itemQuantities[itemKey] = {
+              name: itemKey,
+              quantity: quantity,
+              totalSales: totalMoney
+            };
+          }
+          
+          // Process modifiers
+          if (item.line_modifiers && Array.isArray(item.line_modifiers)) {
+            item.line_modifiers.forEach((modifier: any) => {
+              const modifierKey = `${modifier.name}:${modifier.option || modifier.name}`;
+              const amount = parseFloat(modifier.money_amount || '0');
+              
+              if (modifierCounts[modifierKey]) {
+                modifierCounts[modifierKey].count += 1;
+                modifierCounts[modifierKey].totalAmount += amount;
+              } else {
+                modifierCounts[modifierKey] = {
+                  name: modifier.name,
+                  option: modifier.option || modifier.name,
+                  count: 1,
+                  totalAmount: amount
+                };
+              }
+            });
+          }
+        });
+      });
+      
+      // Convert to arrays and sort by quantity/count
+      const itemsList = Object.values(itemQuantities)
+        .sort((a, b) => b.quantity - a.quantity);
+      
+      const modifiersList = Object.values(modifierCounts)
+        .sort((a, b) => b.count - a.count);
+      
+      console.log(`📋 Found ${itemsList.length} unique items and ${modifiersList.length} unique modifiers`);
+      
+      res.json({
+        shiftInfo: {
+          reportId: shift.reportId,
+          shiftDate: shift.shiftDate,
+          shiftStart: shift.shiftStart,
+          shiftEnd: shift.shiftEnd,
+          totalSales: shift.totalSales,
+          totalReceipts: receipts.length
+        },
+        items: itemsList,
+        modifiers: modifiersList,
+        summary: {
+          totalUniqueItems: itemsList.length,
+          totalUniqueModifiers: modifiersList.length,
+          totalItemsSold: itemsList.reduce((sum, item) => sum + item.quantity, 0),
+          totalModifiersUsed: modifiersList.reduce((sum, mod) => sum + mod.count, 0)
+        }
+      });
+      
+    } catch (error) {
+      console.error('Failed to get last shift inventory:', error);
+      res.status(500).json({ error: "Failed to get shift inventory data" });
+    }
+  });
+
   // Monthly revenue endpoint for chart
   app.get("/api/loyverse/monthly-revenue", async (req, res) => {
     try {
