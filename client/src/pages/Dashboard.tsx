@@ -138,9 +138,10 @@ export default function Dashboard() {
 
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        {/* Sales Chart */}
-        <div className="lg:col-span-2">
+        {/* Sales Chart and Compact Shift Reports */}
+        <div className="lg:col-span-2 space-y-6">
           <MonthlyRevenueChart />
+          <CompactShiftReports />
         </div>
 
         {/* Top Sales Items */}
@@ -207,14 +208,6 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Compact Shift Reports to fill white space */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        <div className="lg:col-span-2">
-          <CompactShiftReports />
-        </div>
-        <div></div> {/* Empty space to maintain grid */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
