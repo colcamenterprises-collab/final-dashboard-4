@@ -15,24 +15,23 @@ export default function SalesByPaymentType() {
     refetchInterval: 60000, // Refresh every minute
   });
 
-  // Create SVG donut chart matching the attached image exactly
+  // Create SVG donut chart matching the reference image exactly
   const DonutChart = ({ data }: { data: PaymentTypeData[] }) => {
-    const size = 200;
-    const strokeWidth = 32; // Much thicker like the reference
+    const size = 160;
+    const strokeWidth = 20;
     const center = size / 2;
     const radius = center - strokeWidth / 2;
     const circumference = 2 * Math.PI * radius;
     
-    // Only show 270 degrees (3/4 circle) like the reference image
+    // 270 degrees (3/4 circle) starting from top-left
     const maxAngle = 270;
-    const startAngle = 225; // Start from bottom left
     
-    let accumulatedPercentage = 0;
+    let accumulatedAngle = 0;
     
     return (
       <div className="flex flex-col items-center">
-        <svg width={size} height={size} className="transform" style={{ transform: `rotate(${startAngle}deg)` }}>
-          {/* Background arc - only 3/4 circle */}
+        <svg width={size} height={size} className="transform rotate-[135deg]">
+          {/* Background arc - light gray */}
           <circle
             cx={center}
             cy={center}
@@ -46,9 +45,9 @@ export default function SalesByPaymentType() {
           {/* Data segments */}
           {data.map((item, index) => {
             const segmentAngle = (item.value / 100) * maxAngle;
-            const strokeDasharray = `${(segmentAngle / 360) * circumference} ${circumference}`;
-            const strokeDashoffset = -(accumulatedPercentage / 100) * (maxAngle / 360) * circumference;
-            accumulatedPercentage += item.value;
+            const segmentArc = (segmentAngle / 360) * circumference;
+            const offset = -(accumulatedAngle / 360) * circumference;
+            accumulatedAngle += segmentAngle;
             
             return (
               <circle
@@ -59,10 +58,10 @@ export default function SalesByPaymentType() {
                 fill="transparent"
                 stroke={item.color}
                 strokeWidth={strokeWidth}
-                strokeDasharray={strokeDasharray}
-                strokeDashoffset={strokeDashoffset}
+                strokeDasharray={`${segmentArc} ${circumference}`}
+                strokeDashoffset={offset}
                 strokeLinecap="round"
-                className="transition-all duration-300 hover:opacity-90"
+                className="transition-all duration-300"
               />
             );
           })}

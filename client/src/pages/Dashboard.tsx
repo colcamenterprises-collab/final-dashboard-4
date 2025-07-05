@@ -8,6 +8,7 @@ import KPICard from "@/components/KPICard";
 import MonthlyRevenueChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
+import CompactShiftReports from "@/components/CompactShiftReports";
 
 
 import { api, mutations } from "@/lib/api";
@@ -206,6 +207,14 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Compact Shift Reports to fill white space */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        <div className="lg:col-span-2">
+          <CompactShiftReports />
+        </div>
+        <div></div> {/* Empty space to maintain grid */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
