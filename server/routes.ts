@@ -189,22 +189,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoints
   app.get("/api/dashboard/kpis", async (req, res) => {
     try {
-      // Use stored data from database for consistent performance
+      console.log("Getting KPIs for last completed shift...");
+      
+      // Import database components
+      const { db } = await import('./db');
+      const { loyverseShiftReports, loyverseReceipts } = await import('../shared/schema');
+      const { sql } = await import('drizzle-orm');
+      
+      // Get latest shift using raw SQL to avoid syntax issues
+      const latestShiftResult = await db.execute(sql`
+        SELECT id, report_id, shift_date, shift_start, shift_end, total_sales, total_transactions
+        FROM loyverse_shift_reports 
+        ORDER BY id DESC 
+        LIMIT 1
+      `);
+      
+      const latestShift = latestShiftResult.rows[0];
+      
+      // Calculate Month-to-Date Sales using raw SQL
+      const mtdResult = await db.execute(sql`
+        SELECT COALESCE(SUM(total_amount), 0) as total_sales 
+        FROM loyverse_receipts 
+        WHERE receipt_date >= '2025-07-01'
+      `);
+      
+      const monthToDateSales = parseFloat(mtdResult.rows[0]?.total_sales || '0');
+      
+      console.log(`📊 Latest shift: ${latestShift?.report_id} with ฿${latestShift?.total_sales}`);
+      console.log(`💰 Month-to-Date Sales: ฿${monthToDateSales.toFixed(2)}`);
+      
       const kpis = await storage.getDashboardKPIs();
       
-      // Current shift period: July 4th 6pm to July 5th 3am (Bangkok time)
-      // Last meaningful completed shift: July 3rd (Shift 538) - July 4th was empty shift
+      // Return authentic latest shift data (shift 540)
       const lastShiftKpis = {
-        lastShiftSales: 14339.10, // Authentic July 3rd shift sales (last meaningful shift)
-        lastShiftOrders: 42, // Actual transactions from Shift 538
+        lastShiftSales: parseFloat(latestShift?.total_sales || '0'),
+        lastShiftOrders: parseInt(latestShift?.total_transactions || '0'),
+        monthToDateSales: monthToDateSales,
         inventoryValue: kpis.inventoryValue || 125000,
-        averageOrderValue: Math.round(14339.10 / 42), // ~341 baht per order (corrected)
-        shiftDate: "July 4th-5th",
+        averageOrderValue: latestShift?.total_sales && latestShift?.total_transactions 
+          ? Math.round(parseFloat(latestShift.total_sales) / parseInt(latestShift.total_transactions))
+          : 0,
+        shiftDate: latestShift?.report_id?.includes('540') ? "July 4th-5th" : "Previous Shift",
         shiftPeriod: { 
-          start: new Date('2025-07-04T18:00:00+07:00'), // Current shift: July 4th 6pm
-          end: new Date('2025-07-05T03:00:00+07:00')   // to July 5th 3am
+          start: latestShift?.shift_start || new Date('2025-07-04T18:00:00+07:00'),
+          end: latestShift?.shift_end || new Date('2025-07-05T03:00:00+07:00')
         },
-        note: "Current shift period (July 4th 6pm - July 5th 3am)"
+        note: `Last completed shift: ${latestShift?.report_id || 'Unknown'}`
       };
       
       res.json(lastShiftKpis);

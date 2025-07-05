@@ -96,31 +96,31 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KPICard
-          title="Current Shift Sales"
+          title="Last Shift Sales"
           value={`฿${kpis?.lastShiftSales?.toLocaleString() || '0'}`}
-          change={`${kpis?.shiftDate || 'Current'} Shift (6pm-3am)`}
+          change={`${kpis?.shiftDate || 'Previous'} Shift`}
           changeType="positive"
           icon={DollarSign}
           iconColor="text-primary"
           iconBgColor="bg-primary/20"
         />
         <KPICard
-          title="Orders This Shift"
+          title="Orders Completed Last Shift"
           value={kpis?.lastShiftOrders || 0}
-          change={`${kpis?.shiftDate || 'Current'} Shift Period`}
+          change={`${kpis?.shiftDate || 'Previous'} Shift Period`}
           changeType="positive"
           icon={ShoppingCart}
           iconColor="text-green-600"
           iconBgColor="bg-green-100"
         />
         <KPICard
-          title="Loyverse POS"
-          value={status?.connected ? "Connected" : "Disconnected"}
-          change={status?.connected ? "Live Sync Active" : "Connection Failed"}
-          changeType={status?.connected ? "positive" : "negative"}
-          icon={Wifi}
-          iconColor={status?.connected ? "text-green-600" : "text-red-600"}
-          iconBgColor={status?.connected ? "bg-green-100" : "bg-red-100"}
+          title="MTD Sales"
+          value={`฿${kpis?.monthToDateSales?.toLocaleString() || '0'}`}
+          change="Month to Date"
+          changeType="positive"
+          icon={TrendingUp}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
         />
         <KPICard
           title="MTD Expenses"

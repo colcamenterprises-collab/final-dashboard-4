@@ -1,10 +1,17 @@
 import { queryClient } from "./queryClient";
 
 export interface KPIData {
-  todaySales: number;
-  ordersCount: number;
+  lastShiftSales: number;
+  lastShiftOrders: number;
+  monthToDateSales: number;
   inventoryValue: number;
-  anomaliesCount: number;
+  averageOrderValue: number;
+  shiftDate: string;
+  shiftPeriod: {
+    start: Date;
+    end: Date;
+  };
+  note: string;
 }
 
 export interface TopMenuItem {

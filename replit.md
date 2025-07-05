@@ -196,6 +196,10 @@ Changelog:
 - July 4, 2025. Updated KPIs to show "Last Shift Sales" and "Orders Completed Last Shift" with specific shift dates
 - July 4, 2025. Implemented getLastCompletedShiftData() method for reliable historical reporting (not live)
 - July 4, 2025. Dashboard now displays accurate historical shift data when opened daily for operational review
+- July 5, 2025. CRITICAL FIX: Updated KPI endpoint to display actual latest shift (540) with ฿11,133 sales instead of outdated shift data
+- July 5, 2025. Added Month-to-Date (MTD) Sales KPI showing ฿81,569 total July sales from authentic receipt data
+- July 5, 2025. Fixed dashboard to show "Last Shift Sales" and "Orders Completed Last Shift" with accurate shift 540 data (32 orders)
+- July 5, 2025. Enhanced receipt accuracy system with complete item details, Thai menu names, and modifier capture for shift 540
 ```
 
 ## User Preferences
