@@ -204,6 +204,11 @@ Changelog:
 - July 5, 2025. Created itemsByCategory grouping with BURGERS, CHICKEN, SIDES, BEVERAGES, SAUCES, PACKAGING, OTHER categories
 - July 5, 2025. Enhanced variant tracking to show specific nugget quantities and other item variants for accurate stock ordering
 - July 5, 2025. Improved shift-based receipt display for inventory management and purchasing decisions
+- July 5, 2025. VISUAL ANALYTICS: Implemented comprehensive sales heatmap on dashboard homepage
+- July 5, 2025. Created interactive hourly sales visualization showing 7-day activity patterns (Bangkok timezone)
+- July 5, 2025. Added color-coded intensity mapping for peak/low activity periods with hover tooltips
+- July 5, 2025. Built heatmap backend API with Bangkok timezone conversion and hourly sales aggregation
+- July 5, 2025. Enhanced dashboard with sales pattern analysis for operational planning and staff scheduling
 ```
 
 ## User Preferences

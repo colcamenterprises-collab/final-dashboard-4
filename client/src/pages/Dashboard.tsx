@@ -8,6 +8,7 @@ import KPICard from "@/components/KPICard";
 import SalesChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
+import SalesHeatmap from "@/components/SalesHeatmap";
 
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
@@ -133,7 +134,10 @@ export default function Dashboard() {
         />
       </div>
 
-
+      {/* Sales Heatmap */}
+      <div className="mb-6 lg:mb-8">
+        <SalesHeatmap />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Sales Chart */}

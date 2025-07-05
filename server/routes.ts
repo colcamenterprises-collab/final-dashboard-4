@@ -186,6 +186,55 @@ async function generateShoppingListFromStockForm(formData: any) {
 import { schedulerService } from "./services/scheduler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Sales heatmap endpoint
+  app.get("/api/dashboard/sales-heatmap", async (req, res) => {
+    try {
+      // Get last 7 days of receipt data
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 7);
+      
+      const receipts = await loyverseReceiptService.getReceiptsByDateRange(startDate, endDate);
+      
+      // Group receipts by day and hour (Bangkok timezone)
+      const heatmapData: { [key: string]: { sales: number; orders: number } } = {};
+      
+      receipts.forEach(receipt => {
+        const receiptDate = new Date(receipt.receiptDate);
+        
+        // Convert to Bangkok time (UTC+7)
+        const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
+        
+        const day = bangkokTime.toISOString().split('T')[0]; // YYYY-MM-DD
+        const hour = bangkokTime.getHours(); // 0-23
+        const key = `${day}-${hour}`;
+        
+        if (!heatmapData[key]) {
+          heatmapData[key] = { sales: 0, orders: 0 };
+        }
+        
+        heatmapData[key].sales += parseFloat(receipt.totalAmount || '0');
+        heatmapData[key].orders += 1;
+      });
+      
+      // Convert to array format for frontend
+      const result = Object.entries(heatmapData).map(([key, data]) => {
+        const [day, hourStr] = key.split('-');
+        return {
+          day,
+          hour: parseInt(hourStr),
+          sales: data.sales,
+          orders: data.orders
+        };
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to get sales heatmap:", error);
+      res.status(500).json({ error: "Failed to get sales heatmap" });
+    }
+  });
+
   // Dashboard endpoints
   app.get("/api/dashboard/kpis", async (req, res) => {
     try {
