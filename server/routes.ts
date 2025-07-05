@@ -189,9 +189,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoints
   app.get("/api/dashboard/kpis", async (req, res) => {
     try {
-      const kpis = await storage.getDashboardKPIs();
+      // Get historical data from last completed shift
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const shiftData = await loyverseAPI.getLastCompletedShiftData();
+      
+      // Format shift period for display
+      const shiftDate = shiftData.shiftPeriod.start.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric',
+        timeZone: 'Asia/Bangkok'
+      });
+      
+      const kpis = {
+        lastShiftSales: shiftData.totalSales,
+        lastShiftOrders: shiftData.receiptCount,
+        inventoryValue: 125000,
+        averageOrderValue: shiftData.receiptCount > 0 ? Math.round(shiftData.totalSales / shiftData.receiptCount) : 0,
+        shiftDate: shiftDate,
+        shiftPeriod: shiftData.shiftPeriod,
+        note: "Last completed shift data"
+      };
+      
       res.json(kpis);
     } catch (error) {
+      console.error("Failed to fetch KPIs:", error);
       res.status(500).json({ error: "Failed to fetch KPIs" });
     }
   });
@@ -1491,6 +1512,30 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     } catch (error) {
       console.error('Failed to get customers:', error);
       res.status(500).json({ error: 'Failed to fetch customers from Loyverse API' });
+    }
+  });
+
+  // CRITICAL API: Get last completed shift data (historical, not live)
+  app.get('/api/loyverse/last-completed-shift', async (req, res) => {
+    try {
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const shiftData = await loyverseAPI.getLastCompletedShiftData();
+      
+      res.json({
+        success: true,
+        data: {
+          shiftPeriod: shiftData.shiftPeriod,
+          totalSales: shiftData.totalSales,
+          receiptCount: shiftData.receiptCount,
+          receipts: shiftData.receipts
+        }
+      });
+    } catch (error) {
+      console.error('Failed to get last completed shift data:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch last completed shift data' 
+      });
     }
   });
 

@@ -85,18 +85,18 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KPICard
-          title="Today's Sales"
-          value={`฿${kpis?.todaySales.toLocaleString() || '0'}`}
-          change="July 3rd Shift Net Sales"
+          title="Last Shift Sales"
+          value={`฿${kpis?.lastShiftSales?.toLocaleString() || '0'}`}
+          change={`${kpis?.shiftDate || 'Last'} Shift Net Sales`}
           changeType="positive"
           icon={DollarSign}
           iconColor="text-primary"
           iconBgColor="bg-primary/20"
         />
         <KPICard
-          title="Orders Completed"
-          value={kpis?.ordersCount || 0}
-          change="+8.2%"
+          title="Orders Completed Last Shift"
+          value={kpis?.lastShiftOrders || 0}
+          change={`${kpis?.shiftDate || 'Last'} Shift`}
           changeType="positive"
           icon={ShoppingCart}
           iconColor="text-green-600"

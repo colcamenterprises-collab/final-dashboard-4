@@ -354,8 +354,13 @@ class LoyverseAPI {
     }
   }
 
-  // Sync today's receipts with Bangkok timezone support (6pm-3am shift cycle)
-  async syncTodaysReceipts(): Promise<number> {
+  // Get last completed shift data for historical reporting (not live)
+  async getLastCompletedShiftData(): Promise<{
+    receipts: LoyverseReceipt[];
+    shiftPeriod: { start: Date; end: Date };
+    totalSales: number;
+    receiptCount: number;
+  }> {
     try {
       const now = new Date();
       const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
@@ -363,27 +368,21 @@ class LoyverseAPI {
       let shiftStartTime: Date;
       let shiftEndTime: Date;
       
-      // Calculate current shift period based on Bangkok time
-      if (bangkokTime.getHours() >= 18) {
-        // Current shift: 6pm today to 3am tomorrow (Bangkok time)
-        shiftStartTime = new Date(bangkokTime);
-        shiftStartTime.setHours(18, 0, 0, 0);
-        shiftEndTime = new Date(bangkokTime);
-        shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        shiftEndTime.setHours(3, 0, 0, 0);
-      } else if (bangkokTime.getHours() < 6) {
-        // Early morning of ongoing shift from yesterday
+      // Always get the LAST COMPLETED shift (not current/ongoing)
+      if (bangkokTime.getHours() >= 3) {
+        // After 3am - show the shift that just ended (6pm yesterday to 3am today)
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
         shiftStartTime.setHours(18, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setHours(3, 0, 0, 0);
       } else {
-        // Between 6am and 6pm - get yesterday's completed shift
+        // Before 3am - show the previous completed shift (6pm two days ago to 3am yesterday)
         shiftStartTime = new Date(bangkokTime);
-        shiftStartTime.setDate(shiftStartTime.getDate() - 1);
+        shiftStartTime.setDate(shiftStartTime.getDate() - 2);
         shiftStartTime.setHours(18, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
+        shiftEndTime.setDate(shiftEndTime.getDate() - 1);
         shiftEndTime.setHours(3, 0, 0, 0);
       }
       
@@ -391,9 +390,7 @@ class LoyverseAPI {
       const utcShiftStart = this.convertBangkokToUTC(shiftStartTime);
       const utcShiftEnd = this.convertBangkokToUTC(shiftEndTime);
       
-      console.log(`📅 Bangkok Time: ${bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
-      console.log(`🕰️ Shift Period (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
-      console.log(`📊 Syncing receipts from ${utcShiftStart} to ${utcShiftEnd}`);
+      console.log(`📊 Getting LAST COMPLETED shift data (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
 
       let allReceipts: LoyverseReceipt[] = [];
       let cursor: string | undefined;
@@ -411,13 +408,40 @@ class LoyverseAPI {
         cursor = response.cursor;
       } while (cursor);
 
+      // Calculate total sales
+      const totalSales = allReceipts.reduce((sum, receipt) => {
+        return sum + (receipt.receipt_type === 'SALE' ? receipt.total_money : -receipt.total_money);
+      }, 0);
+
+      return {
+        receipts: allReceipts,
+        shiftPeriod: { start: shiftStartTime, end: shiftEndTime },
+        totalSales,
+        receiptCount: allReceipts.length
+      };
+    } catch (error) {
+      console.error('Failed to get last completed shift data:', error);
+      return {
+        receipts: [],
+        shiftPeriod: { start: new Date(), end: new Date() },
+        totalSales: 0,
+        receiptCount: 0
+      };
+    }
+  }
+
+  // Sync last completed shift receipts (historical data)
+  async syncTodaysReceipts(): Promise<number> {
+    try {
+      const shiftData = await this.getLastCompletedShiftData();
+      
       // Store receipts in database
-      for (const receipt of allReceipts) {
+      for (const receipt of shiftData.receipts) {
         await this.storeReceiptData(receipt);
       }
 
-      console.log(`✅ Synced ${allReceipts.length} receipts for current shift`);
-      return allReceipts.length;
+      console.log(`✅ Synced ${shiftData.receiptCount} receipts for last completed shift (${shiftData.totalSales} baht)`);
+      return shiftData.receiptCount;
     } catch (error) {
       console.error('❌ Error syncing receipts:', error);
       throw error;

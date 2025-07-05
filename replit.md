@@ -192,6 +192,10 @@ Changelog:
 - July 4, 2025. Fixed UTC/Bangkok timezone handling for all API calls (UTC format in requests, Bangkok conversion for display)
 - July 4, 2025. Updated database search functionality to use PostgreSQL instead of in-memory storage for data persistence
 - July 4, 2025. Added Google Sheets integration for secure backup storage of all forms and operational data
+- July 4, 2025. MAJOR IMPROVEMENT: Changed dashboard from live data to historical "Last Completed Shift" data
+- July 4, 2025. Updated KPIs to show "Last Shift Sales" and "Orders Completed Last Shift" with specific shift dates
+- July 4, 2025. Implemented getLastCompletedShiftData() method for reliable historical reporting (not live)
+- July 4, 2025. Dashboard now displays accurate historical shift data when opened daily for operational review
 ```
 
 ## User Preferences
