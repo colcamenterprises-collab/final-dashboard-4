@@ -8,7 +8,7 @@ import KPICard from "@/components/KPICard";
 import SalesChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
-import SalesHeatmap from "@/components/SalesHeatmap";
+
 
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
@@ -134,13 +134,8 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        {/* Sales Heatmap - Left Aligned, Spans 2 Columns */}
-        <div className="lg:col-span-2">
-          <SalesHeatmap />
-        </div>
-
-        {/* Top Sales Items - Right Column */}
+      {/* Top Sales Items - Full Width */}
+      <div className="mb-6 lg:mb-8">
         <Card className="restaurant-card">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
@@ -153,7 +148,7 @@ export default function Dashboard() {
                 <div className="text-gray-600 text-xs">Unable to connect to Loyverse POS system. Please check your API credentials.</div>
               </div>
             ) : topMenuItemsLoading ? (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, index) => (
                   <div key={index} className="flex items-center justify-between animate-pulse">
                     <div className="flex items-center space-x-3">
@@ -168,7 +163,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : topMenuItems && topMenuItems.length > 0 ? (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {topMenuItems.map((item, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
