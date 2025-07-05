@@ -227,6 +227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         heatmapData[key].sales += parseFloat(receipt.totalAmount || '0');
         heatmapData[key].orders += 1;
+        
+        // Debug problematic Wednesday data
+        if (key === '2025-07-02-21') {
+          console.log(`🔍 Receipt for July 2nd 9pm: Receipt #${receipt.receiptNumber}, Amount: ฿${receipt.totalAmount}, Time: ${receipt.receiptDate}`);
+        }
       });
       
       // Convert to array format for frontend
