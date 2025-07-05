@@ -47,6 +47,17 @@ export default function Dashboard() {
     refetchInterval: 10000, // Check every 10 seconds
   });
 
+  // Add Recent Receipts query for last 24 hours
+  const { data: recentReceipts, isLoading: receiptsLoading } = useQuery({
+    queryKey: ["/api/loyverse/receipts", "last24hours"],
+    queryFn: () => {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+      return api.getLoyverseReceipts(startDate.toISOString(), endDate.toISOString());
+    },
+    refetchInterval: 60000, // Refresh every minute
+  });
+
   const resolveInsightMutation = useMutation({
     mutationFn: mutations.resolveAiInsight
   });

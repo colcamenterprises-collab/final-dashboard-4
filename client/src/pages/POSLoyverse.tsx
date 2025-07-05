@@ -15,7 +15,7 @@ export default function POSLoyverse() {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("1"); // Default to last 24 hours
   const [activeTab, setActiveTab] = useState("receipts");
   const { toast } = useToast();
 
@@ -49,9 +49,25 @@ export default function POSLoyverse() {
     staleTime: 30000,
   });
 
-  // Fetch receipts from Loyverse API
+  // Fetch receipts from Loyverse API with date filtering
   const { data: receipts, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useQuery({
-    queryKey: ['/api/loyverse/receipts'],
+    queryKey: ['/api/loyverse/receipts', dateFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      if (dateFilter !== "all") {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - parseInt(dateFilter));
+        
+        params.append('startDate', startDate.toISOString());
+        params.append('endDate', endDate.toISOString());
+      }
+      
+      const response = await fetch(`/api/loyverse/receipts?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch receipts');
+      return response.json();
+    },
     staleTime: 30000,
   });
 
@@ -189,7 +205,7 @@ export default function POSLoyverse() {
               <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
                 <span className="flex items-center gap-2">
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-base sm:text-lg">Shift Receipts (6pm - 3am)</span>
+                  <span className="text-base sm:text-lg">Recent Receipts (Last 24 Hours)</span>
                 </span>
                 <Button 
                   onClick={syncReceipts}
@@ -227,35 +243,58 @@ export default function POSLoyverse() {
               </div>
 
               <div className="space-y-4">
-                {filteredReceipts.map((receipt) => (
-                  <div key={receipt.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0 mb-2">
-                      <div>
-                        <div className="font-medium text-sm sm:text-base">Receipt #{receipt.receiptNumber}</div>
-                        <div className="text-xs sm:text-sm text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
-                      </div>
-                      <div className="flex sm:flex-col items-start sm:items-end sm:text-right space-x-2 sm:space-x-0">
-                        <div className="font-semibold text-base sm:text-lg">{formatCurrency(receipt.totalAmount)}</div>
-                        <Badge variant="outline" className="text-xs">{receipt.paymentMethod}</Badge>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                      <span>Staff: {receipt.staffMember}</span>
-                      <span>Table: {receipt.tableNumber || 'N/A'}</span>
-                      <span>{(() => {
-                        try {
-                          if (Array.isArray(receipt.items)) return receipt.items.length;
-                          if (receipt.items && typeof receipt.items === 'string') {
-                            return JSON.parse(receipt.items).length;
-                          }
-                          return 0;
-                        } catch {
-                          return 0;
-                        }
-                      })()} items</span>
-                    </div>
+                {isLoadingReceipts ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading recent receipts...</p>
                   </div>
-                ))}
+                ) : filteredReceipts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 text-lg font-medium">No receipts found</p>
+                    <p className="text-gray-400 text-sm mt-2">
+                      {dateFilter === "1" ? "No receipts in the last 24 hours" : "No receipts match your filters"}
+                    </p>
+                    <Button
+                      onClick={syncReceipts}
+                      variant="outline"
+                      className="mt-4"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Latest Receipts
+                    </Button>
+                  </div>
+                ) : (
+                  filteredReceipts.map((receipt) => (
+                    <div key={receipt.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0 mb-2">
+                        <div>
+                          <div className="font-medium text-sm sm:text-base">Receipt #{receipt.receiptNumber}</div>
+                          <div className="text-xs sm:text-sm text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
+                        </div>
+                        <div className="flex sm:flex-col items-start sm:items-end sm:text-right space-x-2 sm:space-x-0">
+                          <div className="font-semibold text-base sm:text-lg">{formatCurrency(receipt.totalAmount)}</div>
+                          <Badge variant="outline" className="text-xs">{receipt.paymentMethod}</Badge>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                        <span>Staff: {receipt.staffMember}</span>
+                        <span>Table: {receipt.tableNumber || 'N/A'}</span>
+                        <span>{(() => {
+                          try {
+                            if (Array.isArray(receipt.items)) return receipt.items.length;
+                            if (receipt.items && typeof receipt.items === 'string') {
+                              return JSON.parse(receipt.items).length;
+                            }
+                            return 0;
+                          } catch {
+                            return 0;
+                          }
+                        })()} items</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
