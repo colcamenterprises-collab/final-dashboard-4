@@ -473,8 +473,8 @@ export default function POSLoyverse() {
                             <Settings className="h-4 w-4" />
                             Modifiers Used ({shift.modifiersUsed.length} types)
                           </h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {shift.modifiersUsed.slice(0, 10).map((modifier: any, index: number) => (
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {shift.modifiersUsed.map((modifier: any, index: number) => (
                               <div key={index} className="flex justify-between items-center text-sm">
                                 <span className="font-medium text-gray-700 dark:text-gray-300">
                                   {modifier.option}
@@ -487,11 +487,6 @@ export default function POSLoyverse() {
                                 </div>
                               </div>
                             ))}
-                            {shift.modifiersUsed.length > 10 && (
-                              <p className="text-gray-500 text-xs mt-2">
-                                ... and {shift.modifiersUsed.length - 10} more modifiers
-                              </p>
-                            )}
                           </div>
                         </div>
                       </div>
