@@ -392,21 +392,14 @@ class LoyverseAPI {
       
       console.log(`📊 Getting LAST COMPLETED shift data (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
 
-      let allReceipts: LoyverseReceipt[] = [];
-      let cursor: string | undefined;
+      // Fetch first page of receipts only for KPI calculation (faster response)
+      const response = await this.getReceipts({
+        start_time: utcShiftStart,
+        end_time: utcShiftEnd,
+        limit: 100 // Reduced limit for faster response
+      });
       
-      // Fetch all receipts using pagination
-      do {
-        const response = await this.getReceipts({
-          start_time: utcShiftStart,
-          end_time: utcShiftEnd,
-          limit: 250,
-          cursor
-        });
-        
-        allReceipts.push(...response.receipts);
-        cursor = response.cursor;
-      } while (cursor);
+      const allReceipts = response.receipts;
 
       // Calculate total sales
       const totalSales = allReceipts.reduce((sum, receipt) => {
