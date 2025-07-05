@@ -1767,26 +1767,41 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
         const { db } = await import('./db');
         const { loyverseShiftReports } = await import('../shared/schema');
         
+        const { eq } = await import('drizzle-orm');
         const existingShift = await db.select()
           .from(loyverseShiftReports)
-          .where(`report_id = 'shift-${shift.id}-authentic'`)
+          .where(eq(loyverseShiftReports.report_id, `shift-${shift.id}-authentic`))
           .limit(1);
         
         if (existingShift.length === 0) {
           // This is a new shift - import it
           console.log(`🆕 Importing new shift ${shift.id}: ${bangkokOpen.toLocaleString()} to ${bangkokClose?.toLocaleString() || 'Open'}`);
           
-          // Create shift report data
+          // Calculate actual sales from receipts for this shift period
+          const shiftStartUTC = new Date(shift.opening_time);
+          const shiftEndUTC = shift.closing_time ? new Date(shift.closing_time) : new Date();
+          
+          // Get receipts for this shift to calculate accurate sales
+          const shiftReceipts = await loyverseAPI.getReceipts({
+            start_time: shiftStartUTC.toISOString(),
+            end_time: shiftEndUTC.toISOString(),
+            limit: 200
+          });
+          
+          const actualSales = shiftReceipts.receipts.reduce((sum, receipt) => {
+            return sum + (receipt.receipt_type === 'SALE' ? receipt.total_money : -receipt.total_money);
+          }, 0);
+          
+          // Create shift report data with accurate sales figures
           const shiftData = {
-            id: shift.id,
             report_id: `shift-${shift.id}-authentic`,
             shift_date: new Date(bangkokOpen.getFullYear(), bangkokOpen.getMonth(), bangkokOpen.getDate()),
             shift_start: openingTime,
             shift_end: closingTime,
-            total_sales: shift.expected_amount - shift.opening_amount,
-            total_transactions: 0,
-            cash_sales: 0,
-            card_sales: 0,
+            total_sales: actualSales,
+            total_transactions: shiftReceipts.receipts.length,
+            cash_sales: 0, // Will be calculated separately
+            card_sales: actualSales, // Approximate for now
             report_data: JSON.stringify({
               shift_number: shift.id.toString(),
               opening_time: shift.opening_time,
@@ -1797,7 +1812,9 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
               starting_cash: shift.opening_amount,
               expected_cash: shift.expected_amount,
               actual_cash: shift.actual_amount || shift.expected_amount,
-              cash_difference: (shift.actual_amount || shift.expected_amount) - shift.expected_amount
+              cash_difference: (shift.actual_amount || shift.expected_amount) - shift.expected_amount,
+              net_sales: actualSales,
+              total_receipts: shiftReceipts.receipts.length
             }),
             created_at: new Date(),
             updated_at: new Date()
@@ -1806,6 +1823,8 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
           // Insert into database
           await db.insert(loyverseShiftReports).values(shiftData);
           newShiftsImported++;
+          
+          console.log(`✅ Imported shift ${shift.id} with ฿${actualSales} sales and ${shiftReceipts.receipts.length} receipts`);
         }
         
         shiftsFound.push({
