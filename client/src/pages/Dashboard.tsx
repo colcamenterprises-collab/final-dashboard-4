@@ -135,7 +135,7 @@ export default function Dashboard() {
       </div>
 
       {/* Sales Heatmap */}
-      <div className="mb-6 lg:mb-8">
+      <div className="mb-6 lg:mb-8 max-w-4xl mx-auto">
         <SalesHeatmap />
       </div>
 
