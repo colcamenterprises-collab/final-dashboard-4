@@ -441,28 +441,103 @@ class LoyverseAPI {
     }
   }
 
-  // Store receipt data in database with proper timezone conversion
+  // Store receipt data in database with complete item and modifier details
   private async storeReceiptData(receipt: LoyverseReceipt): Promise<void> {
     try {
-      // Convert Loyverse receipt to our transaction format
+      // Import database modules
+      const { db } = await import('./db');
+      const { loyverseReceipts } = await import('../shared/schema');
+      const { eq } = await import('drizzle-orm');
+
+      // Check if receipt already exists to avoid duplicates
+      const existingReceipt = await db.select()
+        .from(loyverseReceipts)
+        .where(eq(loyverseReceipts.receipt_id, receipt.id))
+        .limit(1);
+
+      if (existingReceipt.length > 0) {
+        return; // Receipt already stored
+      }
+
+      // Enhanced item details with modifiers
+      const enhancedItems = receipt.line_items.map(item => ({
+        id: item.id,
+        item_id: item.item_id,
+        variant_id: item.variant_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        cost: item.cost,
+        price: item.price,
+        line_total: item.line_total,
+        line_tax: item.line_tax,
+        modifiers_cost: item.modifiers_cost,
+        modifiers: item.modifiers.map(modifier => ({
+          id: modifier.id,
+          name: modifier.name,
+          cost: modifier.cost
+        }))
+      }));
+
+      // Enhanced payment details
+      const paymentDetails = receipt.payments.map(payment => ({
+        id: payment.id,
+        payment_type_id: payment.payment_type_id,
+        amount: payment.amount
+      }));
+
+      // Store enhanced receipt data
+      const receiptData = {
+        receipt_id: receipt.id,
+        receipt_number: receipt.receipt_number,
+        receipt_date: new Date(receipt.receipt_date),
+        total_amount: receipt.total_money,
+        payment_method: receipt.payments[0]?.payment_type_id || 'Unknown',
+        customer_info: receipt.customer_id ? { customer_id: receipt.customer_id } : null,
+        items: enhancedItems,
+        tax_amount: receipt.total_tax,
+        discount_amount: 0, // Will be calculated from line items if needed
+        staff_member: receipt.employee_id || 'System',
+        table_number: null,
+        shift_date: new Date(receipt.receipt_date),
+        raw_data: {
+          receipt_type: receipt.receipt_type,
+          source: receipt.source,
+          dining_option: receipt.dining_option,
+          store_id: receipt.store_id,
+          pos_device_id: receipt.pos_device_id,
+          payments: paymentDetails,
+          line_items: enhancedItems,
+          created_at: receipt.created_at,
+          updated_at: receipt.updated_at
+        },
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+
+      // Insert into loyverse_receipts table for detailed storage
+      await db.insert(loyverseReceipts).values(receiptData);
+
+      // Also store in transactions table for compatibility
       const transaction = {
         orderId: receipt.receipt_number,
         amount: receipt.total_money.toString(),
         paymentMethod: receipt.payments[0]?.payment_type_id || 'Unknown',
-        timestamp: new Date(receipt.receipt_date), // Already in UTC from API
+        timestamp: new Date(receipt.receipt_date),
         items: receipt.line_items.map(item => ({
           itemId: parseInt(item.item_id) || 0,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          name: item.item_name,
+          modifiers: item.modifiers
         })),
-        staffMember: receipt.employee_id || 'Unknown',
+        staffMember: receipt.employee_id || 'System',
         tableNumber: null
       };
 
       await storage.createTransaction(transaction);
-      console.log(`📝 Stored receipt ${receipt.receipt_number}: ฿${receipt.total_money}`);
+      console.log(`📝 Enhanced receipt ${receipt.receipt_number}: ฿${receipt.total_money} with ${receipt.line_items.length} items and ${receipt.line_items.reduce((sum, item) => sum + item.modifiers.length, 0)} modifiers`);
     } catch (error) {
-      console.error('❌ Error storing receipt data:', error);
+      console.error('❌ Error storing enhanced receipt data:', error);
     }
   }
 }
