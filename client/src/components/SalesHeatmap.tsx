@@ -158,7 +158,7 @@ export default function SalesHeatmap() {
                       <div
                         key={hour}
                         className={`w-8 h-6 mx-px rounded cursor-pointer transition-all hover:scale-110 ${getIntensityColor(sales, maxSales)}`}
-                        title={`${getDayName(day)} ${getHourLabel(hour)}: ${formatCurrency(sales)} (${orders} orders)`}
+                        title={`${getDayName(day)} (${day}) ${getHourLabel(hour)}: ${formatCurrency(sales)} (${orders} orders)`}
                       />
                     );
                   })}
