@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity } from "lucide-react";
+import { Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
 // Currency Context
@@ -34,6 +34,7 @@ const navigationItems = [
   { path: "/expenses", label: "Expenses", icon: Receipt },
   { path: "/pos-loyverse", label: "POS Loyverse", icon: BarChart3 },
   { path: "/loyverse-live", label: "Loyverse Live", icon: Activity },
+  { path: "/analysis", label: "Analysis", icon: TrendingUp },
 ];
 
 export default function Layout({ children }: LayoutProps) {

@@ -13,6 +13,7 @@ import ExpensesMerged from "@/pages/ExpensesMerged";
 import POSLoyverse from "@/pages/POSLoyverse";
 import LoyverseLive from "@/pages/LoyverseLive";
 import RecipeManagement from "@/pages/RecipeManagement";
+import Analysis from "@/pages/Analysis";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
         <Route path="/pos-loyverse" component={POSLoyverse} />
         <Route path="/loyverse-live" component={LoyverseLive} />
         <Route path="/recipe-management" component={RecipeManagement} />
+        <Route path="/analysis" component={Analysis} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
