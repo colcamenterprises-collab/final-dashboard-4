@@ -17,8 +17,8 @@ export default function SalesByPaymentType() {
 
   // Create SVG donut chart matching the reference image exactly
   const DonutChart = ({ data }: { data: PaymentTypeData[] }) => {
-    const size = 160;
-    const strokeWidth = 20;
+    const size = 200;
+    const strokeWidth = 35; // Much thicker stroke for fatter appearance
     const center = size / 2;
     const radius = center - strokeWidth / 2;
     const circumference = 2 * Math.PI * radius;
@@ -30,7 +30,7 @@ export default function SalesByPaymentType() {
     
     return (
       <div className="flex flex-col items-center">
-        <svg width={size} height={size} className="transform rotate-[135deg]">
+        <svg width={size} height={size} className="transform -rotate-90">
           {/* Background arc - light gray */}
           <circle
             cx={center}
