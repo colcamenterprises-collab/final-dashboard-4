@@ -318,29 +318,30 @@ export class MemStorage implements IStorage {
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
       
-      // Query to get top selling items from actual receipt data
+      // Query to get top selling items using correct Loyverse API field names from raw_data
       const topItemsQuery = await db.execute(sql`
         SELECT 
-          item_data->>'name' as item_name,
-          COUNT(*) as order_count,
-          SUM(CAST(item_data->>'price' AS DECIMAL) * CAST(COALESCE(item_data->>'quantity', '1') AS INTEGER)) as total_sales
+          item_data->>'item_name' as item_name,
+          COUNT(*) as times_ordered,
+          SUM(CAST(COALESCE(item_data->>'quantity', '1') AS INTEGER)) as total_quantity_sold,
+          SUM(CAST(COALESCE(item_data->>'total_money', '0') AS DECIMAL)) as total_sales
         FROM loyverse_receipts r,
-        jsonb_array_elements(r.items) as item_data
+        jsonb_array_elements(r.raw_data->'line_items') as item_data
         WHERE r.receipt_date >= '2025-07-01'
-          AND item_data->>'name' IS NOT NULL
-        GROUP BY item_data->>'name'
-        ORDER BY total_sales DESC
+          AND item_data->>'item_name' IS NOT NULL
+        GROUP BY item_data->>'item_name'
+        ORDER BY total_quantity_sold DESC
         LIMIT 5
       `);
       
-      console.log('📊 Raw top items query result:', topItemsQuery.rows);
+      console.log('📊 Raw top items query result (by quantity sold):', topItemsQuery.rows);
       
       const topItems = topItemsQuery.rows.map((row: any, index: number) => {
-        console.log(`📋 Processing item: ${row.item_name}, sales: ${row.total_sales}, orders: ${row.order_count}`);
+        console.log(`📋 Processing item: ${row.item_name}, quantity sold: ${row.total_quantity_sold}, sales: ${row.total_sales}`);
         return {
           name: row.item_name || 'Unknown Item',
           sales: parseFloat(row.total_sales || '0'),
-          orders: parseInt(row.order_count || '0'),
+          orders: parseInt(row.total_quantity_sold || '0'), // Now showing total quantity sold, not order count
           monthlyGrowth: (index + 1) * 5.5, // Simple growth calculation
           category: this.categorizeItem(row.item_name || '')
         };
