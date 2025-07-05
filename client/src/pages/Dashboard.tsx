@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import KPICard from "@/components/KPICard";
-import SalesChart from "@/components/SalesChart";
+import MonthlyRevenueChart from "@/components/SalesChart";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 
@@ -139,7 +139,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Sales Chart */}
         <div className="lg:col-span-2">
-          <SalesChart />
+          <MonthlyRevenueChart />
         </div>
 
         {/* Top Sales Items */}

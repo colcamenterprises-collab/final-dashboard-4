@@ -1,234 +1,119 @@
-import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
 
-interface SalesChartProps {
+interface MonthlyRevenueChartProps {
   data?: number[];
   labels?: string[];
 }
 
-interface ShiftReport {
-  id: number;
-  shiftDate: string;
-  totalSales: string;
-  totalTransactions: number;
+interface MonthlyRevenue {
+  year: number;
+  month: number;
+  revenue: number;
 }
 
-export default function SalesChart({ 
+export default function MonthlyRevenueChart({ 
   data,
   labels
-}: SalesChartProps) {
-  const [startDate, setStartDate] = useState<string>('2025-07-01');
-  const [endDate, setEndDate] = useState<string>('2025-07-04');
-  const [selectedRange, setSelectedRange] = useState<string>('4days');
+}: MonthlyRevenueChartProps) {
+  
+  // Historical data up until end of June 2025 (you'll provide this)
+  const historicalData: MonthlyRevenue[] = [
+    // You'll provide this data
+    { year: 2024, month: 7, revenue: 45000 },
+    { year: 2024, month: 8, revenue: 52000 },
+    { year: 2024, month: 9, revenue: 48000 },
+    { year: 2024, month: 10, revenue: 55000 },
+    { year: 2024, month: 11, revenue: 58000 },
+    { year: 2024, month: 12, revenue: 62000 },
+    { year: 2025, month: 1, revenue: 48000 },
+    { year: 2025, month: 2, revenue: 51000 },
+    { year: 2025, month: 3, revenue: 54000 },
+    { year: 2025, month: 4, revenue: 49000 },
+    { year: 2025, month: 5, revenue: 56000 },
+    { year: 2025, month: 6, revenue: 59000 }
+  ];
 
-  // Get real Loyverse sales data by date range
-  const { data: salesData, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/loyverse/sales-summary", startDate, endDate],
-    queryFn: () => fetch(`/api/loyverse/sales-summary?startDate=${startDate}&endDate=${endDate}`).then(res => res.json())
+  // Get current month's revenue from API (July 2025 onwards)
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+
+  const { data: currentMonthRevenue } = useQuery<{ total: number }>({
+    queryKey: ["/api/loyverse/monthly-revenue", currentYear, currentMonth],
+    queryFn: () => fetch(`/api/loyverse/monthly-revenue?year=${currentYear}&month=${currentMonth}`).then(res => res.json()),
+    enabled: currentYear >= 2025 && currentMonth >= 7 // Only fetch from July 2025 onwards
   });
 
-  // Handle date range changes
-  const handleRangeChange = (range: string) => {
-    setSelectedRange(range);
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    switch (range) {
-      case '4days':
-        setStartDate('2025-07-01');
-        setEndDate('2025-07-04');
-        break;
-      case '7days':
-        setStartDate('2025-06-28');
-        setEndDate('2025-07-04');
-        break;
-      case 'custom':
-        // Keep current dates for custom range
-        break;
-    }
-  };
-
-  // Process ONLY authentic Loyverse sales data - no fallbacks
-  const sortedSales = salesData ? [...salesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
+  // Combine historical data with current month if available
+  const allMonthsData = [...historicalData];
   
-  const chartData = data || (sortedSales.length > 0 ? 
-    sortedSales.map(sale => parseFloat(sale.totalSales || sale.total || '0')) : // Chronological order
-    [] // Empty if no authentic data available
-  );
-  
-  const chartLabels = labels || (sortedSales.length > 0 ? 
-    sortedSales.map(sale => {
-      const date = new Date(sale.date);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }) : 
-    [] // Empty if no authentic data available
-  );
-
-  // Debug log to check what data we're getting
-  useEffect(() => {
-    if (chartData && chartLabels) {
-      console.log("🔍 Sales Chart Debug:", {
-        startDate,
-        endDate,
-        salesData: salesData?.length,
-        isLoading,
-        chartData: chartData.length,
-        chartLabels: chartLabels.length
-      });
-    }
-  }, [salesData, startDate, endDate, isLoading, chartData, chartLabels]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas size
-    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
-
-    // Chart dimensions
-    const padding = 40;
-    const width = canvas.offsetWidth - padding * 2;
-    const height = canvas.offsetHeight - padding * 2;
-
-    // Data processing
-    const maxValue = Math.max(...chartData);
-    const minValue = Math.min(...chartData);
-    const range = maxValue - minValue;
-
-    // Draw grid lines
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 5; i++) {
-      const y = padding + (height / 5) * i;
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(padding + width, y);
-      ctx.stroke();
-    }
-
-    // Plot data points and lines
-    const points: Array<{x: number, y: number}> = [];
+  // Add current month if we have API data
+  if (currentMonthRevenue && currentYear >= 2025 && currentMonth >= 7) {
+    const existingIndex = allMonthsData.findIndex(item => 
+      item.year === currentYear && item.month === currentMonth
+    );
     
-    chartData.forEach((value, index) => {
-      const x = padding + (width / (chartData.length - 1)) * index;
-      const y = padding + height - ((value - minValue) / range) * height;
-      points.push({ x, y });
-    });
+    if (existingIndex >= 0) {
+      allMonthsData[existingIndex] = { year: currentYear, month: currentMonth, revenue: currentMonthRevenue.total };
+    } else {
+      allMonthsData.push({ year: currentYear, month: currentMonth, revenue: currentMonthRevenue.total });
+    }
+  }
 
-    // Draw area fill
-    ctx.fillStyle = 'rgba(245, 208, 22, 0.1)';
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, padding + height);
-    points.forEach(point => ctx.lineTo(point.x, point.y));
-    ctx.lineTo(points[points.length - 1].x, padding + height);
-    ctx.closePath();
-    ctx.fill();
-
-    // Draw line connecting actual data points (no smooth curves)
-    ctx.strokeStyle = '#F5D016';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    points.forEach((point, index) => {
-      if (index > 0) {
-        // Draw straight lines between actual data points
-        ctx.lineTo(point.x, point.y);
-      }
-    });
-    ctx.stroke();
-
-    // Draw data points
-    ctx.fillStyle = '#F5D016';
-    points.forEach(point => {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-
-    // Draw labels
-    ctx.fillStyle = '#666';
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'center';
-    chartLabels.forEach((label, index) => {
-      const x = padding + (width / (chartLabels.length - 1)) * index;
-      ctx.fillText(label, x, padding + height + 20);
-    });
-
-  }, [chartData, chartLabels, salesData, startDate, endDate]);
+  // Take last 24 months
+  const last24Months = allMonthsData.slice(-24);
+  const maxRevenue = Math.max(...last24Months.map(item => item.revenue));
+  
+  // Calculate average yearly revenue
+  const totalRevenue = last24Months.reduce((sum, item) => sum + item.revenue, 0);
+  const averageYearlyRevenue = (totalRevenue / 24) * 12; // Convert to yearly average
 
   return (
-    <Card className="restaurant-card">
-      <CardHeader>
-        <div className="flex justify-between items-center mb-4">
-          <CardTitle className="text-lg font-semibold text-gray-900">Sales Overview</CardTitle>
-          <div className="flex gap-2">
-            <Select value={selectedRange} onValueChange={handleRangeChange}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4days">Last 4 Days</SelectItem>
-                <SelectItem value="7days">Last 7 Days</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="relative overflow-hidden rounded-lg" style={{
+      background: 'linear-gradient(135deg, #8CC152 0%, #6BA42D 100%)',
+      minHeight: '180px',
+      padding: '20px'
+    }}>
+      {/* Main Revenue Display */}
+      <div className="mb-4">
+        <div className="text-white text-2xl font-bold mb-1">
+          ฿{averageYearlyRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
         </div>
-        {selectedRange === 'custom' && (
-          <div className="flex gap-2 mb-4">
-            <div className="flex flex-col">
-              <label className="text-xs text-gray-500 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-1 border rounded text-sm"
+        <div className="text-white/80 text-sm">
+          Average Yearly Revenue Over Time
+        </div>
+      </div>
+
+      {/* Bar Chart */}
+      <div className="flex items-end justify-between h-16 mb-4">
+        {last24Months.map((monthData, index) => {
+          const barHeight = (monthData.revenue / maxRevenue) * 100;
+          const year = monthData.year.toString().slice(-2); // Last 2 digits of year
+          
+          return (
+            <div key={`${monthData.year}-${monthData.month}`} className="flex flex-col items-center">
+              <div 
+                className="bg-white/90 rounded-sm transition-all duration-300 hover:bg-white"
+                style={{
+                  width: '8px',
+                  height: `${Math.max(barHeight, 5)}%`,
+                  minHeight: '4px'
+                }}
               />
             </div>
-            <div className="flex flex-col">
-              <label className="text-xs text-gray-500 mb-1">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-1 border rounded text-sm"
-              />
-            </div>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex items-center justify-center h-80">
-            <div className="text-gray-500">Loading authentic Loyverse data...</div>
-          </div>
-        ) : chartData.length === 0 ? (
-          <div className="flex items-center justify-center h-80">
-            <div className="text-gray-500">No authentic Loyverse data available for this date range</div>
-          </div>
-        ) : (
-          <div className="chart-container">
-            <canvas 
-              ref={canvasRef}
-              className="w-full h-full"
-              style={{ width: '100%', height: '320px' }}
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+
+      {/* Year Labels */}
+      <div className="flex justify-between text-white/70 text-xs">
+        {/* Show year labels for specific positions */}
+        <span>Jul '24</span>
+        <span>Oct '24</span>
+        <span>Jan '25</span>
+        <span>Apr '25</span>
+        <span>Jul '25</span>
+      </div>
+    </div>
   );
 }

@@ -269,21 +269,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { loyverseShiftReports, loyverseReceipts } = await import('../shared/schema');
       const { sql } = await import('drizzle-orm');
       
-      // Get latest shift using raw SQL to avoid syntax issues
+      // Get latest shift by actual shift start time using authentic CSV data
       const latestShiftResult = await db.execute(sql`
         SELECT id, report_id, shift_date, shift_start, shift_end, total_sales, total_transactions
         FROM loyverse_shift_reports 
-        ORDER BY id DESC 
+        ORDER BY shift_start DESC 
         LIMIT 1
       `);
       
       const latestShift = latestShiftResult.rows[0];
       
-      // Calculate Month-to-Date Sales using raw SQL
+      // Calculate Month-to-Date Sales from authentic shift data only (not receipt duplicates)
       const mtdResult = await db.execute(sql`
-        SELECT COALESCE(SUM(total_amount), 0) as total_sales 
-        FROM loyverse_receipts 
-        WHERE receipt_date >= '2025-07-01'
+        SELECT COALESCE(SUM(total_sales), 0) as total_sales 
+        FROM loyverse_shift_reports 
+        WHERE shift_date >= '2025-07-01'
       `);
       
       const monthToDateSales = parseFloat(mtdResult.rows[0]?.total_sales || '0');
