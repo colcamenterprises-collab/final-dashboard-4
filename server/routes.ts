@@ -205,8 +205,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Convert to Bangkok time (UTC+7)
         const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
         
-        const day = bangkokTime.toISOString().split('T')[0]; // YYYY-MM-DD
         const hour = bangkokTime.getHours(); // 0-23
+        
+        // Only include operating hours: 6pm-3am (18-23, 0-3)
+        const operatingHours = [18, 19, 20, 21, 22, 23, 0, 1, 2, 3];
+        if (!operatingHours.includes(hour)) {
+          return; // Skip non-operating hours
+        }
+        
+        // Format date as YYYY-MM-DD in Bangkok timezone
+        const year = bangkokTime.getFullYear();
+        const month = String(bangkokTime.getMonth() + 1).padStart(2, '0');
+        const dayOfMonth = String(bangkokTime.getDate()).padStart(2, '0');
+        const day = `${year}-${month}-${dayOfMonth}`;
+        
         const key = `${day}-${hour}`;
         
         if (!heatmapData[key]) {
@@ -219,10 +231,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Convert to array format for frontend
       const result = Object.entries(heatmapData).map(([key, data]) => {
-        const [day, hourStr] = key.split('-');
+        const parts = key.split('-');
+        const hour = parseInt(parts[parts.length - 1]); // Last part is hour
+        const day = parts.slice(0, -1).join('-'); // Everything except last part is the date
+        
         return {
           day,
-          hour: parseInt(hourStr),
+          hour,
           sales: data.sales,
           orders: data.orders
         };

@@ -99,7 +99,8 @@ export default function SalesHeatmap() {
 
   // Get unique days and sort them
   const days = [...new Set(heatmapData.map((d: HeatmapData) => d.day))].sort();
-  const hours = Array.from({length: 24}, (_, i) => i); // 0-23
+  // Only show operating hours: 6pm-3am (18-23, 0-3)
+  const operatingHours = [18, 19, 20, 21, 22, 23, 0, 1, 2, 3];
 
   return (
     <Card>
@@ -109,7 +110,7 @@ export default function SalesHeatmap() {
           Sales Heatmap - Last 7 Days
         </CardTitle>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Hourly sales patterns (Bangkok timezone)
+          Operating hours: 6PM-3AM (Bangkok timezone)
         </p>
       </CardHeader>
       <CardContent>
@@ -134,9 +135,9 @@ export default function SalesHeatmap() {
               {/* Hour labels */}
               <div className="flex items-center mb-2">
                 <div className="w-12 text-xs text-gray-600 dark:text-gray-400">Day</div>
-                {hours.map(hour => (
+                {operatingHours.map(hour => (
                   <div key={hour} className="w-8 text-xs text-center text-gray-600 dark:text-gray-400">
-                    {hour % 6 === 0 ? getHourLabel(hour) : ''}
+                    {getHourLabel(hour)}
                   </div>
                 ))}
               </div>
@@ -147,7 +148,7 @@ export default function SalesHeatmap() {
                   <div className="w-12 text-xs text-gray-600 dark:text-gray-400 pr-2">
                     {getDayName(day)}
                   </div>
-                  {hours.map(hour => {
+                  {operatingHours.map(hour => {
                     const key = `${day}-${hour}`;
                     const data = dataMap.get(key);
                     const sales = data?.sales || 0;
