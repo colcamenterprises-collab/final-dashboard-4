@@ -70,7 +70,7 @@ export default function MonthlyRevenueChart({
   return (
     <div className="relative overflow-hidden rounded-lg" style={{
       background: 'linear-gradient(135deg, #8CC152 0%, #6BA42D 100%)',
-      minHeight: '180px',
+      minHeight: '280px',
       padding: '20px'
     }}>
       {/* Main Revenue Display */}
@@ -84,9 +84,9 @@ export default function MonthlyRevenueChart({
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end justify-between h-20 mb-4 gap-1">
+      <div className="flex items-end justify-between h-32 mb-4 gap-1">
         {last24Months.map((monthData, index) => {
-          const barHeight = (monthData.revenue / maxRevenue) * 80; // Use 80px instead of percentage
+          const barHeight = (monthData.revenue / maxRevenue) * 120; // Use 120px instead of percentage
           const monthName = new Date(monthData.year, monthData.month - 1).toLocaleString('default', { month: 'short' });
           
           return (
