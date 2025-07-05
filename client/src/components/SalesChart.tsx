@@ -84,21 +84,26 @@ export default function MonthlyRevenueChart({
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end justify-between h-16 mb-4">
+      <div className="flex items-end justify-between h-20 mb-4 gap-1">
         {last24Months.map((monthData, index) => {
-          const barHeight = (monthData.revenue / maxRevenue) * 100;
-          const year = monthData.year.toString().slice(-2); // Last 2 digits of year
+          const barHeight = (monthData.revenue / maxRevenue) * 80; // Use 80px instead of percentage
+          const monthName = new Date(monthData.year, monthData.month - 1).toLocaleString('default', { month: 'short' });
           
           return (
-            <div key={`${monthData.year}-${monthData.month}`} className="flex flex-col items-center">
+            <div key={`${monthData.year}-${monthData.month}`} className="flex flex-col items-center group relative">
               <div 
-                className="bg-white/90 rounded-sm transition-all duration-300 hover:bg-white"
+                className="bg-white/90 rounded-sm transition-all duration-300 hover:bg-white cursor-pointer"
                 style={{
-                  width: '8px',
-                  height: `${Math.max(barHeight, 5)}%`,
-                  minHeight: '4px'
+                  width: '6px',
+                  height: `${Math.max(barHeight, 8)}px`,
+                  minHeight: '8px'
                 }}
+                title={`${monthName} ${monthData.year}: ฿${monthData.revenue.toLocaleString()}`}
               />
+              {/* Tooltip */}
+              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                {monthName} {monthData.year}: ฿{monthData.revenue.toLocaleString()}
+              </div>
             </div>
           );
         })}
