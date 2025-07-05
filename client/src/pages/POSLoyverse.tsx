@@ -330,20 +330,22 @@ export default function POSLoyverse() {
                                       <div className="text-gray-600 dark:text-gray-400 mt-1">Quantity: {item.quantity}</div>
                                     )}
                                     {/* Show modifiers if available */}
-                                    {item.modifiers && item.modifiers.length > 0 && (
+                                    {item.line_modifiers && item.line_modifiers.length > 0 && (
                                       <div className="ml-3 mt-2 space-y-1">
                                         <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">Modifiers:</div>
-                                        {item.modifiers.map((modifier: any, modIndex: number) => (
+                                        {item.line_modifiers.map((modifier: any, modIndex: number) => (
                                           <div key={modIndex} className="flex justify-between text-gray-500 dark:text-gray-400 text-xs ml-2">
-                                            <span>+ {modifier.name}</span>
-                                            {modifier.cost && <span>{formatCurrency(modifier.cost)}</span>}
+                                            <span>+ {modifier.option || modifier.name}</span>
+                                            {modifier.money_amount !== undefined && modifier.money_amount > 0 && (
+                                              <span>{formatCurrency(modifier.money_amount)}</span>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
                                     )}
                                   </div>
                                   <div className="text-right ml-3">
-                                    <div className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(item.line_total || item.price || 0)}</div>
+                                    <div className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(item.total_money || item.gross_total_money || item.price || 0)}</div>
                                     {item.cost && (
                                       <div className="text-gray-500 text-xs mt-1">Cost: {formatCurrency(item.cost)}</div>
                                     )}
