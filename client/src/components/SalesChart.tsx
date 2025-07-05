@@ -16,21 +16,20 @@ export default function MonthlyRevenueChart({
   labels
 }: MonthlyRevenueChartProps) {
   
-  // Historical data up until end of June 2025 (you'll provide this)
+  // Authentic NET SALES data from your CSV file
   const historicalData: MonthlyRevenue[] = [
-    // You'll provide this data
-    { year: 2024, month: 7, revenue: 45000 },
-    { year: 2024, month: 8, revenue: 52000 },
-    { year: 2024, month: 9, revenue: 48000 },
-    { year: 2024, month: 10, revenue: 55000 },
-    { year: 2024, month: 11, revenue: 58000 },
-    { year: 2024, month: 12, revenue: 62000 },
-    { year: 2025, month: 1, revenue: 48000 },
-    { year: 2025, month: 2, revenue: 51000 },
-    { year: 2025, month: 3, revenue: 54000 },
-    { year: 2025, month: 4, revenue: 49000 },
-    { year: 2025, month: 5, revenue: 56000 },
-    { year: 2025, month: 6, revenue: 59000 }
+    { year: 2024, month: 8, revenue: 1188747.90 },  // Aug 2024
+    { year: 2024, month: 9, revenue: 504602.17 },   // Sep 2024  
+    { year: 2024, month: 10, revenue: 603361.47 },  // Oct 2024
+    { year: 2024, month: 11, revenue: 644497.10 },  // Nov 2024
+    { year: 2024, month: 12, revenue: 710170.10 },  // Dec 2024
+    { year: 2025, month: 1, revenue: 711206.50 },   // Jan 2025
+    { year: 2025, month: 2, revenue: 729417.30 },   // Feb 2025
+    { year: 2025, month: 3, revenue: 827838.00 },   // Mar 2025
+    { year: 2025, month: 4, revenue: 677521.30 },   // Apr 2025
+    { year: 2025, month: 5, revenue: 618430.80 },   // May 2025
+    { year: 2025, month: 6, revenue: 455860.80 },   // Jun 2025
+    { year: 2025, month: 7, revenue: 55607.90 }     // Jul 2025 (partial)
   ];
 
   // Get current month's revenue from API (July 2025 onwards)

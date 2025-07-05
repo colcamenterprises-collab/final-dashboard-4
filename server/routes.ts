@@ -2533,6 +2533,36 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Monthly revenue endpoint for chart
+  app.get("/api/loyverse/monthly-revenue", async (req, res) => {
+    try {
+      const { year, month } = req.query;
+      
+      // Import database components
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      // Calculate monthly revenue from authentic shift data only
+      const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+      const nextMonth = month === 12 ? 1 : parseInt(month as string) + 1;
+      const nextYear = month === 12 ? parseInt(year as string) + 1 : year;
+      const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+      
+      const result = await db.execute(sql`
+        SELECT COALESCE(SUM(total_sales), 0) as total 
+        FROM loyverse_shift_reports 
+        WHERE shift_date >= ${monthStart} AND shift_date < ${monthEnd}
+      `);
+      
+      const total = parseFloat(result.rows[0]?.total || '0');
+      
+      res.json({ total });
+    } catch (error) {
+      console.error('Failed to get monthly revenue:', error);
+      res.status(500).json({ error: "Failed to calculate monthly revenue" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
