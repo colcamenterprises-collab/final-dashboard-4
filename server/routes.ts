@@ -1737,9 +1737,9 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       const { loyverseAPI } = await import('./loyverseAPI');
       const { importLoyverseShifts } = await import('./importLoyverseShifts');
       
-      // Get shifts from the last 7 days to catch any missed shifts
+      // Get the last 10 shifts to catch any missed shifts
       const endTime = new Date();
-      const startTime = new Date(endTime.getTime() - (7 * 24 * 60 * 60 * 1000));
+      const startTime = new Date(endTime.getTime() - (10 * 24 * 60 * 60 * 1000));
       
       console.log(`🕐 Syncing shifts from ${startTime.toISOString()} to ${endTime.toISOString()}`);
       
