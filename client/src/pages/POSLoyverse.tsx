@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Camera, AlertTriangle, CheckCircle, DollarSign, Package, RefreshCw, FileText, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Camera, AlertTriangle, CheckCircle, DollarSign, Package, RefreshCw, FileText, Calendar, ChevronDown, ChevronUp, Clock, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,9 +51,9 @@ export default function POSLoyverse() {
     staleTime: 30000,
   });
 
-  // Fetch receipts from Loyverse API with date filtering
-  const { data: receipts, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useQuery({
-    queryKey: ['/api/loyverse/receipts', dateFilter],
+  // Fetch receipts grouped by shifts with separated items and modifiers
+  const { data: shiftData, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useQuery({
+    queryKey: ['/api/loyverse/receipts-by-shifts', dateFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       
@@ -66,12 +66,15 @@ export default function POSLoyverse() {
         params.append('endDate', endDate.toISOString());
       }
       
-      const response = await fetch(`/api/loyverse/receipts?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch receipts');
+      const response = await fetch(`/api/loyverse/receipts-by-shifts?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch receipts by shifts');
       return response.json();
     },
     staleTime: 30000,
   });
+
+  // Extract receipts from shift data for compatibility with existing code
+  const receipts = shiftData?.flatMap((shift: any) => shift.receipts) || [];
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -195,9 +198,10 @@ export default function POSLoyverse() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="receipts" className="text-xs sm:text-sm">Receipt</TabsTrigger>
-          <TabsTrigger value="shift-reports" className="text-xs sm:text-sm">Shifts</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="receipts" className="text-xs sm:text-sm">Receipts</TabsTrigger>
+          <TabsTrigger value="shifts" className="text-xs sm:text-sm">Shift View</TabsTrigger>
+          <TabsTrigger value="shift-reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
           <TabsTrigger value="analysis" className="text-xs sm:text-sm">AI Analysis</TabsTrigger>
         </TabsList>
 
@@ -367,6 +371,144 @@ export default function POSLoyverse() {
                       </div>
                     );
                   })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shifts" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-base sm:text-lg">Receipts by Shifts (6PM-3AM)</span>
+                </span>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    onClick={syncReceipts}
+                    disabled={syncReceiptsMutation.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncReceiptsMutation.isPending ? "animate-spin" : ""}`} />
+                    {syncReceiptsMutation.isPending ? "Syncing..." : "Sync Receipts"}
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {isLoadingReceipts ? (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 text-sm">Loading shifts...</div>
+                  </div>
+                ) : !shiftData || shiftData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 text-lg font-medium">No shifts found</p>
+                    <p className="text-gray-400 text-sm mt-2">No shifts match your current filters</p>
+                    <Button
+                      onClick={syncReceipts}
+                      variant="outline"
+                      className="mt-4"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Latest Receipts
+                    </Button>
+                  </div>
+                ) : (
+                  shiftData.map((shift: any) => (
+                    <div key={shift.shiftDate} className="border rounded-lg p-4 space-y-4">
+                      {/* Shift Header */}
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0">
+                        <div>
+                          <h3 className="font-semibold text-lg">{shift.shiftPeriod}</h3>
+                          <p className="text-gray-600 text-sm">
+                            {shift.totalReceipts} receipts • {formatCurrency(shift.totalSales)} total sales
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Items and Modifiers Summary */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Items Sold */}
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            Items Sold ({shift.itemsSold.length} types)
+                          </h4>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {shift.itemsSold.slice(0, 10).map((item: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center text-sm">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">
+                                  {item.item_name}
+                                </span>
+                                <div className="text-right">
+                                  <div className="font-semibold">{item.quantity}x</div>
+                                  <div className="text-gray-500 text-xs">{formatCurrency(item.total_amount)}</div>
+                                </div>
+                              </div>
+                            ))}
+                            {shift.itemsSold.length > 10 && (
+                              <p className="text-gray-500 text-xs mt-2">
+                                ... and {shift.itemsSold.length - 10} more items
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Modifiers Used */}
+                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                            <Settings className="h-4 w-4" />
+                            Modifiers Used ({shift.modifiersUsed.length} types)
+                          </h4>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {shift.modifiersUsed.slice(0, 10).map((modifier: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center text-sm">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">
+                                  {modifier.option}
+                                </span>
+                                <div className="text-right">
+                                  <div className="font-semibold">{modifier.count}x</div>
+                                  {modifier.total_amount > 0 && (
+                                    <div className="text-gray-500 text-xs">{formatCurrency(modifier.total_amount)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {shift.modifiersUsed.length > 10 && (
+                              <p className="text-gray-500 text-xs mt-2">
+                                ... and {shift.modifiersUsed.length - 10} more modifiers
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Individual Receipts in Shift */}
+                      <div className="border-t pt-4">
+                        <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                          Receipts in this shift ({shift.receipts.length})
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {shift.receipts.map((receipt: any) => (
+                            <div key={receipt.id} className="border rounded p-3 text-sm">
+                              <div className="font-medium">#{receipt.receiptNumber}</div>
+                              <div className="text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
+                              <div className="font-semibold text-green-600">{formatCurrency(receipt.totalAmount)}</div>
+                              <div className="text-gray-500 text-xs mt-1">
+                                {receipt.itemsList?.length || 0} items • {receipt.modifiersList?.length || 0} modifiers
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </CardContent>

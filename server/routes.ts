@@ -933,6 +933,187 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // New endpoint: Get receipts grouped by shifts with separated items and modifiers
+  app.get("/api/loyverse/receipts-by-shifts", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      // Get all receipts from database
+      let receipts;
+      if (startDate && endDate) {
+        receipts = await loyverseReceiptService.getReceiptsByDateRange(
+          new Date(startDate as string),
+          new Date(endDate as string)
+        );
+      } else {
+        // Get last 7 days by default
+        const endDateDefault = new Date();
+        const startDateDefault = new Date();
+        startDateDefault.setDate(endDateDefault.getDate() - 7);
+        receipts = await loyverseReceiptService.getReceiptsByDateRange(startDateDefault, endDateDefault);
+      }
+      
+      // Group receipts by shifts and separate items/modifiers
+      const groupedShifts = groupReceiptsByShifts(receipts);
+      
+      res.json(groupedShifts);
+    } catch (error) {
+      console.error("Failed to get receipts by shifts:", error);
+      res.status(500).json({ error: "Failed to get receipts by shifts" });
+    }
+  });
+
+  // Helper function to group receipts by shifts (6pm-3am Bangkok time)
+  function groupReceiptsByShifts(receipts: any[]) {
+    const shifts: { [key: string]: any } = {};
+    
+    receipts.forEach(receipt => {
+      const receiptDate = new Date(receipt.receiptDate);
+      
+      // Convert to Bangkok time (UTC+7)
+      const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
+      
+      // Determine shift date: if before 6am Bangkok time, belongs to previous day's shift
+      let shiftDate = new Date(bangkokTime);
+      if (bangkokTime.getHours() < 6) {
+        shiftDate.setDate(shiftDate.getDate() - 1);
+      }
+      
+      // Set to start of shift date for grouping
+      shiftDate.setHours(0, 0, 0, 0);
+      const shiftKey = shiftDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      if (!shifts[shiftKey]) {
+        const shiftStartBangkok = new Date(shiftDate);
+        shiftStartBangkok.setHours(18, 0, 0, 0); // 6pm Bangkok time
+        const shiftEndBangkok = new Date(shiftStartBangkok);
+        shiftEndBangkok.setDate(shiftEndBangkok.getDate() + 1);
+        shiftEndBangkok.setHours(3, 0, 0, 0); // 3am next day Bangkok time
+        
+        shifts[shiftKey] = {
+          shiftDate: shiftKey,
+          shiftPeriod: `${shiftStartBangkok.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            timeZone: 'Asia/Bangkok'
+          })} 6:00 PM - ${shiftEndBangkok.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            timeZone: 'Asia/Bangkok'
+          })} 3:00 AM`,
+          receipts: [],
+          totalSales: 0,
+          totalReceipts: 0,
+          itemsSold: [],
+          modifiersUsed: []
+        };
+      }
+      
+      // Process receipt items and modifiers separately
+      const { itemsList, modifiersList } = processReceiptItemsAndModifiers(receipt);
+      
+      // Add processed receipt with separated lists
+      const processedReceipt = {
+        ...receipt,
+        itemsList,
+        modifiersList
+      };
+      
+      shifts[shiftKey].receipts.push(processedReceipt);
+      shifts[shiftKey].totalSales += parseFloat(receipt.totalAmount || '0');
+      shifts[shiftKey].totalReceipts += 1;
+      
+      // Aggregate items for shift summary
+      itemsList.forEach(item => {
+        const existingItem = shifts[shiftKey].itemsSold.find(i => i.item_name === item.item_name);
+        if (existingItem) {
+          existingItem.quantity += item.quantity;
+          existingItem.total_amount += item.total_amount;
+        } else {
+          shifts[shiftKey].itemsSold.push({ ...item });
+        }
+      });
+      
+      // Aggregate modifiers for shift summary
+      modifiersList.forEach(modifier => {
+        const existingModifier = shifts[shiftKey].modifiersUsed.find(m => 
+          m.option === modifier.option && m.modifier_name === modifier.modifier_name
+        );
+        if (existingModifier) {
+          existingModifier.count += 1;
+          existingModifier.total_amount += modifier.money_amount;
+        } else {
+          shifts[shiftKey].modifiersUsed.push({ 
+            ...modifier, 
+            count: 1,
+            total_amount: modifier.money_amount 
+          });
+        }
+      });
+    });
+    
+    // Sort shifts by date (newest first) and sort items/modifiers within each shift
+    return Object.values(shifts)
+      .sort((a: any, b: any) => new Date(b.shiftDate).getTime() - new Date(a.shiftDate).getTime())
+      .map((shift: any) => ({
+        ...shift,
+        itemsSold: shift.itemsSold.sort((a: any, b: any) => b.quantity - a.quantity),
+        modifiersUsed: shift.modifiersUsed.sort((a: any, b: any) => b.count - a.count)
+      }));
+  }
+
+  // Helper function to separate items and modifiers from receipt data
+  function processReceiptItemsAndModifiers(receipt: any) {
+    const itemsList: any[] = [];
+    const modifiersList: any[] = [];
+    
+    // Parse items from different possible sources
+    let items = [];
+    try {
+      if (Array.isArray(receipt.items)) {
+        items = receipt.items;
+      } else if (receipt.items && typeof receipt.items === 'string') {
+        items = JSON.parse(receipt.items);
+      } else if (receipt.rawData?.line_items) {
+        items = receipt.rawData.line_items;
+      }
+    } catch (error) {
+      console.error('Error parsing receipt items:', error);
+    }
+    
+    items.forEach((item, itemIndex) => {
+      // Add item to separated items list
+      itemsList.push({
+        item_id: item.item_id || `item_${itemIndex}`,
+        item_name: item.item_name || item.name,
+        quantity: item.quantity || 1,
+        unit_price: parseFloat(item.price || '0'),
+        total_amount: parseFloat(item.total_money || item.gross_total_money || item.price || '0'),
+        cost: parseFloat(item.cost || '0'),
+        sku: item.sku,
+        variant_name: item.variant_name,
+        receipt_id: receipt.receiptId || receipt.id
+      });
+      
+      // Add modifiers to separated modifiers list
+      if (item.line_modifiers && Array.isArray(item.line_modifiers)) {
+        item.line_modifiers.forEach((modifier, modIndex) => {
+          modifiersList.push({
+            modifier_id: modifier.id || `mod_${itemIndex}_${modIndex}`,
+            modifier_name: modifier.name,
+            option: modifier.option || modifier.name,
+            money_amount: parseFloat(modifier.money_amount || '0'),
+            item_applied_to: item.item_name || item.name,
+            item_id: item.item_id,
+            receipt_id: receipt.receiptId || receipt.id
+          });
+        });
+      }
+    });
+    
+    return { itemsList, modifiersList };
+  }
+
   app.get("/api/loyverse/sales-summary", async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
