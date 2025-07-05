@@ -116,17 +116,17 @@ export default function SalesHeatmap() {
       <CardContent>
         <div className="space-y-4">
           {/* Legend */}
-          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-            <span>Low Activity</span>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded"></div>
-              <div className="w-3 h-3 bg-green-200 rounded"></div>
-              <div className="w-3 h-3 bg-green-400 rounded"></div>
-              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
+          <div className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+            <span className="mr-2">Low Activity</span>
+            <div className="flex items-center gap-0.5">
+              <div className="w-2 h-2 bg-gray-100 dark:bg-gray-800 rounded"></div>
+              <div className="w-2 h-2 bg-green-200 rounded"></div>
+              <div className="w-2 h-2 bg-green-400 rounded"></div>
+              <div className="w-2 h-2 bg-yellow-500 rounded"></div>
+              <div className="w-2 h-2 bg-orange-500 rounded"></div>
+              <div className="w-2 h-2 bg-red-500 rounded"></div>
             </div>
-            <span>High Activity</span>
+            <span className="ml-2">High Activity</span>
           </div>
 
           {/* Heatmap Grid */}
@@ -168,30 +168,30 @@ export default function SalesHeatmap() {
           </div>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">
             <div className="text-center">
-              <div className="text-lg font-semibold text-green-600">
+              <div className="text-sm font-semibold text-green-600">
                 {formatCurrency(heatmapData.reduce((sum: number, d: HeatmapData) => sum + d.sales, 0))}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Total Sales</div>
+              <div className="text-xs text-gray-500">Total Sales</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-blue-600">
+              <div className="text-sm font-semibold text-blue-600">
                 {heatmapData.reduce((sum: number, d: HeatmapData) => sum + d.orders, 0)}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Total Orders</div>
+              <div className="text-xs text-gray-500">Total Orders</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-purple-600">
+              <div className="text-sm font-semibold text-purple-600">
                 {formatCurrency(maxSales)}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Peak Hour</div>
+              <div className="text-xs text-gray-500">Peak Hour</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-orange-600">
+              <div className="text-sm font-semibold text-orange-600">
                 {formatCurrency(heatmapData.reduce((sum: number, d: HeatmapData) => sum + d.sales, 0) / heatmapData.filter((d: HeatmapData) => d.sales > 0).length || 0)}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Avg/Hour</div>
+              <div className="text-xs text-gray-500">Avg/Hour</div>
             </div>
           </div>
         </div>
