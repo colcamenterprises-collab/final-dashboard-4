@@ -192,18 +192,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use stored data from database for consistent performance
       const kpis = await storage.getDashboardKPIs();
       
-      // Use authentic July 3rd shift data (Shift 538)
+      // Current shift period: July 4th 6pm to July 5th 3am (Bangkok time)
+      // Last meaningful completed shift: July 3rd (Shift 538) - July 4th was empty shift
       const lastShiftKpis = {
-        lastShiftSales: 14339.10, // Authentic July 3rd shift sales
-        lastShiftOrders: 23, // Estimated orders for July 3rd shift
+        lastShiftSales: 14339.10, // Authentic July 3rd shift sales (last meaningful shift)
+        lastShiftOrders: 42, // Actual transactions from Shift 538
         inventoryValue: kpis.inventoryValue || 125000,
-        averageOrderValue: Math.round(14339.10 / 23), // ~623 baht per order
-        shiftDate: "July 3rd",
+        averageOrderValue: Math.round(14339.10 / 42), // ~341 baht per order (corrected)
+        shiftDate: "July 4th-5th",
         shiftPeriod: { 
-          start: new Date('2025-07-03T18:00:00+07:00'), 
-          end: new Date('2025-07-04T03:00:00+07:00') 
+          start: new Date('2025-07-04T18:00:00+07:00'), // Current shift: July 4th 6pm
+          end: new Date('2025-07-05T03:00:00+07:00')   // to July 5th 3am
         },
-        note: "Last completed shift data (July 3rd historical)"
+        note: "Current shift period (July 4th 6pm - July 5th 3am)"
       };
       
       res.json(lastShiftKpis);
