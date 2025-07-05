@@ -679,9 +679,9 @@ export class LoyverseReceiptService {
       if (receipts.length === 0) {
         console.log("No receipts found, using authentic July 3rd shift payment data");
         const july3rdData = [
-          { name: 'Cash', value: 36.64, amount: 2903.80, color: '#22c55e' },
-          { name: 'Grab', value: 41.30, amount: 3273.00, color: '#ef4444' },
-          { name: 'QR Code', value: 22.06, amount: 1748.00, color: '#3b82f6' }
+          { name: 'Cash', value: 36.64, amount: 2903.80, color: '#0f766e' },
+          { name: 'Grab', value: 41.30, amount: 3273.00, color: '#e11d48' },
+          { name: 'QR Code', value: 22.06, amount: 1748.00, color: '#7c3aed' }
         ];
         console.log("Payment type breakdown:", july3rdData);
         return july3rdData;
@@ -711,12 +711,12 @@ export class LoyverseReceiptService {
 
       const totalAmount = Object.values(paymentTotals).reduce((sum, amount) => sum + amount, 0);
 
-      // Convert to chart data format with colors
+      // Convert to chart data format with colors matching the reference design
       const colors = {
-        'Cash': '#22c55e',
-        'Grab': '#ef4444',
-        'QR Code': '#3b82f6',
-        'Card': '#f59e0b'
+        'Cash': '#0f766e', // Teal like Chrome in reference
+        'Grab': '#e11d48', // Pink like Safari in reference  
+        'QR Code': '#7c3aed', // Purple like Firefox in reference
+        'Card': '#f59e0b' // Yellow like Others in reference
       };
 
       const result = Object.entries(paymentTotals).map(([name, amount]) => ({
@@ -733,9 +733,9 @@ export class LoyverseReceiptService {
       console.error('Error calculating sales by payment type:', error);
       // Return authentic July 3rd shift data as fallback
       return [
-        { name: 'Cash', value: 36.64, amount: 2903.80, color: '#22c55e' },
-        { name: 'Grab', value: 41.30, amount: 3273.00, color: '#ef4444' },
-        { name: 'QR Code', value: 22.06, amount: 1748.00, color: '#3b82f6' }
+        { name: 'Cash', value: 36.64, amount: 2903.80, color: '#0f766e' },
+        { name: 'Grab', value: 41.30, amount: 3273.00, color: '#e11d48' },
+        { name: 'QR Code', value: 22.06, amount: 1748.00, color: '#7c3aed' }
       ];
     }
   }
