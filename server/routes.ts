@@ -227,6 +227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         heatmapData[key].sales += parseFloat(receipt.totalAmount || '0');
         heatmapData[key].orders += 1;
+        
+        // Debug: Log high order counts
+        if (heatmapData[key].orders > 15) {
+          console.log(`⚠️ High order count detected: ${key} - ${heatmapData[key].orders} orders, ฿${heatmapData[key].sales}`);
+        }
       });
       
       // Convert to array format for frontend
