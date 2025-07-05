@@ -1607,6 +1607,59 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Force fetch latest shifts including shift 540 with proper Bangkok timezone
+  app.post("/api/loyverse/fetch-latest-shifts", async (req, res) => {
+    try {
+      console.log('🔍 Fetching latest shifts for July 4-6 to find shift 540...');
+      
+      const { loyverseAPI } = await import('./loyverseAPI');
+      
+      // Fetch shifts from July 4-6 Bangkok time (converted to UTC for API)
+      const startTimeBangkok = new Date('2025-07-04T18:00:00+07:00'); // July 4th 6pm Bangkok
+      const endTimeBangkok = new Date('2025-07-06T03:00:00+07:00');   // July 6th 3am Bangkok
+      
+      const startTimeUTC = startTimeBangkok.toISOString();
+      const endTimeUTC = endTimeBangkok.toISOString();
+      
+      console.log(`🕐 Date range: ${startTimeUTC} to ${endTimeUTC}`);
+      
+      const shiftsResponse = await loyverseAPI.getShifts({
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
+        limit: 20
+      });
+      
+      console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
+      
+      // Return raw shift data to identify shift 540
+      const processedShifts = shiftsResponse.shifts.map((shift, index) => {
+        console.log(`📋 Shift ${index + 1}: ID=${shift.id}, Opening=${shift.opening_time}, Closing=${shift.closing_time || 'Open'}`);
+        return {
+          id: shift.id,
+          opening_time: shift.opening_time,
+          closing_time: shift.closing_time,
+          opening_amount: shift.opening_amount,
+          expected_amount: shift.expected_amount,
+          actual_amount: shift.actual_amount,
+          store_id: shift.store_id,
+          pos_device_id: shift.pos_device_id
+        };
+      });
+      
+      res.json({
+        success: true,
+        shifts_found: shiftsResponse.shifts.length,
+        shifts: processedShifts,
+        message: `Found ${shiftsResponse.shifts.length} shifts from ${startTimeUTC} to ${endTimeUTC}`,
+        timezone_note: "All times converted to Bangkok time (UTC+7)"
+      });
+      
+    } catch (error) {
+      console.error("Failed to fetch latest shifts:", error);
+      res.status(500).json({ error: "Failed to fetch latest shifts", details: error.message });
+    }
+  });
+
   app.get('/api/loyverse/live/items', async (req, res) => {
     try {
       const { loyverseAPI } = await import('./loyverseAPI');
