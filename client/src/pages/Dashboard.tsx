@@ -134,9 +134,76 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Sales Heatmap */}
-      <div className="mb-6 lg:mb-8 max-w-4xl mx-auto">
-        <SalesHeatmap />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        {/* Sales Heatmap - Left Aligned, Spans 2 Columns */}
+        <div className="lg:col-span-2">
+          <SalesHeatmap />
+        </div>
+
+        {/* Top Sales Items - Right Column */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">July 2025</p>
+          </CardHeader>
+          <CardContent>
+            {topMenuItemsError ? (
+              <div className="text-center py-8">
+                <div className="text-red-500 text-sm font-medium mb-2">Loyverse Connection Error</div>
+                <div className="text-gray-600 text-xs">Unable to connect to Loyverse POS system. Please check your API credentials.</div>
+              </div>
+            ) : topMenuItemsLoading ? (
+              <div className="space-y-4">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="flex items-center justify-between animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-gray-200 rounded-full" />
+                      <div className="h-4 bg-gray-200 rounded w-32" />
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="h-4 bg-gray-200 rounded w-16" />
+                      <div className="h-3 bg-gray-200 rounded w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : topMenuItems && topMenuItems.length > 0 ? (
+              <div className="space-y-4">
+                {topMenuItems.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        index === 0 ? 'bg-primary' : 
+                        index === 1 ? 'bg-yellow-400' : 
+                        index === 2 ? 'bg-green-400' : 'bg-gray-400'
+                      }`} />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                        {item.category && (
+                          <div className="text-xs text-gray-500">{item.category}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-gray-900">฿{item.sales.toFixed(0)}</div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">{item.orders} orders</span>
+                        {item.monthlyGrowth && (
+                          <span className="text-xs text-green-600 font-medium">{item.monthlyGrowth}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-500 text-sm">No sales data available</div>
+                <div className="text-gray-400 text-xs mt-1">Connect to Loyverse to view sales data</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
