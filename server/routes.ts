@@ -198,8 +198,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Group receipts by day and hour (Bangkok timezone)
       const heatmapData: { [key: string]: { sales: number; orders: number } } = {};
+      const processedReceipts = new Set<string>(); // Track processed receipt IDs to avoid duplicates
       
       receipts.forEach(receipt => {
+        // Skip if we've already processed this receipt
+        if (processedReceipts.has(receipt.receiptId)) {
+          console.log(`⚠️ Skipping duplicate receipt: ${receipt.receiptId}`);
+          return;
+        }
+        processedReceipts.add(receipt.receiptId);
         const receiptDate = new Date(receipt.receiptDate);
         
         // Convert to Bangkok time (UTC+7)
@@ -228,10 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         heatmapData[key].sales += parseFloat(receipt.totalAmount || '0');
         heatmapData[key].orders += 1;
         
-        // Debug problematic Wednesday data
-        if (key === '2025-07-02-21') {
-          console.log(`🔍 Receipt for July 2nd 9pm: Receipt #${receipt.receiptNumber}, Amount: ฿${receipt.totalAmount}, Time: ${receipt.receiptDate}`);
-        }
+
       });
       
       // Convert to array format for frontend
@@ -600,6 +604,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(category);
     } catch (error) {
       res.status(400).json({ error: "Invalid expense category data" });
+    }
+  });
+
+  // Debug endpoint for heatmap data validation
+  app.get("/api/debug/heatmap-validation/:date", async (req, res) => {
+    try {
+      const { date } = req.params; // Format: YYYY-MM-DD
+      
+      // Get receipts from live Loyverse API for this specific date
+      const startDate = new Date(`${date}T00:00:00.000Z`);
+      const endDate = new Date(`${date}T23:59:59.999Z`);
+      
+      console.log(`🔍 Fetching live Loyverse receipts for ${date}...`);
+      const receiptsResponse = await loyverseAPI.getReceipts({
+        created_at_min: startDate.toISOString(),
+        created_at_max: endDate.toISOString(),
+        limit: 250
+      });
+      
+      // Group by hour in Bangkok timezone
+      const hourlyCount: { [hour: number]: { receipts: any[], count: number, totalSales: number } } = {};
+      
+      receiptsResponse.receipts.forEach(receipt => {
+        const receiptDate = new Date(receipt.receipt_date);
+        // Convert to Bangkok time (UTC+7)
+        const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
+        const hour = bangkokTime.getHours();
+        
+        if (!hourlyCount[hour]) {
+          hourlyCount[hour] = { receipts: [], count: 0, totalSales: 0 };
+        }
+        
+        hourlyCount[hour].receipts.push({
+          id: receipt.id,
+          receipt_number: receipt.receipt_number,
+          total_money: receipt.total_money,
+          receipt_date: receipt.receipt_date,
+          bangkok_time: bangkokTime.toISOString()
+        });
+        hourlyCount[hour].count++;
+        hourlyCount[hour].totalSales += receipt.total_money;
+      });
+      
+      res.json({
+        date,
+        totalReceipts: receiptsResponse.receipts.length,
+        hourlyBreakdown: hourlyCount
+      });
+      
+    } catch (error) {
+      console.error("❌ Error validating heatmap data:", error);
+      res.status(500).json({ error: "Failed to validate heatmap data" });
     }
   });
 
