@@ -354,7 +354,7 @@ export class MemStorage implements IStorage {
     }
   }
   
-  private categorizeItem(itemName: string): string {
+  categorizeItem(itemName: string): string {
     const name = itemName.toLowerCase();
     if (name.includes('set') || name.includes('meal')) return 'Meal Deals';
     if (name.includes('burger') || name.includes('smash')) return 'Smash Burgers';
