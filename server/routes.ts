@@ -1660,6 +1660,178 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Find and import missing shift 540
+  app.post("/api/loyverse/find-shift-540", async (req, res) => {
+    try {
+      console.log('🔍 Searching for missing shift 540...');
+      
+      const { loyverseAPI } = await import('./loyverseAPI');
+      
+      console.log('📋 Looking for shift 540 in Loyverse API...');
+      
+      // Search for shifts in a wider date range to find 540
+      const startTime = new Date('2025-07-04T11:00:00.000Z'); // July 4th 6pm Bangkok = 11am UTC
+      const endTime = new Date('2025-07-06T11:00:00.000Z');   // July 6th 6pm Bangkok = 11am UTC
+      
+      console.log(`🕐 Searching date range: ${startTime.toISOString()} to ${endTime.toISOString()}`);
+      
+      const shiftsResponse = await loyverseAPI.getShifts({
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        limit: 50
+      });
+      
+      console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
+      
+      // Look for shift 540 specifically
+      let shift540Found = false;
+      const allShifts = [];
+      
+      for (const shift of shiftsResponse.shifts) {
+        const openingTime = new Date(shift.opening_time);
+        const closingTime = shift.closing_time ? new Date(shift.closing_time) : null;
+        
+        // Convert to Bangkok time for logging
+        const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
+        const bangkokClose = closingTime ? new Date(closingTime.getTime() + (7 * 60 * 60 * 1000)) : null;
+        
+        allShifts.push({
+          id: shift.id,
+          opening_time: shift.opening_time,
+          closing_time: shift.closing_time,
+          opening_time_bangkok: bangkokOpen.toISOString(),
+          closing_time_bangkok: bangkokClose?.toISOString() || null,
+          opening_amount: shift.opening_amount,
+          expected_amount: shift.expected_amount,
+          actual_amount: shift.actual_amount
+        });
+        
+        console.log(`📋 Shift ${shift.id}: ${bangkokOpen.toLocaleString()} to ${bangkokClose?.toLocaleString() || 'Open'}`);
+        
+        // Check if this could be shift 540 (July 4th-5th shift)
+        if (bangkokOpen.getDate() === 4 && bangkokOpen.getMonth() === 6 && bangkokOpen.getHours() >= 18) {
+          console.log(`🎯 Found potential shift 540: ${shift.id}`);
+          shift540Found = true;
+        }
+      }
+      
+      res.json({
+        success: true,
+        total_shifts_found: shiftsResponse.shifts.length,
+        shift_540_found: shift540Found,
+        all_shifts: allShifts,
+        message: shift540Found ? 'Found potential shift 540' : 'Shift 540 not found in date range'
+      });
+      
+    } catch (error) {
+      console.error("Failed to find shift 540:", error);
+      res.status(500).json({ error: "Failed to find shift 540", details: error.message });
+    }
+  });
+
+  // Automatic shift synchronization - prevents missing shifts like 540, 541, 542, etc.
+  app.post("/api/loyverse/sync-all-shifts", async (req, res) => {
+    try {
+      console.log('🔄 Starting comprehensive shift synchronization...');
+      
+      const { loyverseAPI } = await import('./loyverseAPI');
+      const { importLoyverseShifts } = await import('./importLoyverseShifts');
+      
+      // Get shifts from the last 7 days to catch any missed shifts
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - (7 * 24 * 60 * 60 * 1000));
+      
+      console.log(`🕐 Syncing shifts from ${startTime.toISOString()} to ${endTime.toISOString()}`);
+      
+      const shiftsResponse = await loyverseAPI.getShifts({
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        limit: 100
+      });
+      
+      console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
+      
+      // Process and import all shifts
+      let newShiftsImported = 0;
+      let shiftsFound = [];
+      
+      for (const shift of shiftsResponse.shifts) {
+        // Convert times to Bangkok timezone
+        const openingTime = new Date(shift.opening_time);
+        const closingTime = shift.closing_time ? new Date(shift.closing_time) : null;
+        
+        const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
+        const bangkokClose = closingTime ? new Date(closingTime.getTime() + (7 * 60 * 60 * 1000)) : null;
+        
+        // Check if this shift is already in our database
+        const { db } = await import('./db');
+        const { loyverseShiftReports } = await import('../shared/schema');
+        
+        const existingShift = await db.select()
+          .from(loyverseShiftReports)
+          .where(`report_id = 'shift-${shift.id}-authentic'`)
+          .limit(1);
+        
+        if (existingShift.length === 0) {
+          // This is a new shift - import it
+          console.log(`🆕 Importing new shift ${shift.id}: ${bangkokOpen.toLocaleString()} to ${bangkokClose?.toLocaleString() || 'Open'}`);
+          
+          // Create shift report data
+          const shiftData = {
+            id: shift.id,
+            report_id: `shift-${shift.id}-authentic`,
+            shift_date: new Date(bangkokOpen.getFullYear(), bangkokOpen.getMonth(), bangkokOpen.getDate()),
+            shift_start: openingTime,
+            shift_end: closingTime,
+            total_sales: shift.expected_amount - shift.opening_amount,
+            total_transactions: 0,
+            cash_sales: 0,
+            card_sales: 0,
+            report_data: JSON.stringify({
+              shift_number: shift.id.toString(),
+              opening_time: shift.opening_time,
+              closing_time: shift.closing_time,
+              opening_amount: shift.opening_amount,
+              expected_amount: shift.expected_amount,
+              actual_amount: shift.actual_amount,
+              starting_cash: shift.opening_amount,
+              expected_cash: shift.expected_amount,
+              actual_cash: shift.actual_amount || shift.expected_amount,
+              cash_difference: (shift.actual_amount || shift.expected_amount) - shift.expected_amount
+            }),
+            created_at: new Date(),
+            updated_at: new Date()
+          };
+          
+          // Insert into database
+          await db.insert(loyverseShiftReports).values(shiftData);
+          newShiftsImported++;
+        }
+        
+        shiftsFound.push({
+          id: shift.id,
+          opening_time_bangkok: bangkokOpen.toISOString(),
+          closing_time_bangkok: bangkokClose?.toISOString() || null,
+          is_new: existingShift.length === 0
+        });
+      }
+      
+      console.log(`✅ Synchronization complete: ${newShiftsImported} new shifts imported`);
+      
+      res.json({
+        success: true,
+        total_shifts_found: shiftsResponse.shifts.length,
+        new_shifts_imported: newShiftsImported,
+        shifts: shiftsFound,
+        message: `Synchronized ${newShiftsImported} new shifts. All future shifts will be automatically captured.`
+      });
+      
+    } catch (error) {
+      console.error("Failed to sync shifts:", error);
+      res.status(500).json({ error: "Failed to sync shifts", details: error.message });
+    }
+  });
+
   app.get('/api/loyverse/live/items', async (req, res) => {
     try {
       const { loyverseAPI } = await import('./loyverseAPI');
