@@ -108,3 +108,36 @@
   height: 320px;
   width: 100%;
 }
+
+/* Dark mode styles */
+.dark .restaurant-card {
+  background: hsl(240, 10%, 3.9%);
+  border: 1px solid hsl(240, 3.7%, 15.9%);
+  box-shadow: 0 1px 3px 0 rgba(255, 255, 255, 0.1), 0 1px 2px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dark .restaurant-nav {
+  background-color: hsl(240, 10%, 3.9%);
+  border-bottom: 1px solid hsl(240, 3.7%, 15.9%);
+}
+
+/* Skeleton loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.dark .animate-shimmer {
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+  background-size: 200px 100%;
+}

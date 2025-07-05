@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Camera, AlertTriangle, CheckCircle, DollarSign, Package, RefreshCw, FileText, Calendar } from "lucide-react";
+import { Camera, AlertTriangle, CheckCircle, DollarSign, Package, RefreshCw, FileText, Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { ReceiptSkeleton, ShiftReportSkeleton } from "@/components/SkeletonLoader";
 
 export default function POSLoyverse() {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -17,6 +18,7 @@ export default function POSLoyverse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("1"); // Default to last 24 hours
   const [activeTab, setActiveTab] = useState("receipts");
+  const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Sample receipt data to demonstrate the interface
@@ -244,10 +246,7 @@ export default function POSLoyverse() {
 
               <div className="space-y-4">
                 {isLoadingReceipts ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-gray-500 mt-2">Loading recent receipts...</p>
-                  </div>
+                  <ReceiptSkeleton count={5} />
                 ) : filteredReceipts.length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -265,35 +264,107 @@ export default function POSLoyverse() {
                     </Button>
                   </div>
                 ) : (
-                  filteredReceipts.map((receipt) => (
-                    <div key={receipt.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0 mb-2">
-                        <div>
-                          <div className="font-medium text-sm sm:text-base">Receipt #{receipt.receiptNumber}</div>
-                          <div className="text-xs sm:text-sm text-gray-600">{formatDateTime(receipt.receiptDate)}</div>
+                  filteredReceipts.map((receipt) => {
+                    // Parse items from receipt data
+                    const parseItems = () => {
+                      try {
+                        if (Array.isArray(receipt.items)) return receipt.items;
+                        if (receipt.items && typeof receipt.items === 'string') {
+                          return JSON.parse(receipt.items);
+                        }
+                        if (receipt.rawData?.line_items) return receipt.rawData.line_items;
+                        return [];
+                      } catch {
+                        return [];
+                      }
+                    };
+                    
+                    const items = parseItems();
+                    const isExpanded = expandedReceipts.has(receipt.id.toString());
+                    
+                    const toggleExpanded = () => {
+                      const newExpanded = new Set(expandedReceipts);
+                      if (isExpanded) {
+                        newExpanded.delete(receipt.id.toString());
+                      } else {
+                        newExpanded.add(receipt.id.toString());
+                      }
+                      setExpandedReceipts(newExpanded);
+                    };
+                    
+                    return (
+                      <div key={receipt.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-2 sm:space-y-0 mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium text-sm sm:text-base">Receipt #{receipt.receiptNumber}</div>
+                              {items.length > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={toggleExpanded}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </Button>
+                              )}
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{formatDateTime(receipt.receiptDate)}</div>
+                          </div>
+                          <div className="flex sm:flex-col items-start sm:items-end sm:text-right space-x-2 sm:space-x-0">
+                            <div className="font-semibold text-base sm:text-lg">{formatCurrency(receipt.totalAmount)}</div>
+                            <Badge variant="outline" className="text-xs">{receipt.paymentMethod}</Badge>
+                          </div>
                         </div>
-                        <div className="flex sm:flex-col items-start sm:items-end sm:text-right space-x-2 sm:space-x-0">
-                          <div className="font-semibold text-base sm:text-lg">{formatCurrency(receipt.totalAmount)}</div>
-                          <Badge variant="outline" className="text-xs">{receipt.paymentMethod}</Badge>
+                        
+                        {/* Receipt Items - Only show when expanded */}
+                        {isExpanded && items.length > 0 && (
+                          <div className="mb-3 border-t pt-3">
+                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Items Ordered:</div>
+                            <div className="space-y-2 bg-gray-50 dark:bg-gray-800 rounded p-3">
+                              {items.map((item: any, index: number) => (
+                                <div key={index} className="flex justify-between items-start text-xs border-b border-gray-200 dark:border-gray-600 pb-2 last:border-b-0 last:pb-0">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900 dark:text-gray-100">{item.item_name || item.name}</div>
+                                    {item.quantity && (
+                                      <div className="text-gray-600 dark:text-gray-400 mt-1">Quantity: {item.quantity}</div>
+                                    )}
+                                    {/* Show modifiers if available */}
+                                    {item.modifiers && item.modifiers.length > 0 && (
+                                      <div className="ml-3 mt-2 space-y-1">
+                                        <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">Modifiers:</div>
+                                        {item.modifiers.map((modifier: any, modIndex: number) => (
+                                          <div key={modIndex} className="flex justify-between text-gray-500 dark:text-gray-400 text-xs ml-2">
+                                            <span>+ {modifier.name}</span>
+                                            {modifier.cost && <span>{formatCurrency(modifier.cost)}</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right ml-3">
+                                    <div className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(item.line_total || item.price || 0)}</div>
+                                    {item.cost && (
+                                      <div className="text-gray-500 text-xs mt-1">Cost: {formatCurrency(item.cost)}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                          <span>Staff: {receipt.staffMember || 'N/A'}</span>
+                          <span>Table: {receipt.tableNumber || 'Takeaway'}</span>
+                          <span>{items.length} items</span>
+                          {receipt.rawData?.total_tax && (
+                            <span>Tax: {formatCurrency(receipt.rawData.total_tax)}</span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                        <span>Staff: {receipt.staffMember}</span>
-                        <span>Table: {receipt.tableNumber || 'N/A'}</span>
-                        <span>{(() => {
-                          try {
-                            if (Array.isArray(receipt.items)) return receipt.items.length;
-                            if (receipt.items && typeof receipt.items === 'string') {
-                              return JSON.parse(receipt.items).length;
-                            }
-                            return 0;
-                          } catch {
-                            return 0;
-                          }
-                        })()} items</span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>
@@ -322,9 +393,7 @@ export default function POSLoyverse() {
             </CardHeader>
             <CardContent>
               {isLoadingShifts ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-500">Loading shift reports...</div>
-                </div>
+                <ShiftReportSkeleton count={4} />
               ) : (
                 <div className="space-y-4">
                   {Array.isArray(shiftReports) && shiftReports.length > 0 ? (
