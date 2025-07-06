@@ -120,7 +120,7 @@ export default function RecipeManagement() {
   });
 
   const removeIngredientMutation = useMutation({
-    mutationFn: (id: number) => apiRequest('DELETE', `/api/recipe-ingredients/${id}`),
+    mutationFn: (id: number) => apiRequest(`/api/recipe-ingredients/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
@@ -135,6 +135,15 @@ export default function RecipeManagement() {
       });
     },
   });
+
+  // Force refresh recipe ingredients data
+  const refreshRecipeData = () => {
+    if (selectedRecipe) {
+      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe.id, 'ingredients'] });
+      queryClient.refetchQueries({ queryKey: ['/api/recipes', selectedRecipe.id, 'ingredients'] });
+      toast({ title: "Recipe data refreshed" });
+    }
+  };
 
   const deleteRecipeMutation = useMutation({
     mutationFn: (id: number) => apiRequest('DELETE', `/api/recipes/${id}`),
