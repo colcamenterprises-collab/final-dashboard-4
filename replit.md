@@ -228,6 +228,9 @@ Changelog:
 - July 6, 2025. Created webhook management interface with registration, monitoring, and benefits comparison
 - July 6, 2025. Implemented instant receipt notifications (receipt.created, receipt.updated) and shift closure webhooks (shift.closed)
 - July 6, 2025. Added proper signature validation, Bangkok timezone handling, and automatic database updates via webhooks
+- July 6, 2025. Integrated webhook management functionality into Loyverse Live page for centralized real-time integration
+- July 6, 2025. Added live receipt count to dashboard KPI card showing current shift orders in real-time
+- July 6, 2025. Implemented Bangkok timezone-aware receipt counting for accurate shift period tracking (6pm-3am)
 ```
 
 ## User Preferences

@@ -318,6 +318,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE shift_date >= '2025-07-01'
       `);
       
+      // Get live receipt count for today's shift period (6pm today to 3am tomorrow Bangkok time)
+      const bangkokNow = new Date(new Date().getTime() + (7 * 60 * 60 * 1000));
+      const today = new Date(bangkokNow);
+      today.setHours(18, 0, 0, 0); // 6pm today
+      
+      const tomorrow = new Date(bangkokNow);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(3, 0, 0, 0); // 3am tomorrow
+      
+      const liveReceiptsResult = await db.execute(sql`
+        SELECT COUNT(*) as live_count
+        FROM loyverse_receipts 
+        WHERE receipt_date >= ${today.toISOString()} 
+        AND receipt_date <= ${tomorrow.toISOString()}
+      `);
+      
+      const liveReceiptCount = parseInt(liveReceiptsResult.rows[0]?.live_count || '0');
+      console.log(`📋 Live receipt count for current shift: ${liveReceiptCount}`);
+      
       // Add calculated shift 541 data to MTD if it exists
       let adjustedMtdSales = parseFloat(mtdResult.rows[0]?.total_sales || '0');
       if (shiftData?.report_id === 'shift-541-calculated') {
@@ -334,6 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastShiftSales: parseFloat(shiftData?.total_sales || '0'),
         lastShiftOrders: parseInt(shiftData?.total_transactions || '0'),
         monthToDateSales: adjustedMtdSales,
+        liveReceiptCount: liveReceiptCount,
         inventoryValue: kpis.inventoryValue || 125000,
         averageOrderValue: shiftData?.total_sales && shiftData?.total_transactions 
           ? Math.round(parseFloat(shiftData.total_sales) / parseInt(shiftData.total_transactions))

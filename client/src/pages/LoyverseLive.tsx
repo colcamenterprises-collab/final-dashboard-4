@@ -17,7 +17,12 @@ import {
   XCircle,
   AlertCircle,
   Play,
-  Download
+  Download,
+  Webhook,
+  Zap,
+  Bell,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 
 interface LoyverseStatus {
@@ -47,6 +52,35 @@ export default function LoyverseLive() {
   const [realtimeEnabled, setRealtimeEnabled] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch existing webhooks
+  const { data: webhooks = [], isLoading: webhooksLoading, refetch: refetchWebhooks } = useQuery({
+    queryKey: ['/api/webhooks/list'],
+    queryFn: async () => {
+      const response = await fetch('/api/webhooks/list');
+      if (!response.ok) throw new Error('Failed to fetch webhooks');
+      return response.json();
+    }
+  });
+
+  // Register webhooks mutation
+  const registerWebhooksMutation = useMutation({
+    mutationFn: () => fetch('/api/webhooks/register', { method: 'POST' }).then(res => res.json()),
+    onSuccess: () => {
+      toast({
+        title: "Webhooks Registered",
+        description: "Real-time webhooks have been set up successfully",
+      });
+      refetchWebhooks();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Registration Failed",
+        description: error.message || "Failed to register webhooks",
+        variant: "destructive",
+      });
+    }
+  });
 
   // Connection status query
   const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useQuery<LoyverseStatus>({
@@ -332,6 +366,141 @@ export default function LoyverseLive() {
                 Sync Customers
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Webhook Management */}
+      {status?.connected && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Webhook className="h-5 w-5" />
+              Real-time Webhooks
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchWebhooks()}
+                disabled={webhooksLoading}
+                className="ml-auto"
+              >
+                <RefreshCw className={`h-4 w-4 ${webhooksLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Instant notifications for receipts, shifts, and inventory changes
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Benefits Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                  <h4 className="font-semibold text-orange-700">Current: Scheduled Polling</h4>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <span>4am daily sync only</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <span>Delayed data updates</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-green-500" />
+                  <h4 className="font-semibold text-green-700">Webhooks: Real-time</h4>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>Instant receipt notifications</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>Automatic shift closures</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Webhook Events */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-semibold text-blue-900 mb-2">Webhook Events:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <ArrowRight className="h-3 w-3 text-blue-600" />
+                  <span><code>receipt.created</code> - New sales</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowRight className="h-3 w-3 text-blue-600" />
+                  <span><code>shift.closed</code> - End of shift</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Webhook Status */}
+            {webhooksLoading ? (
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Loading webhooks...</span>
+              </div>
+            ) : webhooks.length === 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>No webhooks are currently registered</span>
+                </div>
+                <Button
+                  onClick={() => registerWebhooksMutation.mutate()}
+                  disabled={registerWebhooksMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  {registerWebhooksMutation.isPending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Registering Webhooks...
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="h-4 w-4 mr-2" />
+                      Register Webhooks
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{webhooks.length} webhook(s) registered</span>
+                </div>
+                {webhooks.map((webhook: any) => (
+                  <div key={webhook.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant={webhook.active ? "default" : "secondary"}>
+                        {webhook.active ? "Active" : "Inactive"}
+                      </Badge>
+                      <span className="font-mono text-xs">{webhook.id}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {webhook.events?.map((event: string) => (
+                        <Badge key={event} variant="outline" className="text-xs">
+                          {event}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

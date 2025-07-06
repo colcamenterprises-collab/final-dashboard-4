@@ -31,7 +31,7 @@ function Router() {
         <Route path="/loyverse-live" component={LoyverseLive} />
         <Route path="/recipe-management" component={RecipeManagement} />
         <Route path="/analysis" component={Analysis} />
-        <Route path="/webhooks" component={WebhookManagement} />
+
         <Route component={NotFound} />
       </Switch>
     </Layout>

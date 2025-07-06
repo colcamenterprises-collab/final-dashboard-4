@@ -107,9 +107,9 @@ export default function Dashboard() {
           iconBgColor="bg-primary/20"
         />
         <KPICard
-          title="Orders Completed Last Shift"
-          value={kpis?.lastShiftOrders || 0}
-          change={`${kpis?.shiftDate || 'Previous'} Shift Period`}
+          title="Live Orders Today"
+          value={kpis?.liveReceiptCount || 0}
+          change="Current Shift Period"
           changeType="positive"
           icon={ShoppingCart}
           iconColor="text-green-600"
