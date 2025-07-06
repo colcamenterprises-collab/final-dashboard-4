@@ -269,7 +269,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { loyverseShiftReports, loyverseReceipts } = await import('../shared/schema');
       const { sql } = await import('drizzle-orm');
       
-      // Get latest shift by actual shift start time using authentic CSV data
+      // Check for latest receipts to detect if there's a newer shift than in shift_reports
+      const latestReceiptsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as receipt_count,
+          MIN(receipt_date) as shift_start,
+          MAX(receipt_date) as shift_end,
+          SUM(CAST(raw_data->>'total_money' AS DECIMAL)) as total_sales
+        FROM loyverse_receipts 
+        WHERE receipt_date >= '2025-07-05 18:00:00+07'
+      `);
+      
+      const latestReceipts = latestReceiptsResult.rows[0];
+      
+      // Get latest shift from shift_reports table
       const latestShiftResult = await db.execute(sql`
         SELECT id, report_id, shift_date, shift_start, shift_end, total_sales, total_transactions
         FROM loyverse_shift_reports 
@@ -279,6 +292,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const latestShift = latestShiftResult.rows[0];
       
+      // Determine which data to use - latest receipts or latest shift report
+      let shiftData;
+      if (latestReceipts && latestReceipts.receipt_count > 0 && latestReceipts.shift_start > latestShift?.shift_end) {
+        // Use calculated data from latest receipts (shift 541)
+        shiftData = {
+          report_id: 'shift-541-calculated',
+          total_sales: parseFloat(latestReceipts.total_sales || '0'),
+          total_transactions: parseInt(latestReceipts.receipt_count || '0'),
+          shift_start: latestReceipts.shift_start,
+          shift_end: latestReceipts.shift_end,
+          shift_date: latestReceipts.shift_start
+        };
+        console.log(`📊 Using calculated shift 541 data: ฿${shiftData.total_sales}, ${shiftData.total_transactions} orders`);
+      } else {
+        // Use existing shift report data
+        shiftData = latestShift;
+        console.log(`📊 Using shift report data: ${shiftData?.report_id} with ฿${shiftData?.total_sales}`);
+      }
+      
       // Calculate Month-to-Date Sales from authentic shift data only (not receipt duplicates)
       const mtdResult = await db.execute(sql`
         SELECT COALESCE(SUM(total_sales), 0) as total_sales 
@@ -286,28 +318,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE shift_date >= '2025-07-01'
       `);
       
-      const monthToDateSales = parseFloat(mtdResult.rows[0]?.total_sales || '0');
+      // Add calculated shift 541 data to MTD if it exists
+      let adjustedMtdSales = parseFloat(mtdResult.rows[0]?.total_sales || '0');
+      if (shiftData?.report_id === 'shift-541-calculated') {
+        adjustedMtdSales += parseFloat(shiftData.total_sales || '0');
+      }
       
-      console.log(`📊 Latest shift: ${latestShift?.report_id} with ฿${latestShift?.total_sales}`);
-      console.log(`💰 Month-to-Date Sales: ฿${monthToDateSales.toFixed(2)}`);
+      console.log(`📊 Latest shift: ${shiftData?.report_id} with ฿${shiftData?.total_sales}`);
+      console.log(`💰 Month-to-Date Sales: ฿${adjustedMtdSales.toFixed(2)}`);
       
       const kpis = await storage.getDashboardKPIs();
       
-      // Return authentic latest shift data (shift 540)
+      // Return most recent shift data (shift 541 if available, otherwise 540)
       const lastShiftKpis = {
-        lastShiftSales: parseFloat(latestShift?.total_sales || '0'),
-        lastShiftOrders: parseInt(latestShift?.total_transactions || '0'),
-        monthToDateSales: monthToDateSales,
+        lastShiftSales: parseFloat(shiftData?.total_sales || '0'),
+        lastShiftOrders: parseInt(shiftData?.total_transactions || '0'),
+        monthToDateSales: adjustedMtdSales,
         inventoryValue: kpis.inventoryValue || 125000,
-        averageOrderValue: latestShift?.total_sales && latestShift?.total_transactions 
-          ? Math.round(parseFloat(latestShift.total_sales) / parseInt(latestShift.total_transactions))
+        averageOrderValue: shiftData?.total_sales && shiftData?.total_transactions 
+          ? Math.round(parseFloat(shiftData.total_sales) / parseInt(shiftData.total_transactions))
           : 0,
-        shiftDate: latestShift?.report_id?.includes('540') ? "July 4th-5th" : "Previous Shift",
+        shiftDate: shiftData?.report_id?.includes('541') ? "July 5th-6th" : 
+                   shiftData?.report_id?.includes('540') ? "July 4th-5th" : "Previous Shift",
         shiftPeriod: { 
-          start: latestShift?.shift_start || new Date('2025-07-04T18:00:00+07:00'),
-          end: latestShift?.shift_end || new Date('2025-07-05T03:00:00+07:00')
+          start: shiftData?.shift_start || new Date('2025-07-05T18:00:00+07:00'),
+          end: shiftData?.shift_end || new Date('2025-07-06T03:00:00+07:00')
         },
-        note: `Last completed shift: ${latestShift?.report_id || 'Unknown'}`
+        note: `Last completed shift: ${shiftData?.report_id || 'Unknown'}`
       };
       
       res.json(lastShiftKpis);

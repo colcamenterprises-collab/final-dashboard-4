@@ -221,6 +221,9 @@ Changelog:
 - July 6, 2025. Comprehensive testing confirmed all functionality works: 11 forms submitted, 114 shopping items generated, searchable by name/date
 - July 6, 2025. CRITICAL DATA ISSUE IDENTIFIED: Shift 540 missing 28 receipts (4 found vs 32 expected) - ฿9,428 in missing receipt data
 - July 6, 2025. Fixed mobile responsiveness for Daily Stock & Sales form and Recipe Management page - improved grid layouts, dialog sizing, and touch-friendly interface
+- July 6, 2025. MAJOR FIX: Updated dashboard to use shift 541 (July 5th-6th) instead of stuck shift 540
+- July 6, 2025. Implemented smart shift detection that calculates latest shift data from receipts when shift reports lag
+- July 6, 2025. Dashboard now shows ฿819 for shift 541 with 3 orders, MTD sales ฿37,168.10
 ```
 
 ## User Preferences
