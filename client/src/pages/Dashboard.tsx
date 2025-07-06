@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import KPICard from "@/components/KPICard";
 import MonthlyRevenueChart from "@/components/SalesChart";
+import MonthlyExpensesChart from "@/components/MonthlyExpensesChart";
+import AIInsightsCard from "@/components/AIInsightsCard";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
@@ -137,14 +139,26 @@ export default function Dashboard() {
 
 
 
+      {/* Three-column layout: Green Chart | Monthly Expenses | AI Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        {/* Sales Chart and Compact Shift Reports */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Column 1: Green Revenue Chart */}
+        <div className="lg:col-span-1">
           <MonthlyRevenueChart />
-          <CompactShiftReports />
         </div>
 
-        {/* Top Sales Items */}
+        {/* Column 2: Monthly Expenses Chart */}
+        <div className="lg:col-span-1">
+          <MonthlyExpensesChart />
+        </div>
+
+        {/* Column 3: AI Insights */}
+        <div className="lg:col-span-1">
+          <AIInsightsCard />
+        </div>
+      </div>
+
+      {/* Top Sales Items - Full Width */}
+      <div className="mb-6 lg:mb-8">
         <Card className="restaurant-card">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-gray-900">Top Sales Items</CardTitle>
