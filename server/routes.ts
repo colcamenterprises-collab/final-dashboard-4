@@ -21,7 +21,7 @@ import {
 } from "./services/ai";
 import { loyverseReceiptService } from "./services/loyverseReceipts";
 import { loyverseAPI } from "./loyverseAPI";
-import { loyverseShiftReports, loyverseReceipts, recipes } from "@shared/schema";
+import { loyverseShiftReports, loyverseReceipts, recipes, recipeIngredients, ingredients } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { generateMarketingContent } from "./openai";
@@ -1626,8 +1626,8 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       if (isNaN(recipeId)) {
         return res.status(400).json({ error: 'Invalid recipe ID format' });
       }
-      const ingredients = await storage.getRecipeIngredients(recipeId);
-      res.json(ingredients);
+      const recipeIngredientsList = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+      res.json(recipeIngredientsList);
     } catch (error) {
       console.error('Error fetching recipe ingredients:', error);
       res.status(500).json({ error: 'Failed to fetch recipe ingredients' });
@@ -1637,11 +1637,41 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
   app.post('/api/recipe-ingredients', async (req, res) => {
     try {
       const parsed = insertRecipeIngredientSchema.parse(req.body);
-      const recipeIngredient = await storage.addRecipeIngredient(parsed);
+      
+      // Get ingredient cost from database
+      const ingredientResult = await db.select().from(ingredients).where(eq(ingredients.id, parseInt(parsed.ingredientId)));
+      const ingredient = ingredientResult[0];
+      
+      if (!ingredient) {
+        return res.status(404).json({ error: 'Ingredient not found' });
+      }
+      
+      // Calculate cost based on quantity
+      const quantity = parseFloat(parsed.quantity);
+      const unitPrice = parseFloat(ingredient.unitPrice);
+      const cost = (quantity * unitPrice).toFixed(2);
+      
+      // Insert into database
+      const recipeIngredientData = {
+        recipeId: parsed.recipeId,
+        ingredientId: parseInt(parsed.ingredientId),
+        quantity: parsed.quantity,
+        unit: parsed.unit || ingredient.unit,
+        cost: cost
+      };
+      
+      const result = await db.insert(recipeIngredients).values(recipeIngredientData).returning();
+      const recipeIngredient = result[0];
       
       // Recalculate recipe cost
-      const totalCost = await storage.calculateRecipeCost(parsed.recipeId);
-      await storage.updateRecipe(parsed.recipeId, { totalCost: totalCost.toString() });
+      const allIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, parsed.recipeId));
+      let totalCost = 0;
+      for (const ingredient of allIngredients) {
+        totalCost += parseFloat(ingredient.cost);
+      }
+      
+      // Update recipe with new total cost
+      await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, parsed.recipeId));
       
       res.json(recipeIngredient);
     } catch (error) {
@@ -1677,16 +1707,25 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       }
       
       // Get the recipe ingredient first to know which recipe to update
-      const recipeIngredients = Array.from((storage as any).recipeIngredients.values());
-      const recipeIngredient = recipeIngredients.find((ri: any) => ri.id === id);
+      const recipeIngredientResult = await db.select().from(recipeIngredients).where(eq(recipeIngredients.id, id));
+      const recipeIngredient = recipeIngredientResult[0];
       
-      await storage.removeRecipeIngredient(id);
-      
-      // Recalculate recipe cost if we found the recipe ingredient
-      if (recipeIngredient) {
-        const totalCost = await storage.calculateRecipeCost(recipeIngredient.recipeId);
-        await storage.updateRecipe(recipeIngredient.recipeId, { totalCost: totalCost.toString() });
+      if (!recipeIngredient) {
+        return res.status(404).json({ error: 'Recipe ingredient not found' });
       }
+      
+      // Delete the recipe ingredient from database
+      await db.delete(recipeIngredients).where(eq(recipeIngredients.id, id));
+      
+      // Recalculate recipe cost
+      const remainingIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeIngredient.recipeId));
+      let totalCost = 0;
+      for (const ingredient of remainingIngredients) {
+        totalCost += parseFloat(ingredient.cost);
+      }
+      
+      // Update the recipe with new total cost
+      await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, recipeIngredient.recipeId));
       
       res.json({ success: true });
     } catch (error) {

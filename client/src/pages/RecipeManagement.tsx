@@ -127,6 +127,14 @@ export default function RecipeManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       toast({ title: "Ingredient removed successfully" });
     },
+    onError: (error: any) => {
+      console.error('Error removing ingredient:', error);
+      toast({ 
+        title: "Failed to remove ingredient", 
+        description: error.message || 'An error occurred while removing the ingredient',
+        variant: "destructive" 
+      });
+    },
   });
 
   const deleteRecipeMutation = useMutation({
@@ -622,7 +630,12 @@ export default function RecipeManagement() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeIngredientMutation.mutate(ri.id)}
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to remove ${getIngredientName(ri.ingredientId)} from this recipe?`)) {
+                                removeIngredientMutation.mutate(ri.id);
+                              }
+                            }}
+                            disabled={removeIngredientMutation.isPending}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
