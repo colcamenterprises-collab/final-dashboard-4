@@ -31,16 +31,12 @@ const ingredientFormSchema = z.object({
 });
 
 const INGREDIENT_CATEGORIES = [
-  'Meat & Protein',
-  'Vegetables',
-  'Dairy & Eggs',
-  'Condiments & Sauces',
-  'Spices & Seasonings',
-  'Bread & Bakery',
-  'Packaging',
-  'Beverages',
-  'Oils & Fats',
-  'Other'
+  'Fresh Food',
+  'Frozen Food',
+  'Shelf Stock',
+  'Drinks',
+  'Kitchen Supplies',
+  'Packaging'
 ];
 
 const COMMON_UNITS = [

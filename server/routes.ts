@@ -1570,6 +1570,56 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Update ingredient by name (for bulk updates)
+  app.post('/api/ingredients/update-by-name', async (req, res) => {
+    try {
+      const { name, unitPrice, packageSize, supplier, category, notes } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: 'Ingredient name is required' });
+      }
+      
+      // Check if ingredient exists
+      const existingIngredient = await db.select().from(ingredients).where(eq(ingredients.name, name));
+      
+      if (existingIngredient.length > 0) {
+        // Update existing ingredient
+        const result = await db.update(ingredients)
+          .set({ 
+            unitPrice,
+            packageSize,
+            supplier,
+            category,
+            notes,
+            lastUpdated: new Date() 
+          })
+          .where(eq(ingredients.name, name))
+          .returning();
+        
+        res.json({ updated: true, ingredient: result[0] });
+      } else {
+        // Create new ingredient
+        const newIngredient = {
+          name,
+          unitPrice,
+          packageSize,
+          supplier,
+          category,
+          notes,
+          unit: 'unit', // default unit
+          lastUpdated: new Date(),
+          createdAt: new Date()
+        };
+        
+        const result = await db.insert(ingredients).values(newIngredient).returning();
+        res.json({ updated: false, ingredient: result[0] });
+      }
+    } catch (error) {
+      console.error('Error updating ingredient by name:', error);
+      res.status(400).json({ error: 'Failed to update ingredient' });
+    }
+  });
+
   // Import ingredient costs from CSV
   app.post('/api/ingredients/import-costs', async (req, res) => {
     try {

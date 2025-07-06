@@ -239,6 +239,9 @@ Changelog:
 - July 6, 2025. Implemented 21 measurement units (grams, kilograms, pieces, each, units, bottles, cans, packets, bags, boxes, rolls, sheets, etc.)
 - July 6, 2025. Added category-based filtering, search capabilities, and supplier management for ingredient inventory
 - July 6, 2025. Enhanced API endpoints with database-direct operations, error handling, and recipe usage protection for deletions
+- July 6, 2025. INGREDIENT CATEGORIZATION: Updated all ingredient categories to restaurant-specific structure: Fresh Food, Frozen Food, Shelf Stock, Drinks, Kitchen Supplies, Packaging
+- July 6, 2025. Updated ingredient cost structure with 34 authentic price updates from supplier CSV data (22 updates, 12 new ingredients)
+- July 6, 2025. Implemented update-by-name API endpoint for bulk ingredient cost updates with proper category management
 ```
 
 ## User Preferences
