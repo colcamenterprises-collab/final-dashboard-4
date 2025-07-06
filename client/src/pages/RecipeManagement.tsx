@@ -261,13 +261,13 @@ export default function RecipeManagement() {
 
   if (recipesLoading || ingredientsLoading) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="flex items-center space-x-2 mb-6">
-          <ChefHat className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Recipe Management</h1>
+      <div className="container mx-auto p-2 sm:p-4 lg:p-6 max-w-7xl">
+        <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+          <ChefHat className="h-5 w-5 sm:h-6 sm:w-6" />
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe Management</h1>
         </div>
         <div className="animate-pulse">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="h-96 bg-gray-200 rounded-lg"></div>
             <div className="h-96 bg-gray-200 rounded-lg"></div>
           </div>
@@ -277,11 +277,11 @@ export default function RecipeManagement() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-2 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
-          <ChefHat className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Recipe Management</h1>
+          <ChefHat className="h-5 w-5 sm:h-6 sm:w-6" />
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe Management</h1>
         </div>
         
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -338,7 +338,7 @@ export default function RecipeManagement() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <FormField
                     control={recipeForm.control}
                     name="servingSize"
@@ -413,7 +413,7 @@ export default function RecipeManagement() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Recipes List */}
         <Card>
           <CardHeader>
@@ -494,7 +494,7 @@ export default function RecipeManagement() {
             {selectedRecipe ? (
               <div className="space-y-6">
                 {/* Recipe Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Category</Label>
                     <p>{selectedRecipe.category}</p>
@@ -898,7 +898,7 @@ export default function RecipeManagement() {
                   </div>
 
                   {/* Quick Content Status */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                     <div className="p-3 border rounded-lg text-center">
                       <FileText className="h-6 w-6 mx-auto mb-2 text-gray-400" />
                       <p className="text-xs font-medium">Delivery Partner</p>
