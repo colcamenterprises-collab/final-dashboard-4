@@ -1488,13 +1488,17 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
   app.get('/api/ingredients', async (req, res) => {
     try {
       const { category } = req.query;
+      let ingredientsList;
+      
       if (category) {
-        const ingredients = await storage.getIngredientsByCategory(category as string);
-        res.json(ingredients);
+        ingredientsList = await db.select().from(ingredients)
+          .where(eq(ingredients.category, category as string))
+          .orderBy(ingredients.name);
       } else {
-        const ingredients = await storage.getIngredients();
-        res.json(ingredients);
+        ingredientsList = await db.select().from(ingredients).orderBy(ingredients.name);
       }
+      
+      res.json(ingredientsList);
     } catch (error) {
       console.error('Error fetching ingredients:', error);
       res.status(500).json({ error: 'Failed to fetch ingredients' });
@@ -1504,8 +1508,8 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
   app.post('/api/ingredients', async (req, res) => {
     try {
       const parsed = insertIngredientSchema.parse(req.body);
-      const ingredient = await storage.createIngredient(parsed);
-      res.json(ingredient);
+      const result = await db.insert(ingredients).values(parsed).returning();
+      res.json(result[0]);
     } catch (error) {
       console.error('Error creating ingredient:', error);
       res.status(400).json({ error: 'Failed to create ingredient' });
@@ -1518,11 +1522,21 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       if (isNaN(id)) {
         return res.status(400).json({ error: 'Invalid ID format' });
       }
-      const ingredient = await storage.updateIngredient(id, req.body);
-      res.json(ingredient);
+      
+      const parsed = insertIngredientSchema.partial().parse(req.body);
+      const result = await db.update(ingredients)
+        .set({ ...parsed, lastUpdated: new Date() })
+        .where(eq(ingredients.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Ingredient not found' });
+      }
+      
+      res.json(result[0]);
     } catch (error) {
       console.error('Error updating ingredient:', error);
-      res.status(500).json({ error: 'Failed to update ingredient' });
+      res.status(400).json({ error: 'Failed to update ingredient' });
     }
   });
 
@@ -1532,7 +1546,23 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       if (isNaN(id)) {
         return res.status(400).json({ error: 'Invalid ID format' });
       }
-      await storage.deleteIngredient(id);
+      
+      // Check if ingredient is used in any recipes
+      const usedInRecipes = await db.select().from(recipeIngredients).where(eq(recipeIngredients.ingredientId, id));
+      
+      if (usedInRecipes.length > 0) {
+        return res.status(400).json({ 
+          error: 'Cannot delete ingredient that is used in recipes',
+          usedInRecipes: usedInRecipes.length
+        });
+      }
+      
+      const result = await db.delete(ingredients).where(eq(ingredients.id, id)).returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Ingredient not found' });
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting ingredient:', error);

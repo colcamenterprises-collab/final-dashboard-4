@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp } from "lucide-react";
+import { Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
 // Currency Context
@@ -30,6 +30,7 @@ const navigationItems = [
   { path: "/daily-stock-sales", label: "Daily Stock & Sales", icon: ClipboardList },
   { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
   { path: "/recipe-management", label: "Recipe Management", icon: ChefHat },
+  { path: "/ingredient-management", label: "Ingredient Management", icon: Package },
   { path: "/finance", label: "Finance", icon: Calculator },
   { path: "/expenses", label: "Expenses", icon: Receipt },
   { path: "/pos-loyverse", label: "POS Loyverse", icon: BarChart3 },
