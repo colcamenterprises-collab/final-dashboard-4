@@ -31,7 +31,6 @@ const recipeIngredientFormSchema = z.object({
     return !isNaN(num) && num > 0;
   }, "Quantity must be a positive number"),
   unit: z.string().optional(),
-  cost: z.string().optional(),
 });
 
 export default function RecipeManagement() {
@@ -55,7 +54,7 @@ export default function RecipeManagement() {
     queryKey: ['/api/ingredients'],
   });
 
-  const { data: recipeIngredients = [], refetch: refetchRecipeIngredients } = useQuery({
+  const { data: recipeIngredients = [], isLoading: recipeIngredientsLoading, refetch: refetchRecipeIngredients } = useQuery({
     queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'],
     enabled: !!selectedRecipe?.id,
   });
@@ -191,25 +190,18 @@ export default function RecipeManagement() {
       return;
     }
 
-    // Calculate cost for this ingredient
-    const unitPrice = parseFloat(selectedIngredient.unitPrice);
-    const packageSize = parseFloat(selectedIngredient.packageSize);
     const quantity = parseFloat(data.quantity);
     
     if (isNaN(quantity) || quantity <= 0) {
       toast({ title: "Please enter a valid quantity", variant: "destructive" });
       return;
     }
-    
-    const costPerUnit = unitPrice / packageSize;
-    const totalCost = costPerUnit * quantity;
 
     addIngredientMutation.mutate({
       recipeId: selectedRecipe.id,
-      ingredientId: ingredientId,
+      ingredientId: ingredientId.toString(),
       quantity: data.quantity,
       unit: selectedIngredient.unit,
-      cost: totalCost.toFixed(2),
     });
   };
 
@@ -253,7 +245,7 @@ export default function RecipeManagement() {
 
   const getIngredientName = (ingredientId: number) => {
     const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
-    return ingredient?.name || "Unknown";
+    return ingredient ? ingredient.name : "Unknown";
   };
 
   const getIngredientCost = (ingredientId: number, quantity: string) => {
