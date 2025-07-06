@@ -139,8 +139,8 @@ export default function Dashboard() {
 
 
 
-      {/* Three-column layout: Green Chart | Monthly Expenses | AI Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+      {/* Two-column layout: Green Chart | Monthly Expenses Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Column 1: Green Revenue Chart */}
         <div className="lg:col-span-1">
           <MonthlyRevenueChart />
@@ -150,11 +150,11 @@ export default function Dashboard() {
         <div className="lg:col-span-1">
           <MonthlyExpensesChart />
         </div>
+      </div>
 
-        {/* Column 3: AI Insights */}
-        <div className="lg:col-span-1">
-          <AIInsightsCard />
-        </div>
+      {/* AI Insights - Full Width */}
+      <div className="mb-6 lg:mb-8">
+        <AIInsightsCard />
       </div>
 
       {/* Top Sales Items - Full Width */}
@@ -224,62 +224,16 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
         {/* Sales by Payment Type */}
         <SalesByPaymentType />
-        
-        {/* Recent Transactions */}
-        <Card className="restaurant-card">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-semibold text-gray-900">Recent Transactions</CardTitle>
-              <Button variant="ghost" className="text-primary hover:text-primary-dark text-sm font-medium">
-                View All
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTransactions?.slice(0, 3).map((transaction, index) => (
-                <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      transaction.paymentMethod === 'Credit Card' ? 'bg-green-100' : 
-                      transaction.paymentMethod === 'Cash' ? 'bg-yellow-100' : 'bg-red-100'
-                    }`}>
-                      {transaction.paymentMethod === 'Credit Card' ? (
-                        <CreditCard className="text-green-600 text-sm" />
-                      ) : transaction.paymentMethod === 'Cash' ? (
-                        <DollarSign className="text-yellow-600 text-sm" />
-                      ) : (
-                        <Truck className="text-red-600 text-sm" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{transaction.orderId}</p>
-                      <p className="text-xs text-gray-500">
-                        {transaction.tableNumber ? `Table ${transaction.tableNumber}` : 'Supplier Payment'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-semibold ${
-                      parseFloat(transaction.amount) > 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {parseFloat(transaction.amount) > 0 ? '+' : ''}${Math.abs(parseFloat(transaction.amount)).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">{transaction.paymentMethod}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      </div>
 
-        {/* AI Insights */}
+      {/* Sales heatmap */}
+      <div className="mb-6 lg:mb-8">
         <Card className="restaurant-card">
           <CardHeader>
             <div className="flex justify-between items-center">

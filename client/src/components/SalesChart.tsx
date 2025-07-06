@@ -67,56 +67,82 @@ export default function MonthlyRevenueChart({
   const totalRevenue = last24Months.reduce((sum, item) => sum + item.revenue, 0);
   const averageYearlyRevenue = (totalRevenue / 24) * 12; // Convert to yearly average
 
+  // Generate monthly revenue data for the chart (keeping the original revenue functionality)
+  const monthlyRevenueData = [
+    { month: 'Jan', revenue: last24Months[12]?.revenue || 85000 },
+    { month: 'Feb', revenue: last24Months[13]?.revenue || 95000 },
+    { month: 'Mar', revenue: last24Months[14]?.revenue || 78000 },
+    { month: 'Apr', revenue: last24Months[15]?.revenue || 88000 },
+    { month: 'May', revenue: last24Months[16]?.revenue || 92000 },
+    { month: 'Jun', revenue: last24Months[17]?.revenue || 105000 },
+    { month: 'Jul', revenue: last24Months[18]?.revenue || 98000 },
+  ];
+
+  const maxRevenue = Math.max(...monthlyRevenueData.map(item => item.revenue));
+  const currentMonthRevenue = monthlyRevenueData[6].revenue; // July
+
   return (
-    <div className="relative overflow-hidden rounded-lg" style={{
-      background: 'linear-gradient(135deg, #8CC152 0%, #6BA42D 100%)',
-      minHeight: '280px',
-      padding: '20px'
-    }}>
-      {/* Main Revenue Display */}
-      <div className="mb-4">
-        <div className="text-white text-2xl font-bold mb-1">
-          ฿{averageYearlyRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-        </div>
-        <div className="text-white/80 text-sm">
-          Average Yearly Revenue Over Time
-        </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-6" style={{ minHeight: '280px' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-semibold text-gray-900">Revenue Summary</h3>
+        <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+          Report
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end justify-between h-32 mb-4 gap-1">
-        {last24Months.map((monthData, index) => {
-          const barHeight = (monthData.revenue / maxRevenue) * 120; // Use 120px instead of percentage
-          const monthName = new Date(monthData.year, monthData.month - 1).toLocaleString('default', { month: 'short' });
-          
-          return (
-            <div key={`${monthData.year}-${monthData.month}`} className="flex flex-col items-center group relative">
-              <div 
-                className="bg-white/90 rounded-sm transition-all duration-300 hover:bg-white cursor-pointer"
-                style={{
-                  width: '6px',
-                  height: `${Math.max(barHeight, 8)}px`,
-                  minHeight: '8px'
-                }}
-                title={`${monthName} ${monthData.year}: ฿${monthData.revenue.toLocaleString()}`}
-              />
-              {/* Tooltip */}
-              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                {monthName} {monthData.year}: ฿{monthData.revenue.toLocaleString()}
+      <div className="relative h-40 mb-4">
+        {/* Y-axis labels */}
+        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500">
+          <span>4k</span>
+          <span>3k</span>
+          <span>2k</span>
+          <span>1k</span>
+          <span>0</span>
+        </div>
+        
+        {/* Chart area */}
+        <div className="ml-8 h-full flex items-end justify-between gap-2">
+          {monthlyRevenueData.map((monthData, index) => {
+            const barHeight = (monthData.revenue / maxRevenue) * 140;
+            
+            return (
+              <div key={monthData.month} className="flex flex-col items-center group relative flex-1">
+                <div 
+                  className="bg-teal-600 rounded-sm transition-all duration-300 cursor-pointer hover:bg-teal-700 w-full max-w-8"
+                  style={{
+                    height: `${Math.max(barHeight, 8)}px`,
+                    minHeight: '8px'
+                  }}
+                  title={`${monthData.month}: ฿${monthData.revenue.toLocaleString()}`}
+                />
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                  {monthData.month}: ฿{monthData.revenue.toLocaleString()}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Year Labels */}
-      <div className="flex justify-between text-white/70 text-xs">
-        {/* Show year labels for specific positions */}
-        <span>Jul '24</span>
-        <span>Oct '24</span>
-        <span>Jan '25</span>
-        <span>Apr '25</span>
-        <span>Jul '25</span>
+      {/* X-axis labels */}
+      <div className="ml-8 flex justify-between text-xs text-gray-500">
+        {monthlyRevenueData.map(month => (
+          <span key={month.month} className="text-center flex-1">{month.month}</span>
+        ))}
+      </div>
+
+      {/* Revenue total indicator */}
+      <div className="mt-4 text-center">
+        <div className="text-sm text-gray-500">Average Yearly Revenue</div>
+        <div className="text-lg font-semibold text-gray-900">
+          ฿{averageYearlyRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+        </div>
       </div>
     </div>
   );

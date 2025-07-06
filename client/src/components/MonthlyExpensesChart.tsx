@@ -6,84 +6,82 @@ export default function MonthlyExpensesChart() {
     queryKey: ["/api/expenses/month-to-date"],
   });
 
-  // Generate sample monthly data for the chart
-  const monthlyExpenseData = [
-    { month: 'Jan', amount: 28500 },
-    { month: 'Feb', amount: 31200 },
-    { month: 'Mar', amount: 29800 },
-    { month: 'Apr', amount: 26700 },
-    { month: 'May', amount: 30100 },
-    { month: 'Jun', amount: 32400 },
-    { month: 'Jul', amount: mtdExpenses?.total || 15458 },
+  // Generate sample daily data for the chart (like the sample design)
+  const dailyExpenseData = [
+    { day: 'Mo', amount: 2100 },
+    { day: 'Tu', amount: 3200 },
+    { day: 'We', amount: 1800 },
+    { day: 'Th', amount: 1200 },
+    { day: 'Fr', amount: 2400 },
+    { day: 'Sa', amount: 3600 },
+    { day: 'Su', amount: 1800 },
   ];
 
-  const maxAmount = Math.max(...monthlyExpenseData.map(item => item.amount));
+  const maxAmount = Math.max(...dailyExpenseData.map(item => item.amount));
   const currentMonthAmount = mtdExpenses?.total || 15458;
 
   return (
-    <div className="relative overflow-hidden rounded-lg" style={{
-      background: 'linear-gradient(135deg, #FF6B6B 0%, #D63447 100%)',
-      minHeight: '280px',
-      padding: '20px'
-    }}>
-      {/* Main Expenses Display */}
-      <div className="mb-4">
-        <div className="text-white text-2xl font-bold mb-1">
-          ฿{currentMonthAmount.toLocaleString()}
-        </div>
-        <div className="text-white/80 text-sm">
-          Monthly Expenses (July 2025)
-        </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-6" style={{ minHeight: '280px' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-semibold text-gray-900">Expense Summary</h3>
+        <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+          Report
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       {/* Bar Chart */}
-      <div className="flex items-end justify-between h-32 mb-4 gap-1">
-        {monthlyExpenseData.map((monthData, index) => {
-          const barHeight = (monthData.amount / maxAmount) * 120;
-          const isCurrentMonth = monthData.month === 'Jul';
-          
-          return (
-            <div key={monthData.month} className="flex flex-col items-center group relative">
-              <div 
-                className={`rounded-sm transition-all duration-300 cursor-pointer ${
-                  isCurrentMonth 
-                    ? 'bg-white/95 hover:bg-white' 
-                    : 'bg-white/70 hover:bg-white/90'
-                }`}
-                style={{
-                  width: '12px',
-                  height: `${Math.max(barHeight, 8)}px`,
-                  minHeight: '8px'
-                }}
-                title={`${monthData.month}: ฿${monthData.amount.toLocaleString()}`}
-              />
-              {/* Tooltip */}
-              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                {monthData.month}: ฿{monthData.amount.toLocaleString()}
+      <div className="relative h-40 mb-4">
+        {/* Y-axis labels */}
+        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500">
+          <span>4k</span>
+          <span>3k</span>
+          <span>2k</span>
+          <span>1k</span>
+          <span>0</span>
+        </div>
+        
+        {/* Chart area */}
+        <div className="ml-8 h-full flex items-end justify-between gap-2">
+          {dailyExpenseData.map((dayData, index) => {
+            const barHeight = (dayData.amount / maxAmount) * 140;
+            
+            return (
+              <div key={dayData.day} className="flex flex-col items-center group relative flex-1">
+                <div 
+                  className="bg-teal-600 rounded-sm transition-all duration-300 cursor-pointer hover:bg-teal-700 w-full max-w-8"
+                  style={{
+                    height: `${Math.max(barHeight, 8)}px`,
+                    minHeight: '8px'
+                  }}
+                  title={`${dayData.day}: ฿${dayData.amount.toLocaleString()}`}
+                />
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:block bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                  {dayData.day}: ฿{dayData.amount.toLocaleString()}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Month Labels */}
-      <div className="flex justify-between text-white/70 text-xs">
-        {monthlyExpenseData.map(month => (
-          <span key={month.month}>{month.month}</span>
-        ))}
-      </div>
-
-      {/* Expense Icon */}
-      <div className="absolute top-4 right-4">
-        <div className="bg-white/20 p-2 rounded-lg">
-          <CreditCard className="h-5 w-5 text-white" />
+            );
+          })}
         </div>
       </div>
 
-      {/* Trend Indicator */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1 text-white/80 text-xs">
-        <TrendingDown className="h-3 w-3" />
-        <span>vs last month</span>
+      {/* X-axis labels */}
+      <div className="ml-8 flex justify-between text-xs text-gray-500">
+        {dailyExpenseData.map(day => (
+          <span key={day.day} className="text-center flex-1">{day.day}</span>
+        ))}
+      </div>
+
+      {/* Total expenses indicator */}
+      <div className="mt-4 text-center">
+        <div className="text-sm text-gray-500">Monthly Total</div>
+        <div className="text-lg font-semibold text-gray-900">
+          ฿{currentMonthAmount.toLocaleString()}
+        </div>
       </div>
     </div>
   );

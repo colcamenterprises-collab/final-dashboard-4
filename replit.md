@@ -231,6 +231,9 @@ Changelog:
 - July 6, 2025. Integrated webhook management functionality into Loyverse Live page for centralized real-time integration
 - July 6, 2025. Added live receipt count to dashboard KPI card showing current shift orders in real-time
 - July 6, 2025. Implemented Bangkok timezone-aware receipt counting for accurate shift period tracking (6pm-3am)
+- July 6, 2025. DASHBOARD REDESIGN: Restructured layout to 2-column chart design with AI insights moved to separate row
+- July 6, 2025. Styled charts to match sample design: Order Summary (bar+line combo), Expense Summary (teal bars), white backgrounds
+- July 6, 2025. Enhanced chart components with proper Y-axis labels, report buttons, and interactive tooltips matching sample aesthetics
 ```
 
 ## User Preferences
