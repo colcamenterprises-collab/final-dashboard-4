@@ -2380,6 +2380,29 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Webhook management endpoints
+  app.get("/api/webhooks/list", async (req, res) => {
+    try {
+      const { listWebhooks } = await import('./webhooks');
+      const webhooks = await listWebhooks();
+      res.json(webhooks || []);
+    } catch (error) {
+      console.error("Failed to list webhooks:", error);
+      res.status(500).json({ error: "Failed to list webhooks" });
+    }
+  });
+
+  app.post("/api/webhooks/register", async (req, res) => {
+    try {
+      const { registerWebhooks } = await import('./webhooks');
+      await registerWebhooks();
+      res.json({ status: "Webhooks registration initiated" });
+    } catch (error) {
+      console.error("Failed to register webhooks:", error);
+      res.status(500).json({ error: "Failed to register webhooks" });
+    }
+  });
+
   // Test endpoint for email service
   app.post('/api/test-email', async (req, res) => {
     try {

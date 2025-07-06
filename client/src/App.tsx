@@ -14,6 +14,7 @@ import POSLoyverse from "@/pages/POSLoyverse";
 import LoyverseLive from "@/pages/LoyverseLive";
 import RecipeManagement from "@/pages/RecipeManagement";
 import Analysis from "@/pages/Analysis";
+import WebhookManagement from "@/pages/WebhookManagement";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/loyverse-live" component={LoyverseLive} />
         <Route path="/recipe-management" component={RecipeManagement} />
         <Route path="/analysis" component={Analysis} />
+        <Route path="/webhooks" component={WebhookManagement} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

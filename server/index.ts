@@ -3,6 +3,7 @@ import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
+import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
 
 const app = express();
 app.use(express.json());
@@ -43,6 +44,9 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Setup webhooks for real-time Loyverse data
+  setupWebhooks(app);
 
   // Start the scheduler service for daily 4am tasks
   schedulerService.start();
