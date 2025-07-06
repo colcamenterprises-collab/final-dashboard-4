@@ -139,9 +139,9 @@ export default function Dashboard() {
 
 
 
-      {/* Two-column layout: Green Chart | Monthly Expenses Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        {/* Column 1: Green Revenue Chart */}
+      {/* Three-column layout: Revenue Chart | Expenses Chart | Payment Type Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        {/* Column 1: Revenue Chart */}
         <div className="lg:col-span-1">
           <MonthlyRevenueChart />
         </div>
@@ -149,6 +149,11 @@ export default function Dashboard() {
         {/* Column 2: Monthly Expenses Chart */}
         <div className="lg:col-span-1">
           <MonthlyExpensesChart />
+        </div>
+
+        {/* Column 3: Payment Type Pie Chart */}
+        <div className="lg:col-span-1">
+          <SalesByPaymentType />
         </div>
       </div>
 
@@ -228,8 +233,10 @@ export default function Dashboard() {
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
-        {/* Sales by Payment Type */}
-        <SalesByPaymentType />
+        {/* Additional space for future components */}
+        <div className="space-y-4">
+          {/* This space can be used for additional dashboard components */}
+        </div>
       </div>
 
       {/* Sales heatmap */}
