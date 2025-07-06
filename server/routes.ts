@@ -1667,6 +1667,17 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Get draft forms (must come before /:id route)
+  app.get('/api/daily-stock-sales/drafts', async (req, res) => {
+    try {
+      const drafts = await storage.getDraftForms();
+      res.json(drafts);
+    } catch (error) {
+      console.error('Error fetching draft forms:', error);
+      res.status(500).json({ error: 'Failed to fetch draft forms' });
+    }
+  });
+
   app.get('/api/daily-stock-sales/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1729,16 +1740,7 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
   
-  // Get draft forms
-  app.get('/api/daily-stock-sales/drafts', async (req, res) => {
-    try {
-      const drafts = await storage.getDraftForms();
-      res.json(drafts);
-    } catch (error) {
-      console.error('Error fetching draft forms:', error);
-      res.status(500).json({ error: 'Failed to fetch draft forms' });
-    }
-  });
+
   
   // Update an existing form (for converting drafts to final)
   app.put('/api/daily-stock-sales/:id', async (req, res) => {

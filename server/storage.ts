@@ -780,9 +780,26 @@ export class MemStorage implements IStorage {
     const { dailyStockSales } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
     
+    // Clean the data for database update
+    const cleanData = { ...data };
+    delete cleanData.id;
+    delete cleanData.createdAt;
+    delete cleanData.updatedAt;
+    
+    // Handle date fields properly
+    if (cleanData.shiftDate) {
+      if (typeof cleanData.shiftDate === 'string') {
+        cleanData.shiftDate = new Date(cleanData.shiftDate);
+      } else if (cleanData.shiftDate instanceof Date) {
+        // Keep as is
+      } else {
+        delete cleanData.shiftDate; // Remove invalid date
+      }
+    }
+    
     const [result] = await db.update(dailyStockSales)
       .set({
-        ...data,
+        ...cleanData,
         updatedAt: new Date()
       })
       .where(eq(dailyStockSales.id, id))
