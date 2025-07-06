@@ -47,13 +47,23 @@ const COMMON_UNITS = [
   'grams',
   'kilograms',
   'pieces',
+  'each',
+  'units',
   'liters',
   'milliliters',
+  'bottles',
+  'cans',
+  'packets',
+  'bags',
+  'boxes',
+  'rolls',
+  'sheets',
   'cups',
   'tablespoons',
   'teaspoons',
   'ounces',
-  'pounds'
+  'pounds',
+  'slices'
 ];
 
 export default function IngredientManagement() {
@@ -180,9 +190,23 @@ export default function IngredientManagement() {
     });
   };
 
-  const handleDelete = (ingredient: Ingredient) => {
-    if (window.confirm(`Are you sure you want to delete "${ingredient.name}"?`)) {
-      deleteIngredientMutation.mutate(ingredient.id);
+  const handleDelete = async (ingredient: Ingredient) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${ingredient.name}"?\n\nThis action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      try {
+        await deleteIngredientMutation.mutateAsync(ingredient.id);
+      } catch (error: any) {
+        console.error('Delete error:', error);
+        const errorMessage = error?.message || 'An unknown error occurred';
+        toast({ 
+          title: "Failed to delete ingredient", 
+          description: errorMessage,
+          variant: "destructive" 
+        });
+      }
     }
   };
 
@@ -417,6 +441,7 @@ export default function IngredientManagement() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(ingredient)}
+                    disabled={deleteIngredientMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
