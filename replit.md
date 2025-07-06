@@ -219,6 +219,8 @@ Changelog:
 - July 6, 2025. Corrected API route ordering for draft functionality and improved date handling in form updates
 - July 6, 2025. Verified complete end-to-end workflow: form submission, search, shopping list generation, draft management, and data persistence
 - July 6, 2025. Comprehensive testing confirmed all functionality works: 11 forms submitted, 114 shopping items generated, searchable by name/date
+- July 6, 2025. CRITICAL DATA ISSUE IDENTIFIED: Shift 540 missing 28 receipts (4 found vs 32 expected) - ฿9,428 in missing receipt data
+- July 6, 2025. Fixed mobile responsiveness for Daily Stock & Sales form and Recipe Management page - improved grid layouts, dialog sizing, and touch-friendly interface
 ```
 
 ## User Preferences
