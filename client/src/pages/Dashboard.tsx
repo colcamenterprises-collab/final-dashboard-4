@@ -239,21 +239,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Sales heatmap */}
-      <div className="mb-6 lg:mb-8">
+      {/* Stock Insights - Three Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        {/* Bakery Stock Insights */}
         <Card className="restaurant-card">
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                <Bot className="inline mr-2 text-primary" />
-                AI Insights
-              </CardTitle>
-              <Badge variant="secondary" className="restaurant-primary text-xs">Live</Badge>
-            </div>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Bakery Stock Insights
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {aiInsights?.slice(0, 3).map((insight) => (
+              {aiInsights?.slice(0, 2).map((insight) => (
                 <div 
                   key={insight.id}
                   className={`p-4 rounded-lg border ${
@@ -262,40 +259,131 @@ export default function Dashboard() {
                     'bg-blue-50 border-blue-200'
                   }`}
                 >
-                  <div className="flex items-start space-x-3">
-                    {insight.severity === 'high' ? (
-                      <AlertTriangle className="text-red-600 mt-1" />
-                    ) : insight.severity === 'medium' ? (
-                      <AlertTriangle className="text-yellow-600 mt-1" />
-                    ) : (
-                      <TrendingUp className="text-blue-600 mt-1" />
-                    )}
-                    <div className="flex-1">
-                      <p className={`text-sm font-medium ${
-                        insight.severity === 'high' ? 'text-red-800' :
-                        insight.severity === 'medium' ? 'text-yellow-800' :
-                        'text-blue-800'
-                      }`}>
-                        {insight.title}
-                      </p>
-                      <p className={`text-sm ${
-                        insight.severity === 'high' ? 'text-red-700' :
-                        insight.severity === 'medium' ? 'text-yellow-700' :
-                        'text-blue-700'
-                      }`}>
-                        {insight.description}
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => handleResolveInsight(insight.id)}
-                        disabled={resolveInsightMutation.isPending}
-                      >
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                        Resolve
-                      </Button>
-                    </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      insight.severity === 'high' ? 'text-red-800' :
+                      insight.severity === 'medium' ? 'text-yellow-800' :
+                      'text-blue-800'
+                    }`}>
+                      {insight.title}
+                    </p>
+                    <p className={`text-sm ${
+                      insight.severity === 'high' ? 'text-red-700' :
+                      insight.severity === 'medium' ? 'text-yellow-700' :
+                      'text-blue-700'
+                    }`}>
+                      {insight.description}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleResolveInsight(insight.id)}
+                      disabled={resolveInsightMutation.isPending}
+                    >
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      Resolve
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Drink Stock Insights */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Drink Stock Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {aiInsights?.slice(0, 2).map((insight) => (
+                <div 
+                  key={`drink-${insight.id}`}
+                  className={`p-4 rounded-lg border ${
+                    insight.severity === 'high' ? 'bg-red-50 border-red-200' :
+                    insight.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      insight.severity === 'high' ? 'text-red-800' :
+                      insight.severity === 'medium' ? 'text-yellow-800' :
+                      'text-blue-800'
+                    }`}>
+                      {insight.title}
+                    </p>
+                    <p className={`text-sm ${
+                      insight.severity === 'high' ? 'text-red-700' :
+                      insight.severity === 'medium' ? 'text-yellow-700' :
+                      'text-blue-700'
+                    }`}>
+                      {insight.description}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleResolveInsight(insight.id)}
+                      disabled={resolveInsightMutation.isPending}
+                    >
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      Resolve
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Meat Stock Insights */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Meat Stock Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {aiInsights?.slice(0, 2).map((insight) => (
+                <div 
+                  key={`meat-${insight.id}`}
+                  className={`p-4 rounded-lg border ${
+                    insight.severity === 'high' ? 'bg-red-50 border-red-200' :
+                    insight.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      insight.severity === 'high' ? 'text-red-800' :
+                      insight.severity === 'medium' ? 'text-yellow-800' :
+                      'text-blue-800'
+                    }`}>
+                      {insight.title}
+                    </p>
+                    <p className={`text-sm ${
+                      insight.severity === 'high' ? 'text-red-700' :
+                      insight.severity === 'medium' ? 'text-yellow-700' :
+                      'text-blue-700'
+                    }`}>
+                      {insight.description}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleResolveInsight(insight.id)}
+                      disabled={resolveInsightMutation.isPending}
+                    >
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      Resolve
+                    </Button>
                   </div>
                 </div>
               ))}
