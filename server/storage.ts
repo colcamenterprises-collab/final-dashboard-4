@@ -448,27 +448,47 @@ export class MemStorage implements IStorage {
   }
 
   async getShoppingList(): Promise<ShoppingList[]> {
-    return Array.from(this.shoppingList.values());
+    // Use database for shopping list
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { desc } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(shoppingList)
+      .orderBy(desc(shoppingList.id));
   }
 
   async createShoppingListItem(item: InsertShoppingList): Promise<ShoppingList> {
-    const id = this.currentId++;
-    const shoppingListItem: ShoppingList = { ...item, id };
-    this.shoppingList.set(id, shoppingListItem);
-    return shoppingListItem;
+    // Use database for shopping list
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    
+    const [result] = await db.insert(shoppingList).values(item).returning();
+    return result;
   }
 
   async updateShoppingListItem(id: number, updates: Partial<ShoppingList>): Promise<ShoppingList> {
-    const item = this.shoppingList.get(id);
-    if (!item) throw new Error("Shopping list item not found");
+    // Use database for shopping list
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
     
-    const updated = { ...item, ...updates };
-    this.shoppingList.set(id, updated);
-    return updated;
+    const [result] = await db.update(shoppingList)
+      .set(updates)
+      .where(eq(shoppingList.id, id))
+      .returning();
+      
+    if (!result) throw new Error("Shopping list item not found");
+    return result;
   }
 
   async deleteShoppingListItem(id: number): Promise<void> {
-    this.shoppingList.delete(id);
+    // Use database for shopping list
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    await db.delete(shoppingList).where(eq(shoppingList.id, id));
   }
 
   async getExpenses(): Promise<Expense[]> {
@@ -755,20 +775,24 @@ export class MemStorage implements IStorage {
   }
   
   async updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales> {
-    const existingForm = this.dailyStockSales.get(id);
-    if (!existingForm) {
+    // Use database for Daily Stock Sales
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db.update(dailyStockSales)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(dailyStockSales.id, id))
+      .returning();
+      
+    if (!result) {
       throw new Error("Form not found");
     }
     
-    const updatedForm: DailyStockSales = {
-      ...existingForm,
-      ...data,
-      id,
-      updatedAt: new Date()
-    };
-    
-    this.dailyStockSales.set(id, updatedForm);
-    return updatedForm;
+    return result;
   }
 
   private seedDailyStockSalesData() {
