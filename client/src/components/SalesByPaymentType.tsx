@@ -72,75 +72,74 @@ export default function SalesByPaymentType() {
 
   if (isLoading) {
     return (
-      <Card className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-gray-900">
-              Sales by Payment Type
-            </CardTitle>
-            <span className="text-xs text-gray-400">Report →</span>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="h-48 flex items-center justify-center">
-            <div className="text-sm text-gray-500">Loading...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-lg border border-gray-200 p-6" style={{ minHeight: '280px' }}>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Sales by Payment Type</h3>
+          <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            Report
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="h-48 flex items-center justify-center">
+          <div className="text-sm text-gray-500">Loading...</div>
+        </div>
+      </div>
     );
   }
 
   if (!paymentData || paymentData.length === 0) {
     return (
-      <Card className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-gray-900">
-              Sales by Payment Type
-            </CardTitle>
-            <span className="text-xs text-gray-400">Report →</span>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="h-48 flex items-center justify-center">
-            <div className="text-sm text-gray-500">No data available</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-lg border border-gray-200 p-6" style={{ minHeight: '280px' }}>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Sales by Payment Type</h3>
+          <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            Report
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="h-48 flex items-center justify-center">
+          <div className="text-sm text-gray-500">No data available</div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-white border border-gray-200 rounded-lg shadow-sm">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-gray-900">
-            Sales by Payment Type
-          </CardTitle>
-          <span className="text-xs text-gray-400">Report →</span>
+    <div className="bg-white rounded-lg border border-gray-200 p-6" style={{ minHeight: '280px' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-semibold text-gray-900">Sales by Payment Type</h3>
+        <button className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+          Report
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex flex-col items-center">
+        {/* Donut Chart */}
+        <div className="mb-6">
+          <DonutChart data={paymentData} />
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-col items-center">
-          {/* Donut Chart */}
-          <div className="mb-6">
-            <DonutChart data={paymentData} />
-          </div>
-          
-          {/* Legend */}
-          <div className="flex flex-wrap justify-center gap-4">
-            {paymentData.map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: item.color }}
-                />
+        
+        {/* Legend */}
+        <div className="flex flex-wrap justify-center gap-4">
+          {paymentData.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: item.color }}
+              />
                 <span className="text-sm text-gray-700 font-medium">{item.name}</span>
               </div>
             ))}
-          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
