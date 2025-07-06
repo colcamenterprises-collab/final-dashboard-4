@@ -242,6 +242,8 @@ Changelog:
 - July 6, 2025. INGREDIENT CATEGORIZATION: Updated all ingredient categories to restaurant-specific structure: Fresh Food, Frozen Food, Shelf Stock, Drinks, Kitchen Supplies, Packaging
 - July 6, 2025. Updated ingredient cost structure with 34 authentic price updates from supplier CSV data (22 updates, 12 new ingredients)
 - July 6, 2025. Implemented update-by-name API endpoint for bulk ingredient cost updates with proper category management
+- July 6, 2025. RECIPE RESET: Deleted all recipes and recipe ingredients to resolve persistent "Unknown" ingredient cache issues
+- July 6, 2025. Clean slate for recipe management - all 14 recipes removed, ready for fresh recipe creation with proper ingredient categorization
 ```
 
 ## User Preferences
