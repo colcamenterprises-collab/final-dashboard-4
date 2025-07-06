@@ -37,7 +37,7 @@ export default function MonthlyRevenueChart({
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  const { data: currentMonthRevenue } = useQuery<{ total: number }>({
+  const { data: apiMonthRevenue } = useQuery<{ total: number }>({
     queryKey: ["/api/loyverse/monthly-revenue", currentYear, currentMonth],
     queryFn: () => fetch(`/api/loyverse/monthly-revenue?year=${currentYear}&month=${currentMonth}`).then(res => res.json()),
     enabled: currentYear >= 2025 && currentMonth >= 7 // Only fetch from July 2025 onwards
@@ -47,21 +47,20 @@ export default function MonthlyRevenueChart({
   const allMonthsData = [...historicalData];
   
   // Add current month if we have API data
-  if (currentMonthRevenue && currentYear >= 2025 && currentMonth >= 7) {
+  if (apiMonthRevenue && currentYear >= 2025 && currentMonth >= 7) {
     const existingIndex = allMonthsData.findIndex(item => 
       item.year === currentYear && item.month === currentMonth
     );
     
     if (existingIndex >= 0) {
-      allMonthsData[existingIndex] = { year: currentYear, month: currentMonth, revenue: currentMonthRevenue.total };
+      allMonthsData[existingIndex] = { year: currentYear, month: currentMonth, revenue: apiMonthRevenue.total };
     } else {
-      allMonthsData.push({ year: currentYear, month: currentMonth, revenue: currentMonthRevenue.total });
+      allMonthsData.push({ year: currentYear, month: currentMonth, revenue: apiMonthRevenue.total });
     }
   }
 
   // Take last 24 months
   const last24Months = allMonthsData.slice(-24);
-  const maxRevenue = Math.max(...last24Months.map(item => item.revenue));
   
   // Calculate average yearly revenue
   const totalRevenue = last24Months.reduce((sum, item) => sum + item.revenue, 0);
