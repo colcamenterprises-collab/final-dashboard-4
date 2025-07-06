@@ -112,10 +112,17 @@ export default function MonthlyRevenueChart({
             return (
               <div key={monthData.month} className="flex flex-col items-center group relative flex-1">
                 <div 
-                  className="bg-teal-600 rounded-sm transition-all duration-300 cursor-pointer hover:bg-teal-700 w-full max-w-8"
+                  className="rounded-sm transition-all duration-300 cursor-pointer w-full max-w-8"
                   style={{
                     height: `${Math.max(barHeight, 8)}px`,
-                    minHeight: '8px'
+                    minHeight: '8px',
+                    backgroundColor: 'hsl(45, 93%, 52%)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'hsl(45, 85%, 47%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'hsl(45, 93%, 52%)';
                   }}
                   title={`${monthData.month}: ฿${monthData.revenue.toLocaleString()}`}
                 />
