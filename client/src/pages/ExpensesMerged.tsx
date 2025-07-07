@@ -120,13 +120,26 @@ function ExpensesMerged() {
 
   // Mutations
   const addExpenseMutation = useMutation({
-    mutationFn: (data: ExpenseFormData) => {
+    mutationFn: async (data: ExpenseFormData) => {
       console.log("Frontend mutation data:", data);
-      // Keep date as string - server will handle conversion
-      return apiRequest("/api/expenses", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      console.log("Making request to /api/expenses with method POST");
+      
+      try {
+        const result = await apiRequest("/api/expenses", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+        console.log("API request successful:", result);
+        return result;
+      } catch (error) {
+        console.error("API request failed:", error);
+        console.log("Error details:", {
+          message: error.message,
+          stack: error.stack,
+          type: typeof error
+        });
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });

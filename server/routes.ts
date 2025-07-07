@@ -563,7 +563,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", async (req, res) => {
     try {
+      console.log("🚀 POST /api/expenses endpoint hit");
       console.log("Raw request body:", req.body);
+      console.log("Request headers:", req.headers);
       const { description, date, amount, category, paymentMethod, supplier, items, notes } = req.body;
       
       // Validate required fields
