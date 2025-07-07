@@ -4,7 +4,7 @@ const readline = require('readline');
 // Your actual credentials
 const CLIENT_ID = '780286917028-oob46sbv8tpta9jcd5dr7i7gaj1f6qgl.apps.googleusercontent.com';
 const CLIENT_SECRET = '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';
-const REDIRECT_URI = 'http://localhost:3000/oauth/callback';
+const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
 
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,

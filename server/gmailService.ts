@@ -28,7 +28,7 @@ class GmailService {
       const oauth2Client = new google.auth.OAuth2(
         clientId,
         clientSecret,
-        'http://localhost:3000/oauth/callback'
+        'https://developers.google.com/oauthplayground'
       );
 
       oauth2Client.setCredentials({
