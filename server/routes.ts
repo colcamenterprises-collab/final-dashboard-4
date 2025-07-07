@@ -1875,6 +1875,12 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
 
   app.post('/api/daily-stock-sales', async (req, res) => {
     try {
+      console.log('📝 Received daily stock sales form submission:', {
+        isDraft: req.body.isDraft,
+        completedBy: req.body.completedBy,
+        receiptPhotosCount: req.body.receiptPhotos?.length || 0
+      });
+      
       const formData = req.body;
       
       // Handle photo receipts and draft status
@@ -1884,14 +1890,18 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
         isDraft: formData.isDraft || false
       };
       
+      console.log('💾 Saving form data to database...');
       const dailyStockSales = await storage.createDailyStockSales(dataToSave);
+      console.log('✅ Form saved successfully with ID:', dailyStockSales.id);
       
       // Only generate shopping list and send email if this is not a draft
       if (!formData.isDraft) {
+        console.log('📋 Generating shopping list from stock form...');
         await generateShoppingListFromStockForm(formData);
         
         // Send management summary email
         try {
+          console.log('📧 Sending management summary email...');
           const { emailService } = await import('./emailService');
           const shoppingList = await storage.getShoppingList();
           
@@ -1902,17 +1912,17 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
             submissionTime: new Date()
           });
           
-          console.log('Management summary email sent successfully');
+          console.log('✅ Management summary email sent successfully');
         } catch (emailError) {
-          console.error('Failed to send management summary email:', emailError);
+          console.error('❌ Failed to send management summary email:', emailError);
           // Don't fail the entire request if email fails
         }
       }
       
       res.json(dailyStockSales);
     } catch (error) {
-      console.error('Error creating daily stock sales:', error);
-      res.status(500).json({ error: 'Failed to create daily stock sales' });
+      console.error('❌ Error creating daily stock sales:', error);
+      res.status(500).json({ error: 'Failed to create daily stock sales', details: error.message });
     }
   });
   

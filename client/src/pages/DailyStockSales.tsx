@@ -205,8 +205,13 @@ export default function DailyStockSales() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', { ...data, receiptPhotos }),
-    onSuccess: () => {
+    mutationFn: (data: FormData) => {
+      console.log('📝 Submitting form with data:', data);
+      console.log('📷 Receipt photos:', receiptPhotos);
+      return apiRequest('POST', '/api/daily-stock-sales', { ...data, receiptPhotos });
+    },
+    onSuccess: (response) => {
+      console.log('✅ Form submitted successfully:', response);
       toast({
         title: "Form Submitted Successfully",
         description: "Daily stock and sales data has been saved and shopping list generated."
@@ -214,12 +219,14 @@ export default function DailyStockSales() {
       queryClient.invalidateQueries({ queryKey: ['/api/shopping-list'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
       form.reset();
+      setReceiptPhotos([]);
+      setIsDraft(false);
     },
     onError: (error) => {
-      console.error('Error submitting form:', error);
+      console.error('❌ Error submitting form:', error);
       toast({
         title: "Error", 
-        description: "Failed to submit form. Please try again.",
+        description: `Failed to submit form: ${error.message || 'Please try again.'}`,
         variant: "destructive"
       });
     }
