@@ -3392,43 +3392,59 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       const today = new Date();
       const fiveDaysAgo = new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000);
       
-      // Get sales data from loyverse receipts grouped by date
+      // Format dates for SQL query
+      const startDate = fiveDaysAgo.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
+      
+      console.log(`Fetching sales vs expenses data from ${startDate} to ${endDate}`);
+      
+      // Get sales data from loyverse receipts grouped by date (using receipt_date instead of created_at)
       const salesQuery = `
         SELECT 
-          DATE(created_at) as date,
-          SUM(total_amount::numeric) as daily_sales
+          DATE(receipt_date) as date,
+          COALESCE(SUM(total_amount::numeric), 0) as daily_sales
         FROM loyverse_receipts 
-        WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2
-        GROUP BY DATE(created_at)
-        ORDER BY DATE(created_at)
+        WHERE DATE(receipt_date) >= $1 AND DATE(receipt_date) <= $2
+        GROUP BY DATE(receipt_date)
+        ORDER BY DATE(receipt_date)
       `;
       
       // Get expenses data grouped by date
       const expensesQuery = `
         SELECT 
           DATE(date) as date,
-          SUM(amount::numeric) as daily_expenses
+          COALESCE(SUM(amount::numeric), 0) as daily_expenses
         FROM expenses 
         WHERE DATE(date) >= $1 AND DATE(date) <= $2
         GROUP BY DATE(date)
         ORDER BY DATE(date)
       `;
       
+      console.log('Executing sales query:', salesQuery);
+      console.log('Executing expenses query:', expensesQuery);
+      
       const [salesResult, expensesResult] = await Promise.all([
-        pool.query(salesQuery, [fiveDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]]),
-        pool.query(expensesQuery, [fiveDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]])
+        pool.query(salesQuery, [startDate, endDate]),
+        pool.query(expensesQuery, [startDate, endDate])
       ]);
+      
+      console.log(`Sales results: ${salesResult.rows.length} rows`);
+      console.log(`Expenses results: ${expensesResult.rows.length} rows`);
       
       // Create a map of sales and expenses by date
       const salesMap = new Map();
       const expensesMap = new Map();
       
       salesResult.rows.forEach(row => {
-        salesMap.set(row.date, parseFloat(row.daily_sales || 0));
+        const dateKey = row.date.toISOString().split('T')[0];
+        salesMap.set(dateKey, parseFloat(row.daily_sales || 0));
+        console.log(`Sales for ${dateKey}: ${row.daily_sales}`);
       });
       
       expensesResult.rows.forEach(row => {
-        expensesMap.set(row.date, parseFloat(row.daily_expenses || 0));
+        const dateKey = row.date.toISOString().split('T')[0];
+        expensesMap.set(dateKey, parseFloat(row.daily_expenses || 0));
+        console.log(`Expenses for ${dateKey}: ${row.daily_expenses}`);
       });
       
       // Generate data for last 5 days
@@ -3438,18 +3454,24 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
         const dateStr = date.toISOString().split('T')[0];
         const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         
+        const salesAmount = salesMap.get(dateStr) || 0;
+        const expensesAmount = expensesMap.get(dateStr) || 0;
+        
         chartData.push({
           date: dateStr,
           dayLabel,
-          sales: salesMap.get(dateStr) || 0,
-          expenses: expensesMap.get(dateStr) || 0
+          sales: salesAmount,
+          expenses: expensesAmount
         });
+        
+        console.log(`Chart data for ${dateStr}: Sales ${salesAmount}, Expenses ${expensesAmount}`);
       }
       
+      console.log('Final chart data:', JSON.stringify(chartData, null, 2));
       res.json(chartData);
     } catch (error) {
       console.error("Error fetching sales vs expenses data:", error);
-      res.status(500).json({ error: "Failed to fetch sales vs expenses data" });
+      res.status(500).json({ error: "Failed to fetch sales vs expenses data", details: error.message });
     }
   });
 
