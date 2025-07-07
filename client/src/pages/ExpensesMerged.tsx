@@ -35,7 +35,10 @@ interface BankStatement {
 // Create a fresh form schema without the problematic month/year fields
 const expenseFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
-  amount: z.string().min(1, "Amount is required"),
+  amount: z.string().min(1, "Amount is required").refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, "Amount must be a positive number"),
   category: z.string().min(1, "Category is required"),
   date: z.string().min(1, "Date is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
@@ -586,7 +589,7 @@ function ExpensesMerged() {
                         <FormItem>
                           <FormLabel>Amount</FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -946,6 +949,8 @@ function ExpensesMerged() {
                               <TableCell>
                                 <Input
                                   type="number"
+                                  min="0"
+                                  step="0.01"
                                   value={editForm.amount || expense.amount}
                                   onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
                                   className="w-full text-right"

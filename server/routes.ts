@@ -573,7 +573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expenseData = {
         description,
         date: expenseDate,
-        amount: String(amount),
+        amount: String(Math.abs(Number(amount))), // Ensure positive amount
         category,
         paymentMethod,
         supplier: supplier || null,
@@ -641,7 +641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.update(expenses)
         .set({ 
           description,
-          amount: amount.toString(),
+          amount: Math.abs(Number(amount)).toString(), // Ensure positive amount
           category,
           date: expenseDate,
           paymentMethod,
