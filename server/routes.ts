@@ -563,10 +563,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", async (req, res) => {
     try {
+      console.log("Raw request body:", req.body);
       const { description, date, amount, category, paymentMethod, supplier, items, notes } = req.body;
+      
+      // Validate required fields
+      if (!description || !date || !amount || !category || !paymentMethod) {
+        return res.status(400).json({ 
+          error: "Missing required fields",
+          details: {
+            description: !description ? "Description is required" : null,
+            date: !date ? "Date is required" : null,
+            amount: !amount ? "Amount is required" : null,
+            category: !category ? "Category is required" : null,
+            paymentMethod: !paymentMethod ? "Payment method is required" : null
+          }
+        });
+      }
       
       // Calculate month and year from date
       const expenseDate = new Date(date);
+      if (isNaN(expenseDate.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
       const month = expenseDate.getMonth() + 1;
       const year = expenseDate.getFullYear();
       
@@ -589,7 +608,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(expense);
     } catch (error) {
       console.error("Expense creation error:", error);
-      res.status(400).json({ error: "Invalid expense data" });
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: "Validation error",
+          details: error.errors 
+        });
+      }
+      res.status(400).json({ error: "Failed to create expense" });
     }
   });
 
