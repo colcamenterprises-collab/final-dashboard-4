@@ -34,14 +34,14 @@ class EmailService {
       return null;
     }
 
-    // Gmail SMTP configuration - try both TLS ports
+    // Gmail SMTP configuration - try TLS port 587
     const config: EmailConfig = {
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // true for 465, false for other ports
+      port: 587,
+      secure: false, // true for 465, false for other ports
       auth: {
         user: email,
-        pass: password,
+        pass: password.replace(/['"]/g, ''), // Remove quotes from password
       }
     };
 
