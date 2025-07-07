@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { DailyStockSales, ShoppingList } from '@shared/schema';
+import { gmailService } from './gmailService';
 
 interface EmailConfig {
   host: string;
@@ -301,9 +302,9 @@ class EmailService {
     const gmailClientId = process.env.GOOGLE_CLIENT_ID;
     if (gmailClientId) {
       try {
-        const { gmailService } = await import('./gmailService');
+        const { sendManagementSummary: gmailSendFunction } = await import('./gmailService');
         console.log('📧 Using Gmail API for email delivery');
-        return await gmailService.sendManagementSummary(data);
+        return await gmailSendFunction(data);
       } catch (error) {
         console.error('❌ Gmail API failed, falling back to SendGrid:', error);
       }
