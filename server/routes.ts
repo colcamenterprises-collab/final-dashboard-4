@@ -624,6 +624,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/expenses/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      
+      const { description, amount, category, date, paymentMethod, supplier, items, notes } = req.body;
+      
+      // Parse the date and extract month/year
+      const expenseDate = new Date(date);
+      const month = expenseDate.getMonth() + 1; // getMonth() returns 0-11
+      const year = expenseDate.getFullYear();
+      
+      const result = await db.update(expenses)
+        .set({ 
+          description,
+          amount: amount.toString(),
+          category,
+          date: expenseDate,
+          paymentMethod,
+          supplier,
+          items,
+          notes,
+          month,
+          year
+        })
+        .where(eq(expenses.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json(result[0]);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      res.status(400).json({ error: 'Failed to update expense' });
+    }
+  });
+
+  app.delete('/api/expenses/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      
+      const result = await db.delete(expenses)
+        .where(eq(expenses.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json({ success: true, deletedExpense: result[0] });
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      res.status(400).json({ error: 'Failed to delete expense' });
+    }
+  });
+
   // Expense Suppliers endpoints
   app.get("/api/expense-suppliers", async (req, res) => {
     try {

@@ -48,6 +48,8 @@ type ExpenseFormData = z.infer<typeof expenseFormSchema>;
 
 function ExpensesMerged() {
   const { toast } = useToast();
+  const [editingExpense, setEditingExpense] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -183,6 +185,57 @@ function ExpensesMerged() {
       toast({
         title: "Bank statement uploaded",
         description: "The statement is being analyzed with AI.",
+      });
+    },
+  });
+
+  const updateExpenseMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Expense> }) => {
+      return apiRequest(`/api/expenses/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses/month-to-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses/by-category"] });
+      setEditingExpense(null);
+      setEditForm({});
+      toast({
+        title: "Success",
+        description: "Expense has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update expense. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteExpenseMutation = useMutation({
+    mutationFn: (id: number) => {
+      return apiRequest(`/api/expenses/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses/month-to-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses/by-category"] });
+      toast({
+        title: "Success",
+        description: "Expense has been deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete expense. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -810,37 +863,183 @@ function ExpensesMerged() {
                       <TableHead>Supplier</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredExpenses.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No expenses found. Start by adding your first expense.
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredExpenses.map((expense: any) => (
                         <TableRow key={expense.id}>
-                          <TableCell>{format(new Date(expense.date), "MMM dd, yyyy")}</TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{expense.description}</p>
-                              {expense.items && (
-                                <p className="text-sm text-muted-foreground">{expense.items}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{expense.category}</Badge>
-                          </TableCell>
-                          <TableCell>{expense.supplier || "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{expense.paymentMethod}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            ฿{parseFloat(expense.amount).toLocaleString()}
-                          </TableCell>
+                          {editingExpense === expense.id ? (
+                            <>
+                              <TableCell>
+                                <Input
+                                  type="date"
+                                  value={editForm.date ? format(new Date(editForm.date), 'yyyy-MM-dd') : format(new Date(expense.date), 'yyyy-MM-dd')}
+                                  onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={editForm.description || expense.description}
+                                  onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={editForm.category || expense.category}
+                                  onValueChange={(value) => setEditForm({...editForm, category: value})}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {categories.map((category: any) => (
+                                      <SelectItem key={category.id} value={category.name}>
+                                        {category.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={editForm.supplier || expense.supplier || ""}
+                                  onValueChange={(value) => setEditForm({...editForm, supplier: value})}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {suppliers.map((supplier: any) => (
+                                      <SelectItem key={supplier.id} value={supplier.name}>
+                                        {supplier.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={editForm.paymentMethod || expense.paymentMethod}
+                                  onValueChange={(value) => setEditForm({...editForm, paymentMethod: value})}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Card">Card</SelectItem>
+                                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                    <SelectItem value="QR Code">QR Code</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={editForm.amount || expense.amount}
+                                  onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
+                                  className="w-full text-right"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      updateExpenseMutation.mutate({
+                                        id: expense.id,
+                                        data: {
+                                          ...editForm,
+                                          date: editForm.date || expense.date,
+                                          description: editForm.description || expense.description,
+                                          category: editForm.category || expense.category,
+                                          supplier: editForm.supplier || expense.supplier,
+                                          paymentMethod: editForm.paymentMethod || expense.paymentMethod,
+                                          amount: editForm.amount || expense.amount
+                                        }
+                                      });
+                                    }}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingExpense(null);
+                                      setEditForm({});
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell>{format(new Date(expense.date), "MMM dd, yyyy")}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{expense.description}</p>
+                                  {expense.items && (
+                                    <p className="text-sm text-muted-foreground">{expense.items}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{expense.category}</Badge>
+                              </TableCell>
+                              <TableCell>{expense.supplier || "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{expense.paymentMethod}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                ฿{parseFloat(expense.amount).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingExpense(expense.id);
+                                      setEditForm({
+                                        date: expense.date,
+                                        description: expense.description,
+                                        category: expense.category,
+                                        supplier: expense.supplier,
+                                        paymentMethod: expense.paymentMethod,
+                                        amount: expense.amount
+                                      });
+                                    }}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      if (confirm('Are you sure you want to delete this expense?')) {
+                                        deleteExpenseMutation.mutate(expense.id);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                       ))
                     )}
@@ -884,6 +1083,39 @@ function ExpensesMerged() {
                           {expense.supplier && (
                             <span className="text-muted-foreground">• {expense.supplier}</span>
                           )}
+                        </div>
+                        
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingExpense(expense.id);
+                              setEditForm({
+                                date: expense.date,
+                                description: expense.description,
+                                category: expense.category,
+                                supplier: expense.supplier,
+                                paymentMethod: expense.paymentMethod,
+                                amount: expense.amount
+                              });
+                            }}
+                            className="flex-1"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this expense?')) {
+                                deleteExpenseMutation.mutate(expense.id);
+                              }
+                            }}
+                            className="flex-1"
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </Card>
