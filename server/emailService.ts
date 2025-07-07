@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import type { DailyStockSales, ShoppingList } from '@shared/schema';
 
 interface EmailConfig {
