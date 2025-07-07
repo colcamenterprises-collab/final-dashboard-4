@@ -27,7 +27,9 @@ class EmailService {
     const email = process.env.GOOGLE_EMAIL || process.env.GMAIL_USER || 'smashbrothersburgersth@gmail.com';
     const password = process.env.GOOGLE_PASSWORD || process.env.GMAIL_APP_PASSWORD;
     
-    console.log('Email config - User:', email ? 'Set' : 'Missing', 'Password:', password ? 'Set' : 'Missing');
+    console.log('🔧 Email config - User:', email, 'Password length:', password?.length);
+    const cleanPassword = password?.replace(/['"]/g, '').trim();
+    console.log('🔧 Clean password:', cleanPassword, 'Length:', cleanPassword?.length);
     
     if (!email || !password) {
       console.error('Gmail credentials are missing');
@@ -41,7 +43,7 @@ class EmailService {
       secure: false, // true for 465, false for other ports
       auth: {
         user: email,
-        pass: password.replace(/['"]/g, '').trim(), // Remove quotes and whitespace from password
+        pass: cleanPassword,
       },
       // Additional Gmail-specific settings
       tls: {
