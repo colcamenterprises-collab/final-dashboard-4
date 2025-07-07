@@ -34,7 +34,8 @@ import {
   Refrigerator,
   Coffee,
   ClipboardList,
-  TrendingUp
+  TrendingUp,
+  Snowflake
 } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
@@ -96,11 +97,14 @@ const PACKAGING_ITEMS = [
   'Plastic Carry Bags', 'Packaging Labels'
 ];
 
+// Wage categories for dropdown
+const WAGE_CATEGORIES = ['Wages', 'Over Time', 'Cleaning', 'Bonus'];
+
 // Define line item types
 const wageEntrySchema = z.object({
   name: z.string(),
   amount: z.number().min(0),
-  notes: z.string().optional()
+  notes: z.enum(['Wages', 'Over Time', 'Cleaning', 'Bonus']).default('Wages')
 });
 
 const shoppingEntrySchema = z.object({
@@ -155,6 +159,22 @@ export default function DailyStockSales() {
   
   // Draft functionality state
   const [isDraft, setIsDraft] = useState(false);
+  
+  // Item management state
+  const [showItemManager, setShowItemManager] = useState(false);
+  const [customItems, setCustomItems] = useState<{
+    freshFood: string[];
+    frozenFood: string[];
+    drinkItems: string[];
+    kitchenItems: string[];
+    packagingItems: string[];
+  }>({
+    freshFood: [...FRESH_FOOD_ITEMS],
+    frozenFood: [...FROZEN_FOOD_ITEMS],
+    drinkItems: [...DRINK_ITEMS],
+    kitchenItems: [...KITCHEN_ITEMS],
+    packagingItems: [...PACKAGING_ITEMS]
+  });
 
   // Search query for completed forms
   const { data: completedForms = [], isLoading: searchLoading } = useQuery({
@@ -317,31 +337,146 @@ export default function DailyStockSales() {
     console.log("Shopping entries:", data.shoppingEntries);
     console.log("Receipt photos:", receiptPhotos);
     
-    // Check if shopping entries exist but no receipt photos uploaded
+    // Comprehensive validation checks
+    const validationErrors: string[] = [];
+    
+    // Check required fields
+    if (!data.completedBy) validationErrors.push("Staff member name is required");
+    if (!data.shiftType) validationErrors.push("Shift type must be selected");
+    if (!data.startingCash || parseFloat(data.startingCash as string) < 0) validationErrors.push("Starting cash amount is required");
+    if (!data.endingCash || parseFloat(data.endingCash as string) < 0) validationErrors.push("Ending cash amount is required");
+    
+    // Check sales data
+    const totalSales = parseFloat(data.totalSales as string || '0');
+    if (totalSales <= 0) validationErrors.push("Sales data section must be completed with valid amounts");
+    
+    // Check shopping receipt photo requirement
     const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
     const hasReceiptPhotos = receiptPhotos.length > 0;
     
     if (hasShoppingItems && !hasReceiptPhotos) {
-      console.log("Blocking submission - shopping items exist but no receipt photos");
+      validationErrors.push("Receipt photo is required when shopping expenses are listed");
+    }
+    
+    // If there are validation errors, save as draft and show clear error message
+    if (validationErrors.length > 0) {
+      console.log("Form validation failed, saving as draft first");
+      
+      // Save as draft first
+      const draftData = { ...data, isDraft: true, receiptPhotos };
+      saveDraftMutation.mutate(draftData);
+      
+      // Show detailed error message
       toast({
-        title: "Receipt Photo Required",
-        description: "Please upload at least one receipt photo when shopping expenses are listed.",
+        title: "Form Incomplete - Saved as Draft",
+        description: (
+          <div className="space-y-1">
+            <p className="font-medium">Please complete the following sections:</p>
+            <ul className="list-disc list-inside text-sm">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ),
         variant: "destructive"
       });
       return;
     }
     
-    console.log("Proceeding with form submission");
+    console.log("All validation checks passed, proceeding with form submission");
     const submissionData = { ...data, isDraft: false, receiptPhotos };
     createMutation.mutate(submissionData);
   };
 
   return (
     <div className="container mx-auto p-2 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 max-w-7xl">
-      <div className="flex items-center gap-2 mb-3 sm:mb-4 lg:mb-6">
-        <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
-        <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Daily Stock and Sales</h1>
+      <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4 lg:mb-6">
+        <div className="flex items-center gap-2">
+          <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Daily Stock and Sales</h1>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowItemManager(!showItemManager)}
+          className="flex items-center gap-2"
+        >
+          <Wrench className="h-4 w-4" />
+          Manage Items
+        </Button>
       </div>
+
+      {/* Item Management Panel */}
+      {showItemManager && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Form Items Management
+            </CardTitle>
+            <p className="text-sm text-gray-600">Add or remove items from the form sections</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(customItems).map(([category, items]) => (
+              <div key={category} className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2 capitalize">
+                  {category.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                </h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {items.map((item, index) => (
+                    <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-sm">{item}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                        onClick={() => {
+                          setCustomItems(prev => ({
+                            ...prev,
+                            [category]: prev[category as keyof typeof prev].filter((_, i) => i !== index)
+                          }));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add new item"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        setCustomItems(prev => ({
+                          ...prev,
+                          [category]: [...prev[category as keyof typeof prev], e.currentTarget.value.trim()]
+                        }));
+                        e.currentTarget.value = '';
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                      if (input.value.trim()) {
+                        setCustomItems(prev => ({
+                          ...prev,
+                          [category]: [...prev[category as keyof typeof prev], input.value.trim()]
+                        }));
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="new-form" className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-auto">
@@ -655,9 +790,20 @@ export default function DailyStockSales() {
                         render={({ field }) => (
                           <FormItem className="md:col-span-4">
                             <FormLabel className="md:hidden text-sm font-medium">Notes</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Wages & list overtime etc" />
-                            </FormControl>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select wage category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {WAGE_CATEGORIES.map((category) => (
+                                  <SelectItem key={category} value={category}>
+                                    {category}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </FormItem>
                         )}
                       />
@@ -682,7 +828,7 @@ export default function DailyStockSales() {
                     variant="outline" 
                     onClick={() => {
                       const current = form.getValues('wageEntries');
-                      form.setValue('wageEntries', [...current, { name: '', amount: 0, notes: '' }]);
+                      form.setValue('wageEntries', [...current, { name: '', amount: 0, notes: 'Wages' }]);
                     }}
                   >
                     Add Wage Entry
@@ -1137,9 +1283,9 @@ export default function DailyStockSales() {
                   name="meatWeight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Meat Weight</FormLabel>
+                      <FormLabel>Meat Weight in Kg's</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" placeholder="kg" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1437,7 +1583,10 @@ export default function DailyStockSales() {
 
               {/* Frozen Food */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Frozen Food</h3>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Snowflake className="h-4 w-4" />
+                  Frozen Food
+                </h3>
                 <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {FROZEN_FOOD_ITEMS.map((item) => (
                     <FormField
@@ -1512,13 +1661,13 @@ export default function DailyStockSales() {
                   
                   <Button 
                     type="button" 
-                    variant="outline" 
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600"
                     onClick={() => {
                       const current = form.getValues('freshFood.otherItems') || [];
                       form.setValue('freshFood.otherItems', [...current, { name: '', quantity: 0 }]);
                     }}
                   >
-                    Add Other Fresh Food Item
+                    Add Other Items
                   </Button>
                 </div>
               </div>
@@ -1626,61 +1775,7 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          {/* Photo Receipt Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Shopping Receipt Photos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handlePhotoCapture}
-                    className="hidden"
-                    id="receipt-photo"
-                  />
-                  <label
-                    htmlFor="receipt-photo"
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Take Photo
-                  </label>
-                  <span className="text-sm text-gray-600">
-                    {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
-                  </span>
-                </div>
-                
-                {receiptPhotos.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {receiptPhotos.map((photo, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={photo.base64Data}
-                          alt={`Receipt ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeReceiptPhoto(index)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                        >
-                          ×
-                        </button>
-                        <p className="text-xs text-gray-500 mt-1">{photo.filename}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
 
           <div className="flex justify-between">
             <Button 
