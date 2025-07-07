@@ -141,9 +141,22 @@ function ExpensesMerged() {
     },
     onError: (error: any) => {
       console.error("Error adding expense:", error);
+      // More detailed error logging
+      console.log("Error type:", typeof error);
+      console.log("Error details:", JSON.stringify(error, null, 2));
+      
+      let errorMessage = "Failed to add expense. Please try again.";
+      
+      // Handle different error types
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast({
         title: "Error adding expense",
-        description: error.message || "Failed to add expense. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
