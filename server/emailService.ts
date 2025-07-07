@@ -24,8 +24,8 @@ class EmailService {
   private initializeTransporter() {
     if (this.transporter) return this.transporter;
 
-    const email = process.env.GOOGLE_EMAIL || process.env.GMAIL_USER || '';
-    const password = process.env.GOOGLE_PASSWORD || process.env.GMAIL_APP_PASSWORD || '';
+    const email = process.env.GOOGLE_EMAIL || process.env.GMAIL_USER || 'smashbrothersburgersth@gmail.com';
+    const password = process.env.GOOGLE_PASSWORD || process.env.GMAIL_APP_PASSWORD || 'nysvebjmaupxysnl';
     
     console.log('Email config - User:', email ? 'Set' : 'Missing', 'Password:', password ? 'Set' : 'Missing');
     
@@ -76,6 +76,51 @@ class EmailService {
     return `฿${num.toFixed(2)}`;
   }
 
+  private generateFoodItemsHTML(formData: any): string {
+    let html = '';
+    
+    const formatFieldName = (key: string) => {
+      return key.replace(/([A-Z])/g, ' $1').trim()
+        .replace(/^./, str => str.toUpperCase());
+    };
+    
+    // Fresh Food Items
+    if (formData.freshFood && Object.keys(formData.freshFood).length > 0) {
+      const hasItems = Object.values(formData.freshFood).some((value: any) => value > 0);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>🥬 Fresh Food Items</h2>
+            <table>
+              ${Object.entries(formData.freshFood).map(([key, value]) => 
+                value > 0 ? `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value}</td></tr>` : ''
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    // Packaging Items
+    if (formData.packagingItems && Object.keys(formData.packagingItems).length > 0) {
+      const hasItems = Object.values(formData.packagingItems).some((value: any) => value > 0);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>📦 Packaging & Supplies</h2>
+            <table>
+              ${Object.entries(formData.packagingItems).map(([key, value]) => 
+                value > 0 ? `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value}</td></tr>` : ''
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    return html;
+  }
+
   private generateEmailHTML(data: ManagementSummaryData): string {
     const { formData, shoppingList, receiptPhotos, submissionTime } = data;
     const balance = this.calculateCashBalance(formData);
@@ -120,13 +165,40 @@ class EmailService {
       </head>
       <body>
         <div class="header">
-          <h1>Daily Stock & Sales Management Summary</h1>
+          <h1>Completed Sales and Stock Form</h1>
           <p>Submitted: ${submissionTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)</p>
           <p>Completed by: ${formData.completedBy}</p>
           <p>Shift: ${formData.shiftType} - ${new Date(formData.shiftDate).toLocaleDateString()}</p>
         </div>
 
         <div class="content">
+          <!-- Sales Data -->
+          <div class="section">
+            <h2>📊 Sales Summary</h2>
+            <table>
+              <tr><td><strong>Grab Sales:</strong></td><td>${this.formatCurrency(formData.grabSales)}</td></tr>
+              <tr><td><strong>FoodPanda Sales:</strong></td><td>${this.formatCurrency(formData.foodPandaSales)}</td></tr>
+              <tr><td><strong>AroiDee Sales:</strong></td><td>${this.formatCurrency(formData.aroiDeeSales)}</td></tr>
+              <tr><td><strong>QR Scan Sales:</strong></td><td>${this.formatCurrency(formData.qrScanSales)}</td></tr>
+              <tr><td><strong>Cash Sales:</strong></td><td>${this.formatCurrency(formData.cashSales)}</td></tr>
+              <tr style="background: #f8f9fa; font-weight: bold;"><td><strong>Total Sales:</strong></td><td>${this.formatCurrency(formData.totalSales)}</td></tr>
+            </table>
+          </div>
+
+          <!-- Stock Details -->
+          <div class="section">
+            <h2>📦 Stock Details</h2>
+            <table>
+              <tr><td><strong>Burger Buns:</strong></td><td>${formData.burgerBunsStock}</td></tr>
+              <tr><td><strong>Rolls Ordered:</strong></td><td>${formData.rollsOrderedCount}</td></tr>
+              <tr><td><strong>Meat Weight:</strong></td><td>${formData.meatWeight} kg</td></tr>
+              <tr><td><strong>Drink Stock:</strong></td><td>${formData.drinkStockCount}</td></tr>
+              <tr><td><strong>Rolls Confirmed:</strong></td><td>${formData.rollsOrderedConfirmed ? 'Yes' : 'No'}</td></tr>
+            </table>
+          </div>
+
+          ${this.generateFoodItemsHTML(formData)}
+
           <!-- Cash Balance Summary -->
           <div class="section">
             <h2>💰 Cash Balance Summary</h2>
@@ -250,16 +322,30 @@ class EmailService {
       const emailHTML = this.generateEmailHTML(data);
       const balance = this.calculateCashBalance(data.formData);
       
-      console.log('\n📧 EMAIL CONTENT PREVIEW:');
-      console.log('Subject:', `Daily Sales Summary - ${data.formData.shiftType} ${new Date(data.formData.shiftDate).toLocaleDateString()} ${balance.isBalanced ? '✅' : '❌ IMBALANCED'}`);
-      console.log('Balance Status:', balance.isBalanced ? '✅ BALANCED' : '❌ IMBALANCED');
-      console.log('Cash Difference:', this.formatCurrency(balance.difference));
-      console.log('Total Sales:', this.formatCurrency(data.formData.totalSales));
-      console.log('Shopping List Items:', data.shoppingList.length);
-      console.log('Receipt Photos:', data.receiptPhotos.length);
-      console.log('\n💡 Gmail Setup Help: This requires an App Password from Google Account Settings > Security > 2-Step Verification > App passwords');
+      const shiftDate = new Date(data.formData.shiftDate);
+      const formattedDate = `${shiftDate.getDate().toString().padStart(2, '0')}/${(shiftDate.getMonth() + 1).toString().padStart(2, '0')}/${shiftDate.getFullYear()}`;
+      const subject = `Completed Sales and Stock Form - ${formattedDate}`;
       
-      return false;
+      const mailOptions = {
+        from: 'smashbrothersburgersth@gmail.com',
+        to: 'smashbrothersburgersth@gmail.com',
+        subject: subject,
+        html: emailHTML,
+        attachments: data.receiptPhotos.map((photo, index) => ({
+          filename: `receipt_${index + 1}_${photo.filename}`,
+          content: photo.base64Data.split(',')[1],
+          encoding: 'base64'
+        }))
+      };
+
+      const transporter = this.initializeTransporter();
+      if (!transporter) {
+        throw new Error('Failed to initialize email transporter');
+      }
+      
+      await transporter.sendMail(mailOptions);
+      console.log('✅ Form summary email sent successfully to: smashbrothersburgersth@gmail.com');
+      return true;
     }
   }
 }
