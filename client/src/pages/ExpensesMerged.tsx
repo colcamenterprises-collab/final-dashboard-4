@@ -121,11 +121,9 @@ function ExpensesMerged() {
   // Mutations
   const addExpenseMutation = useMutation({
     mutationFn: (data: ExpenseFormData) => {
-      const transformedData = {
-        ...data,
-        date: new Date(data.date), // Convert string to Date object
-      };
-      return apiRequest("POST", "/api/expenses", transformedData);
+      console.log("Frontend mutation data:", data);
+      // Keep date as string - server will handle conversion
+      return apiRequest("POST", "/api/expenses", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
