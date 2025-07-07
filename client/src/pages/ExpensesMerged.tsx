@@ -123,7 +123,10 @@ function ExpensesMerged() {
     mutationFn: (data: ExpenseFormData) => {
       console.log("Frontend mutation data:", data);
       // Keep date as string - server will handle conversion
-      return apiRequest("POST", "/api/expenses", data);
+      return apiRequest("/api/expenses", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
@@ -147,7 +150,10 @@ function ExpensesMerged() {
   });
 
   const addSupplierMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/expense-suppliers", data),
+    mutationFn: (data: any) => apiRequest("/api/expense-suppliers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-suppliers"] });
       setIsAddSupplierOpen(false);
@@ -160,7 +166,10 @@ function ExpensesMerged() {
   });
 
   const addCategoryMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/expense-categories", data),
+    mutationFn: (data: any) => apiRequest("/api/expense-categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-categories"] });
       setIsAddCategoryOpen(false);
