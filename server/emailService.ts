@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
 import type { DailyStockSales, ShoppingList } from '@shared/schema';
 
 interface EmailConfig {
@@ -296,19 +295,36 @@ class EmailService {
   }
 
   async sendManagementSummary(data: ManagementSummaryData): Promise<boolean> {
+    // Try Gmail API first if available
+    const gmailClientId = process.env.GOOGLE_CLIENT_ID;
+    if (gmailClientId) {
+      try {
+        const { gmailService } = await import('./gmailService');
+        console.log('📧 Using Gmail API for email delivery');
+        return await gmailService.sendManagementSummary(data);
+      } catch (error) {
+        console.error('❌ Gmail API failed, falling back to SendGrid:', error);
+      }
+    }
+
+    // Try SendGrid next if available
+    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    if (sendGridApiKey) {
+      try {
+        const { sendGridService } = await import('./sendgridService');
+        console.log('📧 Using SendGrid for email delivery');
+        return await sendGridService.sendManagementSummary(data);
+      } catch (error) {
+        console.error('❌ SendGrid failed, falling back to Gmail SMTP:', error);
+      }
+    }
+
+    // Fall back to Gmail SMTP
+    console.log('📧 Using Gmail SMTP for email delivery');
     try {
       const transporter = this.initializeTransporter();
       if (!transporter) {
         console.error('Failed to initialize email transporter - Gmail credentials missing');
-        // Log the email content for debugging purposes
-        const emailHTML = this.generateEmailHTML(data);
-        console.log('=== EMAIL PREVIEW (Would be sent with proper credentials) ===');
-        console.log(`From: smashbrothersburgersth@gmail.com`);
-        console.log(`To: smashbrothersburgersth@gmail.com`);
-        console.log(`Subject: Daily Shift Report - ${data.formData.completedBy} - ${data.formData.shiftType}`);
-        console.log(`Attachments: ${data.receiptPhotos.length} receipt photos`);
-        console.log('Content Preview:', emailHTML.substring(0, 800) + '...');
-        console.log('=== END EMAIL PREVIEW ===');
         return false;
       }
       
