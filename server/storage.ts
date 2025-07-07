@@ -55,6 +55,7 @@ export interface IStorage {
   // Expenses
   getExpenses(): Promise<Expense[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
+  deleteExpense(id: number): Promise<boolean>;
   getExpensesByCategory(): Promise<Record<string, number>>;
   getExpensesByMonth(month: number, year: number): Promise<Expense[]>;
   getMonthToDateExpenses(): Promise<number>;
@@ -513,6 +514,18 @@ export class MemStorage implements IStorage {
     }).returning();
     
     return result;
+  }
+
+  async deleteExpense(id: number): Promise<boolean> {
+    const { db } = await import("./db");
+    const { expenses } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const result = await db.delete(expenses)
+      .where(eq(expenses.id, id))
+      .returning();
+    
+    return result.length > 0;
   }
 
   async getExpensesByCategory(): Promise<Record<string, number>> {

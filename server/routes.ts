@@ -694,20 +694,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/expenses/:id', async (req, res) => {
     try {
+      console.log("🗑️ DELETE /api/expenses endpoint hit");
+      console.log("Expense ID to delete:", req.params.id);
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: 'Invalid ID format' });
       }
       
-      const result = await db.delete(expenses)
-        .where(eq(expenses.id, id))
-        .returning();
-      
-      if (result.length === 0) {
+      const deleted = await storage.deleteExpense(id);
+      if (!deleted) {
         return res.status(404).json({ error: 'Expense not found' });
       }
       
-      res.json({ success: true, deletedExpense: result[0] });
+      res.json({ success: true });
     } catch (error) {
       console.error('Error deleting expense:', error);
       res.status(400).json({ error: 'Failed to delete expense' });

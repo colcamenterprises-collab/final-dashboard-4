@@ -41,8 +41,16 @@ class EmailService {
       secure: false, // true for 465, false for other ports
       auth: {
         user: email,
-        pass: password.replace(/['"]/g, ''), // Remove quotes from password
-      }
+        pass: password.replace(/['"]/g, '').trim(), // Remove quotes and whitespace from password
+      },
+      // Additional Gmail-specific settings
+      tls: {
+        rejectUnauthorized: false
+      },
+      // Connection timeout settings
+      connectionTimeout: 60000,
+      greetingTimeout: 30000,
+      socketTimeout: 60000
     };
 
     this.transporter = nodemailer.createTransport(config);

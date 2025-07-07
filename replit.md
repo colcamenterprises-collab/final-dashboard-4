@@ -256,6 +256,11 @@ Changelog:
 - July 7, 2025. Fixed recipe ingredient addition by including required cost field in validation schema
 - July 7, 2025. Updated Gmail SMTP configuration to use port 587 with TLS for improved authentication
 - July 7, 2025. All core functionality restored: expense tracking, recipe management, Loyverse integration, and form submissions
+- July 7, 2025. EXPENSE FORM FULLY FIXED: Resolved JSON parsing error by correcting API request format in frontend mutations
+- July 7, 2025. Added comprehensive debugging logging for frontend-backend communication troubleshooting
+- July 7, 2025. Confirmed expense form working correctly - user successfully submitted expense without errors
+- July 7, 2025. EXPENSE DELETE FUNCTIONALITY: Fixed missing deleteExpense method in storage interface and implementation
+- July 7, 2025. Added complete deleteExpense functionality with proper database operations and error handling
 ```
 
 ## User Preferences
