@@ -29,7 +29,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function SalesVsExpensesChart() {
-  const { data: chartData, isLoading } = useQuery<SalesVsExpensesData[]>({
+  const { data: chartData, isLoading, error } = useQuery<SalesVsExpensesData[]>({
     queryKey: ["/api/dashboard/sales-vs-expenses"],
     queryFn: async () => {
       const response = await fetch("/api/dashboard/sales-vs-expenses");
@@ -38,6 +38,7 @@ export default function SalesVsExpensesChart() {
       }
       return response.json();
     },
+    retry: false, // Don't retry on failure
   });
 
   if (isLoading) {
