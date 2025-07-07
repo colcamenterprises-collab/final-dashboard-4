@@ -16,10 +16,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return (
       <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-md">
         <p className="font-medium text-gray-900">{label}</p>
-        <p className="text-sm text-teal-600">
+        <p className="text-sm" style={{ color: '#0D9488' }}>
           Sales: ฿{payload[0]?.value?.toLocaleString() || 0}
         </p>
-        <p className="text-sm text-orange-600">
+        <p className="text-sm" style={{ color: '#DEAB12' }}>
           Expenses: ฿{payload[1]?.value?.toLocaleString() || 0}
         </p>
       </div>
@@ -59,12 +59,12 @@ export default function SalesVsExpensesChart() {
   }
 
   return (
-    <Card className="restaurant-card">
+    <Card className="bg-white border border-gray-200 rounded-lg shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold text-gray-900">
           Daily Sales vs Expenses
         </CardTitle>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="text-gray-600 hover:text-gray-900">
           View Report
         </Button>
       </CardHeader>
@@ -78,24 +78,26 @@ export default function SalesVsExpensesChart() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
                 dataKey="dayLabel" 
-                tick={{ fontSize: 12 }}
-                stroke="#666"
+                tick={{ fontSize: 12, fill: '#6b7280' }}
+                stroke="#e5e7eb"
+                axisLine={{ stroke: '#e5e7eb' }}
               />
               <YAxis 
-                tick={{ fontSize: 12 }}
-                stroke="#666"
-                tickFormatter={(value) => `฿${value.toLocaleString()}`}
+                tick={{ fontSize: 12, fill: '#6b7280' }}
+                stroke="#e5e7eb"
+                axisLine={{ stroke: '#e5e7eb' }}
+                tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar 
                 dataKey="sales" 
-                fill="#0f766e" 
+                fill="#0D9488" 
                 name="Sales"
                 radius={[2, 2, 0, 0]}
               />
               <Bar 
                 dataKey="expenses" 
-                fill="#ea580c" 
+                fill="#DEAB12" 
                 name="Expenses"
                 radius={[2, 2, 0, 0]}
               />
