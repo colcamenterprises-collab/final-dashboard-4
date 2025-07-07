@@ -228,7 +228,10 @@ export default function DailyStockSales() {
     mutationFn: (data: FormData) => {
       console.log('📝 Submitting form with data:', data);
       console.log('📷 Receipt photos:', receiptPhotos);
-      return apiRequest('POST', '/api/daily-stock-sales', { ...data, receiptPhotos });
+      return apiRequest('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, receiptPhotos })
+      });
     },
     onSuccess: (response) => {
       console.log('✅ Form submitted successfully:', response);
@@ -306,7 +309,10 @@ export default function DailyStockSales() {
   
   // Draft saving mutation
   const saveDraftMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('POST', '/api/daily-stock-sales', { ...data, isDraft: true, receiptPhotos }),
+    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, isDraft: true, receiptPhotos })
+    }),
     onSuccess: () => {
       toast({
         title: "Draft Saved",
