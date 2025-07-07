@@ -79,7 +79,7 @@ export default function Dashboard() {
 
   return (
     <div className="relative">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Restaurant Operations Hub</h1>
         <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
           <Select defaultValue="7days">
@@ -100,32 +100,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Action Buttons */}
+      {/* Quick Action Buttons - positioned below headline */}
       <div className="mb-8">
-        <Card className="restaurant-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <Zap className="h-5 w-5" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Link href="/expenses">
-                <Button className="w-full h-12 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
-                  <Receipt className="mr-2 h-4 w-4" />
-                  Submit Expense
-                </Button>
-              </Link>
-              <Link href="/daily-stock-sales">
-                <Button className="w-full h-12 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
-                  <ClipboardList className="mr-2 h-4 w-4" />
-                  Sales & Stock Form
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 mb-4">
+          <Zap className="h-5 w-5 text-gray-700" />
+          <span className="text-lg font-semibold text-gray-900">Quick Actions</span>
+        </div>
+        <div className="flex flex-wrap gap-3 max-w-lg">
+          <Link href="/expenses">
+            <Button className="h-10 px-6 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+              <Receipt className="mr-2 h-4 w-4" />
+              Submit Expense
+            </Button>
+          </Link>
+          <Link href="/daily-stock-sales">
+            <Button className="h-10 px-6 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Sales & Stock Form
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* KPI Cards */}

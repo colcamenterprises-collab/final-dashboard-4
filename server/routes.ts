@@ -3396,7 +3396,7 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       const salesQuery = `
         SELECT 
           DATE(created_at) as date,
-          SUM(total_money::numeric) as daily_sales
+          SUM(total_amount::numeric) as daily_sales
         FROM loyverse_receipts 
         WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2
         GROUP BY DATE(created_at)
