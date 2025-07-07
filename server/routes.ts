@@ -2600,15 +2600,13 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
 
   app.post('/api/loyverse/live/start-realtime', async (req, res) => {
     try {
-      const { loyverseAPI } = await import('./loyverseAPI');
-      const intervalMinutes = parseInt(req.body.intervalMinutes) || 5;
-      
-      // Start real-time sync (non-blocking)
-      loyverseAPI.startRealtimeSync(intervalMinutes);
+      // Register webhooks for real-time sync
+      const { registerWebhooks } = await import('./webhooks');
+      await registerWebhooks();
       
       res.json({ 
         success: true, 
-        message: `Real-time sync started with ${intervalMinutes} minute intervals`
+        message: 'Real-time sync started successfully - webhooks registered for receipt and shift events'
       });
     } catch (error) {
       console.error('Real-time sync start error:', error);

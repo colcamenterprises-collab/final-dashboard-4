@@ -172,9 +172,9 @@ async function handleShiftClosedWebhook(event: WebhookEvent) {
 // Webhook management functions
 export async function registerWebhooks() {
   try {
-    const accessToken = process.env.LOYVERSE_ACCESS_TOKEN;
+    const accessToken = process.env.LOYVERSE_API_TOKEN;
     if (!accessToken) {
-      console.error('❌ LOYVERSE_ACCESS_TOKEN not configured');
+      console.error('❌ LOYVERSE_API_TOKEN not configured');
       return;
     }
 
@@ -219,37 +219,32 @@ export async function registerWebhooks() {
   }
 }
 
-// List existing webhooks
 export async function listWebhooks() {
   try {
-    const accessToken = process.env.LOYVERSE_ACCESS_TOKEN;
+    const accessToken = process.env.LOYVERSE_API_TOKEN;
     if (!accessToken) {
-      console.error('❌ LOYVERSE_ACCESS_TOKEN not configured');
-      return;
+      console.error('❌ LOYVERSE_API_TOKEN not configured');
+      return [];
     }
 
     const response = await fetch('https://api.loyverse.com/v1.0/webhooks', {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-      }
+        'Content-Type': 'application/json',
+      },
     });
 
     if (response.ok) {
-      const webhooks = await response.json();
-      console.log('📋 Existing webhooks:');
-      webhooks.forEach((webhook: any) => {
-        console.log(`  - ID: ${webhook.id}`);
-        console.log(`    URL: ${webhook.url}`);
-        console.log(`    Events: ${webhook.events.join(', ')}`);
-        console.log(`    Active: ${webhook.active}`);
-        console.log('');
-      });
-      return webhooks;
+      const result = await response.json();
+      return result.webhooks || [];
     } else {
       const error = await response.text();
       console.error(`❌ Failed to list webhooks: ${error}`);
+      return [];
     }
   } catch (error) {
     console.error('❌ Error listing webhooks:', error);
+    return [];
   }
 }
+
