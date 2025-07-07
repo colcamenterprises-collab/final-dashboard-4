@@ -337,48 +337,35 @@ export default function DailyStockSales() {
     console.log("Shopping entries:", data.shoppingEntries);
     console.log("Receipt photos:", receiptPhotos);
     
-    // Comprehensive validation checks
+    // Only check critical validation for non-draft submissions
     const validationErrors: string[] = [];
     
     // Check required fields
-    if (!data.completedBy) validationErrors.push("Staff member name is required");
-    if (!data.shiftType) validationErrors.push("Shift type must be selected");
-    if (!data.startingCash || parseFloat(data.startingCash as string) < 0) validationErrors.push("Starting cash amount is required");
-    if (!data.endingCash || parseFloat(data.endingCash as string) < 0) validationErrors.push("Ending cash amount is required");
+    if (!data.completedBy || data.completedBy.trim() === "") {
+      validationErrors.push("Staff member name is required");
+    }
+    if (!data.shiftType || data.shiftType.trim() === "") {
+      validationErrors.push("Shift type must be selected");
+    }
     
-    // Check sales data
-    const totalSales = parseFloat(data.totalSales as string || '0');
-    if (totalSales <= 0) validationErrors.push("Sales data section must be completed with valid amounts");
-    
-    // Check shopping receipt photo requirement
+    // Check shopping receipt photo requirement (only critical validation)
     const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
     const hasReceiptPhotos = receiptPhotos.length > 0;
     
     if (hasShoppingItems && !hasReceiptPhotos) {
-      validationErrors.push("Receipt photo is required when shopping expenses are listed");
+      toast({
+        title: "Receipt Photo Required",
+        description: "Please upload at least one receipt photo when shopping expenses are listed.",
+        variant: "destructive"
+      });
+      return;
     }
     
-    // If there are validation errors, save as draft and show clear error message
+    // If critical validation fails, show error and don't submit
     if (validationErrors.length > 0) {
-      console.log("Form validation failed, saving as draft first");
-      
-      // Save as draft first
-      const draftData = { ...data, isDraft: true, receiptPhotos };
-      saveDraftMutation.mutate(draftData);
-      
-      // Show detailed error message
       toast({
-        title: "Form Incomplete - Saved as Draft",
-        description: (
-          <div className="space-y-1">
-            <p className="font-medium">Please complete the following sections:</p>
-            <ul className="list-disc list-inside text-sm">
-              {validationErrors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        ),
+        title: "Required Fields Missing",
+        description: validationErrors.join(". "),
         variant: "destructive"
       });
       return;
