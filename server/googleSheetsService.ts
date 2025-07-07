@@ -19,24 +19,25 @@ class GoogleSheetsService {
 
   private async initializeAuth() {
     try {
-      if (!process.env.GOOGLE_EMAIL || !process.env.GOOGLE_PASSWORD) {
-        console.log('📋 Google Sheets: Credentials not configured');
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REFRESH_TOKEN) {
+        console.log('📋 Google Sheets: OAuth credentials not configured');
         return;
       }
 
-      // For production, use service account authentication
-      // For development, we'll use a simpler approach
-      const auth = new google.auth.GoogleAuth({
-        credentials: {
-          client_email: process.env.GOOGLE_EMAIL,
-          private_key: process.env.GOOGLE_PASSWORD?.replace(/\\n/g, '\n'),
-        },
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      // Use OAuth2 authentication (same as Gmail API)
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'https://developers.google.com/oauthplayground'
+      );
+
+      oauth2Client.setCredentials({
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
       });
 
-      this.sheets = google.sheets({ version: 'v4', auth });
+      this.sheets = google.sheets({ version: 'v4', auth: oauth2Client });
       this.isAuthenticated = true;
-      console.log('📋 Google Sheets: Authentication successful');
+      console.log('📋 Google Sheets: OAuth authentication successful');
     } catch (error) {
       console.error('📋 Google Sheets: Authentication failed:', error);
       this.isAuthenticated = false;
