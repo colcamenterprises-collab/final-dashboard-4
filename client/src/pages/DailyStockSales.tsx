@@ -408,7 +408,7 @@ export default function DailyStockSales() {
 
       {/* Item Management Panel */}
       {showItemManager && (
-        <Card className="mb-6">
+        <Card className="mb-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
@@ -496,7 +496,7 @@ export default function DailyStockSales() {
         })} className="space-y-6">
           
           {/* Who is Completing Form */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
@@ -562,7 +562,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Cash Management */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
@@ -589,7 +589,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Sales Data */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -731,7 +731,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Expenses */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
@@ -1088,7 +1088,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Sales and Expenses Summary */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
@@ -1154,7 +1154,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Cash Balance Status */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
@@ -1229,7 +1229,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Stock Counts */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
@@ -1331,7 +1331,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Food Items Required */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ChefHat className="h-5 w-5" />
@@ -1679,7 +1679,7 @@ export default function DailyStockSales() {
 
 
           {/* Kitchen Items */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
@@ -1716,7 +1716,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Packaging Items */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Box className="h-5 w-5" />
@@ -1753,7 +1753,7 @@ export default function DailyStockSales() {
           </Card>
 
           {/* Confirmation */}
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle>Confirmation</CardTitle>
             </CardHeader>
@@ -1808,7 +1808,7 @@ export default function DailyStockSales() {
         </TabsContent>
 
         <TabsContent value="search" className="space-y-6">
-          <Card>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle>Search Completed Forms</CardTitle>
             </CardHeader>
