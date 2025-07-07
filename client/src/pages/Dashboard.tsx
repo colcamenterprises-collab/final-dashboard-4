@@ -100,19 +100,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Sales vs Expenses Chart Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Sales vs Expenses Chart (2 columns) */}
-        <div className="lg:col-span-2">
-          <SalesVsExpensesChart />
-        </div>
-        
-        {/* Third column empty for now */}
-        <div className="lg:col-span-1">
-          {/* Reserved for future content */}
-        </div>
-      </div>
-
       {/* Quick Action Buttons */}
       <div className="mb-8">
         <Card className="restaurant-card">
@@ -181,7 +168,18 @@ export default function Dashboard() {
         />
       </div>
 
-
+      {/* Sales vs Expenses Chart Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Sales vs Expenses Chart (2 columns) */}
+        <div className="lg:col-span-2">
+          <SalesVsExpensesChart />
+        </div>
+        
+        {/* Third column empty for now */}
+        <div className="lg:col-span-1">
+          {/* Reserved for future content */}
+        </div>
+      </div>
 
       {/* Three-column layout: Revenue Chart | Expenses Chart | Payment Type Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
