@@ -108,13 +108,13 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap gap-3 max-w-lg">
           <Link href="/expenses">
-            <Button className="h-10 px-6 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+            <Button className="h-10 px-6 text-white font-medium" style={{ backgroundColor: '#2eb2ff' }}>
               <Receipt className="mr-2 h-4 w-4" />
               Submit Expense
             </Button>
           </Link>
           <Link href="/daily-stock-sales">
-            <Button className="h-10 px-6 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+            <Button className="h-10 px-6 text-black font-medium" style={{ backgroundColor: '#DEAB12' }}>
               <ClipboardList className="mr-2 h-4 w-4" />
               Sales & Stock Form
             </Button>
