@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot, Wifi } from "lucide-react";
+import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot, Wifi, Zap, Receipt, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,12 +11,15 @@ import AIInsightsCard from "@/components/AIInsightsCard";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
+import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
 
 
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { useMutation } from "@tanstack/react-query";
 import restaurantHubLogo from "@assets/Restuarant Hub (2)_1751479657885.png";
+import { Link } from "wouter";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function Dashboard() {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -95,6 +98,47 @@ export default function Dashboard() {
             <span className="xs:hidden">AI</span>
           </Button>
         </div>
+      </div>
+
+      {/* Sales vs Expenses Chart Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Sales vs Expenses Chart (2 columns) */}
+        <div className="lg:col-span-2">
+          <SalesVsExpensesChart />
+        </div>
+        
+        {/* Third column empty for now */}
+        <div className="lg:col-span-1">
+          {/* Reserved for future content */}
+        </div>
+      </div>
+
+      {/* Quick Action Buttons */}
+      <div className="mb-8">
+        <Card className="restaurant-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              <Zap className="h-5 w-5" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link href="/expenses">
+                <Button className="w-full h-12 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+                  <Receipt className="mr-2 h-4 w-4" />
+                  Submit Expense
+                </Button>
+              </Link>
+              <Link href="/daily-stock-sales">
+                <Button className="w-full h-12 text-white font-medium" style={{ backgroundColor: '#0F766E' }}>
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  Sales & Stock Form
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* KPI Cards */}

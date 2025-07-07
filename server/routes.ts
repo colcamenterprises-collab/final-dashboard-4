@@ -3386,6 +3386,73 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Sales vs Expenses comparison for last 5 days
+  app.get("/api/dashboard/sales-vs-expenses", async (req: Request, res: Response) => {
+    try {
+      const today = new Date();
+      const fiveDaysAgo = new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000);
+      
+      // Get sales data from loyverse receipts grouped by date
+      const salesQuery = `
+        SELECT 
+          DATE(created_at) as date,
+          SUM(total_money::numeric) as daily_sales
+        FROM loyverse_receipts 
+        WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at)
+      `;
+      
+      // Get expenses data grouped by date
+      const expensesQuery = `
+        SELECT 
+          DATE(date) as date,
+          SUM(amount::numeric) as daily_expenses
+        FROM expenses 
+        WHERE DATE(date) >= $1 AND DATE(date) <= $2
+        GROUP BY DATE(date)
+        ORDER BY DATE(date)
+      `;
+      
+      const [salesResult, expensesResult] = await Promise.all([
+        pool.query(salesQuery, [fiveDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]]),
+        pool.query(expensesQuery, [fiveDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]])
+      ]);
+      
+      // Create a map of sales and expenses by date
+      const salesMap = new Map();
+      const expensesMap = new Map();
+      
+      salesResult.rows.forEach(row => {
+        salesMap.set(row.date, parseFloat(row.daily_sales || 0));
+      });
+      
+      expensesResult.rows.forEach(row => {
+        expensesMap.set(row.date, parseFloat(row.daily_expenses || 0));
+      });
+      
+      // Generate data for last 5 days
+      const chartData = [];
+      for (let i = 4; i >= 0; i--) {
+        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        
+        chartData.push({
+          date: dateStr,
+          dayLabel,
+          sales: salesMap.get(dateStr) || 0,
+          expenses: expensesMap.get(dateStr) || 0
+        });
+      }
+      
+      res.json(chartData);
+    } catch (error) {
+      console.error("Error fetching sales vs expenses data:", error);
+      res.status(500).json({ error: "Failed to fetch sales vs expenses data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
