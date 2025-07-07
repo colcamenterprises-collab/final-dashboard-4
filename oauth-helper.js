@@ -1,9 +1,9 @@
 const { google } = require('googleapis');
 const readline = require('readline');
 
-// You'll need to replace these with your actual credentials
-const CLIENT_ID = 'YOUR_CLIENT_ID';
-const CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+// Your actual credentials
+const CLIENT_ID = '780286917028-oob46sbv8tpta9jcd5dr7i7gaj1f6qgl.apps.googleusercontent.com';
+const CLIENT_SECRET = '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';
 const REDIRECT_URI = 'http://localhost:3000/oauth/callback';
 
 const oauth2Client = new google.auth.OAuth2(
