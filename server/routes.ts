@@ -494,6 +494,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/shopping-list/history", async (req, res) => {
+    try {
+      const history = await storage.getShoppingListHistory();
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shopping list history" });
+    }
+  });
+
+  app.get("/api/shopping-list/by-date/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      const lists = await storage.getShoppingListsByDate(new Date(date));
+      res.json(lists);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shopping lists for date" });
+    }
+  });
+
   app.post("/api/shopping-list", async (req, res) => {
     try {
       const validatedData = insertShoppingListSchema.parse(req.body);
@@ -501,6 +520,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(item);
     } catch (error) {
       res.status(400).json({ error: "Invalid shopping list item data" });
+    }
+  });
+
+  app.post("/api/shopping-list/complete", async (req, res) => {
+    try {
+      const { listIds, actualCost } = req.body;
+      await storage.completeShoppingList(listIds, actualCost);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to complete shopping list" });
     }
   });
 
@@ -1987,7 +2016,7 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       // Only generate shopping list and send email if this is not a draft
       if (!formData.isDraft) {
         console.log('📋 Generating shopping list from stock form...');
-        await generateShoppingListFromStockForm(formData);
+        await generateShoppingListFromStockForm(formData, result.id);
         
         // Send management summary email
         try {

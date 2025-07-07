@@ -53,6 +53,17 @@ export const shoppingList = pgTable("shopping_list", {
   priority: text("priority").notNull(), // 'high', 'medium', 'low'
   selected: boolean("selected").default(false),
   aiGenerated: boolean("ai_generated").default(false),
+  // Enhanced shopping list functionality
+  listDate: timestamp("list_date").defaultNow(), // Date when shopping list was generated
+  formId: integer("form_id"), // Reference to Daily Stock Sales form that generated this list
+  listName: text("list_name"), // Name/title for the shopping list
+  isCompleted: boolean("is_completed").default(false), // Mark entire list as completed
+  completedAt: timestamp("completed_at"), // When the list was completed
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }).default('0'), // Estimated cost based on ingredient prices
+  actualCost: decimal("actual_cost", { precision: 10, scale: 2 }).default('0'), // Actual cost when completed
+  notes: text("notes"), // Additional notes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Expenses table

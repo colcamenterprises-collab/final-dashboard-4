@@ -48,9 +48,12 @@ export interface IStorage {
   
   // Shopping List
   getShoppingList(): Promise<ShoppingList[]>;
+  getShoppingListHistory(): Promise<ShoppingList[]>;
+  getShoppingListsByDate(date: Date): Promise<ShoppingList[]>;
   createShoppingListItem(item: InsertShoppingList): Promise<ShoppingList>;
   updateShoppingListItem(id: number, updates: Partial<ShoppingList>): Promise<ShoppingList>;
   deleteShoppingListItem(id: number): Promise<void>;
+  completeShoppingList(listIds: number[], actualCost?: number): Promise<void>;
   
   // Expenses
   getExpenses(): Promise<Expense[]>;
@@ -449,14 +452,63 @@ export class MemStorage implements IStorage {
   }
 
   async getShoppingList(): Promise<ShoppingList[]> {
-    // Use database for shopping list
+    // Use database for shopping list - get current/active shopping list
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { desc, eq } = await import("drizzle-orm");
+    
+    // Get current active shopping list (not completed)
+    return await db.select().from(shoppingList)
+      .where(eq(shoppingList.isCompleted, false))
+      .orderBy(desc(shoppingList.listDate));
+  }
+
+  async getShoppingListHistory(): Promise<ShoppingList[]> {
+    // Get historical shopping lists grouped by date
     const { db } = await import("./db");
     const { shoppingList } = await import("@shared/schema");
     const { desc } = await import("drizzle-orm");
     
-    return await db.select()
-      .from(shoppingList)
-      .orderBy(desc(shoppingList.id));
+    return await db.select().from(shoppingList)
+      .orderBy(desc(shoppingList.listDate));
+  }
+
+  async getShoppingListsByDate(date: Date): Promise<ShoppingList[]> {
+    // Get shopping lists for a specific date
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { gte, lte, desc } = await import("drizzle-orm");
+    
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db.select().from(shoppingList)
+      .where(gte(shoppingList.listDate, startOfDay))
+      .where(lte(shoppingList.listDate, endOfDay))
+      .orderBy(desc(shoppingList.listDate));
+  }
+
+  async completeShoppingList(listIds: number[], actualCost?: number): Promise<void> {
+    // Mark shopping list items as completed
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    const { inArray } = await import("drizzle-orm");
+    
+    const updates: any = {
+      isCompleted: true,
+      completedAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    if (actualCost !== undefined) {
+      updates.actualCost = actualCost.toString();
+    }
+    
+    await db.update(shoppingList)
+      .set(updates)
+      .where(inArray(shoppingList.id, listIds));
   }
 
   async createShoppingListItem(item: InsertShoppingList): Promise<ShoppingList> {
