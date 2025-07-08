@@ -2016,7 +2016,7 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       // Only generate shopping list and send email if this is not a draft
       if (!formData.isDraft) {
         console.log('📋 Generating shopping list from stock form...');
-        await generateShoppingListFromStockForm(formData, result.id);
+        await generateShoppingListFromStockForm(formData, dailyStockSales.id);
         
         // Send management summary email
         try {

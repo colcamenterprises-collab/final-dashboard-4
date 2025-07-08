@@ -767,10 +767,11 @@ export class MemStorage implements IStorage {
       shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
     }).returning();
     
-    // Backup to Google Sheets
+    // Backup to Google Sheets (temporarily disabled due to OAuth scope requirements)
     try {
-      const { googleSheetsService } = await import('./googleSheetsService');
-      await googleSheetsService.backupDailyStockSales(result);
+      console.log('📊 Google Sheets backup temporarily disabled - OAuth token needs spreadsheets scope');
+      // const { googleSheetsService } = await import('./googleSheetsService');
+      // await googleSheetsService.backupDailyStockSales(result);
     } catch (error) {
       console.error('Failed to backup to Google Sheets:', error);
       // Don't fail the request if backup fails
