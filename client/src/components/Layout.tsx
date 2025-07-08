@@ -29,8 +29,7 @@ const navigationItems = [
   { path: "/", label: "Dashboard", icon: Home },
   { path: "/daily-stock-sales", label: "Daily Stock & Sales", icon: ClipboardList },
   { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
-  { path: "/recipe-management", label: "Recipe Management", icon: ChefHat },
-  { path: "/ingredient-management", label: "Ingredient Management", icon: Package },
+  { path: "/recipe-management", label: "Recipe & Ingredient Management", icon: ChefHat },
   { path: "/finance", label: "Finance", icon: Calculator },
   { path: "/expenses", label: "Expenses", icon: Receipt },
   { path: "/pos-loyverse", label: "POS Loyverse", icon: BarChart3 },
@@ -70,7 +69,8 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex flex-col space-y-6">
             {navigationItems.map((item) => {
               const IconComponent = item.icon;
-              const isActive = location === item.path;
+              const isActive = location === item.path || 
+                (item.path === "/recipe-management" && location === "/ingredient-management");
               
               return (
                 <Link key={item.path} href={item.path}>

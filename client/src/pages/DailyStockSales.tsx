@@ -1775,8 +1775,7 @@ export default function DailyStockSales() {
               type="button"
               onClick={saveDraft}
               disabled={saveDraftMutation.isPending}
-              variant="outline"
-              className="min-w-[150px]"
+              className="min-w-[150px] bg-black text-white hover:bg-gray-800"
             >
               <Save className="h-4 w-4 mr-2" />
               {saveDraftMutation.isPending ? "Saving..." : "Save as Draft"}
@@ -1785,7 +1784,7 @@ export default function DailyStockSales() {
             <Button 
               type="submit" 
               disabled={createMutation.isPending || ((form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0)}
-              className={`min-w-[200px] ${
+              className={`min-w-[200px] bg-black text-white hover:bg-gray-800 ${
                 (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0
                   ? 'opacity-50 cursor-not-allowed'
                   : ''

@@ -268,6 +268,15 @@ Changelog:
 - July 7, 2025. WEBHOOK SYSTEM SETUP: Fixed webhook registration system with proper API token configuration
 - July 7, 2025. Resolved duplicate function errors and corrected environment variable names for webhook authentication
 - July 7, 2025. Created comprehensive webhook management with real-time sync capabilities for receipt and shift notifications
+- July 8, 2025. CRITICAL FIX: Resolved Daily Stock & Sales form submission issue completely
+- July 8, 2025. Fixed ReferenceError preventing form saves by correcting variable references in route handlers
+- July 8, 2025. Temporarily disabled Google Sheets backup due to OAuth scope requirements (needs spreadsheets permission)
+- July 8, 2025. Form submission now works properly with database storage and Gmail email notifications
+- July 8, 2025. Enhanced form button styling: both Save as Draft and Submit Form buttons now have black background with white text
+- July 8, 2025. NAVIGATION CONSOLIDATION: Merged Recipe Management and Ingredient Management into single unified page
+- July 8, 2025. Created comprehensive Recipe & Ingredient Management page with tabbed interface for both functionalities
+- July 8, 2025. Unified navigation: Recipe Management now handles both recipes and ingredients in one location
+- July 8, 2025. Enhanced user experience: single page for all recipe and ingredient operations with consistent styling
 ```
 
 ## User Preferences
