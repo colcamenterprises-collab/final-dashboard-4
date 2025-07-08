@@ -84,7 +84,7 @@ export default function RecipeIngredientManagement() {
   const [isCreateIngredientDialogOpen, setIsCreateIngredientDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
   const [ingredientSearch, setIngredientSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Queries
   const { data: recipes = [], isLoading: recipesLoading } = useQuery({
@@ -245,7 +245,7 @@ export default function RecipeIngredientManagement() {
   const filteredIngredients = ingredients.filter(ingredient => {
     const matchesSearch = ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase()) ||
                          ingredient.supplier.toLowerCase().includes(ingredientSearch.toLowerCase());
-    const matchesCategory = !selectedCategory || ingredient.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -982,7 +982,7 @@ export default function RecipeIngredientManagement() {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {INGREDIENT_CATEGORIES.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
