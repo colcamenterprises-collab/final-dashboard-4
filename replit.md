@@ -289,6 +289,10 @@ Changelog:
 - July 8, 2025. COMPLETE WORKFLOW VERIFICATION: Successfully tested end-to-end Daily Stock Sales form submission process
 - July 8, 2025. Verified form submission, shopping list generation, and Gmail API email delivery working correctly
 - July 8, 2025. Form ID 56 test completed successfully - email sent (Message ID: 197eb59b35ef2f01)
+- July 8, 2025. REACT SELECT ERROR FIX: Fixed SelectItem component error by removing empty value prop in ingredient category filter
+- July 8, 2025. Updated category filtering logic to handle "All Categories" properly with "all" value instead of empty string
+- July 8, 2025. REQUEST SIZE LIMIT FIX: Increased Express server JSON and URL-encoded body limits to 50MB for large receipt photo uploads
+- July 8, 2025. Fixed "Request Entity Too Large" (413) error that prevented form submission with multiple receipt photos
 ```
 
 ## User Preferences
