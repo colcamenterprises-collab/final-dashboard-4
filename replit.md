@@ -277,6 +277,13 @@ Changelog:
 - July 8, 2025. Created comprehensive Recipe & Ingredient Management page with tabbed interface for both functionalities
 - July 8, 2025. Unified navigation: Recipe Management now handles both recipes and ingredients in one location
 - July 8, 2025. Enhanced user experience: single page for all recipe and ingredient operations with consistent styling
+- July 8, 2025. COMPREHENSIVE FORM DISPLAY: Enhanced Daily Stock Sales search to show complete form data in detail view
+- July 8, 2025. Added comprehensive form sections: sales breakdown by platform, detailed expenses, wage entries, shopping entries, inventory tracking
+- July 8, 2025. Included all food item categories: fresh food, frozen food, shelf items, kitchen items, packaging items, drink stock
+- July 8, 2025. Added receipt photo display, draft status indicators, and complete form timestamps
+- July 8, 2025. ENHANCED EMAIL TEMPLATES: Updated email notifications to include all comprehensive form data
+- July 8, 2025. Added detailed wage entries table, shopping entries with shop information, and complete inventory breakdown
+- July 8, 2025. Enhanced email with all food category sections, draft status warnings, and form creation/update timestamps
 ```
 
 ## User Preferences

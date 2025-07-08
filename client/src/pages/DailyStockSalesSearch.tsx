@@ -69,33 +69,13 @@ export default function DailyStockSalesSearch() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-green-500" />
-              <div>
-                <p className="text-sm text-gray-600">Total Sales</p>
-                <p className="font-bold text-green-600">{formatCurrency(form.totalSales)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-red-500" />
-              <div>
-                <p className="text-sm text-gray-600">Total Expenses</p>
-                <p className="font-bold text-red-600">{formatCurrency(form.totalExpenses)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
+      {/* Cash Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Cash Management</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-blue-500" />
               <div>
@@ -103,11 +83,6 @@ export default function DailyStockSalesSearch() {
                 <p className="font-medium">{formatCurrency(form.startingCash)}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-blue-500" />
               <div>
@@ -115,15 +90,83 @@ export default function DailyStockSalesSearch() {
                 <p className="font-medium">{formatCurrency(form.endingCash)}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sales Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sales Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Grab Sales</p>
+              <p className="font-medium text-green-600">{formatCurrency(form.grabSales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Food Panda Sales</p>
+              <p className="font-medium text-green-600">{formatCurrency(form.foodPandaSales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Aroi Dee Sales</p>
+              <p className="font-medium text-green-600">{formatCurrency(form.aroiDeeSales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">QR Scan Sales</p>
+              <p className="font-medium text-green-600">{formatCurrency(form.qrScanSales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Cash Sales</p>
+              <p className="font-medium text-green-600">{formatCurrency(form.cashSales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 font-semibold">Total Sales</p>
+              <p className="font-bold text-green-600">{formatCurrency(form.totalSales)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Expenses Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Expenses Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Salary / Wages</p>
+              <p className="font-medium text-red-600">{formatCurrency(form.salaryWages)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Shopping</p>
+              <p className="font-medium text-red-600">{formatCurrency(form.shopping)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Gas Expense</p>
+              <p className="font-medium text-red-600">{formatCurrency(form.gasExpense)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 font-semibold">Total Expenses</p>
+              <p className="font-bold text-red-600">{formatCurrency(form.totalExpenses)}</p>
+            </div>
+          </div>
+          {form.expenseDescription && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Expense Description</p>
+              <p className="text-sm">{form.expenseDescription}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Wage Entries */}
       {form.wageEntries && (form.wageEntries as any[]).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Salary / Wages</CardTitle>
+            <CardTitle className="text-lg">Salary / Wages Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -145,7 +188,7 @@ export default function DailyStockSalesSearch() {
       {form.shoppingEntries && (form.shoppingEntries as any[]).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Shopping</CardTitle>
+            <CardTitle className="text-lg">Shopping Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -153,6 +196,8 @@ export default function DailyStockSalesSearch() {
                 <div key={index} className="flex justify-between items-center py-2 border-b">
                   <div>
                     <p className="font-medium">{entry.item}</p>
+                    {entry.shop && <p className="text-xs text-blue-600">Shop: {entry.shop}</p>}
+                    {entry.customShop && <p className="text-xs text-blue-600">Custom Shop: {entry.customShop}</p>}
                     {entry.notes && <p className="text-sm text-gray-600">{entry.notes}</p>}
                   </div>
                   <Badge variant="outline">{formatCurrency(entry.amount)}</Badge>
@@ -169,7 +214,7 @@ export default function DailyStockSalesSearch() {
           <CardTitle className="text-lg">Stock Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-gray-600">Burger Buns Stock</p>
               <p className="font-medium">{form.burgerBunsStock}</p>
@@ -181,6 +226,186 @@ export default function DailyStockSalesSearch() {
             <div>
               <p className="text-sm text-gray-600">Meat Weight</p>
               <p className="font-medium">{form.meatWeight} kg</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Drink Stock Count</p>
+              <p className="font-medium">{form.drinkStockCount}</p>
+            </div>
+          </div>
+          {form.rollsOrderedConfirmed && (
+            <div className="mt-4 p-3 bg-green-50 rounded-lg">
+              <p className="text-sm text-green-700">✓ Rolls Ordered Confirmed</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Fresh Food Items */}
+      {form.freshFood && Object.keys(form.freshFood as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Fresh Food Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.freshFood as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'Required' : 'Not Required'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Frozen Food Items */}
+      {form.frozenFood && Object.keys(form.frozenFood as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Frozen Food Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.frozenFood as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'Required' : 'Not Required'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Shelf Items */}
+      {form.shelfItems && Object.keys(form.shelfItems as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Shelf Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.shelfItems as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'Required' : 'Not Required'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Kitchen Items */}
+      {form.kitchenItems && Object.keys(form.kitchenItems as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Kitchen Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.kitchenItems as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'Required' : 'Not Required'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Packaging Items */}
+      {form.packagingItems && Object.keys(form.packagingItems as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Packaging Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.packagingItems as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'Required' : 'Not Required'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Drink Stock */}
+      {form.drinkStock && Object.keys(form.drinkStock as any).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Drink Stock</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(form.drinkStock as any).map(([key, value]) => (
+                <div key={key} className="p-3 border rounded-lg">
+                  <p className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-sm text-gray-600">{value ? 'In Stock' : 'Out of Stock'}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Receipt Photos */}
+      {form.receiptPhotos && (form.receiptPhotos as any[]).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Receipt Photos ({(form.receiptPhotos as any[]).length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(form.receiptPhotos as any[]).map((photo, index) => (
+                <div key={index} className="p-3 border rounded-lg">
+                  <img 
+                    src={`data:image/jpeg;base64,${photo.base64Data}`} 
+                    alt={`Receipt ${index + 1}`} 
+                    className="w-full h-32 object-cover rounded mb-2"
+                  />
+                  <p className="text-xs text-gray-600">{photo.filename}</p>
+                  <p className="text-xs text-gray-500">
+                    {format(new Date(photo.uploadedAt), 'MMM dd, yyyy HH:mm')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Draft Status */}
+      {form.isDraft && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary">Draft</Badge>
+              <p className="text-sm text-gray-600">This form is saved as a draft</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Timestamps */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Form Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-600">Created At</p>
+              <p className="font-medium">{format(new Date(form.createdAt), 'PPP p')}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Updated At</p>
+              <p className="font-medium">{format(new Date(form.updatedAt), 'PPP p')}</p>
             </div>
           </div>
         </CardContent>

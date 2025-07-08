@@ -99,14 +99,65 @@ class EmailService {
     
     // Fresh Food Items
     if (formData.freshFood && Object.keys(formData.freshFood).length > 0) {
-      const hasItems = Object.values(formData.freshFood).some((value: any) => value > 0);
+      const hasItems = Object.values(formData.freshFood).some((value: any) => value);
       if (hasItems) {
         html += `
           <div class="section">
             <h2>🥬 Fresh Food Items</h2>
             <table>
               ${Object.entries(formData.freshFood).map(([key, value]) => 
-                value > 0 ? `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value}</td></tr>` : ''
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'Required' : 'Not Required'}</td></tr>`
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    // Frozen Food Items
+    if (formData.frozenFood && Object.keys(formData.frozenFood).length > 0) {
+      const hasItems = Object.values(formData.frozenFood).some((value: any) => value);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>🧊 Frozen Food Items</h2>
+            <table>
+              ${Object.entries(formData.frozenFood).map(([key, value]) => 
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'Required' : 'Not Required'}</td></tr>`
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    // Shelf Items
+    if (formData.shelfItems && Object.keys(formData.shelfItems).length > 0) {
+      const hasItems = Object.values(formData.shelfItems).some((value: any) => value);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>🏪 Shelf Items</h2>
+            <table>
+              ${Object.entries(formData.shelfItems).map(([key, value]) => 
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'Required' : 'Not Required'}</td></tr>`
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    // Kitchen Items
+    if (formData.kitchenItems && Object.keys(formData.kitchenItems).length > 0) {
+      const hasItems = Object.values(formData.kitchenItems).some((value: any) => value);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>🔪 Kitchen Items</h2>
+            <table>
+              ${Object.entries(formData.kitchenItems).map(([key, value]) => 
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'Required' : 'Not Required'}</td></tr>`
               ).join('')}
             </table>
           </div>
@@ -116,14 +167,31 @@ class EmailService {
     
     // Packaging Items
     if (formData.packagingItems && Object.keys(formData.packagingItems).length > 0) {
-      const hasItems = Object.values(formData.packagingItems).some((value: any) => value > 0);
+      const hasItems = Object.values(formData.packagingItems).some((value: any) => value);
       if (hasItems) {
         html += `
           <div class="section">
             <h2>📦 Packaging & Supplies</h2>
             <table>
               ${Object.entries(formData.packagingItems).map(([key, value]) => 
-                value > 0 ? `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value}</td></tr>` : ''
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'Required' : 'Not Required'}</td></tr>`
+              ).join('')}
+            </table>
+          </div>
+        `;
+      }
+    }
+    
+    // Drink Stock
+    if (formData.drinkStock && Object.keys(formData.drinkStock).length > 0) {
+      const hasItems = Object.values(formData.drinkStock).some((value: any) => value);
+      if (hasItems) {
+        html += `
+          <div class="section">
+            <h2>🥤 Drink Stock</h2>
+            <table>
+              ${Object.entries(formData.drinkStock).map(([key, value]) => 
+                `<tr><td><strong>${formatFieldName(key)}:</strong></td><td>${value ? 'In Stock' : 'Out of Stock'}</td></tr>`
               ).join('')}
             </table>
           </div>
@@ -255,7 +323,64 @@ class EmailService {
               <tr><td><strong>Gas Expense:</strong></td><td>${this.formatCurrency(formData.gasExpense)}</td></tr>
               <tr style="background: #f8f9fa; font-weight: bold;"><td><strong>Total Expenses:</strong></td><td>${this.formatCurrency(formData.totalExpenses)}</td></tr>
             </table>
+            ${formData.expenseDescription ? `
+              <div style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                <strong>Expense Description:</strong> ${formData.expenseDescription}
+              </div>
+            ` : ''}
           </div>
+
+          <!-- Wage Entries Details -->
+          ${formData.wageEntries && formData.wageEntries.length > 0 ? `
+          <div class="section">
+            <h2>👥 Salary / Wages Details</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Amount</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${formData.wageEntries.map((entry: any) => `
+                  <tr>
+                    <td>${entry.name}</td>
+                    <td>${this.formatCurrency(entry.amount)}</td>
+                    <td>${entry.notes || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          <!-- Shopping Entries Details -->
+          ${formData.shoppingEntries && formData.shoppingEntries.length > 0 ? `
+          <div class="section">
+            <h2>🛒 Shopping Details</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Amount</th>
+                  <th>Shop</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${formData.shoppingEntries.map((entry: any) => `
+                  <tr>
+                    <td>${entry.item}</td>
+                    <td>${this.formatCurrency(entry.amount)}</td>
+                    <td>${entry.shop || entry.customShop || '-'}</td>
+                    <td>${entry.notes || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
 
           <!-- Shopping List -->
           ${shoppingList.length > 0 ? `
@@ -285,6 +410,25 @@ class EmailService {
             ${receiptImagesHTML}
           </div>
           ` : ''}
+
+          <!-- Draft Status -->
+          ${formData.isDraft ? `
+          <div class="section">
+            <div class="alert alert-warning">
+              <strong>⚠️ Draft Status:</strong> This form was saved as a draft
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Form Information -->
+          <div class="section">
+            <h2>📄 Form Information</h2>
+            <table>
+              <tr><td><strong>Form Created:</strong></td><td>${new Date(formData.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)</td></tr>
+              <tr><td><strong>Form Updated:</strong></td><td>${new Date(formData.updatedAt).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)</td></tr>
+              <tr><td><strong>Form Status:</strong></td><td>${formData.isDraft ? 'Draft' : 'Complete'}</td></tr>
+            </table>
+          </div>
 
           <!-- Footer -->
           <div class="section" style="text-align: center; color: #666; font-size: 12px;">
