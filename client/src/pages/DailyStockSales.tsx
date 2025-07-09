@@ -225,13 +225,39 @@ export default function DailyStockSales() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => {
+    mutationFn: async (data: FormData) => {
       console.log('📝 Submitting form with data:', data);
       console.log('📷 Receipt photos:', receiptPhotos);
-      return apiRequest('/api/daily-stock-sales', {
-        method: 'POST',
-        body: JSON.stringify({ ...data, receiptPhotos })
-      });
+      
+      // Create a controller for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+      
+      try {
+        const response = await fetch('/api/daily-stock-sales', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ...data, receiptPhotos }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        return response.json();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('Request timed out after 5 minutes');
+        }
+        throw error;
+      }
     },
     onSuccess: (response) => {
       console.log('✅ Form submitted successfully:', response);
@@ -281,26 +307,68 @@ export default function DailyStockSales() {
     form.setValue('totalExpenses', total.toFixed(2));
   };
 
-  // Photo capture functionality
+  // Photo capture functionality with compression
+  const compressImage = (file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        // Set canvas size and draw compressed image
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handlePhotoCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Data = reader.result as string;
+    try {
+      // Compress image before adding to form
+      const compressedBase64 = await compressImage(file);
       const newPhoto = {
         filename: file.name,
-        base64Data,
+        base64Data: compressedBase64,
         uploadedAt: new Date().toISOString()
       };
       setReceiptPhotos(prev => [...prev, newPhoto]);
       toast({
         title: "Photo Added",
-        description: "Receipt photo has been captured and added to the form."
+        description: "Receipt photo has been compressed and added to the form."
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process image. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
   const removeReceiptPhoto = (index: number) => {
