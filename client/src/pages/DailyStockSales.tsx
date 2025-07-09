@@ -540,8 +540,9 @@ export default function DailyStockSales() {
       )}
 
       <Tabs defaultValue="new-form" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto">
+        <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="new-form" className="text-xs sm:text-sm lg:text-base py-2 px-2 sm:px-4">New Form</TabsTrigger>
+          <TabsTrigger value="draft" className="text-xs sm:text-sm lg:text-base py-2 px-2 sm:px-4">Load Draft</TabsTrigger>
           <TabsTrigger value="search" className="text-xs sm:text-sm lg:text-base py-2 px-2 sm:px-4">Search Forms</TabsTrigger>
         </TabsList>
         
@@ -1839,6 +1840,99 @@ export default function DailyStockSales() {
           </div>
           </form>
         </Form>
+        </TabsContent>
+
+        <TabsContent value="draft" className="space-y-6">
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
+            <CardHeader>
+              <CardTitle>Load Draft</CardTitle>
+              <p className="text-sm text-gray-600">Find and load your saved draft forms to continue working on them.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {searchLoading ? (
+                  <div className="text-center py-8">
+                    <p>Loading drafts...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {completedForms.filter(form => form.isDraft).length === 0 ? (
+                      <p className="text-center py-8 text-gray-500">No drafts found. Save a draft from the "New Form" tab to see it here.</p>
+                    ) : (
+                      completedForms.filter(form => form.isDraft).map((draftForm) => (
+                        <div key={draftForm.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-blue-500" />
+                                <p className="font-medium">{draftForm.completedBy}</p>
+                                <Badge variant="secondary">Draft</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {format(new Date(draftForm.shiftDate), 'PPP')} - {draftForm.shiftType}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Created: {format(new Date(draftForm.createdAt), 'PPpp')}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                // Load the draft data into the form
+                                form.reset({
+                                  completedBy: draftForm.completedBy,
+                                  shiftType: draftForm.shiftType,
+                                  shiftDate: new Date(draftForm.shiftDate),
+                                  startingCash: draftForm.startingCash || "0",
+                                  endingCash: draftForm.endingCash || "0",
+                                  grabSales: draftForm.grabSales || "0",
+                                  foodPandaSales: draftForm.foodPandaSales || "0",
+                                  aroiDeeSales: draftForm.aroiDeeSales || "0",
+                                  qrScanSales: draftForm.qrScanSales || "0",
+                                  cashSales: draftForm.cashSales || "0",
+                                  totalSales: draftForm.totalSales || "0",
+                                  salaryWages: draftForm.salaryWages || "0",
+                                  shopping: draftForm.shopping || "0",
+                                  gasExpense: draftForm.gasExpense || "0",
+                                  totalExpenses: draftForm.totalExpenses || "0",
+                                  expenseDescription: draftForm.expenseDescription || "",
+                                  wageEntries: draftForm.wageEntries || [],
+                                  shoppingEntries: draftForm.shoppingEntries || [],
+                                  burgerBunsStock: draftForm.burgerBunsStock || 0,
+                                  rollsOrderedCount: draftForm.rollsOrderedCount || 0,
+                                  meatWeight: draftForm.meatWeight || "0",
+                                  rollsOrderedConfirmed: draftForm.rollsOrderedConfirmed || false,
+                                  freshFood: draftForm.freshFood || Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
+                                  frozenFood: draftForm.frozenFood || Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
+                                  shelfItems: draftForm.shelfItems || Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+                                  foodItems: draftForm.foodItems || {},
+                                  drinkStock: draftForm.drinkStock || Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
+                                  kitchenItems: draftForm.kitchenItems || Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
+                                  packagingItems: draftForm.packagingItems || Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
+                                });
+                                // Load receipt photos if they exist
+                                if (draftForm.receiptPhotos) {
+                                  setReceiptPhotos(draftForm.receiptPhotos);
+                                }
+                                setIsDraft(true);
+                                toast({
+                                  title: "Draft Loaded",
+                                  description: "Your draft has been loaded into the form. You can continue editing."
+                                });
+                              }}
+                              className="bg-blue-500 hover:bg-blue-600 text-white"
+                            >
+                              Load Draft
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="search" className="space-y-6">
