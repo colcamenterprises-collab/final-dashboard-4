@@ -936,11 +936,7 @@ export default function DailyStockSales() {
                       />
                       <label
                         htmlFor="receipt-photo"
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
-                          (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0
-                            ? 'bg-red-500 text-white hover:bg-red-600'
-                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors bg-blue-500 text-white hover:bg-blue-600"
                       >
                         <Camera className="h-4 w-4" />
                         Take Photo
@@ -949,16 +945,7 @@ export default function DailyStockSales() {
                         <span className="text-sm text-gray-600">
                           {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
                         </span>
-                        {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 && (
-                          <span className="text-red-600 text-sm font-medium">
-                            ⚠️ Required
-                          </span>
-                        )}
-                        {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length > 0 && (
-                          <span className="text-green-600 text-sm font-medium">
-                            ✓ Complete
-                          </span>
-                        )}
+
                       </div>
                     </div>
                     
@@ -985,14 +972,7 @@ export default function DailyStockSales() {
                     )}
                   </div>
                   
-                  {(form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 && (
-                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        <strong>Important:</strong> Receipt photos are required when shopping expenses are listed. 
-                        You cannot submit the form without uploading at least one receipt photo.
-                      </p>
-                    </div>
-                  )}
+
                 </div>
                 
                 <div className="space-y-3">
@@ -1851,16 +1831,10 @@ export default function DailyStockSales() {
             
             <Button 
               type="submit" 
-              disabled={createMutation.isPending || ((form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0)}
-              className={`min-w-[200px] bg-black text-white hover:bg-gray-800 ${
-                (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0
-                  ? 'opacity-50 cursor-not-allowed'
-                  : ''
-              }`}
+              disabled={createMutation.isPending}
+              className="min-w-[200px] bg-black text-white hover:bg-gray-800"
             >
-              {createMutation.isPending ? "Submitting..." : 
-               (form.watch('shoppingEntries') || []).length > 0 && receiptPhotos.length === 0 ? "Receipt Photo Required" :
-               "Submit Form"}
+              {createMutation.isPending ? "Submitting..." : "Submit Form"}
             </Button>
           </div>
           </form>
