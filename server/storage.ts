@@ -2,6 +2,7 @@ import {
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
   expenseSuppliers, expenseCategories, bankStatements, ingredients, recipes, recipeIngredients,
+  quickNotes, marketingCalendar,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
@@ -13,7 +14,9 @@ import {
   type BankStatement, type InsertBankStatement,
   type Ingredient, type InsertIngredient,
   type Recipe, type InsertRecipe,
-  type RecipeIngredient, type InsertRecipeIngredient
+  type RecipeIngredient, type InsertRecipeIngredient,
+  type QuickNote, type InsertQuickNote,
+  type MarketingCalendar, type InsertMarketingCalendar
 } from "@shared/schema";
 
 export interface IStorage {
@@ -121,6 +124,20 @@ export interface IStorage {
   updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient>;
   removeRecipeIngredient(id: number): Promise<void>;
   calculateRecipeCost(recipeId: number): Promise<number>;
+  
+  // Quick Notes
+  getQuickNotes(): Promise<QuickNote[]>;
+  createQuickNote(note: InsertQuickNote): Promise<QuickNote>;
+  updateQuickNote(id: number, updates: Partial<QuickNote>): Promise<QuickNote>;
+  deleteQuickNote(id: number): Promise<void>;
+  getQuickNotesByPriority(priority: string): Promise<QuickNote[]>;
+  
+  // Marketing Calendar
+  getMarketingCalendar(): Promise<MarketingCalendar[]>;
+  createMarketingCalendarEvent(event: InsertMarketingCalendar): Promise<MarketingCalendar>;
+  updateMarketingCalendarEvent(id: number, updates: Partial<MarketingCalendar>): Promise<MarketingCalendar>;
+  deleteMarketingCalendarEvent(id: number): Promise<void>;
+  getMarketingCalendarByMonth(month: number, year: number): Promise<MarketingCalendar[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -140,6 +157,8 @@ export class MemStorage implements IStorage {
   private ingredients: Map<number, Ingredient> = new Map();
   private recipes: Map<number, Recipe> = new Map();
   private recipeIngredients: Map<number, RecipeIngredient> = new Map();
+  private quickNotes: Map<number, QuickNote> = new Map();
+  private marketingCalendar: Map<number, MarketingCalendar> = new Map();
   private currentId: number = 1;
 
   constructor() {
@@ -1142,6 +1161,89 @@ export class MemStorage implements IStorage {
     }
 
     return totalCost;
+  }
+
+  // Quick Notes methods
+  async getQuickNotes(): Promise<QuickNote[]> {
+    return Array.from(this.quickNotes.values());
+  }
+
+  async createQuickNote(note: InsertQuickNote): Promise<QuickNote> {
+    const id = this.currentId++;
+    const quickNote: QuickNote = {
+      ...note,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.quickNotes.set(id, quickNote);
+    return quickNote;
+  }
+
+  async updateQuickNote(id: number, updates: Partial<QuickNote>): Promise<QuickNote> {
+    const note = this.quickNotes.get(id);
+    if (!note) {
+      throw new Error("Quick note not found");
+    }
+    const updatedNote: QuickNote = {
+      ...note,
+      ...updates,
+      id,
+      updatedAt: new Date()
+    };
+    this.quickNotes.set(id, updatedNote);
+    return updatedNote;
+  }
+
+  async deleteQuickNote(id: number): Promise<void> {
+    this.quickNotes.delete(id);
+  }
+
+  async getQuickNotesByPriority(priority: string): Promise<QuickNote[]> {
+    return Array.from(this.quickNotes.values()).filter(note => note.priority === priority);
+  }
+
+  // Marketing Calendar methods
+  async getMarketingCalendar(): Promise<MarketingCalendar[]> {
+    return Array.from(this.marketingCalendar.values());
+  }
+
+  async createMarketingCalendarEvent(event: InsertMarketingCalendar): Promise<MarketingCalendar> {
+    const id = this.currentId++;
+    const marketingEvent: MarketingCalendar = {
+      ...event,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.marketingCalendar.set(id, marketingEvent);
+    return marketingEvent;
+  }
+
+  async updateMarketingCalendarEvent(id: number, updates: Partial<MarketingCalendar>): Promise<MarketingCalendar> {
+    const event = this.marketingCalendar.get(id);
+    if (!event) {
+      throw new Error("Marketing calendar event not found");
+    }
+    const updatedEvent: MarketingCalendar = {
+      ...event,
+      ...updates,
+      id,
+      updatedAt: new Date()
+    };
+    this.marketingCalendar.set(id, updatedEvent);
+    return updatedEvent;
+  }
+
+  async deleteMarketingCalendarEvent(id: number): Promise<void> {
+    this.marketingCalendar.delete(id);
+  }
+
+  async getMarketingCalendarByMonth(month: number, year: number): Promise<MarketingCalendar[]> {
+    return Array.from(this.marketingCalendar.values()).filter(event => {
+      const eventDate = new Date(event.eventDate);
+      return eventDate.getMonth() === month && eventDate.getFullYear() === year;
+    });
   }
 }
 

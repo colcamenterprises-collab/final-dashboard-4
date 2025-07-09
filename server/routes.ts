@@ -10,7 +10,9 @@ import {
   insertTransactionSchema,
   insertIngredientSchema,
   insertRecipeSchema,
-  insertRecipeIngredientSchema
+  insertRecipeIngredientSchema,
+  insertQuickNoteSchema,
+  insertMarketingCalendarSchema
 } from "@shared/schema";
 import { 
   analyzeReceipt, 
@@ -3463,6 +3465,134 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     } catch (error) {
       console.error("Error fetching sales vs expenses data:", error);
       res.status(500).json({ error: "Failed to fetch sales vs expenses data", details: error.message });
+    }
+  });
+
+  // Marketing API routes
+  
+  // Quick Notes endpoints
+  app.get('/api/quick-notes', async (req, res) => {
+    try {
+      const notes = await storage.getQuickNotes();
+      res.json(notes);
+    } catch (error) {
+      console.error('Error fetching quick notes:', error);
+      res.status(500).json({ error: 'Failed to fetch quick notes' });
+    }
+  });
+
+  app.post('/api/quick-notes', async (req, res) => {
+    try {
+      const parsed = insertQuickNoteSchema.parse(req.body);
+      const note = await storage.createQuickNote(parsed);
+      res.json(note);
+    } catch (error) {
+      console.error('Error creating quick note:', error);
+      res.status(400).json({ error: 'Failed to create quick note' });
+    }
+  });
+
+  app.put('/api/quick-notes/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const note = await storage.updateQuickNote(id, req.body);
+      res.json(note);
+    } catch (error) {
+      console.error('Error updating quick note:', error);
+      res.status(500).json({ error: 'Failed to update quick note' });
+    }
+  });
+
+  app.delete('/api/quick-notes/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      await storage.deleteQuickNote(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting quick note:', error);
+      res.status(500).json({ error: 'Failed to delete quick note' });
+    }
+  });
+
+  app.get('/api/quick-notes/priority/:priority', async (req, res) => {
+    try {
+      const priority = req.params.priority;
+      const notes = await storage.getQuickNotesByPriority(priority);
+      res.json(notes);
+    } catch (error) {
+      console.error('Error fetching quick notes by priority:', error);
+      res.status(500).json({ error: 'Failed to fetch quick notes by priority' });
+    }
+  });
+
+  // Marketing Calendar endpoints
+  app.get('/api/marketing-calendar', async (req, res) => {
+    try {
+      const events = await storage.getMarketingCalendar();
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching marketing calendar:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing calendar' });
+    }
+  });
+
+  app.post('/api/marketing-calendar', async (req, res) => {
+    try {
+      const parsed = insertMarketingCalendarSchema.parse(req.body);
+      const event = await storage.createMarketingCalendarEvent(parsed);
+      res.json(event);
+    } catch (error) {
+      console.error('Error creating marketing calendar event:', error);
+      res.status(400).json({ error: 'Failed to create marketing calendar event' });
+    }
+  });
+
+  app.put('/api/marketing-calendar/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      const event = await storage.updateMarketingCalendarEvent(id, req.body);
+      res.json(event);
+    } catch (error) {
+      console.error('Error updating marketing calendar event:', error);
+      res.status(500).json({ error: 'Failed to update marketing calendar event' });
+    }
+  });
+
+  app.delete('/api/marketing-calendar/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
+      }
+      await storage.deleteMarketingCalendarEvent(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting marketing calendar event:', error);
+      res.status(500).json({ error: 'Failed to delete marketing calendar event' });
+    }
+  });
+
+  app.get('/api/marketing-calendar/:month/:year', async (req, res) => {
+    try {
+      const month = parseInt(req.params.month);
+      const year = parseInt(req.params.year);
+      if (isNaN(month) || isNaN(year)) {
+        return res.status(400).json({ error: 'Invalid month or year format' });
+      }
+      const events = await storage.getMarketingCalendarByMonth(month, year);
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching marketing calendar by month:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing calendar by month' });
     }
   });
 

@@ -378,3 +378,37 @@ export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
 export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+
+// Quick Notes table
+export const quickNotes = pgTable("quick_notes", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  priority: text("priority").notNull(), // 'idea', 'note only', 'implement'
+  date: timestamp("date").notNull(),
+  isCompleted: boolean("is_completed").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Marketing Calendar table
+export const marketingCalendar = pgTable("marketing_calendar", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  eventDate: timestamp("event_date").notNull(),
+  eventType: text("event_type").notNull(), // 'promotion', 'campaign', 'social_media', 'content', 'other'
+  status: text("status").notNull(), // 'upcoming', 'idea', 'in_progress', 'completed'
+  googleCalendarId: text("google_calendar_id"), // For Google Calendar sync
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas
+export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMarketingCalendarSchema = createInsertSchema(marketingCalendar).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Types
+export type QuickNote = typeof quickNotes.$inferSelect;
+export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
+export type MarketingCalendar = typeof marketingCalendar.$inferSelect;
+export type InsertMarketingCalendar = z.infer<typeof insertMarketingCalendarSchema>;
