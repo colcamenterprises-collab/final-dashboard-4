@@ -1996,10 +1996,12 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
 
   app.post('/api/daily-stock-sales', async (req, res) => {
     try {
+      const startTime = Date.now();
       console.log('📝 Received daily stock sales form submission:', {
         isDraft: req.body.isDraft,
         completedBy: req.body.completedBy,
-        receiptPhotosCount: req.body.receiptPhotos?.length || 0
+        receiptPhotosCount: req.body.receiptPhotos?.length || 0,
+        bodySize: JSON.stringify(req.body).length
       });
       
       const formData = req.body;
@@ -2012,17 +2014,21 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       };
       
       console.log('💾 Saving form data to database...');
+      const dbStartTime = Date.now();
       const dailyStockSales = await storage.createDailyStockSales(dataToSave);
-      console.log('✅ Form saved successfully with ID:', dailyStockSales.id);
+      console.log(`✅ Form saved successfully with ID: ${dailyStockSales.id} (${Date.now() - dbStartTime}ms)`);
       
       // Only generate shopping list and send email if this is not a draft
       if (!formData.isDraft) {
         console.log('📋 Generating shopping list from stock form...');
+        const shoppingStartTime = Date.now();
         await generateShoppingListFromStockForm(formData, dailyStockSales.id);
+        console.log(`✅ Shopping list generated (${Date.now() - shoppingStartTime}ms)`);
         
         // Send management summary email
         try {
           console.log('📧 Sending management summary email...');
+          const emailStartTime = Date.now();
           const { emailService } = await import('./emailService');
           const shoppingList = await storage.getShoppingList();
           
@@ -2033,13 +2039,14 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
             submissionTime: new Date()
           });
           
-          console.log('✅ Management summary email sent successfully');
+          console.log(`✅ Management summary email sent successfully (${Date.now() - emailStartTime}ms)`);
         } catch (emailError) {
           console.error('❌ Failed to send management summary email:', emailError);
           // Don't fail the entire request if email fails
         }
       }
       
+      console.log(`🎉 Form submission completed in ${Date.now() - startTime}ms`);
       res.json(dailyStockSales);
     } catch (error) {
       console.error('❌ Error creating daily stock sales:', error);
