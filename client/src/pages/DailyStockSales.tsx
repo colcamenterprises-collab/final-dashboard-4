@@ -354,18 +354,18 @@ export default function DailyStockSales() {
       validationErrors.push("Shift type must be selected");
     }
     
-    // Check shopping receipt photo requirement (only critical validation)
-    const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
-    const hasReceiptPhotos = receiptPhotos.length > 0;
+    // Check shopping receipt photo requirement (TEMPORARILY DISABLED FOR QUICK SUBMISSION)
+    // const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
+    // const hasReceiptPhotos = receiptPhotos.length > 0;
     
-    if (hasShoppingItems && !hasReceiptPhotos) {
-      toast({
-        title: "Receipt Photo Required",
-        description: "Please upload at least one receipt photo when shopping expenses are listed.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // if (hasShoppingItems && !hasReceiptPhotos) {
+    //   toast({
+    //     title: "Receipt Photo Required",
+    //     description: "Please upload at least one receipt photo when shopping expenses are listed.",
+    //     variant: "destructive"
+    //   });
+    //   return;
+    // }
     
     // If critical validation fails, show error and don't submit
     if (validationErrors.length > 0) {
