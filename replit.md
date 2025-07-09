@@ -293,6 +293,10 @@ Changelog:
 - July 8, 2025. Updated category filtering logic to handle "All Categories" properly with "all" value instead of empty string
 - July 8, 2025. REQUEST SIZE LIMIT FIX: Increased Express server JSON and URL-encoded body limits to 50MB for large receipt photo uploads
 - July 8, 2025. Fixed "Request Entity Too Large" (413) error that prevented form submission with multiple receipt photos
+- July 9, 2025. GMAIL API OAUTH INTEGRATION: Successfully implemented proper Gmail API authentication for email notifications
+- July 9, 2025. Added Gmail API OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) for reliable email delivery
+- July 9, 2025. Removed confusing old SMTP secrets and replaced with proper Gmail API authentication system
+- July 9, 2025. Test email sent successfully via Gmail API (Message ID: 197ef4c45aebb43e) - complete workflow verified
 ```
 
 ## User Preferences
