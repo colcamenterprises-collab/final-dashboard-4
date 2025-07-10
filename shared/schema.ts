@@ -2,23 +2,9 @@ import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Users table
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
-
-// Daily Sales table
-export const dailySales = pgTable("daily_sales", {
-  id: serial("id").primaryKey(),
-  date: timestamp("date").notNull(),
-  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).notNull(),
-  ordersCount: integer("orders_count").notNull(),
-  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).notNull(),
-  cardSales: decimal("card_sales", { precision: 10, scale: 2 }).notNull(),
-  staffMember: text("staff_member").notNull(),
-});
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
 
 // Menu Items table
 export const menuItems = pgTable("menu_items", {
@@ -210,45 +196,50 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
+ 
+    / // Sales Data - Optional
+      grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).default('0'),
+      foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).default('0'),
+      aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).default('0'),
+      qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).default('0'),
+      cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).default('0'),
+      totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default('0'),
 
-// Daily Stock and Sales Form table
-export const dailyStockSales = pgTable("daily_stock_sales", {
-  id: serial("id").primaryKey(),
-  completedBy: text("completed_by").notNull(),
-  shiftType: text("shift_type").notNull(), // Night Shift, Day Shift
-  shiftDate: timestamp("shift_date").notNull(),
+      // Expenses - Optional
+      salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).default('0'),
+      shopping: decimal("shopping", { precision: 10, scale: 2 }).default('0'),
+      gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).default('0'),
+      totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).default('0'),
+      wageEntries: jsonb("wage_entries").notNull().default('[]'), // Array of {name, amount, notes}
+      shoppingEntries: jsonb("shopping_entries").notNull().default('[]'), // Array of {item, amount, notes, shop, customShop}
+      expenseDescription: text("expense_description"),
   
-  // Cash Management - Optional
-  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).default('0'),
-  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).default('0'),
+        // Stock Counts - Optional
+        burgerBunsStock: integer("burger_buns_stock").default(0),
+        rollsOrderedCount: integer("rolls_ordered_count").default(0),
+        meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).default('0'), // in kg
+        drinkStockCount: integer("drink_stock_count").default(0),
   
-  // Sales Data - Optional
-  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).default('0'),
-  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).default('0'),
-  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).default('0'),
-  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).default('0'),
-  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).default('0'),
-  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default('0'),
-  
-  // Expenses - Optional
-  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).default('0'),
-  shopping: decimal("shopping", { precision: 10, scale: 2 }).default('0'),
-  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).default('0'),
-  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).default('0'),
-  wageEntries: jsonb("wage_entries").notNull().default('[]'), // Array of {name, amount, notes}
-  shoppingEntries: jsonb("shopping_entries").notNull().default('[]'), // Array of {item, amount, notes, shop, customShop}
-  expenseDescription: text("expense_description"),
-  
-  // Stock Counts - Optional
-  burgerBunsStock: integer("burger_buns_stock").default(0),
-  rollsOrderedCount: integer("rolls_ordered_count").default(0),
-  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).default('0'), // in kg
-  drinkStockCount: integer("drink_stock_count").default(0),
-  
-  // Food Items Required - Optional
-  freshFood: jsonb("fresh_food").notNull().default('{}'), // Fresh food items (Salad, Tomatos, etc.) with otherItems array
-  frozenFood: jsonb("frozen_food").notNull().default('{}'), // Frozen food items (Bacon, Cheese, etc.)
-  shelfItems: jsonb("shelf_items").notNull().default('{}'), // Shelf stable items
+        // Food Items Required - Optional
+        freshFood: jsonb("fresh_food").notNull().default('{}'),
+        frozenFood: jsonb("frozen_food").notNull().default('{}'),
+        shelfItems: jsonb("shelf_items").notNull().default('{}'),
+
+        // Legacy compatibility
+          foodItems: jsonb("food_items").notNull().default('{}'),
+          drinkStock: jsonb("drink_stock").notNull().default('{}'),
+          kitchenItems: jsonb("kitchen_items").notNull().default('{}'),
+          packagingItems: jsonb("packaging_items").notNull().default('{}'),
+
+          rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").default(false),
+          receiptPhotos: jsonb("receipt_photos").notNull().default('[]'),
+          isDraft: boolean("is_draft").notNull().default(false),
+
+          createdAt: timestamp("created_at").defaultNow(),
+          updatedAt: timestamp("updated_at").defaultNow()
+        });
+
+        
   
   // Keep existing food items for backward compatibility - Optional
   foodItems: jsonb("food_items").notNull().default('{}'), // Contains all food item requirements
@@ -316,7 +307,9 @@ export const recipeIngredients = pgTable("recipe_ingredients", {
 
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true });
+export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true }).extend({
+  isBalanced: z.boolean().optional(),  discrepancyNotes: z.string().optional(),
+});
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true });
@@ -334,7 +327,12 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: tru
 export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({ id: true });
 export const insertLoyverseReceiptSchema = createInsertSchema(loyverseReceipts).omit({ id: true });
 export const insertLoyverseShiftReportSchema = createInsertSchema(loyverseShiftReports).omit({ id: true });
-export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales)
+.omit({ id: true })
+.extend({
+  isBalanced: z.boolean().optional(),
+  discrepancyNotes: z.string().optional(),
+});
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
