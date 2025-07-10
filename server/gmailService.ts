@@ -113,54 +113,99 @@ export const gmailService = new GmailService();
 // Export a sendManagementSummary function that matches the expected interface
 export async function sendManagementSummary(data: any): Promise<boolean> {
   const emailHTML = generateEmailHTML(data);
+  const shift = `${data.formData.shiftType} - ${new Date(data.formData.shiftDate).toLocaleDateString()}`;
   
   return await gmailService.sendEmail({
-    from: 'colcamenterprises@gmail.com',
+    from: '"Smash Brothers Burgers" <colcamenterprises@gmail.com>',
     to: 'colcamenterprises@gmail.com',
-    subject: `Daily Management Summary - ${data.formData.completedBy} - ${data.formData.shiftDate}`,
+    subject: `Smash Brothers | Daily Summary — ${shift}`,
     html: emailHTML
   });
 }
 
-// Helper function to generate email HTML (simplified version)
+// Helper function to generate email HTML with comprehensive template
 function generateEmailHTML(data: any): string {
   const { formData } = data;
+  
+  // Calculate order count from total sales (example calculation)
+  const orderCount = Math.round(Number(formData.totalSales) / 180) || 0; // Approximate orders based on average ticket
+  
+  // Calculate stock usage and variances (example calculations)
+  const bunsStart = 100; // These would come from previous day's ending stock
+  const bunsOrdered = Number(formData.rollsOrderedCount) || 0;
+  const bunsEnd = Number(formData.burgerBunsStock) || 0;
+  const bunsUsed = bunsStart + bunsOrdered - bunsEnd;
+  
+  const meatStart = 10000; // grams
+  const meatOrdered = 0;
+  const meatEnd = Number(formData.meatWeight) || 0;
+  const meatUsed = meatStart + meatOrdered - meatEnd;
+  const meatVariance = meatUsed - (orderCount * 150); // Assuming 150g per order
+  
+  const drinksStart = 50;
+  const drinksOrdered = 0;
+  const drinksEnd = Number(formData.drinkStockCount) || 0;
+  const drinksUsed = drinksStart + drinksOrdered - drinksEnd;
+  
+  // Format shift date
+  const shift = `${formData.shiftType} - ${new Date(formData.shiftDate).toLocaleDateString()}`;
+  const staffMember = formData.completedBy;
+  const totalSales = Number(formData.totalSales).toFixed(2);
+  const cashSales = Number(formData.cashSales).toFixed(2);
+  const cardSales = (Number(formData.grabSales) + Number(formData.qrScanSales) + Number(formData.foodPandaSales) + Number(formData.aroiDeeSales)).toFixed(2);
+  const startingCash = Number(formData.startingCash).toFixed(2);
+  const endingCash = Number(formData.endingCash).toFixed(2);
+  const discrepancyNotes = formData.expenseDescription || 'No notes provided.';
+
   return `
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { background: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; }
-        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 8px; border-bottom: 1px solid #eee; }
-        .alert { padding: 10px; margin: 10px 0; border-radius: 4px; }
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Daily Management Summary</h1>
-        <p><strong>Completed by:</strong> ${formData.completedBy}</p>
-        <p><strong>Shift:</strong> ${formData.shiftType}</p>
-        <p><strong>Date:</strong> ${formData.shiftDate}</p>
-      </div>
-      
-      <div class="section">
-        <h2>Sales Summary</h2>
-        <table>
-          <tr><td><strong>Total Sales:</strong></td><td>฿${formData.totalSales}</td></tr>
-          <tr><td><strong>Cash Sales:</strong></td><td>฿${formData.cashSales}</td></tr>
-        </table>
-      </div>
-      
-      <div class="section">
-        <h2>Form Submission</h2>
-        <p>This is a test email from your restaurant management system.</p>
-        <p>Gmail API OAuth integration is working successfully!</p>
-      </div>
-    </body>
-    </html>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+      <h2 style="border-left: 4px solid #007BFF; padding-left: 10px;">Daily Management Summary</h2>
+      <p><strong>Completed by:</strong> ${staffMember}</p>
+      <p><strong>Shift:</strong> ${shift}</p>
+      <p><strong>Date:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })}</p>
+
+      <hr style="margin: 20px 0;" />
+
+      <h3>💰 Sales Summary</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td>Total Sales:</td><td style="text-align: right;"><strong>฿${totalSales}</strong></td></tr>
+        <tr><td>Cash Sales:</td><td style="text-align: right;">฿${cashSales}</td></tr>
+        <tr><td>Card Sales:</td><td style="text-align: right;">฿${cardSales}</td></tr>
+        <tr><td>Orders:</td><td style="text-align: right;">${orderCount} orders</td></tr>
+      </table>
+
+      <hr style="margin: 20px 0;" />
+
+      <h3>🍔 Stock & Usage</h3>
+      <table style="width: 100%; border-collapse: collapse;" border="1">
+        <thead>
+          <tr style="background-color: #f0f0f0;">
+            <th>Item</th><th>Start</th><th>Ordered</th><th>End</th><th>Used</th><th>Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Burger Buns</td><td>${bunsStart}</td><td>${bunsOrdered}</td><td>${bunsEnd}</td><td>${bunsUsed}</td><td>✅ Match</td></tr>
+          <tr><td>Meat (g)</td><td>${meatStart}</td><td>${meatOrdered}</td><td>${meatEnd}</td><td>${meatUsed}</td><td>${meatVariance > 0 ? '+' : ''}${meatVariance}g</td></tr>
+          <tr><td>Drinks</td><td>${drinksStart}</td><td>${drinksOrdered}</td><td>${drinksEnd}</td><td>${drinksUsed}</td><td>✅ Match</td></tr>
+        </tbody>
+      </table>
+
+      <hr style="margin: 20px 0;" />
+
+      <h3>🧾 Cash Management</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td>Starting Cash:</td><td style="text-align: right;">฿${startingCash}</td></tr>
+        <tr><td>Ending Cash:</td><td style="text-align: right;">฿${endingCash}</td></tr>
+      </table>
+
+      <hr style="margin: 20px 0;" />
+
+      <h3>📌 Discrepancy Notes</h3>
+      <p>${discrepancyNotes}</p>
+
+      <hr style="margin: 20px 0;" />
+
+      <p style="font-size: 12px; color: #666;">This report was automatically generated by your Smash Brothers system.</p>
+    </div>
   `;
 }

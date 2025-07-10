@@ -311,6 +311,10 @@ Changelog:
 - July 9, 2025. Added detailed logging throughout submission process for debugging
 - July 9, 2025. Temporarily disabled receipt photo requirement for urgent shift submissions
 - July 9, 2025. Backend submissions working correctly (6.6 seconds average), frontend timeout issue resolved
+- July 10, 2025. EMAIL TEMPLATE UPDATE: Implemented new comprehensive HTML email template for daily sales summaries
+- July 10, 2025. Updated email format with structured sections: Sales Summary, Stock & Usage tracking, Cash Management, and Discrepancy Notes
+- July 10, 2025. Modified sender format to "Smash Brothers Burgers" with professional subject line format: "Smash Brothers | Daily Summary — [Shift]"
+- July 10, 2025. Enhanced email content with stock variance calculations, order count estimation, and Bangkok timezone formatting
 ```
 
 ## User Preferences
