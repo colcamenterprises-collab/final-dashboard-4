@@ -113,7 +113,8 @@ export const gmailService = new GmailService();
 // Export a sendManagementSummary function that matches the expected interface
 export async function sendManagementSummary(data: any): Promise<boolean> {
   const emailHTML = generateEmailHTML(data);
-  const shift = `${data.formData.shiftType} - ${new Date(data.formData.shiftDate).toLocaleDateString()}`;
+  const shiftDate = data.formData.shiftDate instanceof Date ? data.formData.shiftDate : new Date(data.formData.shiftDate);
+  const shift = `${data.formData.shiftType} - ${shiftDate.toLocaleDateString()}`;
   
   return await gmailService.sendEmail({
     from: '"Smash Brothers Burgers" <colcamenterprises@gmail.com>',
@@ -147,8 +148,9 @@ function generateEmailHTML(data: any): string {
   const drinksEnd = Number(formData.drinkStockCount) || 0;
   const drinksUsed = drinksStart + drinksOrdered - drinksEnd;
   
-  // Format shift date
-  const shift = `${formData.shiftType} - ${new Date(formData.shiftDate).toLocaleDateString()}`;
+  // Format shift date safely
+  const shiftDate = formData.shiftDate instanceof Date ? formData.shiftDate : new Date(formData.shiftDate);
+  const shift = `${formData.shiftType} - ${shiftDate.toLocaleDateString()}`;
   const staffMember = formData.completedBy;
   const totalSales = Number(formData.totalSales).toFixed(2);
   const cashSales = Number(formData.cashSales).toFixed(2);

@@ -2284,6 +2284,55 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
+  // Test endpoint: Send email with last form submission
+  app.post('/api/test/send-email', async (req, res) => {
+    try {
+      // Get the most recent form submission
+      const forms = await storage.searchDailyStockSales('', 1);
+      if (forms.length === 0) {
+        return res.status(404).json({ error: 'No form submissions found' });
+      }
+
+      const lastForm = forms[0];
+      console.log('📧 Sending test email with form data:', lastForm.id);
+
+      // Use Gmail service to send email
+      const { sendManagementSummary } = await import('./gmailService');
+      
+      const emailData = {
+        formData: lastForm,
+        shoppingList: [],
+        receiptPhotos: [],
+        submissionTime: new Date()
+      };
+
+      const success = await sendManagementSummary(emailData);
+      
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: `Test email sent successfully using form ID ${lastForm.id}`,
+          formData: {
+            completedBy: lastForm.completedBy,
+            shiftType: lastForm.shiftType,
+            totalSales: lastForm.totalSales
+          }
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          error: 'Failed to send test email' 
+        });
+      }
+    } catch (error) {
+      console.error('Test email error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: `Failed to send test email: ${error.message}` 
+      });
+    }
+  });
+
 
 
   app.post('/api/loyverse/live/sync-receipts', async (req, res) => {
