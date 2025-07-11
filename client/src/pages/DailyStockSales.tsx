@@ -422,18 +422,7 @@ export default function DailyStockSales() {
       validationErrors.push("Shift type must be selected");
     }
     
-    // Check shopping receipt photo requirement (TEMPORARILY DISABLED FOR QUICK SUBMISSION)
-    // const hasShoppingItems = data.shoppingEntries && data.shoppingEntries.length > 0;
-    // const hasReceiptPhotos = receiptPhotos.length > 0;
-    
-    // if (hasShoppingItems && !hasReceiptPhotos) {
-    //   toast({
-    //     title: "Receipt Photo Required",
-    //     description: "Please upload at least one receipt photo when shopping expenses are listed.",
-    //     variant: "destructive"
-    //   });
-    //   return;
-    // }
+    // Photo validation removed - photos are now optional
     
     // If critical validation fails, show error and don't submit
     if (validationErrors.length > 0) {
@@ -911,19 +900,13 @@ export default function DailyStockSales() {
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
                 {/* Photo Receipt Section */}
-                <div className={`mb-6 p-4 rounded-lg ${
-                  (form.watch('shoppingEntries') || []).length > 0 
-                    ? 'bg-red-50 border-2 border-red-200' 
-                    : 'bg-blue-50'
-                }`}>
+                <div className="mb-6 p-4 rounded-lg bg-blue-50">
                   <h4 className="flex items-center gap-2 text-md font-medium mb-3">
                     <Camera className="h-4 w-4" />
                     Shopping Receipt Photos
-                    {(form.watch('shoppingEntries') || []).length > 0 && (
-                      <span className="text-red-600 text-sm font-normal">
-                        (Required when shopping items listed)
-                      </span>
-                    )}
+                    <span className="text-gray-600 text-sm font-normal">
+                      (Optional)
+                    </span>
                   </h4>
                   <div className="space-y-3">
                     <div className="flex items-center gap-4">

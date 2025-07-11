@@ -323,6 +323,9 @@ Changelog:
 - July 11, 2025. Added detailed breakdown cards for sales summary, cash management, expense breakdown, stock information, and inventory status
 - July 11, 2025. Included wage entries summary, shopping entries summary, and expense notes preview in search results
 - July 11, 2025. Enhanced visual organization with color-coded sections and improved spacing for better readability
+- July 11, 2025. PHOTO REQUIREMENT REMOVED: Eliminated mandatory receipt photo validation from Daily Stock & Sales form
+- July 11, 2025. Updated form styling to remove red warning backgrounds and changed photo requirement text to "Optional"
+- July 11, 2025. Receipt photos are now completely optional - forms can be submitted without photos regardless of shopping entries
 ```
 
 ## User Preferences
