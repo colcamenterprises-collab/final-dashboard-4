@@ -1,16 +1,19 @@
-interface StockCounts {
-  burgerBunsUsed: number;
-  meatUsedGrams: number;
-  drinksUsed: number;
+// Stock analysis functions for comparing Loyverse receipts with staff forms
+
+interface ReceiptItem {
+  itemName: string;
+  quantity: number;
+  price: number;
+  totalMoney: number;
 }
 
-interface StockForm {
-  burgerBunsStock: number;
-  meatWeight: number;
-  drinkStockCount: number;
+interface StockExpectation {
+  item: string;
+  expected: number;
+  category: string;
 }
 
-interface DiscrepancyResult {
+interface StockDiscrepancy {
   item: string;
   expected: number;
   actual: number;
@@ -20,99 +23,119 @@ interface DiscrepancyResult {
   alert: string | null;
 }
 
-export const getExpectedStockFromReceipts = async (receipts: any[]): Promise<StockCounts> => {
-  let burgerCount = 0;
-  let pattyCount = 0;
-  let drinkCount = 0;
+// Map Loyverse menu items to stock ingredients
+const MENU_TO_STOCK_MAPPING: Record<string, Array<{ item: string; quantity: number; category: string }>> = {
+  // Burgers
+  "Smash Burger": [
+    { item: "Burger Buns", quantity: 1, category: "packaging" },
+    { item: "Beef Patty", quantity: 1, category: "meat" },
+    { item: "Cheese", quantity: 1, category: "dairy" },
+    { item: "Pickles", quantity: 2, category: "condiments" }
+  ],
+  "Bacon Burger": [
+    { item: "Burger Buns", quantity: 1, category: "packaging" },
+    { item: "Beef Patty", quantity: 1, category: "meat" },
+    { item: "Bacon", quantity: 2, category: "meat" },
+    { item: "Cheese", quantity: 1, category: "dairy" }
+  ],
+  "Chicken Burger": [
+    { item: "Burger Buns", quantity: 1, category: "packaging" },
+    { item: "Chicken Fillet", quantity: 1, category: "meat" },
+    { item: "Lettuce", quantity: 1, category: "vegetables" }
+  ],
+  
+  // Chicken items
+  "Chicken Nuggets": [
+    { item: "Chicken Nuggets", quantity: 1, category: "frozen" }
+  ],
+  "Chicken Wings": [
+    { item: "Chicken Wings", quantity: 1, category: "meat" }
+  ],
+  
+  // Sides
+  "French Fries": [
+    { item: "French Fries", quantity: 1, category: "frozen" }
+  ],
+  "Sweet Potato Fries": [
+    { item: "Sweet Potato Fries", quantity: 1, category: "frozen" }
+  ],
+  "Onion Rings": [
+    { item: "Onion Rings", quantity: 1, category: "frozen" }
+  ],
+  
+  // Drinks
+  "Coke": [
+    { item: "Coke", quantity: 1, category: "beverages" }
+  ],
+  "Fanta": [
+    { item: "Fanta", quantity: 1, category: "beverages" }
+  ],
+  "Water": [
+    { item: "Water", quantity: 1, category: "beverages" }
+  ]
+};
 
+export function getExpectedStockFromReceipts(receipts: any[]): StockExpectation[] {
+  const stockUsage: Record<string, { quantity: number; category: string }> = {};
+  
   for (const receipt of receipts) {
-    for (const item of receipt.line_items || []) {
-      const name = item.variant_name?.toLowerCase() || "";
-      const qty = item.quantity || 1;
-
-      if (name.includes("burger")) {
-        burgerCount += qty;
-        // Estimate patties per burger by name
-        if (name.includes("double")) pattyCount += 2 * qty;
-        else if (name.includes("triple")) pattyCount += 3 * qty;
-        else pattyCount += qty;
+    const lineItems = receipt.lineItems || [];
+    
+    for (const item of lineItems) {
+      const itemName = item.itemName;
+      const quantity = item.quantity || 1;
+      
+      // Map menu item to stock ingredients
+      const stockItems = MENU_TO_STOCK_MAPPING[itemName] || [];
+      
+      for (const stockItem of stockItems) {
+        const key = stockItem.item;
+        if (!stockUsage[key]) {
+          stockUsage[key] = { quantity: 0, category: stockItem.category };
+        }
+        stockUsage[key].quantity += stockItem.quantity * quantity;
       }
-
-      if (name.includes("drink") || name.includes("soda") || name.includes("coke")) {
-        drinkCount += qty;
-      }
-
-      // Optional: detect combo meals and parse inner modifiers if needed
     }
   }
+  
+  return Object.entries(stockUsage).map(([item, data]) => ({
+    item,
+    expected: data.quantity,
+    category: data.category
+  }));
+}
 
-  return {
-    burgerBunsUsed: burgerCount,
-    meatUsedGrams: pattyCount * 90,
-    drinksUsed: drinkCount
-  };
-};
-
-export const analyzeStockDiscrepancy = (expected: StockCounts, actual: StockForm): DiscrepancyResult[] => {
-  const results: DiscrepancyResult[] = [];
-
-  const bunStart = 100; // replace with dynamic start tracking later
-  const meatStart = 10000; // in grams
-  const drinkStart = 50;
-
-  const bunOrdered = Number(actual["rollsOrderedCount"]) || 0;
-  const meatOrdered = 0; // Update if tracked
-  const drinksOrdered = 0; // Update if tracked
-
-  const bunEnd = Number(actual["burgerBunsStock"]) || 0;
-  const meatEnd = Number(actual["meatWeight"]) || 0;
-  const drinkEnd = Number(actual["drinkStockCount"]) || 0;
-
-  const actualUsedBuns = bunStart + bunOrdered - bunEnd;
-  const actualUsedMeat = meatStart + meatOrdered - meatEnd;
-  const actualUsedDrinks = drinkStart + drinksOrdered - drinkEnd;
-
-  const thresholds = {
-    buns: 5,
-    meat: 500,
-    drinks: 3
-  };
-
-  results.push({
-    item: "Burger Buns",
-    expected: expected.burgerBunsUsed,
-    actual: actualUsedBuns,
-    difference: actualUsedBuns - expected.burgerBunsUsed,
-    threshold: thresholds.buns,
-    isOutOfBounds: Math.abs(actualUsedBuns - expected.burgerBunsUsed) > thresholds.buns,
-    alert: Math.abs(actualUsedBuns - expected.burgerBunsUsed) > thresholds.buns
-      ? `Discrepancy in buns: ${actualUsedBuns - expected.burgerBunsUsed}`
-      : null
-  });
-
-  results.push({
-    item: "Meat (grams)",
-    expected: expected.meatUsedGrams,
-    actual: actualUsedMeat,
-    difference: actualUsedMeat - expected.meatUsedGrams,
-    threshold: thresholds.meat,
-    isOutOfBounds: Math.abs(actualUsedMeat - expected.meatUsedGrams) > thresholds.meat,
-    alert: Math.abs(actualUsedMeat - expected.meatUsedGrams) > thresholds.meat
-      ? `Discrepancy in meat: ${actualUsedMeat - expected.meatUsedGrams}g`
-      : null
-  });
-
-  results.push({
-    item: "Drinks",
-    expected: expected.drinksUsed,
-    actual: actualUsedDrinks,
-    difference: actualUsedDrinks - expected.drinksUsed,
-    threshold: thresholds.drinks,
-    isOutOfBounds: Math.abs(actualUsedDrinks - expected.drinksUsed) > thresholds.drinks,
-    alert: Math.abs(actualUsedDrinks - expected.drinksUsed) > thresholds.drinks
-      ? `Discrepancy in drinks: ${actualUsedDrinks - expected.drinksUsed}`
-      : null
-  });
-
-  return results;
-};
+export function analyzeStockDiscrepancies(
+  expectedStock: StockExpectation[],
+  actualStock: Record<string, number> = {}
+): StockDiscrepancy[] {
+  const discrepancies: StockDiscrepancy[] = [];
+  
+  for (const expected of expectedStock) {
+    const actual = actualStock[expected.item] || 0;
+    const difference = actual - expected.expected;
+    const threshold = Math.max(5, Math.floor(expected.expected * 0.2)); // 20% or minimum 5
+    const isOutOfBounds = Math.abs(difference) > threshold;
+    
+    let alert: string | null = null;
+    if (isOutOfBounds) {
+      if (difference > 0) {
+        alert = `${difference} units over expected usage`;
+      } else {
+        alert = `${Math.abs(difference)} units under expected usage`;
+      }
+    }
+    
+    discrepancies.push({
+      item: expected.item,
+      expected: expected.expected,
+      actual,
+      difference,
+      threshold,
+      isOutOfBounds,
+      alert
+    });
+  }
+  
+  return discrepancies.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
+}

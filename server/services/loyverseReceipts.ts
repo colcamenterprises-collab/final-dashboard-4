@@ -558,6 +558,24 @@ export class LoyverseReceiptService {
       .limit(limit);
   }
 
+  async getShiftData(shiftType: "last" | "current" = "last") {
+    // Get the most recent shift report
+    const shiftReports = await db.select().from(loyverseShiftReports)
+      .orderBy(desc(loyverseShiftReports.shiftDate))
+      .limit(1);
+    
+    if (shiftReports.length === 0) {
+      throw new Error("No shift data found");
+    }
+    
+    return shiftReports[0];
+  }
+
+  async getReceiptsByShift(shiftId: string) {
+    // Get receipts for the latest shift period (use existing getAllReceipts method)
+    return await this.getAllReceipts(100);
+  }
+
   async getShiftBalanceAnalysis(limit: number = 5) {
     // First try to fetch from database
     let recentShifts = await db.select().from(loyverseShiftReports)
