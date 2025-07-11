@@ -154,8 +154,7 @@ export default function DailyStockSales() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedForm, setSelectedForm] = useState<DailyStockSales | null>(null);
   
-  // Photo receipt state
-  const [receiptPhotos, setReceiptPhotos] = useState<Array<{filename: string, base64Data: string, uploadedAt: string}>>([]);
+  // Receipt photo functionality removed
   
   // Draft functionality state
   const [isDraft, setIsDraft] = useState(false);
@@ -379,7 +378,7 @@ export default function DailyStockSales() {
   const saveDraftMutation = useMutation({
     mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales', {
       method: 'POST',
-      body: JSON.stringify({ ...data, isDraft: true, receiptPhotos })
+      body: JSON.stringify({ ...data, isDraft: true })
     }),
     onSuccess: () => {
       toast({
@@ -401,7 +400,6 @@ export default function DailyStockSales() {
   const saveDraft = () => {
     const formData = form.getValues();
     console.log("Saving draft with data:", formData);
-    console.log("Receipt photos for draft:", receiptPhotos);
     saveDraftMutation.mutate(formData);
   };
 
@@ -409,7 +407,6 @@ export default function DailyStockSales() {
     console.log("Form submission attempt:", data);
     console.log("Form validation errors:", form.formState.errors);
     console.log("Shopping entries:", data.shoppingEntries);
-    console.log("Receipt photos:", receiptPhotos);
     
     // Only check critical validation for non-draft submissions
     const validationErrors: string[] = [];
@@ -435,7 +432,7 @@ export default function DailyStockSales() {
     }
     
     console.log("All validation checks passed, proceeding with form submission");
-    const submissionData = { ...data, isDraft: false, receiptPhotos };
+    const submissionData = { ...data, isDraft: false };
     createMutation.mutate(submissionData);
   };
 
@@ -899,65 +896,7 @@ export default function DailyStockSales() {
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">Please list each item individually</p>
                 
-                {/* Photo Receipt Section */}
-                <div className="mb-6 p-4 rounded-lg bg-blue-50">
-                  <h4 className="flex items-center gap-2 text-md font-medium mb-3">
-                    <Camera className="h-4 w-4" />
-                    Shopping Receipt Photos
-                    <span className="text-gray-600 text-sm font-normal">
-                      (Optional)
-                    </span>
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handlePhotoCapture}
-                        className="hidden"
-                        id="receipt-photo"
-                      />
-                      <label
-                        htmlFor="receipt-photo"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors bg-blue-500 text-white hover:bg-blue-600"
-                      >
-                        <Camera className="h-4 w-4" />
-                        Take Photo
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">
-                          {receiptPhotos.length} photo{receiptPhotos.length !== 1 ? 's' : ''} added
-                        </span>
-
-                      </div>
-                    </div>
-                    
-                    {receiptPhotos.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {receiptPhotos.map((photo, index) => (
-                          <div key={index} className="relative">
-                            <img
-                              src={photo.base64Data}
-                              alt={`Receipt ${index + 1}`}
-                              className="w-full h-24 object-cover rounded-lg border"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeReceiptPhoto(index)}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                            >
-                              ×
-                            </button>
-                            <p className="text-xs text-gray-500 mt-1 truncate">{photo.filename}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-
-                </div>
+                {/* Photo Receipt Section - REMOVED */}
                 
                 <div className="space-y-3">
                   <div className="grid grid-cols-12 gap-3 text-sm font-medium text-gray-700">
