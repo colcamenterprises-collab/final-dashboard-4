@@ -12,6 +12,7 @@ import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
 import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
+import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 
 
 import { api, mutations } from "@/lib/api";
@@ -120,6 +121,11 @@ export default function Dashboard() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Stock Discrepancy Report */}
+      <div className="mb-6 lg:mb-8">
+        <DiscrepancyCard />
       </div>
 
       {/* KPI Cards */}
