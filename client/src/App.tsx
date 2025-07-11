@@ -25,6 +25,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/daily-stock-sales" component={DailyStockSales} />
         <Route path="/daily-stock-sales/search" component={DailyStockSalesSearch} />
+        <Route path="/daily-stock-sales-search" component={DailyStockSalesSearch} />
         <Route path="/shopping-list" component={ShoppingList} />
         <Route path="/finance" component={Finance} />
         <Route path="/expenses" component={ExpensesMerged} />

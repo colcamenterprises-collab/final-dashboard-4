@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, Eye, FileText, DollarSign, Users, Package } from "lucide-react";
+import { CalendarIcon, Search, Eye, FileText, DollarSign, Users, Package, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DailyStockSales } from "@shared/schema";
 
@@ -41,8 +41,12 @@ export default function DailyStockSalesSearch() {
     setEndDate(undefined);
   };
 
-  const formatCurrency = (value: string | number) => {
-    return `$${parseFloat(value.toString()).toFixed(2)}`;
+  const formatCurrency = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') {
+      return '$0.00';
+    }
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return `$${(isNaN(numValue) ? 0 : numValue).toFixed(2)}`;
   };
 
   const FormDetailView = ({ form }: { form: DailyStockSales }) => (
@@ -528,38 +532,25 @@ export default function DailyStockSalesSearch() {
                 <p className="text-gray-600">No forms found matching your search criteria</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {forms.map((form: DailyStockSales) => (
-                  <div key={form.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
+                  <div key={form.id} className="border rounded-lg p-6 hover:bg-gray-50">
+                    {/* Form Header */}
+                    <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
                         <div className="flex items-center space-x-4 mb-2">
-                          <h3 className="font-medium">{form.completedBy}</h3>
+                          <h3 className="font-bold text-lg">{form.completedBy}</h3>
                           <Badge variant={form.shiftType === 'Night Shift' ? 'secondary' : 'outline'}>
                             {form.shiftType}
                           </Badge>
                           <span className="text-sm text-gray-600">
                             {format(new Date(form.shiftDate), 'MMM dd, yyyy')}
                           </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Sales: </span>
-                            <span className="font-medium text-green-600">{formatCurrency(form.totalSales)}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Expenses: </span>
-                            <span className="font-medium text-red-600">{formatCurrency(form.totalExpenses)}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Wages: </span>
-                            <span className="font-medium">{(form.wageEntries as any[] || []).length} entries</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Shopping: </span>
-                            <span className="font-medium">{(form.shoppingEntries as any[] || []).length} items</span>
-                          </div>
+                          {form.isDraft && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-600">
+                              Draft
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       
@@ -570,9 +561,204 @@ export default function DailyStockSalesSearch() {
                         className="flex items-center space-x-1"
                       >
                         <Eye className="h-4 w-4" />
-                        <span>View</span>
+                        <span>View Full Details</span>
                       </Button>
                     </div>
+
+                    {/* Sales Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <span className="text-xs text-gray-600">Total Sales</span>
+                        <p className="font-bold text-green-600">{formatCurrency(form.totalSales)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Cash Sales</span>
+                        <p className="font-medium">{formatCurrency(form.cashSales)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Grab Sales</span>
+                        <p className="font-medium">{formatCurrency(form.grabSales)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">QR Scan</span>
+                        <p className="font-medium">{formatCurrency(form.qrScanSales)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">FoodPanda</span>
+                        <p className="font-medium">{formatCurrency(form.foodPandaSales)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Aroi Dee</span>
+                        <p className="font-medium">{formatCurrency(form.aroiDeeSales)}</p>
+                      </div>
+                    </div>
+
+                    {/* Cash Management */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 bg-blue-50 rounded-lg">
+                      <div>
+                        <span className="text-xs text-gray-600">Starting Cash</span>
+                        <p className="font-medium">{formatCurrency(form.startingCash)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Ending Cash</span>
+                        <p className="font-medium">{formatCurrency(form.endingCash)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Total Expenses</span>
+                        <p className="font-medium text-red-600">{formatCurrency(form.totalExpenses)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Cash Balance</span>
+                        <p className="font-medium">{formatCurrency(Number(form.endingCash) - Number(form.startingCash))}</p>
+                      </div>
+                    </div>
+
+                    {/* Expense Breakdown */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 bg-red-50 rounded-lg">
+                      <div>
+                        <span className="text-xs text-gray-600">Wages</span>
+                        <p className="font-medium">{formatCurrency(form.salaryWages)}</p>
+                        <p className="text-xs text-gray-500">{(form.wageEntries as any[] || []).length} entries</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Shopping</span>
+                        <p className="font-medium">{formatCurrency(form.shopping)}</p>
+                        <p className="text-xs text-gray-500">{(form.shoppingEntries as any[] || []).length} items</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Gas Expense</span>
+                        <p className="font-medium">{formatCurrency(form.gasExpense)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Other Expenses</span>
+                        <p className="font-medium">{formatCurrency(form.otherExpenses)}</p>
+                      </div>
+                    </div>
+
+                    {/* Stock Information */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 bg-green-50 rounded-lg">
+                      <div>
+                        <span className="text-xs text-gray-600">Burger Buns</span>
+                        <p className="font-medium">{form.burgerBunsStock}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Rolls Ordered</span>
+                        <p className="font-medium">{form.rollsOrderedCount}</p>
+                        {form.rollsOrderedConfirmed && <span className="text-xs text-green-600">✓ Confirmed</span>}
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Meat Weight</span>
+                        <p className="font-medium">{form.meatWeight} kg</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-600">Drink Stock</span>
+                        <p className="font-medium">{form.drinkStockCount}</p>
+                      </div>
+                    </div>
+
+                    {/* Inventory Status */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      {/* Fresh Food Status */}
+                      {form.freshFood && Object.keys(form.freshFood as any).length > 0 && (
+                        <div className="p-3 border rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Fresh Food Items</p>
+                          <p className="font-medium">{Object.values(form.freshFood as any).filter(v => v).length} required</p>
+                          <p className="text-xs text-gray-500">of {Object.keys(form.freshFood as any).length} total</p>
+                        </div>
+                      )}
+
+                      {/* Frozen Food Status */}
+                      {form.frozenFood && Object.keys(form.frozenFood as any).length > 0 && (
+                        <div className="p-3 border rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Frozen Food Items</p>
+                          <p className="font-medium">{Object.values(form.frozenFood as any).filter(v => v).length} required</p>
+                          <p className="text-xs text-gray-500">of {Object.keys(form.frozenFood as any).length} total</p>
+                        </div>
+                      )}
+
+                      {/* Kitchen Items Status */}
+                      {form.kitchenItems && Object.keys(form.kitchenItems as any).length > 0 && (
+                        <div className="p-3 border rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Kitchen Items</p>
+                          <p className="font-medium">{Object.values(form.kitchenItems as any).filter(v => v).length} required</p>
+                          <p className="text-xs text-gray-500">of {Object.keys(form.kitchenItems as any).length} total</p>
+                        </div>
+                      )}
+
+                      {/* Packaging Items Status */}
+                      {form.packagingItems && Object.keys(form.packagingItems as any).length > 0 && (
+                        <div className="p-3 border rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Packaging Items</p>
+                          <p className="font-medium">{Object.values(form.packagingItems as any).filter(v => v).length} required</p>
+                          <p className="text-xs text-gray-500">of {Object.keys(form.packagingItems as any).length} total</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional Details */}
+                    <div className="flex justify-between items-center text-sm text-gray-600 mt-4 pt-3 border-t">
+                      <div className="flex space-x-4">
+                        <span>Created: {format(new Date(form.createdAt), 'MMM dd, HH:mm')}</span>
+                        <span>Updated: {format(new Date(form.updatedAt), 'MMM dd, HH:mm')}</span>
+                        {form.receiptPhotos && (form.receiptPhotos as any[]).length > 0 && (
+                          <span className="flex items-center space-x-1">
+                            <Camera className="h-3 w-3" />
+                            <span>{(form.receiptPhotos as any[]).length} photos</span>
+                          </span>
+                        )}
+                      </div>
+                      {form.expenseDescription && (
+                        <span className="text-blue-600">Has expense notes</span>
+                      )}
+                    </div>
+
+                    {/* Wage Entries Details */}
+                    {form.wageEntries && (form.wageEntries as any[]).length > 0 && (
+                      <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Wage Entries Summary</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          {(form.wageEntries as any[]).slice(0, 4).map((entry, index) => (
+                            <div key={index} className="flex justify-between">
+                              <span>{entry.name} ({entry.notes})</span>
+                              <span className="font-medium">{formatCurrency(entry.amount)}</span>
+                            </div>
+                          ))}
+                          {(form.wageEntries as any[]).length > 4 && (
+                            <div className="text-gray-500 text-xs">
+                              +{(form.wageEntries as any[]).length - 4} more entries...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Shopping Entries Details */}
+                    {form.shoppingEntries && (form.shoppingEntries as any[]).length > 0 && (
+                      <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Shopping Entries Summary</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          {(form.shoppingEntries as any[]).slice(0, 4).map((entry, index) => (
+                            <div key={index} className="flex justify-between">
+                              <span>{entry.item} ({entry.shop})</span>
+                              <span className="font-medium">{formatCurrency(entry.amount)}</span>
+                            </div>
+                          ))}
+                          {(form.shoppingEntries as any[]).length > 4 && (
+                            <div className="text-gray-500 text-xs">
+                              +{(form.shoppingEntries as any[]).length - 4} more entries...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expense Description */}
+                    {form.expenseDescription && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Expense Notes</p>
+                        <p className="text-sm text-gray-600">{form.expenseDescription}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
