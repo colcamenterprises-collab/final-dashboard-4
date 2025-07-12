@@ -64,7 +64,7 @@ const LEGACY_FOOD_ITEMS: string[] = [];
 // Drink items with current requirements (matching backend requirements)
 const DRINK_ITEMS = [
   'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
-  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
+  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'
 ];
 
 // Shop options for shopping entries

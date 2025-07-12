@@ -355,6 +355,7 @@ Changelog:
 - July 12, 2025. SUBMIT BUTTON FIX: Replaced custom fetch with apiRequest method matching successful draft functionality
 - July 12, 2025. Simplified form submission to use same reliable API pattern as draft saving
 - July 12, 2025. Verified both draft saving and form submission working correctly with authentic data storage
+- July 12, 2025. DRINK INVENTORY UPDATE: Added "Sprite" to drink options in Daily Stock & Sales form
 ```
 
 ## User Preferences
