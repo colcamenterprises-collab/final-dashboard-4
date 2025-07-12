@@ -258,6 +258,45 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // NEW: latest shift summary
+  app.get("/api/shift-summary/latest", async (req: Request, res: Response) => {
+    try {
+      const { db } = await import("./db");
+      const { dailyShiftReceiptSummary } = await import("../shared/schema");
+      const { desc } = await import("drizzle-orm");
+      
+      const latest = await db
+        .select()
+        .from(dailyShiftReceiptSummary)
+        .orderBy(desc(dailyShiftReceiptSummary.shiftDate))
+        .limit(1);
+      
+      res.json(latest[0] ?? {});
+    } catch (err) {
+      console.error("Error fetching latest shift summary:", err);
+      res.status(500).json({ error: "Failed to fetch latest shift summary" });
+    }
+  });
+
+  // NEW: generate shift summary
+  app.post("/api/shift-summary/generate", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.body;
+      const { buildShiftSummary } = await import("./services/receiptSummary");
+      
+      const summary = await buildShiftSummary(date);
+      
+      res.json({ 
+        success: true, 
+        message: `Summary generated for ${date}`, 
+        summary 
+      });
+    } catch (err) {
+      console.error("Error generating shift summary:", err);
+      res.status(500).json({ error: "Failed to generate shift summary" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;

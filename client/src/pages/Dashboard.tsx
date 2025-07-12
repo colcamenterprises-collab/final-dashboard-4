@@ -13,6 +13,7 @@ import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
 import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
 import { DiscrepancyCard } from "@/components/DiscrepancyCard";
+import ShiftSummaryCard from "@/components/ShiftSummaryCard";
 
 
 import { api, mutations } from "@/lib/api";
@@ -175,9 +176,9 @@ export default function Dashboard() {
           <SalesVsExpensesChart />
         </div>
         
-        {/* Third column empty for now */}
+        {/* Shift Summary Card */}
         <div className="lg:col-span-1">
-          {/* Reserved for future content */}
+          <ShiftSummaryCard />
         </div>
       </div>
 

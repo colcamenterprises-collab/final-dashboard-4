@@ -463,6 +463,32 @@ export const marketingCalendar = pgTable("marketing_calendar", {
 export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMarketingCalendarSchema = createInsertSchema(marketingCalendar).omit({ id: true, createdAt: true, updatedAt: true });
 
+// ─── NEW TABLE ────────────────────────────────────────────────────────
+export const dailyShiftReceiptSummary = pgTable("daily_shift_receipt_summary", {
+  id: serial("id").primaryKey(),
+  /* shift date is the date that 6 PM belongs to (e.g. 2025-07-12) */
+  shiftDate: date("shift_date").notNull().unique(),
+  burgersSold: integer("burgers_sold").notNull().default(0),
+  drinksSold: integer("drinks_sold").notNull().default(0),
+  /* full JSON blobs so we can drill-down later */
+  itemsBreakdown: jsonb("items_breakdown")
+    .$type<Record<string, { qty: number; sales: number }>>()
+    .notNull(),
+  modifiersSummary: jsonb("modifiers_summary")
+    .$type<Record<string, { qty: number; sales: number }>>()
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ─── INSERT SCHEMA & TYPES ────────────────────────────────────────────
+export const insertDailyReceiptSummarySchema =
+  createInsertSchema(dailyShiftReceiptSummary).omit({ id: true, createdAt: true });
+
+export type DailyShiftReceiptSummary =
+  typeof dailyShiftReceiptSummary.$inferSelect;
+export type InsertDailyShiftReceiptSummary =
+  z.infer<typeof insertDailyReceiptSummarySchema>;
+
 // Types
 export type QuickNote = typeof quickNotes.$inferSelect;
 export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;

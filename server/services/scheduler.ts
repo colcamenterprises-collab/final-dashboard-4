@@ -1,4 +1,5 @@
 import { loyverseAPI } from "../loyverseAPI";
+import { buildShiftSummary } from "./receiptSummary";
 
 export class SchedulerService {
   private intervals: NodeJS.Timeout[] = [];
@@ -8,6 +9,11 @@ export class SchedulerService {
     this.scheduleDailyTask(() => {
       this.syncReceiptsAndReports();
     }, 3, 0); // 3:00 AM Bangkok time
+
+    // Schedule daily summary job at 3:05 AM Bangkok time  
+    this.scheduleDailyTask(() => {
+      this.buildDailySummary();
+    }, 3, 5); // 3:05 AM Bangkok time
 
     console.log('Scheduler service started - daily sync at 3am Bangkok time');
   }
@@ -171,6 +177,23 @@ export class SchedulerService {
       
     } catch (error) {
       console.error('❌ Failed to sync new shifts:', error);
+    }
+  }
+
+  private async buildDailySummary() {
+    try {
+      console.log('📊 Building daily shift summary...');
+      
+      // Get yesterday's date for the summary (shift that just ended)
+      const bangkokNow = new Date(new Date().getTime() + 7 * 3600_000);
+      const dateStr = bangkokNow.toISOString().slice(0, 10); // yyyy-mm-dd
+      
+      console.log('📊 Building shift summary for', dateStr);
+      const summary = await buildShiftSummary(dateStr);
+      
+      console.log(`✅ Shift summary built: ${summary.burgersSold} burgers, ${summary.drinksSold} drinks`);
+    } catch (error) {
+      console.error('❌ Failed to build daily summary:', error);
     }
   }
 
