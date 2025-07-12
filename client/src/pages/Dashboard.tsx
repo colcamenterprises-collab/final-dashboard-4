@@ -125,10 +125,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stock Discrepancy Report */}
-      <div className="mb-6 lg:mb-8">
-        <DiscrepancyCard />
-      </div>
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -170,15 +167,11 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Shift Summary Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Shift Summary and Roll Variance Cards - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="lg:col-span-1">
           <ShiftSummaryCard />
         </div>
-      </div>
-
-      {/* Roll Variance Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-1">
           <RollVarianceCard />
         </div>
@@ -590,6 +583,11 @@ export default function Dashboard() {
         </Card>
       </div>
       
+      {/* Stock Discrepancy Report - Moved to Bottom */}
+      <div className="mb-6 lg:mb-8">
+        <DiscrepancyCard />
+      </div>
+
       {/* Restaurant Hub Logo and Copyright */}
 
 
