@@ -233,12 +233,21 @@ export default function DailyStockSales() {
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
       try {
+        // Ensure date is properly formatted
+        const formattedData = {
+          ...data,
+          shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
+          receiptPhotos
+        };
+        
+        console.log('📤 Sending formatted data:', formattedData);
+        
         const response = await fetch('/api/daily-stock-sales', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ ...data, receiptPhotos }),
+          body: JSON.stringify(formattedData),
           signal: controller.signal
         });
         
@@ -246,14 +255,21 @@ export default function DailyStockSales() {
         
         if (!response.ok) {
           const errorText = await response.text();
+          console.error('Server error response:', errorText);
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
-        return response.json();
+        const result = await response.json();
+        console.log('✅ Server response:', result);
+        return result;
       } catch (error) {
         clearTimeout(timeoutId);
+        console.error('📛 Fetch error caught:', error);
         if (error instanceof Error && error.name === 'AbortError') {
           throw new Error('Request timed out after 5 minutes');
+        }
+        if (error instanceof TypeError) {
+          throw new Error('Network error: Please check your connection and try again');
         }
         throw error;
       }
@@ -272,9 +288,14 @@ export default function DailyStockSales() {
     },
     onError: (error) => {
       console.error('❌ Error submitting form:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       toast({
         title: "Error", 
-        description: `Failed to submit form: ${error.message || 'Please try again.'}`,
+        description: `Failed to submit form: ${error.message || 'Network error. Please try again.'}`,
         variant: "destructive"
       });
     }
