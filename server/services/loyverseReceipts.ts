@@ -117,17 +117,24 @@ export class LoyverseReceiptService {
       console.log(`📅 Bangkok Time: ${bangkokTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
       console.log(`🕰️ Shift Period (Bangkok): ${shiftStartTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })} to ${shiftEndTime.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' })}`);
       
-      const startTimeStr = utcShiftStart.toISOString().split('.')[0] + 'Z';
-      const endTimeStr = utcShiftEnd.toISOString().split('.')[0] + 'Z';
+      // Helper function - Loyverse likes seconds, no milliseconds
+      const toRFC3339 = (d: Date) =>
+        d.toISOString().replace(/\.\d{3}Z$/, "Z");  // strip millis
       
-      const apiUrl = `${this.config.baseUrl}/receipts?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}&limit=500`;
+      const params = new URLSearchParams({
+        store_id: process.env.LOYVERSE_STORE_ID || "",
+        start_time: toRFC3339(utcShiftStart),
+        end_time: toRFC3339(utcShiftEnd),
+        limit: "250"
+      });
+      
+      const apiUrl = `${this.config.baseUrl}/receipts?${params.toString()}`;
       console.log(`🔗 API URL: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${this.config.accessToken}`
         }
       });
 

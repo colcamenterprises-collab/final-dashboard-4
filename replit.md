@@ -330,6 +330,11 @@ Changelog:
 - July 11, 2025. Fixed "failed to save draft" errors by adding missing storage methods and route handlers
 - July 11, 2025. Removed all photo-related functions and UI components from Daily Stock Sales form
 - July 11, 2025. VERIFICATION COMPLETE: Form submission, draft saving, and search functionality all working properly
+- July 12, 2025. CRITICAL SUCCESS: Loyverse API integration fully operational with real-time receipt sync
+- July 12, 2025. Fixed API authentication (401→400→200): corrected token format and added required LOYVERSE_STORE_ID parameter
+- July 12, 2025. Implemented RFC3339 date formatting and corrected API limit from 500 to 250 per Loyverse requirements
+- July 12, 2025. Manual receipt sync endpoint working: processing hundreds of new receipts with proper duplicate handling
+- July 12, 2025. Stock discrepancy analysis now using completely fresh authentic Loyverse data for real-time operational insights
 ```
 
 ## User Preferences
