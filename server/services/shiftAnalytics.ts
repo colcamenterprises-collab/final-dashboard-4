@@ -18,21 +18,21 @@ const getBangkokDate = (date: Date): Date => {
   return new Date(date.getTime() + bangkokOffset * 60 * 1000);
 };
 
-// Get shift date from any timestamp (6pm-3am cycle)
+// Get shift date from any timestamp (5pm-3am cycle)
 const getShiftDate = (timestamp: Date): Date => {
   const bangkokTime = getBangkokDate(timestamp);
   const hour = bangkokTime.getHours();
   
-  // If before 6pm, this receipt belongs to previous day's shift
-  if (hour < 18) {
+  // If before 5pm, this receipt belongs to previous day's shift
+  if (hour < 17) {
     const shiftDate = new Date(bangkokTime);
     shiftDate.setDate(shiftDate.getDate() - 1);
-    shiftDate.setHours(18, 0, 0, 0);
+    shiftDate.setHours(17, 0, 0, 0);
     return shiftDate;
   } else {
-    // If 6pm or after, this is today's shift
+    // If 5pm or after, this is today's shift
     const shiftDate = new Date(bangkokTime);
-    shiftDate.setHours(18, 0, 0, 0);
+    shiftDate.setHours(17, 0, 0, 0);
     return shiftDate;
   }
 };
@@ -72,7 +72,7 @@ const processReceiptItemsAndModifiers = (receipt: any) => {
 // Main function to process previous shift
 export const processPreviousShift = async (): Promise<{ success: boolean; message: string }> => {
   try {
-    // Calculate previous shift date (yesterday's 6pm-3am)
+    // Calculate previous shift date (yesterday's 5pm-3am)
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -80,7 +80,7 @@ export const processPreviousShift = async (): Promise<{ success: boolean; messag
     
     // Get shift start and end times in UTC
     const shiftStart = new Date(shiftDate.getTime() - 7 * 60 * 60 * 1000); // Convert to UTC
-    const shiftEnd = new Date(shiftStart.getTime() + 9 * 60 * 60 * 1000); // 9 hours later (6pm-3am)
+    const shiftEnd = new Date(shiftStart.getTime() + 10 * 60 * 60 * 1000); // 10 hours later (5pm-3am)
     
     console.log(`Processing shift analytics for ${shiftDate.toISOString().split('T')[0]}`);
     console.log(`Shift period: ${shiftStart.toISOString()} to ${shiftEnd.toISOString()}`);

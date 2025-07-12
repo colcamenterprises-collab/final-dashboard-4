@@ -8,8 +8,8 @@ import { between } from "drizzle-orm";
 
 /** Helper: return [shiftStartUTC, shiftEndUTC] for any Bangkok-date (yyyy-mm-dd). */
 export function getShiftWindow(dateStr: string): [Date, Date] {
-  // 6 PM Bangkok
-  const start = new Date(`${dateStr}T11:00:00Z`);       // 18:00 +07 == 11:00Z
+  // 5 PM Bangkok
+  const start = new Date(`${dateStr}T10:00:00Z`);       // 17:00 +07 == 10:00Z
   const end = new Date(`${dateStr}T20:00:00Z`);         // 03:00 +07 next day == 20:00Z
   end.setUTCDate(end.getUTCDate() + 1);
   return [start, end];

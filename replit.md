@@ -111,16 +111,16 @@ This is a comprehensive restaurant management dashboard application built with a
 - Frontend built for responsive design across devices
 
 ### Loyverse POS Receipt Management
-- **Receipt Capture**: Automated daily receipt sync from Loyverse API (6pm-3am shifts)
+- **Receipt Capture**: Automated daily receipt sync from Loyverse API (5pm-3am shifts)
 - **Shift Reports**: Daily shift summaries with sales analytics and staff tracking
 - **Archival System**: Complete receipt storage with search by date, receipt number, and amount
-- **Automated Processing**: Daily 4am scheduled tasks for receipt and report generation
+- **Automated Processing**: Daily 3am scheduled tasks for receipt and report generation
 - **Real-time Sync**: Manual sync capabilities for immediate data refresh
 
 ## Operational Schedule
-- **Shift Hours**: 6pm - 3am daily
+- **Shift Hours**: 5pm - 3am daily
 - **Staff Reporting**: 2am - 3am (shift end reports)
-- **Automated Sync**: 4am daily (receipts and shift reports)
+- **Automated Sync**: 3am daily (receipts and shift reports)
 - **Data Retention**: All receipts and reports permanently archived and searchable
 
 ## Changelog
@@ -335,6 +335,10 @@ Changelog:
 - July 12, 2025. Implemented RFC3339 date formatting and corrected API limit from 500 to 250 per Loyverse requirements
 - July 12, 2025. Manual receipt sync endpoint working: processing hundreds of new receipts with proper duplicate handling
 - July 12, 2025. Stock discrepancy analysis now using completely fresh authentic Loyverse data for real-time operational insights
+- July 12, 2025. CRITICAL TIMING UPDATE: Changed all shift operations from 6:00 PM-3:00 AM to 5:00 PM-3:00 AM
+- July 12, 2025. Updated shift date logic, Loyverse API pull timing, dashboard calculations, and database assignments for new 5pm-3am cycle
+- July 12, 2025. Modified scheduler service, receipt processing, and analytics to reflect 5pm shift start instead of 6pm
+- July 12, 2025. All shift-based calculations now use 10-hour window (5pm-3am) instead of 9-hour window (6pm-3am)
 ```
 
 ## User Preferences

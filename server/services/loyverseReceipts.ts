@@ -58,19 +58,19 @@ export class LoyverseReceiptService {
     baseUrl: 'https://api.loyverse.com/v1.0'
   };
 
-  // Calculate shift date based on 6pm-3am cycle in Bangkok timezone (UTC+7)
+  // Calculate shift date based on 5pm-3am cycle in Bangkok timezone (UTC+7)
   private getShiftDate(timestamp: Date): Date {
     // Convert to Bangkok time (UTC+7)
     const bangkokTime = new Date(timestamp.getTime() + (7 * 60 * 60 * 1000));
     const shiftStart = new Date(bangkokTime);
     
-    // If Bangkok time is before 6am, this receipt belongs to previous day's shift
-    if (bangkokTime.getHours() < 6) {
+    // If Bangkok time is before 5pm, this receipt belongs to previous day's shift
+    if (bangkokTime.getHours() < 17) {
       shiftStart.setDate(shiftStart.getDate() - 1);
     }
     
-    // Set to 6pm Bangkok time of shift date, then convert back to UTC
-    shiftStart.setHours(18, 0, 0, 0);
+    // Set to 5pm Bangkok time of shift date, then convert back to UTC
+    shiftStart.setHours(17, 0, 0, 0);
     const utcShiftStart = new Date(shiftStart.getTime() - (7 * 60 * 60 * 1000));
     return utcShiftStart;
   }
@@ -86,26 +86,26 @@ export class LoyverseReceiptService {
       let shiftStartTime: Date;
       let shiftEndTime: Date;
       
-      // If current Bangkok time is between 6pm and 11:59pm, we're in today's shift
-      if (bangkokTime.getHours() >= 18) {
-        // Current shift: 6pm today to 3am tomorrow (Bangkok time)
+      // If current Bangkok time is between 5pm and 11:59pm, we're in today's shift
+      if (bangkokTime.getHours() >= 17) {
+        // Current shift: 5pm today to 3am tomorrow (Bangkok time)
         shiftStartTime = new Date(bangkokTime);
-        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftStartTime.setHours(17, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
         shiftEndTime.setHours(3, 0, 0, 0);
-      } else if (bangkokTime.getHours() < 6) {
+      } else if (bangkokTime.getHours() < 5) {
         // We're in the early morning of ongoing shift from yesterday
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
-        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftStartTime.setHours(17, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setHours(3, 0, 0, 0);
       } else {
-        // Between 6am and 6pm - no active shift, get yesterday's shift
+        // Between 5am and 5pm - no active shift, get yesterday's shift
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
-        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftStartTime.setHours(17, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setHours(3, 0, 0, 0);
       }

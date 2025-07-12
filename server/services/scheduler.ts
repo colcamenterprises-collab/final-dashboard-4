@@ -5,7 +5,7 @@ export class SchedulerService {
   private intervals: NodeJS.Timeout[] = [];
 
   start() {
-    // Schedule daily receipt sync at 3am Bangkok time (end of shift)
+    // Schedule daily receipt sync at 3am Bangkok time (end of 5pm-3am shift)
     this.scheduleDailyTask(() => {
       this.syncReceiptsAndReports();
     }, 3, 0); // 3:00 AM Bangkok time
@@ -15,7 +15,7 @@ export class SchedulerService {
       this.buildDailySummary();
     }, 3, 5); // 3:05 AM Bangkok time
 
-    console.log('Scheduler service started - daily sync at 3am Bangkok time');
+    console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
   }
 
   stop() {
