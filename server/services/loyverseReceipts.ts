@@ -120,7 +120,10 @@ export class LoyverseReceiptService {
       const startTimeStr = utcShiftStart.toISOString().split('.')[0] + 'Z';
       const endTimeStr = utcShiftEnd.toISOString().split('.')[0] + 'Z';
       
-      const response = await fetch(`${this.config.baseUrl}/receipts?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}&limit=500`, {
+      const apiUrl = `${this.config.baseUrl}/receipts?start_time=${encodeURIComponent(startTimeStr)}&end_time=${encodeURIComponent(endTimeStr)}&limit=500`;
+      console.log(`🔗 API URL: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.config.accessToken}`,
@@ -129,7 +132,10 @@ export class LoyverseReceiptService {
       });
 
       if (!response.ok) {
-        throw new Error(`Loyverse API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`❌ Loyverse API error: ${response.status} - ${response.statusText}`);
+        console.error(`📝 Error details: ${errorText}`);
+        throw new Error(`Loyverse API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
