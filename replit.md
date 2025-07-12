@@ -352,6 +352,8 @@ Changelog:
 - July 12, 2025. DAILY SALES FORM FIX: Restored complete form submission functionality for staff operations
 - July 12, 2025. Fixed missing draft endpoint - added /api/daily-stock-sales/draft route for proper draft saving
 - July 12, 2025. Updated saveDraftMutation to use correct endpoint with proper cache invalidation
+- July 12, 2025. SUBMIT BUTTON FIX: Replaced custom fetch with apiRequest method matching successful draft functionality
+- July 12, 2025. Simplified form submission to use same reliable API pattern as draft saving
 - July 12, 2025. Verified both draft saving and form submission working correctly with authentic data storage
 ```
 

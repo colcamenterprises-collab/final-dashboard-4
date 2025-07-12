@@ -224,55 +224,23 @@ export default function DailyStockSales() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: (data: FormData) => {
       console.log('📝 Submitting form with data:', data);
-      console.log('📷 Receipt photos:', receiptPhotos);
       
-      // Create a controller for timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+      // Format the data properly like the draft mutation
+      const formattedData = {
+        ...data,
+        shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
+        receiptPhotos: receiptPhotos || [],
+        isDraft: false
+      };
       
-      try {
-        // Ensure date is properly formatted
-        const formattedData = {
-          ...data,
-          shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
-          receiptPhotos
-        };
-        
-        console.log('📤 Sending formatted data:', formattedData);
-        
-        const response = await fetch('/api/daily-stock-sales', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formattedData),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server error response:', errorText);
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-        
-        const result = await response.json();
-        console.log('✅ Server response:', result);
-        return result;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        console.error('📛 Fetch error caught:', error);
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Request timed out after 5 minutes');
-        }
-        if (error instanceof TypeError) {
-          throw new Error('Network error: Please check your connection and try again');
-        }
-        throw error;
-      }
+      console.log('📤 Sending formatted data:', formattedData);
+      
+      return apiRequest('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify(formattedData)
+      });
     },
     onSuccess: (response) => {
       console.log('✅ Form submitted successfully:', response);
