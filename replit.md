@@ -339,6 +339,12 @@ Changelog:
 - July 12, 2025. Updated shift date logic, Loyverse API pull timing, dashboard calculations, and database assignments for new 5pm-3am cycle
 - July 12, 2025. Modified scheduler service, receipt processing, and analytics to reflect 5pm shift start instead of 6pm
 - July 12, 2025. All shift-based calculations now use 10-hour window (5pm-3am) instead of 9-hour window (6pm-3am)
+- July 12, 2025. BURGER ROLL VARIANCE TRACKING: Implemented comprehensive burger bun usage tracking system
+- July 12, 2025. Created daily_shift_summary table with burger/patty counts, roll inventory tracking, and variance calculations
+- July 12, 2025. Built burger definitions mapping system with authentic Loyverse POS item handles and patty quantities
+- July 12, 2025. Added RollVarianceCard component with professional variance analysis display and alert system
+- July 12, 2025. Integrated variance tracking into dashboard with color-coded alerts for high variance situations (>5 rolls)
+- July 12, 2025. Created burgerVarianceService with authentic receipt analysis and stock form integration
 ```
 
 ## User Preferences

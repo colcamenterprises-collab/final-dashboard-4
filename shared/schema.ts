@@ -73,6 +73,7 @@ export const expenses = pgTable("expenses", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
   date: timestamp("date").notNull().defaultNow(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).default('0'), // For rolls/drinks quantity tracking
   paymentMethod: text("payment_method").notNull(),
   supplier: text("supplier"),
   items: text("items"),
@@ -488,6 +489,24 @@ export type DailyShiftReceiptSummary =
   typeof dailyShiftReceiptSummary.$inferSelect;
 export type InsertDailyShiftReceiptSummary =
   z.infer<typeof insertDailyReceiptSummarySchema>;
+
+// Daily Shift Summary table for burger roll variance tracking
+export const dailyShiftSummary = pgTable("daily_shift_summary", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull().unique(), // e.g. 2025-07-11 (5 PM start)
+  burgersSold: integer("burgers_sold").notNull(),
+  pattiesUsed: integer("patties_used").notNull(),
+  rollsStart: integer("rolls_start").notNull(),
+  rollsPurchased: integer("rolls_purchased").notNull(),
+  rollsExpected: integer("rolls_expected").notNull(),
+  rollsActual: integer("rolls_actual").notNull(),
+  rollsVariance: integer("rolls_variance").notNull(),
+  varianceFlag: boolean("variance_flag").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+export const insertDailyShiftSummarySchema = createInsertSchema(dailyShiftSummary);
+export type InsertDailyShiftSummary = z.infer<typeof insertDailyShiftSummarySchema>;
 
 // Types
 export type QuickNote = typeof quickNotes.$inferSelect;

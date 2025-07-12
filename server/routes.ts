@@ -350,6 +350,32 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Roll variance endpoint for dashboard
+  app.get("/api/dashboard/roll-variance", async (req: Request, res: Response) => {
+    try {
+      const { getLatestShiftSummary } = await import("./services/burgerVarianceService");
+      const latest = await getLatestShiftSummary();
+      res.json(latest || {});
+    } catch (err) {
+      console.error("Roll variance endpoint failed:", err);
+      res.status(500).json({ error: "Failed to fetch roll variance data" });
+    }
+  });
+
+  // Generate shift summary endpoint
+  app.post("/api/shift-summary/generate-variance", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.body;
+      const { generateShiftSummary } = await import("./services/burgerVarianceService");
+      const shiftDate = date ? new Date(date) : new Date();
+      const result = await generateShiftSummary(shiftDate);
+      res.json(result);
+    } catch (err) {
+      console.error("Generate shift summary failed:", err);
+      res.status(500).json({ error: "Failed to generate shift summary" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;

@@ -14,6 +14,7 @@ import CompactShiftReports from "@/components/CompactShiftReports";
 import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
 import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 import ShiftSummaryCard from "@/components/ShiftSummaryCard";
+import RollVarianceCard from "@/components/RollVarianceCard";
 
 
 import { api, mutations } from "@/lib/api";
@@ -589,6 +590,13 @@ export default function Dashboard() {
       </div>
       
       {/* Restaurant Hub Logo and Copyright */}
+      {/* Roll Variance Tracking */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        <div className="lg:col-span-1">
+          <RollVarianceCard />
+        </div>
+      </div>
+
       <div className="flex flex-col items-end mt-8 mb-4">
         <a 
           href="https://www.customli.io" 
