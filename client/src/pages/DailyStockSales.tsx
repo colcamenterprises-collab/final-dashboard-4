@@ -35,7 +35,8 @@ import {
   Coffee,
   ClipboardList,
   TrendingUp,
-  Snowflake
+  Snowflake,
+  Edit
 } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
@@ -158,6 +159,8 @@ export default function DailyStockSales() {
   
   // Draft functionality state
   const [isDraft, setIsDraft] = useState(false);
+  const [editingFormId, setEditingFormId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState('new-form');
   
   // Item management state
   const [showItemManager, setShowItemManager] = useState(false);
@@ -237,22 +240,28 @@ export default function DailyStockSales() {
       
       console.log('📤 Sending formatted data:', formattedData);
       
-      return apiRequest('/api/daily-stock-sales', {
-        method: 'POST',
+      // If editing an existing form, use PUT instead of POST
+      const method = editingFormId ? 'PUT' : 'POST';
+      const url = editingFormId ? `/api/daily-stock-sales/${editingFormId}` : '/api/daily-stock-sales';
+      
+      return apiRequest(url, {
+        method: method,
         body: JSON.stringify(formattedData)
       });
     },
     onSuccess: (response) => {
       console.log('✅ Form submitted successfully:', response);
       toast({
-        title: "Form Submitted Successfully",
-        description: "Daily stock and sales data has been saved and shopping list generated."
+        title: editingFormId ? "Form Updated Successfully" : "Form Submitted Successfully",
+        description: editingFormId ? "The form has been updated with your changes." : "Daily stock and sales data has been saved and shopping list generated."
       });
       queryClient.invalidateQueries({ queryKey: ['/api/shopping-list'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/search'] });
       form.reset();
       setReceiptPhotos([]);
       setIsDraft(false);
+      setEditingFormId(null);
     },
     onError: (error) => {
       console.error('❌ Error submitting form:', error);
@@ -299,17 +308,31 @@ export default function DailyStockSales() {
   
   // Draft saving mutation
   const saveDraftMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales/draft', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: FormData) => {
+      const formattedData = {
+        ...data,
+        shiftDate: new Date(data.shiftDate).toISOString().split('T')[0],
+        receiptPhotos: receiptPhotos || [],
+        isDraft: true
+      };
+      
+      // If editing an existing form, use PUT instead of POST
+      const method = editingFormId ? 'PUT' : 'POST';
+      const url = editingFormId ? `/api/daily-stock-sales/${editingFormId}` : '/api/daily-stock-sales/draft';
+      
+      return apiRequest(url, {
+        method: method,
+        body: JSON.stringify(formattedData)
+      });
+    },
     onSuccess: () => {
       toast({
-        title: "Draft Saved",
-        description: "Your form has been saved as a draft."
+        title: editingFormId ? "Draft Updated" : "Draft Saved",
+        description: editingFormId ? "Your draft has been updated." : "Your form has been saved as a draft."
       });
       setIsDraft(true);
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/search'] });
     },
     onError: (error) => {
       console.error('Error saving draft:', error);
@@ -449,7 +472,7 @@ export default function DailyStockSales() {
         </Card>
       )}
 
-      <Tabs defaultValue="new-form" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="new-form" className="text-xs sm:text-sm lg:text-base py-2 px-2 sm:px-4">New Form</TabsTrigger>
           <TabsTrigger value="draft" className="text-xs sm:text-sm lg:text-base py-2 px-2 sm:px-4">Load Draft</TabsTrigger>
@@ -457,6 +480,29 @@ export default function DailyStockSales() {
         </TabsList>
         
         <TabsContent value="new-form" className="space-y-6">
+          {editingFormId && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Edit className="h-5 w-5 text-blue-600" />
+                <h3 className="font-medium text-blue-900">Editing Form</h3>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                You are currently editing an existing form. Changes will update the original form.
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setEditingFormId(null);
+                  form.reset();
+                  setIsDraft(false);
+                }}
+                className="mt-2"
+              >
+                Cancel Edit
+              </Button>
+            </div>
+          )}
           <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
           console.log("Form validation errors:", errors);
@@ -1673,7 +1719,7 @@ export default function DailyStockSales() {
               className="min-w-[150px] bg-black text-white hover:bg-gray-800"
             >
               <Save className="h-4 w-4 mr-2" />
-              {saveDraftMutation.isPending ? "Saving..." : "Save as Draft"}
+              {saveDraftMutation.isPending ? "Saving..." : editingFormId ? "Update Draft" : "Save as Draft"}
             </Button>
             
             <Button 
@@ -1681,7 +1727,7 @@ export default function DailyStockSales() {
               disabled={createMutation.isPending}
               className="min-w-[200px] bg-black text-white hover:bg-gray-800"
             >
-              {createMutation.isPending ? "Submitting..." : "Submit Form"}
+              {createMutation.isPending ? "Submitting..." : editingFormId ? "Update Form" : "Submit Form"}
             </Button>
           </div>
           </form>
@@ -1891,49 +1937,101 @@ export default function DailyStockSales() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {completedForms.map((form: DailyStockSales) => (
-                          <div key={form.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        {completedForms.map((formItem: DailyStockSales) => (
+                          <div key={formItem.id} className="border rounded-lg p-4 hover:bg-gray-50">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <div className="flex items-center space-x-4 mb-2">
-                                  <h4 className="font-medium">{form.completedBy}</h4>
-                                  <Badge variant={form.shiftType === 'Night Shift' ? 'secondary' : 'outline'}>
-                                    {form.shiftType}
+                                  <h4 className="font-medium">{formItem.completedBy}</h4>
+                                  <Badge variant={formItem.shiftType === 'Night Shift' ? 'secondary' : 'outline'}>
+                                    {formItem.shiftType}
                                   </Badge>
                                   <span className="text-sm text-gray-600">
-                                    {format(new Date(form.shiftDate), 'MMM dd, yyyy')}
+                                    {format(new Date(formItem.shiftDate), 'MMM dd, yyyy')}
                                   </span>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
                                     <span className="text-gray-600">Sales: </span>
-                                    <span className="font-medium text-green-600">{formatCurrency(form.totalSales)}</span>
+                                    <span className="font-medium text-green-600">{formatCurrency(formItem.totalSales)}</span>
                                   </div>
                                   <div>
                                     <span className="text-gray-600">Expenses: </span>
-                                    <span className="font-medium text-red-600">{formatCurrency(form.totalExpenses)}</span>
+                                    <span className="font-medium text-red-600">{formatCurrency(formItem.totalExpenses)}</span>
                                   </div>
                                   <div>
                                     <span className="text-gray-600">Wages: </span>
-                                    <span className="font-medium">{(form.wageEntries as any[] || []).length} entries</span>
+                                    <span className="font-medium">{(formItem.wageEntries as any[] || []).length} entries</span>
                                   </div>
                                   <div>
                                     <span className="text-gray-600">Shopping: </span>
-                                    <span className="font-medium">{(form.shoppingEntries as any[] || []).length} items</span>
+                                    <span className="font-medium">{(formItem.shoppingEntries as any[] || []).length} items</span>
                                   </div>
                                 </div>
                               </div>
                               
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => setSelectedForm(form)}
-                                className="flex items-center space-x-1"
-                              >
-                                <Eye className="h-4 w-4" />
-                                <span>View</span>
-                              </Button>
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => setSelectedForm(formItem)}
+                                  className="flex items-center space-x-1"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span>View</span>
+                                </Button>
+                                <Button 
+                                  variant="default" 
+                                  size="sm"
+                                  onClick={() => {
+                                    // Load the selected form data into the form for editing
+                                    form.reset({
+                                      completedBy: formItem.completedBy,
+                                      shiftType: formItem.shiftType,
+                                      shiftDate: new Date(formItem.shiftDate),
+                                      startingCash: formItem.startingCash || "0",
+                                      endingCash: formItem.endingCash || "0",
+                                      grabSales: formItem.grabSales || "0",
+                                      foodPandaSales: formItem.foodPandaSales || "0",
+                                      aroiDeeSales: formItem.aroiDeeSales || "0",
+                                      qrScanSales: formItem.qrScanSales || "0",
+                                      cashSales: formItem.cashSales || "0",
+                                      totalSales: formItem.totalSales || "0",
+                                      salaryWages: formItem.salaryWages || "0",
+                                      shopping: formItem.shopping || "0",
+                                      gasExpense: formItem.gasExpense || "0",
+                                      totalExpenses: formItem.totalExpenses || "0",
+                                      expenseDescription: formItem.expenseDescription || "",
+                                      wageEntries: formItem.wageEntries || [],
+                                      shoppingEntries: formItem.shoppingEntries || [],
+                                      burgerBunsStock: formItem.burgerBunsStock || 0,
+                                      rollsOrderedCount: formItem.rollsOrderedCount || 0,
+                                      meatWeight: formItem.meatWeight || "0",
+                                      rollsOrderedConfirmed: formItem.rollsOrderedConfirmed || false,
+                                      freshFood: formItem.freshFood || Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
+                                      frozenFood: formItem.frozenFood || Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
+                                      shelfItems: formItem.shelfItems || Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+                                      foodItems: formItem.foodItems || {},
+                                      drinkStock: formItem.drinkStock || Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
+                                      kitchenItems: formItem.kitchenItems || Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
+                                      packagingItems: formItem.packagingItems || Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
+                                    });
+                                    setEditingFormId(formItem.id);
+                                    setIsDraft(formItem.isDraft);
+                                    // Switch to the New Form tab for editing
+                                    setActiveTab('new-form');
+                                    toast({
+                                      title: "Form Loaded for Editing",
+                                      description: "The form has been loaded into the editor. Make your changes and submit."
+                                    });
+                                  }}
+                                  className="flex items-center space-x-1 bg-blue-500 hover:bg-blue-600 text-white"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  <span>Edit</span>
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}

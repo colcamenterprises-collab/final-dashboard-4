@@ -131,6 +131,25 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  app.put("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      console.log("Updating daily stock sales:", { id, data });
+      
+      const result = await storage.updateDailyStockSales(parseInt(id), data);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Daily stock sales not found" });
+      }
+      
+      res.json(result);
+    } catch (err) {
+      console.error("Error updating daily stock sales:", err);
+      res.status(500).json({ error: "Failed to update daily stock sales" });
+    }
+  });
+
   // ─── Manual "pull receipts now" endpoint ───────────────────────────────
   app.post("/api/loyverse/pull", async (_req: Request, res: Response) => {
     try {
