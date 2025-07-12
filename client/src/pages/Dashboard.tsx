@@ -11,7 +11,7 @@ import AIInsightsCard from "@/components/AIInsightsCard";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
-import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
+
 import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 import ShiftSummaryCard from "@/components/ShiftSummaryCard";
 import RollVarianceCard from "@/components/RollVarianceCard";
@@ -170,14 +170,8 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Sales vs Expenses Chart Row */}
+      {/* Shift Summary Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Sales vs Expenses Chart (2 columns) */}
-        <div className="lg:col-span-2">
-          <SalesVsExpensesChart />
-        </div>
-        
-        {/* Shift Summary Card */}
         <div className="lg:col-span-1">
           <ShiftSummaryCard />
         </div>
