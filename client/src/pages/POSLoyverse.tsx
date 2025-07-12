@@ -21,29 +21,26 @@ export default function POSLoyverse() {
   const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
-  // Sample receipt data to demonstrate the interface
-  const sampleReceipts = [
-    {
-      id: "1",
-      receiptNumber: "R-2025-001",
-      receiptDate: new Date().toISOString(),
-      totalAmount: "450.00",
-      paymentMethod: "Card",
-      staffMember: "John Doe",
-      tableNumber: 5,
-      items: 3
+  // Fetch individual receipts from API
+  const { 
+    data: receipts = [], 
+    isLoading: isLoadingReceiptsList, 
+    refetch: refetchReceiptsList 
+  } = useQuery({
+    queryKey: ['/api/loyverse/receipts', searchQuery, dateFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: '50',
+        search: searchQuery,
+        dateFilter: dateFilter
+      });
+      
+      const response = await fetch(`/api/loyverse/receipts?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch receipts');
+      return response.json();
     },
-    {
-      id: "2", 
-      receiptNumber: "R-2025-002",
-      receiptDate: new Date(Date.now() - 3600000).toISOString(),
-      totalAmount: "220.00",
-      paymentMethod: "Cash",
-      staffMember: "Jane Smith",
-      tableNumber: 2,
-      items: 2
-    }
-  ];
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
   // Fetch real shift reports from Loyverse API
   const { data: shiftReports, isLoading: isLoadingShifts, refetch: refetchShifts } = useQuery({
@@ -72,9 +69,6 @@ export default function POSLoyverse() {
     },
     staleTime: 30000,
   });
-
-  // Extract receipts from shift data for compatibility with existing code
-  const receipts = shiftData?.flatMap((shift: any) => shift.receipts) || [];
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,7 +115,7 @@ export default function POSLoyverse() {
         title: "Data Synced",
         description: "Successfully synced receipts and shift reports from Loyverse.",
       });
-      refetchReceipts();
+      refetchReceiptsList();
       refetchShifts();
       queryClient.invalidateQueries({ queryKey: ['/api/loyverse/shift-balance-analysis'] });
     },
@@ -152,7 +146,7 @@ export default function POSLoyverse() {
         title: "Receipts Synced",
         description: `Successfully synced ${data.receiptsProcessed} receipts from Loyverse API.`,
       });
-      refetchReceipts();
+      refetchReceiptsList();
     },
     onError: () => {
       toast({
@@ -249,7 +243,7 @@ export default function POSLoyverse() {
               </div>
 
               <div className="space-y-4">
-                {isLoadingReceipts ? (
+                {isLoadingReceiptsList ? (
                   <ReceiptSkeleton count={5} />
                 ) : filteredReceipts.length === 0 ? (
                   <div className="text-center py-8">

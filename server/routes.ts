@@ -297,6 +297,59 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // NEW: Get receipts for POSLoyverse page
+  app.get("/api/loyverse/receipts", async (req: Request, res: Response) => {
+    try {
+      const limit = Number(req.query.limit) || 50;
+      const searchQuery = req.query.search as string || '';
+      const dateFilter = req.query.dateFilter as string || 'all';
+      
+      const { db } = await import("./db");
+      const { loyverseReceipts } = await import("../shared/schema");
+      const { desc, like, gte, and } = await import("drizzle-orm");
+      
+      let whereConditions = [];
+      
+      // Add search filter
+      if (searchQuery) {
+        whereConditions.push(like(loyverseReceipts.receiptNumber, `%${searchQuery}%`));
+      }
+      
+      // Add date filter
+      if (dateFilter !== 'all') {
+        const days = parseInt(dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        whereConditions.push(gte(loyverseReceipts.receiptDate, cutoffDate));
+      }
+      
+      const receipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+        .orderBy(desc(loyverseReceipts.receiptDate))
+        .limit(limit);
+      
+      // Transform to expected format
+      const formattedReceipts = receipts.map(receipt => ({
+        id: receipt.id.toString(),
+        receiptNumber: receipt.receiptNumber,
+        receiptDate: receipt.receiptDate.toISOString(),
+        totalAmount: receipt.totalAmount.toString(),
+        paymentMethod: receipt.paymentMethod,
+        staffMember: receipt.staffMember || 'Unknown',
+        tableNumber: receipt.tableNumber || 0,
+        items: receipt.items || [],
+        rawData: receipt.rawData
+      }));
+      
+      res.json(formattedReceipts);
+    } catch (err) {
+      console.error("Error fetching receipts:", err);
+      res.status(500).json({ error: "Failed to fetch receipts" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;
