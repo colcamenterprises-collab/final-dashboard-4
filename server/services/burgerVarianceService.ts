@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { loyverseReceipts, dailyShiftSummary, dailyStockSales, expenses } from "@shared/schema";
-import { and, gte, lte, eq } from "drizzle-orm";
+import { and, gte, lte, eq, desc } from "drizzle-orm";
 import { BURGER_DEFS } from "../constants/burgerDefinitions";
 
 const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -121,7 +121,7 @@ export async function generateShiftSummary(shiftDate: Date) {
 export async function getLatestShiftSummary() {
   try {
     const latest = await db.select().from(dailyShiftSummary)
-      .orderBy(dailyShiftSummary.shiftDate)
+      .orderBy(desc(dailyShiftSummary.shiftDate))
       .limit(1);
     
     return latest[0] || null;
