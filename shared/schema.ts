@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -314,6 +314,42 @@ export const recipeIngredients = pgTable("recipe_ingredients", {
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
 });
 
+// Shift-level analytics tables
+export const shiftItemSales = pgTable("shift_item_sales", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull(), // Date of the shift (6pm-3am cycle)
+  category: text("category").notNull(), // BURGERS, SIDE_ORDERS, DRINKS, BURGER_EXTRAS, OTHER
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  salesTotal: decimal("sales_total", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const shiftModifierSales = pgTable("shift_modifier_sales", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull(), // Date of the shift (6pm-3am cycle)
+  modifierName: text("modifier_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  salesTotal: decimal("sales_total", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const shiftSummary = pgTable("shift_summary", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull().unique(), // Date of the shift (6pm-3am cycle)
+  burgersSold: integer("burgers_sold").notNull().default(0),
+  drinksSold: integer("drinks_sold").notNull().default(0),
+  sidesSold: integer("sides_sold").notNull().default(0),
+  extrasSold: integer("extras_sold").notNull().default(0),
+  otherSold: integer("other_sold").notNull().default(0),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).notNull(),
+  totalReceipts: integer("total_receipts").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true }).extend({
@@ -345,6 +381,11 @@ export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales)
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
+
+// Shift analytics insert schemas  
+export const insertShiftItemSalesSchema = createInsertSchema(shiftItemSales).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertShiftModifierSalesSchema = createInsertSchema(shiftModifierSales).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertShiftSummarySchema = createInsertSchema(shiftSummary).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -385,6 +426,14 @@ export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
 export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+
+// Shift analytics types
+export type ShiftItemSales = typeof shiftItemSales.$inferSelect;
+export type InsertShiftItemSales = z.infer<typeof insertShiftItemSalesSchema>;
+export type ShiftModifierSales = typeof shiftModifierSales.$inferSelect;
+export type InsertShiftModifierSales = z.infer<typeof insertShiftModifierSalesSchema>;
+export type ShiftSummary = typeof shiftSummary.$inferSelect;
+export type InsertShiftSummary = z.infer<typeof insertShiftSummarySchema>;
 
 // Quick Notes table
 export const quickNotes = pgTable("quick_notes", {

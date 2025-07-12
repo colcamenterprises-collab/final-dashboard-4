@@ -72,6 +72,14 @@ export class SchedulerService {
       // 2. Sync receipts from Loyverse using Bangkok timezone-aware API
       const receiptCount = await loyverseAPI.syncTodaysReceipts();
       console.log(`✅ Synced ${receiptCount} receipts from completed shift`);
+      
+      // 3. Process shift analytics for the completed shift
+      if (receiptCount > 0) {
+        console.log('🔄 Processing shift analytics for previous shift...');
+        const { processPreviousShift } = await import('./shiftAnalytics');
+        const analyticsResult = await processPreviousShift();
+        console.log(`📊 Shift analytics: ${analyticsResult.message}`);
+      }
 
       // 3. Sync additional data (items, customers, etc.)
       const itemCount = await loyverseAPI.syncAllItems();

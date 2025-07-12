@@ -218,6 +218,46 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Shift Analytics endpoints
+  app.get("/api/analysis/shift/:date", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const { getShiftAnalytics } = await import("./services/shiftAnalytics");
+      const analytics = await getShiftAnalytics(date);
+      
+      if (!analytics) {
+        return res.status(404).json({ error: "No analytics found for this shift" });
+      }
+      
+      res.json(analytics);
+    } catch (err) {
+      console.error("Error fetching shift analytics:", err);
+      res.status(500).json({ error: "Failed to fetch shift analytics" });
+    }
+  });
+
+  app.get("/api/analysis/search", async (req: Request, res: Response) => {
+    try {
+      const { q, from, to, cat } = req.query;
+      // TODO: implement search functionality
+      res.json({ message: "Search functionality coming soon" });
+    } catch (err) {
+      console.error("Error searching analytics:", err);
+      res.status(500).json({ error: "Failed to search analytics" });
+    }
+  });
+
+  app.post("/api/analysis/process-shift", async (req: Request, res: Response) => {
+    try {
+      const { processPreviousShift } = await import("./services/shiftAnalytics");
+      const result = await processPreviousShift();
+      res.json(result);
+    } catch (err) {
+      console.error("Error processing shift analytics:", err);
+      res.status(500).json({ error: "Failed to process shift analytics" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;
