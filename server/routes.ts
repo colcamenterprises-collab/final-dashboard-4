@@ -143,6 +143,81 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Expense endpoints
+  app.get("/api/expenses", async (req: Request, res: Response) => {
+    try {
+      const expenses = await storage.getExpenses();
+      res.json(expenses);
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.post("/api/expenses", async (req: Request, res: Response) => {
+    try {
+      const expense = await storage.createExpense(req.body);
+      res.json(expense);
+    } catch (err) {
+      console.error("Error creating expense:", err);
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req: Request, res: Response) => {
+    try {
+      const success = await storage.deleteExpense(parseInt(req.params.id));
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Expense not found" });
+      }
+    } catch (err) {
+      console.error("Error deleting expense:", err);
+      res.status(500).json({ error: "Failed to delete expense" });
+    }
+  });
+
+  app.get("/api/expenses/month-to-date", async (req: Request, res: Response) => {
+    try {
+      const total = await storage.getMonthToDateExpenses();
+      res.json({ total });
+    } catch (err) {
+      console.error("Error fetching month-to-date expenses:", err);
+      res.status(500).json({ error: "Failed to fetch month-to-date expenses" });
+    }
+  });
+
+  app.get("/api/expenses/by-category", async (req: Request, res: Response) => {
+    try {
+      const categories = await storage.getExpensesByCategory();
+      res.json(categories);
+    } catch (err) {
+      console.error("Error fetching expenses by category:", err);
+      res.status(500).json({ error: "Failed to fetch expenses by category" });
+    }
+  });
+
+  app.get("/api/expense-suppliers", async (req: Request, res: Response) => {
+    try {
+      const suppliers = await storage.getExpenseSuppliers();
+      res.json(suppliers);
+    } catch (err) {
+      console.error("Error fetching expense suppliers:", err);
+      res.status(500).json({ error: "Failed to fetch expense suppliers" });
+    }
+  });
+
+  app.get("/api/expense-categories", async (req: Request, res: Response) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (err) {
+      console.error("Error fetching expense categories:", err);
+      res.status(500).json({ error: "Failed to fetch expense categories" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;
