@@ -310,9 +310,9 @@ export default function DailyStockSales() {
   
   // Draft saving mutation
   const saveDraftMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales', {
+    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales/draft', {
       method: 'POST',
-      body: JSON.stringify({ ...data, isDraft: true })
+      body: JSON.stringify(data)
     }),
     onSuccess: () => {
       toast({
@@ -320,6 +320,7 @@ export default function DailyStockSales() {
         description: "Your form has been saved as a draft."
       });
       setIsDraft(true);
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
     },
     onError: (error) => {
       console.error('Error saving draft:', error);

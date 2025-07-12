@@ -117,6 +117,20 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  app.post("/api/daily-stock-sales/draft", async (req: Request, res: Response) => {
+    try {
+      const data = { ...req.body, isDraft: true };
+      console.log("Saving draft:", data);
+      
+      const result = await storage.createDailyStockSales(data);
+      
+      res.json(result);
+    } catch (err) {
+      console.error("Error saving draft:", err);
+      res.status(500).json({ error: "Failed to save draft" });
+    }
+  });
+
   // ─── Manual "pull receipts now" endpoint ───────────────────────────────
   app.post("/api/loyverse/pull", async (_req: Request, res: Response) => {
     try {

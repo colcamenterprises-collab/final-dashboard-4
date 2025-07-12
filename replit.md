@@ -349,6 +349,10 @@ Changelog:
 - July 12, 2025. Created NO_EMOJI_POLICY.md documentation for professional business standards
 - July 12, 2025. Fixed heading size consistency - all card titles now use standardized text-lg font-semibold text-gray-900 styling
 - July 12, 2025. Moved Roll Variance Card to top of dashboard near shift summary for better operational visibility
+- July 12, 2025. DAILY SALES FORM FIX: Restored complete form submission functionality for staff operations
+- July 12, 2025. Fixed missing draft endpoint - added /api/daily-stock-sales/draft route for proper draft saving
+- July 12, 2025. Updated saveDraftMutation to use correct endpoint with proper cache invalidation
+- July 12, 2025. Verified both draft saving and form submission working correctly with authentic data storage
 ```
 
 ## User Preferences
