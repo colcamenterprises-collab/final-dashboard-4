@@ -183,6 +183,13 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Roll Variance Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-1">
+          <RollVarianceCard />
+        </div>
+      </div>
+
       {/* Three-column layout: Revenue Chart | Expenses Chart | Payment Type Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Column 1: Revenue Chart */}
@@ -590,12 +597,7 @@ export default function Dashboard() {
       </div>
       
       {/* Restaurant Hub Logo and Copyright */}
-      {/* Roll Variance Tracking */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        <div className="lg:col-span-1">
-          <RollVarianceCard />
-        </div>
-      </div>
+
 
       <div className="flex flex-col items-end mt-8 mb-4">
         <a 

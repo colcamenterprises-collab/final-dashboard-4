@@ -14,7 +14,7 @@ export default function RollVarianceCard() {
       <Card className="restaurant-card">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-gray-900">
-            🍔 Burger Roll Variance
+            Burger Roll Variance
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -33,7 +33,7 @@ export default function RollVarianceCard() {
       <Card className="restaurant-card">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-gray-900">
-            🍔 Burger Roll Variance
+            Burger Roll Variance
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -55,7 +55,7 @@ export default function RollVarianceCard() {
     <Card className="restaurant-card">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
-          🍔 Burger Roll Variance
+          Burger Roll Variance
           {data.varianceFlag && (
             <Badge variant="destructive" className="text-xs">
               <AlertTriangle className="w-3 h-3 mr-1" />

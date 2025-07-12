@@ -27,7 +27,7 @@ export default function ShiftSummaryCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Shift Summary – {data.shiftDate}</CardTitle>
+        <CardTitle className="text-lg font-semibold text-gray-900">Shift Summary – {data.shiftDate}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3 mb-4">
@@ -43,10 +43,10 @@ export default function ShiftSummaryCard() {
         </div>
         <div className="flex gap-4 pt-2 border-t">
           <span className="text-sm">
-            🍔 Burgers: <span className="font-bold">{data.burgersSold}</span>
+            Burgers: <span className="font-bold">{data.burgersSold}</span>
           </span>
           <span className="text-sm">
-            🥤 Drinks: <span className="font-bold">{data.drinksSold}</span>
+            Drinks: <span className="font-bold">{data.drinksSold}</span>
           </span>
         </div>
       </CardContent>
