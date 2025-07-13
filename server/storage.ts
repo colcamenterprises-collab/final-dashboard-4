@@ -61,6 +61,7 @@ export interface IStorage {
   updateShoppingListItem(id: number, updates: Partial<ShoppingList>): Promise<ShoppingList>;
   deleteShoppingListItem(id: number): Promise<void>;
   completeShoppingList(listIds: number[], actualCost?: number): Promise<void>;
+  generateShoppingList(formData: DailyStockSales): Promise<ShoppingList[]>;
   
   // Expenses
   getExpenses(): Promise<Expense[]>;
@@ -1335,6 +1336,74 @@ export class MemStorage implements IStorage {
     }).returning();
     
     return result;
+  }
+
+  async generateShoppingList(formData: DailyStockSales): Promise<ShoppingList[]> {
+    const { db } = await import("./db");
+    const { shoppingList } = await import("@shared/schema");
+    
+    const shoppingItems: InsertShoppingList[] = [];
+    
+    // Process shopping entries from the form
+    if (formData.shoppingEntries && formData.shoppingEntries.length > 0) {
+      formData.shoppingEntries.forEach(entry => {
+        shoppingItems.push({
+          formId: formData.id,
+          itemName: entry.item,
+          quantity: 1,
+          unit: "each",
+          unitPrice: entry.amount.toString(),
+          totalPrice: entry.amount.toString(),
+          supplier: entry.shop || "Unknown",
+          category: "Shopping",
+          priority: "medium",
+          notes: entry.notes || "",
+          listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
+          isCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      });
+    }
+
+    // Process low stock items based on inventory tracking
+    const categories = ['freshFood', 'frozenFood', 'shelfItems', 'drinkStock', 'kitchenItems', 'packagingItems'];
+    
+    categories.forEach(category => {
+      const categoryData = formData[category as keyof DailyStockSales];
+      if (categoryData && typeof categoryData === 'object') {
+        Object.entries(categoryData).forEach(([itemName, quantity]) => {
+          // Add items with low stock (less than 5 units)
+          if (typeof quantity === 'number' && quantity < 5) {
+            const orderQuantity = Math.max(10, quantity * 2); // Order at least 10 or double current stock
+            shoppingItems.push({
+              formId: formData.id,
+              itemName: itemName.replace(/([A-Z])/g, ' $1').trim(), // Convert camelCase to readable
+              quantity: orderQuantity,
+              unit: "each",
+              unitPrice: "0.00",
+              totalPrice: "0.00",
+              supplier: "TBD",
+              category: category.replace(/([A-Z])/g, ' $1').trim(),
+              priority: quantity === 0 ? "high" : "medium",
+              notes: `Low stock: ${quantity} remaining`,
+              listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
+              isCompleted: false,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+          }
+        });
+      }
+    });
+
+    // Save all shopping items to database
+    if (shoppingItems.length > 0) {
+      const results = await db.insert(shoppingList).values(shoppingItems).returning();
+      return results;
+    }
+    
+    return [];
   }
 }
 

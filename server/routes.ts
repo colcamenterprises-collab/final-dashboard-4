@@ -94,6 +94,33 @@ export function registerRoutes(app: express.Application): Server {
       // Save to storage
       const result = await storage.createDailyStockSales(data);
       
+      // Generate shopping list if not a draft
+      if (!data.isDraft) {
+        try {
+          console.log("Generating shopping list for form submission...");
+          const shoppingList = await storage.generateShoppingList(result);
+          console.log(`Generated ${shoppingList.length} shopping items`);
+          
+          // Send email notification
+          try {
+            const { sendManagementSummary } = await import('./services/gmailService');
+            const emailData = {
+              formData: result,
+              shoppingList: shoppingList,
+              submissionTime: new Date()
+            };
+            await sendManagementSummary(emailData);
+            console.log("Email notification sent successfully");
+          } catch (emailError) {
+            console.error("Failed to send email notification:", emailError);
+            // Don't fail the request if email fails
+          }
+        } catch (error) {
+          console.error("Failed to generate shopping list:", error);
+          // Don't fail the request if shopping list generation fails
+        }
+      }
+      
       res.json(result);
     } catch (err) {
       console.error("Error creating daily stock sales:", err);
