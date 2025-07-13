@@ -511,27 +511,30 @@ export function registerRoutes(app: express.Application): Server {
   app.get("/api/shift-reports/balance-review", async (req: Request, res: Response) => {
     try {
       const { db } = await import("./db");
-      const { dailyStockSales } = await import("../shared/schema");
+      const { loyverseShiftReports } = await import("../shared/schema");
       const { desc } = await import("drizzle-orm");
       const { format } = await import("date-fns");
       
-      // Get last 5 shift reports with balance information
+      // Get last 5 authentic shift reports from Loyverse data
       const recentShifts = await db
         .select()
-        .from(dailyStockSales)
-        .orderBy(desc(dailyStockSales.shiftDate))
+        .from(loyverseShiftReports)
+        .orderBy(desc(loyverseShiftReports.shiftDate))
         .limit(5);
       
       const balanceReports = recentShifts.map(shift => {
-        // Calculate balance as ending cash - starting cash
-        const startingCash = parseFloat(shift.startingCash?.toString() || '0');
-        const endingCash = parseFloat(shift.endingCash?.toString() || '0');
-        const cashBalance = endingCash - startingCash;
-        const isWithinRange = Math.abs(cashBalance) <= 50;
+        // Extract authentic cash difference from report_data JSON
+        const reportData = shift.reportData as any;
+        const cashDifference = parseFloat(reportData?.cash_difference?.toString() || '0');
+        const isWithinRange = Math.abs(cashDifference) <= 50;
+        
+        // Format date to show actual shift date
+        const shiftDate = shift.shiftDate ? new Date(shift.shiftDate) : new Date();
+        const formattedDate = format(shiftDate, 'dd/MM/yyyy');
         
         return {
-          date: shift.shiftDate ? format(new Date(shift.shiftDate), 'dd/MM/yyyy') : 'Unknown',
-          balance: cashBalance,
+          date: formattedDate,
+          balance: cashDifference,
           status: isWithinRange ? "Balanced" : "Attention",
           isWithinRange
         };
