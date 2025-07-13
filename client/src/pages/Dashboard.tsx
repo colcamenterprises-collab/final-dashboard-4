@@ -239,20 +239,20 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
           <Link href="/expenses" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 px-6 bg-slate-800 text-white font-medium hover:bg-slate-700">
+            <Button className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center">
               <Receipt className="mr-2 h-4 w-4" />
               Submit Expense
             </Button>
           </Link>
           <Link href="/daily-stock-sales" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 px-6 bg-slate-800 text-white font-medium hover:bg-slate-700">
+            <Button className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center">
               <ClipboardList className="mr-2 h-4 w-4" />
               Sales & Stock Form
             </Button>
           </Link>
           <Button 
             onClick={() => setIsQuickNoteDialogOpen(true)}
-            className="w-full sm:w-44 h-10 px-6 bg-slate-800 text-white font-medium hover:bg-slate-700"
+            className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center"
           >
             <StickyNote className="mr-2 h-4 w-4" />
             Quick Notes
