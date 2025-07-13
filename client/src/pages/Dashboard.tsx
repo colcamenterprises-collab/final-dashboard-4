@@ -1,9 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot, Wifi, Zap, Receipt, ClipboardList } from "lucide-react";
+import { useState } from "react";
+import { DollarSign, ShoppingCart, Package, AlertTriangle, TrendingUp, Clock, CreditCard, Truck, CheckCircle, Bot, Wifi, Zap, Receipt, ClipboardList, Plus, StickyNote, Edit, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import KPICard from "@/components/KPICard";
 import MonthlyRevenueChart from "@/components/SalesChart";
 import MonthlyExpensesChart from "@/components/MonthlyExpensesChart";
@@ -19,12 +24,116 @@ import RollVarianceCard from "@/components/RollVarianceCard";
 
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
 import restaurantHubLogo from "@assets/Restuarant Hub (2)_1751479657885.png";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
+// Quick Note form schema
+const quickNoteFormSchema = z.object({
+  content: z.string().min(1, "Content is required"),
+  priority: z.enum(["idea", "note", "implement"]),
+  date: z.date()
+});
+
+type QuickNoteFormData = z.infer<typeof quickNoteFormSchema>;
+
+interface QuickNote {
+  id: number;
+  content: string;
+  priority: "idea" | "note" | "implement";
+  date: Date;
+  createdAt: Date;
+}
+
 export default function Dashboard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isQuickNoteDialogOpen, setIsQuickNoteDialogOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<QuickNote | null>(null);
+
+  const quickNoteForm = useForm<QuickNoteFormData>({
+    resolver: zodResolver(quickNoteFormSchema),
+    defaultValues: {
+      content: "",
+      priority: "idea",
+      date: new Date()
+    }
+  });
+
+  // Fetch quick notes
+  const { data: quickNotes = [], isLoading: isLoadingNotes } = useQuery({
+    queryKey: ['/api/quick-notes'],
+    queryFn: async () => {
+      const response = await fetch('/api/quick-notes');
+      if (!response.ok) throw new Error('Failed to fetch quick notes');
+      return response.json();
+    }
+  });
+
+  // Create quick note mutation
+  const createQuickNoteMutation = useMutation({
+    mutationFn: async (data: QuickNoteFormData) => {
+      return apiRequest('/api/quick-notes', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quick-notes'] });
+      setIsQuickNoteDialogOpen(false);
+      quickNoteForm.reset();
+      toast({
+        title: "Success",
+        description: "Quick note created successfully"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to create quick note",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete quick note mutation
+  const deleteQuickNoteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/quick-notes/${id}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quick-notes'] });
+      toast({
+        title: "Success",
+        description: "Quick note deleted successfully"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete quick note",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const onCreateQuickNote = (data: QuickNoteFormData) => {
+    createQuickNoteMutation.mutate(data);
+  };
+
+  const handleDeleteNote = (id: number) => {
+    deleteQuickNoteMutation.mutate(id);
+  };
+
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ["/api/shift-summary/latest"],
     select: (data: any) => {
@@ -437,10 +546,147 @@ export default function Dashboard() {
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
-        {/* Additional space for future components */}
-        <div className="space-y-4">
-          {/* This space can be used for additional dashboard components */}
-        </div>
+        {/* Quick Notes */}
+        <Card className="restaurant-card">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <StickyNote className="h-5 w-5" />
+                Quick Notes
+              </CardTitle>
+              <Dialog open={isQuickNoteDialogOpen} onOpenChange={setIsQuickNoteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Note
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Quick Note</DialogTitle>
+                  </DialogHeader>
+                  <Form {...quickNoteForm}>
+                    <form onSubmit={quickNoteForm.handleSubmit(onCreateQuickNote)} className="space-y-4">
+                      <FormField
+                        control={quickNoteForm.control}
+                        name="content"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Content</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} placeholder="Enter your note content..." />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={quickNoteForm.control}
+                        name="priority"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Priority</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="idea">Idea</SelectItem>
+                                <SelectItem value="note">Note</SelectItem>
+                                <SelectItem value="implement">Implement</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={quickNoteForm.control}
+                        name="date"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => field.onChange(new Date(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsQuickNoteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Create</Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {isLoadingNotes ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500 text-sm">Loading notes...</div>
+                </div>
+              ) : quickNotes.length === 0 ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500 text-sm">No quick notes yet</div>
+                  <div className="text-gray-400 text-xs mt-1">Click "Add Note" to create your first note</div>
+                </div>
+              ) : (
+                quickNotes.slice(0, 3).map((note: QuickNote) => (
+                  <div key={note.id} className="border rounded-lg p-3 hover:bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Badge variant={
+                            note.priority === 'implement' ? 'default' :
+                            note.priority === 'note' ? 'secondary' :
+                            'outline'
+                          }>
+                            {note.priority}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            {format(new Date(note.date), 'MMM dd')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 line-clamp-2">
+                          {note.content}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+              {quickNotes.length > 3 && (
+                <div className="text-center">
+                  <Link to="/marketing">
+                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                      View all {quickNotes.length} notes
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stock Insights - Three Column Layout */}

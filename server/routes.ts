@@ -409,6 +409,49 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Quick Notes API endpoints
+  app.get("/api/quick-notes", async (req: Request, res: Response) => {
+    try {
+      const notes = await storage.getQuickNotes();
+      res.json(notes);
+    } catch (err) {
+      console.error("Error fetching quick notes:", err);
+      res.status(500).json({ error: "Failed to fetch quick notes" });
+    }
+  });
+
+  app.post("/api/quick-notes", async (req: Request, res: Response) => {
+    try {
+      const note = await storage.createQuickNote(req.body);
+      res.json(note);
+    } catch (err) {
+      console.error("Error creating quick note:", err);
+      res.status(500).json({ error: "Failed to create quick note" });
+    }
+  });
+
+  app.put("/api/quick-notes/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const note = await storage.updateQuickNote(id, req.body);
+      res.json(note);
+    } catch (err) {
+      console.error("Error updating quick note:", err);
+      res.status(500).json({ error: "Failed to update quick note" });
+    }
+  });
+
+  app.delete("/api/quick-notes/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteQuickNote(id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting quick note:", err);
+      res.status(500).json({ error: "Failed to delete quick note" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;
