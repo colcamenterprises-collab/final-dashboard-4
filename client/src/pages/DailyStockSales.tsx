@@ -259,7 +259,6 @@ export default function DailyStockSales() {
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/search'] });
       form.reset();
-      setReceiptPhotos([]);
       setIsDraft(false);
       setEditingFormId(null);
     },
@@ -1802,10 +1801,6 @@ export default function DailyStockSales() {
                                   kitchenItems: draftForm.kitchenItems || Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
                                   packagingItems: draftForm.packagingItems || Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
                                 });
-                                // Load receipt photos if they exist
-                                if (draftForm.receiptPhotos) {
-                                  setReceiptPhotos(draftForm.receiptPhotos);
-                                }
                                 setIsDraft(true);
                                 toast({
                                   title: "Draft Loaded",
