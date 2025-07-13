@@ -20,6 +20,7 @@ import CompactShiftReports from "@/components/CompactShiftReports";
 import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 import ShiftSummaryCard from "@/components/ShiftSummaryCard";
 import RollVarianceCard from "@/components/RollVarianceCard";
+import ShiftReportReview from "@/components/ShiftReportReview";
 
 
 import { api, mutations } from "@/lib/api";
@@ -546,7 +547,12 @@ export default function Dashboard() {
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
-        {/* Quick Notes */}
+        {/* Daily Register Balance Review */}
+        <ShiftReportReview />
+      </div>
+
+      {/* Quick Notes - moved to separate row */}
+      <div className="mb-6 lg:mb-8">
         <Card className="restaurant-card">
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -632,18 +638,18 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {isLoadingNotes ? (
-                <div className="text-center py-4">
+                <div className="col-span-full text-center py-4">
                   <div className="text-gray-500 text-sm">Loading notes...</div>
                 </div>
               ) : quickNotes.length === 0 ? (
-                <div className="text-center py-4">
+                <div className="col-span-full text-center py-4">
                   <div className="text-gray-500 text-sm">No quick notes yet</div>
                   <div className="text-gray-400 text-xs mt-1">Click "Add Note" to create your first note</div>
                 </div>
               ) : (
-                quickNotes.slice(0, 3).map((note: QuickNote) => (
+                quickNotes.slice(0, 6).map((note: QuickNote) => (
                   <div key={note.id} className="border rounded-lg p-3 hover:bg-gray-50">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
@@ -675,8 +681,8 @@ export default function Dashboard() {
                   </div>
                 ))
               )}
-              {quickNotes.length > 3 && (
-                <div className="text-center">
+              {quickNotes.length > 6 && (
+                <div className="col-span-full text-center">
                   <Link to="/marketing">
                     <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
                       View all {quickNotes.length} notes

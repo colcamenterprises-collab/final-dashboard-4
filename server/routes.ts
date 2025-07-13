@@ -452,6 +452,43 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Shift Report Balance Review endpoint
+  app.get("/api/shift-reports/balance-review", async (req: Request, res: Response) => {
+    try {
+      const { db } = await import("./db");
+      const { dailyStockSales } = await import("../shared/schema");
+      const { desc } = await import("drizzle-orm");
+      const { format } = await import("date-fns");
+      
+      // Get last 5 shift reports with balance information
+      const recentShifts = await db
+        .select()
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.shiftDate))
+        .limit(5);
+      
+      const balanceReports = recentShifts.map(shift => {
+        // Calculate balance as ending cash - starting cash
+        const startingCash = parseFloat(shift.startingCash?.toString() || '0');
+        const endingCash = parseFloat(shift.endingCash?.toString() || '0');
+        const cashBalance = endingCash - startingCash;
+        const isWithinRange = Math.abs(cashBalance) <= 50;
+        
+        return {
+          date: shift.shiftDate ? format(new Date(shift.shiftDate), 'dd/MM/yyyy') : 'Unknown',
+          balance: cashBalance,
+          status: isWithinRange ? "Balanced" : "Attention",
+          isWithinRange
+        };
+      });
+      
+      res.json(balanceReports);
+    } catch (err) {
+      console.error("Error fetching shift balance review:", err);
+      res.status(500).json({ error: "Failed to fetch shift balance review" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;
