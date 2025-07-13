@@ -409,10 +409,11 @@ export default function RecipeManagement() {
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsCreateDialogOpen(false)}
+                    className="w-24"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={createRecipeMutation.isPending}>
+                  <Button type="submit" disabled={createRecipeMutation.isPending} className="w-32">
                     {createRecipeMutation.isPending ? "Creating..." : "Create Recipe"}
                   </Button>
                 </div>
@@ -595,10 +596,11 @@ export default function RecipeManagement() {
                                 type="button" 
                                 variant="outline" 
                                 onClick={() => setIsAddIngredientDialogOpen(false)}
+                                className="w-24"
                               >
                                 Cancel
                               </Button>
-                              <Button type="submit" disabled={addIngredientMutation.isPending}>
+                              <Button type="submit" disabled={addIngredientMutation.isPending} className="w-32">
                                 {addIngredientMutation.isPending ? "Adding..." : "Add Ingredient"}
                               </Button>
                             </div>
@@ -625,6 +627,7 @@ export default function RecipeManagement() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setEditingIngredient(ri)}
+                            className="w-8"
                           >
                             <Edit3 className="h-3 w-3" />
                           </Button>
@@ -637,6 +640,7 @@ export default function RecipeManagement() {
                               }
                             }}
                             disabled={removeIngredientMutation.isPending}
+                            className="w-8"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -705,6 +709,7 @@ export default function RecipeManagement() {
                                 variant={marketingOutputType === 'delivery' ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setMarketingOutputType('delivery')}
+                                className="w-36"
                               >
                                 <FileText className="h-4 w-4 mr-2" />
                                 Delivery Partner
@@ -713,6 +718,7 @@ export default function RecipeManagement() {
                                 variant={marketingOutputType === 'advertising' ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setMarketingOutputType('advertising')}
+                                className="w-36"
                               >
                                 <Megaphone className="h-4 w-4 mr-2" />
                                 Advertising
@@ -721,6 +727,7 @@ export default function RecipeManagement() {
                                 variant={marketingOutputType === 'social' ? 'default' : 'outline'}
                                 size="sm"
                                 onClick={() => setMarketingOutputType('social')}
+                                className="w-36"
                               >
                                 <Share2 className="h-4 w-4 mr-2" />
                                 Social Media
@@ -976,11 +983,12 @@ export default function RecipeManagement() {
                     type="button" 
                     variant="outline" 
                     onClick={() => setEditingIngredient(null)}
+                    className="w-20"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={updateIngredientMutation.isPending}>
+                  <Button type="submit" disabled={updateIngredientMutation.isPending} className="w-20">
                     <Save className="h-4 w-4 mr-1" />
                     {updateIngredientMutation.isPending ? "Saving..." : "Save"}
                   </Button>
