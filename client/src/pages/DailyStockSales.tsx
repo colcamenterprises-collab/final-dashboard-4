@@ -36,7 +36,8 @@ import {
   ClipboardList,
   TrendingUp,
   Snowflake,
-  Edit
+  Edit,
+  Trash2
 } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
@@ -339,6 +340,20 @@ export default function DailyStockSales() {
         variant: "destructive"
       });
     }
+  });
+
+  const deleteDraftMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/daily-stock-sales/${id}`, {
+      method: 'DELETE',
+    }),
+    onSuccess: () => {
+      toast({ title: "Draft deleted successfully!" });
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/search'] });
+    },
+    onError: (error) => {
+      console.error('Draft delete error:', error);
+      toast({ title: "Failed to delete draft", variant: "destructive" });
+    },
   });
   
   const saveDraft = () => {
@@ -1764,9 +1779,18 @@ export default function DailyStockSales() {
                                 Created: {format(new Date(draftForm.createdAt), 'PPpp')}
                               </p>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={() => {
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteDraftMutation.mutate(draftForm.id)}
+                                disabled={deleteDraftMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
                                 // Load the draft data into the form
                                 form.reset({
                                   completedBy: draftForm.completedBy,
@@ -1809,6 +1833,7 @@ export default function DailyStockSales() {
                             >
                               Load Draft
                             </Button>
+                            </div>
                           </div>
                         </div>
                       ))

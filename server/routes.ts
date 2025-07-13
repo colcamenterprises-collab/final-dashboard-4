@@ -170,10 +170,51 @@ export function registerRoutes(app: express.Application): Server {
         return res.status(404).json({ error: "Daily stock sales not found" });
       }
       
+      // If form is being submitted (not a draft), generate shopping list
+      if (!data.isDraft) {
+        try {
+          console.log("Generating shopping list for updated form submission...");
+          const shoppingList = await storage.generateShoppingList(result);
+          console.log(`Generated ${shoppingList.length} shopping items`);
+          
+          // Send email notification
+          try {
+            const { sendManagementSummary } = await import('./services/gmailService');
+            const emailData = {
+              formData: result,
+              shoppingList: shoppingList,
+              submissionTime: new Date()
+            };
+            await sendManagementSummary(emailData);
+            console.log("Email notification sent successfully");
+          } catch (emailError) {
+            console.error("Failed to send email notification:", emailError);
+          }
+        } catch (error) {
+          console.error("Failed to generate shopping list:", error);
+        }
+      }
+      
       res.json(result);
     } catch (err) {
       console.error("Error updating daily stock sales:", err);
       res.status(500).json({ error: "Failed to update daily stock sales" });
+    }
+  });
+
+  app.delete("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteDailyStockSales(parseInt(id));
+      
+      if (!success) {
+        return res.status(404).json({ error: "Daily stock sales not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting daily stock sales:", err);
+      res.status(500).json({ error: "Failed to delete daily stock sales" });
     }
   });
 

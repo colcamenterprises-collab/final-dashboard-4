@@ -109,6 +109,7 @@ export interface IStorage {
   getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined>;
   getDraftForms(): Promise<DailyStockSales[]>;
   updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales>;
+  deleteDailyStockSales(id: number): Promise<boolean>;
   
   // Ingredients
   getIngredients(): Promise<Ingredient[]>;
@@ -920,6 +921,23 @@ export class MemStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async deleteDailyStockSales(id: number): Promise<boolean> {
+    try {
+      const { db } = await import("./db");
+      const { dailyStockSales } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const result = await db.delete(dailyStockSales)
+        .where(eq(dailyStockSales.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error deleting daily stock sales:", error);
+      return false;
+    }
   }
 
   private seedDailyStockSalesData() {
