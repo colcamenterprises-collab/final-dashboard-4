@@ -358,31 +358,7 @@ export default function DailyStockSalesSearch() {
         </Card>
       )}
 
-      {/* Receipt Photos */}
-      {form.receiptPhotos && (form.receiptPhotos as any[]).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Receipt Photos ({(form.receiptPhotos as any[]).length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(form.receiptPhotos as any[]).map((photo, index) => (
-                <div key={index} className="p-3 border rounded-lg">
-                  <img 
-                    src={`data:image/jpeg;base64,${photo.base64Data}`} 
-                    alt={`Receipt ${index + 1}`} 
-                    className="w-full h-32 object-cover rounded mb-2"
-                  />
-                  <p className="text-xs text-gray-600">{photo.filename}</p>
-                  <p className="text-xs text-gray-500">
-                    {format(new Date(photo.uploadedAt), 'dd/MM/yyyy HH:mm')}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Draft Status */}
       {form.isDraft && (

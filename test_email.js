@@ -33,7 +33,6 @@ async function testEmail() {
     const emailData = {
       formData: sampleFormData,
       shoppingList: [],
-      receiptPhotos: [],
       submissionTime: new Date()
     };
 

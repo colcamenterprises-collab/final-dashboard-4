@@ -234,7 +234,6 @@ export default function DailyStockSales() {
       const formattedData = {
         ...data,
         shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
-        receiptPhotos: [],
         isDraft: false
       };
       
@@ -311,7 +310,6 @@ export default function DailyStockSales() {
       const formattedData = {
         ...data,
         shiftDate: new Date(data.shiftDate).toISOString().split('T')[0],
-        receiptPhotos: [],
         isDraft: true
       };
       
