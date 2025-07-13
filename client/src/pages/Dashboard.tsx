@@ -237,7 +237,7 @@ export default function Dashboard() {
           <Zap className="h-5 w-5 text-gray-700" />
           <span className="text-lg font-semibold text-gray-900">Quick Actions</span>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 max-w-lg">
+        <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
           <Link href="/expenses" className="flex-1 sm:flex-none">
             <Button className="w-full sm:w-auto h-10 px-6 bg-black text-white font-medium hover:bg-gray-800">
               <Receipt className="mr-2 h-4 w-4" />
@@ -250,6 +250,13 @@ export default function Dashboard() {
               Sales & Stock Form
             </Button>
           </Link>
+          <Button 
+            onClick={() => setIsQuickNoteDialogOpen(true)}
+            className="w-full sm:w-auto h-10 px-6 bg-black text-white font-medium hover:bg-gray-800"
+          >
+            <StickyNote className="mr-2 h-4 w-4" />
+            Quick Notes
+          </Button>
         </div>
       </div>
 
@@ -302,7 +309,7 @@ export default function Dashboard() {
         <RollVarianceCard />
       </div>
 
-      {/* Three-column layout: Revenue Chart | Expenses Chart | Payment Type Chart */}
+      {/* Three-column layout: Revenue Chart | Expenses Chart | Quick Notes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         {/* Column 1: Revenue Chart */}
         <div className="lg:col-span-1">
@@ -314,9 +321,158 @@ export default function Dashboard() {
           <MonthlyExpensesChart />
         </div>
 
-        {/* Column 3: Payment Type Pie Chart */}
+        {/* Column 3: Quick Notes */}
+        <div className="lg:col-span-1">
+          <Card className="restaurant-card">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <StickyNote className="h-5 w-5" />
+                  Quick Notes
+                </CardTitle>
+                <Dialog open={isQuickNoteDialogOpen} onOpenChange={setIsQuickNoteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Note
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Quick Note</DialogTitle>
+                    </DialogHeader>
+                    <Form {...quickNoteForm}>
+                      <form onSubmit={quickNoteForm.handleSubmit(onCreateQuickNote)} className="space-y-4">
+                        <FormField
+                          control={quickNoteForm.control}
+                          name="content"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Content</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Enter your note content..." />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={quickNoteForm.control}
+                          name="priority"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Priority</FormLabel>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="idea">Idea</SelectItem>
+                                  <SelectItem value="note">Note</SelectItem>
+                                  <SelectItem value="implement">Implement</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={quickNoteForm.control}
+                          name="date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Date</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                  onChange={(e) => field.onChange(new Date(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex justify-end space-x-2">
+                          <Button type="button" variant="outline" onClick={() => setIsQuickNoteDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit">Create</Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3">
+                {isLoadingNotes ? (
+                  <div className="text-center py-4">
+                    <div className="text-gray-500 text-sm">Loading notes...</div>
+                  </div>
+                ) : quickNotes.length === 0 ? (
+                  <div className="text-center py-4">
+                    <div className="text-gray-500 text-sm">No quick notes yet</div>
+                    <div className="text-gray-400 text-xs mt-1">Click "Add Note" to create your first note</div>
+                  </div>
+                ) : (
+                  quickNotes.slice(0, 4).map((note: QuickNote) => (
+                    <div key={note.id} className="border rounded-lg p-3 hover:bg-gray-50">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <Badge variant={
+                              note.priority === 'implement' ? 'default' :
+                              note.priority === 'note' ? 'secondary' :
+                              'outline'
+                            }>
+                              {note.priority}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              {format(new Date(note.date), 'MMM dd')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 line-clamp-2">
+                            {note.content}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {quickNotes.length > 4 && (
+                  <div className="text-center">
+                    <Link to="/marketing">
+                      <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                        View all {quickNotes.length} notes
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Payment Type Chart - moved to its own row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
         <div className="lg:col-span-1">
           <SalesByPaymentType />
+        </div>
+        <div className="lg:col-span-2">
+          {/* This space can be used for additional components later */}
         </div>
       </div>
 
@@ -555,149 +711,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Notes - moved to separate row */}
-      <div className="mb-6 lg:mb-8">
-        <Card className="restaurant-card">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <StickyNote className="h-5 w-5" />
-                Quick Notes
-              </CardTitle>
-              <Dialog open={isQuickNoteDialogOpen} onOpenChange={setIsQuickNoteDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Note
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Quick Note</DialogTitle>
-                  </DialogHeader>
-                  <Form {...quickNoteForm}>
-                    <form onSubmit={quickNoteForm.handleSubmit(onCreateQuickNote)} className="space-y-4">
-                      <FormField
-                        control={quickNoteForm.control}
-                        name="content"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Content</FormLabel>
-                            <FormControl>
-                              <Textarea {...field} placeholder="Enter your note content..." />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={quickNoteForm.control}
-                        name="priority"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Priority</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="idea">Idea</SelectItem>
-                                <SelectItem value="note">Note</SelectItem>
-                                <SelectItem value="implement">Implement</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={quickNoteForm.control}
-                        name="date"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Date</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="date"
-                                value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                                onChange={(e) => field.onChange(new Date(e.target.value))}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setIsQuickNoteDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">Create</Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {isLoadingNotes ? (
-                <div className="col-span-full text-center py-4">
-                  <div className="text-gray-500 text-sm">Loading notes...</div>
-                </div>
-              ) : quickNotes.length === 0 ? (
-                <div className="col-span-full text-center py-4">
-                  <div className="text-gray-500 text-sm">No quick notes yet</div>
-                  <div className="text-gray-400 text-xs mt-1">Click "Add Note" to create your first note</div>
-                </div>
-              ) : (
-                quickNotes.slice(0, 6).map((note: QuickNote) => (
-                  <div key={note.id} className="border rounded-lg p-3 hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <Badge variant={
-                            note.priority === 'implement' ? 'default' :
-                            note.priority === 'note' ? 'secondary' :
-                            'outline'
-                          }>
-                            {note.priority}
-                          </Badge>
-                          <span className="text-xs text-gray-500">
-                            {format(new Date(note.date), 'MMM dd')}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700 line-clamp-2">
-                          {note.content}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-              {quickNotes.length > 6 && (
-                <div className="col-span-full text-center">
-                  <Link to="/marketing">
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
-                      View all {quickNotes.length} notes
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
 
       {/* Stock Insights - Three Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
