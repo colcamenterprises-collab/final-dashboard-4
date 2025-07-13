@@ -239,23 +239,23 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
           <Link href="/expenses" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center">
-              <Receipt className="mr-2 h-4 w-4" />
-              Submit Expense
+            <Button className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center">
+              <Receipt className="mr-2 h-4 w-4 shrink-0" />
+              <span className="text-sm">Submit Expense</span>
             </Button>
           </Link>
           <Link href="/daily-stock-sales" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center">
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Sales & Stock Form
+            <Button className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center">
+              <ClipboardList className="mr-2 h-4 w-4 shrink-0" />
+              <span className="text-sm">Sales & Stock Form</span>
             </Button>
           </Link>
           <Button 
             onClick={() => setIsQuickNoteDialogOpen(true)}
-            className="w-full sm:w-44 h-10 px-4 bg-slate-800 text-white font-medium hover:bg-slate-700 flex items-center justify-center"
+            className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center"
           >
-            <StickyNote className="mr-2 h-4 w-4" />
-            Quick Notes
+            <StickyNote className="mr-2 h-4 w-4 shrink-0" />
+            <span className="text-sm">Quick Notes</span>
           </Button>
         </div>
       </div>

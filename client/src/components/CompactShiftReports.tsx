@@ -16,9 +16,10 @@ export default function CompactShiftReports() {
   });
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
       timeZone: 'Asia/Bangkok'
     });
   };

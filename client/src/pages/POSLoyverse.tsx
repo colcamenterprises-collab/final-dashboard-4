@@ -542,10 +542,10 @@ export default function POSLoyverse() {
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0 mb-4 sm:mb-6">
                           <div>
                             <div className="font-medium text-base sm:text-lg">
-                              Shift Closed: {new Date(report.shiftEnd).toLocaleDateString('en-US', { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric',
+                              Shift Closed: {new Date(report.shiftEnd).toLocaleDateString('en-GB', { 
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 timeZone: 'Asia/Bangkok'

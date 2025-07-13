@@ -433,7 +433,7 @@ export default function Marketing() {
                               {note.priority}
                             </Badge>
                             <span className="text-sm text-gray-500">
-                              {new Date(note.date).toLocaleDateString()}
+                              {new Date(note.date).toLocaleDateString('en-GB')}
                             </span>
                           </div>
                           <p className={`text-gray-900 ${note.isCompleted ? 'line-through opacity-60' : ''}`}>
@@ -441,9 +441,9 @@ export default function Marketing() {
                           </p>
                           <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                             <Clock className="w-3 h-3" />
-                            Created: {new Date(note.createdAt).toLocaleDateString()}
+                            Created: {new Date(note.createdAt).toLocaleDateString('en-GB')}
                             {note.updatedAt && note.updatedAt !== note.createdAt && (
-                              <span>• Updated: {new Date(note.updatedAt).toLocaleDateString()}</span>
+                              <span>• Updated: {new Date(note.updatedAt).toLocaleDateString('en-GB')}</span>
                             )}
                           </div>
                         </div>
@@ -501,7 +501,7 @@ export default function Marketing() {
                             {formatEventType(event.eventType)}
                           </Badge>
                           <span className="text-sm text-gray-500">
-                            {new Date(event.eventDate).toLocaleDateString()}
+                            {new Date(event.eventDate).toLocaleDateString('en-GB')}
                           </span>
                         </div>
                         <h3 className="font-semibold text-gray-900 mb-1">{event.title}</h3>
@@ -510,9 +510,9 @@ export default function Marketing() {
                         )}
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Clock className="w-3 h-3" />
-                          Created: {new Date(event.createdAt).toLocaleDateString()}
+                          Created: {new Date(event.createdAt).toLocaleDateString('en-GB')}
                           {event.updatedAt && event.updatedAt !== event.createdAt && (
-                            <span>• Updated: {new Date(event.updatedAt).toLocaleDateString()}</span>
+                            <span>• Updated: {new Date(event.updatedAt).toLocaleDateString('en-GB')}</span>
                           )}
                           {event.googleCalendarId && (
                             <span className="flex items-center gap-1 text-blue-600">
