@@ -122,53 +122,70 @@ export class LoyverseReceiptService {
       const toRFC3339 = (d: Date) =>
         d.toISOString().replace(/\.\d{3}Z$/, "Z");  // strip millis
       
-      const params = new URLSearchParams({
-        store_id: process.env.LOYVERSE_STORE_ID || "",
-        start_time: toRFC3339(utcShiftStart),
-        end_time: toRFC3339(utcShiftEnd),
-        limit: "250"
-      });
-      
-      const apiUrl = `${this.config.baseUrl}/receipts?${params.toString()}`;
-      console.log(`🔗 API URL: ${apiUrl}`);
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ Loyverse API error: ${response.status} - ${response.statusText}`);
-        console.error(`📝 Error details: ${errorText}`);
-        throw new Error(`Loyverse API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const receipts = data.receipts || [];
-      
       let processed = 0;
-      for (const receipt of receipts) {
-        try {
-          // Skip receipts with missing essential data
-          if (!receipt.receipt_number || !receipt.created_at) {
-            console.log('Skipping receipt with missing receipt_number/created_at:', {
-              receipt_number: receipt.receipt_number,
-              created_at: receipt.created_at
-            });
-            continue;
-          }
-          
-          await this.storeReceipt(receipt);
-          processed++;
-        } catch (error) {
-          console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+      let cursor: string | undefined;
+      let totalReceipts = 0;
+      
+      // Implement cursor-based pagination to fetch all receipts
+      do {
+        const params = new URLSearchParams({
+          store_id: process.env.LOYVERSE_STORE_ID || "",
+          start_time: toRFC3339(utcShiftStart),
+          end_time: toRFC3339(utcShiftEnd),
+          limit: "250"
+        });
+        
+        if (cursor) {
+          params.append('cursor', cursor);
         }
-      }
+        
+        const apiUrl = `${this.config.baseUrl}/receipts?${params.toString()}`;
+        console.log(`🔗 API URL: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.config.accessToken}`
+          }
+        });
 
-      console.log(`Processed ${processed} receipts`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Loyverse API error: ${response.status} - ${response.statusText}`);
+          console.error(`📝 Error details: ${errorText}`);
+          throw new Error(`Loyverse API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const receipts = data.receipts || [];
+        cursor = data.cursor;
+        totalReceipts += receipts.length;
+        
+        console.log(`📊 Fetched ${receipts.length} receipts from Loyverse API (cursor: ${cursor ? 'has next page' : 'no more pages'})`);
+        
+        // Process receipts from this page
+        for (const receipt of receipts) {
+          try {
+            // Skip receipts with missing essential data
+            if (!receipt.receipt_number || !receipt.created_at) {
+              console.log('Skipping receipt with missing receipt_number/created_at:', {
+                receipt_number: receipt.receipt_number,
+                created_at: receipt.created_at
+              });
+              continue;
+            }
+            
+            await this.storeReceipt(receipt);
+            processed++;
+          } catch (error) {
+            console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+          }
+        }
+        
+        // Continue if there's a cursor (more pages available)
+      } while (cursor);
+
+      console.log(`✅ Processed ${processed} receipts using cursor pagination (total fetched: ${totalReceipts})`);
       return { success: true, receiptsProcessed: processed };
     } catch (error) {
       console.error('Failed to fetch receipts:', error);
@@ -848,34 +865,56 @@ export class LoyverseReceiptService {
       const startTime = startDate.toISOString();
       const endTime = endDate.toISOString();
 
-      const response = await fetch(`${this.config.baseUrl}/receipts?start_time=${startTime}&end_time=${endTime}&limit=100`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Loyverse API responded with status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const receipts = data.receipts || [];
-      
-      console.log(`Fetched ${receipts.length} receipts from Loyverse API`);
-
       let processed = 0;
-      for (const receipt of receipts) {
-        try {
-          await this.storeReceipt(receipt);
-          processed++;
-        } catch (error) {
-          console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+      let cursor: string | undefined;
+      let totalReceipts = 0;
+      
+      // Implement cursor-based pagination to fetch all receipts
+      do {
+        const params = new URLSearchParams({
+          store_id: process.env.LOYVERSE_STORE_ID || "",
+          start_time: startTime,
+          end_time: endTime,
+          limit: "250"
+        });
+        
+        if (cursor) {
+          params.append('cursor', cursor);
         }
-      }
 
-      console.log(`Successfully processed ${processed} receipts from Loyverse API`);
+        const response = await fetch(`${this.config.baseUrl}/receipts?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.config.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Loyverse API responded with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const receipts = data.receipts || [];
+        cursor = data.cursor;
+        totalReceipts += receipts.length;
+        
+        console.log(`Fetched ${receipts.length} receipts from Loyverse API (cursor: ${cursor ? 'has next page' : 'no more pages'})`);
+
+        // Process receipts from this page
+        for (const receipt of receipts) {
+          try {
+            await this.storeReceipt(receipt);
+            processed++;
+          } catch (error) {
+            console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
+          }
+        }
+        
+        // Continue if there's a cursor (more pages available)
+      } while (cursor);
+
+      console.log(`Successfully processed ${processed} receipts using cursor pagination (total fetched: ${totalReceipts})`);
       return { success: true, receiptsProcessed: processed };
 
     } catch (error) {

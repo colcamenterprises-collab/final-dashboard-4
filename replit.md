@@ -374,6 +374,11 @@ Changelog:
 - July 13, 2025. Added recipe ingredients management endpoints and fixed storage method naming consistency
 - July 13, 2025. Created 18 recipe names across all categories: GRAB/FOODPANDA PROMOTIONS (2), Kids Will Love This (3), Smash Burger Sets (4), Smash Burgers (9)
 - July 13, 2025. All recipes created as name-only templates ready for ingredient addition by user through Recipe Management interface
+- July 13, 2025. CRITICAL PAGINATION FIX: Fixed persistent "receiptPhotos is not defined" error in Daily Stock & Sales form by replacing undefined variable with empty array []
+- July 13, 2025. Enhanced mobile responsiveness for Daily Stock & Sales form buttons - now full-width on mobile devices with vertical stacking
+- July 13, 2025. LOYVERSE API PAGINATION ENHANCEMENT: Implemented proper cursor-based pagination for receipt fetching according to Loyverse API documentation
+- July 13, 2025. Updated fetchAndStoreReceipts and fetchReceiptsFromLoyverseAPI functions to use do-while loops with cursor parameter for complete data retrieval
+- July 13, 2025. Fixed potential data loss issue where only first 250 receipts were being fetched - now retrieves all receipts using pagination
 ```
 
 ## User Preferences
