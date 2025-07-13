@@ -302,11 +302,11 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Three-column row: Shift Report Review, Shift Summary, Burger Roll Variance */}
+      {/* Three-column row: Burger Roll Variance, Shift Summary, Shift Report Review */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        <ShiftReportReview />
-        <ShiftSummaryCard />
         <RollVarianceCard />
+        <ShiftSummaryCard />
+        <ShiftReportReview />
       </div>
 
       {/* Three-column layout: Revenue Chart | Expenses Chart | Quick Notes */}
