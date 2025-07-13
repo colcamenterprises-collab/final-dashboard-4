@@ -295,16 +295,71 @@ export function registerRoutes(app: express.Application): Server {
   app.get("/api/shift-summary/latest", async (req: Request, res: Response) => {
     try {
       const { db } = await import("./db");
-      const { dailyShiftReceiptSummary } = await import("../shared/schema");
+      const { loyverseReceipts, dailyShiftReceiptSummary } = await import("../shared/schema");
       const { desc } = await import("drizzle-orm");
       
-      const latest = await db
-        .select()
-        .from(dailyShiftReceiptSummary)
-        .orderBy(desc(dailyShiftReceiptSummary.shiftDate))
-        .limit(1);
+      // Generate from receipts directly for now
       
-      res.json(latest[0] ?? {});
+      // If no summary or empty, generate from latest receipts
+      const latestReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .orderBy(desc(loyverseReceipts.receiptDate))
+        .limit(50);
+      
+      if (latestReceipts.length === 0) {
+        res.json({
+          shiftDate: new Date().toISOString().split('T')[0],
+          burgersSold: 0,
+          drinksSold: 0,
+          itemsBreakdown: {},
+          modifiersSummary: {}
+        });
+        return;
+      }
+      
+      // Calculate summary from receipts
+      let burgersSold = 0;
+      let drinksSold = 0;
+      const itemsBreakdown: Record<string, { qty: number; sales: number }> = {};
+      
+      for (const receipt of latestReceipts) {
+        const items = receipt.items as any[];
+        if (!items || !Array.isArray(items)) continue;
+        
+        for (const item of items) {
+          const itemName = item.item_name || 'Unknown';
+          const quantity = item.quantity || 0;
+          const totalMoney = item.total_money || 0;
+          
+          // Count burgers and drinks
+          if (itemName.toLowerCase().includes('burger') || itemName.toLowerCase().includes('smash')) {
+            burgersSold += quantity;
+          }
+          if (itemName.toLowerCase().includes('coke') || itemName.toLowerCase().includes('fanta') || 
+              itemName.toLowerCase().includes('sprite') || itemName.toLowerCase().includes('water')) {
+            drinksSold += quantity;
+          }
+          
+          // Update items breakdown
+          if (!itemsBreakdown[itemName]) {
+            itemsBreakdown[itemName] = { qty: 0, sales: 0 };
+          }
+          itemsBreakdown[itemName].qty += quantity;
+          itemsBreakdown[itemName].sales += totalMoney;
+        }
+      }
+      
+      // Get the latest shift date
+      const latestShiftDate = latestReceipts[0]?.shiftDate || new Date().toISOString().split('T')[0];
+      
+      res.json({
+        shiftDate: latestShiftDate,
+        burgersSold,
+        drinksSold,
+        itemsBreakdown,
+        modifiersSummary: {}
+      });
     } catch (err) {
       console.error("Error fetching latest shift summary:", err);
       res.status(500).json({ error: "Failed to fetch latest shift summary" });
