@@ -356,6 +356,11 @@ Changelog:
 - July 12, 2025. Simplified form submission to use same reliable API pattern as draft saving
 - July 12, 2025. Verified both draft saving and form submission working correctly with authentic data storage
 - July 12, 2025. DRINK INVENTORY UPDATE: Added "Sprite" to drink options in Daily Stock & Sales form
+- July 13, 2025. DISCOUNT DATA EXTRACTION FIX: Updated Loyverse receipt sync to properly extract discount amounts from API response
+- July 13, 2025. Fixed hardcoded discountAmount: "0" to extract actual discount values from receiptData.total_discount field
+- July 13, 2025. Added total_discount field to LoyverseReceiptData interface for proper TypeScript typing
+- July 13, 2025. Future syncs will now correctly capture member discount amounts (e.g., July 12th: ฿110.70 in 2 member discounts)
+- July 13, 2025. Ensured discount data accuracy by using authentic Loyverse API response fields instead of hardcoded values
 ```
 
 ## User Preferences

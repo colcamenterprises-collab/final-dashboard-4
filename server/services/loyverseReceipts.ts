@@ -7,6 +7,7 @@ interface LoyverseReceiptData {
   order?: string;
   created_at: string;
   total_money: number;
+  total_discount?: number;
   receipt_type: string;
   source: string;
   line_items: Array<{
@@ -192,6 +193,9 @@ export class LoyverseReceiptService {
     const paymentMethod = receiptData.payments?.[0]?.type || 'CASH';
     const receiptId = receiptData.order || receiptData.receipt_number;
     
+    // Extract discount amount from raw API data (stored as total_discount in Loyverse response)
+    const discountAmount = receiptData.total_discount || 0;
+    
     // Check if receipt already exists
     const existing = await db.select().from(loyverseReceipts)
       .where(eq(loyverseReceipts.receiptId, receiptId))
@@ -211,7 +215,7 @@ export class LoyverseReceiptService {
         customerInfo: receiptData.customer_id ? { id: receiptData.customer_id } : null,
         items: receiptData.line_items || [],
         taxAmount: "0",
-        discountAmount: "0",
+        discountAmount: discountAmount.toString(),
         staffMember: receiptData.employee_id || null,
         tableNumber: null,
         shiftDate: shiftDate,
