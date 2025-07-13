@@ -290,14 +290,11 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Shift Summary and Roll Variance Cards - Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="lg:col-span-1">
-          <ShiftSummaryCard />
-        </div>
-        <div className="lg:col-span-1">
-          <RollVarianceCard />
-        </div>
+      {/* Three-column row: Shift Report Review, Shift Summary, Burger Roll Variance */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+        <ShiftReportReview />
+        <ShiftSummaryCard />
+        <RollVarianceCard />
       </div>
 
       {/* Three-column layout: Revenue Chart | Expenses Chart | Payment Type Chart */}
@@ -547,8 +544,10 @@ export default function Dashboard() {
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
-        {/* Daily Register Balance Review */}
-        <ShiftReportReview />
+        {/* Additional space for future components */}
+        <div className="space-y-4">
+          {/* This space can be used for additional dashboard components */}
+        </div>
       </div>
 
       {/* Quick Notes - moved to separate row */}

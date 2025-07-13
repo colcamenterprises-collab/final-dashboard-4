@@ -25,7 +25,7 @@ export default function ShiftReportReview() {
     return (
       <Card className="restaurant-card">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-900">Daily Register Balance</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-900">Shift Report Review</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-4">
@@ -39,7 +39,7 @@ export default function ShiftReportReview() {
   return (
     <Card className="restaurant-card">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-900">Daily Register Balance</CardTitle>
+        <CardTitle className="text-lg font-semibold text-gray-900">Shift Report Review</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {shiftReports.map((report: ShiftReportData, index: number) => (
