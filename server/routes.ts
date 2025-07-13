@@ -608,6 +608,142 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Recipe Management endpoints
+  app.get("/api/recipes", async (req: Request, res: Response) => {
+    try {
+      const recipes = await storage.getRecipes();
+      res.json(recipes);
+    } catch (err) {
+      console.error("Error fetching recipes:", err);
+      res.status(500).json({ error: "Failed to fetch recipes" });
+    }
+  });
+
+  app.post("/api/recipes", async (req: Request, res: Response) => {
+    try {
+      const { insertRecipeSchema } = await import("../shared/schema");
+      const validatedData = insertRecipeSchema.parse(req.body);
+      const recipe = await storage.createRecipe(validatedData);
+      res.json(recipe);
+    } catch (err) {
+      console.error("Error creating recipe:", err);
+      res.status(500).json({ error: "Failed to create recipe" });
+    }
+  });
+
+  app.put("/api/recipes/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recipe = await storage.updateRecipe(id, req.body);
+      res.json(recipe);
+    } catch (err) {
+      console.error("Error updating recipe:", err);
+      res.status(500).json({ error: "Failed to update recipe" });
+    }
+  });
+
+  app.delete("/api/recipes/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteRecipe(id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting recipe:", err);
+      res.status(500).json({ error: "Failed to delete recipe" });
+    }
+  });
+
+  // Recipe Ingredients endpoints
+  app.get("/api/recipes/:id/ingredients", async (req: Request, res: Response) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      const ingredients = await storage.getRecipeIngredients(recipeId);
+      res.json(ingredients);
+    } catch (err) {
+      console.error("Error fetching recipe ingredients:", err);
+      res.status(500).json({ error: "Failed to fetch recipe ingredients" });
+    }
+  });
+
+  app.post("/api/recipe-ingredients", async (req: Request, res: Response) => {
+    try {
+      const { insertRecipeIngredientSchema } = await import("../shared/schema");
+      const validatedData = insertRecipeIngredientSchema.parse(req.body);
+      const recipeIngredient = await storage.createRecipeIngredient(validatedData);
+      res.json(recipeIngredient);
+    } catch (err) {
+      console.error("Error creating recipe ingredient:", err);
+      res.status(500).json({ error: "Failed to create recipe ingredient" });
+    }
+  });
+
+  app.put("/api/recipe-ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recipeIngredient = await storage.updateRecipeIngredient(id, req.body);
+      res.json(recipeIngredient);
+    } catch (err) {
+      console.error("Error updating recipe ingredient:", err);
+      res.status(500).json({ error: "Failed to update recipe ingredient" });
+    }
+  });
+
+  app.delete("/api/recipe-ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteRecipeIngredient(id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting recipe ingredient:", err);
+      res.status(500).json({ error: "Failed to delete recipe ingredient" });
+    }
+  });
+
+  // Ingredients endpoints
+  app.get("/api/ingredients", async (req: Request, res: Response) => {
+    try {
+      const ingredients = await storage.getIngredients();
+      res.json(ingredients);
+    } catch (err) {
+      console.error("Error fetching ingredients:", err);
+      res.status(500).json({ error: "Failed to fetch ingredients" });
+    }
+  });
+
+  app.post("/api/ingredients", async (req: Request, res: Response) => {
+    try {
+      const { insertIngredientSchema } = await import("../shared/schema");
+      const validatedData = insertIngredientSchema.parse(req.body);
+      const ingredient = await storage.createIngredient(validatedData);
+      res.json(ingredient);
+    } catch (err) {
+      console.error("Error creating ingredient:", err);
+      res.status(500).json({ error: "Failed to create ingredient" });
+    }
+  });
+
+  app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const ingredient = await storage.updateIngredient(id, req.body);
+      res.json(ingredient);
+    } catch (err) {
+      console.error("Error updating ingredient:", err);
+      res.status(500).json({ error: "Failed to update ingredient" });
+    }
+  });
+
+  app.delete("/api/ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteIngredient(id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting ingredient:", err);
+      res.status(500).json({ error: "Failed to delete ingredient" });
+    }
+  });
+
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
   return httpServer;

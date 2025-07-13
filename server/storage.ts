@@ -125,9 +125,9 @@ export interface IStorage {
   
   // Recipe Ingredients
   getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]>;
-  addRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient>;
+  createRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient>;
   updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient>;
-  removeRecipeIngredient(id: number): Promise<void>;
+  deleteRecipeIngredient(id: number): Promise<void>;
   calculateRecipeCost(recipeId: number): Promise<number>;
   
   // Quick Notes
@@ -1138,7 +1138,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.recipeIngredients.values()).filter(ri => ri.recipeId === recipeId);
   }
 
-  async addRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
+  async createRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
     const id = this.currentId++;
     const recipeIngredientRecord: RecipeIngredient = {
       ...recipeIngredient,
@@ -1162,7 +1162,7 @@ export class MemStorage implements IStorage {
     return updatedRecipeIngredient;
   }
 
-  async removeRecipeIngredient(id: number): Promise<void> {
+  async deleteRecipeIngredient(id: number): Promise<void> {
     this.recipeIngredients.delete(id);
   }
 
