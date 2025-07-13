@@ -234,7 +234,7 @@ export default function DailyStockSales() {
       const formattedData = {
         ...data,
         shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
-        receiptPhotos: receiptPhotos || [],
+        receiptPhotos: [],
         isDraft: false
       };
       
@@ -311,7 +311,7 @@ export default function DailyStockSales() {
       const formattedData = {
         ...data,
         shiftDate: new Date(data.shiftDate).toISOString().split('T')[0],
-        receiptPhotos: receiptPhotos || [],
+        receiptPhotos: [],
         isDraft: true
       };
       
@@ -1710,12 +1710,12 @@ export default function DailyStockSales() {
 
 
 
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row gap-4 sm:justify-between">
             <Button 
               type="button"
               onClick={saveDraft}
               disabled={saveDraftMutation.isPending}
-              className="min-w-[150px] bg-black text-white hover:bg-gray-800"
+              className="w-full sm:min-w-[150px] bg-black text-white hover:bg-gray-800"
             >
               <Save className="h-4 w-4 mr-2" />
               {saveDraftMutation.isPending ? "Saving..." : editingFormId ? "Update Draft" : "Save as Draft"}
@@ -1724,7 +1724,7 @@ export default function DailyStockSales() {
             <Button 
               type="submit" 
               disabled={createMutation.isPending}
-              className="min-w-[200px] bg-black text-white hover:bg-gray-800"
+              className="w-full sm:min-w-[200px] bg-black text-white hover:bg-gray-800"
             >
               {createMutation.isPending ? "Submitting..." : editingFormId ? "Update Form" : "Submit Form"}
             </Button>
