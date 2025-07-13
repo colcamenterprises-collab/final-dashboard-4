@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from "date-fns";
-import { Calendar, Plus, DollarSign, FileText, TrendingUp, Receipt, Upload, Search, Filter, Download, BarChart3 } from "lucide-react";
+import { Calendar, Plus, DollarSign, FileText, TrendingUp, Receipt, Upload, Search, Filter, Download, BarChart3, ShoppingCart, Beef, Wheat } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,18 @@ function ExpensesMerged() {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [reportGenerating, setReportGenerating] = useState(false);
+  
+  // Stock count dialog states
+  const [isRollsDialogOpen, setIsRollsDialogOpen] = useState(false);
+  const [isDrinksDialogOpen, setIsDrinksDialogOpen] = useState(false);
+  const [isMeatDialogOpen, setIsMeatDialogOpen] = useState(false);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null);
+  
+  // Stock count forms
+  const [rollsCount, setRollsCount] = useState("");
+  const [drinkItems, setDrinkItems] = useState([{ name: "", quantity: "" }]);
+  const [meatType, setMeatType] = useState("");
+  const [meatDetails, setMeatDetails] = useState("");
 
   // Queries
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<Expense[]>({
@@ -276,6 +288,53 @@ function ExpensesMerged() {
     },
   });
 
+  // Stock count mutations
+  const createRollsPurchaseMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/stock-purchase/rolls", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Roll purchase recorded successfully.",
+      });
+      setIsRollsDialogOpen(false);
+      setRollsCount("");
+    },
+  });
+
+  const createDrinksPurchaseMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/stock-purchase/drinks", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Drink purchase recorded successfully.",
+      });
+      setIsDrinksDialogOpen(false);
+      setDrinkItems([{ name: "", quantity: "" }]);
+    },
+  });
+
+  const createMeatPurchaseMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/stock-purchase/meat", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Meat purchase recorded successfully.",
+      });
+      setIsMeatDialogOpen(false);
+      setMeatType("");
+      setMeatDetails("");
+    },
+  });
+
   const onSubmit = (data: ExpenseFormData) => {
     console.log("Form data being submitted:", data);
     console.log("Form errors:", expenseForm.formState.errors);
@@ -302,6 +361,55 @@ function ExpensesMerged() {
   };
 
   // Report generation function
+  // Stock count handlers
+  const handleRollsSubmit = () => {
+    if (!rollsCount) return;
+    
+    createRollsPurchaseMutation.mutate({
+      expenseId: 1, // For now, use a default expense ID
+      quantity: parseInt(rollsCount),
+      date: new Date().toISOString(),
+    });
+  };
+
+  const handleDrinksSubmit = () => {
+    drinkItems.forEach(item => {
+      if (item.name && item.quantity) {
+        createDrinksPurchaseMutation.mutate({
+          expenseId: 1, // For now, use a default expense ID
+          itemName: item.name,
+          quantity: parseInt(item.quantity),
+          date: new Date().toISOString(),
+        });
+      }
+    });
+  };
+
+  const handleMeatSubmit = () => {
+    if (!meatType || !meatDetails) return;
+    
+    createMeatPurchaseMutation.mutate({
+      expenseId: 1, // For now, use a default expense ID
+      meatType: meatType,
+      details: meatDetails,
+      date: new Date().toISOString(),
+    });
+  };
+
+  const addDrinkItem = () => {
+    setDrinkItems([...drinkItems, { name: "", quantity: "" }]);
+  };
+
+  const removeDrinkItem = (index: number) => {
+    setDrinkItems(drinkItems.filter((_, i) => i !== index));
+  };
+
+  const updateDrinkItem = (index: number, field: string, value: string) => {
+    const updated = [...drinkItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setDrinkItems(updated);
+  };
+
   const generateExpenseReport = async (reportType: 'monthly' | 'quarterly' | 'annual' | 'custom') => {
     setReportGenerating(true);
     
@@ -826,6 +934,159 @@ function ExpensesMerged() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Stock Count Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stock Count</CardTitle>
+          <CardDescription>
+            Track stock purchases with detailed inventory management
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Dialog open={isRollsDialogOpen} onOpenChange={setIsRollsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Wheat className="w-4 h-4 mr-2" />
+                  Rolls Purchased
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Rolls Purchased</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rollsQuantity">Quantity</Label>
+                    <Input
+                      id="rollsQuantity"
+                      type="number"
+                      placeholder="Enter quantity"
+                      value={rollsCount}
+                      onChange={(e) => setRollsCount(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsRollsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleRollsSubmit}
+                      disabled={!rollsCount || createRollsPurchaseMutation.isPending}
+                    >
+                      {createRollsPurchaseMutation.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isDrinksDialogOpen} onOpenChange={setIsDrinksDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Drinks Purchased
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Drinks Purchased</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Drink Items</Label>
+                    {drinkItems.map((item, index) => (
+                      <div key={index} className="flex space-x-2">
+                        <Input
+                          placeholder="Drink name"
+                          value={item.name}
+                          onChange={(e) => updateDrinkItem(index, 'name', e.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Quantity"
+                          value={item.quantity}
+                          onChange={(e) => updateDrinkItem(index, 'quantity', e.target.value)}
+                        />
+                        {drinkItems.length > 1 && (
+                          <Button variant="outline" size="sm" onClick={() => removeDrinkItem(index)}>
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addDrinkItem}>
+                      Add Item
+                    </Button>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsDrinksDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleDrinksSubmit}
+                      disabled={createDrinksPurchaseMutation.isPending}
+                    >
+                      {createDrinksPurchaseMutation.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isMeatDialogOpen} onOpenChange={setIsMeatDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Beef className="w-4 h-4 mr-2" />
+                  Meat by Weight & Type
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Meat Purchase</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="meatType">Meat Type</Label>
+                    <Select value={meatType} onValueChange={setMeatType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select meat type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Topside">Topside</SelectItem>
+                        <SelectItem value="Chuck">Chuck</SelectItem>
+                        <SelectItem value="Brisket">Brisket</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meatDetails">Details</Label>
+                    <Textarea
+                      id="meatDetails"
+                      placeholder="Enter weight, price, and other details"
+                      value={meatDetails}
+                      onChange={(e) => setMeatDetails(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsMeatDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleMeatSubmit}
+                      disabled={!meatType || !meatDetails || createMeatPurchaseMutation.isPending}
+                    >
+                      {createMeatPurchaseMutation.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Expenses Table */}
       <Card>

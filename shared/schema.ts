@@ -460,9 +460,46 @@ export const marketingCalendar = pgTable("marketing_calendar", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Stock Count tables for expense tracking
+export const stockPurchaseRolls = pgTable("stock_purchase_rolls", {
+  id: serial("id").primaryKey(),
+  expenseId: integer("expense_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  pricePerUnit: decimal("price_per_unit", { precision: 8, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockPurchaseDrinks = pgTable("stock_purchase_drinks", {
+  id: serial("id").primaryKey(),
+  expenseId: integer("expense_id").notNull(),
+  drinkName: text("drink_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  pricePerUnit: decimal("price_per_unit", { precision: 8, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockPurchaseMeat = pgTable("stock_purchase_meat", {
+  id: serial("id").primaryKey(),
+  expenseId: integer("expense_id").notNull(),
+  meatType: text("meat_type").notNull(), // 'Topside', 'Chuck', 'Brisket', 'Other'
+  weight: decimal("weight", { precision: 8, scale: 2 }).notNull(),
+  pricePerKg: decimal("price_per_kg", { precision: 8, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  otherDetails: text("other_details"), // For 'Other' meat type
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMarketingCalendarSchema = createInsertSchema(marketingCalendar).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStockPurchaseRollsSchema = createInsertSchema(stockPurchaseRolls).omit({ id: true, createdAt: true });
+export const insertStockPurchaseDrinksSchema = createInsertSchema(stockPurchaseDrinks).omit({ id: true, createdAt: true });
+export const insertStockPurchaseMeatSchema = createInsertSchema(stockPurchaseMeat).omit({ id: true, createdAt: true });
 
 // ─── NEW TABLE ────────────────────────────────────────────────────────
 export const dailyShiftReceiptSummary = pgTable("daily_shift_receipt_summary", {
@@ -513,3 +550,9 @@ export type QuickNote = typeof quickNotes.$inferSelect;
 export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
 export type MarketingCalendar = typeof marketingCalendar.$inferSelect;
 export type InsertMarketingCalendar = z.infer<typeof insertMarketingCalendarSchema>;
+export type StockPurchaseRolls = typeof stockPurchaseRolls.$inferSelect;
+export type InsertStockPurchaseRolls = z.infer<typeof insertStockPurchaseRollsSchema>;
+export type StockPurchaseDrinks = typeof stockPurchaseDrinks.$inferSelect;
+export type InsertStockPurchaseDrinks = z.infer<typeof insertStockPurchaseDrinksSchema>;
+export type StockPurchaseMeat = typeof stockPurchaseMeat.$inferSelect;
+export type InsertStockPurchaseMeat = z.infer<typeof insertStockPurchaseMeatSchema>;

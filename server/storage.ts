@@ -16,7 +16,11 @@ import {
   type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient,
   type QuickNote, type InsertQuickNote,
-  type MarketingCalendar, type InsertMarketingCalendar
+  type MarketingCalendar, type InsertMarketingCalendar,
+  type StockPurchaseRolls, type InsertStockPurchaseRolls,
+  type StockPurchaseDrinks, type InsertStockPurchaseDrinks,
+  type StockPurchaseMeat, type InsertStockPurchaseMeat,
+  stockPurchaseRolls, stockPurchaseDrinks, stockPurchaseMeat
 } from "@shared/schema";
 
 export interface IStorage {
@@ -139,6 +143,14 @@ export interface IStorage {
   updateMarketingCalendarEvent(id: number, updates: Partial<MarketingCalendar>): Promise<MarketingCalendar>;
   deleteMarketingCalendarEvent(id: number): Promise<void>;
   getMarketingCalendarByMonth(month: number, year: number): Promise<MarketingCalendar[]>;
+  
+  // Stock Purchase Tracking
+  getStockPurchaseRolls(expenseId: number): Promise<StockPurchaseRolls[]>;
+  createStockPurchaseRolls(data: InsertStockPurchaseRolls): Promise<StockPurchaseRolls>;
+  getStockPurchaseDrinks(expenseId: number): Promise<StockPurchaseDrinks[]>;
+  createStockPurchaseDrinks(data: InsertStockPurchaseDrinks): Promise<StockPurchaseDrinks>;
+  getStockPurchaseMeat(expenseId: number): Promise<StockPurchaseMeat[]>;
+  createStockPurchaseMeat(data: InsertStockPurchaseMeat): Promise<StockPurchaseMeat>;
 }
 
 export class MemStorage implements IStorage {
@@ -1256,6 +1268,73 @@ export class MemStorage implements IStorage {
       const eventDate = new Date(event.eventDate);
       return eventDate.getMonth() === month && eventDate.getFullYear() === year;
     });
+  }
+
+  // Stock Purchase Tracking methods
+  async getStockPurchaseRolls(expenseId: number): Promise<StockPurchaseRolls[]> {
+    const { db } = await import("./db");
+    const { stockPurchaseRolls } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(stockPurchaseRolls)
+      .where(eq(stockPurchaseRolls.expenseId, expenseId));
+  }
+
+  async createStockPurchaseRolls(data: InsertStockPurchaseRolls): Promise<StockPurchaseRolls> {
+    const { db } = await import("./db");
+    const { stockPurchaseRolls } = await import("@shared/schema");
+    
+    const [result] = await db.insert(stockPurchaseRolls).values({
+      ...data,
+      date: data.date ? new Date(data.date) : new Date(),
+    }).returning();
+    
+    return result;
+  }
+
+  async getStockPurchaseDrinks(expenseId: number): Promise<StockPurchaseDrinks[]> {
+    const { db } = await import("./db");
+    const { stockPurchaseDrinks } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(stockPurchaseDrinks)
+      .where(eq(stockPurchaseDrinks.expenseId, expenseId));
+  }
+
+  async createStockPurchaseDrinks(data: InsertStockPurchaseDrinks): Promise<StockPurchaseDrinks> {
+    const { db } = await import("./db");
+    const { stockPurchaseDrinks } = await import("@shared/schema");
+    
+    const [result] = await db.insert(stockPurchaseDrinks).values({
+      ...data,
+      date: data.date ? new Date(data.date) : new Date(),
+    }).returning();
+    
+    return result;
+  }
+
+  async getStockPurchaseMeat(expenseId: number): Promise<StockPurchaseMeat[]> {
+    const { db } = await import("./db");
+    const { stockPurchaseMeat } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    return await db.select()
+      .from(stockPurchaseMeat)
+      .where(eq(stockPurchaseMeat.expenseId, expenseId));
+  }
+
+  async createStockPurchaseMeat(data: InsertStockPurchaseMeat): Promise<StockPurchaseMeat> {
+    const { db } = await import("./db");
+    const { stockPurchaseMeat } = await import("@shared/schema");
+    
+    const [result] = await db.insert(stockPurchaseMeat).values({
+      ...data,
+      date: data.date ? new Date(data.date) : new Date(),
+    }).returning();
+    
+    return result;
   }
 }
 

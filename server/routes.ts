@@ -251,6 +251,67 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Stock Purchase endpoints
+  app.get("/api/stock-purchase/rolls/:expenseId", async (req: Request, res: Response) => {
+    try {
+      const rolls = await storage.getStockPurchaseRolls(parseInt(req.params.expenseId));
+      res.json(rolls);
+    } catch (err) {
+      console.error("Error fetching stock purchase rolls:", err);
+      res.status(500).json({ error: "Failed to fetch stock purchase rolls" });
+    }
+  });
+
+  app.post("/api/stock-purchase/rolls", async (req: Request, res: Response) => {
+    try {
+      const roll = await storage.createStockPurchaseRolls(req.body);
+      res.json(roll);
+    } catch (err) {
+      console.error("Error creating stock purchase rolls:", err);
+      res.status(500).json({ error: "Failed to create stock purchase rolls" });
+    }
+  });
+
+  app.get("/api/stock-purchase/drinks/:expenseId", async (req: Request, res: Response) => {
+    try {
+      const drinks = await storage.getStockPurchaseDrinks(parseInt(req.params.expenseId));
+      res.json(drinks);
+    } catch (err) {
+      console.error("Error fetching stock purchase drinks:", err);
+      res.status(500).json({ error: "Failed to fetch stock purchase drinks" });
+    }
+  });
+
+  app.post("/api/stock-purchase/drinks", async (req: Request, res: Response) => {
+    try {
+      const drink = await storage.createStockPurchaseDrinks(req.body);
+      res.json(drink);
+    } catch (err) {
+      console.error("Error creating stock purchase drinks:", err);
+      res.status(500).json({ error: "Failed to create stock purchase drinks" });
+    }
+  });
+
+  app.get("/api/stock-purchase/meat/:expenseId", async (req: Request, res: Response) => {
+    try {
+      const meat = await storage.getStockPurchaseMeat(parseInt(req.params.expenseId));
+      res.json(meat);
+    } catch (err) {
+      console.error("Error fetching stock purchase meat:", err);
+      res.status(500).json({ error: "Failed to fetch stock purchase meat" });
+    }
+  });
+
+  app.post("/api/stock-purchase/meat", async (req: Request, res: Response) => {
+    try {
+      const meat = await storage.createStockPurchaseMeat(req.body);
+      res.json(meat);
+    } catch (err) {
+      console.error("Error creating stock purchase meat:", err);
+      res.status(500).json({ error: "Failed to create stock purchase meat" });
+    }
+  });
+
   // Shift Analytics endpoints
   app.get("/api/analysis/shift/:date", async (req: Request, res: Response) => {
     try {

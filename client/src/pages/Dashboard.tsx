@@ -237,15 +237,15 @@ export default function Dashboard() {
           <Zap className="h-5 w-5 text-gray-700" />
           <span className="text-lg font-semibold text-gray-900">Quick Actions</span>
         </div>
-        <div className="flex flex-wrap gap-3 max-w-lg">
-          <Link href="/expenses">
-            <Button className="h-10 px-6 bg-black text-white font-medium hover:bg-gray-800">
+        <div className="flex flex-col sm:flex-row gap-3 max-w-lg">
+          <Link href="/expenses" className="flex-1 sm:flex-none">
+            <Button className="w-full sm:w-auto h-10 px-6 bg-black text-white font-medium hover:bg-gray-800">
               <Receipt className="mr-2 h-4 w-4" />
               Submit Expense
             </Button>
           </Link>
-          <Link href="/daily-stock-sales">
-            <Button className="h-10 px-6 bg-black text-white font-medium hover:bg-gray-800">
+          <Link href="/daily-stock-sales" className="flex-1 sm:flex-none">
+            <Button className="w-full sm:w-auto h-10 px-6 bg-black text-white font-medium hover:bg-gray-800">
               <ClipboardList className="mr-2 h-4 w-4" />
               Sales & Stock Form
             </Button>
