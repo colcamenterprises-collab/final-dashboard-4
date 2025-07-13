@@ -361,6 +361,14 @@ Changelog:
 - July 13, 2025. Added total_discount field to LoyverseReceiptData interface for proper TypeScript typing
 - July 13, 2025. Future syncs will now correctly capture member discount amounts (e.g., July 12th: ฿110.70 in 2 member discounts)
 - July 13, 2025. Ensured discount data accuracy by using authentic Loyverse API response fields instead of hardcoded values
+- July 13, 2025. SHIFT REPORT REVIEW UPDATE: Connected to authentic Loyverse shift data from loyverse_shift_reports table
+- July 13, 2025. Updated /api/shift-reports/balance-review to use real cash_difference values from report_data JSON
+- July 13, 2025. Fixed date formatting to show actual shift dates (July 3rd, July 2nd, July 1st, June 30th) instead of incorrect dates
+- July 13, 2025. Shift reports now display authentic cash variances: ฿0 (balanced), ฿1479 (attention), ฿-2500 (attention), ฿697 (attention)
+- July 13, 2025. MOBILE RESPONSIVENESS FIX: Enhanced KPI card display for mobile devices with proper shift sales visibility
+- July 13, 2025. Improved KPI card responsive design: reduced padding, better font sizes, enhanced mobile grid layout
+- July 13, 2025. Fixed mobile display issue where "Last Shift Sales" (฿18,579.30) and "Orders Completed" (94) were not visible
+- July 13, 2025. Added console logging to verify KPI calculations and confirmed authentic data loading correctly
 ```
 
 ## User Preferences

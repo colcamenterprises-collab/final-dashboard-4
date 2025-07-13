@@ -135,14 +135,19 @@ export default function Dashboard() {
     deleteQuickNoteMutation.mutate(id);
   };
 
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
+  const { data: kpis, isLoading: kpisLoading, error: kpisError } = useQuery({
     queryKey: ["/api/shift-summary/latest"],
     select: (data: any) => {
-      if (!data || !data.itemsBreakdown) return null;
+      if (!data || !data.itemsBreakdown) {
+        console.log("No data or itemsBreakdown:", data);
+        return null;
+      }
       
       // Calculate total sales from itemsBreakdown
       const lastShiftSales = Object.values(data.itemsBreakdown).reduce((sum: number, item: any) => sum + item.sales, 0);
       const lastShiftOrders = Object.values(data.itemsBreakdown).reduce((sum: number, item: any) => sum + item.qty, 0);
+      
+      console.log("KPI Calculation:", { lastShiftSales, lastShiftOrders, shiftDate: data.shiftDate });
       
       return {
         lastShiftSales,
@@ -251,7 +256,7 @@ export default function Dashboard() {
 
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <KPICard
           title="Last Shift Sales"
           value={`฿${kpis?.lastShiftSales?.toLocaleString() || '0'}`}
