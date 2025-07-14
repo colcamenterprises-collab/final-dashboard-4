@@ -66,6 +66,21 @@ export const shoppingList = pgTable("shopping_list", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Simple Stock Forms table - isolated from complex form
+export const simpleStockForms = pgTable("simple_stock_forms", {
+  id: serial("id").primaryKey(),
+  completedBy: text("completed_by").notNull(),
+  shiftType: text("shift_type").notNull(),
+  shiftDate: date("shift_date").notNull(),
+  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).default('0'),
+  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).default('0'),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default('0'),
+  notes: text("notes"),
+  isDraft: boolean("is_draft").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Expenses table
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
@@ -565,3 +580,8 @@ export type StockPurchaseDrinks = typeof stockPurchaseDrinks.$inferSelect;
 export type InsertStockPurchaseDrinks = z.infer<typeof insertStockPurchaseDrinksSchema>;
 export type StockPurchaseMeat = typeof stockPurchaseMeat.$inferSelect;
 export type InsertStockPurchaseMeat = z.infer<typeof insertStockPurchaseMeatSchema>;
+
+// Simple Stock Forms Schema and Types
+export const insertSimpleStockFormSchema = createInsertSchema(simpleStockForms).omit({ id: true, createdAt: true, updatedAt: true });
+export type SimpleStockForm = typeof simpleStockForms.$inferSelect;
+export type InsertSimpleStockForm = z.infer<typeof insertSimpleStockFormSchema>;

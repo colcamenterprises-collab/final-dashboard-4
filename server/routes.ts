@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
+import { simpleStockFormRoutes } from "./routes/simpleStockForm";
 
 export function registerRoutes(app: express.Application): Server {
   // Stock discrepancy endpoint for dashboard
@@ -950,6 +951,11 @@ export function registerRoutes(app: express.Application): Server {
       res.status(500).json({ error: "Failed to delete ingredient" });
     }
   });
+
+  // Simple Stock Form routes - isolated from complex form
+  app.post("/api/simple-stock-form/draft", simpleStockFormRoutes.saveDraft);
+  app.post("/api/simple-stock-form", simpleStockFormRoutes.submitForm);
+  app.get("/api/simple-stock-form", simpleStockFormRoutes.getAllForms);
 
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
