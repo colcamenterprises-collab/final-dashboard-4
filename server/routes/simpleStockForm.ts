@@ -9,11 +9,17 @@ export const simpleStockFormRoutes = {
       console.log('Saving simple stock form draft:', req.body);
       
       const formData = {
-        ...req.body,
-        isDraft: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        completedBy: req.body.completedBy || '',
+        shiftType: req.body.shiftType || 'Night Shift',
+        shiftDate: req.body.shiftDate || new Date().toISOString().split('T')[0],
+        startingCash: req.body.startingCash ? parseFloat(req.body.startingCash) : 0,
+        endingCash: req.body.endingCash ? parseFloat(req.body.endingCash) : 0,
+        totalSales: req.body.totalSales ? parseFloat(req.body.totalSales) : 0,
+        notes: req.body.notes || null,
+        isDraft: true
       };
+      
+      console.log('Formatted form data:', formData);
       
       const result = await db.insert(simpleStockForms).values(formData).returning();
       
@@ -31,28 +37,32 @@ export const simpleStockFormRoutes = {
       console.log('Submitting simple stock form:', req.body);
       
       const formData = {
-        ...req.body,
-        isDraft: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        completedBy: req.body.completedBy || '',
+        shiftType: req.body.shiftType || 'Night Shift',
+        shiftDate: req.body.shiftDate || new Date().toISOString().split('T')[0],
+        startingCash: req.body.startingCash ? parseFloat(req.body.startingCash) : 0,
+        endingCash: req.body.endingCash ? parseFloat(req.body.endingCash) : 0,
+        totalSales: req.body.totalSales ? parseFloat(req.body.totalSales) : 0,
+        notes: req.body.notes || null,
+        isDraft: false
       };
+      
+      console.log('Formatted form data:', formData);
       
       const result = await db.insert(simpleStockForms).values(formData).returning();
       
       console.log('Form submitted successfully:', result[0]);
       
       // Send email notification in background (non-blocking)
-      if (!req.body.isDraft) {
-        setImmediate(async () => {
-          try {
-            const { sendSimpleFormEmail } = await import('../services/simpleEmailService');
-            await sendSimpleFormEmail(result[0]);
-            console.log('Email sent successfully for form:', result[0].id);
-          } catch (emailError) {
-            console.error('Email sending failed (non-blocking):', emailError);
-          }
-        });
-      }
+      setImmediate(async () => {
+        try {
+          const { sendSimpleFormEmail } = await import('../services/simpleEmailService');
+          await sendSimpleFormEmail(result[0]);
+          console.log('Email sent successfully for form:', result[0].id);
+        } catch (emailError) {
+          console.error('Email sending failed (non-blocking):', emailError);
+        }
+      });
       
       res.json(result[0]);
     } catch (error) {
