@@ -91,44 +91,37 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Received daily stock sales data:", data);
       
-      // Save to storage first - this is the primary operation
+      // ONLY save the form - nothing else should block this
       const result = await storage.createDailyStockSales(data);
       console.log("✅ Form saved successfully with ID:", result.id);
       
-      // Generate shopping list if not a draft (secondary operation)
+      // Return immediately - form submission is complete
+      res.json(result);
+      
+      // Everything else happens after the response is sent
       if (!data.isDraft) {
-        // Run shopping list generation in the background
-        setImmediate(async () => {
-          try {
-            console.log("Generating shopping list for form submission...");
-            const shoppingList = await storage.generateShoppingList(result);
+        // Generate shopping list completely separately
+        storage.generateShoppingList(result)
+          .then(shoppingList => {
             console.log(`Generated ${shoppingList.length} shopping items`);
             
-            // Send email notification (tertiary operation)
-            try {
-              const { sendManagementSummary } = await import('./services/gmailService');
-              const emailData = {
-                formData: result,
-                shoppingList: shoppingList,
-                submissionTime: new Date()
-              };
-              
-              // Send email without blocking anything
-              sendManagementSummary(emailData)
-                .then(() => console.log("Email notification sent successfully"))
-                .catch(error => console.error("Failed to send email notification:", error));
+            // Try to send email notification (completely optional)
+            import('./services/gmailService')
+              .then(({ sendManagementSummary }) => {
+                const emailData = {
+                  formData: result,
+                  shoppingList: shoppingList,
+                  submissionTime: new Date()
+                };
                 
-            } catch (emailError) {
-              console.error("Failed to initialize email service:", emailError);
-            }
-          } catch (error) {
-            console.error("Failed to generate shopping list:", error);
-          }
-        });
+                return sendManagementSummary(emailData);
+              })
+              .then(() => console.log("Email notification sent successfully"))
+              .catch(error => console.error("Failed to send email notification:", error));
+          })
+          .catch(error => console.error("Failed to generate shopping list:", error));
       }
       
-      // Return immediately after saving the form
-      res.json(result);
     } catch (err) {
       console.error("❌ Error creating daily stock sales:", err);
       console.error("Error details:", err.message, err.stack);
