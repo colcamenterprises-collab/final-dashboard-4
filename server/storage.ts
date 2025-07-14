@@ -1360,9 +1360,12 @@ export class MemStorage implements IStorage {
     const { db } = await import("./db");
     const { shoppingList } = await import("@shared/schema");
     
+    // Clear previous shopping list items first
+    await db.delete(shoppingList);
+    
     const shoppingItems: InsertShoppingList[] = [];
     
-    // Process shopping entries from the form
+    // Process shopping entries from the form ONLY
     if (formData.shoppingEntries && formData.shoppingEntries.length > 0) {
       formData.shoppingEntries.forEach(entry => {
         shoppingItems.push({
@@ -1387,32 +1390,35 @@ export class MemStorage implements IStorage {
       });
     }
 
-    // Process low stock items based on inventory tracking
-    const categories = ['freshFood', 'frozenFood', 'shelfItems', 'drinkStock', 'kitchenItems', 'packagingItems'];
+    // Process purchase requirement items from form sections
+    const purchaseCategories = [
+      { key: 'freshFood', items: formData.freshFood },
+      { key: 'frozenFood', items: formData.frozenFood },
+      { key: 'shelfItems', items: formData.shelfItems },
+      { key: 'kitchenItems', items: formData.kitchenItems },
+      { key: 'packagingItems', items: formData.packagingItems }
+    ];
     
-    categories.forEach(category => {
-      const categoryData = formData[category as keyof DailyStockSales];
-      if (categoryData && typeof categoryData === 'object') {
-        Object.entries(categoryData).forEach(([itemName, quantity]) => {
-          // Add items with low stock (less than 5 units)
-          if (typeof quantity === 'number' && quantity < 5) {
-            const orderQuantity = Math.max(10, quantity * 2); // Order at least 10 or double current stock
+    purchaseCategories.forEach(category => {
+      if (category.items && typeof category.items === 'object') {
+        Object.entries(category.items).forEach(([itemName, quantity]) => {
+          if (typeof quantity === 'number' && quantity > 0) {
             shoppingItems.push({
               formId: formData.id,
-              itemName: itemName.replace(/([A-Z])/g, ' $1').trim(), // Convert camelCase to readable
-              quantity: orderQuantity,
+              itemName: itemName.replace(/([A-Z])/g, ' $1').trim(),
+              quantity: quantity,
               unit: "each",
               pricePerUnit: "0.00",
               supplier: "TBD",
-              priority: quantity === 0 ? "high" : "medium",
+              priority: "medium",
               selected: false,
-              aiGenerated: true,
+              aiGenerated: false,
               listDate: new Date(),
               listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
               isCompleted: false,
               estimatedCost: "0.00",
               actualCost: "0.00",
-              notes: `Low stock: ${quantity} remaining`,
+              notes: `Purchase requirement: ${quantity} units needed`,
               createdAt: new Date(),
               updatedAt: new Date()
             });
