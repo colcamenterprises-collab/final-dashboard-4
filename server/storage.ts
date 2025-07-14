@@ -807,10 +807,54 @@ export class MemStorage implements IStorage {
     const { db } = await import("./db");
     const { dailyStockSales } = await import("@shared/schema");
     
-    const [result] = await db.insert(dailyStockSales).values({
+    // Convert empty strings to null for numeric fields to prevent database errors
+    const cleanData = {
       ...data,
       shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
-    }).returning();
+      
+      // Cash Management - convert empty strings to null
+      startingCash: data.startingCash === '' || data.startingCash === undefined ? null : data.startingCash,
+      endingCash: data.endingCash === '' || data.endingCash === undefined ? null : data.endingCash,
+      
+      // Sales Data - convert empty strings to null
+      grabSales: data.grabSales === '' || data.grabSales === undefined ? null : data.grabSales,
+      foodPandaSales: data.foodPandaSales === '' || data.foodPandaSales === undefined ? null : data.foodPandaSales,
+      aroiDeeSales: data.aroiDeeSales === '' || data.aroiDeeSales === undefined ? null : data.aroiDeeSales,
+      qrScanSales: data.qrScanSales === '' || data.qrScanSales === undefined ? null : data.qrScanSales,
+      cashSales: data.cashSales === '' || data.cashSales === undefined ? null : data.cashSales,
+      totalSales: data.totalSales === '' || data.totalSales === undefined ? null : data.totalSales,
+      
+      // Expenses - convert empty strings to null
+      salaryWages: data.salaryWages === '' || data.salaryWages === undefined ? null : data.salaryWages,
+      shopping: data.shopping === '' || data.shopping === undefined ? null : data.shopping,
+      gasExpense: data.gasExpense === '' || data.gasExpense === undefined ? null : data.gasExpense,
+      totalExpenses: data.totalExpenses === '' || data.totalExpenses === undefined ? null : data.totalExpenses,
+      meatWeight: data.meatWeight === '' || data.meatWeight === undefined ? null : data.meatWeight,
+      
+      // Integer fields - convert empty strings to null
+      burgerBunsStock: data.burgerBunsStock === '' || data.burgerBunsStock === undefined ? null : data.burgerBunsStock,
+      rollsOrderedCount: data.rollsOrderedCount === '' || data.rollsOrderedCount === undefined ? null : data.rollsOrderedCount,
+      drinkStockCount: data.drinkStockCount === '' || data.drinkStockCount === undefined ? null : data.drinkStockCount,
+      
+      // JSON fields - ensure they are arrays/objects
+      wageEntries: data.wageEntries || [],
+      shoppingEntries: data.shoppingEntries || [],
+      freshFood: data.freshFood || {},
+      frozenFood: data.frozenFood || {},
+      shelfItems: data.shelfItems || {},
+      foodItems: data.foodItems || {},
+      drinkStock: data.drinkStock || {},
+      kitchenItems: data.kitchenItems || {},
+      packagingItems: data.packagingItems || {},
+      
+      // Boolean fields
+      rollsOrderedConfirmed: data.rollsOrderedConfirmed || false,
+      isDraft: data.isDraft || false
+    };
+    
+    console.log('📋 Creating Daily Stock Sales with clean data:', cleanData);
+    
+    const [result] = await db.insert(dailyStockSales).values(cleanData).returning();
     
     // Backup to Google Sheets (temporarily disabled due to OAuth scope requirements)
     try {
