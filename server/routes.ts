@@ -380,6 +380,81 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Shopping List endpoints
+  app.get("/api/shopping-list", async (req: Request, res: Response) => {
+    try {
+      const shoppingList = await storage.getShoppingList();
+      res.json(shoppingList);
+    } catch (err) {
+      console.error("Error fetching shopping list:", err);
+      res.status(500).json({ error: "Failed to fetch shopping list" });
+    }
+  });
+
+  app.get("/api/shopping-list/history", async (req: Request, res: Response) => {
+    try {
+      const history = await storage.getShoppingListHistory();
+      res.json(history);
+    } catch (err) {
+      console.error("Error fetching shopping list history:", err);
+      res.status(500).json({ error: "Failed to fetch shopping list history" });
+    }
+  });
+
+  app.get("/api/shopping-list/date/:date", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const shoppingList = await storage.getShoppingListByDate(date);
+      res.json(shoppingList);
+    } catch (err) {
+      console.error("Error fetching shopping list by date:", err);
+      res.status(500).json({ error: "Failed to fetch shopping list by date" });
+    }
+  });
+
+  app.post("/api/shopping-list/complete", async (req: Request, res: Response) => {
+    try {
+      const { listIds } = req.body;
+      await storage.completeShoppingList(listIds);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error completing shopping list:", err);
+      res.status(500).json({ error: "Failed to complete shopping list" });
+    }
+  });
+
+  app.post("/api/shopping-list", async (req: Request, res: Response) => {
+    try {
+      const item = await storage.createShoppingListItem(req.body);
+      res.json(item);
+    } catch (err) {
+      console.error("Error creating shopping list item:", err);
+      res.status(500).json({ error: "Failed to create shopping list item" });
+    }
+  });
+
+  app.put("/api/shopping-list/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const item = await storage.updateShoppingListItem(id, req.body);
+      res.json(item);
+    } catch (err) {
+      console.error("Error updating shopping list item:", err);
+      res.status(500).json({ error: "Failed to update shopping list item" });
+    }
+  });
+
+  app.delete("/api/shopping-list/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteShoppingListItem(id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting shopping list item:", err);
+      res.status(500).json({ error: "Failed to delete shopping list item" });
+    }
+  });
+
   // Shift Analytics endpoints
   app.get("/api/analysis/shift/:date", async (req: Request, res: Response) => {
     try {
