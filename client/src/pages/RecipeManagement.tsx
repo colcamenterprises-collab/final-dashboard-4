@@ -372,10 +372,11 @@ export default function RecipeManagement() {
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe & Ingredient Management</h1>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 w-full sm:w-auto">
           <Button
             variant={activeTab === 'recipes' ? 'default' : 'outline'}
             onClick={() => setActiveTab('recipes')}
+            className="flex-1 sm:flex-none"
           >
             <ChefHat className="h-4 w-4 mr-2" />
             Recipes
@@ -383,6 +384,7 @@ export default function RecipeManagement() {
           <Button
             variant={activeTab === 'ingredients' ? 'default' : 'outline'}
             onClick={() => setActiveTab('ingredients')}
+            className="flex-1 sm:flex-none"
           >
             <Package className="h-4 w-4 mr-2" />
             Ingredients
@@ -1061,6 +1063,7 @@ export default function RecipeManagement() {
                 setEditingIngredientItem(null);
                 setIsIngredientFormOpen(true);
               }}
+              className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Ingredient
