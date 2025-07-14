@@ -355,12 +355,16 @@ export default function DailyStockSales() {
   
   // Draft saving mutation
   const saveDraftMutation = useMutation({
-    mutationFn: (data: FormData) => {
+    mutationFn: (data: any) => {
+      console.log("Draft mutation received data:", data);
+      
       const formattedData = {
         ...data,
         shiftDate: new Date(data.shiftDate).toISOString().split('T')[0],
         isDraft: true
       };
+      
+      console.log("Formatted draft data:", formattedData);
       
       // If editing an existing form, use PUT instead of POST
       const method = editingFormId ? 'PUT' : 'POST';
@@ -405,9 +409,31 @@ export default function DailyStockSales() {
   });
   
   const saveDraft = () => {
+    // Get form values without validation
     const formData = form.getValues();
     console.log("Saving draft with data:", formData);
-    saveDraftMutation.mutate(formData);
+    
+    // Ensure minimum required fields are present
+    const draftData = {
+      ...formData,
+      completedBy: formData.completedBy || "",
+      shiftType: formData.shiftType || "Night Shift",
+      shiftDate: formData.shiftDate || new Date(),
+      // Fill in any missing required fields with defaults
+      startingCash: formData.startingCash || "0",
+      endingCash: formData.endingCash || "0",
+      totalSales: formData.totalSales || "0",
+      wageEntries: formData.wageEntries || [],
+      shoppingEntries: formData.shoppingEntries || [],
+      freshFood: formData.freshFood || {},
+      frozenFood: formData.frozenFood || {},
+      shelfItems: formData.shelfItems || {},
+      drinkStock: formData.drinkStock || {},
+      kitchenItems: formData.kitchenItems || {},
+      packagingItems: formData.packagingItems || {}
+    };
+    
+    saveDraftMutation.mutate(draftData);
   };
 
   const onSubmit = (data: FormData) => {
