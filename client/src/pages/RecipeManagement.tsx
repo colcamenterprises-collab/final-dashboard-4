@@ -336,9 +336,11 @@ export default function RecipeManagement() {
 
   // Filter ingredients for search and category
   const filteredIngredients = (ingredients as Ingredient[]).filter((ingredient: Ingredient) => {
-    const matchesSearch = ingredient.name.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
+    const matchesSearch = !ingredientSearchTerm || 
+                         ingredient.name.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
                          ingredient.supplier?.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
-                         ingredient.brand?.toLowerCase().includes(ingredientSearchTerm.toLowerCase());
+                         ingredient.brand?.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
+                         ingredient.notes?.toLowerCase().includes(ingredientSearchTerm.toLowerCase());
     
     const matchesCategory = ingredientCategoryFilter === 'all' || ingredient.category === ingredientCategoryFilter;
     
@@ -1100,7 +1102,7 @@ export default function RecipeManagement() {
                     <div className="flex-1">
                       <CardTitle className="text-sm font-medium">{ingredient.name}</CardTitle>
                       <CardDescription className="text-xs">
-                        {ingredient.supplier} • {ingredient.category}
+                        {ingredient.supplier || 'Unknown Supplier'} • {ingredient.category}
                       </CardDescription>
                     </div>
                     <div className="flex space-x-1">
@@ -1130,15 +1132,15 @@ export default function RecipeManagement() {
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Cost per item:</span>
-                      <span className="font-medium">฿{ingredient.costPerItem}</span>
+                      <span className="font-medium">฿{ingredient.costPerItem || ingredient.unitPrice}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Package:</span>
-                      <span>{ingredient.packageQty}</span>
+                      <span>{ingredient.packageQty || ingredient.packageSize}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Measurement:</span>
-                      <span>{ingredient.measurement}</span>
+                      <span>{ingredient.measurement || ingredient.unit}</span>
                     </div>
                     {ingredient.brand && (
                       <div className="flex justify-between">
@@ -1150,6 +1152,12 @@ export default function RecipeManagement() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Min Stock:</span>
                         <span>{ingredient.minimumStockAmount}</span>
+                      </div>
+                    )}
+                    {ingredient.notes && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Notes:</span>
+                        <span className="text-right">{ingredient.notes}</span>
                       </div>
                     )}
                   </div>
