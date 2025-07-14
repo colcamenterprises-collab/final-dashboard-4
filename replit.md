@@ -379,6 +379,13 @@ Changelog:
 - July 13, 2025. LOYVERSE API PAGINATION ENHANCEMENT: Implemented proper cursor-based pagination for receipt fetching according to Loyverse API documentation
 - July 13, 2025. Updated fetchAndStoreReceipts and fetchReceiptsFromLoyverseAPI functions to use do-while loops with cursor parameter for complete data retrieval
 - July 13, 2025. Fixed potential data loss issue where only first 250 receipts were being fetched - now retrieves all receipts using pagination
+- July 14, 2025. COMPREHENSIVE UI/UX IMPROVEMENTS: Enhanced Daily Stock & Sales form user experience with placeholder removal, improved success handling, and comprehensive search functionality
+- July 14, 2025. Removed all placeholder text from shopping entries form fields for cleaner professional appearance
+- July 14, 2025. Changed "Add Shopping Item" button text to "Add Expense" for better clarity
+- July 14, 2025. Enhanced form submission success handling with prominent green success message lasting 6 seconds and automatic form reset to blank state
+- July 14, 2025. Implemented comprehensive form detail view in search results showing complete form data including sales breakdown, cash management, wage entries, shopping entries, stock information, and inventory status
+- July 14, 2025. Added draft deletion functionality with trash icon buttons in Load Draft section for better draft management
+- July 14, 2025. Fixed shopping list generation to work automatically on form submission (not drafts) and properly handle draft status transitions
 ```
 
 ## User Preferences

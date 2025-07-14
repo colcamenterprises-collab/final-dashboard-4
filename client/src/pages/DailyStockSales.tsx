@@ -251,14 +251,51 @@ export default function DailyStockSales() {
     },
     onSuccess: (response) => {
       console.log('✅ Form submitted successfully:', response);
-      toast({
-        title: editingFormId ? "Form Updated Successfully" : "Form Submitted Successfully",
-        description: editingFormId ? "The form has been updated with your changes." : "Daily stock and sales data has been saved and shopping list generated."
+      
+      // Reset form to default state
+      form.reset({
+        completedBy: "",
+        shiftType: "",
+        shiftDate: new Date(),
+        startingCash: "0",
+        endingCash: "0",
+        grabSales: "0",
+        foodPandaSales: "0",
+        aroiDeeSales: "0",
+        qrScanSales: "0",
+        cashSales: "0",
+        totalSales: "0",
+        salaryWages: "0",
+        shopping: "0",
+        gasExpense: "0",
+        totalExpenses: "0",
+        expenseDescription: "",
+        wageEntries: [],
+        shoppingEntries: [],
+        burgerBunsStock: 0,
+        rollsOrderedCount: 0,
+        meatWeight: "0",
+        rollsOrderedConfirmed: false,
+        freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
+        frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
+        shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+        foodItems: {},
+        drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
+        kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
+        packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
       });
+      
+      // Show prominent success message
+      toast({
+        title: editingFormId ? "✅ Form Updated Successfully" : "✅ Form Submitted Successfully",
+        description: editingFormId ? "The form has been updated with your changes." : "Daily stock and sales data has been saved and shopping list generated.",
+        duration: 6000, // Show for 6 seconds
+        className: "bg-green-50 border-green-200 text-green-800"
+      });
+      
       queryClient.invalidateQueries({ queryKey: ['/api/shopping-list'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/search'] });
-      form.reset();
       setIsDraft(false);
       setEditingFormId(null);
     },
@@ -901,7 +938,7 @@ export default function DailyStockSales() {
                           render={({ field }) => (
                             <FormItem className="col-span-3">
                               <FormControl>
-                                <Input {...field} placeholder="Bin Bags" />
+                                <Input {...field} />
                               </FormControl>
                             </FormItem>
                           )}
@@ -916,7 +953,6 @@ export default function DailyStockSales() {
                                   {...field} 
                                   type="number" 
                                   step="0.01" 
-                                  placeholder="200"
                                   onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                 />
                               </FormControl>
@@ -964,7 +1000,7 @@ export default function DailyStockSales() {
                           render={({ field }) => (
                             <FormItem className={isOtherShop ? "col-span-1" : "col-span-3"}>
                               <FormControl>
-                                <Input {...field} placeholder="Garbage Bags" />
+                                <Input {...field} />
                               </FormControl>
                             </FormItem>
                           )}
@@ -994,7 +1030,7 @@ export default function DailyStockSales() {
                       form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '', shop: '', customShop: '' }]);
                     }}
                   >
-                    Add Shopping Item
+                    Add Expense
                   </Button>
                   
                   <div className="text-right">
@@ -1899,51 +1935,174 @@ export default function DailyStockSales() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <p className="text-sm text-gray-600">Total Sales</p>
-                              <p className="font-bold text-green-600">{formatCurrency(selectedForm.totalSales)}</p>
-                            </div>
+                    {/* Sales Summary */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Sales Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Total Sales</p>
+                            <p className="font-bold text-green-600 text-lg">฿{parseFloat(selectedForm.totalSales || '0').toFixed(2)}</p>
                           </div>
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm text-gray-600">Grab Sales</p>
+                            <p className="font-medium">฿{parseFloat(selectedForm.grabSales || '0').toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">FoodPanda Sales</p>
+                            <p className="font-medium">฿{parseFloat(selectedForm.foodPandaSales || '0').toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Cash Sales</p>
+                            <p className="font-medium">฿{parseFloat(selectedForm.cashSales || '0').toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <p className="text-sm text-gray-600">Total Expenses</p>
-                              <p className="font-bold text-red-600">{formatCurrency(selectedForm.totalExpenses)}</p>
-                            </div>
+                    {/* Cash Management */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Cash Management</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Starting Cash</p>
+                            <p className="font-medium">฿{parseFloat(selectedForm.startingCash || '0').toFixed(2)}</p>
                           </div>
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm text-gray-600">Ending Cash</p>
+                            <p className="font-medium">฿{parseFloat(selectedForm.endingCash || '0').toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Total Expenses</p>
+                            <p className="font-bold text-red-600">฿{parseFloat(selectedForm.totalExpenses || '0').toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Cash Variance</p>
+                            <p className="font-medium">
+                              {(() => {
+                                const expected = parseFloat(selectedForm.startingCash || '0') + parseFloat(selectedForm.cashSales || '0') - parseFloat(selectedForm.totalExpenses || '0');
+                                const actual = parseFloat(selectedForm.endingCash || '0');
+                                const variance = actual - expected;
+                                return `฿${variance.toFixed(2)}`;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
+                    {/* Wage Entries */}
+                    {selectedForm.wageEntries && (selectedForm.wageEntries as any[]).length > 0 && (
                       <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <p className="text-sm text-gray-600">Starting Cash</p>
-                              <p className="font-medium">{formatCurrency(selectedForm.startingCash)}</p>
-                            </div>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Wage Entries</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {(selectedForm.wageEntries as any[]).map((wage, index) => (
+                              <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                                <div>
+                                  <p className="font-medium">{wage.name}</p>
+                                  <p className="text-sm text-gray-600">{wage.notes}</p>
+                                </div>
+                                <p className="font-medium">฿{parseFloat(wage.amount || '0').toFixed(2)}</p>
+                              </div>
+                            ))}
                           </div>
                         </CardContent>
                       </Card>
+                    )}
 
+                    {/* Shopping Entries */}
+                    {selectedForm.shoppingEntries && (selectedForm.shoppingEntries as any[]).length > 0 && (
                       <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <p className="text-sm text-gray-600">Ending Cash</p>
-                              <p className="font-medium">{formatCurrency(selectedForm.endingCash)}</p>
-                            </div>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Shopping & Expenses</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {(selectedForm.shoppingEntries as any[]).map((item, index) => (
+                              <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                                <div>
+                                  <p className="font-medium">{item.item}</p>
+                                  <p className="text-sm text-gray-600">{item.shop} {item.customShop && `(${item.customShop})`}</p>
+                                  {item.notes && <p className="text-sm text-gray-500">{item.notes}</p>}
+                                </div>
+                                <p className="font-medium">฿{parseFloat(item.amount || '0').toFixed(2)}</p>
+                              </div>
+                            ))}
                           </div>
                         </CardContent>
                       </Card>
-                    </div>
+                    )}
+
+                    {/* Stock Information */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Stock Information</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Burger Buns Stock</p>
+                            <p className="font-medium">{selectedForm.burgerBunsStock || 0} units</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Rolls Ordered</p>
+                            <p className="font-medium">{selectedForm.rollsOrderedCount || 0} units</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Meat Weight</p>
+                            <p className="font-medium">{selectedForm.meatWeight || 0} kg</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Rolls Confirmed</p>
+                            <p className="font-medium">{selectedForm.rollsOrderedConfirmed ? 'Yes' : 'No'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Inventory Status */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Inventory Status</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Drink Stock */}
+                          <div>
+                            <h4 className="font-medium mb-3">Drink Stock</h4>
+                            <div className="space-y-2">
+                              {selectedForm.drinkStock && Object.entries(selectedForm.drinkStock as any).map(([drink, count]) => (
+                                <div key={drink} className="flex justify-between text-sm">
+                                  <span>{drink}</span>
+                                  <span className="font-medium">{count} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Fresh Food */}
+                          <div>
+                            <h4 className="font-medium mb-3">Fresh Food</h4>
+                            <div className="space-y-2">
+                              {selectedForm.freshFood && Object.entries(selectedForm.freshFood as any).map(([food, count]) => (
+                                <div key={food} className="flex justify-between text-sm">
+                                  <span>{food}</span>
+                                  <span className="font-medium">{count} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 ) : (
                   <div className="space-y-4">
