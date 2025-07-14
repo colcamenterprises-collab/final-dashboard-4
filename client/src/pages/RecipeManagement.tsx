@@ -55,6 +55,7 @@ export default function RecipeManagement() {
 
   // Ingredient categories
   const INGREDIENT_CATEGORIES = [
+    'Ingredients', // Legacy category for existing data
     'Stock Items',
     'Fresh Food',
     'Frozen Food',
