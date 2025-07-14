@@ -117,33 +117,44 @@ const shoppingEntrySchema = z.object({
   customShop: z.string().optional()
 });
 
-const formSchema = insertDailyStockSalesSchema.extend({
-  foodItems: z.record(z.number().min(0)).optional(),
-  drinkStock: z.record(z.number().min(0)).optional(),
-  kitchenItems: z.record(z.number().min(0)).optional(),
-  packagingItems: z.record(z.number().min(0)).optional(),
+const formSchema = z.object({
+  // Only require essential fields
+  completedBy: z.string().min(1, "Name is required"),
+  shiftType: z.string().min(1, "Shift type is required"),
+  shiftDate: z.date(),
+  
+  // Make all other fields optional with defaults
+  startingCash: z.string().default("0"),
+  endingCash: z.string().default("0"),
+  grabSales: z.string().default("0"),
+  foodPandaSales: z.string().default("0"),
+  aroiDeeSales: z.string().default("0"),
+  qrScanSales: z.string().default("0"),
+  cashSales: z.string().default("0"),
+  totalSales: z.string().default("0"),
+  salaryWages: z.string().default("0"),
+  shopping: z.string().default("0"),
+  gasExpense: z.string().default("0"),
+  totalExpenses: z.string().default("0"),
+  burgerBunsStock: z.number().default(0),
+  rollsOrderedCount: z.number().default(0),
+  meatWeight: z.string().default("0"),
+  drinkStockCount: z.number().default(0),
+  rollsOrderedConfirmed: z.boolean().default(false),
+  expenseDescription: z.string().optional(),
+  
+  // Arrays
   wageEntries: z.array(wageEntrySchema).default([]),
-  shoppingEntries: z.array(shoppingEntrySchema).default([])
-}).partial({
-  // Make most fields optional except for the essential ones
-  startingCash: true,
-  endingCash: true,
-  grabSales: true,
-  foodPandaSales: true,
-  aroiDeeSales: true,
-  qrScanSales: true,
-  cashSales: true,
-  totalSales: true,
-  salaryWages: true,
-  shopping: true,
-  gasExpense: true,
-  totalExpenses: true,
-  burgerBunsStock: true,
-  rollsOrderedCount: true,
-  meatWeight: true,
-  drinkStockCount: true,
-  rollsOrderedConfirmed: true,
-  expenseDescription: true
+  shoppingEntries: z.array(shoppingEntrySchema).default([]),
+  
+  // Objects for inventory
+  freshFood: z.record(z.number().min(0)).default({}),
+  frozenFood: z.record(z.number().min(0)).default({}),
+  shelfItems: z.record(z.number().min(0)).default({}),
+  foodItems: z.record(z.number().min(0)).default({}),
+  drinkStock: z.record(z.number().min(0)).default({}),
+  kitchenItems: z.record(z.number().min(0)).default({}),
+  packagingItems: z.record(z.number().min(0)).default({})
 });
 
 type FormData = z.infer<typeof formSchema>;

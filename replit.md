@@ -386,6 +386,10 @@ Changelog:
 - July 14, 2025. Implemented comprehensive form detail view in search results showing complete form data including sales breakdown, cash management, wage entries, shopping entries, stock information, and inventory status
 - July 14, 2025. Added draft deletion functionality with trash icon buttons in Load Draft section for better draft management
 - July 14, 2025. Fixed shopping list generation to work automatically on form submission (not drafts) and properly handle draft status transitions
+- July 14, 2025. CRITICAL FIX: Resolved 500 server errors on Daily Stock & Sales form by completely separating email service from form submission process
+- July 14, 2025. Made Gmail email notifications run independently after form saves to prevent blocking form submission
+- July 14, 2025. Simplified form validation to only require name and shift type, making all other fields optional with proper defaults
+- July 14, 2025. Fixed form submission workflow: save form immediately, return success response, then handle shopping list generation and email notifications separately
 ```
 
 ## User Preferences
