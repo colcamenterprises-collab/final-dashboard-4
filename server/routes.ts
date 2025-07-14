@@ -91,40 +91,48 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Received daily stock sales data:", data);
       
-      // Save to storage
+      // Save to storage first - this is the primary operation
       const result = await storage.createDailyStockSales(data);
+      console.log("✅ Form saved successfully with ID:", result.id);
       
-      // Generate shopping list if not a draft
+      // Generate shopping list if not a draft (secondary operation)
       if (!data.isDraft) {
-        try {
-          console.log("Generating shopping list for form submission...");
-          const shoppingList = await storage.generateShoppingList(result);
-          console.log(`Generated ${shoppingList.length} shopping items`);
-          
-          // Send email notification
+        // Run shopping list generation in the background
+        setImmediate(async () => {
           try {
-            const { sendManagementSummary } = await import('./services/gmailService');
-            const emailData = {
-              formData: result,
-              shoppingList: shoppingList,
-              submissionTime: new Date()
-            };
-            await sendManagementSummary(emailData);
-            console.log("Email notification sent successfully");
-          } catch (emailError) {
-            console.error("Failed to send email notification:", emailError);
-            // Don't fail the request if email fails
+            console.log("Generating shopping list for form submission...");
+            const shoppingList = await storage.generateShoppingList(result);
+            console.log(`Generated ${shoppingList.length} shopping items`);
+            
+            // Send email notification (tertiary operation)
+            try {
+              const { sendManagementSummary } = await import('./services/gmailService');
+              const emailData = {
+                formData: result,
+                shoppingList: shoppingList,
+                submissionTime: new Date()
+              };
+              
+              // Send email without blocking anything
+              sendManagementSummary(emailData)
+                .then(() => console.log("Email notification sent successfully"))
+                .catch(error => console.error("Failed to send email notification:", error));
+                
+            } catch (emailError) {
+              console.error("Failed to initialize email service:", emailError);
+            }
+          } catch (error) {
+            console.error("Failed to generate shopping list:", error);
           }
-        } catch (error) {
-          console.error("Failed to generate shopping list:", error);
-          // Don't fail the request if shopping list generation fails
-        }
+        });
       }
       
+      // Return immediately after saving the form
       res.json(result);
     } catch (err) {
-      console.error("Error creating daily stock sales:", err);
-      res.status(500).json({ error: "Failed to create daily stock sales" });
+      console.error("❌ Error creating daily stock sales:", err);
+      console.error("Error details:", err.message, err.stack);
+      res.status(500).json({ error: "Failed to create daily stock sales", details: err.message });
     }
   });
 
@@ -150,11 +158,13 @@ export function registerRoutes(app: express.Application): Server {
       console.log("Saving draft:", data);
       
       const result = await storage.createDailyStockSales(data);
+      console.log("✅ Draft saved successfully with ID:", result.id);
       
       res.json(result);
     } catch (err) {
-      console.error("Error saving draft:", err);
-      res.status(500).json({ error: "Failed to save draft" });
+      console.error("❌ Error saving draft:", err);
+      console.error("Error details:", err.message, err.stack);
+      res.status(500).json({ error: "Failed to save draft", details: err.message });
     }
   });
 
@@ -177,7 +187,7 @@ export function registerRoutes(app: express.Application): Server {
           const shoppingList = await storage.generateShoppingList(result);
           console.log(`Generated ${shoppingList.length} shopping items`);
           
-          // Send email notification
+          // Send email notification (non-blocking)
           try {
             const { sendManagementSummary } = await import('./services/gmailService');
             const emailData = {
@@ -185,10 +195,15 @@ export function registerRoutes(app: express.Application): Server {
               shoppingList: shoppingList,
               submissionTime: new Date()
             };
-            await sendManagementSummary(emailData);
-            console.log("Email notification sent successfully");
+            
+            // Send email without blocking the response
+            sendManagementSummary(emailData)
+              .then(() => console.log("Email notification sent successfully"))
+              .catch(error => console.error("Failed to send email notification:", error));
+              
           } catch (emailError) {
-            console.error("Failed to send email notification:", emailError);
+            console.error("Failed to initialize email service:", emailError);
+            // Don't fail the request if email service fails
           }
         } catch (error) {
           console.error("Failed to generate shopping list:", error);
