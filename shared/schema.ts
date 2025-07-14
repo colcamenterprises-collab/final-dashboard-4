@@ -274,10 +274,17 @@ export const ingredients = pgTable("ingredients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   category: text("category").notNull(),
+  supplier: text("supplier").notNull(),
+  brand: text("brand"),
+  costPerItem: decimal("cost_per_item", { precision: 10, scale: 2 }).notNull(),
+  packageQty: text("package_qty").notNull(),
+  measurement: text("measurement").notNull(),
+  minimumStockAmount: text("minimum_stock_amount"),
+  servingSize: text("serving_size"), // For ingredient serving size (measurement)
+  // Legacy fields for backwards compatibility
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   packageSize: text("package_size").notNull(),
   unit: text("unit").notNull(),
-  supplier: text("supplier").notNull(),
   notes: text("notes"),
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -378,7 +385,10 @@ export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales)
   isBalanced: z.boolean().optional(),
   discrepancyNotes: z.string().optional(),
 });
-export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true }).extend({
+  costPerItem: z.coerce.number().min(0, "Cost per item must be positive"),
+  unitPrice: z.coerce.number().min(0, "Unit price must be positive").optional(),
+});
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
 

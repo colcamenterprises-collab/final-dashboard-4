@@ -15,7 +15,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertRecipeSchema, insertRecipeIngredientSchema, type Recipe, type Ingredient, type RecipeIngredient } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone } from "lucide-react";
+import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone, Package, Search, Users, Filter } from "lucide-react";
+import { IngredientForm } from "@/components/IngredientForm";
 import { z } from "zod";
 
 const recipeFormSchema = insertRecipeSchema.extend({
@@ -44,6 +45,24 @@ export default function RecipeManagement() {
   const [marketingOutputType, setMarketingOutputType] = useState<'delivery' | 'advertising' | 'social'>('delivery');
   const [marketingNotes, setMarketingNotes] = useState('');
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  
+  // Ingredient Management state
+  const [activeTab, setActiveTab] = useState<'recipes' | 'ingredients'>('recipes');
+  const [editingIngredientItem, setEditingIngredientItem] = useState<Ingredient | null>(null);
+  const [isIngredientFormOpen, setIsIngredientFormOpen] = useState(false);
+  const [ingredientSearchTerm, setIngredientSearchTerm] = useState('');
+  const [ingredientCategoryFilter, setIngredientCategoryFilter] = useState('all');
+
+  // Ingredient categories
+  const INGREDIENT_CATEGORIES = [
+    'Stock Items',
+    'Fresh Food',
+    'Frozen Food',
+    'Shelf Items',
+    'Drinks',
+    'Kitchen Items',
+    'Packaging Items'
+  ];
 
   // Queries
   const { data: recipes = [], isLoading: recipesLoading } = useQuery({
@@ -173,6 +192,36 @@ export default function RecipeManagement() {
     }
   });
 
+  // Ingredient Management Mutations
+  const createIngredientMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', '/api/ingredients', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ingredients'] });
+      setIsIngredientFormOpen(false);
+      setEditingIngredientItem(null);
+      toast({ title: "Ingredient created successfully" });
+    },
+  });
+
+  const updateIngredientItemMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => 
+      apiRequest('PUT', `/api/ingredients/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ingredients'] });
+      setIsIngredientFormOpen(false);
+      setEditingIngredientItem(null);
+      toast({ title: "Ingredient updated successfully" });
+    },
+  });
+
+  const deleteIngredientMutation = useMutation({
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/ingredients/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ingredients'] });
+      toast({ title: "Ingredient deleted successfully" });
+    },
+  });
+
   // Query for existing marketing content
   const { data: marketingContentData } = useQuery({
     queryKey: [`/api/recipes/${selectedRecipe?.id}/marketing`, marketingOutputType],
@@ -268,6 +317,34 @@ export default function RecipeManagement() {
     return (costPerUnit * qty).toFixed(2);
   };
 
+  // Ingredient Management handlers
+  const handleCreateIngredient = (data: any) => {
+    createIngredientMutation.mutate(data);
+  };
+
+  const handleUpdateIngredient = (data: any) => {
+    if (editingIngredientItem) {
+      updateIngredientItemMutation.mutate({ id: editingIngredientItem.id, data });
+    }
+  };
+
+  const handleDeleteIngredient = (id: number) => {
+    if (window.confirm('Are you sure you want to delete this ingredient?')) {
+      deleteIngredientMutation.mutate(id);
+    }
+  };
+
+  // Filter ingredients for search and category
+  const filteredIngredients = (ingredients as Ingredient[]).filter((ingredient: Ingredient) => {
+    const matchesSearch = ingredient.name.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
+                         ingredient.supplier?.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
+                         ingredient.brand?.toLowerCase().includes(ingredientSearchTerm.toLowerCase());
+    
+    const matchesCategory = ingredientCategoryFilter === 'all' || ingredient.category === ingredientCategoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
+
   if (recipesLoading || ingredientsLoading) {
     return (
       <div className="container mx-auto p-2 sm:p-4 lg:p-6 max-w-7xl">
@@ -290,16 +367,36 @@ export default function RecipeManagement() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
           <ChefHat className="h-5 w-5 sm:h-6 sm:w-6" />
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe Management</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe & Ingredient Management</h1>
         </div>
         
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Recipe
-            </Button>
-          </DialogTrigger>
+        <div className="flex space-x-2">
+          <Button
+            variant={activeTab === 'recipes' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('recipes')}
+          >
+            <ChefHat className="h-4 w-4 mr-2" />
+            Recipes
+          </Button>
+          <Button
+            variant={activeTab === 'ingredients' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('ingredients')}
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Ingredients
+          </Button>
+        </div>
+      </div>
+
+      {activeTab === 'recipes' && (
+        <div className="space-y-4">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Recipe
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create New Recipe</DialogTitle>
@@ -947,6 +1044,153 @@ export default function RecipeManagement() {
           </CardContent>
         </Card>
       </div>
+      )}
+
+      {/* Ingredients Tab */}
+      {activeTab === 'ingredients' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Package className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">Ingredient Management</h2>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingIngredientItem(null);
+                setIsIngredientFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Ingredient
+            </Button>
+          </div>
+
+          {/* Search and Filter */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search ingredients, suppliers, or brands..."
+                value={ingredientSearchTerm}
+                onChange={(e) => setIngredientSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={ingredientCategoryFilter} onValueChange={setIngredientCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {INGREDIENT_CATEGORIES.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Ingredient List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredIngredients.map((ingredient) => (
+              <Card key={ingredient.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <CardTitle className="text-sm font-medium">{ingredient.name}</CardTitle>
+                      <CardDescription className="text-xs">
+                        {ingredient.supplier} • {ingredient.category}
+                      </CardDescription>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingIngredientItem(ingredient);
+                          setIsIngredientFormOpen(true);
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteIngredient(ingredient.id)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cost per item:</span>
+                      <span className="font-medium">฿{ingredient.costPerItem}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Package:</span>
+                      <span>{ingredient.packageQty}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Measurement:</span>
+                      <span>{ingredient.measurement}</span>
+                    </div>
+                    {ingredient.brand && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Brand:</span>
+                        <span>{ingredient.brand}</span>
+                      </div>
+                    )}
+                    {ingredient.minimumStockAmount && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Min Stock:</span>
+                        <span>{ingredient.minimumStockAmount}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {filteredIngredients.length === 0 && (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">No ingredients found</p>
+              <p className="text-sm text-gray-400">
+                {ingredientSearchTerm || ingredientCategoryFilter !== 'all' 
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Add your first ingredient to get started'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Ingredient Form Dialog */}
+      <Dialog open={isIngredientFormOpen} onOpenChange={setIsIngredientFormOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingIngredientItem ? 'Edit Ingredient' : 'Add New Ingredient'}
+            </DialogTitle>
+          </DialogHeader>
+          <IngredientForm
+            ingredient={editingIngredientItem || undefined}
+            onSubmit={editingIngredientItem ? handleUpdateIngredient : handleCreateIngredient}
+            onCancel={() => {
+              setIsIngredientFormOpen(false);
+              setEditingIngredientItem(null);
+            }}
+            isSubmitting={createIngredientMutation.isPending || updateIngredientItemMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Ingredient Dialog */}
       {editingIngredient && (

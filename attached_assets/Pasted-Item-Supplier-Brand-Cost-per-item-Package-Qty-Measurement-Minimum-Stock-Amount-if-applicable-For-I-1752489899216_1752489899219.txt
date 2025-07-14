@@ -1,0 +1,74 @@
+Item	Supplier	Brand	Cost per item	Package Qty	Measurement	Minimum Stock Amount (if applicable)	For Ingredient Serving Size (measurement)
+Burger Buns Stock (burgerBunsStock)	Bakery	Bakery	฿9.00	Each	Each	100	1
+Meat Weight (meatWeight)	Makro	Butcher	฿330.00	per kg	kg	10kg	90 grams
+							
+1. Fresh Food Items (7 items)							
+Salad	Makro			per kg		N/A	20 grams
+Tomatos	Makro			per kg		N/A	20 grams
+White Cabbage	Makro			per kg		N/A	
+Purple Cabbage	Makro			per kg		N/A	
+Onions	Makro			per kg		N/A	
+Milk	Makro					N/A	
+Butter	Makro					N/A	
+							
+2. Frozen Food Items (4 items)							
+Sweet Potato Fries	Makro					N/A	
+Chicken Nuggets	Makro					N/A	
+Chicken Fillets	Makro					N/A	
+French Fries	Makro					N/A	
+							
+3. Shelf Items (13 items)							
+Mayonnaise	Makro				1kg	N/A	
+Mustard	Makro					N/A	
+Cajun Spice	Makro				500 grams	N/A	
+Dill Pickles	Makro					N/A	
+Sweet Pickles	Makro					N/A	
+Crispy Fried Onions	Makro					N/A	
+BBQ Sauce (Smokey)	Makro					N/A	
+Jalapenos	Makro					N/A	
+Ketchup	Makro					N/A	
+Chili Sauce (Sriracha)	Makro					N/A	
+Oil (Fryer)	Makro					N/A	
+Pepper	Makro					N/A	
+Salt	Makro					N/A	
+							
+4. Drink Items (10 items)							
+Coke	Makro	Coke		6 Pack	Each	25	
+Schweppes Manow	Makro	Schweppes		6 Pack	Each	15	
+Coke Zero	Makro	Coke		6 Pack	Each	20	
+Fanta Strawberry	Makro	Fanta		6 Pack	Each	15	
+Fanta Orange	Makro	Fanta		6 Pack	Each	15	
+Kids Apple Juice	Makro	Tipco		6 Pack	Each	15	
+Kids Orange	Makro	Tipco		6 Pack	Each	15	
+Soda Water	Makro	Leo		6 Pack	Each	15	
+Bottle Water	Makro	Nestle		6 Pack	Each	25	
+Sprite	Makro	Sprite		6 Pack	Each	15	
+							
+5. Kitchen Items (12 items)							
+Clear Food Wrap	Makro					N/A	
+Aluminum Foil	Makro					N/A	
+Plastic Hand Gloves (Meat)	Makro					N/A	
+Rubber Gloves (Small)	Makro					N/A	
+Rubber Gloves (Medium)	Makro					N/A	
+Rubber Gloves (Large)	Makro					N/A	
+Alcohol Sanitiser	Makro					N/A	
+Dish Washing Liquid	Makro					N/A	
+Paper Towel (Long)	Makro					N/A	
+Sponge (dish washing)	Makro					N/A	
+Paper Towel (Short)	Makro					N/A	
+Rolls Sticky Tape	Makro					N/A	
+							
+6. Packaging Items (12 items)							
+French Fries Box	Makro					N/A	
+French Fries Paper	Makro					N/A	
+Paper Food Bags	Makro					N/A	
+Fork & Knife Set	Makro					N/A	
+Loaded Fries Boxes	Makro					N/A	
+Burger Paper (12 x 14)	Makro					N/A	
+Wooden Flag Skewers	Makro					N/A	
+Printer Rolls	Makro					N/A	
+Takeaway Sauce Containers	Makro					N/A	
+Coleslaw Container	Makro					N/A	
+Plastic Carry Bags	Makro					N/A	
+Packaging Labels	Makro					N/A	
+							
