@@ -460,15 +460,28 @@ export function registerRoutes(app: express.Application): Server {
     try {
       console.log('🔄 Regenerating shopping list from last completed form...');
       
-      // Get the last completed form
+      // Get the last completed form (most recent by date)
       const completedForms = await storage.searchDailyStockSales('');
       
       if (!completedForms || completedForms.length === 0) {
         return res.status(404).json({ error: "No completed forms found" });
       }
       
-      const lastForm = completedForms[completedForms.length - 1];
-      console.log(`📋 Found last completed form: ID ${lastForm.id} by ${lastForm.completedBy}`);
+      console.log(`📊 Found ${completedForms.length} forms total`);
+      console.log(`📋 First 3 forms: ${completedForms.slice(0, 3).map(f => `ID ${f.id} by ${f.completedBy} (draft: ${f.isDraft})`).join(', ')}`);
+      
+      // Filter out drafts and get the most recent completed form
+      const nonDraftForms = completedForms.filter(form => !form.isDraft);
+      if (nonDraftForms.length === 0) {
+        return res.status(404).json({ error: "No completed forms found (only drafts available)" });
+      }
+      
+      console.log(`📋 Found ${nonDraftForms.length} non-draft forms`);
+      console.log(`📋 First non-draft form: ID ${nonDraftForms[0].id} by ${nonDraftForms[0].completedBy}`);
+      
+      // Forms are already ordered by date DESC, so take the first one
+      const lastForm = nonDraftForms[0];
+      console.log(`📋 Selected form: ID ${lastForm.id} by ${lastForm.completedBy}`);
       
       // Check if form has shopping entries
       const shoppingEntries = lastForm.shoppingEntries || [];
