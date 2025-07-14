@@ -104,6 +104,29 @@ export default function ShoppingList() {
     }
   });
 
+  const regenerateShoppingListMutation = useMutation({
+    mutationFn: () =>
+      fetch('/api/shopping-list/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(res => res.json()),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      toast({ 
+        title: "Shopping list regenerated successfully!",
+        description: `Generated ${data.itemsGenerated} items from last completed form`
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to regenerate shopping list",
+        description: error.message || "Please try again later",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleCheckboxChange = (id: number, selected: boolean) => {
     updateItemMutation.mutate({ id, updates: { selected } });
     
@@ -228,6 +251,14 @@ export default function ShoppingList() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Shopping List</h1>
         <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
+          <Button 
+            onClick={() => regenerateShoppingListMutation.mutate()}
+            disabled={regenerateShoppingListMutation.isPending}
+            className="bg-blue-600 text-white hover:bg-blue-700 w-full xs:w-auto"
+          >
+            <Bot className="mr-2 h-4 w-4" />
+            {regenerateShoppingListMutation.isPending ? "Regenerating..." : "Regenerate from Last Form"}
+          </Button>
           <Dialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
             <DialogTrigger asChild>
               <Button 

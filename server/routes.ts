@@ -455,6 +455,49 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Regenerate shopping list from last completed form
+  app.post("/api/shopping-list/regenerate", async (req: Request, res: Response) => {
+    try {
+      console.log('🔄 Regenerating shopping list from last completed form...');
+      
+      // Get the last completed form
+      const completedForms = await storage.searchDailyStockSales('');
+      
+      if (!completedForms || completedForms.length === 0) {
+        return res.status(404).json({ error: "No completed forms found" });
+      }
+      
+      const lastForm = completedForms[completedForms.length - 1];
+      console.log(`📋 Found last completed form: ID ${lastForm.id} by ${lastForm.completedBy}`);
+      
+      // Check if form has shopping entries
+      const shoppingEntries = lastForm.shoppingEntries || [];
+      console.log(`🛒 Form has ${shoppingEntries.length} shopping entries`);
+      
+      if (shoppingEntries.length === 0) {
+        return res.status(400).json({ error: "No shopping entries found in the last form" });
+      }
+      
+      // Generate shopping list
+      console.log('🔄 Generating shopping list...');
+      const shoppingList = await storage.generateShoppingList(lastForm);
+      console.log(`✅ Generated ${shoppingList.length} shopping list items`);
+      
+      res.json({
+        success: true,
+        message: `Shopping list regenerated from form ${lastForm.id}`,
+        formId: lastForm.id,
+        completedBy: lastForm.completedBy,
+        shiftDate: lastForm.shiftDate,
+        itemsGenerated: shoppingList.length,
+        shoppingList: shoppingList
+      });
+    } catch (err) {
+      console.error("Error regenerating shopping list:", err);
+      res.status(500).json({ error: "Failed to regenerate shopping list" });
+    }
+  });
+
   // Shift Analytics endpoints
   app.get("/api/analysis/shift/:date", async (req: Request, res: Response) => {
     try {
