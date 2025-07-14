@@ -2074,7 +2074,7 @@ export default function DailyStockSales() {
                         <CardTitle className="text-lg">Inventory Status</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {/* Drink Stock */}
                           <div>
                             <h4 className="font-medium mb-3">Drink Stock</h4>
@@ -2092,9 +2092,83 @@ export default function DailyStockSales() {
                           <div>
                             <h4 className="font-medium mb-3">Fresh Food</h4>
                             <div className="space-y-2">
-                              {selectedForm.freshFood && Object.entries(selectedForm.freshFood as any).map(([food, count]) => (
+                              {selectedForm.freshFood && Object.entries(selectedForm.freshFood as any).map(([food, count]) => {
+                                // Skip the otherItems array as it's handled separately
+                                if (food === 'otherItems') {
+                                  return null;
+                                }
+                                // Handle simple values
+                                return (
+                                  <div key={food} className="flex justify-between text-sm">
+                                    <span>{food}</span>
+                                    <span className="font-medium">{count} units</span>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Handle otherItems array separately */}
+                              {selectedForm.freshFood && (selectedForm.freshFood as any).otherItems && Array.isArray((selectedForm.freshFood as any).otherItems) && (
+                                <>
+                                  <div className="border-t pt-2 mt-2">
+                                    <h5 className="font-medium text-sm mb-2">Other Items</h5>
+                                    {((selectedForm.freshFood as any).otherItems as any[]).map((item, index) => (
+                                      <div key={index} className="flex justify-between text-sm">
+                                        <span>{item.name || 'Unknown Item'}</span>
+                                        <span className="font-medium">{item.quantity || 0} units</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Frozen Food */}
+                          <div>
+                            <h4 className="font-medium mb-3">Frozen Food</h4>
+                            <div className="space-y-2">
+                              {selectedForm.frozenFood && Object.entries(selectedForm.frozenFood as any).map(([food, count]) => (
                                 <div key={food} className="flex justify-between text-sm">
                                   <span>{food}</span>
+                                  <span className="font-medium">{count} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Shelf Items */}
+                          <div>
+                            <h4 className="font-medium mb-3">Shelf Items</h4>
+                            <div className="space-y-2">
+                              {selectedForm.shelfItems && Object.entries(selectedForm.shelfItems as any).map(([item, count]) => (
+                                <div key={item} className="flex justify-between text-sm">
+                                  <span>{item}</span>
+                                  <span className="font-medium">{count} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Kitchen Items */}
+                          <div>
+                            <h4 className="font-medium mb-3">Kitchen Items</h4>
+                            <div className="space-y-2">
+                              {selectedForm.kitchenItems && Object.entries(selectedForm.kitchenItems as any).map(([item, count]) => (
+                                <div key={item} className="flex justify-between text-sm">
+                                  <span>{item}</span>
+                                  <span className="font-medium">{count} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Packaging Items */}
+                          <div>
+                            <h4 className="font-medium mb-3">Packaging Items</h4>
+                            <div className="space-y-2">
+                              {selectedForm.packagingItems && Object.entries(selectedForm.packagingItems as any).map(([item, count]) => (
+                                <div key={item} className="flex justify-between text-sm">
+                                  <span>{item}</span>
                                   <span className="font-medium">{count} units</span>
                                 </div>
                               ))}
