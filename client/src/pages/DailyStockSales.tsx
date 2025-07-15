@@ -1301,8 +1301,8 @@ export default function DailyStockSales() {
                               type="number" 
                               min="0" 
                               className="h-8"
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                              value={field.value || ''}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || 0}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1342,8 +1342,8 @@ export default function DailyStockSales() {
                               type="number" 
                               min="0" 
                               className="h-8"
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                              value={field.value || ''}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || 0}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1375,8 +1375,8 @@ export default function DailyStockSales() {
                               type="number" 
                               min="0" 
                               className="h-8"
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                              value={field.value || ''}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || 0}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1408,8 +1408,8 @@ export default function DailyStockSales() {
                               type="number" 
                               min="0" 
                               className="h-8"
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                              value={field.value || ''}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              value={field.value || 0}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1508,8 +1508,8 @@ export default function DailyStockSales() {
                             type="number" 
                             min="0" 
                             className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || 0}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1545,8 +1545,8 @@ export default function DailyStockSales() {
                             type="number" 
                             min="0" 
                             className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || 0}
                           />
                         </FormControl>
                         <FormMessage />
