@@ -42,33 +42,6 @@ import {
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
-// Fresh Food items 
-const FRESH_FOOD_ITEMS = [
-  'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
-  'Milk', 'Butter'
-];
-
-// Frozen Food items
-const FROZEN_FOOD_ITEMS = [
-  'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
-];
-
-// Shelf Items (non-perishable items)
-const SHELF_ITEMS = [
-  'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
-  'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup',
-  'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'
-];
-
-// Legacy food items (empty - all items moved to appropriate sections)
-const LEGACY_FOOD_ITEMS: string[] = [];
-
-// Drink items with current requirements (matching backend requirements)
-const DRINK_ITEMS = [
-  'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
-  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'
-];
-
 // Shop options for shopping entries
 const SHOP_OPTIONS = [
   'Makro',
@@ -81,22 +54,6 @@ const SHOP_OPTIONS = [
   'GO Wholesale',
   'Gas Supply',
   '*Other'
-];
-
-// Kitchen supplies
-const KITCHEN_ITEMS = [
-  'Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)',
-  'Rubber Gloves (Medium)', 'Rubber Gloves (Large)', 'Alcohol Sanitiser',
-  'Dish Washing Liquid', 'Paper Towel (Long)', 'Sponge (dish washing)',
-  'Paper Towel (Short)', 'Rolls Sticky Tape'
-];
-
-// Packaging supplies
-const PACKAGING_ITEMS = [
-  'French Fries Box', 'French Fries Paper', 'Paper Food Bags', 'Fork & Knife Set',
-  'Loaded Fries Boxes', 'Burger Paper (12 x 14)', 'Wooden Flag Skewers',
-  'Printer Rolls', 'Takeaway Sauce Containers', 'Coleslaw Container',
-  'Plastic Carry Bags', 'Packaging Labels'
 ];
 
 // Wage categories for dropdown
@@ -147,81 +104,14 @@ const formSchema = z.object({
   wageEntries: z.array(wageEntrySchema).default([]),
   shoppingEntries: z.array(shoppingEntrySchema).default([]),
   
-  // Objects for inventory - all fields optional
-  freshFood: z.object({
-    salad: z.number().min(0).optional(),
-    tomatos: z.number().min(0).optional(),
-    whiteCabbage: z.number().min(0).optional(),
-    purpleCabbage: z.number().min(0).optional(),
-    onions: z.number().min(0).optional(),
-    baconShort: z.number().min(0).optional(),
-    baconLong: z.number().min(0).optional(),
-    cheese: z.number().min(0).optional(),
-    milk: z.number().min(0).optional(),
-    butter: z.number().min(0).optional(),
-  }).optional().default({}),
-  frozenFood: z.object({
-    "Sweet Potato Fries": z.number().min(0).optional(),
-    "Chicken Nuggets": z.number().min(0).optional(),
-    "Chicken Fillets": z.number().min(0).optional(),
-    "French Fries": z.number().min(0).optional(),
-  }).optional().default({}),
-  shelfItems: z.object({
-    "Mayonnaise": z.number().min(0).optional(),
-    "Mustard": z.number().min(0).optional(),
-    "Cajun Spice": z.number().min(0).optional(),
-    "Dill Pickles": z.number().min(0).optional(),
-    "Sweet Pickles": z.number().min(0).optional(),
-    "Crispy Fried Onions": z.number().min(0).optional(),
-    "BBQ Sauce (Smokey)": z.number().min(0).optional(),
-    "Jalapenos": z.number().min(0).optional(),
-    "Ketchup": z.number().min(0).optional(),
-    "Chili Sauce (Sriracha)": z.number().min(0).optional(),
-    "Oil (Fryer)": z.number().min(0).optional(),
-    "Pepper": z.number().min(0).optional(),
-    "Salt": z.number().min(0).optional(),
-  }).optional().default({}),
+  // Objects for inventory - all fields optional, now using dynamic records
+  freshFood: z.record(z.number().min(0)).optional().default({}),
+  frozenFood: z.record(z.number().min(0)).optional().default({}),
+  shelfItems: z.record(z.number().min(0)).optional().default({}),
   foodItems: z.record(z.number().min(0)).optional().default({}),
-  drinkStock: z.object({
-    "Coke": z.number().min(0).optional(),
-    "Schweppes Manow": z.number().min(0).optional(),
-    "Coke Zero": z.number().min(0).optional(),
-    "Fanta Strawberry": z.number().min(0).optional(),
-    "Fanta Orange": z.number().min(0).optional(),
-    "Kids Apple Juice": z.number().min(0).optional(),
-    "Kids Orange": z.number().min(0).optional(),
-    "Soda Water": z.number().min(0).optional(),
-    "Bottle Water": z.number().min(0).optional(),
-    "Sprite": z.number().min(0).optional(),
-  }).optional().default({}),
-  kitchenItems: z.object({
-    "Clear Food Wrap": z.number().min(0).optional(),
-    "Aluminum Foil": z.number().min(0).optional(),
-    "Plastic Hand Gloves (Meat)": z.number().min(0).optional(),
-    "Rubber Gloves (Small)": z.number().min(0).optional(),
-    "Rubber Gloves (Medium)": z.number().min(0).optional(),
-    "Rubber Gloves (Large)": z.number().min(0).optional(),
-    "Alcohol Sanitiser": z.number().min(0).optional(),
-    "Dish Washing Liquid": z.number().min(0).optional(),
-    "Paper Towel (Long)": z.number().min(0).optional(),
-    "Sponge (dish washing)": z.number().min(0).optional(),
-    "Paper Towel (Short)": z.number().min(0).optional(),
-    "Rolls Sticky Tape": z.number().min(0).optional(),
-  }).optional().default({}),
-  packagingItems: z.object({
-    "French Fries Box": z.number().min(0).optional(),
-    "French Fries Paper": z.number().min(0).optional(),
-    "Paper Food Bags": z.number().min(0).optional(),
-    "Fork & Knife Set": z.number().min(0).optional(),
-    "Loaded Fries Boxes": z.number().min(0).optional(),
-    "Burger Paper (12 x 14)": z.number().min(0).optional(),
-    "Wooden Flag Skewers": z.number().min(0).optional(),
-    "Printer Rolls": z.number().min(0).optional(),
-    "Takeaway Sauce Containers": z.number().min(0).optional(),
-    "Coleslaw Container": z.number().min(0).optional(),
-    "Plastic Carry Bags": z.number().min(0).optional(),
-    "Packaging Labels": z.number().min(0).optional(),
-  }).optional().default({})
+  drinkStock: z.record(z.number().min(0)).optional().default({}),
+  kitchenItems: z.record(z.number().min(0)).optional().default({}),
+  packagingItems: z.record(z.number().min(0)).optional().default({})
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -243,18 +133,10 @@ export default function DailyStockSales() {
   
   // Item management state
   const [showItemManager, setShowItemManager] = useState(false);
-  const [customItems, setCustomItems] = useState<{
-    freshFood: string[];
-    frozenFood: string[];
-    drinkItems: string[];
-    kitchenItems: string[];
-    packagingItems: string[];
-  }>({
-    freshFood: [...FRESH_FOOD_ITEMS],
-    frozenFood: [...FROZEN_FOOD_ITEMS],
-    drinkItems: [...DRINK_ITEMS],
-    kitchenItems: [...KITCHEN_ITEMS],
-    packagingItems: [...PACKAGING_ITEMS]
+
+  // Fetch ingredients from database to populate form sections
+  const { data: ingredients = [], isLoading: ingredientsLoading } = useQuery({
+    queryKey: ['/api/ingredients'],
   });
 
   // Search query for completed forms
@@ -269,6 +151,23 @@ export default function DailyStockSales() {
       return response.json();
     }
   });
+
+  // Group ingredients by category for form sections
+  const groupedIngredients = ingredients.reduce((acc: any, ingredient: any) => {
+    if (!acc[ingredient.category]) {
+      acc[ingredient.category] = [];
+    }
+    acc[ingredient.category].push(ingredient.name);
+    return acc;
+  }, {});
+
+  // Extract ingredient names by category
+  const FRESH_FOOD_ITEMS = groupedIngredients['Fresh Food'] || [];
+  const FROZEN_FOOD_ITEMS = groupedIngredients['Frozen Food'] || [];
+  const SHELF_ITEMS = groupedIngredients['Shelf Stock'] || [];
+  const DRINK_ITEMS = groupedIngredients['Drinks'] || [];
+  const KITCHEN_ITEMS = groupedIngredients['Kitchen Supplies'] || [];
+  const PACKAGING_ITEMS = groupedIngredients['Packaging'] || [];
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -1429,209 +1328,30 @@ export default function DailyStockSales() {
               <div>
                 <h3 className="text-lg font-medium mb-3">Fresh Food</h3>
                 <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="freshFood.salad"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Salad</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.tomatos"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Tomatos</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.whiteCabbage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">White Cabbage</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.purpleCabbage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Purple Cabbage</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.onions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Onions</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.baconShort"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Bacon Short</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.baconLong"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Bacon Long</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.cheese"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Cheese</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.milk"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Milk</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="freshFood.butter"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Butter</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            min="0" 
-                            className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {FRESH_FOOD_ITEMS.map((item) => (
+                    <FormField
+                      key={item}
+                      control={form.control}
+                      name={`freshFood.${item}` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">{item}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="0" 
+                              className="h-8"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
                 </div>
-
-
               </div>
 
               {/* Shelf Items */}

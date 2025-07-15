@@ -1074,28 +1074,77 @@ export class MemStorage implements IStorage {
   }
 
   private seedIngredients() {
-    // Real Loyverse ingredients data from CSV
+    // Real ingredient data from your supplier pricing list
     const ingredientData: (InsertIngredient & {id: number})[] = [
-      { id: 1, name: "Bacon Long", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "strip", supplier: "Makro", notes: "Long bacon strips" },
-      { id: 2, name: "Bacon Short", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "strip", supplier: "Makro", notes: "Short bacon strips" },
-      { id: 3, name: "Burger Bun", category: "Ingredients", unitPrice: "8.00", packageSize: "1", unit: "bun", supplier: "Bakery", notes: "Burger buns" },
-      { id: 4, name: "Butter", category: "Ingredients", unitPrice: "5.00", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Butter portions" },
-      { id: 5, name: "Cajun Seasoning", category: "Ingredients", unitPrice: "7.00", packageSize: "1", unit: "portion", supplier: "Spice Shop", notes: "Cajun seasoning mix" },
-      { id: 6, name: "Cheese Slice", category: "Ingredients", unitPrice: "4.30", packageSize: "1", unit: "slice", supplier: "Dairy Supplier", notes: "American cheese slices" },
-      { id: 7, name: "Chicken Fillet", category: "Ingredients", unitPrice: "20.00", packageSize: "1", unit: "piece", supplier: "Meat Supplier", notes: "Chicken breast fillet" },
-      { id: 8, name: "Chipotle Sauce", category: "Ingredients", unitPrice: "1.80", packageSize: "1", unit: "portion", supplier: "Sauce Co", notes: "Chipotle sauce" },
-      { id: 9, name: "Fries", category: "Ingredients", unitPrice: "9.10", packageSize: "130", unit: "g", supplier: "Frozen Foods", notes: "French fries portion" },
-      { id: 10, name: "Jalapeños", category: "Ingredients", unitPrice: "3.65", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Pickled jalapeños" },
-      { id: 11, name: "Ketchup", category: "Ingredients", unitPrice: "1.00", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Tomato ketchup" },
-      { id: 12, name: "Mayonnaise", category: "Ingredients", unitPrice: "1.80", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Mayonnaise" },
-      { id: 13, name: "Meat Patty", category: "Ingredients", unitPrice: "30.00", packageSize: "1", unit: "patty", supplier: "Meat Supplier", notes: "Beef patty 100g" },
-      { id: 14, name: "Mustard", category: "Ingredients", unitPrice: "1.50", packageSize: "1", unit: "portion", supplier: "Condiment Co", notes: "Yellow mustard" },
-      { id: 15, name: "Onion", category: "Ingredients", unitPrice: "69.00", packageSize: "1", unit: "kg", supplier: "Fresh Market", notes: "Fresh onions" },
-      { id: 16, name: "Pickles", category: "Ingredients", unitPrice: "2.25", packageSize: "1", unit: "portion", supplier: "Pickle Co", notes: "Dill pickles" },
-      { id: 17, name: "Red Cabbage", category: "Ingredients", unitPrice: "7.45", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Shredded red cabbage" },
-      { id: 18, name: "Salad", category: "Ingredients", unitPrice: "2.00", packageSize: "1", unit: "portion", supplier: "Fresh Market", notes: "Mixed salad greens" },
-      { id: 19, name: "Tomato", category: "Ingredients", unitPrice: "2.25", packageSize: "1", unit: "slice", supplier: "Fresh Market", notes: "Fresh tomato slices" },
-      { id: 20, name: "Original Burger Sauce", category: "Ingredients", unitPrice: "2.50", packageSize: "1", unit: "portion", supplier: "House Made", notes: "Signature burger sauce blend" }
+      // Fresh Food
+      { id: 1, name: "Topside Beef", category: "Fresh Food", unitPrice: "319.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Harvery Beef - 95gr serving" },
+      { id: 2, name: "Brisket Point End", category: "Fresh Food", unitPrice: "299.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Harvery Beef - 95gr serving" },
+      { id: 3, name: "Chuck Roll Beef", category: "Fresh Food", unitPrice: "319.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Harvey Beef - 95gr serving" },
+      { id: 4, name: "Salad (Iceberg Lettuce)", category: "Fresh Food", unitPrice: "99.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Makro brand - 20gr serving" },
+      { id: 5, name: "Tomatos", category: "Fresh Food", unitPrice: "89.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Makro brand - 25gr serving" },
+      { id: 6, name: "White Cabbage", category: "Fresh Food", unitPrice: "45.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Makro brand" },
+      { id: 7, name: "Purple Cabbage", category: "Fresh Food", unitPrice: "41.25", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Makro brand" },
+      { id: 8, name: "Onions Bulk 10kg", category: "Fresh Food", unitPrice: "29.00", packageSize: "10", unit: "kg", supplier: "Makro", notes: "Makro brand - 20gr serving" },
+      { id: 9, name: "Onions", category: "Fresh Food", unitPrice: "29.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Makro brand" },
+      { id: 10, name: "Bacon Short", category: "Fresh Food", unitPrice: "305.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "305/66 brand" },
+      { id: 11, name: "Bacon Long", category: "Fresh Food", unitPrice: "430.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "BMP brand - 20gr serving" },
+      
+      // Frozen Food
+      { id: 12, name: "French Fries", category: "Frozen Food", unitPrice: "64.50", packageSize: "2", unit: "kg", supplier: "Makro", notes: "Savepak 7mm - 130g serving" },
+      { id: 13, name: "French Fries MY", category: "Frozen Food", unitPrice: "82.50", packageSize: "2", unit: "kg", supplier: "Makro", notes: "MY Frozen 7mm" },
+      { id: 14, name: "Onion Rings", category: "Frozen Food", unitPrice: "189.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Farm Frites brand" },
+      { id: 15, name: "Chicken Nuggets", category: "Frozen Food", unitPrice: "155.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Aro brand" },
+      { id: 16, name: "Sweet Potato Fries", category: "Frozen Food", unitPrice: "145.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Aro brand" },
+      
+      // Shelf Stock
+      { id: 17, name: "Burger Bun", category: "Shelf Stock", unitPrice: "8.00", packageSize: "1", unit: "each", supplier: "Bakery", notes: "Bakery brand" },
+      { id: 18, name: "Cheese", category: "Shelf Stock", unitPrice: "4.27", packageSize: "1", unit: "slice", supplier: "Makro", notes: "Horecav - 84 slices per kg" },
+      { id: 19, name: "Pickles (standard dill)", category: "Shelf Stock", unitPrice: "185.42", packageSize: "480", unit: "g", supplier: "Makro", notes: "Sis brand - 20gr serving" },
+      { id: 20, name: "Pickles Sweet", category: "Shelf Stock", unitPrice: "185.42", packageSize: "480", unit: "g", supplier: "Makro", notes: "SIS brand" },
+      { id: 21, name: "Pickles Dill Premium", category: "Shelf Stock", unitPrice: "283.58", packageSize: "670", unit: "g", supplier: "Makro", notes: "Develey brand" },
+      { id: 22, name: "Jalapeños", category: "Shelf Stock", unitPrice: "190.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Aro brand" },
+      { id: 23, name: "Mustard", category: "Shelf Stock", unitPrice: "88.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Aro brand" },
+      { id: 24, name: "Mayonnaise", category: "Shelf Stock", unitPrice: "90.00", packageSize: "1", unit: "kg", supplier: "Makro", notes: "Aro brand" },
+      { id: 25, name: "Tomato Sauce", category: "Shelf Stock", unitPrice: "35.00", packageSize: "5", unit: "L", supplier: "Makro", notes: "Aro brand" },
+      { id: 26, name: "Chili Sauce (Sriracha)", category: "Shelf Stock", unitPrice: "108.00", packageSize: "1000", unit: "g", supplier: "Makro", notes: "Aro brand" },
+      { id: 27, name: "BBQ Sauce", category: "Shelf Stock", unitPrice: "220.00", packageSize: "500", unit: "g", supplier: "Makro", notes: "HEINZ - 20gr serving" },
+      { id: 28, name: "Sriracha Sauce", category: "Shelf Stock", unitPrice: "113.68", packageSize: "950", unit: "g", supplier: "Makro", notes: "Aro brand" },
+      { id: 29, name: "Cajun Fries", category: "Shelf Stock", unitPrice: "995.69", packageSize: "510", unit: "g", supplier: "Makro", notes: "McCormick brand" },
+      { id: 30, name: "Crispy Fried Onions", category: "Shelf Stock", unitPrice: "158.00", packageSize: "500", unit: "g", supplier: "Makro", notes: "Fried Shallots" },
+      { id: 31, name: "Oil (Fryer)", category: "Shelf Stock", unitPrice: "39.00", packageSize: "5", unit: "L", supplier: "Makro", notes: "Bonus Palm Oil" },
+      { id: 32, name: "Salt (Coarse Sea Salt)", category: "Shelf Stock", unitPrice: "121.00", packageSize: "1", unit: "kg", supplier: "Online", notes: "Salt Odyssey - Lazada" },
+      
+      // Drinks
+      { id: 33, name: "Coke", category: "Drinks", unitPrice: "13.13", packageSize: "24", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 34, name: "Coke Zero", category: "Drinks", unitPrice: "13.13", packageSize: "24", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 35, name: "Fanta Orange", category: "Drinks", unitPrice: "13.50", packageSize: "6", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 36, name: "Fanta Strawberry", category: "Drinks", unitPrice: "13.50", packageSize: "6", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 37, name: "Schweppes Manow", category: "Drinks", unitPrice: "14.00", packageSize: "6", unit: "cans", supplier: "Makro", notes: "330ml cans" },
+      { id: 38, name: "Kids Juice (Orange)", category: "Drinks", unitPrice: "16.50", packageSize: "6", unit: "cans", supplier: "Makro", notes: "200ml cans" },
+      { id: 39, name: "Kids Juice (Apple)", category: "Drinks", unitPrice: "16.50", packageSize: "6", unit: "cans", supplier: "Makro", notes: "200ml cans" },
+      { id: 40, name: "Sprite", category: "Drinks", unitPrice: "13.50", packageSize: "6", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 41, name: "Soda Water", category: "Drinks", unitPrice: "8.67", packageSize: "6", unit: "cans", supplier: "Makro", notes: "325ml cans" },
+      { id: 42, name: "Water", category: "Drinks", unitPrice: "4.08", packageSize: "12", unit: "bottles", supplier: "Makro", notes: "0.6L bottles" },
+      
+      // Kitchen Supplies
+      { id: 43, name: "Paper Towel Long", category: "Kitchen Supplies", unitPrice: "13.17", packageSize: "6", unit: "pieces", supplier: "Makro", notes: "savepack brand" },
+      { id: 44, name: "Paper Towel Short (Serviettes)", category: "Kitchen Supplies", unitPrice: "19.33", packageSize: "6", unit: "pieces", supplier: "Makro", notes: "Aro brand" },
+      { id: 45, name: "Food Gloves (Large)", category: "Kitchen Supplies", unitPrice: "1.33", packageSize: "100", unit: "pieces", supplier: "Makro", notes: "Satory brand" },
+      { id: 46, name: "Food Gloves (Medium)", category: "Kitchen Supplies", unitPrice: "1.33", packageSize: "100", unit: "pieces", supplier: "Supercheap", notes: "Satory brand" },
+      { id: 47, name: "Food Gloves (Small)", category: "Kitchen Supplies", unitPrice: "1.33", packageSize: "100", unit: "pieces", supplier: "Makro", notes: "Satory brand" },
+      { id: 48, name: "Aluminum Foil", category: "Kitchen Supplies", unitPrice: "4.28", packageSize: "90", unit: "m", supplier: "Makro", notes: "Aro brand - 29.5cm width" },
+      { id: 49, name: "Plastic Meat Gloves", category: "Kitchen Supplies", unitPrice: "0.94", packageSize: "24", unit: "pieces", supplier: "Makro", notes: "M Glover brand" },
+      { id: 50, name: "Kitchen Cleaner", category: "Kitchen Supplies", unitPrice: "42.57", packageSize: "3.5", unit: "L", supplier: "Makro", notes: "Aro Kitchen Cleaner" },
+      { id: 51, name: "Alcohol Sanitiser", category: "Kitchen Supplies", unitPrice: "153.33", packageSize: "450", unit: "g", supplier: "Makro", notes: "Alsoff brand" },
+      
+      // Packaging
+      { id: 52, name: "French Fries Box", category: "Packaging", unitPrice: "2.10", packageSize: "50", unit: "pieces", supplier: "Makro", notes: "Fest brand" },
+      { id: 53, name: "Plastic Carry Bags (6×14)", category: "Packaging", unitPrice: "0.072", packageSize: "500", unit: "pieces", supplier: "Makro", notes: "Koi Fish brand" },
+      { id: 54, name: "Plastic Carry Bags (9×18)", category: "Packaging", unitPrice: "0.072", packageSize: "500", unit: "pieces", supplier: "Makro", notes: "Koi Fish brand" },
+      { id: 55, name: "Plastic Food Wrap", category: "Packaging", unitPrice: "0.75", packageSize: "500", unit: "m", supplier: "Makro", notes: "Aro brand" },
+      { id: 56, name: "Brown Paper Food Bags", category: "Packaging", unitPrice: "2.78", packageSize: "50", unit: "bags", supplier: "Online", notes: "Thaibox Food Lazada (12.5x20x30cm)" },
+      { id: 57, name: "Loaded Fries Boxes", category: "Packaging", unitPrice: "3.42", packageSize: "50", unit: "boxes", supplier: "Online", notes: "Pac Away - Lazada 17x11x4.5" },
+      { id: 58, name: "Packaging Labels", category: "Packaging", unitPrice: "1.11", packageSize: "45", unit: "stickers", supplier: "Local", notes: "Small stickers per sheet" }
     ];
 
     ingredientData.forEach(ingredient => {
@@ -1402,10 +1451,14 @@ export class MemStorage implements IStorage {
 
   async generateShoppingList(formData: DailyStockSales): Promise<ShoppingList[]> {
     const { db } = await import("./db");
-    const { shoppingList } = await import("@shared/schema");
+    const { shoppingList, ingredients } = await import("@shared/schema");
     
     // Clear previous shopping list items first
     await db.delete(shoppingList);
+    
+    // Get all ingredients from database to match with real prices
+    const allIngredients = await db.select().from(ingredients);
+    const ingredientMap = new Map(allIngredients.map(ing => [ing.name, ing]));
     
     const shoppingItems: InsertShoppingList[] = [];
     
@@ -1424,20 +1477,23 @@ export class MemStorage implements IStorage {
       if (category.items && typeof category.items === 'object') {
         Object.entries(category.items).forEach(([itemName, quantity]) => {
           if (typeof quantity === 'number' && quantity > 0) {
+            // Find ingredient in database for real pricing
+            const ingredient = ingredientMap.get(itemName);
+            
             shoppingItems.push({
               formId: formData.id,
               itemName: itemName.replace(/([A-Z])/g, ' $1').trim(),
               quantity: quantity,
-              unit: "each",
-              pricePerUnit: "0.00",
-              supplier: "TBD",
+              unit: ingredient?.unit || "each",
+              pricePerUnit: ingredient?.unitPrice || "0.00",
+              supplier: ingredient?.supplier || "TBD",
               priority: "medium",
               selected: false,
               aiGenerated: false,
               listDate: new Date(),
               listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
               isCompleted: false,
-              estimatedCost: "0.00",
+              estimatedCost: ingredient ? (parseFloat(ingredient.unitPrice) * quantity).toFixed(2) : "0.00",
               actualCost: "0.00",
               notes: `${category.categoryName}: ${quantity} units in stock`,
               createdAt: new Date(),
