@@ -399,10 +399,15 @@ Changelog:
 - July 15, 2025. Updated shopping list to include: Fresh Food, Frozen Food, Shelf Items, Drink Stock, Kitchen Items, Packaging Items, and main stock items (Burger Buns, Meat, Rolls Ordered)
 - July 15, 2025. Added category-based notes to shopping list items for better organization (e.g., "Fresh Food: 12 units in stock")
 - July 15, 2025. Verified shopping list generation works correctly - expense items no longer appear in shopping lists
+- July 15, 2025. MOBILE SHOPPING LIST FIX: Fixed mobile responsiveness with card-based layout instead of table
+- July 15, 2025. Added complete drink stock items and packaging items to shopping list from form data
+- July 15, 2025. ISOLATION POLICY: Implemented code isolation practices to prevent working functionality from breaking when updating other sections
 ```
 
 ## User Preferences
 
 ```
 Preferred communication style: Simple, everyday language.
+Code isolation policy: Once functionality is working and tested, isolate it to prevent breaking when updating other sections.
+Testing requirement: Always test changes in isolation before making additional modifications.
 ```
