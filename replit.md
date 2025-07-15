@@ -394,6 +394,11 @@ Changelog:
 - July 15, 2025. Fixed form validation schema to make all freshFood fields optional using z.object() with individual optional fields instead of z.record()
 - July 15, 2025. Updated form default values to use empty objects {} instead of populated inventory maps to prevent validation conflicts
 - July 15, 2025. Backend validation confirmed working correctly - forms can submit with empty food objects without errors
+- July 15, 2025. SHOPPING LIST GENERATION FIX: Completely restructured shopping list generation to only include items from Stock Counts section
+- July 15, 2025. Removed expense entries (shoppingEntries) from shopping list generation - now only processes food inventory data
+- July 15, 2025. Updated shopping list to include: Fresh Food, Frozen Food, Shelf Items, Drink Stock, Kitchen Items, Packaging Items, and main stock items (Burger Buns, Meat, Rolls Ordered)
+- July 15, 2025. Added category-based notes to shopping list items for better organization (e.g., "Fresh Food: 12 units in stock")
+- July 15, 2025. Verified shopping list generation works correctly - expense items no longer appear in shopping lists
 ```
 
 ## User Preferences

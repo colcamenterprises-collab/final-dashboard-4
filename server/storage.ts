@@ -1409,41 +1409,18 @@ export class MemStorage implements IStorage {
     
     const shoppingItems: InsertShoppingList[] = [];
     
-    // Process shopping entries from the form ONLY
-    if (formData.shoppingEntries && formData.shoppingEntries.length > 0) {
-      formData.shoppingEntries.forEach(entry => {
-        shoppingItems.push({
-          formId: formData.id,
-          itemName: entry.item,
-          quantity: 1,
-          unit: "each",
-          pricePerUnit: entry.amount.toString(),
-          supplier: entry.shop || "Unknown",
-          priority: "medium",
-          selected: false,
-          aiGenerated: false,
-          listDate: new Date(),
-          listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
-          isCompleted: false,
-          estimatedCost: "0.00",
-          actualCost: "0.00",
-          notes: entry.notes || "",
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-      });
-    }
-
-    // Process purchase requirement items from form sections
-    const purchaseCategories = [
-      { key: 'freshFood', items: formData.freshFood },
-      { key: 'frozenFood', items: formData.frozenFood },
-      { key: 'shelfItems', items: formData.shelfItems },
-      { key: 'kitchenItems', items: formData.kitchenItems },
-      { key: 'packagingItems', items: formData.packagingItems }
+    // ONLY process food inventory items from Stock Counts section
+    // These are the actual stock levels that determine what needs to be purchased
+    const stockCategories = [
+      { key: 'freshFood', items: formData.freshFood, categoryName: 'Fresh Food' },
+      { key: 'frozenFood', items: formData.frozenFood, categoryName: 'Frozen Food' },
+      { key: 'shelfItems', items: formData.shelfItems, categoryName: 'Shelf Items' },
+      { key: 'drinkStock', items: formData.drinkStock, categoryName: 'Drink Stock' },
+      { key: 'kitchenItems', items: formData.kitchenItems, categoryName: 'Kitchen Items' },
+      { key: 'packagingItems', items: formData.packagingItems, categoryName: 'Packaging Items' }
     ];
     
-    purchaseCategories.forEach(category => {
+    stockCategories.forEach(category => {
       if (category.items && typeof category.items === 'object') {
         Object.entries(category.items).forEach(([itemName, quantity]) => {
           if (typeof quantity === 'number' && quantity > 0) {
@@ -1462,7 +1439,7 @@ export class MemStorage implements IStorage {
               isCompleted: false,
               estimatedCost: "0.00",
               actualCost: "0.00",
-              notes: `Purchase requirement: ${quantity} units needed`,
+              notes: `${category.categoryName}: ${quantity} units in stock`,
               createdAt: new Date(),
               updatedAt: new Date()
             });
@@ -1470,6 +1447,73 @@ export class MemStorage implements IStorage {
         });
       }
     });
+
+    // Also include the main stock items from Stock Counts section
+    if (formData.burgerBunsStock && formData.burgerBunsStock > 0) {
+      shoppingItems.push({
+        formId: formData.id,
+        itemName: "Burger Buns",
+        quantity: formData.burgerBunsStock,
+        unit: "each",
+        pricePerUnit: "0.00",
+        supplier: "TBD",
+        priority: "high",
+        selected: false,
+        aiGenerated: false,
+        listDate: new Date(),
+        listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
+        isCompleted: false,
+        estimatedCost: "0.00",
+        actualCost: "0.00",
+        notes: `Stock Count: ${formData.burgerBunsStock} buns in stock`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    if (formData.meatWeight && parseFloat(formData.meatWeight) > 0) {
+      shoppingItems.push({
+        formId: formData.id,
+        itemName: "Meat",
+        quantity: parseFloat(formData.meatWeight),
+        unit: "kg",
+        pricePerUnit: "0.00",
+        supplier: "TBD",
+        priority: "high",
+        selected: false,
+        aiGenerated: false,
+        listDate: new Date(),
+        listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
+        isCompleted: false,
+        estimatedCost: "0.00",
+        actualCost: "0.00",
+        notes: `Stock Count: ${formData.meatWeight} kg meat in stock`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    if (formData.rollsOrderedCount && formData.rollsOrderedCount > 0) {
+      shoppingItems.push({
+        formId: formData.id,
+        itemName: "Rolls Ordered",
+        quantity: formData.rollsOrderedCount,
+        unit: "each",
+        pricePerUnit: "0.00",
+        supplier: "TBD",
+        priority: "high",
+        selected: false,
+        aiGenerated: false,
+        listDate: new Date(),
+        listName: `Shopping List - ${new Date(formData.createdAt).toLocaleDateString('en-GB')}`,
+        isCompleted: false,
+        estimatedCost: "0.00",
+        actualCost: "0.00",
+        notes: `Stock Count: ${formData.rollsOrderedCount} rolls ordered`,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
 
     // Save all shopping items to database
     if (shoppingItems.length > 0) {
