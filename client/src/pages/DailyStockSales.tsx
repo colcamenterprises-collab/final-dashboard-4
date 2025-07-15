@@ -147,14 +147,14 @@ const formSchema = z.object({
   wageEntries: z.array(wageEntrySchema).default([]),
   shoppingEntries: z.array(shoppingEntrySchema).default([]),
   
-  // Objects for inventory
-  freshFood: z.record(z.number().min(0)).default({}),
-  frozenFood: z.record(z.number().min(0)).default({}),
-  shelfItems: z.record(z.number().min(0)).default({}),
-  foodItems: z.record(z.number().min(0)).default({}),
-  drinkStock: z.record(z.number().min(0)).default({}),
-  kitchenItems: z.record(z.number().min(0)).default({}),
-  packagingItems: z.record(z.number().min(0)).default({})
+  // Objects for inventory - made optional
+  freshFood: z.record(z.number().min(0)).optional().default({}),
+  frozenFood: z.record(z.number().min(0)).optional().default({}),
+  shelfItems: z.record(z.number().min(0)).optional().default({}),
+  foodItems: z.record(z.number().min(0)).optional().default({}),
+  drinkStock: z.record(z.number().min(0)).optional().default({}),
+  kitchenItems: z.record(z.number().min(0)).optional().default({}),
+  packagingItems: z.record(z.number().min(0)).optional().default({})
 });
 
 type FormData = z.infer<typeof formSchema>;
