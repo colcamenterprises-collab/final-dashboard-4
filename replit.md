@@ -390,6 +390,10 @@ Changelog:
 - July 14, 2025. Made Gmail email notifications run independently after form saves to prevent blocking form submission
 - July 14, 2025. Simplified form validation to only require name and shift type, making all other fields optional with proper defaults
 - July 14, 2025. Fixed form submission workflow: save form immediately, return success response, then handle shopping list generation and email notifications separately
+- July 15, 2025. CRITICAL FIX: Resolved Daily Stock & Sales form validation errors making food inventory fields required
+- July 15, 2025. Fixed form validation schema to make all freshFood fields optional using z.object() with individual optional fields instead of z.record()
+- July 15, 2025. Updated form default values to use empty objects {} instead of populated inventory maps to prevent validation conflicts
+- July 15, 2025. Backend validation confirmed working correctly - forms can submit with empty food objects without errors
 ```
 
 ## User Preferences

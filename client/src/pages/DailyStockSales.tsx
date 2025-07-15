@@ -147,8 +147,19 @@ const formSchema = z.object({
   wageEntries: z.array(wageEntrySchema).default([]),
   shoppingEntries: z.array(shoppingEntrySchema).default([]),
   
-  // Objects for inventory - made optional
-  freshFood: z.record(z.number().min(0)).optional().default({}),
+  // Objects for inventory - all fields optional
+  freshFood: z.object({
+    salad: z.number().min(0).optional(),
+    tomatos: z.number().min(0).optional(),
+    whiteCabbage: z.number().min(0).optional(),
+    purpleCabbage: z.number().min(0).optional(),
+    onions: z.number().min(0).optional(),
+    baconShort: z.number().min(0).optional(),
+    baconLong: z.number().min(0).optional(),
+    cheese: z.number().min(0).optional(),
+    milk: z.number().min(0).optional(),
+    butter: z.number().min(0).optional(),
+  }).optional().default({}),
   frozenFood: z.record(z.number().min(0)).optional().default({}),
   shelfItems: z.record(z.number().min(0)).optional().default({}),
   foodItems: z.record(z.number().min(0)).optional().default({}),
@@ -228,13 +239,13 @@ export default function DailyStockSales() {
       rollsOrderedCount: 0,
       meatWeight: "0",
       rollsOrderedConfirmed: false,
-      freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
-      frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
-      shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+      freshFood: {},
+      frozenFood: {},
+      shelfItems: {},
       foodItems: {},
-      drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
-      kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
-      packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
+      drinkStock: {},
+      kitchenItems: {},
+      packagingItems: {}
     }
   });
 
@@ -287,13 +298,13 @@ export default function DailyStockSales() {
         rollsOrderedCount: 0,
         meatWeight: "0",
         rollsOrderedConfirmed: false,
-        freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
-        frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
-        shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+        freshFood: {},
+        frozenFood: {},
+        shelfItems: {},
         foodItems: {},
-        drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
-        kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
-        packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0]))
+        drinkStock: {},
+        kitchenItems: {},
+        packagingItems: {}
       });
       
       // Show prominent success message
@@ -1374,7 +1385,7 @@ export default function DailyStockSales() {
                             type="number" 
                             min="0" 
                             className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
                             value={field.value || ''}
                           />
                         </FormControl>
@@ -1394,7 +1405,7 @@ export default function DailyStockSales() {
                             type="number" 
                             min="0" 
                             className="h-8"
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
                             value={field.value || ''}
                           />
                         </FormControl>
