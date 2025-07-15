@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trash2, Plus, Bot, Send, Truck, Apple, Pizza, Croissant, History, Calendar, CheckCircle, DollarSign } from "lucide-react";
+import { Trash2, Plus, Bot, Send, Truck, Apple, Pizza, Croissant, History, Calendar, CheckCircle, DollarSign, Snowflake, Package, Droplets, ChefHat, ShoppingBag, Utensils } from "lucide-react";
 import { api, mutations } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -169,16 +169,36 @@ export default function ShoppingList() {
     });
   };
 
-  const getItemIcon = (itemName: string) => {
-    const name = itemName.toLowerCase();
-    if (name.includes('tomato') || name.includes('apple') || name.includes('produce')) {
-      return <Apple className="text-gray-600" />;
-    } else if (name.includes('cheese') || name.includes('dairy')) {
-      return <Pizza className="text-gray-600" />;
-    } else if (name.includes('bread') || name.includes('flour') || name.includes('dough')) {
-      return <Croissant className="text-gray-600" />;
+  const getItemIcon = (item: any) => {
+    // Use the notes field to determine category
+    const notes = item.notes?.toLowerCase() || '';
+    
+    if (notes.includes('fresh food')) {
+      return <Apple className="text-green-600" />;
+    } else if (notes.includes('frozen food')) {
+      return <Snowflake className="text-blue-600" />;
+    } else if (notes.includes('shelf items')) {
+      return <Package className="text-amber-600" />;
+    } else if (notes.includes('drink stock')) {
+      return <Droplets className="text-cyan-600" />;
+    } else if (notes.includes('kitchen items')) {
+      return <ChefHat className="text-purple-600" />;
+    } else if (notes.includes('packaging items')) {
+      return <ShoppingBag className="text-gray-600" />;
+    } else if (notes.includes('stock count')) {
+      // For main stock items (burger buns, meat, rolls)
+      if (item.itemName?.toLowerCase().includes('bun')) {
+        return <Croissant className="text-orange-600" />;
+      } else if (item.itemName?.toLowerCase().includes('meat')) {
+        return <Utensils className="text-red-600" />;
+      } else if (item.itemName?.toLowerCase().includes('roll')) {
+        return <Croissant className="text-orange-600" />;
+      }
+      return <Package className="text-gray-600" />;
     }
-    return <Apple className="text-gray-600" />;
+    
+    // Fallback icon
+    return <Package className="text-gray-600" />;
   };
 
   const getPriorityColor = (priority: string) => {
@@ -337,7 +357,7 @@ export default function ShoppingList() {
                           />
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                              {getItemIcon(item.itemName)}
+                              {getItemIcon(item)}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
