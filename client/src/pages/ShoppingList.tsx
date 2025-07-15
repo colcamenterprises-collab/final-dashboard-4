@@ -349,52 +349,49 @@ export default function ShoppingList() {
                 <CardContent>
                   <div className="space-y-4">
                     {shoppingList?.map((item) => (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors space-y-3 sm:space-y-0">
-                        <div className="flex items-center space-x-3 sm:space-x-4">
-                          <Checkbox
-                            checked={item.selected || selectedItems.includes(item.id)}
-                            onCheckedChange={(checked) => handleCheckboxChange(item.id, checked as boolean)}
-                          />
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                              {getItemIcon(item)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
-                              <p className="text-xs text-gray-500 truncate">{item.supplier}</p>
-                              {item.estimatedCost && parseFloat(item.estimatedCost) > 0 && (
-                                <p className="text-xs text-green-600 font-medium">
-                                  Est: {formatCurrency(parseFloat(item.estimatedCost))}
-                                </p>
-                              )}
+                      <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        {/* Mobile-first layout */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-3 flex-1">
+                            <Checkbox
+                              checked={item.selected || selectedItems.includes(item.id)}
+                              onCheckedChange={(checked) => handleCheckboxChange(item.id, checked as boolean)}
+                              className="mt-1"
+                            />
+                            <div className="flex items-center space-x-3 flex-1">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                {getItemIcon(item)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 break-words">{item.itemName}</p>
+                                <p className="text-xs text-gray-500 mt-1">{item.supplier}</p>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mt-2">
+                                  <span className="text-sm font-medium text-gray-900">{item.quantity} {item.unit}</span>
+                                  {item.estimatedCost && parseFloat(item.estimatedCost) > 0 && (
+                                    <span className="text-sm text-green-600 font-medium">
+                                      Est: {formatCurrency(parseFloat(item.estimatedCost))}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4">
-                          <div className="text-left sm:text-right">
-                            <p className="text-sm font-medium text-gray-900">{item.quantity} {item.unit}</p>
-                            <p className="text-xs text-gray-500">
-                              ฿{item.pricePerUnit || (getEstimatedCost(item) / parseFloat(item.quantity || '1')).toFixed(2)}/{item.unit}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2 sm:space-x-3">
-                            <Badge variant="secondary" className={`text-xs ${getPriorityColor(item.priority)}`}>
-                              {item.priority === 'high' ? 'High' : 
-                               item.priority === 'medium' ? 'Med' : 'Low'}
+                          <div className="flex items-center space-x-2 ml-3">
+                            <Badge className={`${getPriorityColor(item.priority)} text-xs`}>
+                              {item.priority}
                             </Badge>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteItem(item.id)}
-                              className="text-gray-400 hover:text-red-600"
-                              disabled={deleteItemMutation.isPending}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                  </div>
-                ))}
+                      </div>
+                    ))}
                 
                 {(!shoppingList || shoppingList.length === 0) && (
                   <div className="text-center py-8">
