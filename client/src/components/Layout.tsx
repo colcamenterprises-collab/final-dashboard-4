@@ -27,7 +27,6 @@ interface LayoutProps {
 
 const navigationItems = [
   { path: "/", label: "Dashboard", icon: Home },
-  { path: "/simple-stock-form", label: "Simple Stock Form", icon: ClipboardList },
   { path: "/daily-stock-sales", label: "Daily Stock & Sales", icon: ClipboardList },
   { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
   { path: "/recipe-management", label: "Recipe & Ingredient Management", icon: ChefHat },

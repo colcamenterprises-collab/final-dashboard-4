@@ -17,7 +17,7 @@ import Analysis from "@/pages/Analysis";
 import ShiftAnalytics from "@/pages/ShiftAnalytics";
 import WebhookManagement from "@/pages/WebhookManagement";
 import Marketing from "@/pages/Marketing";
-import SimpleStockForm from "@/pages/SimpleStockForm";
+
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -38,7 +38,7 @@ function Router() {
         <Route path="/analysis" component={Analysis} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/marketing" component={Marketing} />
-        <Route path="/simple-stock-form" component={SimpleStockForm} />
+
 
         <Route component={NotFound} />
       </Switch>
