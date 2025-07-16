@@ -211,7 +211,7 @@ export default function DailyStockSales() {
       // Format the data properly like the draft mutation
       const formattedData = {
         ...data,
-        shiftDate: new Date(data.shiftDate).toISOString().split('T')[0], // Format as YYYY-MM-DD
+        shiftDate: new Date(data.shiftDate).toISOString(), // Send as full ISO string
         isDraft: false
       };
       
@@ -326,7 +326,7 @@ export default function DailyStockSales() {
       
       const formattedData = {
         ...data,
-        shiftDate: new Date(data.shiftDate).toISOString().split('T')[0],
+        shiftDate: new Date(data.shiftDate).toISOString(),
         isDraft: true
       };
       

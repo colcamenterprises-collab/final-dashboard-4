@@ -402,6 +402,10 @@ Changelog:
 - July 15, 2025. MOBILE SHOPPING LIST FIX: Fixed mobile responsiveness with card-based layout instead of table
 - July 15, 2025. Added complete drink stock items and packaging items to shopping list from form data
 - July 15, 2025. ISOLATION POLICY: Implemented code isolation practices to prevent working functionality from breaking when updating other sections
+- July 16, 2025. CRITICAL FIX: Resolved Daily Stock & Sales form submission errors completely by fixing field mapping and date formatting
+- July 16, 2025. Fixed database schema mismatch - backend now properly handles both `completedBy`/`shiftType` (frontend) and `name`/`shift` (legacy) field names
+- July 16, 2025. Corrected frontend date formatting - changed from YYYY-MM-DD string to full ISO string format for consistent backend processing
+- July 16, 2025. Verified both draft saving and form submission work correctly via API testing - forms now submit without 500 errors
 ```
 
 ## User Preferences
