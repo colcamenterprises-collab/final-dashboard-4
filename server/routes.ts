@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
+import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 
 
 export function registerRoutes(app: express.Application): Server {
@@ -952,7 +953,8 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-
+  // Enhanced Loyverse API routes
+  app.use("/api/loyverse", loyverseEnhancedRoutes);
 
   // Create and return the HTTP server instance
   const httpServer = createServer(app);
