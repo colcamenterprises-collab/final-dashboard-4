@@ -811,6 +811,8 @@ export class MemStorage implements IStorage {
     const cleanData = {
       ...data,
       shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+      completedBy: data.completedBy || data.name || 'Unknown User', // Map name to completedBy
+      shiftType: data.shiftType || data.shift || 'night', // Map shift to shiftType
       
       // Cash Management - convert empty strings to null
       startingCash: data.startingCash === '' || data.startingCash === undefined ? null : data.startingCash,
