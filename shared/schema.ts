@@ -277,12 +277,6 @@ export const ingredients = pgTable("ingredients", {
   name: text("name").notNull(),
   category: text("category").notNull(),
   supplier: text("supplier").notNull(),
-  brand: text("brand"),
-  costPerItem: decimal("cost_per_item", { precision: 10, scale: 2 }).notNull(),
-  packageQty: text("package_qty").notNull(),
-  measurement: text("measurement").notNull(),
-  minimumStockAmount: text("minimum_stock_amount"),
-  servingSize: text("serving_size"), // For ingredient serving size (measurement)
   // Legacy fields for backwards compatibility
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   packageSize: text("package_size").notNull(),
