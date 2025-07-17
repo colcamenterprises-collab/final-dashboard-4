@@ -304,8 +304,20 @@ export default function DailyStockSales() {
   };
 
   // Auto-calculate total expenses
-  const formatCurrency = (value: string | number) => {
-    return `$${parseFloat(value.toString()).toFixed(2)}`;
+  const formatCurrency = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') {
+      return '$0.00';
+    }
+    try {
+      const numValue = parseFloat(value.toString());
+      if (isNaN(numValue)) {
+        return '$0.00';
+      }
+      return `$${numValue.toFixed(2)}`;
+    } catch (error) {
+      console.warn('Error formatting currency:', error, 'value:', value);
+      return '$0.00';
+    }
   };
 
   const calculateTotalExpenses = () => {
