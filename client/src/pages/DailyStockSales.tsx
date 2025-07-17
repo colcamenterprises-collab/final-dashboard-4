@@ -203,23 +203,29 @@ export default function DailyStockSales() {
   });
 
   // Auto-calculate totals when individual amounts change
-  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash] = form.watch([
-    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales', 'salaryWages', 'shopping', 'gasExpense', 'startingCash'
+  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, totalExpenses] = form.watch([
+    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales', 'salaryWages', 'shopping', 'gasExpense', 'startingCash', 'totalExpenses'
   ]);
 
   useEffect(() => {
-    // Calculate total sales - ensure all values are numbers
-    const totalSales = Number(grabSales || 0) + Number(foodPandaSales || 0) + Number(aroiDeeSales || 0) + Number(qrScanSales || 0) + Number(cashSales || 0);
+    // Calculate total sales using reduce for cleaner logic
+    const salesFields = [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales];
+    const totalSales = salesFields.reduce((sum, val) => sum + Number(val || 0), 0);
     form.setValue('totalSales', totalSales);
-    
-    // Calculate total expenses - ensure all values are numbers
-    const totalExpenses = Number(salaryWages || 0) + Number(shopping || 0) + Number(gasExpense || 0);
+  }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, form]);
+
+  useEffect(() => {
+    // Calculate total expenses using reduce for cleaner logic
+    const expenseFields = [salaryWages, shopping, gasExpense];
+    const totalExpenses = expenseFields.reduce((sum, val) => sum + Number(val || 0), 0);
     form.setValue('totalExpenses', totalExpenses);
-    
+  }, [salaryWages, shopping, gasExpense, form]);
+
+  useEffect(() => {
     // Calculate ending cash (startingCash + cashSales - totalExpenses)
-    const endingCash = Number(startingCash || 0) + Number(cashSales || 0) - totalExpenses;
+    const endingCash = Number(startingCash || 0) + Number(cashSales || 0) - Number(totalExpenses || 0);
     form.setValue('endingCash', endingCash);
-  }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, form]);
+  }, [startingCash, cashSales, totalExpenses, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
