@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -69,9 +69,37 @@ function ExpensesMerged() {
   
   // Stock count forms
   const [rollsCount, setRollsCount] = useState("");
-  const [drinkItems, setDrinkItems] = useState([{ name: "", quantity: "" }]);
+  const [rollsPrice, setRollsPrice] = useState("");
+  const [rollsTotal, setRollsTotal] = useState("");
+  const [drinkItems, setDrinkItems] = useState([{ name: "", quantity: "", price: "" }]);
   const [meatType, setMeatType] = useState("");
+  const [meatWeight, setMeatWeight] = useState("");
+  const [meatPricePerKg, setMeatPricePerKg] = useState("");
+  const [meatTotal, setMeatTotal] = useState("");
   const [meatDetails, setMeatDetails] = useState("");
+
+  // Auto-calculation effects
+  useEffect(() => {
+    // Calculate total for rolls
+    const qty = parseFloat(rollsCount);
+    const price = parseFloat(rollsPrice);
+    if (!isNaN(qty) && !isNaN(price)) {
+      setRollsTotal((qty * price).toFixed(2));
+    } else {
+      setRollsTotal("");
+    }
+  }, [rollsCount, rollsPrice]);
+
+  useEffect(() => {
+    // Calculate total for meat
+    const weight = parseFloat(meatWeight);
+    const pricePerKg = parseFloat(meatPricePerKg);
+    if (!isNaN(weight) && !isNaN(pricePerKg)) {
+      setMeatTotal((weight * pricePerKg).toFixed(2));
+    } else {
+      setMeatTotal("");
+    }
+  }, [meatWeight, meatPricePerKg]);
 
   // Queries
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<Expense[]>({
@@ -301,6 +329,8 @@ function ExpensesMerged() {
       });
       setIsRollsDialogOpen(false);
       setRollsCount("");
+      setRollsPrice("");
+      setRollsTotal("");
     },
   });
 
@@ -331,6 +361,9 @@ function ExpensesMerged() {
       });
       setIsMeatDialogOpen(false);
       setMeatType("");
+      setMeatWeight("");
+      setMeatPricePerKg("");
+      setMeatTotal("");
       setMeatDetails("");
     },
   });
@@ -363,22 +396,30 @@ function ExpensesMerged() {
   // Report generation function
   // Stock count handlers
   const handleRollsSubmit = () => {
-    if (!rollsCount) return;
+    if (!rollsCount || !rollsPrice || !rollsTotal) return;
     
     createRollsPurchaseMutation.mutate({
       expenseId: 1, // For now, use a default expense ID
       quantity: parseInt(rollsCount),
+      pricePerUnit: parseFloat(rollsPrice),
+      totalCost: parseFloat(rollsTotal),
       date: new Date().toISOString(),
     });
   };
 
   const handleDrinksSubmit = () => {
     drinkItems.forEach(item => {
-      if (item.name && item.quantity) {
+      if (item.name && item.quantity && item.price) {
+        const quantity = parseInt(item.quantity);
+        const pricePerUnit = parseFloat(item.price);
+        const totalCost = quantity * pricePerUnit;
+        
         createDrinksPurchaseMutation.mutate({
           expenseId: 1, // For now, use a default expense ID
-          itemName: item.name,
-          quantity: parseInt(item.quantity),
+          drinkName: item.name,
+          quantity: quantity,
+          pricePerUnit: pricePerUnit,
+          totalCost: totalCost,
           date: new Date().toISOString(),
         });
       }
@@ -386,18 +427,21 @@ function ExpensesMerged() {
   };
 
   const handleMeatSubmit = () => {
-    if (!meatType || !meatDetails) return;
+    if (!meatType || !meatWeight || !meatPricePerKg || !meatTotal) return;
     
     createMeatPurchaseMutation.mutate({
       expenseId: 1, // For now, use a default expense ID
       meatType: meatType,
-      details: meatDetails,
+      weight: parseFloat(meatWeight),
+      pricePerKg: parseFloat(meatPricePerKg),
+      totalCost: parseFloat(meatTotal),
+      otherDetails: meatDetails,
       date: new Date().toISOString(),
     });
   };
 
   const addDrinkItem = () => {
-    setDrinkItems([...drinkItems, { name: "", quantity: "" }]);
+    setDrinkItems([...drinkItems, { name: "", quantity: "", price: "" }]);
   };
 
   const removeDrinkItem = (index: number) => {
@@ -967,13 +1011,35 @@ function ExpensesMerged() {
                       onChange={(e) => setRollsCount(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rollsPrice">Price Per Unit (฿)</Label>
+                    <Input
+                      id="rollsPrice"
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter price per unit"
+                      value={rollsPrice}
+                      onChange={(e) => setRollsPrice(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rollsTotal">Total Cost (฿)</Label>
+                    <Input
+                      id="rollsTotal"
+                      type="number"
+                      step="0.01"
+                      placeholder="Calculated automatically"
+                      value={rollsTotal}
+                      onChange={(e) => setRollsTotal(e.target.value)}
+                    />
+                  </div>
                   <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={() => setIsRollsDialogOpen(false)}>
                       Cancel
                     </Button>
                     <Button 
                       onClick={handleRollsSubmit}
-                      disabled={!rollsCount || createRollsPurchaseMutation.isPending}
+                      disabled={!rollsCount || !rollsPrice || createRollsPurchaseMutation.isPending}
                     >
                       {createRollsPurchaseMutation.isPending ? 'Saving...' : 'Save'}
                     </Button>
@@ -1008,6 +1074,13 @@ function ExpensesMerged() {
                           placeholder="Quantity"
                           value={item.quantity}
                           onChange={(e) => updateDrinkItem(index, 'quantity', e.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Price per unit"
+                          value={item.price}
+                          onChange={(e) => updateDrinkItem(index, 'price', e.target.value)}
                         />
                         {drinkItems.length > 1 && (
                           <Button variant="outline" size="sm" onClick={() => removeDrinkItem(index)}>
@@ -1062,10 +1135,43 @@ function ExpensesMerged() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="meatDetails">Details</Label>
+                    <Label htmlFor="meatWeight">Weight (kg)</Label>
+                    <Input
+                      id="meatWeight"
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter weight in kg"
+                      value={meatWeight}
+                      onChange={(e) => setMeatWeight(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meatPricePerKg">Price per kg (฿)</Label>
+                    <Input
+                      id="meatPricePerKg"
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter price per kg"
+                      value={meatPricePerKg}
+                      onChange={(e) => setMeatPricePerKg(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meatTotal">Total Cost (฿)</Label>
+                    <Input
+                      id="meatTotal"
+                      type="number"
+                      step="0.01"
+                      placeholder="Calculated automatically"
+                      value={meatTotal}
+                      onChange={(e) => setMeatTotal(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meatDetails">Additional Details</Label>
                     <Textarea
                       id="meatDetails"
-                      placeholder="Enter weight, price, and other details"
+                      placeholder="Enter any additional details (optional)"
                       value={meatDetails}
                       onChange={(e) => setMeatDetails(e.target.value)}
                     />
@@ -1076,7 +1182,7 @@ function ExpensesMerged() {
                     </Button>
                     <Button 
                       onClick={handleMeatSubmit}
-                      disabled={!meatType || !meatDetails || createMeatPurchaseMutation.isPending}
+                      disabled={!meatType || !meatWeight || !meatPricePerKg || createMeatPurchaseMutation.isPending}
                     >
                       {createMeatPurchaseMutation.isPending ? 'Saving...' : 'Save'}
                     </Button>
