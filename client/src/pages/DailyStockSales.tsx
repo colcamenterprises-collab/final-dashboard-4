@@ -75,43 +75,36 @@ const shoppingEntrySchema = z.object({
 });
 
 const formSchema = z.object({
-  // Only require essential fields
-  completedBy: z.string().min(1, "Name is required"),
-  shiftType: z.string().min(1, "Shift type is required"),
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']).optional(), // Optional
   shiftDate: z.date(),
-  
-  // Make all other fields optional with defaults
-  startingCash: z.string().default("0"),
-  endingCash: z.string().default("0"),
-  grabSales: z.string().default("0"),
-  foodPandaSales: z.string().default("0"),
-  aroiDeeSales: z.string().default("0"),
-  qrScanSales: z.string().default("0"),
-  cashSales: z.string().default("0"),
-  totalSales: z.string().default("0"),
-  salaryWages: z.string().default("0"),
-  shopping: z.string().default("0"),
-  gasExpense: z.string().default("0"),
-  totalExpenses: z.string().default("0"),
-  burgerBunsStock: z.number().default(0),
-  rollsOrderedCount: z.number().default(0),
-  meatWeight: z.string().default("0"),
-  drinkStockCount: z.number().default(0),
-  rollsOrderedConfirmed: z.boolean().default(false),
+  startingCash: z.number().min(0).optional(), // Optional
+  endingCash: z.number().min(0).optional(),
+  grabSales: z.number().min(0).optional(),
+  foodPandaSales: z.number().min(0).optional(),
+  aroiDeeSales: z.number().min(0).optional(),
+  qrScanSales: z.number().min(0).optional(),
+  cashSales: z.number().min(0).optional(),
+  totalSales: z.number().min(0).optional(),
+  salaryWages: z.number().min(0).optional(),
+  shopping: z.number().min(0).optional(),
+  gasExpense: z.number().min(0).optional(),
+  totalExpenses: z.number().min(0).optional(),
+  wageEntries: z.array(wageEntrySchema).optional(),
+  shoppingEntries: z.array(z.object({ item: z.string(), amount: z.number().min(0).optional() })).optional(),
+  burgerBunsStock: z.number().min(0).optional(),
+  rollsOrderedCount: z.number().min(0).optional(),
+  meatWeight: z.number().min(0).optional(),
+  drinkStockCount: z.number().min(0).optional(),
+  rollsOrderedConfirmed: z.boolean().optional(),
   expenseDescription: z.string().optional(),
-  
-  // Arrays
-  wageEntries: z.array(wageEntrySchema).default([]),
-  shoppingEntries: z.array(shoppingEntrySchema).default([]),
-  
-  // Objects for inventory - all fields optional, now using dynamic records
-  freshFood: z.record(z.number().min(0)).optional().default({}),
-  frozenFood: z.record(z.number().min(0)).optional().default({}),
-  shelfItems: z.record(z.number().min(0)).optional().default({}),
-  foodItems: z.record(z.number().min(0)).optional().default({}),
-  drinkStock: z.record(z.number().min(0)).optional().default({}),
-  kitchenItems: z.record(z.number().min(0)).optional().default({}),
-  packagingItems: z.record(z.number().min(0)).optional().default({})
+  freshFood: z.record(z.number().min(0).optional()).optional(),
+  frozenFood: z.record(z.number().min(0).optional()).optional(),
+  shelfItems: z.record(z.number().min(0).optional()).optional(),
+  drinkStock: z.record(z.number().min(0).optional()).optional(),
+  kitchenItems: z.record(z.number().min(0).optional()).optional(),
+  packagingItems: z.record(z.number().min(0).optional()).optional(),
+  isDraft: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -173,31 +166,30 @@ export default function DailyStockSales() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       completedBy: "",
-      shiftType: "Night Shift",
+      shiftType: "closing",
       shiftDate: new Date(),
-      startingCash: "0",
-      endingCash: "0",
-      grabSales: "0",
-      foodPandaSales: "0",
-      aroiDeeSales: "0",
-      qrScanSales: "0",
-      cashSales: "0",
-      totalSales: "0",
-      salaryWages: "0",
-      shopping: "0",
-      gasExpense: "0",
-      totalExpenses: "0",
+      startingCash: 0,
+      endingCash: 0,
+      grabSales: 0,
+      foodPandaSales: 0,
+      aroiDeeSales: 0,
+      qrScanSales: 0,
+      cashSales: 0,
+      totalSales: 0,
+      salaryWages: 0,
+      shopping: 0,
+      gasExpense: 0,
+      totalExpenses: 0,
       expenseDescription: "",
       wageEntries: [],
       shoppingEntries: [],
       burgerBunsStock: 0,
       rollsOrderedCount: 0,
-      meatWeight: "0",
+      meatWeight: 0,
       rollsOrderedConfirmed: false,
       freshFood: {},
       frozenFood: {},
       shelfItems: {},
-      foodItems: {},
       drinkStock: {},
       kitchenItems: {},
       packagingItems: {}
@@ -232,31 +224,30 @@ export default function DailyStockSales() {
       // Reset form to default state
       form.reset({
         completedBy: "",
-        shiftType: "",
+        shiftType: "closing",
         shiftDate: new Date(),
-        startingCash: "0",
-        endingCash: "0",
-        grabSales: "0",
-        foodPandaSales: "0",
-        aroiDeeSales: "0",
-        qrScanSales: "0",
-        cashSales: "0",
-        totalSales: "0",
-        salaryWages: "0",
-        shopping: "0",
-        gasExpense: "0",
-        totalExpenses: "0",
+        startingCash: 0,
+        endingCash: 0,
+        grabSales: 0,
+        foodPandaSales: 0,
+        aroiDeeSales: 0,
+        qrScanSales: 0,
+        cashSales: 0,
+        totalSales: 0,
+        salaryWages: 0,
+        shopping: 0,
+        gasExpense: 0,
+        totalExpenses: 0,
         expenseDescription: "",
         wageEntries: [],
         shoppingEntries: [],
         burgerBunsStock: 0,
         rollsOrderedCount: 0,
-        meatWeight: "0",
+        meatWeight: 0,
         rollsOrderedConfirmed: false,
         freshFood: {},
         frozenFood: {},
         shelfItems: {},
-        foodItems: {},
         drinkStock: {},
         kitchenItems: {},
         packagingItems: {}
@@ -439,34 +430,52 @@ export default function DailyStockSales() {
   const onSubmit = (data: FormData) => {
     console.log("Form submission attempt:", data);
     console.log("Form validation errors:", form.formState.errors);
-    console.log("Shopping entries:", data.shoppingEntries);
     
-    // Only check critical validation for non-draft submissions
-    const validationErrors: string[] = [];
+    // Default blanks to 0 for all numeric fields
+    const defaults = {
+      ...data,
+      burgerBunsStock: data.burgerBunsStock || 0,
+      rollsOrderedCount: data.rollsOrderedCount || 0,
+      meatWeight: data.meatWeight || 0,
+      drinkStockCount: data.drinkStockCount || 0,
+      startingCash: data.startingCash || 0,
+      endingCash: data.endingCash || 0,
+      grabSales: data.grabSales || 0,
+      foodPandaSales: data.foodPandaSales || 0,
+      aroiDeeSales: data.aroiDeeSales || 0,
+      qrScanSales: data.qrScanSales || 0,
+      cashSales: data.cashSales || 0,
+      totalSales: data.totalSales || 0,
+      salaryWages: data.salaryWages || 0,
+      shopping: data.shopping || 0,
+      gasExpense: data.gasExpense || 0,
+      totalExpenses: data.totalExpenses || 0,
+      wageEntries: data.wageEntries || [],
+      shoppingEntries: data.shoppingEntries || [],
+      // Default arrays
+      freshFood: data.freshFood ? Object.fromEntries(
+        Object.entries(data.freshFood).map(([key, value]) => [key, value || 0])
+      ) : {},
+      frozenFood: data.frozenFood ? Object.fromEntries(
+        Object.entries(data.frozenFood).map(([key, value]) => [key, value || 0])
+      ) : {},
+      shelfItems: data.shelfItems ? Object.fromEntries(
+        Object.entries(data.shelfItems).map(([key, value]) => [key, value || 0])
+      ) : {},
+      drinkStock: data.drinkStock ? Object.fromEntries(
+        Object.entries(data.drinkStock).map(([key, value]) => [key, value || 0])
+      ) : {},
+      kitchenItems: data.kitchenItems ? Object.fromEntries(
+        Object.entries(data.kitchenItems).map(([key, value]) => [key, value || 0])
+      ) : {},
+      packagingItems: data.packagingItems ? Object.fromEntries(
+        Object.entries(data.packagingItems).map(([key, value]) => [key, value || 0])
+      ) : {},
+      isDraft: false
+    };
     
-    // Check required fields
-    if (!data.completedBy || data.completedBy.trim() === "") {
-      validationErrors.push("Staff member name is required");
-    }
-    if (!data.shiftType || data.shiftType.trim() === "") {
-      validationErrors.push("Shift type must be selected");
-    }
-    
-    // Photo validation removed - photos are now optional
-    
-    // If critical validation fails, show error and don't submit
-    if (validationErrors.length > 0) {
-      toast({
-        title: "Required Fields Missing",
-        description: validationErrors.join(". "),
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log("All validation checks passed, proceeding with form submission");
-    const submissionData = { ...data, isDraft: false };
-    createMutation.mutate(submissionData);
+    console.log("Submitting form with defaults:", defaults);
+    createMutation.mutate(defaults);
   };
 
   return (
@@ -635,8 +644,8 @@ export default function DailyStockSales() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Night Shift">Night Shift</SelectItem>
-                        <SelectItem value="Day Shift">Day Shift</SelectItem>
+                        <SelectItem value="opening">Opening Shift</SelectItem>
+                        <SelectItem value="closing">Closing Shift</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

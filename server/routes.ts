@@ -98,6 +98,11 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Received daily stock sales data:", data);
       
+      // Ensure shiftDate is a Date object
+      if (data.shiftDate && typeof data.shiftDate === 'string') {
+        data.shiftDate = new Date(data.shiftDate);
+      }
+      
       let result;
       
       // Use database transaction to ensure data integrity
@@ -186,6 +191,11 @@ export function registerRoutes(app: express.Application): Server {
       const data = { ...req.body, isDraft: true };
       console.log("Saving draft:", data);
       
+      // Ensure shiftDate is a Date object
+      if (data.shiftDate && typeof data.shiftDate === 'string') {
+        data.shiftDate = new Date(data.shiftDate);
+      }
+      
       const result = await storage.createDailyStockSales(data);
       console.log("✅ Draft saved successfully with ID:", result.id);
       
@@ -202,6 +212,11 @@ export function registerRoutes(app: express.Application): Server {
       const { id } = req.params;
       const data = req.body;
       console.log("Updating daily stock sales:", { id, data });
+      
+      // Ensure shiftDate is a Date object
+      if (data.shiftDate && typeof data.shiftDate === 'string') {
+        data.shiftDate = new Date(data.shiftDate);
+      }
       
       const result = await storage.updateDailyStockSales(parseInt(id), data);
       
