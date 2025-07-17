@@ -830,6 +830,17 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // AI Insights API endpoint
+  app.get("/api/dashboard/ai-insights", async (req: Request, res: Response) => {
+    try {
+      const insights = await storage.getAiInsights();
+      res.json(insights);
+    } catch (err) {
+      console.error("Error fetching AI insights:", err);
+      res.status(500).json({ error: "Failed to fetch AI insights" });
+    }
+  });
+
   // Quick Notes API endpoints
   app.get("/api/quick-notes", async (req: Request, res: Response) => {
     try {
