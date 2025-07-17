@@ -5,7 +5,7 @@ import { EnhancedLoyverseAPI } from './enhancedLoyverseAPI';
 import { AIAnalysisService } from './aiAnalysisService';
 import { LoyverseDataValidator } from './loyverseDataValidator';
 import { db } from '../db';
-import { loyverseReceipts, loyverseShiftReports, aiInsights } from '../../shared/schema';
+import { loyverseReceipts, loyverseShiftReports, aiInsights, dailyStockSales } from '../../shared/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
 const logger = winston.createLogger({
@@ -61,6 +61,19 @@ export class LoyverseDataOrchestrator {
     return LoyverseDataOrchestrator.instance;
   }
 
+  // New Webhook Process Method
+  static async processReceipt(receipt: any) {
+    const instance = this.getInstance();
+    const shiftDate = new Date(receipt.receipt_date); // Calculate BKK shift
+    await instance.storeReceiptInDatabase(receipt, shiftDate);
+    
+    // Trigger partial analysis if threshold, else queue
+    const receipts = await db.select().from(loyverseReceipts).where(eq(loyverseReceipts.shiftDate, shiftDate));
+    if (receipts.length % 10 === 0) {
+      await instance.processShiftData(shiftDate);
+    }
+  }
+
   // Process complete shift data (receipts + analysis)
   async processShiftData(shiftDate: Date): Promise<ProcessingResult> {
     if (this.isProcessing) {
@@ -110,6 +123,15 @@ export class LoyverseDataOrchestrator {
         logger.info(`AI analysis completed with ${analysis.anomalies.length} anomalies detected`);
       } catch (error) {
         errors.push(`AI analysis failed: ${error}`);
+      }
+
+      // Step 5: Staff form comparison
+      const staffForm = await db.select().from(dailyStockSales).where(eq(dailyStockSales.shiftDate, shiftDate));
+      if (staffForm.length) {
+        const posTotal = receiptResult.receipts.reduce((sum, r) => sum + r.total_money, 0);
+        if (Math.abs(posTotal - parseFloat(staffForm[0].totalSales || '0')) > 50) {
+          errors.push(`Staff vs POS mismatch: ${posTotal} vs ${staffForm[0].totalSales}`);
+        }
       }
 
       // Step 5: Validate data consistency
@@ -162,50 +184,45 @@ export class LoyverseDataOrchestrator {
 
   // Store receipt in database with enhanced error handling
   private async storeReceiptInDatabase(receipt: any, shiftDate: Date): Promise<void> {
-    const receiptDate = new Date(receipt.receipt_date);
-    
-    // Calculate shift date for Bangkok timezone (5pm-3am cycle)
-    const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
-    const calculatedShiftDate = new Date(bangkokTime);
-    
-    if (bangkokTime.getHours() < 17) {
-      calculatedShiftDate.setDate(calculatedShiftDate.getDate() - 1);
-    }
-    calculatedShiftDate.setHours(17, 0, 0, 0);
-    
-    // Convert back to UTC
-    const utcShiftDate = new Date(calculatedShiftDate.getTime() - (7 * 60 * 60 * 1000));
+    await db.transaction(async (tx) => {
+      const existingReceipt = await tx.select().from(loyverseReceipts).where(eq(loyverseReceipts.receiptId, receipt.id)).limit(1);
+      if (existingReceipt.length) return;
+      
+      const receiptDate = new Date(receipt.receipt_date);
+      
+      // Calculate shift date for Bangkok timezone (5pm-3am cycle)
+      const bangkokTime = new Date(receiptDate.getTime() + (7 * 60 * 60 * 1000));
+      const calculatedShiftDate = new Date(bangkokTime);
+      
+      if (bangkokTime.getHours() < 17) {
+        calculatedShiftDate.setDate(calculatedShiftDate.getDate() - 1);
+      }
+      calculatedShiftDate.setHours(17, 0, 0, 0);
+      
+      // Convert back to UTC
+      const utcShiftDate = new Date(calculatedShiftDate.getTime() - (7 * 60 * 60 * 1000));
 
-    // Check if receipt already exists
-    const existingReceipt = await db.select()
-      .from(loyverseReceipts)
-      .where(eq(loyverseReceipts.receiptId, receipt.id))
-      .limit(1);
+      // Prepare receipt data
+      const receiptData = {
+        receiptId: receipt.id,
+        receiptNumber: receipt.receipt_number,
+        receiptDate: receiptDate,
+        totalAmount: receipt.total_money.toString(),
+        paymentMethod: receipt.payments[0]?.payment_type_id || 'Unknown',
+        customerInfo: receipt.customer_id ? { id: receipt.customer_id } : null,
+        items: receipt.line_items,
+        taxAmount: (receipt.total_tax || 0).toString(),
+        discountAmount: (receipt.total_discount || 0).toString(),
+        staffMember: receipt.employee_id || null,
+        tableNumber: null,
+        shiftDate: utcShiftDate,
+        rawData: receipt,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-    if (existingReceipt.length > 0) {
-      return; // Skip if already exists
-    }
-
-    // Prepare receipt data
-    const receiptData = {
-      receiptId: receipt.id,
-      receiptNumber: receipt.receipt_number,
-      receiptDate: receiptDate,
-      totalAmount: receipt.total_money.toString(),
-      paymentMethod: receipt.payments[0]?.payment_type_id || 'Unknown',
-      customerInfo: receipt.customer_id ? { id: receipt.customer_id } : null,
-      items: receipt.line_items,
-      taxAmount: (receipt.total_tax || 0).toString(),
-      discountAmount: (receipt.total_discount || 0).toString(),
-      staffMember: receipt.employee_id || null,
-      tableNumber: null,
-      shiftDate: utcShiftDate,
-      rawData: receipt,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    await db.insert(loyverseReceipts).values(receiptData);
+      await tx.insert(loyverseReceipts).values(receiptData);
+    });
   }
 
   // Generate shift report from receipts

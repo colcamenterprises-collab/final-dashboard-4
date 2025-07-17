@@ -5,6 +5,9 @@ import winston from 'winston';
 import { db } from '../db';
 import { recipes, recipeIngredients, ingredients, aiInsights, dailyStockSales } from '../../shared/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
+// For auto-ordering alerts
+// import { Client } from '@line/bot-sdk';
+// const lineClient = new Client({ channelAccessToken: process.env.LINE_TOKEN });
 
 const logger = winston.createLogger({
   level: 'info',
@@ -113,6 +116,30 @@ export class AIAnalysisService {
       
       // Generate AI recommendations
       const recommendations = await this.generateRecommendations(receipts, itemAnalysis, ingredientUsage);
+      
+      // Add marketing content generation
+      const topItems = itemAnalysis.slice(0, 5);
+      const marketingContent = await this.generateMarketingContent(topItems);
+      recommendations.push(...marketingContent.recommendations);
+      
+      // Add finance forecast
+      const financeForecast = await this.forecastExpenses(ingredientUsage);
+      recommendations.push(...financeForecast.recommendations);
+      
+      // Auto-order low stock (commented out until LINE_TOKEN is available)
+      /*
+      for (const ing of ingredientUsage) {
+        if (ing.quantityUsed > (ing.stock || 0) * 0.9) { // Threshold
+          await lineClient.pushMessage({ 
+            to: 'supplier_group', 
+            messages: [{ 
+              type: 'text', 
+              text: `Order ${ing.name}: ${ing.quantityUsed + 20} ${ing.unit}` 
+            }] 
+          });
+        }
+      }
+      */
       
       // Compare with previous shift
       const comparisonWithPrevious = await this.compareWithPreviousShift(shiftDate, totalSales, totalOrders, itemAnalysis);
@@ -651,6 +678,77 @@ export class AIAnalysisService {
     } catch (error) {
       logger.error('Failed to store analysis:', error);
     }
+  }
+
+  // New Marketing Agent Method
+  private async generateMarketingContent(topItems: ItemAnalysis[]): Promise<{ recommendations: string[] }> {
+    try {
+      const prompt = `Generate social media posts and ad content for these top-selling items: ${JSON.stringify(topItems.map(item => ({ name: item.itemName, sales: item.totalSales, quantity: item.quantity })))}.
+      
+      Focus on:
+      1. Engaging social media captions
+      2. Promotional offers to increase sales
+      3. Highlighting popular items
+      4. Creating urgency and appetite appeal
+      
+      Return a JSON array of marketing recommendations.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1000
+      });
+
+      const aiResponse = response.choices[0]?.message?.content;
+      if (aiResponse) {
+        try {
+          return { recommendations: JSON.parse(aiResponse) };
+        } catch (parseError) {
+          logger.error('Failed to parse marketing content response:', parseError);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to generate marketing content:', error);
+    }
+
+    return { recommendations: ['Consider promoting top-selling items on social media platforms'] };
+  }
+
+  // New Finance Agent Method
+  private async forecastExpenses(usage: IngredientUsage[]): Promise<{ recommendations: string[] }> {
+    try {
+      const prompt = `Forecast expenses from ingredient usage data: ${JSON.stringify(usage)}.
+      
+      Analyze:
+      1. Cost trends and patterns
+      2. Predict next week's expenses
+      3. Identify cost-saving opportunities
+      4. Budget recommendations
+      5. Supplier negotiation suggestions
+      
+      Return a JSON array of financial recommendations.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1000
+      });
+
+      const aiResponse = response.choices[0]?.message?.content;
+      if (aiResponse) {
+        try {
+          return { recommendations: JSON.parse(aiResponse) };
+        } catch (parseError) {
+          logger.error('Failed to parse finance forecast response:', parseError);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to generate finance forecast:', error);
+    }
+
+    return { recommendations: ['Monitor ingredient costs and seek supplier alternatives for cost optimization'] };
   }
 }
 

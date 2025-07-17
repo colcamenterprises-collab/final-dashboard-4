@@ -3,6 +3,11 @@ import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
+import crypto from "crypto"; // For webhook signature
+import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
+import { db } from "./db"; // For transactions
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema } from "../shared/schema"; // Adjust path
+import { z } from "zod";
 
 
 export function registerRoutes(app: express.Application): Server {
@@ -93,7 +98,7 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Received daily stock sales data:", data);
       
-      // ONLY save the form - nothing else should block this
+      // ONLY save the form using existing storage method first
       const result = await storage.createDailyStockSales(data);
       console.log("✅ Form saved successfully with ID:", result.id);
       
@@ -950,6 +955,34 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error deleting ingredient:", err);
       res.status(500).json({ error: "Failed to delete ingredient" });
+    }
+  });
+
+  // New Webhook Route (Direct to Replit)
+  app.post("/api/loyverse-webhook", async (req: Request, res: Response) => {
+    try {
+      const secret = process.env.LOYVERSE_WEBHOOK_SECRET;
+      if (!secret) {
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+      }
+      
+      const signature = req.headers['x-loyverse-signature'] as string;
+      const payload = JSON.stringify(req.body);
+      const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+      
+      if (`sha256=${hmac}` !== signature) {
+        return res.status(403).json({ error: 'Invalid signature' });
+      }
+      
+      const event = req.body.event;
+      if (event === 'receipts.created') {
+        await LoyverseDataOrchestrator.processReceipt(req.body.data);
+      }
+      
+      res.status(200).json({ success: true });
+    } catch (err) {
+      console.error("Error processing webhook:", err);
+      res.status(500).json({ error: "Failed to process webhook" });
     }
   });
 

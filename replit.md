@@ -4,6 +4,21 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
+## Recent Changes (July 17, 2025)
+
+### Enhanced Transaction Support & Webhook Integration
+- **Database Transaction Support**: Updated daily stock sales form submission to use atomic database transactions, ensuring data integrity when saving form data and related shopping list entries
+- **Loyverse Webhook Integration**: Added webhook endpoint `/api/loyverse-webhook` to handle real-time receipt processing from Loyverse POS system
+- **AI Analysis Enhancements**: Expanded AI analysis service with marketing content generation and financial forecasting agents
+- **Staff vs POS Comparison**: Added automated comparison between staff-reported sales and POS system data for variance detection
+
+### Technical Improvements
+- **Transaction Safety**: All form submissions now use database transactions to prevent partial data saves
+- **Webhook Processing**: Real-time receipt processing with signature verification for secure webhook handling
+- **Marketing Agent**: AI-powered generation of social media posts and promotional content based on top-selling items
+- **Finance Agent**: Automated expense forecasting and cost optimization recommendations
+- **Auto-ordering Alerts**: Framework for automatic supplier notifications when stock levels are low (LINE integration ready)
+
 ## System Architecture
 
 ### Frontend Architecture
