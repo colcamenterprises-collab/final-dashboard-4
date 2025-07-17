@@ -196,15 +196,24 @@ export default function DailyStockSales() {
     }
   });
 
-  // Auto-calculate total sales when individual sales amounts change
-  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales] = form.watch([
-    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales'
+  // Auto-calculate totals when individual amounts change
+  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash] = form.watch([
+    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales', 'salaryWages', 'shopping', 'gasExpense', 'startingCash'
   ]);
 
   useEffect(() => {
-    const total = (grabSales || 0) + (foodPandaSales || 0) + (aroiDeeSales || 0) + (qrScanSales || 0) + (cashSales || 0);
-    form.setValue('totalSales', total);
-  }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, form]);
+    // Calculate total sales
+    const totalSales = (grabSales || 0) + (foodPandaSales || 0) + (aroiDeeSales || 0) + (qrScanSales || 0) + (cashSales || 0);
+    form.setValue('totalSales', totalSales);
+    
+    // Calculate total expenses
+    const totalExpenses = (salaryWages || 0) + (shopping || 0) + (gasExpense || 0);
+    form.setValue('totalExpenses', totalExpenses);
+    
+    // Calculate ending cash (startingCash + cashSales - totalExpenses)
+    const endingCash = (startingCash || 0) + (cashSales || 0) - totalExpenses;
+    form.setValue('endingCash', endingCash);
+  }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
@@ -292,17 +301,7 @@ export default function DailyStockSales() {
     }
   });
 
-  // Auto-calculate total sales
-  const calculateTotalSales = () => {
-    const grab = parseFloat(form.getValues('grabSales') || '0');
-    const foodPanda = parseFloat(form.getValues('foodPandaSales') || '0');
-    const aroiDee = parseFloat(form.getValues('aroiDeeSales') || '0');
-    const qrScan = parseFloat(form.getValues('qrScanSales') || '0');
-    const cash = parseFloat(form.getValues('cashSales') || '0');
-    
-    const total = grab + foodPanda + aroiDee + qrScan + cash;
-    form.setValue('totalSales', total.toFixed(2));
-  };
+
 
   // Auto-calculate total expenses
   const formatCurrency = (value: string | number | null | undefined) => {
@@ -321,14 +320,7 @@ export default function DailyStockSales() {
     }
   };
 
-  const calculateTotalExpenses = () => {
-    const salary = parseFloat(form.getValues('salaryWages') || '0');
-    const shopping = parseFloat(form.getValues('shopping') || '0');
-    const gas = parseFloat(form.getValues('gasExpense') || '0');
-    
-    const total = salary + shopping + gas;
-    form.setValue('totalExpenses', total.toFixed(2));
-  };
+
 
   // Photo functions removed - no longer required
   
@@ -733,10 +725,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalSales, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -756,10 +744,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalSales, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -779,10 +763,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalSales, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -802,10 +782,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalSales, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -825,10 +801,6 @@ export default function DailyStockSales() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setTimeout(calculateTotalSales, 100);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />

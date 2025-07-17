@@ -6,6 +6,13 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (July 17, 2025)
 
+### Enhanced Form Auto-Calculation & Validation System
+- **Real-time Auto-Calculation**: Implemented complete auto-calculation system using useEffect and form.watch() for total sales, total expenses, and ending cash
+- **Advanced Form Validation**: Enhanced Zod schema with z.coerce.number() for automatic string-to-number conversion with default values (0)
+- **Comprehensive Numeric Parsing**: Updated all API endpoints (POST, PUT, draft) with consistent numeric field parsing for 16 numeric fields
+- **Improved User Experience**: Removed manual calculation functions and simplified form inputs with type="number" for better mobile experience
+- **Data Integrity**: All form submissions now handle mixed string/number inputs seamlessly with proper validation and error handling
+
 ### Comprehensive Workflow Implementation & Automation
 - **Enhanced Form Workflow**: Implemented complete end-to-end form submission workflow with database transactions for data integrity
 - **Automated Shopping List Generation**: Enhanced form processing to automatically generate shopping lists from inventory requirements (items >0 only)
