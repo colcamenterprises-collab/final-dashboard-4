@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -78,32 +78,32 @@ const formSchema = z.object({
   completedBy: z.string().min(1, "Required"),
   shiftType: z.enum(['opening', 'closing']).optional(), // Optional
   shiftDate: z.date(),
-  startingCash: z.number().min(0).optional(), // Optional
-  endingCash: z.number().min(0).optional(),
-  grabSales: z.number().min(0).optional(),
-  foodPandaSales: z.number().min(0).optional(),
-  aroiDeeSales: z.number().min(0).optional(),
-  qrScanSales: z.number().min(0).optional(),
-  cashSales: z.number().min(0).optional(),
-  totalSales: z.number().min(0).optional(),
-  salaryWages: z.number().min(0).optional(),
-  shopping: z.number().min(0).optional(),
-  gasExpense: z.number().min(0).optional(),
-  totalExpenses: z.number().min(0).optional(),
+  startingCash: z.coerce.number().min(0).optional().default(0),
+  endingCash: z.coerce.number().min(0).optional().default(0),
+  grabSales: z.coerce.number().min(0).optional().default(0),
+  foodPandaSales: z.coerce.number().min(0).optional().default(0),
+  aroiDeeSales: z.coerce.number().min(0).optional().default(0),
+  qrScanSales: z.coerce.number().min(0).optional().default(0),
+  cashSales: z.coerce.number().min(0).optional().default(0),
+  totalSales: z.coerce.number().min(0).optional().default(0),
+  salaryWages: z.coerce.number().min(0).optional().default(0),
+  shopping: z.coerce.number().min(0).optional().default(0),
+  gasExpense: z.coerce.number().min(0).optional().default(0),
+  totalExpenses: z.coerce.number().min(0).optional().default(0),
   wageEntries: z.array(wageEntrySchema).optional(),
-  shoppingEntries: z.array(z.object({ item: z.string(), amount: z.number().min(0).optional() })).optional(),
-  burgerBunsStock: z.number().min(0).optional(),
-  rollsOrderedCount: z.number().min(0).optional(),
-  meatWeight: z.number().min(0).optional(),
-  drinkStockCount: z.number().min(0).optional(),
+  shoppingEntries: z.array(z.object({ item: z.string(), amount: z.coerce.number().min(0).optional().default(0) })).optional(),
+  burgerBunsStock: z.coerce.number().min(0).optional().default(0),
+  rollsOrderedCount: z.coerce.number().min(0).optional().default(0),
+  meatWeight: z.coerce.number().min(0).optional().default(0),
+  drinkStockCount: z.coerce.number().min(0).optional().default(0),
   rollsOrderedConfirmed: z.boolean().optional(),
   expenseDescription: z.string().optional(),
-  freshFood: z.record(z.number().min(0).optional()).optional(),
-  frozenFood: z.record(z.number().min(0).optional()).optional(),
-  shelfItems: z.record(z.number().min(0).optional()).optional(),
-  drinkStock: z.record(z.number().min(0).optional()).optional(),
-  kitchenItems: z.record(z.number().min(0).optional()).optional(),
-  packagingItems: z.record(z.number().min(0).optional()).optional(),
+  freshFood: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
+  frozenFood: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
+  shelfItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
+  drinkStock: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
+  kitchenItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
+  packagingItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
   isDraft: z.boolean().optional(),
 });
 
@@ -195,6 +195,16 @@ export default function DailyStockSales() {
       packagingItems: {}
     }
   });
+
+  // Auto-calculate total sales when individual sales amounts change
+  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales] = form.watch([
+    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales'
+  ]);
+
+  useEffect(() => {
+    const total = (grabSales || 0) + (foodPandaSales || 0) + (aroiDeeSales || 0) + (qrScanSales || 0) + (cashSales || 0);
+    form.setValue('totalSales', total);
+  }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {

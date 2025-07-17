@@ -103,6 +103,20 @@ export function registerRoutes(app: express.Application): Server {
         data.shiftDate = new Date(data.shiftDate);
       }
       
+      // Parse numeric fields to ensure proper number types
+      const numericFields = [
+        'startingCash', 'endingCash', 'grabSales', 'foodPandaSales', 'aroiDeeSales', 
+        'qrScanSales', 'cashSales', 'totalSales', 'salaryWages', 'shopping', 
+        'gasExpense', 'totalExpenses', 'burgerBunsStock', 'rollsOrderedCount', 
+        'meatWeight', 'drinkStockCount'
+      ];
+      
+      numericFields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null) {
+          data[field] = parseFloat(data[field] || '0');
+        }
+      });
+      
       let result;
       
       // Use database transaction to ensure data integrity
@@ -196,6 +210,20 @@ export function registerRoutes(app: express.Application): Server {
         data.shiftDate = new Date(data.shiftDate);
       }
       
+      // Parse numeric fields to ensure proper number types
+      const numericFields = [
+        'startingCash', 'endingCash', 'grabSales', 'foodPandaSales', 'aroiDeeSales', 
+        'qrScanSales', 'cashSales', 'totalSales', 'salaryWages', 'shopping', 
+        'gasExpense', 'totalExpenses', 'burgerBunsStock', 'rollsOrderedCount', 
+        'meatWeight', 'drinkStockCount'
+      ];
+      
+      numericFields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null) {
+          data[field] = parseFloat(data[field] || '0');
+        }
+      });
+      
       const result = await storage.createDailyStockSales(data);
       console.log("✅ Draft saved successfully with ID:", result.id);
       
@@ -217,6 +245,20 @@ export function registerRoutes(app: express.Application): Server {
       if (data.shiftDate && typeof data.shiftDate === 'string') {
         data.shiftDate = new Date(data.shiftDate);
       }
+      
+      // Parse numeric fields to ensure proper number types
+      const numericFields = [
+        'startingCash', 'endingCash', 'grabSales', 'foodPandaSales', 'aroiDeeSales', 
+        'qrScanSales', 'cashSales', 'totalSales', 'salaryWages', 'shopping', 
+        'gasExpense', 'totalExpenses', 'burgerBunsStock', 'rollsOrderedCount', 
+        'meatWeight', 'drinkStockCount'
+      ];
+      
+      numericFields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null) {
+          data[field] = parseFloat(data[field] || '0');
+        }
+      });
       
       const result = await storage.updateDailyStockSales(parseInt(id), data);
       
