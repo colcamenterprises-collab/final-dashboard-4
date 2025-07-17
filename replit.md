@@ -6,11 +6,19 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (July 17, 2025)
 
+### Manual Cash Register System Implementation
+- **Removed Auto-Calculation**: Eliminated automatic calculation for ending cash register amount - now requires manual staff input
+- **Enhanced Security Monitoring**: Implemented cash validation system that compares manual input against calculated amount (starting cash + cash sales - expenses)
+- **Warning System**: Added toast notifications that alert staff when manual cash doesn't match calculated amount but allows form submission to proceed
+- **Backend Anomaly Logging**: Added comprehensive security logging that records cash discrepancies with detailed breakdown for fraud detection
+- **Proactive Data Update Script**: Created sync-data.js script for comprehensive Loyverse receipt synchronization and stock level updates
+- **Stock Management APIs**: Added new endpoints (/api/stock, /api/top-sales, /api/shift-summary, /api/loyverse/pull) for real-time inventory tracking
+
 ### Enhanced Form Auto-Calculation & Validation System
-- **Real-time Auto-Calculation**: Implemented complete auto-calculation system using useEffect and form.watch() for total sales, total expenses, and ending cash
+- **Real-time Auto-Calculation**: Maintained auto-calculation system for total sales and total expenses while removing ending cash calculation
 - **Advanced Form Validation**: Enhanced Zod schema with z.coerce.number() for automatic string-to-number conversion with default values (0)
 - **Comprehensive Numeric Parsing**: Updated all API endpoints (POST, PUT, draft) with consistent numeric field parsing for 16 numeric fields
-- **Improved User Experience**: Removed manual calculation functions and simplified form inputs with type="number" for better mobile experience
+- **Improved User Experience**: Simplified form inputs with type="number" for better mobile experience
 - **Data Integrity**: All form submissions now handle mixed string/number inputs seamlessly with proper validation and error handling
 
 ### Comprehensive Workflow Implementation & Automation

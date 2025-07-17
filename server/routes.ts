@@ -6,8 +6,9 @@ import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary } from "../shared/schema"; // Adjust path
 import { z } from "zod";
+import { eq, desc, sql } from "drizzle-orm";
 
 
 export function registerRoutes(app: express.Application): Server {
@@ -1108,6 +1109,80 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error deleting ingredient:", err);
       res.status(500).json({ error: "Failed to delete ingredient" });
+    }
+  });
+
+  // Stock and Sales Data API endpoints
+  app.get("/api/stock", async (req: Request, res: Response) => {
+    try {
+      const stock = await db.select().from(inventory)
+        .where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`);
+      res.json(stock);
+    } catch (error) {
+      console.error("Error fetching stock:", error);
+      res.status(500).json({ error: "Failed to fetch stock data" });
+    }
+  });
+
+  app.get("/api/top-sales", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const topSales = await db.select({
+        itemName: shiftItemSales.itemName,
+        totalQuantity: sql`SUM(${shiftItemSales.quantity})`.as('total_quantity'),
+        totalSales: sql`SUM(${shiftItemSales.salesTotal})`.as('total_sales')
+      })
+      .from(shiftItemSales)
+      .where(eq(shiftItemSales.shiftDate, today))
+      .groupBy(shiftItemSales.itemName)
+      .orderBy(desc(sql`SUM(${shiftItemSales.salesTotal})`))
+      .limit(5);
+      
+      res.json(topSales);
+    } catch (error) {
+      console.error("Error fetching top sales:", error);
+      res.status(500).json({ error: "Failed to fetch top sales data" });
+    }
+  });
+
+  app.get("/api/shift-summary", async (req: Request, res: Response) => {
+    try {
+      const summary = await db.select().from(dailyShiftSummary)
+        .orderBy(desc(dailyShiftSummary.shiftDate))
+        .limit(1);
+      
+      res.json(summary.length > 0 ? summary[0] : null);
+    } catch (error) {
+      console.error("Error fetching shift summary:", error);
+      res.status(500).json({ error: "Failed to fetch shift summary" });
+    }
+  });
+
+  app.post("/api/loyverse/pull", async (req: Request, res: Response) => {
+    try {
+      console.log("🔄 Manual Loyverse data pull requested");
+      
+      // Import and run the sync script functionality
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      
+      const { stdout, stderr } = await execAsync('node server/sync-data.js');
+      
+      if (stderr) {
+        console.error("Sync script stderr:", stderr);
+      }
+      
+      console.log("Sync script output:", stdout);
+      
+      res.json({ 
+        success: true, 
+        message: "Data sync completed successfully",
+        output: stdout
+      });
+    } catch (error) {
+      console.error("Error during manual sync:", error);
+      res.status(500).json({ error: "Failed to sync data", details: error.message });
     }
   });
 

@@ -1,0 +1,108 @@
+Proactive Data Update Script: Run this in Replit terminal to sync latest Loyverse receipts, update shift summary/stock, recalculate top sales: node server/sync-data.js. Full script below.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { db } from '../db';
+import { loyverseReceipts, dailyShiftSummary, inventory, shiftItemSales } from '../../shared/schema';
+import { eq, desc, sql } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+
+async function syncData() {
+  const today = DateTime.now().setZone('Asia/Bangkok').toISODate();
+
+  // Sync receipts (call EnhancedLoyverseAPI.sync if needed - assume run)
+  const receipts = await db.select().from(loyverseReceipts).where(eq(loyverseReceipts.shiftDate, today));
+
+  // Update shift summary
+  const burgersSold = receipts.reduce((sum, r) => sum + (r.items.filter(i => i.item_name.includes('Burger')).reduce((s, i) => s + i.quantity, 0)), 0);
+  await db.update(dailyShiftSummary).set({ burgersSold }).where(eq(dailyShiftSummary.shiftDate, today));
+
+  // Update stock (from last form + purchases - usage)
+  const lastForm = await db.select().from(dailyStockSales).orderBy(desc(dailyStockSales.shiftDate)).limit(1)[0];
+  const usedRolls = burgersSold; // 1 per burger
+  const currentRolls = (lastForm.burgerBunsStock || 0) + 40 - usedRolls; // + purchase
+  await db.update(inventory).set({ quantity: currentRolls }).where(eq(inventory.name, 'Burger Rolls'));
+  // Repeat for meat/drinks (usedMeat = burgersSold * patties_per, etc.)
+
+  // Update top sales
+  await db.delete(shiftItemSales); // Clear old
+  for (const r of receipts) {
+    for (const i of r.items) {
+      await db.insert(shiftItemSales).values({ shiftDate: today, itemName: i.item_name, quantity: i.quantity, salesTotal: i.line_total });
+    }
+  }
+
+  console.table(await db.select().from(dailyShiftSummary).where(eq(dailyShiftSummary.shiftDate, today)));
+  console.table(await db.select().from(inventory).where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`));
+  console.table(await db.select().from(shiftItemSales).groupBy(shiftItemSales.itemName).orderBy(desc(sql`SUM(sales_total)`)).limit(5));
+}
+
+syncData();
+Layout Clean-Up (client/src/pages/Home.tsx - Replace Components): Remove Tomato placeholders, show "No data" if blank. Use conditional render.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+// Bakery Stock Insights -> Rolls
+<Card>
+  <CardHeader>Burger Rolls Insights</CardHeader>
+  <CardContent>
+    {rollsData ? (
+      <Alert variant="warning">
+        Stock Alert: Rolls inventory is {rollsData.quantity}.
+        <Button>Resolve</Button>
+      </Alert>
+    ) : 'No data - Sync'
+    }
+  </CardContent>
+</Card>
+// Repeat for Meat/Drinks - pull from API /api/stock
+// Top Sales: If blank, "No sales - Sync Loyverse"
+New API Endpoints (server/routes.ts - Add):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.get("/api/stock", async (req, res) => {
+  const stock = await db.select().from(inventory).where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`);
+  res.json(stock);
+});
+
+app.get("/api/top-sales", async (req, res) => {
+  const top = await db.select().from(shiftItemSales).groupBy(shiftItemSales.itemName).orderBy(desc(sql`SUM(sales_total)`)).limit(5);
+  res.json(top);
+});
+
+app.get("/api/shift-summary", async (req, res) => {
+  const summary = await db.select().from(dailyShiftSummary).orderBy(desc(dailyShiftSummary.shiftDate)).limit(1)[0];
+  res.json(summary);
+});
+Current vs Correct Data Table (Based on Sync)
+
+
+Section	Current (Incorrect)	Correct (After Sync)	Note
+Shift Report	Old balances	Latest from 07/17: Balance +B0.00	Pull latest daily_shift_summary
+Stock Insights	Tomatoes alerts	Rolls: Low, suggest 50; Meat: Low, suggest 10kg; Drinks: Low, suggest 50	From inventory, usage calc
+Top Sales Items	Blank	Burger: B1360 (8 qty), Fries: B834 (6 qty), etc.	From shift_item_sales, group/sum
+Run Sync Script: node server/sync-data.js—reload dashboard, data updates.
+
+Optimization: Add cron for daily sync at 3:05 AM. Remove placeholders: If no data, show "Sync Loyverse" button (POST /api/loyverse/pull).
+
+Test sync—share new screenshot if data still wrong
