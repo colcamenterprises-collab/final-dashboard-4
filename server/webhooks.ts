@@ -43,6 +43,9 @@ export function setupWebhooks(app: Express) {
           console.error('🚫 Invalid webhook signature');
           return res.status(401).json({ error: 'Invalid signature' });
         }
+        console.log('✅ Webhook signature validated');
+      } else if (!webhookSecret) {
+        console.log('⚠️ Webhook secret not configured - accepting all webhooks');
       }
 
       const event: WebhookEvent = req.body;
