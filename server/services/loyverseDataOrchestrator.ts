@@ -202,15 +202,15 @@ export class LoyverseDataOrchestrator {
       // Convert back to UTC
       const utcShiftDate = new Date(calculatedShiftDate.getTime() - (7 * 60 * 60 * 1000));
 
-      // Prepare receipt data
+      // Prepare receipt data with safe property access
       const receiptData = {
         receiptId: receipt.id,
-        receiptNumber: receipt.receipt_number,
+        receiptNumber: receipt.receipt_number || 'Unknown',
         receiptDate: receiptDate,
-        totalAmount: receipt.total_money.toString(),
-        paymentMethod: receipt.payments[0]?.payment_type_id || 'Unknown',
+        totalAmount: (receipt.total_money || 0).toString(),
+        paymentMethod: (receipt.payments && receipt.payments.length > 0) ? receipt.payments[0].payment_type_id : 'Unknown',
         customerInfo: receipt.customer_id ? { id: receipt.customer_id } : null,
-        items: receipt.line_items,
+        items: receipt.line_items || [],
         taxAmount: (receipt.total_tax || 0).toString(),
         discountAmount: (receipt.total_discount || 0).toString(),
         staffMember: receipt.employee_id || null,

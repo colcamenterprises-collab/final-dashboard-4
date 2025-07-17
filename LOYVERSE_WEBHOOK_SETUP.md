@@ -47,6 +47,23 @@ curl -X POST https://api.loyverse.com/v1.0/webhooks \
 - **shift.opened**: Triggered when a new shift starts
 - **shift.closed**: Triggered when a shift ends
 
+## Security
+
+**Important**: Webhooks are secured using **SHA-1 HMAC with base64 encoding** (not SHA-256). The signature is provided in the `x-loyverse-signature` header and validated against your webhook secret.
+
+### Signature Generation
+
+The webhook signature is generated using:
+1. SHA-1 HMAC algorithm
+2. Base64 encoding of the digest
+3. JSON payload as the message
+
+Example signature generation:
+```javascript
+const crypto = require('crypto');
+const signature = crypto.createHmac('sha1', secret).update(payload).digest('base64');
+```
+
 ## Webhook Payload Structure
 
 ### Receipt Event Example

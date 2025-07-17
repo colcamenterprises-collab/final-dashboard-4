@@ -9,20 +9,18 @@ import https from 'https';
 
 // Configuration
 const LOYVERSE_API_BASE = 'https://api.loyverse.com/v1.0';
-const WEBHOOK_URL = 'https://your-replit-app-domain.replit.app/api/webhooks/loyverse';
+const WEBHOOK_URL = 'https://your-replit-app-domain.replit.app/api/loyverse-webhook';
 const WEBHOOK_EVENTS = [
-  'receipt.created',
-  'receipt.updated', 
-  'shift.opened',
+  'receipts.created',
   'shift.closed'
 ];
 
 // Get token from environment variable
-const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN;
+const LOYVERSE_TOKEN = process.env.LOYVERSE_API_TOKEN;
 
 if (!LOYVERSE_TOKEN) {
-  console.error('❌ LOYVERSE_TOKEN environment variable is required');
-  console.error('Please set it with: export LOYVERSE_TOKEN=your_token_here');
+  console.error('❌ LOYVERSE_API_TOKEN environment variable is required');
+  console.error('Please set it with: export LOYVERSE_API_TOKEN=your_token_here');
   process.exit(1);
 }
 

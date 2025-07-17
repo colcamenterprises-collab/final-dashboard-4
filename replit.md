@@ -6,6 +6,13 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (July 17, 2025)
 
+### Webhook Security Enhancement & Configuration
+- **SHA-1 Signature Validation**: Updated webhook signature validation to use SHA-1 HMAC with base64 encoding as per Loyverse API requirements
+- **Webhook Secret Configuration**: Added LOYVERSE_WEBHOOK_SECRET environment variable for secure webhook authentication
+- **Dual Webhook Endpoints**: Two operational webhook endpoints - `/api/loyverse-webhook` (direct processing) and `/api/webhooks/loyverse` (enhanced logging)
+- **Comprehensive Error Handling**: Enhanced webhook receipt processing with safe property access and fallback values
+- **Documentation Updates**: Updated LOYVERSE_WEBHOOK_SETUP.md with correct signature generation method and security information
+
 ### Enhanced Transaction Support & Webhook Integration
 - **Database Transaction Support**: Updated daily stock sales form submission to use atomic database transactions, ensuring data integrity when saving form data and related shopping list entries
 - **Loyverse Webhook Integration**: Added webhook endpoint `/api/loyverse-webhook` to handle real-time receipt processing from Loyverse POS system

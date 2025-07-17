@@ -11,15 +11,14 @@ interface WebhookEvent {
   created_at: string;
 }
 
-// Webhook signature validation
+// Webhook signature validation (Loyverse uses SHA-1 with base64)
 function validateWebhookSignature(payload: string, signature: string, secret: string): boolean {
   const expectedSignature = crypto
-    .createHmac('sha256', secret)
+    .createHmac('sha1', secret)
     .update(payload, 'utf8')
-    .digest('hex');
+    .digest('base64');
   
-  const headerSignature = signature.replace('sha256=', '');
-  return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(headerSignature));
+  return signature === expectedSignature;
 }
 
 // Convert Bangkok time to UTC for database storage

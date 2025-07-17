@@ -968,15 +968,24 @@ export function registerRoutes(app: express.Application): Server {
       
       const signature = req.headers['x-loyverse-signature'] as string;
       const payload = JSON.stringify(req.body);
-      const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+      const hmac = crypto.createHmac('sha1', secret).update(payload).digest('base64');
       
-      if (`sha256=${hmac}` !== signature) {
+      if (signature !== hmac) {
+        console.warn('Invalid webhook signature received');
         return res.status(403).json({ error: 'Invalid signature' });
       }
       
+      console.log('✅ Webhook signature validated successfully');
+      
       const event = req.body.event;
+      console.log(`🔔 Webhook event received: ${event}`);
+      
       if (event === 'receipts.created') {
+        console.log('📄 Processing receipt from webhook');
         await LoyverseDataOrchestrator.processReceipt(req.body.data);
+      } else if (event === 'shift.closed') {
+        console.log('📊 Processing shift closure from webhook');
+        // Handle shift closure if needed
       }
       
       res.status(200).json({ success: true });
