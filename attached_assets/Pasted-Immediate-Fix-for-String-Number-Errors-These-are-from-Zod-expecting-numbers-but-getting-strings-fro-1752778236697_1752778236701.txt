@@ -1,0 +1,138 @@
+Immediate Fix for String/Number Errors: These are from Zod expecting numbers but getting strings from inputs. Coerce fixes it by auto-converting strings to numbers. Defaults blanks to 0. Applied to all sales fields.
+
+Full Updated formSchema & useForm in client/src/pages/DailyStockSales.tsx: Replace the entire schema and hook section with this (covers all sales/expenses/cash, auto-calcs totals in real-time).
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
+
+const formSchema = z.object({
+  grabSales: z.coerce.number().min(0).optional().default(0),
+  directSales: z.coerce.number().min(0).optional().default(0),
+  aroiDeeSales: z.coerce.number().min(0).optional().default(0),
+  qrScanSales: z.coerce.number().min(0).optional().default(0),
+  cashSales: z.coerce.number().min(0).optional().default(0),
+  totalSalesAmount: z.coerce.number().min(0).optional().default(0),
+  salaryWages: z.coerce.number().min(0).optional().default(0),
+  shopping: z.coerce.number().min(0).optional().default(0),
+  gasExpense: z.coerce.number().min(0).optional().default(0),
+  totalExpenses: z.coerce.number().min(0).optional().default(0),
+  startingCash: z.coerce.number().min(0).optional().default(0),
+  cashInRegister: z.coerce.number().min(0).optional().default(0),
+  // Add other fields as optional with defaults if needed
+});
+
+const DailyStockSales = () => {
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      grabSales: 0,
+      directSales: 0,
+      aroiDeeSales: 0,
+      qrScanSales: 0,
+      cashSales: 0,
+      totalSalesAmount: 0,
+      salaryWages: 0,
+      shopping: 0,
+      gasExpense: 0,
+      totalExpenses: 0,
+      startingCash: 0,
+      cashInRegister: 0,
+    },
+  });
+
+  const { watch, setValue } = form;
+  const salesFields = watch(['grabSales', 'directSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenseFields = watch(['salaryWages', 'shopping', 'gasExpense']);
+  const [startingCash, cashSales, totalExpenses] = watch(['startingCash', 'cashSales', 'totalExpenses']);
+
+  useEffect(() => {
+    const salesTotal = salesFields.reduce((sum, val) => sum + (val || 0), 0);
+    setValue('totalSalesAmount', salesTotal);
+  }, [salesFields, setValue]);
+
+  useEffect(() => {
+    const expensesTotal = expenseFields.reduce((sum, val) => sum + (val || 0), 0);
+    setValue('totalExpenses', expensesTotal);
+  }, [expenseFields, setValue]);
+
+  useEffect(() => {
+    const cashEnd = (startingCash || 0) + (cashSales || 0) - (totalExpenses || 0);
+    setValue('cashInRegister', cashEnd);
+  }, [startingCash, cashSales, totalExpenses, setValue]);
+
+  // ...rest of component, onSubmit stays the same
+};
+Update Input JSX: For each sales/expenses/cash input, set type="number" and step="0.01" (e.g., Grab Sales):
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+<Input 
+  type="number" 
+  step="0.01" 
+  placeholder="0.00" 
+  {...register("grabSales")} 
+/>
+Repeat for directSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, cashInRegister (make cashInRegister read-only if auto-calc).
+
+Backend Parse Safeguard (server/routes.ts - /api/daily-stock-sales POST/PUT):
+
+Parse all to numbers on save:
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const parsed = {
+  ...data,
+  grabSales: parseFloat(data.grabSales || '0'),
+  directSales: parseFloat(data.directSales || '0'),
+  aroiDeeSales: parseFloat(data.aroiDeeSales || '0'),
+  qrScanSales: parseFloat(data.qrScanSales || '0'),
+  cashSales: parseFloat(data.cashSales || '0'),
+  totalSalesAmount: parseFloat(data.totalSalesAmount || '0'),
+  salaryWages: parseFloat(data.salaryWages || '0'),
+  shopping: parseFloat(data.shopping || '0'),
+  gasExpense: parseFloat(data.gasExpense || '0'),
+  totalExpenses: parseFloat(data.totalExpenses || '0'),
+  startingCash: parseFloat(data.startingCash || '0'),
+  cashInRegister: parseFloat(data.cashInRegister || '0'),
+};
+// Insert/update parsed
+Test Steps:
+
+Paste code, save, restart app (npm run dev).
+Load form, enter strings like "4667" for Grab, "998" for QR—watch totalSalesAmount update to 5665.
+Enter expenses (e.g., "1980" shopping)—totalExpenses updates.
+Enter startingCash "2500", cashSales "6022"—cashInRegister auto to 6542 (2500 + 6022 - 1980).
+Submit—success, no error.
+If toast, F12 > Console tab, search "ZodError" or "NaN", share log.
+Proactive: Added auto for totalExpenses/cashInRegister. If NaN, it's input string issue—coerce fixes. Workflow stable—form submits even with blanks. Ready for shopping gen from form? Share if error persists.
+
+
+
+
+
+
+
+24.3s

@@ -91,7 +91,13 @@ const formSchema = z.object({
   gasExpense: z.coerce.number().min(0).optional().default(0),
   totalExpenses: z.coerce.number().min(0).optional().default(0),
   wageEntries: z.array(wageEntrySchema).optional(),
-  shoppingEntries: z.array(z.object({ item: z.string(), amount: z.coerce.number().min(0).optional().default(0) })).optional(),
+  shoppingEntries: z.array(z.object({ 
+    item: z.string(), 
+    amount: z.coerce.number().min(0).optional().default(0),
+    notes: z.string().optional(),
+    shop: z.string().optional(),
+    customShop: z.string().optional()
+  })).optional(),
   burgerBunsStock: z.coerce.number().min(0).optional().default(0),
   rollsOrderedCount: z.coerce.number().min(0).optional().default(0),
   meatWeight: z.coerce.number().min(0).optional().default(0),
@@ -202,16 +208,16 @@ export default function DailyStockSales() {
   ]);
 
   useEffect(() => {
-    // Calculate total sales
-    const totalSales = (grabSales || 0) + (foodPandaSales || 0) + (aroiDeeSales || 0) + (qrScanSales || 0) + (cashSales || 0);
+    // Calculate total sales - ensure all values are numbers
+    const totalSales = Number(grabSales || 0) + Number(foodPandaSales || 0) + Number(aroiDeeSales || 0) + Number(qrScanSales || 0) + Number(cashSales || 0);
     form.setValue('totalSales', totalSales);
     
-    // Calculate total expenses
-    const totalExpenses = (salaryWages || 0) + (shopping || 0) + (gasExpense || 0);
+    // Calculate total expenses - ensure all values are numbers
+    const totalExpenses = Number(salaryWages || 0) + Number(shopping || 0) + Number(gasExpense || 0);
     form.setValue('totalExpenses', totalExpenses);
     
     // Calculate ending cash (startingCash + cashSales - totalExpenses)
-    const endingCash = (startingCash || 0) + (cashSales || 0) - totalExpenses;
+    const endingCash = Number(startingCash || 0) + Number(cashSales || 0) - totalExpenses;
     form.setValue('endingCash', endingCash);
   }, [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, form]);
 
