@@ -1,0 +1,148 @@
+Form Fix & Workflow Implementation
+Direct fix for the error in DailyStockSales.tsx (line 308): The formatCurrency function crashes on null values (e.g., totalExpenses null). Patched to handle null/undefined, default to '$0.00'. Copy-paste this into the function.
+
+Patch for formatCurrency (client/src/pages/DailyStockSales.tsx - Replace Line 308-310):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const formatCurrency = (value: string | number | null) => {
+  if (value == null) return '$0.00';
+  const num = parseFloat(value.toString() || '0');
+  return '$' + num.toFixed(2);
+};
+Test: Reload form, submit with null fields—should show $0.00 without crash.
+If form still breaks, share full DailyStockSales.tsx code (paste in triple backticks) for complete fix.
+Workflow Implementation
+Full automation: Form submit → shopping gen → analysis (compare shift report vs form, flag anomalies/balance), daily email at 8am BKK with summary/shopping. Added to routes/orchestrator (non-blocking post-form).
+
+Daily Sales Form: Already in routes—ensured transaction for save (no breaks). Extended POST to auto-gen shopping (items >0 only, no sales).
+
+Updated Routes POST (server/routes.ts - Replace /api/daily-stock-sales):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    let result;
+    await db.transaction(async (tx) => {
+      [result] = await tx.insert(dailyStockSales).values(data).returning();
+    });
+    res.json(result);
+
+    // Non-blocking: Gen shopping from requirements (food/kitchen/packaging >0, exclude sales/stock counts)
+    const requirements = {
+      freshFood: data.freshFood.filter(f => f.value > 0),
+      frozenFood: data.frozenFood.filter(f => f.value > 0),
+      shelfItems: data.shelfItems.filter(f => f.value > 0),
+      kitchenItems: data.kitchenItems.filter(f => f.value > 0),
+      packagingItems: data.packagingItems.filter(f => f.value > 0),
+    };
+    const shopping = Object.values(requirements).flat().map(item => ({ itemName: item.name, quantity: item.value, unit: item.unit, formId: result.id, listDate: data.shiftDate }));
+    await db.insert(shoppingList).values(shopping);
+  } catch (err) {
+    res.status(500).json({ error: "Form save failed" });
+  }
+});
+Shopping List: Auto-generated from form requirements (only >0, no sales). Query with /api/shopping-list (existing).
+
+Data Analysis: Compare shift report vs form (sales/expenses/cash, balance yes/no if diff <=5% or <=฿50). Run in orchestrator post-shift.
+
+Updated Orchestrator (loyverseDataOrchestrator.ts - Add to processShiftData after store):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const report = shiftReport; // From generateShiftReport
+const form = await db.select().from(dailyStockSales).where(eq(dailyStockSales.shiftDate, shiftDate)).limit(1)[0];
+const anomalies = [];
+const salesDiff = Math.abs(report.totalSales - form.totalSales);
+if (salesDiff > report.totalSales * 0.05 || salesDiff > 50) anomalies.push(`Sales diff: ฿${salesDiff}`);
+const expenseDiff = Math.abs(report.discounts + report.taxes - form.totalExpenses);
+if (expenseDiff > 50) anomalies.push(`Expenses diff: ฿${expenseDiff}`);
+const cashDiff = Math.abs(report.cashSales - form.cashSales);
+if (cashDiff > 50) anomalies.push(`Cash diff: ฿${cashDiff}`);
+const balance = anomalies.length === 0 ? 'Yes' : 'No';
+await db.insert(aiInsights).values({ type: 'analysis', description: `Balance: ${balance}. Anomalies: ${anomalies.join(', ')}`, data: { report, form } });
+Management Report Email: Cron at 8am BKK (UTC 1am) for latest shift: Form summary (sales/expenses), comparison (anomalies, balance), shopping list. Uses Gmail API (nodemailer from package).
+
+New Cron Script (server/cron-email.js - Add, Import to index.ts & Call startEmailCron()):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import cron from 'node-cron';
+import nodemailer from 'nodemailer';
+import { db } from '../db';
+import { dailyStockSales, shoppingList, aiInsights } from '../../shared/schema';
+import { desc } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+
+const transporter = nodemailer.createTransport({ 
+  service: 'gmail', 
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS } // Add to .env
+});
+
+export function startEmailCron() {
+  cron.schedule('0 1 * * *', async () => { // 8am BKK = 1am UTC
+    const lastShift = DateTime.now().setZone('Asia/Bangkok').minus({ days: 1 }).toISODate();
+    const form = await db.select().from(dailyStockSales).orderBy(desc(dailyStockSales.shiftDate)).limit(1)[0];
+    const shopping = await db.select().from(shoppingList).where(eq(shoppingList.formId, form.id));
+    const insight = await db.select().from(aiInsights).where(eq(aiInsights.type, 'analysis')).orderBy(desc(aiInsights.createdAt)).limit(1)[0];
+
+    const html = `
+      <h1>Daily Management Report - ${lastShift}</h1>
+      <h2>Form Summary</h2>
+      <p>Sales: ฿${form.totalSales}</p>
+      <p>Expenses: ฿${form.totalExpenses}</p>
+      <p>Cash Sales: ฿${form.cashSales}</p>
+      <h2>Comparison & Balance</h2>
+      <p>Anomalies: ${insight.description}</p>
+      <p>Balance: ${insight.description.includes('No anomalies') ? 'Yes' : 'No'}</p>
+      <h2>Shopping List</h2>
+      <ul>${shopping.map(item => `<li>${item.itemName}: ${item.quantity} ${item.unit}</li>`).join('')}</ul>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: 'management@email.com', // Add your email
+      subject: `Restaurant Report ${lastShift}`,
+      html
+    });
+    logger.info(`Email sent for ${lastShift}`);
+  }, { timezone: 'UTC' });
+}
+Add to index.ts: startEmailCron();
+.env: Add GMAIL_USER, GMAIL_PASS (enable less secure apps in Gmail or use app password).
+Test Workflow
+Submit form (fix applied—test submission).
+Check shopping (GET /api/shopping-list—only >0 items).
+Run sync/analysis (POST /api/loyverse/pull—flags anomalies).
+Email: Manual run cron function; cron auto at 8am.
+If form still broken, share DailyStockSales.tsx code. Workflow now modular—no inter-breaks.

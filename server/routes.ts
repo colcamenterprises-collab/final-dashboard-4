@@ -98,35 +98,64 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Received daily stock sales data:", data);
       
-      // ONLY save the form using existing storage method first
-      const result = await storage.createDailyStockSales(data);
+      let result;
+      
+      // Use database transaction to ensure data integrity
+      await db.transaction(async (tx) => {
+        [result] = await tx.insert(dailyStockSales).values(data).returning();
+      });
+      
       console.log("✅ Form saved successfully with ID:", result.id);
       
       // Return immediately - form submission is complete
       res.json(result);
       
-      // Everything else happens after the response is sent
+      // Non-blocking post-processing for non-draft submissions
       if (!data.isDraft) {
-        // Generate shopping list completely separately
-        storage.generateShoppingList(result)
-          .then(shoppingList => {
-            console.log(`Generated ${shoppingList.length} shopping items`);
+        // Generate shopping list from requirements (only items >0, exclude sales/stock counts)
+        const requirements = {
+          freshFood: Object.entries(data.freshFood || {}).filter(([_, value]) => Number(value) > 0),
+          frozenFood: Object.entries(data.frozenFood || {}).filter(([_, value]) => Number(value) > 0),
+          shelfItems: Object.entries(data.shelfItems || {}).filter(([_, value]) => Number(value) > 0),
+          kitchenItems: Object.entries(data.kitchenItems || {}).filter(([_, value]) => Number(value) > 0),
+          packagingItems: Object.entries(data.packagingItems || {}).filter(([_, value]) => Number(value) > 0),
+          drinkStock: Object.entries(data.drinkStock || {}).filter(([_, value]) => Number(value) > 0)
+        };
+        
+        const shoppingItems = Object.entries(requirements).flatMap(([category, items]) => 
+          items.map(([itemName, quantity]) => ({
+            itemName,
+            quantity: Number(quantity),
+            unit: 'units', // Default unit
+            formId: result.id,
+            listDate: data.shiftDate,
+            category,
+            isCompleted: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }))
+        );
+        
+        // Insert shopping items if any exist
+        if (shoppingItems.length > 0) {
+          await db.insert(shoppingList).values(shoppingItems)
+            .then(() => console.log(`Generated ${shoppingItems.length} shopping items`))
+            .catch(error => console.error("Failed to save shopping items:", error));
+        }
+        
+        // Send email notification (completely optional)
+        import('./services/gmailService')
+          .then(({ sendManagementSummary }) => {
+            const emailData = {
+              formData: result,
+              shoppingList: shoppingItems,
+              submissionTime: new Date()
+            };
             
-            // Try to send email notification (completely optional)
-            import('./services/gmailService')
-              .then(({ sendManagementSummary }) => {
-                const emailData = {
-                  formData: result,
-                  shoppingList: shoppingList,
-                  submissionTime: new Date()
-                };
-                
-                return sendManagementSummary(emailData);
-              })
-              .then(() => console.log("Email notification sent successfully"))
-              .catch(error => console.error("Failed to send email notification:", error));
+            return sendManagementSummary(emailData);
           })
-          .catch(error => console.error("Failed to generate shopping list:", error));
+          .then(() => console.log("Email notification sent successfully"))
+          .catch(error => console.error("Failed to send email notification:", error));
       }
       
     } catch (err) {
@@ -239,10 +268,57 @@ export function registerRoutes(app: express.Application): Server {
       const { loyverseReceiptService } = await import("./services/loyverseReceipts");
       const { success, receiptsProcessed } = await loyverseReceiptService.fetchAndStoreReceipts();
 
+      // After receipt sync, run shift analysis
+      try {
+        const { shiftAnalysisService } = await import("./services/shiftAnalysisService");
+        const today = new Date().toISOString().split('T')[0];
+        await shiftAnalysisService.analyzeShiftData(today);
+        console.log("Shift analysis completed after receipt sync");
+      } catch (analysisError) {
+        console.error("Shift analysis failed:", analysisError);
+      }
+
       return res.json({ success, receiptsProcessed });
     } catch (err) {
       console.error("Receipt sync failed:", err);
       return res.status(500).json({ error: "Loyverse pull failed" });
+    }
+  });
+
+  // ─── Shift Analysis endpoints ───────────────────────────────
+  app.post("/api/shift-analysis/analyze", async (req: Request, res: Response) => {
+    try {
+      const { shiftDate } = req.body;
+      const { shiftAnalysisService } = await import("./services/shiftAnalysisService");
+      
+      const analysis = await shiftAnalysisService.analyzeShiftData(shiftDate);
+      res.json(analysis);
+    } catch (err) {
+      console.error("Shift analysis failed:", err);
+      res.status(500).json({ error: "Shift analysis failed" });
+    }
+  });
+
+  app.get("/api/shift-analysis/latest", async (_req: Request, res: Response) => {
+    try {
+      const { shiftAnalysisService } = await import("./services/shiftAnalysisService");
+      const analysis = await shiftAnalysisService.getLatestShiftAnalysis();
+      res.json(analysis);
+    } catch (err) {
+      console.error("Error fetching latest shift analysis:", err);
+      res.status(500).json({ error: "Failed to fetch shift analysis" });
+    }
+  });
+
+  // ─── Email Management endpoints ───────────────────────────────
+  app.post("/api/email/send-daily-report", async (_req: Request, res: Response) => {
+    try {
+      const { cronEmailService } = await import("./services/cronEmailService");
+      await cronEmailService.sendTestReport();
+      res.json({ success: true, message: "Daily report sent" });
+    } catch (err) {
+      console.error("Error sending daily report:", err);
+      res.status(500).json({ error: "Failed to send daily report" });
     }
   });
 

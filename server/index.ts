@@ -59,6 +59,10 @@ app.use((req, res, next) => {
   // Start the scheduler service for daily 4am tasks
   schedulerService.start();
 
+  // Start the email cron service for daily 8am management reports
+  const { cronEmailService } = await import('./services/cronEmailService');
+  cronEmailService.startEmailCron();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
