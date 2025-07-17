@@ -117,6 +117,15 @@ export function registerRoutes(app: express.Application): Server {
         }
       });
       
+      // Check for cash anomalies (manual vs calculated)
+      const calculatedCash = Number(data.startingCash || 0) + Number(data.cashSales || 0) - Number(data.totalExpenses || 0);
+      const manualCash = Number(data.endingCash || 0);
+      
+      if (manualCash !== calculatedCash) {
+        console.log(`🚨 CASH ANOMALY DETECTED: Manual cash ${manualCash} vs calculated ${calculatedCash} (diff: ${manualCash - calculatedCash})`);
+        console.log(`📊 Cash breakdown: Starting ${data.startingCash} + Cash Sales ${data.cashSales} - Expenses ${data.totalExpenses} = ${calculatedCash}`);
+      }
+      
       let result;
       
       // Use database transaction to ensure data integrity

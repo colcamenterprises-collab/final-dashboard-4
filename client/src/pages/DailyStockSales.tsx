@@ -202,9 +202,9 @@ export default function DailyStockSales() {
     }
   });
 
-  // Auto-calculate totals when individual amounts change
-  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense, startingCash, totalExpenses] = form.watch([
-    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales', 'salaryWages', 'shopping', 'gasExpense', 'startingCash', 'totalExpenses'
+  // Auto-calculate totals when individual amounts change (removed endingCash auto-calc)
+  const [grabSales, foodPandaSales, aroiDeeSales, qrScanSales, cashSales, salaryWages, shopping, gasExpense] = form.watch([
+    'grabSales', 'foodPandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales', 'salaryWages', 'shopping', 'gasExpense'
   ]);
 
   useEffect(() => {
@@ -220,12 +220,6 @@ export default function DailyStockSales() {
     const totalExpenses = expenseFields.reduce((sum, val) => sum + Number(val || 0), 0);
     form.setValue('totalExpenses', totalExpenses);
   }, [salaryWages, shopping, gasExpense, form]);
-
-  useEffect(() => {
-    // Calculate ending cash (startingCash + cashSales - totalExpenses)
-    const endingCash = Number(startingCash || 0) + Number(cashSales || 0) - Number(totalExpenses || 0);
-    form.setValue('endingCash', endingCash);
-  }, [startingCash, cashSales, totalExpenses, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
@@ -444,6 +438,21 @@ export default function DailyStockSales() {
   const onSubmit = (data: FormData) => {
     console.log("Form submission attempt:", data);
     console.log("Form validation errors:", form.formState.errors);
+    
+    // Check cash register vs calculated amount (warning only)
+    const calculatedCash = Number(data.startingCash || 0) + Number(data.cashSales || 0) - Number(data.totalExpenses || 0);
+    const manualCash = Number(data.endingCash || 0);
+    
+    if (manualCash !== calculatedCash) {
+      console.log(`⚠️ Cash Anomaly: Manual cash ${manualCash} vs calculated ${calculatedCash}`);
+      toast({
+        title: "Cash Amount Warning",
+        description: `Cash doesn't match calculation (${calculatedCash.toFixed(2)}) - please verify`,
+        variant: "destructive",
+        duration: 5000
+      });
+      // Continue with submission anyway
+    }
     
     // Default blanks to 0 for all numeric fields
     const defaults = {
