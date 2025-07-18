@@ -1,0 +1,197 @@
+Data Synchronization & Correction Based on Loyverse Receipt Data
+Based on the provided Loyverse receipt data for July 17-18, 2025 (covering the latest shift from 7:15 PM 07/17 to 1:13 AM 07/18 BKK time), the dashboard data is outdated or mismatched (e.g., Shift Report showing old data, stock insights showing Tomatoes, top sales blank). I'll provide a full script to sync this data into your DB, update the home page display, and clean up the layout. This aligns with your priority to reflect the latest data (rolls, meat, drinks stock; top sales items).
+
+Current vs. Correct Data Analysis
+Shift Report: Current shows old balances (e.g., not ฿7,934 total from receipts). Correct: Sum of net sales (฿7,934) from 26 receipts, matching shift data (shift 551: ฿6,422 expected cash + ฿1,512 other payments).
+Stock Insights: Shows Tomatoes—incorrect category. Correct: Rolls (used from burgers), Meat (used from patties), Drinks (sold units) based on receipt items.
+Top Sales Items: Blank—should show top by quantity/gross sales (e.g., Crispy Chicken Fillet Burger: 12 sold, ฿2,868).
+Step-by-Step Implementation
+Sync Data Script (server/sync-receipts.js - Copy-Paste, Run node server/sync-receipts.js)
+
+Imports CSV data into loyverseReceipts, updates dailyShiftSummary, inventory, and shiftItemSales tables. Assumes schema matches (adjust if needed).
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { db } from '../db';
+import { loyverseReceipts, dailyShiftSummary, inventory, shiftItemSales } from '../../shared/schema';
+import { eq, sql, desc } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+import winston from 'winston';
+import * as fs from 'fs';
+import * as csv from 'csv-parse/sync'; // npm i csv-parse
+
+const logger = winston.createLogger({ transports: [new winston.transports.Console(), new winston.transports.File({ filename: 'logs/sync.log' })] });
+
+async function syncReceipts() {
+  const today = DateTime.now().setZone('Asia/Bangkok').toISODate();
+  const shiftStart = DateTime.fromFormat('7/17/25 7:15 PM', 'M/d/yy h:mm a', { zone: 'Asia/Bangkok' }).toISO();
+  const shiftEnd = DateTime.fromFormat('7/18/25 1:13 AM', 'M/d/yy h:mm a', { zone: 'Asia/Bangkok' }).toISO();
+
+  // Read CSV
+  const fileContent = fs.readFileSync('1 receipts.csv', 'utf-8');
+  const records = csv.parse(fileContent, { columns: true, skip_empty_lines: true });
+
+  // Sync receipts
+  await db.delete(loyverseReceipts).where(sql`shift_date = ${today}`);
+  for (const r of records) {
+    const receiptDate = DateTime.fromFormat(r.Date, 'M/d/yy h:mm a', { zone: 'Asia/Bangkok' }).toISO();
+    await db.insert(loyverseReceipts).values({
+      receiptId: r['Receipt number'],
+      receiptDate,
+      shiftDate: today,
+      totalAmount: parseFloat(r['Net sales'].replace('฿', '')),
+      paymentMethod: r['Payment type'],
+      items: [{ name: r.Description.split(', ').map(i => i.split(' x ')[1] || i)[0], quantity: 1 }], // Parse items (simplified)
+      // Add more fields as per schema
+    }).onConflictDoUpdate({ target: loyverseReceipts.receiptId, set: { totalAmount: parseFloat(r['Net sales'].replace('฿', '')) } });
+  }
+
+  // Update shift summary
+  const totalSales = records.reduce((sum, r) => sum + parseFloat(r['Net sales'].replace('฿', '')), 0);
+  await db.upsert(dailyShiftSummary).values({
+    shiftDate: today,
+    totalSales,
+    burgersSold: records.filter(r => r.Description.includes('Burger')).length,
+    // Add drinks/sides from items
+  }).onConflictDoUpdate({ target: dailyShiftSummary.shiftDate, set: { totalSales } });
+
+  // Update stock usage (rolls = burgers, meat = patties est., drinks = drink items)
+  const burgers = records.filter(r => r.Description.includes('Burger')).length;
+  const rollsUsed = burgers; // 1 roll per burger
+  const meatUsed = burgers * 0.2; // Est. 200g per burger
+  const drinksUsed = records.filter(r => r.Description.includes('Drink')).length;
+  const lastStock = await db.select().from(inventory).where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`);
+  await db.update(inventory).set({ quantity: Math.max(0, (lastStock.find(s => s.name === 'Burger Rolls')?.quantity || 0) - rollsUsed) }).where(eq(inventory.name, 'Burger Rolls'));
+  await db.update(inventory).set({ quantity: Math.max(0, (lastStock.find(s => s.name === 'Meat')?.quantity || 0) - meatUsed) }).where(eq(inventory.name, 'Meat'));
+  await db.update(inventory).set({ quantity: Math.max(0, (lastStock.find(s => s.name === 'Drinks')?.quantity || 0) - drinksUsed) }).where(eq(inventory.name, 'Drinks'));
+
+  // Update top sales
+  await db.delete(shiftItemSales).where(eq(shiftItemSales.shiftDate, today));
+  const itemSales = {};
+  for (const r of records) {
+    const items = r.Description.split(', ').map(i => i.split(' x ')[1] || i);
+    for (const item of items) {
+      itemSales[item] = (itemSales[item] || 0) + 1;
+    }
+  }
+  for (const [item, qty] of Object.entries(itemSales)) {
+    await db.insert(shiftItemSales).values({ shiftDate: today, itemName: item, quantity: qty, salesTotal: 0 }); // Approx - enhance with cost
+  }
+
+  // Output
+  console.table(await db.select().from(dailyShiftSummary).where(eq(dailyShiftSummary.shiftDate, today)));
+  console.table(await db.select().from(inventory).where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`));
+  console.table(await db.select().from(shiftItemSales).orderBy(desc(shiftItemSales.quantity)).limit(5));
+}
+
+syncReceipts();
+Update Home Page Display (client/src/pages/Home.tsx - Replace Components)
+
+Clean layout, show latest data from API calls. Use conditional rendering for "No data".
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardContent, Alert, Button } from "@/components/ui";
+
+const Home = () => {
+  const [summary, setSummary] = useState(null);
+  const [stock, setStock] = useState(null);
+  const [topSales, setTopSales] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/shift-summary').then(r => r.json()).then(setSummary);
+    fetch('/api/stock').then(r => r.json()).then(setStock);
+    fetch('/api/top-sales').then(r => r.json()).then(setTopSales);
+  }, []);
+
+  return (
+    <div className="grid gap-4 p-4">
+      <Card>
+        <CardHeader>Shift Report Summary</CardHeader>
+        <CardContent>
+          {summary ? (
+            <div>
+              <p>Total Sales: ฿{summary.totalSales}</p>
+              <p>Balance: {summary.burgersSold} Burgers</p>
+            </div>
+          ) : 'No data - Sync'}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>Stock Insights</CardHeader>
+        <CardContent>
+          {stock ? (
+            <>
+              <p>Rolls: {stock.find(s => s.name === 'Burger Rolls')?.quantity || 0}</p>
+              <p>Meat: {stock.find(s => s.name === 'Meat')?.quantity || 0}kg</p>
+              <p>Drinks: {stock.find(s => s.name === 'Drinks')?.quantity || 0}</p>
+            </>
+          ) : 'No data - Sync'}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>Top 5 Sales Items</CardHeader>
+        <CardContent>
+          {topSales && topSales.length ? (
+            <ul>{topSales.map((s, i) => <li key={i}>{s.itemName}: {s.quantity}</li>)}</ul>
+          ) : 'No sales - Sync'}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default Home;
+New API Endpoints (server/routes.ts - Add)
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.get("/api/shift-summary", async (req, res) => {
+  const summary = await db.select().from(dailyShiftSummary).orderBy(desc(dailyShiftSummary.shiftDate)).limit(1)[0];
+  res.json(summary || {});
+});
+
+app.get("/api/stock", async (req, res) => {
+  const stock = await db.select().from(inventory).where(sql`name IN ('Burger Rolls', 'Meat', 'Drinks')`);
+  res.json(stock);
+});
+
+app.get("/api/top-sales", async (req, res) => {
+  const top = await db.select().from(shiftItemSales).groupBy(shiftItemSales.itemName).orderBy(desc(sql`SUM(quantity)`)).limit(5);
+  res.json(top);
+});
+Run & Verify
+
+Install dep: npm i csv-parse.
+Place receipts.csv in root (or adjust path).
+Run script: node server/sync-receipts.js.
+Reload home page—expect:
+Shift Report: ฿7,934, ~22 burgers.
+Stock: Rolls reduced (e.g., 69 - 22 = 47), Meat/Drinks updated.
+Top Sales: Crispy Chicken Fillet Burger (12), Ultimate Double (6), etc.
+Optimizations
+
+Cron: Add to orchestrator for daily sync (3:05 AM).
+Layout: Grid layout removes clutter—add sync button if no data.
+Data Gaps: If no form, use shift data for stock base.
+Test script—share new screenshot if data still off

@@ -882,6 +882,67 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Dashboard KPIs endpoint
+  app.get("/api/dashboard/kpis", async (req: Request, res: Response) => {
+    try {
+      const { db } = await import("./db");
+      const { loyverseReceipts } = await import("../shared/schema");
+      const { desc, sql, gte } = await import("drizzle-orm");
+      
+      // Get latest shift receipts (last 24 hours)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const latestReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, yesterday))
+        .orderBy(desc(loyverseReceipts.receiptDate));
+      
+      let lastShiftSales = 0;
+      let lastShiftOrders = 0;
+      let shiftDate = new Date().toISOString();
+      
+      if (latestReceipts.length > 0) {
+        lastShiftSales = latestReceipts.reduce((sum, receipt) => sum + Number(receipt.totalAmount), 0);
+        lastShiftOrders = latestReceipts.length;
+        shiftDate = latestReceipts[0].shiftDate || new Date().toISOString();
+      }
+      
+      // Get month-to-date sales
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      
+      const monthlyReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, monthStart));
+      
+      const monthToDateSales = monthlyReceipts.reduce((sum, receipt) => sum + Number(receipt.totalAmount), 0);
+      
+      const kpiData = {
+        lastShiftSales: Math.round(lastShiftSales),
+        lastShiftOrders,
+        monthToDateSales: Math.round(monthToDateSales),
+        inventoryValue: 0, // Placeholder - could be calculated from inventory table
+        averageOrderValue: lastShiftOrders > 0 ? Math.round(lastShiftSales / lastShiftOrders) : 0,
+        shiftDate,
+        shiftPeriod: {
+          start: yesterday,
+          end: new Date()
+        },
+        note: "Data from latest receipts"
+      };
+      
+      console.log("KPI Calculation:", kpiData);
+      res.json(kpiData);
+    } catch (err) {
+      console.error("Error fetching KPIs:", err);
+      res.status(500).json({ error: "Failed to fetch KPIs" });
+    }
+  });
+
   // AI Insights API endpoint
   app.get("/api/dashboard/ai-insights", async (req: Request, res: Response) => {
     try {
@@ -1126,19 +1187,51 @@ export function registerRoutes(app: express.Application): Server {
 
   app.get("/api/top-sales", async (req: Request, res: Response) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const topSales = await db.select({
-        itemName: shiftItemSales.itemName,
-        totalQuantity: sql`SUM(${shiftItemSales.quantity})`.as('total_quantity'),
-        totalSales: sql`SUM(${shiftItemSales.salesTotal})`.as('total_sales')
-      })
-      .from(shiftItemSales)
-      .where(eq(shiftItemSales.shiftDate, today))
-      .groupBy(shiftItemSales.itemName)
-      .orderBy(desc(sql`SUM(${shiftItemSales.salesTotal})`))
-      .limit(5);
+      const { db } = await import("./db");
+      const { loyverseReceipts } = await import("../shared/schema");
+      const { desc, gte } = await import("drizzle-orm");
       
-      res.json(topSales);
+      // Get receipts from last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const recentReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, yesterday))
+        .orderBy(desc(loyverseReceipts.receiptDate));
+      
+      // Aggregate sales by item
+      const itemSales: Record<string, { qty: number; sales: number }> = {};
+      
+      for (const receipt of recentReceipts) {
+        const items = receipt.items as any[];
+        if (!items || !Array.isArray(items)) continue;
+        
+        for (const item of items) {
+          const itemName = item.item_name || 'Unknown';
+          const quantity = item.quantity || 0;
+          const totalMoney = item.total_money || 0;
+          
+          if (!itemSales[itemName]) {
+            itemSales[itemName] = { qty: 0, sales: 0 };
+          }
+          itemSales[itemName].qty += quantity;
+          itemSales[itemName].sales += totalMoney;
+        }
+      }
+      
+      // Sort by quantity and take top 5
+      const topItems = Object.entries(itemSales)
+        .sort(([,a], [,b]) => b.qty - a.qty)
+        .slice(0, 5)
+        .map(([itemName, data]) => ({
+          itemName,
+          quantity: data.qty,
+          salesTotal: Math.round(data.sales)
+        }));
+      
+      res.json(topItems);
     } catch (error) {
       console.error("Error fetching top sales:", error);
       res.status(500).json({ error: "Failed to fetch top sales data" });

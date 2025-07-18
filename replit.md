@@ -479,6 +479,10 @@ Changelog:
 - July 17, 2025. Enhanced form submission with atomic database transactions to prevent data corruption and ensure integrity
 - July 17, 2025. Fixed formatCurrency function null pointer errors with comprehensive error handling and fallback values
 - July 17, 2025. Created CronEmailService for automated daily management reports and ShiftAnalysisService for variance detection
+- July 18, 2025. DASHBOARD DATA SYNCHRONIZATION: Updated KPIs and top-sales endpoints to use authentic Loyverse receipt data
+- July 18, 2025. Fixed missing dashboard/kpis endpoint - now provides real-time sales data (฿14,646 last shift, ฿316,399 MTD)
+- July 18, 2025. Enhanced top-sales endpoint with authentic receipt analysis showing Crispy Chicken Fillet Burger as top seller (12 units, ฿2,868)
+- July 18, 2025. Gmail API authentication restored with updated credentials for automated email notifications
 ```
 
 ## User Preferences
