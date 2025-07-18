@@ -709,23 +709,21 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // NEW: latest shift summary
+  // NEW: latest shift summary - Updated to use corrected data
   app.get("/api/shift-summary/latest", async (req: Request, res: Response) => {
     try {
       const { db } = await import("./db");
-      const { loyverseReceipts, dailyShiftReceiptSummary } = await import("../shared/schema");
-      const { desc } = await import("drizzle-orm");
+      const { dailyShiftSummary, shiftItemSales } = await import("../shared/schema");
+      const { desc, eq } = await import("drizzle-orm");
       
-      // Generate from receipts directly for now
-      
-      // If no summary or empty, generate from latest receipts
-      const latestReceipts = await db
+      // Get the latest shift summary from the corrected data
+      const latestShiftSummary = await db
         .select()
-        .from(loyverseReceipts)
-        .orderBy(desc(loyverseReceipts.receiptDate))
-        .limit(50);
+        .from(dailyShiftSummary)
+        .orderBy(desc(dailyShiftSummary.shiftDate))
+        .limit(1);
       
-      if (latestReceipts.length === 0) {
+      if (latestShiftSummary.length === 0) {
         res.json({
           shiftDate: new Date().toISOString().split('T')[0],
           burgersSold: 0,
@@ -736,44 +734,37 @@ export function registerRoutes(app: express.Application): Server {
         return;
       }
       
-      // Calculate summary from receipts
-      let burgersSold = 0;
-      let drinksSold = 0;
-      const itemsBreakdown: Record<string, { qty: number; sales: number }> = {};
+      const shiftData = latestShiftSummary[0];
       
-      for (const receipt of latestReceipts) {
-        const items = receipt.items as any[];
-        if (!items || !Array.isArray(items)) continue;
+      // Get item sales for the latest shift
+      const itemSales = await db
+        .select()
+        .from(shiftItemSales)
+        .where(eq(shiftItemSales.shiftDate, shiftData.shiftDate))
+        .orderBy(desc(shiftItemSales.quantity));
+      
+      // Build items breakdown from shift item sales
+      const itemsBreakdown: Record<string, { qty: number; sales: number }> = {};
+      let drinksSold = 0;
+      
+      for (const item of itemSales) {
+        const itemName = item.itemName;
+        const quantity = item.quantity;
+        const salesTotal = Number(item.salesTotal || 0);
         
-        for (const item of items) {
-          const itemName = item.item_name || 'Unknown';
-          const quantity = item.quantity || 0;
-          const totalMoney = item.total_money || 0;
-          
-          // Count burgers and drinks
-          if (itemName.toLowerCase().includes('burger') || itemName.toLowerCase().includes('smash')) {
-            burgersSold += quantity;
-          }
-          if (itemName.toLowerCase().includes('coke') || itemName.toLowerCase().includes('fanta') || 
-              itemName.toLowerCase().includes('sprite') || itemName.toLowerCase().includes('water')) {
-            drinksSold += quantity;
-          }
-          
-          // Update items breakdown
-          if (!itemsBreakdown[itemName]) {
-            itemsBreakdown[itemName] = { qty: 0, sales: 0 };
-          }
-          itemsBreakdown[itemName].qty += quantity;
-          itemsBreakdown[itemName].sales += totalMoney;
+        // Count drinks
+        if (itemName.toLowerCase().includes('coke') || itemName.toLowerCase().includes('fanta') || 
+            itemName.toLowerCase().includes('sprite') || itemName.toLowerCase().includes('water')) {
+          drinksSold += quantity;
         }
+        
+        // Add to items breakdown
+        itemsBreakdown[itemName] = { qty: quantity, sales: salesTotal };
       }
       
-      // Get the latest shift date
-      const latestShiftDate = latestReceipts[0]?.shiftDate || new Date().toISOString().split('T')[0];
-      
       res.json({
-        shiftDate: latestShiftDate,
-        burgersSold,
+        shiftDate: shiftData.shiftDate,
+        burgersSold: shiftData.burgersSold,
         drinksSold,
         itemsBreakdown,
         modifiersSummary: {}
