@@ -885,37 +885,57 @@ export function registerRoutes(app: express.Application): Server {
   // Dashboard KPIs endpoint
   app.get("/api/dashboard/kpis", async (req: Request, res: Response) => {
     try {
-      // Use authentic July 17-18 shift data (7:15 PM 07/17 to 1:13 AM 07/18 BKK time)
-      // Total of 34 receipts with ฿13,493 in sales
-      const authenticShiftData = {
-        shiftDate: "2025-07-17",
-        receipts: 34,
-        totalSales: 13493,
-        shiftPeriod: {
-          start: "2025-07-17T19:15:00+07:00", // 7:15 PM BKK
-          end: "2025-07-18T01:13:00+07:00"    // 1:13 AM BKK
-        }
-      };
+      const { db } = await import("./db");
+      const { loyverseReceipts } = await import("../shared/schema");
+      const { desc, sql, gte } = await import("drizzle-orm");
       
-      const lastShiftSales = authenticShiftData.totalSales;
-      const lastShiftOrders = authenticShiftData.receipts;
-      const averageOrderValue = Math.round(lastShiftSales / lastShiftOrders);
+      // Get latest shift receipts (last 24 hours)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
       
-      // Month-to-date includes previous shifts + this shift
-      const monthToDateSales = 316399 + lastShiftSales; // Previous total + current shift
+      const latestReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, yesterday))
+        .orderBy(desc(loyverseReceipts.receiptDate));
+      
+      let lastShiftSales = 0;
+      let lastShiftOrders = 0;
+      let shiftDate = new Date().toISOString();
+      
+      if (latestReceipts.length > 0) {
+        lastShiftSales = latestReceipts.reduce((sum, receipt) => sum + Number(receipt.totalAmount), 0);
+        lastShiftOrders = latestReceipts.length;
+        shiftDate = latestReceipts[0].shiftDate || new Date().toISOString();
+      }
+      
+      // Get month-to-date sales
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      
+      const monthlyReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, monthStart));
+      
+      const monthToDateSales = monthlyReceipts.reduce((sum, receipt) => sum + Number(receipt.totalAmount), 0);
       
       const kpiData = {
-        lastShiftSales,
+        lastShiftSales: Math.round(lastShiftSales),
         lastShiftOrders,
-        monthToDateSales,
-        inventoryValue: 0,
-        averageOrderValue,
-        shiftDate: authenticShiftData.shiftDate,
-        shiftPeriod: authenticShiftData.shiftPeriod,
-        note: "Authentic July 17-18 shift data (34 receipts, ฿13,493)"
+        monthToDateSales: Math.round(monthToDateSales),
+        inventoryValue: 0, // Placeholder - could be calculated from inventory table
+        averageOrderValue: lastShiftOrders > 0 ? Math.round(lastShiftSales / lastShiftOrders) : 0,
+        shiftDate,
+        shiftPeriod: {
+          start: yesterday,
+          end: new Date()
+        },
+        note: "Data from latest receipts"
       };
       
-      console.log("KPI Calculation - Authentic July 17-18 Data:", kpiData);
+      console.log("KPI Calculation:", kpiData);
       res.json(kpiData);
     } catch (err) {
       console.error("Error fetching KPIs:", err);
@@ -1167,36 +1187,51 @@ export function registerRoutes(app: express.Application): Server {
 
   app.get("/api/top-sales", async (req: Request, res: Response) => {
     try {
-      // Authentic July 17-18 top sales data from 34 receipts
-      const authenticTopSales = [
-        {
-          itemName: "Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น)",
-          quantity: 12,
-          salesTotal: 2868
-        },
-        {
-          itemName: "Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน)",
-          quantity: 8,
-          salesTotal: 2046
-        },
-        {
-          itemName: "French Fries",
-          quantity: 6,
-          salesTotal: 534
-        },
-        {
-          itemName: "Onion Rings",
-          quantity: 6,
-          salesTotal: 594
-        },
-        {
-          itemName: "Ultimate Double (คู่)",
-          quantity: 6,
-          salesTotal: 1320
-        }
-      ];
+      const { db } = await import("./db");
+      const { loyverseReceipts } = await import("../shared/schema");
+      const { desc, gte } = await import("drizzle-orm");
       
-      res.json(authenticTopSales);
+      // Get receipts from last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const recentReceipts = await db
+        .select()
+        .from(loyverseReceipts)
+        .where(gte(loyverseReceipts.receiptDate, yesterday))
+        .orderBy(desc(loyverseReceipts.receiptDate));
+      
+      // Aggregate sales by item
+      const itemSales: Record<string, { qty: number; sales: number }> = {};
+      
+      for (const receipt of recentReceipts) {
+        const items = receipt.items as any[];
+        if (!items || !Array.isArray(items)) continue;
+        
+        for (const item of items) {
+          const itemName = item.item_name || 'Unknown';
+          const quantity = item.quantity || 0;
+          const totalMoney = item.total_money || 0;
+          
+          if (!itemSales[itemName]) {
+            itemSales[itemName] = { qty: 0, sales: 0 };
+          }
+          itemSales[itemName].qty += quantity;
+          itemSales[itemName].sales += totalMoney;
+        }
+      }
+      
+      // Sort by quantity and take top 5
+      const topItems = Object.entries(itemSales)
+        .sort(([,a], [,b]) => b.qty - a.qty)
+        .slice(0, 5)
+        .map(([itemName, data]) => ({
+          itemName,
+          quantity: data.qty,
+          salesTotal: Math.round(data.sales)
+        }));
+      
+      res.json(topItems);
     } catch (error) {
       console.error("Error fetching top sales:", error);
       res.status(500).json({ error: "Failed to fetch top sales data" });

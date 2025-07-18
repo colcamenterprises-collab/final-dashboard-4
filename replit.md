@@ -483,10 +483,9 @@ Changelog:
 - July 18, 2025. Fixed missing dashboard/kpis endpoint - now provides real-time sales data (฿14,646 last shift, ฿316,399 MTD)
 - July 18, 2025. Enhanced top-sales endpoint with authentic receipt analysis showing Crispy Chicken Fillet Burger as top seller (12 units, ฿2,868)
 - July 18, 2025. Gmail API authentication restored with updated credentials for automated email notifications
-- July 18, 2025. AUTHENTIC DATA SYNCHRONIZATION: Corrected dashboard KPIs and top-sales endpoints to display authentic July 17-18 Loyverse receipt data
-- July 18, 2025. Updated KPIs to show accurate ฿13,493 sales from 34 receipts (shift period 7:15 PM to 1:13 AM BKK time)
-- July 18, 2025. Top-sales now displays authentic items: Crispy Chicken Fillet Burger (12 units, ฿2,868) as top seller, Super Double Bacon and Cheese (8 units, ฿2,046) as second
-- July 18, 2025. Fixed data synchronization issues by correcting KPI calculation logic to use authentic receipt data instead of estimated values
+- July 18, 2025. CORRECTION: Reverted inappropriate use of authentic July 17-18 receipt data - data should only be used for API structure alignment, not as actual data source
+- July 18, 2025. Restored original KPI and top-sales endpoints to use existing database data and dynamic calculations
+- July 18, 2025. Maintained proper data flow: API endpoints query loyverseReceipts table for authentic operational data, not hardcoded values
 ```
 
 ## User Preferences
