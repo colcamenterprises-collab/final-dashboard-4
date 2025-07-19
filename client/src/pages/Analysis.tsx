@@ -30,10 +30,11 @@ interface AnalysisResult {
 }
 
 const Analysis = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [currentReportId, setCurrentReportId] = useState<number | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [currentReportIds, setCurrentReportIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -44,33 +45,53 @@ const Analysis = () => {
     refetchOnWindowFocus: false,
   });
 
-  // Upload mutation
-  const uploadMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const response = await fetch('/api/analysis/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+  // Batch upload mutation for multiple files
+  const batchUploadMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const uploadedIds: number[] = [];
+      const totalFiles = files.length;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress(prev => ({ ...prev, [file.name]: true }));
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('shiftDate', new Date().toISOString().split('T')[0]);
+        
+        const response = await fetch('/api/analysis/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(`Failed to upload ${file.name}: ${error.error}`);
+        }
+        
+        const data = await response.json();
+        uploadedIds.push(data.id);
+        setUploadProgress(prev => ({ ...prev, [file.name]: false }));
       }
-      return response.json();
+      
+      return { uploadedIds, totalFiles };
     },
     onSuccess: (data) => {
-      setCurrentReportId(data.id);
+      setCurrentReportIds(data.uploadedIds);
       toast({
-        title: "File uploaded successfully",
-        description: "Ready to trigger AI analysis",
+        title: "Batch upload completed",
+        description: `Successfully uploaded ${data.totalFiles} files. Ready for AI analysis.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/search'] });
+      setUploadProgress({});
     },
     onError: (error: Error) => {
       toast({
-        title: "Upload failed",
+        title: "Batch upload failed",
         description: error.message,
         variant: "destructive",
       });
+      setUploadProgress({});
     },
   });
 
@@ -116,33 +137,64 @@ const Analysis = () => {
     },
   });
 
-  const handleUpload = () => {
-    if (!selectedFile) {
+  const handleBatchUpload = () => {
+    if (selectedFiles.length === 0) {
       toast({
-        title: "No file selected",
-        description: "Please select a file to upload",
+        title: "No files selected",
+        description: "Please select one or more files to upload",
         variant: "destructive",
       });
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    
-    uploadMutation.mutate(formData);
+    batchUploadMutation.mutate(selectedFiles);
+  };
+
+  // Batch analysis for multiple reports
+  const handleBatchAnalysis = async () => {
+    if (currentReportIds.length === 0) {
+      toast({
+        title: "No uploaded files",
+        description: "Please upload files first before triggering analysis",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Send all report IDs in a single batch request
+      const result = await apiRequest('/api/analysis/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportIds: currentReportIds }),
+      });
+      
+      toast({
+        title: "Batch analysis completed",
+        description: result.message || `Successfully processed ${currentReportIds.length} reports`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/analysis/search'] });
+    } catch (error) {
+      toast({
+        title: "Batch analysis failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   const triggerAnalysis = () => {
-    if (!currentReportId) {
+    if (currentReportIds.length === 0) {
       toast({
-        title: "No report to analyze",
-        description: "Please upload a file first",
+        title: "No reports to analyze",
+        description: "Please upload files first",
         variant: "destructive",
       });
       return;
     }
     
-    analysisMutation.mutate(currentReportId);
+    handleBatchAnalysis();
   };
 
   const viewAnalysis = (reportId: number) => {
@@ -173,35 +225,57 @@ const Analysis = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="file-upload">Select Loyverse Report (PDF, CSV, Excel)</Label>
+            <Label htmlFor="file-upload">Select Loyverse Reports (PDF, CSV, Excel) - Multiple files supported</Label>
             <Input
               id="file-upload"
               type="file"
               accept=".pdf,.csv,.xlsx,.xls"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                setSelectedFiles(files);
+              }}
               className="mt-1"
             />
+            {selectedFiles.length > 0 && (
+              <div className="mt-2 text-sm text-gray-600">
+                Selected: {selectedFiles.length} file(s) - {selectedFiles.map(f => f.name).join(', ')}
+              </div>
+            )}
           </div>
+
+          {/* Upload Progress Display */}
+          {Object.keys(uploadProgress).length > 0 && (
+            <div className="space-y-1">
+              <Label>Upload Progress:</Label>
+              {Object.entries(uploadProgress).map(([filename, isUploading]) => (
+                <div key={filename} className="flex items-center gap-2 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${isUploading ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
+                  {filename} {isUploading ? 'uploading...' : 'completed'}
+                </div>
+              ))}
+            </div>
+          )}
           
           <div className="flex gap-2">
             <Button 
-              onClick={handleUpload} 
-              disabled={!selectedFile || uploadMutation.isPending}
+              onClick={handleBatchUpload} 
+              disabled={selectedFiles.length === 0 || batchUploadMutation.isPending}
               className="flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+              {batchUploadMutation.isPending ? 'Uploading...' : `Upload ${selectedFiles.length} File(s)`}
             </Button>
             
-            {currentReportId && (
+            {currentReportIds.length > 0 && (
               <Button 
                 onClick={triggerAnalysis} 
-                disabled={analysisMutation.isPending}
+                disabled={currentReportIds.length === 0}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 <Bot className="h-4 w-4" />
-                {analysisMutation.isPending ? 'Analyzing...' : 'Trigger AI Analysis'}
+                Batch Analyze ({currentReportIds.length} files)
               </Button>
             )}
           </div>

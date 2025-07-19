@@ -15,8 +15,9 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Fallback System**: Implemented graceful fallback to demo analysis when OpenAI API is unavailable, ensuring continuous operation
 
 ### Enhanced Analysis Page Functionality
-- **File Upload Interface**: Professional upload interface with date selection and file type validation for Loyverse reports
-- **Real-time Analysis Processing**: One-click analysis trigger with progress indicators and comprehensive result display
+- **Multiple File Upload Interface**: Professional batch upload interface supporting multiple Loyverse reports simultaneously (CSV, Excel, PDF)
+- **Batch Processing Capability**: Upload and analyze multiple files at once with progress tracking and individual file status monitoring
+- **Real-time Analysis Processing**: One-click batch analysis trigger with progress indicators and comprehensive result display
 - **Search and History**: Complete search functionality for previously uploaded reports with detailed metadata
 - **Visual Results Display**: Structured display of analysis results including sales summaries, payment methods, top items, stock usage, and anomaly alerts
 - **Dashboard Link Integration**: Seamless navigation between analysis page and dashboard with consistent data presentation
