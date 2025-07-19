@@ -687,16 +687,7 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  app.get("/api/analysis/search", async (req: Request, res: Response) => {
-    try {
-      const { q, from, to, cat } = req.query;
-      // TODO: implement search functionality
-      res.json({ message: "Search functionality coming soon" });
-    } catch (err) {
-      console.error("Error searching analytics:", err);
-      res.status(500).json({ error: "Failed to search analytics" });
-    }
-  });
+  // Removed old search route - replaced with AI analysis search below
 
   app.post("/api/analysis/process-shift", async (req: Request, res: Response) => {
     try {
@@ -1304,6 +1295,138 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error processing webhook:", err);
       res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Analysis API endpoints for file upload and AI processing
+  // Upload endpoint
+  app.post('/api/analysis/upload', async (req: Request, res: Response) => {
+    const multer = (await import('multer')).default;
+    const upload = multer({ storage: multer.memoryStorage() });
+    
+    // Use upload middleware
+    upload.single('file')(req, res, async (err: any) => {
+      if (err) {
+        return res.status(400).json({ error: 'File upload failed' });
+      }
+      
+      try {
+        const file = req.file;
+        if (!file) {
+          return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const { uploadedReports } = await import("../shared/schema");
+        const shiftDate = req.body.shiftDate ? new Date(req.body.shiftDate) : null;
+        
+        // Convert file to base64 for JSON storage
+        const fileDataBase64 = file.buffer.toString('base64');
+
+        // Insert to DB
+        const [report] = await db.insert(uploadedReports).values({
+          filename: file.originalname,
+          fileType: file.mimetype,
+          fileData: { data: fileDataBase64 },
+          shiftDate: shiftDate?.toISOString(),
+          userId: 1, // Default user for now
+        }).returning({ id: uploadedReports.id });
+
+        res.json({ success: true, id: report.id, message: 'File uploaded successfully - trigger analysis next' });
+      } catch (err) {
+        console.error('Upload error:', err);
+        res.status(500).json({ error: 'Upload failed' });
+      }
+    });
+  });
+
+  // Trigger analysis endpoint
+  app.post('/api/analysis/trigger', async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.body;
+      const { uploadedReports } = await import("../shared/schema");
+      const { analyzeReport, updateDashboardFromAnalysis } = await import("./ai-agent");
+      
+      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+
+      // Parse file based on type
+      let textContent: string;
+      const fileBuffer = Buffer.from((report.fileData as any).data, 'base64');
+      
+      if (report.fileType === 'application/pdf') {
+        const pdfParse = (await import('pdf-parse')).default;
+        textContent = (await pdfParse(fileBuffer)).text;
+      } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        const xlsx = await import('xlsx');
+        const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+        textContent = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+      } else if (report.fileType === 'text/csv' || report.fileType === 'application/octet-stream' || report.filename.endsWith('.csv')) {
+        textContent = fileBuffer.toString('utf-8');
+      } else {
+        return res.status(400).json({ error: 'Unsupported file type: ' + report.fileType });
+      }
+
+      // AI analysis
+      const analysis = await analyzeReport(textContent, report.filename);
+
+      // Update DB with analysis
+      await db.update(uploadedReports)
+        .set({ analysisSummary: analysis })
+        .where(eq(uploadedReports.id, reportId));
+
+      // Update dashboard tables if shift date is provided
+      if (analysis.shiftDate) {
+        await updateDashboardFromAnalysis(analysis, analysis.shiftDate);
+      }
+
+      res.json({ success: true, analysis });
+    } catch (err) {
+      console.error('Analysis error:', err);
+      res.status(500).json({ error: 'Analysis failed: ' + (err as Error).message });
+    }
+  });
+
+  // Search stored documents - Must come before the :id route
+  app.get('/api/analysis/search', async (req: Request, res: Response) => {
+    try {
+      const { uploadedReports } = await import("../shared/schema");
+      const { like } = await import("drizzle-orm");
+      const query = req.query.q as string;
+      
+      let results;
+      if (query) {
+        results = await db.select().from(uploadedReports)
+          .where(like(uploadedReports.filename, `%${query}%`))
+          .orderBy(desc(uploadedReports.uploadDate));
+      } else {
+        results = await db.select().from(uploadedReports)
+          .orderBy(desc(uploadedReports.uploadDate))
+          .limit(20);
+      }
+
+      res.json(results);
+    } catch (err) {
+      console.error('Error searching documents:', err);
+      res.status(500).json({ error: 'Search failed' });
+    }
+  });
+
+  // View analysis endpoint - Must come after the search route
+  app.get('/api/analysis/:id', async (req: Request, res: Response) => {
+    try {
+      const { uploadedReports } = await import("../shared/schema");
+      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, parseInt(req.params.id))).limit(1);
+      
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+
+      res.json(report.analysisSummary || { message: 'No analysis available' });
+    } catch (err) {
+      console.error('Error fetching analysis:', err);
+      res.status(500).json({ error: 'Failed to fetch analysis' });
     }
   });
 

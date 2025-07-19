@@ -1,508 +1,372 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Calendar, TrendingUp, AlertTriangle, CheckCircle, XCircle, BarChart3, Package, Users, DollarSign } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { FileUp, Search, Eye, Bot, Upload } from "lucide-react";
 
-interface LoyverseData {
-  shiftInfo: {
-    reportId: string;
-    shiftDate: string;
-    shiftStart: string;
-    shiftEnd: string;
-    totalSales: string;
-    totalReceipts: number;
-  };
-  items: Array<{
-    name: string;
-    quantity: number;
-    totalSales: number;
-  }>;
-  modifiers: Array<{
-    name: string;
-    option: string;
-    count: number;
-    totalAmount: number;
-  }>;
-  summary: {
-    totalUniqueItems: number;
-    totalUniqueModifiers: number;
-    totalItemsSold: number;
-    totalModifiersUsed: number;
-  };
-}
-
-interface StaffFormData {
+interface UploadedReport {
   id: number;
-  completedBy: string;
-  shiftType: string;
-  shiftDate: string;
-  totalSales: string;
-  cashSales: string;
-  grabSales: string;
-  foodPandaSales: string;
-  aroiDeeSales: string;
-  qrScanSales: string;
-  burgerBunsStock: string;
-  rollsOrderedCount: string;
-  burgerMeatStock: string;
-  cokeStock: string;
-  cokeZeroStock: string;
-  spriteStock: string;
-  createdAt: string;
+  filename: string;
+  fileType: string;
+  uploadDate: string;
+  shiftDate?: string;
+  analysisSummary?: any;
 }
 
-export default function Analysis() {
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+interface AnalysisResult {
+  totalSales: number;
+  totalOrders: number;
+  topItems: Array<{ name: string; quantity: number; sales: number }>;
+  paymentMethods: { cash: number; card: number; other: number };
+  anomalies: string[];
+  stockUsage: { rolls: number; meat: number; drinks: number; fries: number };
+  shiftDate: string;
+  summary: string;
+}
 
-  // Fetch Loyverse data for last completed shift
-  const { data: loyverseData, isLoading: loyverseLoading } = useQuery<LoyverseData>({
-    queryKey: ['/api/loyverse/last-shift-inventory'],
-    refetchInterval: 30000, // Refresh every 30 seconds
+const Analysis = () => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [currentReportId, setCurrentReportId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Search documents query
+  const { data: reports = [], isLoading: isSearching } = useQuery({
+    queryKey: ['/api/analysis/search', searchQuery],
+    queryFn: () => apiRequest(`/api/analysis/search?q=${encodeURIComponent(searchQuery)}`),
+    refetchOnWindowFocus: false,
   });
 
-  // Fetch staff form data for selected date
-  const { data: staffFormData, isLoading: staffFormLoading } = useQuery<StaffFormData[]>({
-    queryKey: ['/api/daily-stock-sales/search', selectedDate],
-    enabled: !!selectedDate,
+  // Upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await fetch('/api/analysis/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setCurrentReportId(data.id);
+      toast({
+        title: "File uploaded successfully",
+        description: "Ready to trigger AI analysis",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analysis/search'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
-  const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return `฿${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  // Analysis trigger mutation
+  const analysisMutation = useMutation({
+    mutationFn: async (reportId: number) => {
+      return apiRequest('/api/analysis/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId }),
+      });
+    },
+    onSuccess: (data) => {
+      setCurrentAnalysis(data.analysis);
+      toast({
+        title: "Analysis completed",
+        description: "AI has processed the report successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Analysis failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
-  const formatDateTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('en-US', {
-      timeZone: 'Asia/Bangkok',
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // View analysis mutation
+  const viewAnalysisMutation = useMutation({
+    mutationFn: async (reportId: number) => {
+      return apiRequest(`/api/analysis/${reportId}`);
+    },
+    onSuccess: (data) => {
+      if (data.message) {
+        toast({
+          title: "No analysis available",
+          description: data.message,
+        });
+      } else {
+        setCurrentAnalysis(data);
+      }
+    },
+  });
 
-  const getVarianceStatus = (loyverse: number, staff: number, tolerance: number = 0.05) => {
-    const variance = Math.abs(loyverse - staff) / loyverse;
-    if (variance <= tolerance) return 'match';
-    if (variance <= 0.1) return 'warning';
-    return 'error';
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'match':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case 'error':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return null;
+  const handleUpload = () => {
+    if (!selectedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
     }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    
+    uploadMutation.mutate(formData);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'match':
-        return 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800';
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800';
-      case 'error':
-        return 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800';
-      default:
-        return 'bg-gray-50 border-gray-200 dark:bg-gray-900/20 dark:border-gray-800';
+  const triggerAnalysis = () => {
+    if (!currentReportId) {
+      toast({
+        title: "No report to analyze",
+        description: "Please upload a file first",
+        variant: "destructive",
+      });
+      return;
     }
+    
+    analysisMutation.mutate(currentReportId);
   };
 
-  const currentStaffForm = staffFormData?.[0];
-  const loyverseSales = loyverseData ? parseFloat(loyverseData.shiftInfo.totalSales) : 0;
-  const staffSales = currentStaffForm ? parseFloat(currentStaffForm.totalSales) : 0;
-  const salesVarianceStatus = getVarianceStatus(loyverseSales, staffSales);
+  const viewAnalysis = (reportId: number) => {
+    viewAnalysisMutation.mutate(reportId);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+    }).format(amount);
+  };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Daily Operations Analysis
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Compare Loyverse POS data with staff form reports
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
-          />
-          <Button variant="outline" size="sm">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Generate AI Analysis
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Bot className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">AI Report Analysis</h1>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Data Status</p>
-                <p className="text-lg font-semibold">
-                  {loyverseData && currentStaffForm ? 'Complete' : 'Partial'}
-                </p>
-              </div>
-              <div className="text-blue-500">
-                {loyverseData && currentStaffForm ? 
-                  <CheckCircle className="h-6 w-6" /> : 
-                  <AlertTriangle className="h-6 w-6" />
-                }
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Upload Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileUp className="h-5 w-5" />
+            <h3 className="text-lg font-semibold">Upload Report</h3>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="file-upload">Select Loyverse Report (PDF, CSV, Excel)</Label>
+            <Input
+              id="file-upload"
+              type="file"
+              accept=".pdf,.csv,.xlsx,.xls"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              className="mt-1"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleUpload} 
+              disabled={!selectedFile || uploadMutation.isPending}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+            </Button>
+            
+            {currentReportId && (
+              <Button 
+                onClick={triggerAnalysis} 
+                disabled={analysisMutation.isPending}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Bot className="h-4 w-4" />
+                {analysisMutation.isPending ? 'Analyzing...' : 'Trigger AI Analysis'}
+              </Button>
+            )}
+          </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Sales Variance</p>
-                <p className="text-lg font-semibold">
-                  {salesVarianceStatus === 'match' ? 'Match' : 
-                   salesVarianceStatus === 'warning' ? 'Minor' : 'Major'}
-                </p>
-              </div>
-              <div>
-                {getStatusIcon(salesVarianceStatus)}
-              </div>
+          {uploadMutation.isSuccess && currentReportId && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-800">
+                File uploaded successfully (ID: {currentReportId}). Click "Trigger AI Analysis" to process.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Items Tracked</p>
-                <p className="text-lg font-semibold">
-                  {loyverseData?.summary.totalUniqueItems || 0}
-                </p>
-              </div>
-              <Package className="h-6 w-6 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Staff Reports</p>
-                <p className="text-lg font-semibold">
-                  {staffFormData?.length || 0}
-                </p>
-              </div>
-              <Users className="h-6 w-6 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Analysis Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Loyverse Column */}
+      {/* Current Analysis Results */}
+      {currentAnalysis && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-500" />
-              Loyverse POS Data
-            </CardTitle>
+            <h3 className="text-lg font-semibold">Analysis Results</h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loyverseLoading ? (
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-300 rounded w-full"></div>
-              </div>
-            ) : loyverseData ? (
-              <>
-                {/* Shift Summary */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Shift Summary
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Total Sales</p>
-                      <p className="font-semibold text-green-600">
-                        {formatCurrency(loyverseData.shiftInfo.totalSales)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Total Orders</p>
-                      <p className="font-semibold">{loyverseData.shiftInfo.totalReceipts}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Items Sold</p>
-                      <p className="font-semibold">{loyverseData.summary.totalItemsSold}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Modifiers Used</p>
-                      <p className="font-semibold">{loyverseData.summary.totalModifiersUsed}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Top Items */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                    Top Items Sold
-                  </h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {loyverseData.items.slice(0, 8).map((item, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-xs text-gray-500">{item.quantity} sold</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm">{formatCurrency(item.totalSales)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Key Modifiers */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                    Key Modifiers
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {loyverseData.modifiers.filter(mod => mod.count > 1).slice(0, 5).map((modifier, index) => (
-                      <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="font-medium">{modifier.option}</span>
-                        <Badge variant="secondary">{modifier.count}x</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  No Loyverse data available for analysis.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Staff Form Column */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-purple-500" />
-              Staff Form Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {staffFormLoading ? (
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-300 rounded w-full"></div>
-              </div>
-            ) : currentStaffForm ? (
-              <>
-                {/* Staff Summary */}
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Staff Report Summary
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Completed By</p>
-                      <p className="font-semibold">{currentStaffForm.completedBy}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Shift Type</p>
-                      <p className="font-semibold">{currentStaffForm.shiftType}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Reported Sales</p>
-                      <p className="font-semibold text-green-600">
-                        {formatCurrency(currentStaffForm.totalSales)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Submitted</p>
-                      <p className="font-semibold text-xs">
-                        {formatDateTime(currentStaffForm.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sales Breakdown */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                    Sales Breakdown
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                      <span className="font-medium text-sm">Cash Sales</span>
-                      <span className="font-semibold text-sm">{formatCurrency(currentStaffForm.cashSales)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                      <span className="font-medium text-sm">Grab Sales</span>
-                      <span className="font-semibold text-sm">{formatCurrency(currentStaffForm.grabSales)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                      <span className="font-medium text-sm">FoodPanda Sales</span>
-                      <span className="font-semibold text-sm">{formatCurrency(currentStaffForm.foodPandaSales)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                      <span className="font-medium text-sm">QR Scan Sales</span>
-                      <span className="font-semibold text-sm">{formatCurrency(currentStaffForm.qrScanSales)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stock Levels */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                    Stock Levels Reported
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Burger Buns</span>
-                      <Badge variant="outline">{currentStaffForm.burgerBunsStock}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Rolls Ordered</span>
-                      <Badge variant="outline">{currentStaffForm.rollsOrderedCount}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Burger Meat</span>
-                      <Badge variant="outline">{currentStaffForm.burgerMeatStock}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Coke Stock</span>
-                      <Badge variant="outline">{currentStaffForm.cokeStock}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Coke Zero Stock</span>
-                      <Badge variant="outline">{currentStaffForm.cokeZeroStock}</Badge>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  No staff form data available for {selectedDate}.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Comparison Analysis */}
-      {loyverseData && currentStaffForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-orange-500" />
-              Variance Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Sales Comparison */}
-              <div className={`p-4 rounded-lg border-2 ${getStatusColor(salesVarianceStatus)}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold">Sales Comparison</h4>
-                  {getStatusIcon(salesVarianceStatus)}
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Loyverse POS:</span>
-                    <span className="font-semibold">{formatCurrency(loyverseSales)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Staff Report:</span>
-                    <span className="font-semibold">{formatCurrency(staffSales)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span>Difference:</span>
-                    <span className={`font-semibold ${loyverseSales > staffSales ? 'text-red-600' : 'text-green-600'}`}>
-                      {formatCurrency(Math.abs(loyverseSales - staffSales))}
-                    </span>
-                  </div>
-                </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-blue-900">Total Sales</h4>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(currentAnalysis.totalSales)}
+                </p>
               </div>
-
-              {/* Item Analysis */}
-              <div className="p-4 rounded-lg border-2 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-                <h4 className="font-semibold mb-2">Item Analysis</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Unique Items:</span>
-                    <span className="font-semibold">{loyverseData.summary.totalUniqueItems}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Sold:</span>
-                    <span className="font-semibold">{loyverseData.summary.totalItemsSold}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Avg per Order:</span>
-                    <span className="font-semibold">
-                      {(loyverseData.summary.totalItemsSold / loyverseData.shiftInfo.totalReceipts).toFixed(1)}
-                    </span>
-                  </div>
-                </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <h4 className="font-semibold text-green-900">Total Orders</h4>
+                <p className="text-2xl font-bold text-green-700">
+                  {currentAnalysis.totalOrders}
+                </p>
               </div>
-
-              {/* Stock Analysis */}
-              <div className="p-4 rounded-lg border-2 bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-                <h4 className="font-semibold mb-2">Stock Analysis</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Burger Buns:</span>
-                    <span className="font-semibold">{currentStaffForm.burgerBunsStock}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Rolls Ordered:</span>
-                    <span className="font-semibold">{currentStaffForm.rollsOrderedCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Meat Stock:</span>
-                    <span className="font-semibold">{currentStaffForm.burgerMeatStock}</span>
-                  </div>
-                </div>
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <h4 className="font-semibold text-purple-900">Shift Date</h4>
+                <p className="text-lg font-semibold text-purple-700">
+                  {currentAnalysis.shiftDate}
+                </p>
               </div>
             </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">Summary</h4>
+              <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
+                {currentAnalysis.summary}
+              </p>
+            </div>
+
+            {currentAnalysis.topItems && currentAnalysis.topItems.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">Top Selling Items</h4>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Sales</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentAnalysis.topItems.slice(0, 10).map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{formatCurrency(item.sales)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {currentAnalysis.anomalies && currentAnalysis.anomalies.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">Anomalies Detected</h4>
+                <ul className="space-y-1">
+                  {currentAnalysis.anomalies.map((anomaly, index) => (
+                    <li key={index} className="text-amber-700 bg-amber-50 p-2 rounded border-l-4 border-amber-400">
+                      {anomaly}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Search and View Documents */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            <h3 className="text-lg font-semibold">Stored Documents</h3>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search documents by filename..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1"
+            />
+            <Button variant="outline" onClick={() => setSearchQuery('')}>
+              Clear
+            </Button>
+          </div>
+
+          {isSearching ? (
+            <p>Searching...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Filename</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Upload Date</TableHead>
+                    <TableHead>Shift Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reports.map((report: UploadedReport) => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-medium">{report.filename}</TableCell>
+                      <TableCell>{report.fileType}</TableCell>
+                      <TableCell>
+                        {new Date(report.uploadDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {report.shiftDate ? new Date(report.shiftDate).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => viewAnalysis(report.id)}
+                          disabled={viewAnalysisMutation.isPending}
+                          className="flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          View Analysis
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {reports.length === 0 && !isSearching && (
+            <p className="text-gray-500 text-center py-4">
+              No documents found. Upload a report to get started.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
+
+export default Analysis;

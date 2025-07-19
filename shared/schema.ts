@@ -562,4 +562,20 @@ export type InsertStockPurchaseDrinks = z.infer<typeof insertStockPurchaseDrinks
 export type StockPurchaseMeat = typeof stockPurchaseMeat.$inferSelect;
 export type InsertStockPurchaseMeat = z.infer<typeof insertStockPurchaseMeatSchema>;
 
+// Uploaded Reports table for AI analysis
+export const uploadedReports = pgTable('uploaded_reports', {
+  id: serial('id').primaryKey(),
+  filename: text('filename').notNull(),
+  fileType: text('file_type').notNull(), // pdf, csv, xlsx
+  fileData: jsonb('file_data').notNull(), // Base64 encoded data storage
+  uploadDate: timestamp('upload_date').defaultNow(),
+  shiftDate: timestamp('shift_date'), // Extracted from report
+  analysisSummary: jsonb('analysis_summary'), // AI results
+  userId: integer('user_id'), // For multi-restaurant scalability
+});
+
+export const insertUploadedReportsSchema = createInsertSchema(uploadedReports).omit({ id: true, uploadDate: true });
+export type UploadedReport = typeof uploadedReports.$inferSelect;
+export type InsertUploadedReport = z.infer<typeof insertUploadedReportsSchema>;
+
 
