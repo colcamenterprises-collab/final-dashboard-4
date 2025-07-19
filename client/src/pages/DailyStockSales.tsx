@@ -42,6 +42,46 @@ import {
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
+// Fresh Food items 
+const FRESH_FOOD_ITEMS = [
+  'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
+  'Milk', 'Butter'
+];
+
+// Frozen Food items
+const FROZEN_FOOD_ITEMS = [
+  'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
+];
+
+// Shelf Items (non-perishable items)
+const SHELF_ITEMS = [
+  'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
+  'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup',
+  'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'
+];
+
+// Drink items with current requirements (matching backend requirements)
+const DRINK_ITEMS = [
+  'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
+  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
+];
+
+// Kitchen supplies
+const KITCHEN_ITEMS = [
+  'Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)',
+  'Rubber Gloves (Medium)', 'Rubber Gloves (Large)', 'Alcohol Sanitiser',
+  'Dish Washing Liquid', 'Paper Towel (Long)', 'Sponge (dish washing)',
+  'Paper Towel (Short)', 'Rolls Sticky Tape'
+];
+
+// Packaging supplies
+const PACKAGING_ITEMS = [
+  'French Fries Box', 'French Fries Paper', 'Paper Food Bags', 'Fork & Knife Set',
+  'Loaded Fries Boxes', 'Burger Paper (12 x 14)', 'Wooden Flag Skewers',
+  'Printer Rolls', 'Takeaway Sauce Containers', 'Coleslaw Container',
+  'Plastic Carry Bags', 'Packaging Labels'
+];
+
 // Shop options for shopping entries
 const SHOP_OPTIONS = [
   'Makro',
@@ -133,11 +173,6 @@ export default function DailyStockSales() {
   // Item management state
   const [showItemManager, setShowItemManager] = useState(false);
 
-  // Fetch ingredients from database to populate form sections
-  const { data: ingredients = [], isLoading: ingredientsLoading } = useQuery({
-    queryKey: ['/api/ingredients'],
-  });
-
   // Search query for completed forms
   const { data: completedForms = [], isLoading: searchLoading } = useQuery({
     queryKey: ['/api/daily-stock-sales/search', searchQuery],
@@ -150,23 +185,6 @@ export default function DailyStockSales() {
       return response.json();
     }
   });
-
-  // Group ingredients by category for form sections
-  const groupedIngredients = ingredients.reduce((acc: any, ingredient: any) => {
-    if (!acc[ingredient.category]) {
-      acc[ingredient.category] = [];
-    }
-    acc[ingredient.category].push(ingredient.name);
-    return acc;
-  }, {});
-
-  // Extract ingredient names by category
-  const FRESH_FOOD_ITEMS = groupedIngredients['Fresh Food'] || [];
-  const FROZEN_FOOD_ITEMS = groupedIngredients['Frozen Food'] || [];
-  const SHELF_ITEMS = groupedIngredients['Shelf Stock'] || [];
-  const DRINK_ITEMS = groupedIngredients['Drinks'] || [];
-  const KITCHEN_ITEMS = groupedIngredients['Kitchen Supplies'] || [];
-  const PACKAGING_ITEMS = groupedIngredients['Packaging'] || [];
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
