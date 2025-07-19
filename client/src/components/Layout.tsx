@@ -5,7 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText,
+  ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils
+} from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
 // Currency Context
@@ -25,19 +29,61 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  { path: "/", label: "Dashboard", icon: Home },
-  { path: "/daily-stock-sales", label: "Daily Stock & Sales", icon: ClipboardList },
-  { path: "/past-forms", label: "Past Forms", icon: FileText },
-  { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
-  { path: "/recipe-management", label: "Recipe & Ingredient Management", icon: ChefHat },
-  { path: "/marketing", label: "Marketing", icon: Megaphone },
-  { path: "/finance", label: "Finance", icon: Calculator },
-  { path: "/expenses", label: "Expenses", icon: Receipt },
-  { path: "/pos-loyverse", label: "POS Loyverse", icon: BarChart3 },
-  { path: "/loyverse-live", label: "Loyverse Live", icon: Activity },
-  { path: "/analysis", label: "Analysis", icon: TrendingUp },
-  { path: "/shift-analytics", label: "Shift Analytics", icon: PieChart },
+// Consolidated navigation structure matching Dribbble design
+const navigationStructure = [
+  {
+    id: "operations",
+    label: "Operations & Sales",
+    icon: FolderOpen,
+    expandable: true,
+    items: [
+      { path: "/daily-stock-sales", label: "Daily Sales & Stock Form", icon: ClipboardList },
+      { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
+      { path: "/past-forms", label: "Critical Stock", icon: Package },
+      { path: "/pos-loyverse", label: "Daily Receipts", icon: Receipt },
+      { path: "/analysis", label: "AI Analysis", icon: TrendingUp },
+      { path: "/shift-analytics", label: "Items Sold Breakdown", icon: PieChart },
+      { path: "/loyverse-live", label: "Stock vs Purchased", icon: Activity },
+    ]
+  },
+  {
+    id: "finance",
+    label: "Finance",
+    icon: Finance,
+    expandable: true,
+    items: [
+      { path: "/expenses", label: "Expenses", icon: Receipt },
+      { path: "/finance", label: "P&L", icon: LineChart },
+      { path: "/placeholder/financial-analysis", label: "Financial Analysis (AI)", icon: BarChart3 },
+      { path: "/placeholder/ratios", label: "Ratio Calculations", icon: Calculator },
+      { path: "/placeholder/bank-statements", label: "Bank Statement Upload", icon: FileText },
+    ]
+  },
+  {
+    id: "menu",
+    label: "Menu Management",
+    icon: Utensils,
+    expandable: true,
+    items: [
+      { path: "/recipe-management", label: "Recipes", icon: ChefHat },
+      { path: "/recipe-management", label: "Ingredients List", icon: Package },
+      { path: "/placeholder/pricing", label: "Pricing Database", icon: DollarSign },
+      { path: "/placeholder/food-costs", label: "Food Cost Calculations", icon: Calculator },
+      { path: "/placeholder/ai-descriptions", label: "Food Description Generator (AI)", icon: TrendingUp },
+    ]
+  },
+  {
+    id: "marketing",
+    label: "Marketing",
+    icon: Megaphone,
+    path: "/marketing"
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    path: "/placeholder/settings"
+  }
 ];
 
 export default function Layout({ children }: LayoutProps) {
