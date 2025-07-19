@@ -20,6 +20,7 @@ import Analysis from "@/pages/Analysis";
 import ShiftAnalytics from "@/pages/ShiftAnalytics";
 import WebhookManagement from "@/pages/WebhookManagement";
 import Marketing from "@/pages/Marketing";
+import Placeholder from "@/pages/Placeholder";
 
 import NotFound from "@/pages/not-found";
 
@@ -44,7 +45,15 @@ function Router() {
         <Route path="/analysis" component={Analysis} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/marketing" component={Marketing} />
-
+        
+        {/* Placeholder routes */}
+        <Route path="/placeholder/settings" component={() => <Placeholder title="Settings" description="Business info, logo upload, API keys, theme settings, and employee management." />} />
+        <Route path="/placeholder/financial-analysis" component={() => <Placeholder title="Financial Analysis (AI)" description="AI-powered financial analysis with ratio calculations and insights." />} />
+        <Route path="/placeholder/ratios" component={() => <Placeholder title="Ratio Calculations" description="Prime cost, food cost percentage, profit margins, and financial ratios." />} />
+        <Route path="/placeholder/bank-statements" component={() => <Placeholder title="Bank Statement Upload" description="Upload and categorize bank statements for expense matching." />} />
+        <Route path="/placeholder/pricing" component={() => <Placeholder title="Pricing Database" description="Key ingredients pricing database for shopping cost calculations." />} />
+        <Route path="/placeholder/food-costs" component={() => <Placeholder title="Food Cost Calculations" description="Calculate food costs based on recipes and ingredient pricing." />} />
+        <Route path="/placeholder/ai-descriptions" component={() => <Placeholder title="Food Description Generator (AI)" description="AI-powered food descriptions for marketing and menu creation." />} />
 
         <Route component={NotFound} />
       </Switch>

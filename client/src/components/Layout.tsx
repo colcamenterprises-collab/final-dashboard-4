@@ -66,7 +66,7 @@ const navigationStructure = [
     expandable: true,
     items: [
       { path: "/recipe-management", label: "Recipes", icon: ChefHat },
-      { path: "/recipe-management", label: "Ingredients List", icon: Package },
+      { path: "/recipe-management?tab=ingredients", label: "Ingredients List", icon: Package },
       { path: "/placeholder/pricing", label: "Pricing Database", icon: DollarSign },
       { path: "/placeholder/food-costs", label: "Food Cost Calculations", icon: Calculator },
       { path: "/placeholder/ai-descriptions", label: "Food Description Generator (AI)", icon: TrendingUp },
@@ -91,6 +91,12 @@ export default function Layout({ children }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currency, setCurrency] = useState("THB");
+  const [expandedSections, setExpandedSections] = useState({
+    operations: true,
+    finance: true,
+    menu: true
+  });
+  const [darkMode, setDarkMode] = useState(false);
 
   const formatCurrency = (amount: number) => {
     if (currency === "THB") {
@@ -100,51 +106,152 @@ export default function Layout({ children }: LayoutProps) {
     }
   };
 
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', (!darkMode).toString());
+  };
+
   return (
     <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
-      <div className="min-h-screen bg-white font-inter flex">
-        {/* Black Sidebar */}
-        <div className="w-16 bg-black flex flex-col items-center py-4 space-y-4 fixed left-0 top-0 h-full z-50">
+      <div className={`min-h-screen font-inter flex ${darkMode ? 'dark' : ''}`}>
+        {/* Redesigned Sidebar - Dribbble Style */}
+        <div className="w-64 bg-gray-100 dark:bg-gray-900 flex flex-col py-4 px-3 fixed left-0 top-0 h-full z-50 border-r border-gray-200 dark:border-gray-700">
           {/* Logo */}
-          <div className="mb-6">
+          <div className="flex items-center gap-3 mb-8 px-2">
             <img 
               src={gradientLogo} 
               alt="Restaurant Hub Logo" 
               className="h-8 w-8 object-contain"
             />
+            <span className="font-semibold text-gray-900 dark:text-white">Restaurant Hub</span>
           </div>
           
-          {/* Navigation Icons */}
-          <div className="flex flex-col space-y-6">
-            {navigationItems.map((item) => {
-              const IconComponent = item.icon;
-              const isActive = location === item.path || 
-                (item.path === "/recipe-management" && location === "/ingredient-management");
+          {/* Dashboard Link */}
+          <Link href="/">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start mb-2 ${
+                location === "/" 
+                  ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white" 
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+              }`}
+            >
+              <Home className="h-4 w-4 mr-3" />
+              Dashboard
+            </Button>
+          </Link>
+          
+          {/* Navigation Sections */}
+          <div className="space-y-1">
+            {navigationStructure.map((section) => {
+              const SectionIcon = section.icon;
               
+              if (!section.expandable) {
+                // Simple menu item
+                return (
+                  <Link key={section.id} href={section.path!}>
+                    <Button
+                      variant="ghost"
+                      className={`w-full justify-start ${
+                        location === section.path
+                          ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <SectionIcon className="h-4 w-4 mr-3" />
+                      {section.label}
+                    </Button>
+                  </Link>
+                );
+              }
+              
+              // Expandable section
               return (
-                <Link key={item.path} href={item.path}>
+                <div key={section.id}>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className={`p-2 h-10 w-10 rounded-lg transition-colors ${
-                      isActive 
-                        ? "bg-white/20 text-white" 
-                        : "text-white/70 hover:text-white hover:bg-white/10"
-                    }`}
-                    title={item.label}
+                    className="w-full justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                    onClick={() => toggleSection(section.id)}
                   >
-                    <IconComponent className="h-5 w-5" />
+                    <div className="flex items-center">
+                      <SectionIcon className="h-4 w-4 mr-3" />
+                      {section.label}
+                    </div>
+                    {expandedSections[section.id] ? 
+                      <ChevronDown className="h-4 w-4" /> : 
+                      <ChevronRight className="h-4 w-4" />
+                    }
                   </Button>
-                </Link>
+                  
+                  {expandedSections[section.id] && section.items && (
+                    <div className="ml-6 space-y-1 mt-1">
+                      {section.items.map((item) => {
+                        const ItemIcon = item.icon;
+                        const isPlaceholder = item.path.startsWith('/placeholder');
+                        
+                        return (
+                          <Link key={item.path} href={item.path}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`w-full justify-start text-sm ${
+                                location === item.path
+                                  ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
+                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                              } ${isPlaceholder ? 'opacity-60' : ''}`}
+                            >
+                              <ItemIcon className="h-3 w-3 mr-2" />
+                              {item.label}
+                              {isPlaceholder && <span className="ml-auto text-xs">Soon</span>}
+                            </Button>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
+          </div>
+          
+          {/* Bottom Section - Chat & Controls */}
+          <div className="mt-auto space-y-2">
+            <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
+              <MessageCircle className="h-4 w-4 mr-3" />
+              Chat Support
+            </Button>
+            
+            <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Sun className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <Switch 
+                  checked={darkMode}
+                  onCheckedChange={toggleDarkMode}
+                  className="data-[state=checked]:bg-gray-700"
+                />
+                <Moon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </div>
+            </div>
+            
+            <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
+              <UserPlus className="h-4 w-4 mr-3" />
+              Employees
+            </Button>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 ml-16">
+        <div className="flex-1 ml-64 bg-white dark:bg-gray-950">
           {/* Top Navigation Header */}
-          <nav className="restaurant-nav px-4 sm:px-6 py-4 border-b border-gray-200">
+          <nav className="restaurant-nav px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
             <div className="flex items-center justify-between max-w-7xl mx-auto">
               <div className="flex items-center space-x-4 sm:space-x-8">
                 {/* Mobile menu button */}
@@ -224,25 +331,68 @@ export default function Layout({ children }: LayoutProps) {
 
             {/* Mobile Navigation Menu */}
             {mobileMenuOpen && (
-              <div className="lg:hidden mt-4 pb-4 border-t border-gray-200">
+              <div className="lg:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex flex-col space-y-2 pt-4">
-                  {navigationItems.map((item) => {
-                    const IconComponent = item.icon;
+                  <Link href="/">
+                    <Button
+                      variant={location === "/" ? "default" : "ghost"}
+                      className="w-full justify-start px-4 py-3 rounded-lg font-medium transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Home className="h-4 w-4 mr-3" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                  
+                  {navigationStructure.map((section) => {
+                    const SectionIcon = section.icon;
+                    
+                    if (!section.expandable) {
+                      return (
+                        <Link key={section.id} href={section.path!}>
+                          <Button
+                            variant={location === section.path ? "default" : "ghost"}
+                            className="w-full justify-start px-4 py-3 rounded-lg font-medium transition-colors"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <SectionIcon className="h-4 w-4 mr-3" />
+                            {section.label}
+                          </Button>
+                        </Link>
+                      );
+                    }
+                    
                     return (
-                      <Link key={item.path} href={item.path}>
+                      <div key={section.id} className="space-y-1">
                         <Button
-                          variant={location === item.path ? "default" : "ghost"}
-                          className={`w-full justify-start px-4 py-3 rounded-lg font-medium transition-colors ${
-                            location === item.path 
-                              ? "restaurant-primary" 
-                              : "text-gray-700 hover:text-gray-900"
-                          }`}
-                          onClick={() => setMobileMenuOpen(false)}
+                          variant="ghost"
+                          className="w-full justify-start px-4 py-3 rounded-lg font-medium"
+                          onClick={() => toggleSection(section.id)}
                         >
-                          <IconComponent className="h-4 w-4 mr-3" />
-                          {item.label}
+                          <SectionIcon className="h-4 w-4 mr-3" />
+                          {section.label}
                         </Button>
-                      </Link>
+                        
+                        {expandedSections[section.id] && section.items && (
+                          <div className="ml-6 space-y-1">
+                            {section.items.map((item) => {
+                              const ItemIcon = item.icon;
+                              return (
+                                <Link key={item.path} href={item.path}>
+                                  <Button
+                                    variant={location === item.path ? "default" : "ghost"}
+                                    className="w-full justify-start px-4 py-2 rounded-lg text-sm"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <ItemIcon className="h-3 w-3 mr-2" />
+                                    {item.label}
+                                  </Button>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -263,7 +413,7 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* Main Content */}
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
             {children}
           </main>
         </div>
