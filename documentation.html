@@ -1,0 +1,313 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Restaurant Management Dashboard Documentation</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 20px;
+                background: white;
+            }
+            h1 {
+                color: #2c3e50;
+                border-bottom: 3px solid #3498db;
+                padding-bottom: 10px;
+                font-size: 2.5em;
+                margin-bottom: 30px;
+            }
+            h2 {
+                color: #34495e;
+                border-bottom: 2px solid #ecf0f1;
+                padding-bottom: 8px;
+                margin-top: 40px;
+                margin-bottom: 20px;
+                font-size: 1.8em;
+            }
+            h3 {
+                color: #2c3e50;
+                margin-top: 30px;
+                margin-bottom: 15px;
+                font-size: 1.4em;
+            }
+            h4 {
+                color: #34495e;
+                margin-top: 25px;
+                margin-bottom: 10px;
+                font-size: 1.2em;
+            }
+            p {
+                margin-bottom: 15px;
+                text-align: justify;
+            }
+            ul, ol {
+                margin-bottom: 15px;
+                padding-left: 30px;
+            }
+            li {
+                margin-bottom: 8px;
+            }
+            code {
+                background-color: #f8f9fa;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+            }
+            pre {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                overflow-x: auto;
+                border-left: 4px solid #3498db;
+                margin: 20px 0;
+            }
+            .feature-list {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                margin: 15px 0;
+            }
+            .important {
+                background-color: #fff3cd;
+                border-left: 4px solid #ffc107;
+                padding: 15px;
+                margin: 20px 0;
+            }
+            .section-break {
+                page-break-before: always;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 12px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+            }
+            .header-info {
+                background-color: #e8f4f8;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 30px;
+                border-left: 5px solid #3498db;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Restaurant Management Dashboard - Complete Operational Documentation</h1><h2>Project Overview</h2><p>The Restaurant Management Dashboard is a comprehensive full-stack web application designed for "Smash Brothers Burgers" restaurant operations. This system provides AI-powered analytics, real-time POS integration, inventory management, and automated operational insights to streamline daily restaurant management.</p><h3>Business Purpose</h3>
+<ul><li><strong>Primary Function</strong>: Centralized restaurant operations management</li>
+<li><strong>Target User</strong>: Restaurant managers and staff</li>
+<li><strong>Key Value</strong>: Automated data analysis, inventory tracking, and operational insights</li>
+<li><strong>Operational Hours</strong>: Supports 5:00 PM - 3:00 AM shift cycles (Bangkok timezone)</li><h2>Technical Architecture</h2><h3>Frontend Stack</h3>
+<li><strong>Framework</strong>: React 18 with TypeScript</li>
+<li><strong>Build Tool</strong>: Vite (development and production builds)</li>
+<li><strong>UI Library</strong>: shadcn/ui components built on Radix UI primitives</li>
+<li><strong>Styling</strong>: Tailwind CSS with custom restaurant-specific design tokens</li>
+<li><strong>State Management</strong>: TanStack Query (React Query) for server state</li>
+<li><strong>Routing</strong>: Wouter (lightweight client-side routing)</li>
+<li><strong>Forms</strong>: React Hook Form with Zod validation</li><h3>Backend Stack</h3>
+<li><strong>Runtime</strong>: Node.js with Express.js framework</li>
+<li><strong>Language</strong>: TypeScript with ES modules</li>
+<li><strong>API Design</strong>: RESTful API with centralized route handling</li>
+<li><strong>Database</strong>: PostgreSQL (Neon Database - serverless)</li>
+<li><strong>ORM</strong>: Drizzle ORM for type-safe database operations</li>
+<li><strong>Session Management</strong>: PostgreSQL-based sessions with connect-pg-simple</li><h3>Development Environment</h3>
+<li><strong>Platform</strong>: Replit (web-based development environment)</li>
+<li><strong>Package Manager</strong>: npm</li>
+<li><strong>Hot Reload</strong>: Full-stack hot reloading via Vite</li>
+<li><strong>TypeScript</strong>: Strict mode with path mapping</li><h2>Core System Components</h2><h3>1. Main Dashboard</h3>
+<p><strong>File</strong>: <code>client/src/pages/Dashboard.tsx</code></p>
+<p><strong>Purpose</strong>: Central hub showing real-time operational metrics</p>
+<p><strong>Features</strong>:</p>
+<li>Real-time KPI cards (sales, orders, cash balances)</li>
+<li>AI insights from latest analysis</li>
+<li>Sales vs expenses charts</li>
+<li>Roll variance tracking for burger inventory</li>
+<li>Quick action buttons for common tasks</li><h3>2. Daily Stock & Sales Form</h3>
+<p><strong>File</strong>: <code>client/src/pages/DailyStockSalesSimple.tsx</code></p>
+<p><strong>Purpose</strong>: Staff shift reporting and inventory tracking</p>
+<p><strong>Features</strong>:</p>
+<li>Shift sales reporting (cash, card, delivery platforms)</li>
+<li>Inventory stock counts for all categories</li>
+<li>Expense tracking with receipt photos</li>
+<li>Shopping list auto-generation</li>
+<li>Email notifications to management</li>
+<li>Draft saving and form history</li><h3>3. AI Analysis System</h3>
+<p><strong>File</strong>: <code>client/src/pages/Analysis.tsx</code></p>
+<p><strong>Purpose</strong>: AI-powered analysis of Loyverse POS reports</p>
+<p><strong>Features</strong>:</p>
+<li>Multiple file upload (CSV, Excel, PDF)</li>
+<li>Batch processing with progress tracking</li>
+<li>OpenAI GPT-4o integration for data extraction</li>
+<li>Analysis results with sales summaries and anomaly detection</li>
+<li>Historical analysis search and retrieval</li><h3>4. POS Integration (Loyverse)</h3>
+<p><strong>File</strong>: <code>client/src/pages/LoyverseLive.tsx</code></p>
+<p><strong>Purpose</strong>: Real-time integration with Loyverse POS system</p>
+<p><strong>Features</strong>:</p>
+<li>Live receipt synchronization</li>
+<li>Shift report management</li>
+<li>Webhook configuration for real-time updates</li>
+<li>Manual sync capabilities</li>
+<li>Connection status monitoring</li><h3>5. Expense Management</h3>
+<p><strong>File</strong>: <code>client/src/pages/ExpensesMerged.tsx</code></p>
+<p><strong>Purpose</strong>: Business expense tracking and analysis</p>
+<p><strong>Features</strong>:</p>
+<li>Expense entry with categorization</li>
+<li>Bank statement upload and AI analysis</li>
+<li>Supplier management</li>
+<li>Monthly expense summaries</li><h3>6. Recipe & Ingredient Management</h3>
+<p><strong>File</strong>: <code>client/src/pages/RecipeManagement.tsx</code></p>
+<p><strong>Purpose</strong>: Menu item recipes and ingredient cost tracking</p>
+<p><strong>Features</strong>:</p>
+<li>Recipe creation and editing</li>
+<li>Ingredient cost management</li>
+<li>Marketing content generation (AI-powered)</li>
+<li>Category-based organization</li><h3>7. Shopping List Management</h3>
+<p><strong>File</strong>: <code>client/src/pages/ShoppingList.tsx</code></p>
+<p><strong>Purpose</strong>: Automated procurement management</p>
+<p><strong>Features</strong>:</p>
+<li>Auto-generated from inventory needs</li>
+<li>Supplier integration</li>
+<li>Priority-based organization</li>
+<li>Completion tracking</li><h2>Database Schema</h2><h3>Core Tables</h3><h4>uploaded_reports</h4>
+<li>Stores Loyverse report files for AI analysis</li>
+<li>Fields: filename, fileType, fileData, shiftDate, analysisSummary, uploadedAt, analyzedAt, isAnalyzed</li><h4>daily_stock_sales</h4>
+<li>Staff shift reports and inventory data</li>
+<li>Fields: completedBy, shift, formDate, sales data, inventory counts, expenses</li><h4>loyverse_receipts</h4>
+<li>Real-time POS transaction data</li>
+<li>Fields: receiptNumber, totalAmount, items, paymentMethods, customerInfo</li><h4>inventory</h4>
+<li>Current stock levels and supplier information</li>
+<li>Fields: name, category, quantity, unit, minStock, supplier, pricePerUnit</li><h4>shopping_list</h4>
+<li>Automated and manual procurement lists</li>
+<li>Fields: itemName, quantity, supplier, priority, listDate, formId</li><h4>expenses</h4>
+<li>Business expense tracking</li>
+<li>Fields: description, amount, category, supplier, receiptPhoto, date</li><h2>External Integrations</h2><h3>1. Loyverse POS API</h3>
+<p><strong>Purpose</strong>: Real-time sales data synchronization</p>
+<p><strong>Authentication</strong>: API token stored in environment variables</p>
+<p><strong>Key Endpoints</strong>:</p>
+<li><code>/receipts</code> - Transaction data</li>
+<li><code>/shifts</code> - Shift summaries</li>
+<li><code>/items</code> - Menu items and modifiers</li>
+<li>Webhook support for real-time updates</li><h3>2. OpenAI API (GPT-4o)</h3>
+<p><strong>Purpose</strong>: AI-powered analysis of reports and receipts</p>
+<p><strong>Authentication</strong>: API key in environment variables</p>
+<p><strong>Usage</strong>:</p>
+<li>Report analysis and data extraction</li>
+<li>Anomaly detection in sales patterns</li>
+<li>Marketing content generation</li>
+<li>Expense categorization</li><h3>3. Gmail API</h3>
+<p><strong>Purpose</strong>: Automated email notifications</p>
+<p><strong>Authentication</strong>: OAuth2 with refresh token</p>
+<p><strong>Usage</strong>:</p>
+<li>Daily management summary emails</li>
+<li>Form submission notifications</li>
+<li>Shopping list distribution</li><h2>Environment Variables (Required)</h2><h3>Database</h3>
+<li><code>DATABASE_URL</code> - PostgreSQL connection string (Neon Database)</li><h3>External APIs</h3>
+<li><code>LOYVERSE_API_TOKEN</code> - Loyverse POS API authentication</li>
+<li><code>LOYVERSE_STORE_ID</code> - Restaurant store identifier</li>
+<li><code>LOYVERSE_WEBHOOK_SECRET</code> - Webhook signature validation</li>
+<li><code>OPENAI_API_KEY</code> - OpenAI API access for AI analysis</li><h3>Email System</h3>
+<li><code>GOOGLE_CLIENT_ID</code> - Gmail API OAuth client ID</li>
+<li><code>GOOGLE_CLIENT_SECRET</code> - Gmail API OAuth client secret</li>
+<li><code>GOOGLE_REFRESH_TOKEN</code> - Gmail API refresh token for authentication</li><h3>Application</h3>
+<li><code>NODE_ENV</code> - Environment mode (development/production)</li>
+<li><code>SESSION_SECRET</code> - Session encryption secret</li><h2>Automated Processes</h2><h3>1. Daily Receipt Sync</h3>
+<p><strong>Schedule</strong>: 3:00 AM Bangkok time (daily)</p>
+<p><strong>Purpose</strong>: Synchronize previous shift receipts from Loyverse</p>
+<p><strong>Implementation</strong>: Node-cron scheduler in <code>server/index.ts</code></p><h3>2. Daily Management Reports</h3>
+<p><strong>Schedule</strong>: 8:00 AM Bangkok time (daily)</p>
+<p><strong>Purpose</strong>: Email summary of previous shift operations</p>
+<p><strong>Content</strong>: Sales summary, cash balances, shopping lists, anomalies</p><h3>3. Real-time Webhooks</h3>
+<p><strong>Triggers</strong>: Receipt creation/updates in Loyverse POS</p>
+<p><strong>Purpose</strong>: Immediate data synchronization</p>
+<p><strong>Security</strong>: SHA-1 HMAC signature validation</p><h2>Key Operational Workflows</h2><h3>1. Daily Shift Workflow</h3>
+<p>1. Staff opens Daily Stock & Sales form</p>
+<p>2. Records sales by payment method</p>
+<p>3. Conducts inventory counts</p>
+<p>4. Records expenses and purchases</p>
+<p>5. Submits form (triggers email to management)</p>
+<p>6. System auto-generates shopping list</p>
+<p>7. Management receives summary email at 8 AM</p><h3>2. AI Analysis Workflow</h3>
+<p>1. Upload Loyverse reports (CSV/Excel/PDF)</p>
+<p>2. System extracts text content</p>
+<p>3. OpenAI analyzes for key metrics</p>
+<p>4. Results stored with anomaly detection</p>
+<p>5. Dashboard updated with insights</p><h3>3. Inventory Management Workflow</h3>
+<p>1. Daily stock counts via form submission</p>
+<p>2. Auto-calculation of usage rates</p>
+<p>3. Shopping list generation when low stock</p>
+<p>4. Supplier integration for ordering</p>
+<p>5. Receipt tracking for cost analysis</p><h2>Deployment Instructions</h2><h3>Prerequisites</h3>
+<p>1. Replit account with sufficient compute resources</p>
+<p>2. Neon Database account (PostgreSQL)</p>
+<p>3. API keys for Loyverse, OpenAI, and Gmail</p><h3>Setup Process</h3>
+<p>1. <strong>Clone/Import Project</strong>: Import into Replit workspace</p>
+<p>2. <strong>Environment Setup</strong>: Configure all required environment variables</p>
+<p>3. <strong>Database Migration</strong>: Run <code>npm run db:push</code> to sync schema</p>
+<p>4. <strong>Dependency Installation</strong>: Run <code>npm install</code> (handled automatically)</p>
+<p>5. <strong>Development Start</strong>: Run <code>npm run dev</code> (port 5000)</p>
+<p>6. <strong>Production Build</strong>: Run <code>npm run build</code> and <code>npm start</code></p><h3>Initial Configuration</h3>
+<p>1. Set up Loyverse webhook endpoints in POS system</p>
+<p>2. Configure Gmail OAuth and generate refresh token</p>
+<p>3. Initialize database with basic inventory items</p>
+<p>4. Test email notifications and AI analysis</p>
+<p>5. Verify POS data synchronization</p><h2>Troubleshooting Guide</h2><h3>Common Issues</h3><h4>Database Connection Errors</h4>
+<li>Verify <code>DATABASE_URL</code> environment variable</li>
+<li>Check Neon Database connection status</li>
+<li>Run <code>npm run db:push</code> to sync schema</li><h4>API Integration Failures</h4>
+<li>Verify all API keys are correctly set</li>
+<li>Check API rate limits and quotas</li>
+<li>Review webhook signature validation</li><h4>Email Notification Issues</h4>
+<li>Verify Gmail OAuth tokens are valid</li>
+<li>Check Google Cloud Console permissions</li>
+<li>Test email delivery manually</li><h4>Form Submission Errors</h4>
+<li>Check database schema compatibility</li>
+<li>Verify Zod validation schemas</li>
+<li>Review error logs for specific issues</li><h3>Performance Optimization</h3>
+<li>Monitor database query performance</li>
+<li>Optimize image upload sizes (auto-compression enabled)</li>
+<li>Use proper indexes on frequently queried columns</li>
+<li>Cache frequently accessed data with TanStack Query</li><h2>Security Considerations</h2><h3>Data Protection</h3>
+<li>All sensitive data stored in environment variables</li>
+<li>Database connections use SSL encryption</li>
+<li>File uploads validated and sanitized</li>
+<li>Session management with secure cookies</li><h3>API Security</h3>
+<li>Webhook signature validation for external APIs</li>
+<li>Rate limiting on critical endpoints</li>
+<li>Input validation with Zod schemas</li>
+<li>Error handling without sensitive data exposure</li><h3>Access Control</h3>
+<li>User authentication required for all operations</li>
+<li>Session-based access control</li>
+<li>Secure password handling (if user accounts implemented)</li><h2>Maintenance Procedures</h2><h3>Daily Tasks</h3>
+<li>Monitor automated email delivery</li>
+<li>Verify POS data synchronization</li>
+<li>Check for any system errors in logs</li><h3>Weekly Tasks</h3>
+<li>Review database performance</li>
+<li>Update ingredient costs</li>
+<li>Analyze AI insights for operational improvements</li><h3>Monthly Tasks</h3>
+<li>Review and clean old data</li>
+<li>Update dependencies if needed</li>
+<li>Analyze expense trends and cost optimization</li><h2>Contact Information & Support</h2><h3>Technical Support</h3>
+<li>Primary codebase: Replit workspace</li>
+<li>Documentation: This file and <code>replit.md</code></li>
+<li>Error logs: Available in Replit console</li><h3>Business Context</h3>
+<li>Restaurant: Smash Brothers Burgers</li>
+<li>Operating hours: 5:00 PM - 3:00 AM (Bangkok time)</li>
+<li>Shift reporting: Staff complete forms at end of shift (2:00-3:00 AM)</li></ul><p>---</p><p><strong>Last Updated</strong>: July 19, 2025</p>
+<p><strong>Documentation Version</strong>: 1.0</p>
+<p><strong>System Status</strong>: Production Ready</p><p>This documentation provides everything needed to understand, maintain, and rebuild the Restaurant Management Dashboard system from scratch.</p>
+    </body>
+    </html>
+    
