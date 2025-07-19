@@ -68,6 +68,13 @@ export default function Dashboard() {
     }
   });
 
+  // Fetch latest analysis for dashboard integration
+  const { data: latestAnalysis } = useQuery({
+    queryKey: ['/api/analysis/latest'],
+    queryFn: () => apiRequest('/api/analysis/latest'),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
   // Fetch quick notes
   const { data: quickNotes = [], isLoading: isLoadingNotes } = useQuery({
     queryKey: ['/api/quick-notes'],
@@ -308,6 +315,85 @@ export default function Dashboard() {
         <ShiftSummaryCard />
         <ShiftReportReview />
       </div>
+
+      {/* AI Analysis Insights Card - if we have analysis data */}
+      {latestAnalysis && (
+        <div className="mb-8">
+          <Card className="restaurant-card border-l-4 border-l-blue-500">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Bot className="h-5 w-5 text-blue-600" />
+                Latest AI Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    ฿{latestAnalysis.totalSales?.toLocaleString() || '0'}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Sales</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {latestAnalysis.totalOrders || '0'}
+                  </div>
+                  <div className="text-sm text-gray-600">Orders</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {latestAnalysis.stockUsage?.rolls || '0'}
+                  </div>
+                  <div className="text-sm text-gray-600">Rolls Used</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {latestAnalysis.anomalies?.length || '0'}
+                  </div>
+                  <div className="text-sm text-gray-600">Anomalies</div>
+                </div>
+              </div>
+              
+              {latestAnalysis.topItems && latestAnalysis.topItems.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-semibold mb-2">Top Selling Items</h4>
+                  <div className="space-y-1">
+                    {latestAnalysis.topItems.slice(0, 3).map((item, index) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <span>{item.name}</span>
+                        <span className="font-medium">{item.quantity} sold</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {latestAnalysis.anomalies && latestAnalysis.anomalies.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Recent Anomalies</h4>
+                  {latestAnalysis.anomalies.slice(0, 2).map((anomaly, index) => (
+                    <div key={index} className={`p-2 rounded text-xs ${
+                      anomaly.severity === 'high' ? 'bg-red-50 text-red-700' :
+                      anomaly.severity === 'medium' ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-blue-50 text-blue-700'
+                    }`}>
+                      {anomaly.description}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-4 pt-4 border-t">
+                <Link href="/analysis">
+                  <Button size="sm" className="w-full">
+                    View Full Analysis
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Three-column layout: Revenue Chart | Expenses Chart | Quick Notes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">

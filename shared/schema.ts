@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -465,6 +465,19 @@ export const marketingCalendar = pgTable("marketing_calendar", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Uploaded Reports table for AI analysis
+export const uploadedReports = pgTable("uploaded_reports", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  fileType: varchar("file_type", { length: 100 }).notNull(),
+  fileData: text("file_data").notNull(), // Base64 encoded file data
+  shiftDate: timestamp("shift_date").notNull(),
+  analysisSummary: jsonb("analysis_summary"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  analyzedAt: timestamp("analyzed_at"),
+  isAnalyzed: boolean("is_analyzed").default(false),
+});
+
 // Stock Count tables for expense tracking
 export const stockPurchaseRolls = pgTable("stock_purchase_rolls", {
   id: serial("id").primaryKey(),
@@ -502,6 +515,7 @@ export const stockPurchaseMeat = pgTable("stock_purchase_meat", {
 // Insert schemas
 export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMarketingCalendarSchema = createInsertSchema(marketingCalendar).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUploadedReportSchema = createInsertSchema(uploadedReports).omit({ id: true, uploadedAt: true, analyzedAt: true });
 export const insertStockPurchaseRollsSchema = createInsertSchema(stockPurchaseRolls).omit({ id: true, createdAt: true });
 export const insertStockPurchaseDrinksSchema = createInsertSchema(stockPurchaseDrinks).omit({ id: true, createdAt: true });
 export const insertStockPurchaseMeatSchema = createInsertSchema(stockPurchaseMeat).omit({ id: true, createdAt: true });
@@ -555,27 +569,13 @@ export type QuickNote = typeof quickNotes.$inferSelect;
 export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
 export type MarketingCalendar = typeof marketingCalendar.$inferSelect;
 export type InsertMarketingCalendar = z.infer<typeof insertMarketingCalendarSchema>;
+export type UploadedReport = typeof uploadedReports.$inferSelect;
+export type InsertUploadedReport = z.infer<typeof insertUploadedReportSchema>;
 export type StockPurchaseRolls = typeof stockPurchaseRolls.$inferSelect;
 export type InsertStockPurchaseRolls = z.infer<typeof insertStockPurchaseRollsSchema>;
 export type StockPurchaseDrinks = typeof stockPurchaseDrinks.$inferSelect;
 export type InsertStockPurchaseDrinks = z.infer<typeof insertStockPurchaseDrinksSchema>;
 export type StockPurchaseMeat = typeof stockPurchaseMeat.$inferSelect;
 export type InsertStockPurchaseMeat = z.infer<typeof insertStockPurchaseMeatSchema>;
-
-// Uploaded Reports table for AI analysis
-export const uploadedReports = pgTable('uploaded_reports', {
-  id: serial('id').primaryKey(),
-  filename: text('filename').notNull(),
-  fileType: text('file_type').notNull(), // pdf, csv, xlsx
-  fileData: jsonb('file_data').notNull(), // Base64 encoded data storage
-  uploadDate: timestamp('upload_date').defaultNow(),
-  shiftDate: timestamp('shift_date'), // Extracted from report
-  analysisSummary: jsonb('analysis_summary'), // AI results
-  userId: integer('user_id'), // For multi-restaurant scalability
-});
-
-export const insertUploadedReportsSchema = createInsertSchema(uploadedReports).omit({ id: true, uploadDate: true });
-export type UploadedReport = typeof uploadedReports.$inferSelect;
-export type InsertUploadedReport = z.infer<typeof insertUploadedReportsSchema>;
 
 
