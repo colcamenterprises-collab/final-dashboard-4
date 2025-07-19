@@ -527,4 +527,5 @@ Changelog:
 Preferred communication style: Simple, everyday language.
 Code isolation policy: Once functionality is working and tested, isolate it to prevent breaking when updating other sections.
 Testing requirement: Always test changes in isolation before making additional modifications.
+Documentation requirement: When creating comprehensive project documentation, include all operational details someone would need to rebuild the system from scratch.
 ```
