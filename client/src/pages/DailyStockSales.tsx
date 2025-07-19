@@ -1622,6 +1622,80 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
+          {/* Kitchen Items */}
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Kitchen Requirements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {KITCHEN_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`kitchenItems.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || 0}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Packaging Items */}
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Box className="h-5 w-5" />
+                Packaging & Supplies
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {PACKAGING_ITEMS.map((item) => (
+                  <FormField
+                    key={item}
+                    control={form.control}
+                    name={`packagingItems.${item}` as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">{item}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="0" 
+                            className="h-8"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value || 0}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Confirmation */}
           <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
