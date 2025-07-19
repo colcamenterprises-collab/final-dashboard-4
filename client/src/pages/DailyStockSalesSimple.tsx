@@ -11,6 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Save, FileText } from "lucide-react";
 
+// All inventory items
+const DRINK_ITEMS = ['Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange', 'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'];
+const FRESH_FOOD_ITEMS = ['Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 'Milk', 'Butter'];
+const FROZEN_FOOD_ITEMS = ['Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'];
+const SHELF_ITEMS = ['Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup', 'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'];
+const KITCHEN_ITEMS = ['Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)', 'Rubber Gloves (Medium)', 'Rubber Gloves (Large)', 'Alcohol Sanitiser', 'Dish Washing Liquid', 'Paper Towel (Long)', 'Sponge (dish washing)', 'Paper Towel (Short)', 'Rolls Sticky Tape'];
+const PACKAGING_ITEMS = ['French Fries Box', 'French Fries Paper', 'Paper Food Bags', 'Fork & Knife Set', 'Loaded Fries Boxes', 'Burger Paper (12 x 14)', 'Wooden Flag Skewers', 'Printer Rolls', 'Takeaway Sauce Containers', 'Coleslaw Container', 'Plastic Carry Bags', 'Packaging Labels'];
+
 // Minimal, bulletproof form schema
 const formSchema = z.object({
   completedBy: z.string().min(1, "Name is required"),
@@ -40,7 +48,14 @@ const formSchema = z.object({
   burgerBunsStock: z.coerce.number().optional().default(0),
   rollsOrderedCount: z.coerce.number().optional().default(0),
   meatWeight: z.coerce.number().optional().default(0),
-  drinkStockCount: z.coerce.number().optional().default(0),
+  
+  // All inventory sections
+  drinkStock: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  freshFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  frozenFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  shelfItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  kitchenItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  packagingItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
   
   // Draft flag
   isDraft: z.boolean().optional().default(false),
@@ -74,7 +89,12 @@ const DailyStockSalesSimple = () => {
       burgerBunsStock: 0,
       rollsOrderedCount: 0,
       meatWeight: 0,
-      drinkStockCount: 0,
+      drinkStock: Object.fromEntries(DRINK_ITEMS.map(item => [item, 0])),
+      freshFood: Object.fromEntries(FRESH_FOOD_ITEMS.map(item => [item, 0])),
+      frozenFood: Object.fromEntries(FROZEN_FOOD_ITEMS.map(item => [item, 0])),
+      shelfItems: Object.fromEntries(SHELF_ITEMS.map(item => [item, 0])),
+      kitchenItems: Object.fromEntries(KITCHEN_ITEMS.map(item => [item, 0])),
+      packagingItems: Object.fromEntries(PACKAGING_ITEMS.map(item => [item, 0])),
       isDraft: false,
     }
   });
@@ -464,19 +484,210 @@ const DailyStockSalesSimple = () => {
                     )}
                   />
                   
-                  <FormField
-                    control={form.control}
-                    name="drinkStockCount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Drink Stock</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="0" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                </CardContent>
+              </Card>
+
+              {/* Drink Stock */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Drink Stock</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {DRINK_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`drinkStock.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Fresh Food */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Fresh Food</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {FRESH_FOOD_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`freshFood.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shelf Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Shelf Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {SHELF_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`shelfItems.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Frozen Food */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Frozen Food</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {FROZEN_FOOD_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`frozenFood.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Kitchen Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Kitchen Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {KITCHEN_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`kitchenItems.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Packaging Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Packaging Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {PACKAGING_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`packagingItems.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
 
