@@ -76,6 +76,16 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Daily Stock Sales endpoints
+  app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
+    try {
+      const forms = await storage.getAllDailyStockSales();
+      res.json(forms);
+    } catch (err) {
+      console.error("Error fetching daily stock sales:", err);
+      res.status(500).json({ error: "Failed to fetch daily stock sales" });
+    }
+  });
+
   app.get("/api/daily-stock-sales/search", async (req: Request, res: Response) => {
     try {
       const { query } = req.query;

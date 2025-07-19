@@ -6,7 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import DailyStockSales from "@/pages/DailyStockSales";
+import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
 import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
+import PastForms from "@/pages/PastForms";
 import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import ExpensesMerged from "@/pages/ExpensesMerged";
@@ -25,9 +27,11 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/daily-stock-sales" component={DailyStockSales} />
+        <Route path="/daily-stock-sales" component={DailyStockSalesSimple} />
+        <Route path="/daily-stock-sales-complex" component={DailyStockSales} />
         <Route path="/daily-stock-sales/search" component={DailyStockSalesSearch} />
         <Route path="/daily-stock-sales-search" component={DailyStockSalesSearch} />
+        <Route path="/past-forms" component={PastForms} />
         <Route path="/shopping-list" component={ShoppingList} />
         <Route path="/finance" component={Finance} />
         <Route path="/expenses" component={ExpensesMerged} />
