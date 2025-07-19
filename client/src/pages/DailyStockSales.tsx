@@ -42,40 +42,40 @@ import {
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
-// Default Fresh Food items (can be modified live on form)
-const DEFAULT_FRESH_FOOD_ITEMS = [
+// Fresh Food items 
+const FRESH_FOOD_ITEMS = [
   'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
   'Milk', 'Butter'
 ];
 
-// Default Frozen Food items
-const DEFAULT_FROZEN_FOOD_ITEMS = [
+// Frozen Food items
+const FROZEN_FOOD_ITEMS = [
   'Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'
 ];
 
-// Default Shelf Items (non-perishable items)
-const DEFAULT_SHELF_ITEMS = [
+// Shelf Items (non-perishable items)
+const SHELF_ITEMS = [
   'Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 
   'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup',
   'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'
 ];
 
-// Default Drink items
-const DEFAULT_DRINK_ITEMS = [
+// Drink items with current requirements (matching backend requirements)
+const DRINK_ITEMS = [
   'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
-  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water'
+  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'
 ];
 
-// Default Kitchen supplies
-const DEFAULT_KITCHEN_ITEMS = [
+// Kitchen supplies
+const KITCHEN_ITEMS = [
   'Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)',
   'Rubber Gloves (Medium)', 'Rubber Gloves (Large)', 'Alcohol Sanitiser',
   'Dish Washing Liquid', 'Paper Towel (Long)', 'Sponge (dish washing)',
   'Paper Towel (Short)', 'Rolls Sticky Tape'
 ];
 
-// Default Packaging supplies
-const DEFAULT_PACKAGING_ITEMS = [
+// Packaging supplies
+const PACKAGING_ITEMS = [
   'French Fries Box', 'French Fries Paper', 'Paper Food Bags', 'Fork & Knife Set',
   'Loaded Fries Boxes', 'Burger Paper (12 x 14)', 'Wooden Flag Skewers',
   'Printer Rolls', 'Takeaway Sauce Containers', 'Coleslaw Container',
@@ -170,17 +170,8 @@ export default function DailyStockSales() {
   const [editingFormId, setEditingFormId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('new-form');
   
-  // Live item lists state - can be modified on the form
-  const [freshFoodItems, setFreshFoodItems] = useState(DEFAULT_FRESH_FOOD_ITEMS);
-  const [frozenFoodItems, setFrozenFoodItems] = useState(DEFAULT_FROZEN_FOOD_ITEMS);
-  const [shelfItems, setShelfItems] = useState(DEFAULT_SHELF_ITEMS);
-  const [drinkItems, setDrinkItems] = useState(DEFAULT_DRINK_ITEMS);
-  const [kitchenItems, setKitchenItems] = useState(DEFAULT_KITCHEN_ITEMS);
-  const [packagingItems, setPackagingItems] = useState(DEFAULT_PACKAGING_ITEMS);
-  
-  // Item editing states
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [newItemName, setNewItemName] = useState("");
+  // Item management state
+  const [showItemManager, setShowItemManager] = useState(false);
 
   // Search query for completed forms
   const { data: completedForms = [], isLoading: searchLoading } = useQuery({
