@@ -47,6 +47,11 @@ function Router() {
         <Route path="/marketing" component={Marketing} />
         
         {/* Placeholder routes */}
+        <Route path="/placeholder/business-info" component={() => <Placeholder title="Business Info" description="Update business email, contact details, and company information." />} />
+        <Route path="/placeholder/logo" component={() => <Placeholder title="Amend Logo" description="Upload and manage your restaurant logo." />} />
+        <Route path="/placeholder/api-keys" component={() => <Placeholder title="Secret Keys" description="Manage API keys for POS systems and external integrations." />} />
+        <Route path="/placeholder/theme" component={() => <Placeholder title="Theme Settings" description="Customize dark/light mode and interface preferences." />} />
+        <Route path="/placeholder/employees" component={() => <Placeholder title="Employee Creation" description="Add and manage staff accounts with role-based access." />} />
         <Route path="/placeholder/settings" component={() => <Placeholder title="Settings" description="Business info, logo upload, API keys, theme settings, and employee management." />} />
         <Route path="/placeholder/financial-analysis" component={() => <Placeholder title="Financial Analysis (AI)" description="AI-powered financial analysis with ratio calculations and insights." />} />
         <Route path="/placeholder/ratios" component={() => <Placeholder title="Ratio Calculations" description="Prime cost, food cost percentage, profit margins, and financial ratios." />} />

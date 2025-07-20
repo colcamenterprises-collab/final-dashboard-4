@@ -29,47 +29,47 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Consolidated navigation structure matching Dribbble design
+// Minimal navigation structure - shortened labels for collapsed view
 const navigationStructure = [
   {
     id: "operations",
-    label: "Operations & Sales",
-    icon: FolderOpen,
+    label: "Ops & Sales",
+    icon: ShoppingCart,
     expandable: true,
     items: [
-      { path: "/daily-stock-sales", label: "Daily Sales & Stock Form", icon: ClipboardList },
-      { path: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
-      { path: "/past-forms", label: "Critical Stock", icon: Package },
-      { path: "/pos-loyverse", label: "Daily Receipts", icon: Receipt },
+      { path: "/daily-stock-sales", label: "Daily Shift Form", icon: ClipboardList },
+      { path: "/shopping-list", label: "Purchasing", icon: ShoppingCart },
+      { path: "/pos-loyverse", label: "Receipts", icon: Receipt },
       { path: "/analysis", label: "AI Analysis", icon: TrendingUp },
-      { path: "/shift-analytics", label: "Items Sold Breakdown", icon: PieChart },
+      { path: "/past-forms", label: "Critical Stock", icon: Package },
+      { path: "/shift-analytics", label: "Items Sold", icon: PieChart },
       { path: "/loyverse-live", label: "Stock vs Purchased", icon: Activity },
     ]
   },
   {
     id: "finance",
     label: "Finance",
-    icon: Finance,
+    icon: DollarSign,
     expandable: true,
     items: [
       { path: "/expenses", label: "Expenses", icon: Receipt },
-      { path: "/finance", label: "P&L", icon: LineChart },
-      { path: "/placeholder/financial-analysis", label: "Financial Analysis (AI)", icon: BarChart3 },
-      { path: "/placeholder/ratios", label: "Ratio Calculations", icon: Calculator },
-      { path: "/placeholder/bank-statements", label: "Bank Statement Upload", icon: FileText },
+      { path: "/finance", label: "Profit & Loss", icon: LineChart },
+      { path: "/placeholder/financial-analysis", label: "Analysis (AI)", icon: BarChart3 },
+      { path: "/placeholder/ratios", label: "Ratios", icon: Calculator },
+      { path: "/placeholder/bank-statements", label: "Bank Statements", icon: FileText },
     ]
   },
   {
     id: "menu",
-    label: "Menu Management",
+    label: "Menu Mgmt",
     icon: Utensils,
     expandable: true,
     items: [
       { path: "/recipe-management", label: "Recipes", icon: ChefHat },
-      { path: "/recipe-management?tab=ingredients", label: "Ingredients List", icon: Package },
-      { path: "/placeholder/pricing", label: "Pricing Database", icon: DollarSign },
-      { path: "/placeholder/food-costs", label: "Food Cost Calculations", icon: Calculator },
-      { path: "/placeholder/ai-descriptions", label: "Food Description Generator (AI)", icon: TrendingUp },
+      { path: "/recipe-management?tab=ingredients", label: "Ingredients", icon: Package },
+      { path: "/placeholder/pricing", label: "Pricing", icon: DollarSign },
+      { path: "/placeholder/food-costs", label: "Food Costs", icon: Calculator },
+      { path: "/placeholder/ai-descriptions", label: "AI Descriptions", icon: TrendingUp },
     ]
   },
   {
@@ -82,7 +82,14 @@ const navigationStructure = [
     id: "settings",
     label: "Settings",
     icon: Settings,
-    path: "/placeholder/settings"
+    expandable: true,
+    items: [
+      { path: "/placeholder/business-info", label: "Business Info", icon: FileText },
+      { path: "/placeholder/logo", label: "Amend Logo", icon: Settings },
+      { path: "/placeholder/api-keys", label: "Secret Keys", icon: Settings },
+      { path: "/placeholder/theme", label: "Theme", icon: Settings },
+      { path: "/placeholder/employees", label: "Employees", icon: UserPlus },
+    ]
   }
 ];
 
@@ -91,12 +98,18 @@ export default function Layout({ children }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currency, setCurrency] = useState("THB");
+  const [isExpanded, setIsExpanded] = useState(false); // Collapsed by default - icons only
   const [expandedSections, setExpandedSections] = useState({
-    operations: true,
-    finance: true,
-    menu: true
+    operations: false,
+    finance: false,
+    menu: false
   });
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
+    }
+    return false;
+  });
 
   const formatCurrency = (amount: number) => {
     if (currency === "THB") {
@@ -114,43 +127,74 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', (!darkMode).toString());
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    document.documentElement.classList.toggle('dark', newDarkMode);
+    localStorage.setItem('darkMode', newDarkMode.toString());
   };
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+    // Close all sections when collapsing
+    if (isExpanded) {
+      setExpandedSections({
+        operations: false,
+        finance: false,
+        menu: false
+      });
+    }
+  };
+
+  // Initialize dark mode on load
+  useState(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    }
+  });
 
   return (
     <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
       <div className={`min-h-screen font-inter flex ${darkMode ? 'dark' : ''}`}>
-        {/* Redesigned Sidebar - Dribbble Style */}
-        <div className="w-64 bg-gray-100 dark:bg-gray-900 flex flex-col py-4 px-3 fixed left-0 top-0 h-full z-50 border-r border-gray-200 dark:border-gray-700">
+        {/* Minimal Collapsible Sidebar - Icons Only by Default */}
+        <div className={`${isExpanded ? 'w-64' : 'w-16'} bg-gray-100 dark:bg-gray-900 flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-200 dark:border-gray-700 transition-all duration-300`}>
+          {/* Expand/Collapse Toggle */}
+          <Button
+            variant="ghost"
+            onClick={toggleExpanded}
+            className="mb-4 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+            title={isExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </Button>
+
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-8 px-2">
+          <div className={`flex items-center gap-3 mb-6 px-1 ${!isExpanded && 'justify-center'}`}>
             <img 
               src={gradientLogo} 
               alt="Restaurant Hub Logo" 
               className="h-8 w-8 object-contain"
             />
-            <span className="font-semibold text-gray-900 dark:text-white">Restaurant Hub</span>
+            {isExpanded && <span className="font-semibold text-gray-900 dark:text-white">Restaurant Hub</span>}
           </div>
           
           {/* Dashboard Link */}
           <Link href="/">
             <Button
               variant="ghost"
-              className={`w-full justify-start mb-2 ${
+              className={`w-full mb-2 p-2 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'} ${
                 location === "/" 
                   ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white" 
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
+              title="Dashboard"
             >
-              <Home className="h-4 w-4 mr-3" />
-              Dashboard
+              <Home className="h-4 w-4" />
+              {isExpanded && <span className="ml-3">Dashboard</span>}
             </Button>
           </Link>
           
           {/* Navigation Sections */}
-          <div className="space-y-1">
+          <div className="space-y-1 flex-1">
             {navigationStructure.map((section) => {
               const SectionIcon = section.icon;
               
@@ -160,14 +204,15 @@ export default function Layout({ children }: LayoutProps) {
                   <Link key={section.id} href={section.path!}>
                     <Button
                       variant="ghost"
-                      className={`w-full justify-start ${
+                      className={`w-full p-2 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'} ${
                         location === section.path
                           ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
                       }`}
+                      title={section.label}
                     >
-                      <SectionIcon className="h-4 w-4 mr-3" />
-                      {section.label}
+                      <SectionIcon className="h-4 w-4" />
+                      {isExpanded && <span className="ml-3">{section.label}</span>}
                     </Button>
                   </Link>
                 );
@@ -178,20 +223,27 @@ export default function Layout({ children }: LayoutProps) {
                 <div key={section.id}>
                   <Button
                     variant="ghost"
-                    className="w-full justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
-                    onClick={() => toggleSection(section.id)}
+                    className={`w-full p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-between'}`}
+                    onClick={() => isExpanded && toggleSection(section.id)}
+                    title={section.label}
                   >
-                    <div className="flex items-center">
-                      <SectionIcon className="h-4 w-4 mr-3" />
-                      {section.label}
-                    </div>
-                    {expandedSections[section.id] ? 
-                      <ChevronDown className="h-4 w-4" /> : 
-                      <ChevronRight className="h-4 w-4" />
-                    }
+                    {isExpanded ? (
+                      <>
+                        <div className="flex items-center">
+                          <SectionIcon className="h-4 w-4" />
+                          <span className="ml-3">{section.label}</span>
+                        </div>
+                        {expandedSections[section.id] ? 
+                          <ChevronDown className="h-4 w-4" /> : 
+                          <ChevronRight className="h-4 w-4" />
+                        }
+                      </>
+                    ) : (
+                      <SectionIcon className="h-4 w-4" />
+                    )}
                   </Button>
                   
-                  {expandedSections[section.id] && section.items && (
+                  {isExpanded && expandedSections[section.id] && section.items && (
                     <div className="ml-6 space-y-1 mt-1">
                       {section.items.map((item) => {
                         const ItemIcon = item.icon;
@@ -202,14 +254,15 @@ export default function Layout({ children }: LayoutProps) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className={`w-full justify-start text-sm ${
+                              className={`w-full justify-start text-sm p-2 ${
                                 location === item.path
                                   ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
                                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
                               } ${isPlaceholder ? 'opacity-60' : ''}`}
+                              title={item.label}
                             >
-                              <ItemIcon className="h-3 w-3 mr-2" />
-                              {item.label}
+                              <ItemIcon className="h-3 w-3" />
+                              <span className="ml-2">{item.label}</span>
                               {isPlaceholder && <span className="ml-auto text-xs">Soon</span>}
                             </Button>
                           </Link>
@@ -223,33 +276,43 @@ export default function Layout({ children }: LayoutProps) {
           </div>
           
           {/* Bottom Section - Chat & Controls */}
-          <div className="mt-auto space-y-2">
-            <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
-              <MessageCircle className="h-4 w-4 mr-3" />
-              Chat Support
+          <div className="space-y-2 mt-auto">
+            <Button 
+              variant="ghost" 
+              className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+              title="Chat Support"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {isExpanded && <span className="ml-3">Chat Support</span>}
             </Button>
             
-            <div className="flex items-center justify-between px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Sun className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <Switch 
-                  checked={darkMode}
-                  onCheckedChange={toggleDarkMode}
-                  className="data-[state=checked]:bg-gray-700"
-                />
-                <Moon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            {isExpanded && (
+              <div className="flex items-center justify-center px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Sun className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <Switch 
+                    checked={darkMode}
+                    onCheckedChange={toggleDarkMode}
+                    className="data-[state=checked]:bg-gray-700"
+                  />
+                  <Moon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </div>
               </div>
-            </div>
+            )}
             
-            <Button variant="ghost" className="w-full justify-start text-gray-700 dark:text-gray-300">
-              <UserPlus className="h-4 w-4 mr-3" />
-              Employees
+            <Button 
+              variant="ghost" 
+              className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+              title="Employees"
+            >
+              <UserPlus className="h-4 w-4" />
+              {isExpanded && <span className="ml-3">Employees</span>}
             </Button>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 ml-64 bg-white dark:bg-gray-950">
+        <div className={`flex-1 ${isExpanded ? 'ml-64' : 'ml-16'} bg-white dark:bg-gray-950 transition-all duration-300`}>
           {/* Top Navigation Header */}
           <nav className="restaurant-nav px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
             <div className="flex items-center justify-between max-w-7xl mx-auto">

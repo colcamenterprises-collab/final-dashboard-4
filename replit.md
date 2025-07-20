@@ -4,7 +4,16 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
-## Recent Changes (July 19, 2025)
+## Recent Changes (July 20, 2025)
+
+### Minimal Collapsible Sidebar Implementation - Dribbble Design Match
+- **Icons-Only Default State**: Sidebar now starts collapsed showing only icons (60px width) for minimal, clean interface
+- **Expandable on Click**: Click chevron button to expand to full width (250px) with labels and sub-navigation
+- **Shortened Navigation Labels**: "Operations & Sales" → "Ops & Sales", "Menu Management" → "Menu Mgmt" for cleaner display
+- **Enhanced Dark Mode Support**: Full dark theme implementation with proper color transitions and localStorage persistence
+- **Smooth Animations**: CSS transitions for width changes, icon rotations, and theme switching
+- **Mobile-Optimized**: Responsive design maintains functionality across all screen sizes
+- **Settings Sub-Navigation**: Added expandable Settings section with Business Info, Logo, API Keys, Theme, and Employee management
 
 ### Critical Inventory Form Completion - Operational Ready
 - **Complete Inventory Sections Added**: Restored all missing inventory sections to DailyStockSalesSimple.tsx for end-of-shift reporting
