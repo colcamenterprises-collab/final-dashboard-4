@@ -59,6 +59,8 @@ function Router() {
         <Route path="/placeholder/pricing" component={() => <Placeholder title="Pricing Database" description="Key ingredients pricing database for shopping cost calculations." />} />
         <Route path="/placeholder/food-costs" component={() => <Placeholder title="Food Cost Calculations" description="Calculate food costs based on recipes and ingredient pricing." />} />
         <Route path="/placeholder/ai-descriptions" component={() => <Placeholder title="Food Description Generator (AI)" description="AI-powered food descriptions for marketing and menu creation." />} />
+        <Route path="/placeholder/chat" component={() => <Placeholder title="Chat Support" description="AI-powered chat support and assistance system." />} />
+        <Route path="/placeholder/employees" component={() => <Placeholder title="Employees" description="Staff management and employee access controls." />} />
 
         <Route component={NotFound} />
       </Switch>

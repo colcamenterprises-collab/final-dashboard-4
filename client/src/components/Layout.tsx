@@ -199,7 +199,7 @@ export default function Layout({ children }: LayoutProps) {
               const SectionIcon = section.icon;
               
               if (!section.expandable) {
-                // Simple menu item
+                // Simple menu item - always clickable
                 return (
                   <Link key={section.id} href={section.path!}>
                     <Button
@@ -218,30 +218,47 @@ export default function Layout({ children }: LayoutProps) {
                 );
               }
               
-              // Expandable section
+              // Expandable section with main item link
+              const hasActiveChild = section.items?.some(item => location === item.path);
+              const mainItemPath = section.items?.[0]?.path || section.path || '#';
+              
               return (
                 <div key={section.id}>
-                  <Button
-                    variant="ghost"
-                    className={`w-full p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-between'}`}
-                    onClick={() => isExpanded && toggleSection(section.id)}
-                    title={section.label}
-                  >
-                    {isExpanded ? (
-                      <>
-                        <div className="flex items-center">
-                          <SectionIcon className="h-4 w-4" />
-                          <span className="ml-3">{section.label}</span>
-                        </div>
-                        {expandedSections[section.id] ? 
-                          <ChevronDown className="h-4 w-4" /> : 
-                          <ChevronRight className="h-4 w-4" />
-                        }
-                      </>
-                    ) : (
-                      <SectionIcon className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {!isExpanded ? (
+                    // Collapsed state - icon links to first sub-item
+                    <Link href={mainItemPath}>
+                      <Button
+                        variant="ghost"
+                        className={`w-full p-2 justify-center ${
+                          hasActiveChild || location === mainItemPath
+                            ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                        }`}
+                        title={section.label}
+                      >
+                        <SectionIcon className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    // Expanded state - section header with expand/collapse
+                    <Button
+                      variant="ghost"
+                      className={`w-full p-2 justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 ${
+                        hasActiveChild ? "bg-gray-50 dark:bg-gray-800/50" : ""
+                      }`}
+                      onClick={() => toggleSection(section.id)}
+                      title={section.label}
+                    >
+                      <div className="flex items-center">
+                        <SectionIcon className="h-4 w-4" />
+                        <span className="ml-3">{section.label}</span>
+                      </div>
+                      {expandedSections[section.id] ? 
+                        <ChevronDown className="h-4 w-4" /> : 
+                        <ChevronRight className="h-4 w-4" />
+                      }
+                    </Button>
+                  )}
                   
                   {isExpanded && expandedSections[section.id] && section.items && (
                     <div className="ml-6 space-y-1 mt-1">
@@ -277,14 +294,16 @@ export default function Layout({ children }: LayoutProps) {
           
           {/* Bottom Section - Chat & Controls */}
           <div className="space-y-2 mt-auto">
-            <Button 
-              variant="ghost" 
-              className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
-              title="Chat Support"
-            >
-              <MessageCircle className="h-4 w-4" />
-              {isExpanded && <span className="ml-3">Chat Support</span>}
-            </Button>
+            <Link href="/placeholder/chat">
+              <Button 
+                variant="ghost" 
+                className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+                title="Chat Support"
+              >
+                <MessageCircle className="h-4 w-4" />
+                {isExpanded && <span className="ml-3">Chat Support</span>}
+              </Button>
+            </Link>
             
             {isExpanded && (
               <div className="flex items-center justify-center px-3 py-2">
@@ -300,14 +319,16 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             )}
             
-            <Button 
-              variant="ghost" 
-              className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
-              title="Employees"
-            >
-              <UserPlus className="h-4 w-4" />
-              {isExpanded && <span className="ml-3">Employees</span>}
-            </Button>
+            <Link href="/placeholder/employees">
+              <Button 
+                variant="ghost" 
+                className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+                title="Employees"
+              >
+                <UserPlus className="h-4 w-4" />
+                {isExpanded && <span className="ml-3">Employees</span>}
+              </Button>
+            </Link>
           </div>
         </div>
 
