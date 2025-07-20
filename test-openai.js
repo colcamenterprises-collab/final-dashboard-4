@@ -1,1 +1,0 @@
-// Test file removed - OpenAI integration working in AI agent
