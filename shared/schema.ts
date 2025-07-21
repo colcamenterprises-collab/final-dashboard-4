@@ -66,6 +66,37 @@ export const shoppingList = pgTable("shopping_list", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Receipts table - Enhanced receipt management system
+export const receipts = pgTable("receipts", {
+  id: serial("id").primaryKey(),
+  receiptId: text("receipt_id").notNull().unique(), // Unique receipt identifier
+  items: jsonb("items").$type<string[]>().notNull(), // List of items purchased
+  modifiers: jsonb("modifiers").$type<string[]>().default([]), // Item modifiers/customizations
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(), // Final total amount
+  timestamp: timestamp("timestamp").notNull(), // When receipt was created
+  paymentType: text("payment_type"), // Cash, card, etc.
+  netSales: decimal("net_sales", { precision: 10, scale: 2 }), // Sales after discounts
+  grossSales: decimal("gross_sales", { precision: 10, scale: 2 }), // Sales before discounts
+  discounts: decimal("discounts", { precision: 10, scale: 2 }).default('0'), // Total discount amount
+  taxes: decimal("taxes", { precision: 10, scale: 2 }).default('0'), // Tax amount
+  shiftDate: date("shift_date"), // Which shift this receipt belongs to
+  processed: boolean("processed").default(false), // Whether receipt has been processed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Stock Entry table for tracking stock movements
+export const stockEntries = pgTable("stock_entries", {
+  id: serial("id").primaryKey(),
+  rolls: integer("rolls").notNull().default(0),
+  meat: decimal("meat", { precision: 8, scale: 2 }).notNull().default('0'), // Weight in kg
+  drinks: integer("drinks").notNull().default(0),
+  entryDate: timestamp("entry_date").defaultNow(),
+  formId: integer("form_id"), // Reference to Daily Stock Sales form
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 
 // Expenses table
