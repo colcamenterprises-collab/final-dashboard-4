@@ -851,6 +851,23 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Shopping list bulk endpoint for form submission
+  app.post("/api/shopping-list/bulk", async (req: Request, res: Response) => {
+    try {
+      const items = req.body;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ error: "Expected array of shopping items" });
+      }
+      
+      const { shoppingList } = await import("../shared/schema");
+      const results = await db.insert(shoppingList).values(items).returning();
+      res.json(results);
+    } catch (err) {
+      console.error("Error creating bulk shopping list:", err);
+      res.status(500).json({ error: "Failed to create shopping list items" });
+    }
+  });
+
   // Regenerate shopping list from last completed form
   app.post("/api/shopping-list/regenerate", async (req: Request, res: Response) => {
     try {
