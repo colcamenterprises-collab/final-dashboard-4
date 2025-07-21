@@ -165,7 +165,7 @@ export function registerRoutes(app: express.Application): Server {
       if (analysis.totalSales && analysis.totalOrders) {
         try {
           await db.insert(dailyShiftSummary).values({
-            shiftDate: report.shiftDate.toISOString().split('T')[0],
+            shiftDate: new Date(report.shiftDate).toISOString().split('T')[0],
             burgersSold: analysis.topItems.reduce((sum: number, item: any) => {
               if (item.name.toLowerCase().includes('burger')) {
                 return sum + item.quantity;
@@ -398,7 +398,7 @@ export function registerRoutes(app: express.Application): Server {
             pricePerUnit: '0', // Default price
             priority: 'medium', // Default priority
             formId: result.id,
-            listDate: data.shiftDate,
+            listDate: data.shiftDate instanceof Date ? data.shiftDate : new Date(data.shiftDate),
             category,
             isCompleted: false,
             createdAt: new Date(),
@@ -862,8 +862,17 @@ export function registerRoutes(app: express.Application): Server {
         return res.status(400).json({ error: "Expected array of shopping items" });
       }
       
+      // Ensure proper date conversion for timestamp fields
+      const processedItems = items.map(item => ({
+        ...item,
+        listDate: item.listDate ? (item.listDate instanceof Date ? item.listDate : new Date(item.listDate)) : new Date(),
+        createdAt: item.createdAt ? (item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt)) : new Date(),
+        updatedAt: item.updatedAt ? (item.updatedAt instanceof Date ? item.updatedAt : new Date(item.updatedAt)) : new Date(),
+        completedAt: item.completedAt ? (item.completedAt instanceof Date ? item.completedAt : new Date(item.completedAt)) : null
+      }));
+      
       const { shoppingList } = await import("../shared/schema");
-      const results = await db.insert(shoppingList).values(items).returning();
+      const results = await db.insert(shoppingList).values(processedItems).returning();
       res.json(results);
     } catch (err) {
       console.error("Error creating bulk shopping list:", err);
@@ -1752,9 +1761,8 @@ export function registerRoutes(app: express.Application): Server {
         const [report] = await db.insert(uploadedReports).values({
           filename: file.originalname,
           fileType: file.mimetype,
-          fileData: { data: fileDataBase64 },
-          shiftDate: shiftDate?.toISOString(),
-          userId: 1, // Default user for now
+          fileData: fileDataBase64, // Store as text, not as object
+          shiftDate: shiftDate || new Date(), // Ensure we have a valid date
         }).returning({ id: uploadedReports.id });
 
         res.json({ success: true, id: report.id, message: 'File uploaded successfully - trigger analysis next' });
@@ -1825,10 +1833,10 @@ export function registerRoutes(app: express.Application): Server {
       if (query) {
         results = await db.select().from(uploadedReports)
           .where(like(uploadedReports.filename, `%${query}%`))
-          .orderBy(desc(uploadedReports.uploadDate));
+          .orderBy(desc(uploadedReports.uploadedAt));
       } else {
         results = await db.select().from(uploadedReports)
-          .orderBy(desc(uploadedReports.uploadDate))
+          .orderBy(desc(uploadedReports.uploadedAt))
           .limit(20);
       }
 
