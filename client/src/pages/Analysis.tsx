@@ -280,10 +280,10 @@ const Analysis = () => {
             )}
           </div>
 
-          {uploadMutation.isSuccess && currentReportId && (
+          {batchUploadMutation.isSuccess && currentReportIds.length > 0 && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-md">
               <p className="text-sm text-green-800">
-                File uploaded successfully (ID: {currentReportId}). Click "Trigger AI Analysis" to process.
+                Files uploaded successfully ({currentReportIds.length} files). Click "Batch Analyze" to process.
               </p>
             </div>
           )}

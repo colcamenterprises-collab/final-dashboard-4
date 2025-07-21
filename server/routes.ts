@@ -1351,8 +1351,8 @@ export function registerRoutes(app: express.Application): Server {
   // Ingredients endpoints
   app.get("/api/ingredients", async (req: Request, res: Response) => {
     try {
-      const ingredients = await storage.getIngredients();
-      res.json(ingredients);
+      const ingredientsList = await db.select().from(ingredients).orderBy(ingredients.name);
+      res.json(ingredientsList);
     } catch (err) {
       console.error("Error fetching ingredients:", err);
       res.status(500).json({ error: "Failed to fetch ingredients" });
@@ -1361,10 +1361,18 @@ export function registerRoutes(app: express.Application): Server {
 
   app.post("/api/ingredients", async (req: Request, res: Response) => {
     try {
-      const { insertIngredientSchema } = await import("../shared/schema");
-      const validatedData = insertIngredientSchema.parse(req.body);
-      const ingredient = await storage.createIngredient(validatedData);
-      res.json(ingredient);
+      const [result] = await db.insert(ingredients).values({
+        name: req.body.name,
+        category: req.body.category,
+        supplier: req.body.supplier,
+        unitPrice: req.body.unitPrice || req.body.price || '0',
+        price: req.body.price || '0',
+        packageSize: req.body.packageSize || '',
+        portionSize: req.body.portionSize || '0',
+        unit: req.body.unit || 'g',
+        notes: req.body.notes || '',
+      }).returning();
+      res.json(result);
     } catch (err) {
       console.error("Error creating ingredient:", err);
       res.status(500).json({ error: "Failed to create ingredient" });
@@ -1374,8 +1382,22 @@ export function registerRoutes(app: express.Application): Server {
   app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const ingredient = await storage.updateIngredient(id, req.body);
-      res.json(ingredient);
+      const [result] = await db.update(ingredients)
+        .set({
+          name: req.body.name,
+          category: req.body.category,
+          supplier: req.body.supplier,
+          unitPrice: req.body.unitPrice || req.body.price || '0',
+          price: req.body.price || '0',
+          packageSize: req.body.packageSize || '',
+          portionSize: req.body.portionSize || '0',
+          unit: req.body.unit || 'g',
+          notes: req.body.notes || '',
+          updatedAt: new Date(), // Auto-timestamp
+        })
+        .where(eq(ingredients.id, id))
+        .returning();
+      res.json(result);
     } catch (err) {
       console.error("Error updating ingredient:", err);
       res.status(500).json({ error: "Failed to update ingredient" });

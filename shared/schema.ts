@@ -279,10 +279,14 @@ export const ingredients = pgTable("ingredients", {
   supplier: text("supplier").notNull(),
   // Legacy fields for backwards compatibility
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  packageSize: text("package_size").notNull(),
+  // Enhanced packaging and pricing fields
+  price: decimal("price", { precision: 10, scale: 2 }), // Package price (e.g., jar 89 THB)
+  packageSize: text("package_size").notNull(), // Package size (e.g., 300g)
+  portionSize: decimal("portion_size", { precision: 10, scale: 2 }), // Average per use (e.g., 30g)
   unit: text("unit").notNull(),
   notes: text("notes"),
   lastUpdated: timestamp("last_updated").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()), // Auto-timestamp on changes
   createdAt: timestamp("created_at").defaultNow(),
 });
 
