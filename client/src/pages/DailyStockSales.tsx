@@ -42,6 +42,59 @@ import {
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
+// Enhanced form schema with proper validation
+const formSchema = z.object({
+  completedBy: z.string().min(1, "Staff name is required"),
+  shiftType: z.enum(['Evening', 'Morning'], { errorMap: () => ({ message: "Please select a shift type" }) }),
+  shiftDate: z.string().min(1, "Shift date is required"),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wageEntries: z.array(z.object({ 
+    staffName: z.string().min(1, "Staff name required"), 
+    amount: z.coerce.number().min(0).optional().default(0), 
+    type: z.enum(['wages', 'overtime', 'other'], { errorMap: () => ({ message: "Select wage type" }) })
+  })).optional().default([]),
+  shoppingEntries: z.array(z.object({ 
+    item: z.string().min(1, "Item name required"), 
+    amount: z.coerce.number().min(0).optional().default(0), 
+    shop: z.string().optional().default("")
+  })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  startingCash: z.coerce.number().optional().default(0),
+  endingCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  rollsOrderedCount: z.coerce.number().optional().default(0),
+  drinkStockCount: z.coerce.number().optional().default(0),
+  // Individual drink items for better tracking
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  // Food inventory sections
+  freshFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  frozenFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  shelfItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  drinkStock: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  kitchenItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  packagingItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  expenseDescription: z.string().optional(),
+  isDraft: z.boolean().optional().default(false),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
 // Fresh Food items 
 const FRESH_FOOD_ITEMS = [
   'Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 
@@ -112,45 +165,6 @@ const shoppingEntrySchema = z.object({
   notes: z.string().optional(),
   shop: z.string(),
   customShop: z.string().optional()
-});
-
-const formSchema = z.object({
-  completedBy: z.string().min(1, "Required"),
-  shiftType: z.enum(['opening', 'closing']).optional(), // Optional
-  shiftDate: z.date(),
-  startingCash: z.coerce.number().min(0).optional().default(0),
-  endingCash: z.coerce.number().min(0).optional().default(0),
-  grabSales: z.coerce.number().min(0).optional().default(0),
-  foodPandaSales: z.coerce.number().min(0).optional().default(0),
-  aroiDeeSales: z.coerce.number().min(0).optional().default(0),
-  qrScanSales: z.coerce.number().min(0).optional().default(0),
-  cashSales: z.coerce.number().min(0).optional().default(0),
-  totalSales: z.coerce.number().min(0).optional().default(0),
-  salaryWages: z.coerce.number().min(0).optional().default(0),
-  shopping: z.coerce.number().min(0).optional().default(0),
-  gasExpense: z.coerce.number().min(0).optional().default(0),
-  totalExpenses: z.coerce.number().min(0).optional().default(0),
-  wageEntries: z.array(wageEntrySchema).optional(),
-  shoppingEntries: z.array(z.object({ 
-    item: z.string(), 
-    amount: z.coerce.number().min(0).optional().default(0),
-    notes: z.string().optional(),
-    shop: z.string().optional(),
-    customShop: z.string().optional()
-  })).optional(),
-  burgerBunsStock: z.coerce.number().min(0).optional().default(0),
-  rollsOrderedCount: z.coerce.number().min(0).optional().default(0),
-  meatWeight: z.coerce.number().min(0).optional().default(0),
-  drinkStockCount: z.coerce.number().min(0).optional().default(0),
-  rollsOrderedConfirmed: z.boolean().optional(),
-  expenseDescription: z.string().optional(),
-  freshFood: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  frozenFood: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  shelfItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  drinkStock: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  kitchenItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  packagingItems: z.record(z.coerce.number().min(0).optional().default(0)).optional(),
-  isDraft: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
