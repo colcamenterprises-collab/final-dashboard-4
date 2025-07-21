@@ -284,7 +284,7 @@ const DailyShiftForm = () => {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total Sales:</span>
-                    <span className="text-xl font-bold text-blue-600">฿{watch('totalSales')?.toFixed(2) || '0.00'}</span>
+                    <span className="text-xl font-bold text-blue-600">฿{Number(watch('totalSales') || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -407,7 +407,7 @@ const DailyShiftForm = () => {
                 <div className="p-4 bg-red-50 rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total Expenses:</span>
-                    <span className="text-xl font-bold text-red-600">฿{watch('totalExpenses')?.toFixed(2) || '0.00'}</span>
+                    <span className="text-xl font-bold text-red-600">฿{Number(watch('totalExpenses') || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -425,23 +425,23 @@ const DailyShiftForm = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>Grab Sales:</span>
-                        <span>฿{watch('grabSales')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('grabSales') || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Aroi Dee Sales:</span>
-                        <span>฿{watch('aroiDeeSales')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('aroiDeeSales') || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>QR Scan Sales:</span>
-                        <span>฿{watch('qrScanSales')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('qrScanSales') || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Cash Sales:</span>
-                        <span>฿{watch('cashSales')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('cashSales') || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-semibold border-t pt-2">
                         <span>Total Sales:</span>
-                        <span>฿{watch('totalSales')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('totalSales') || 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -458,11 +458,11 @@ const DailyShiftForm = () => {
                       </div>
                       <div className="flex justify-between">
                         <span>Gas Expense:</span>
-                        <span>฿{watch('gasExpense')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('gasExpense') || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-semibold border-t pt-2">
                         <span>Total Expenses:</span>
-                        <span>฿{watch('totalExpenses')?.toFixed(2) || '0.00'}</span>
+                        <span>฿{Number(watch('totalExpenses') || 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
