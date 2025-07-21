@@ -33,14 +33,14 @@ export function registerRoutes(app: express.Application): Server {
       
       // Get actual stock from the latest staff form (if available)
       const latestForms = await storage.getAllDailyStockSales();
-      const actualStock = latestForms.length > 0 ? {
-        "Burger Buns": latestForms[0].burgerBunsStock || 0,
-        "French Fries": latestForms[0].frozenFood?.["French Fries"] || 0,
-        "Chicken Wings": latestForms[0].frozenFood?.["Chicken Wings"] || 0,
-        "Chicken Nuggets": latestForms[0].frozenFood?.["Chicken Nuggets"] || 0,
-        "Coke": latestForms[0].drinkStock?.["Coke"] || 0,
-        "Fanta": latestForms[0].drinkStock?.["Fanta"] || 0,
-        "Water": latestForms[0].drinkStock?.["Water"] || 0
+      const actualStock: Record<string, number> = latestForms.length > 0 ? {
+        "Burger Buns": Number(latestForms[0].burgerBunsStock) || 0,
+        "French Fries": Number((latestForms[0].frozenFood as any)?.["French Fries"]) || 0,
+        "Chicken Wings": Number((latestForms[0].frozenFood as any)?.["Chicken Wings"]) || 0,
+        "Chicken Nuggets": Number((latestForms[0].frozenFood as any)?.["Chicken Nuggets"]) || 0,
+        "Coke": Number((latestForms[0].drinkStock as any)?.["Coke"]) || 0,
+        "Fanta": Number((latestForms[0].drinkStock as any)?.["Fanta"]) || 0,
+        "Water": Number((latestForms[0].drinkStock as any)?.["Water"]) || 0
       } : {};
       
       // Analyze discrepancies between expected and actual
@@ -152,7 +152,7 @@ export function registerRoutes(app: express.Application): Server {
         response_format: { type: "json_object" }
       });
 
-      const analysis = JSON.parse(completion.choices[0].message.content);
+      const analysis = JSON.parse(completion.choices[0].message.content || '{}');
 
       // Update report with analysis
       await db.update(uploadedReports).set({ 
@@ -166,7 +166,7 @@ export function registerRoutes(app: express.Application): Server {
         try {
           await db.insert(dailyShiftSummary).values({
             shiftDate: report.shiftDate.toISOString().split('T')[0],
-            burgersSold: analysis.topItems.reduce((sum, item) => {
+            burgersSold: analysis.topItems.reduce((sum: number, item: any) => {
               if (item.name.toLowerCase().includes('burger')) {
                 return sum + item.quantity;
               }
@@ -182,7 +182,7 @@ export function registerRoutes(app: express.Application): Server {
           }).onConflictDoUpdate({
             target: dailyShiftSummary.shiftDate,
             set: {
-              burgersSold: analysis.topItems.reduce((sum, item) => {
+              burgersSold: analysis.topItems.reduce((sum: number, item: any) => {
                 if (item.name.toLowerCase().includes('burger')) {
                   return sum + item.quantity;
                 }
@@ -392,8 +392,11 @@ export function registerRoutes(app: express.Application): Server {
         const shoppingItems = Object.entries(requirements).flatMap(([category, items]) => 
           items.map(([itemName, quantity]) => ({
             itemName,
-            quantity: Number(quantity),
+            quantity: Number(quantity).toString(),
             unit: 'units', // Default unit
+            supplier: 'TBD', // Default supplier
+            pricePerUnit: '0', // Default price
+            priority: 'medium', // Default priority
             formId: result.id,
             listDate: data.shiftDate,
             category,
@@ -425,10 +428,10 @@ export function registerRoutes(app: express.Application): Server {
           .catch(error => console.error("Failed to send email notification:", error));
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ Error creating daily stock sales:", err);
-      console.error("Error details:", err.message, err.stack);
-      res.status(500).json({ error: "Failed to create daily stock sales", details: err.message });
+      console.error("Error details:", err?.message, err?.stack);
+      res.status(500).json({ error: "Failed to create daily stock sales", details: err?.message || 'Unknown error' });
     }
   });
 
@@ -476,10 +479,10 @@ export function registerRoutes(app: express.Application): Server {
       console.log("✅ Draft saved successfully with ID:", result.id);
       
       res.json(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ Error saving draft:", err);
-      console.error("Error details:", err.message, err.stack);
-      res.status(500).json({ error: "Failed to save draft", details: err.message });
+      console.error("Error details:", err?.message, err?.stack);
+      res.status(500).json({ error: "Failed to save draft", details: err?.message || 'Unknown error' });
     }
   });
 
@@ -800,7 +803,7 @@ export function registerRoutes(app: express.Application): Server {
   app.get("/api/shopping-list/date/:date", async (req: Request, res: Response) => {
     try {
       const { date } = req.params;
-      const shoppingList = await storage.getShoppingListByDate(date);
+      const shoppingList = await storage.getShoppingListsByDate(date);
       res.json(shoppingList);
     } catch (err) {
       console.error("Error fetching shopping list by date:", err);
@@ -898,9 +901,10 @@ export function registerRoutes(app: express.Application): Server {
       
       // Check if form has shopping entries
       const shoppingEntries = lastForm.shoppingEntries || [];
-      console.log(`🛒 Form has ${shoppingEntries.length} shopping entries`);
+      const entriesArray = Array.isArray(shoppingEntries) ? shoppingEntries : [];
+      console.log(`🛒 Form has ${entriesArray.length} shopping entries`);
       
-      if (shoppingEntries.length === 0) {
+      if (entriesArray.length === 0) {
         return res.status(400).json({ error: "No shopping entries found in the last form" });
       }
       
@@ -1518,8 +1522,8 @@ export function registerRoutes(app: express.Application): Server {
             .set({ estimatedCost: newEstCost.toString() })
             .where(eq(shoppingList.id, item.id));
         }
-      } catch (shoppingErr) {
-        console.log("Shopping list update skipped (table may not exist):", shoppingErr.message);
+      } catch (shoppingErr: any) {
+        console.log("Shopping list update skipped (table may not exist):", shoppingErr?.message);
       }
       
       // Update recipes that use this ingredient - recalculate costs
@@ -1532,7 +1536,7 @@ export function registerRoutes(app: express.Application): Server {
           let newCost = 0;
           const newBreakDown = [];
           
-          for (const ing of recipe.ingredients) {
+          for (const ing of recipe.ingredients || []) {
             const ingData = await db.select().from(ingredientsTable)
               .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
             
@@ -1555,8 +1559,8 @@ export function registerRoutes(app: express.Application): Server {
             })
             .where(eq(recipes.id, recipe.id));
         }
-      } catch (recipeErr) {
-        console.log("Recipe cost update skipped:", recipeErr.message);
+      } catch (recipeErr: any) {
+        console.log("Recipe cost update skipped:", recipeErr?.message);
       }
       
       res.json(result);
