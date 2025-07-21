@@ -8,7 +8,7 @@ import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; 
 import { db } from "./db"; // For transactions
 import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports } from "../shared/schema"; // Adjust path
 import { z } from "zod";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import multer from 'multer';
 import OpenAI from 'openai';
 import xlsx from 'xlsx';
@@ -1668,81 +1668,86 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Receipts upload endpoint
-  app.post('/api/receipts/upload', upload.single('file'), async (req: Request, res: Response) => {
+  // Receipts upload endpoint - multiple files
+  app.post('/api/receipts/upload', upload.array('files', 5), async (req: Request, res: Response) => {
     try {
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
       }
 
       const shiftDate = req.body.shiftDate || new Date().toISOString().split('T')[0];
-      const fileData = file.buffer.toString('base64');
+      const ids: number[] = [];
       
-      const [report] = await db.insert(uploadedReports).values({
-        filename: file.originalname,
-        fileType: file.mimetype,
-        fileData,
-        shiftDate: new Date(shiftDate + 'T00:00:00Z'),
-        isAnalyzed: false,
-      }).returning({ id: uploadedReports.id });
+      for (const file of files) {
+        const fileData = file.buffer.toString('base64');
+        
+        const [report] = await db.insert(uploadedReports).values({
+          filename: file.originalname,
+          fileType: file.mimetype,
+          fileData,
+          shiftDate: new Date(shiftDate + 'T00:00:00Z'),
+          isAnalyzed: false,
+          analysisSummary: null,
+          compilationSummary: null,
+        }).returning({ id: uploadedReports.id });
+        
+        ids.push(report.id);
+      }
 
-      res.json({ id: report.id, message: 'File uploaded successfully' });
+      res.json({ ids, message: `${files.length} files uploaded successfully` });
     } catch (err) {
       console.error('Receipts upload error:', err);
-      res.status(500).json({ error: 'Failed to upload receipts file' });
+      res.status(500).json({ error: 'Failed to upload receipts files' });
     }
   });
 
-  // Receipts compilation endpoint  
+  // Receipts compilation endpoint - multiple files
   app.post('/api/receipts/compile', async (req: Request, res: Response) => {
     try {
-      const { reportId } = req.body;
-      if (!reportId) {
-        return res.status(400).json({ error: 'Report ID required' });
+      const { reportIds } = req.body;
+      if (!reportIds || !Array.isArray(reportIds) || reportIds.length === 0) {
+        return res.status(400).json({ error: 'Report IDs required' });
       }
 
-      // Get the uploaded report
-      const [report] = await db
+      // Get all uploaded reports
+      const reports = await db
         .select()
         .from(uploadedReports)
-        .where(eq(uploadedReports.id, reportId))
-        .limit(1);
+        .where(inArray(uploadedReports.id, reportIds));
 
-      if (!report) {
-        return res.status(404).json({ error: 'Report not found' });
+      if (reports.length === 0) {
+        return res.status(404).json({ error: 'No reports found' });
       }
 
-      // Parse file based on type
-      let text = '';
-      try {
-        const fileBuffer = Buffer.from(report.fileData, 'base64');
-        
-        if (report.fileType === 'application/pdf') {
-          const pdfParse = (await import('pdf-parse')).default;
-          const pdfData = await pdfParse(fileBuffer);
-          text = pdfData.text;
-        } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-          const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
-          text = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
-        } else if (report.fileType === 'text/csv') {
-          text = fileBuffer.toString('utf-8');
-        } else {
-          return res.status(400).json({ error: 'Unsupported file type' });
+      // Combine text from all files
+      let combinedText = '';
+      for (const report of reports) {
+        let text = '';
+        try {
+          const fileBuffer = Buffer.from(report.fileData as string, 'base64');
+          
+          if (report.fileType === 'application/pdf') {
+            const pdfParse = (await import('pdf-parse')).default;
+            const pdfData = await pdfParse(fileBuffer);
+            text = pdfData.text;
+          } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+            const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+            text = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+          } else if (report.fileType === 'text/csv') {
+            text = fileBuffer.toString('utf-8');
+          }
+          combinedText += `\n--- ${report.filename} ---\n${text}`;
+        } catch (parseError) {
+          console.error(`File parsing error for ${report.filename}:`, parseError);
+          combinedText += `\n--- ${report.filename} (parsing failed) ---\n`;
         }
-      } catch (parseError) {
-        console.error('File parsing error:', parseError);
-        return res.status(400).json({ error: 'Failed to parse file' });
       }
 
       // AI analysis with OpenAI
-      const prompt = `Analyze these restaurant receipts and compile the data. Extract:
+      const prompt = `Compile receipts from multiple files: List items sold by category, include quantities/modifiers, calculate ingredient usage (e.g., Single Smash Burger: 1 roll, 20g butter, 1 cheese, 95g meat). 
 
-1. Items sold by category with quantities
-2. All modifiers/add-ons with their counts  
-3. Ingredient usage calculations (e.g., Single Smash Burger = 1 roll, 20g butter, 1 cheese, 95g meat)
-
-Use this sample calculation guide:
+Use this calculation guide:
 - Single Smash Burger: 1 roll, 20g butter, 1 cheese slice, 95g meat
 - Double Smash Burger: 1 roll, 25g butter, 2 cheese slices, 190g meat  
 - French Fries: 150g potatoes, 10ml oil
@@ -1756,8 +1761,8 @@ Return JSON format:
   "ingredients": [{"name": "string", "quantity": number, "unit": "string"}]
 }
 
-Receipt data:
-${text.slice(0, 10000)}`; // Limit text to avoid token limits
+Combined receipt data:
+${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
 
       try {
         const response = await openai.chat.completions.create({
@@ -1777,30 +1782,27 @@ ${text.slice(0, 10000)}`; // Limit text to avoid token limits
           // Fallback compilation if AI response isn't valid JSON
           compilation = {
             items: [
-              { category: "Burgers", name: "Single Smash Burger", quantity: 0 },
-              { category: "Sides", name: "French Fries", quantity: 0 }
+              { category: "Burgers", name: "Combined Analysis Error", quantity: 0 },
+              { category: "Files", name: `${reports.length} files processed`, quantity: reports.length }
             ],
             modifiers: [
-              { name: "Extra Cheese", count: 0 },
-              { name: "Jalapeños", count: 0 }
+              { name: "AI Analysis Unavailable", count: 0 }
             ],
             ingredients: [
-              { name: "Burger Rolls", quantity: 0, unit: "pieces" },
-              { name: "Ground Beef", quantity: 0, unit: "g" },
-              { name: "Cheese Slices", quantity: 0, unit: "pieces" }
+              { name: "Manual Review Required", quantity: reports.length, unit: "files" }
             ]
           };
         }
 
-        // Update report with compilation summary
+        // Store compilation in first report
         await db
           .update(uploadedReports)
           .set({ 
-            analysisSummary: compilation,
+            compilationSummary: compilation,
             analyzedAt: new Date(),
             isAnalyzed: true
           })
-          .where(eq(uploadedReports.id, reportId));
+          .where(eq(uploadedReports.id, reportIds[0]));
 
         res.json(compilation);
 
@@ -1810,13 +1812,13 @@ ${text.slice(0, 10000)}`; // Limit text to avoid token limits
         // Return fallback compilation if OpenAI fails
         const fallbackCompilation = {
           items: [
-            { category: "Burgers", name: "Analysis Error - Check File Format", quantity: 0 }
+            { category: "Files", name: `${reports.length} files uploaded`, quantity: reports.length }
           ],
           modifiers: [
             { name: "AI Analysis Unavailable", count: 0 }
           ],
           ingredients: [
-            { name: "Manual Review Required", quantity: 0, unit: "items" }
+            { name: "Manual Review Required", quantity: reports.length, unit: "files" }
           ]
         };
         

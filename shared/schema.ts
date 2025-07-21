@@ -473,6 +473,7 @@ export const uploadedReports = pgTable("uploaded_reports", {
   fileData: text("file_data").notNull(), // Base64 encoded file data
   shiftDate: timestamp("shift_date").notNull(),
   analysisSummary: jsonb("analysis_summary"),
+  compilationSummary: jsonb("compilation_summary"), // Stores items, modifiers, ingredients
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   analyzedAt: timestamp("analyzed_at"),
   isAnalyzed: boolean("is_analyzed").default(false),

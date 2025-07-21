@@ -13,35 +13,40 @@ interface CompilationResult {
 }
 
 const Receipts = () => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<FileList | null>(null);
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [reportId, setReportId] = useState<number | null>(null);
+  const [reportIds, setReportIds] = useState<number[]>([]);
   const [compilation, setCompilation] = useState<CompilationResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
       const allowedTypes = ['application/pdf', 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-      if (allowedTypes.includes(selectedFile.type)) {
-        setFile(selectedFile);
-      } else {
+      const validFiles = Array.from(selectedFiles).filter(file => 
+        allowedTypes.includes(file.type)
+      );
+      
+      if (validFiles.length !== selectedFiles.length) {
         toast({
           title: "Invalid file type",
-          description: "Please select a PDF, CSV, or Excel file",
+          description: "Please select only PDF, CSV, or Excel files",
           variant: "destructive",
         });
+        return;
       }
+      
+      setFiles(selectedFiles);
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
+    if (!files || files.length === 0) {
       toast({
-        title: "No file selected",
-        description: "Please select a file to upload",
+        title: "No files selected",
+        description: "Please select files to upload",
         variant: "destructive",
       });
       return;
@@ -50,7 +55,7 @@ const Receipts = () => {
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      Array.from(files).forEach(file => formData.append('files', file));
       formData.append('shiftDate', shiftDate);
       
       const response = await fetch('/api/receipts/upload', { 
@@ -63,17 +68,17 @@ const Receipts = () => {
       }
       
       const data = await response.json();
-      setReportId(data.id);
+      setReportIds(data.ids);
       
       toast({
-        title: "File uploaded successfully",
-        description: "Ready to compile items and modifiers",
+        title: "Files uploaded successfully",
+        description: `${files.length} files ready for compilation`,
       });
     } catch (error) {
       console.error('Upload error:', error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload file. Please try again.",
+        description: "Failed to upload files. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -82,7 +87,7 @@ const Receipts = () => {
   };
 
   const triggerCompilation = async () => {
-    if (!reportId) return;
+    if (reportIds.length === 0) return;
 
     setIsCompiling(true);
     try {
@@ -91,7 +96,7 @@ const Receipts = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reportId })
+        body: JSON.stringify({ reportIds })
       });
       
       if (!response.ok) {
@@ -140,30 +145,38 @@ const Receipts = () => {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="fileUpload">Receipt File (PDF, CSV, or Excel)</Label>
+            <Label htmlFor="fileUpload">Receipt Files (PDF, CSV, or Excel) - Multiple files supported</Label>
             <Input
               id="fileUpload"
               type="file"
               accept=".pdf,.csv,.xlsx,.xls"
+              multiple
               onChange={handleFileChange}
             />
-            {file && (
-              <p className="text-sm text-gray-600">
-                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-              </p>
+            {files && files.length > 0 && (
+              <div className="text-sm text-gray-600">
+                <p>Selected {files.length} file(s):</p>
+                <ul className="list-disc ml-4">
+                  {Array.from(files).map((file, index) => (
+                    <li key={index}>
+                      {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
           
           <Button 
             onClick={handleUpload} 
-            disabled={!file || isUploading}
+            disabled={!files || files.length === 0 || isUploading}
             className="w-full"
           >
             <Upload className="w-4 h-4 mr-2" />
-            {isUploading ? "Uploading..." : "Upload Receipts"}
+            {isUploading ? "Uploading..." : `Upload ${files?.length || 0} Receipt Files`}
           </Button>
 
-          {reportId && (
+          {reportIds.length > 0 && (
             <Button 
               onClick={triggerCompilation} 
               disabled={isCompiling}
