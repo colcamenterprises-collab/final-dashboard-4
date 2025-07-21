@@ -1351,7 +1351,8 @@ export function registerRoutes(app: express.Application): Server {
   // Ingredients endpoints
   app.get("/api/ingredients", async (req: Request, res: Response) => {
     try {
-      const ingredientsList = await db.select().from(ingredients).orderBy(ingredients.name);
+      const { ingredients: ingredientsTable } = await import("../shared/schema");
+      const ingredientsList = await db.select().from(ingredientsTable).orderBy(ingredientsTable.name);
       res.json(ingredientsList);
     } catch (err) {
       console.error("Error fetching ingredients:", err);
@@ -1361,14 +1362,23 @@ export function registerRoutes(app: express.Application): Server {
 
   app.post("/api/ingredients", async (req: Request, res: Response) => {
     try {
-      const [result] = await db.insert(ingredients).values({
+      const { ingredients: ingredientsTable } = await import("../shared/schema");
+      
+      // Auto-calculate cost per portion
+      const price = parseFloat(req.body.price) || 0;
+      const packageSize = parseFloat(req.body.packageSize) || 1;
+      const portionSize = parseFloat(req.body.portionSize) || 1;
+      const costPerPortion = price / (packageSize / portionSize) || 0;
+      
+      const [result] = await db.insert(ingredientsTable).values({
         name: req.body.name,
         category: req.body.category,
         supplier: req.body.supplier,
         unitPrice: req.body.unitPrice || req.body.price || '0',
         price: req.body.price || '0',
-        packageSize: req.body.packageSize || '',
+        packageSize: req.body.packageSize || '0',
         portionSize: req.body.portionSize || '0',
+        costPerPortion: costPerPortion.toString(),
         unit: req.body.unit || 'g',
         notes: req.body.notes || '',
       }).returning();
@@ -1382,21 +1392,46 @@ export function registerRoutes(app: express.Application): Server {
   app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const [result] = await db.update(ingredients)
+      const { ingredients: ingredientsTable, recipes, shoppingList } = await import("../shared/schema");
+      
+      // Auto-calculate cost per portion
+      const price = parseFloat(req.body.price) || 0;
+      const packageSize = parseFloat(req.body.packageSize) || 1;
+      const portionSize = parseFloat(req.body.portionSize) || 1;
+      const costPerPortion = price / (packageSize / portionSize) || 0;
+      
+      const [result] = await db.update(ingredientsTable)
         .set({
           name: req.body.name,
           category: req.body.category,
           supplier: req.body.supplier,
           unitPrice: req.body.unitPrice || req.body.price || '0',
           price: req.body.price || '0',
-          packageSize: req.body.packageSize || '',
+          packageSize: req.body.packageSize || '0',
           portionSize: req.body.portionSize || '0',
+          costPerPortion: costPerPortion.toString(),
           unit: req.body.unit || 'g',
           notes: req.body.notes || '',
           updatedAt: new Date(), // Auto-timestamp
         })
-        .where(eq(ingredients.id, id))
+        .where(eq(ingredientsTable.id, id))
         .returning();
+        
+      // Update shopping list estimated costs for this ingredient
+      try {
+        const shoppingItems = await db.select().from(shoppingList)
+          .where(sql`item_name = ${req.body.name}`);
+        
+        for (const item of shoppingItems) {
+          const newEstCost = (parseFloat(item.quantity) || 0) * price;
+          await db.update(shoppingList)
+            .set({ estimatedCost: newEstCost.toString() })
+            .where(eq(shoppingList.id, item.id));
+        }
+      } catch (shoppingErr) {
+        console.log("Shopping list update skipped (table may not exist):", shoppingErr.message);
+      }
+      
       res.json(result);
     } catch (err) {
       console.error("Error updating ingredient:", err);

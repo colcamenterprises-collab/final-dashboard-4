@@ -16,8 +16,9 @@ interface Ingredient {
   supplier: string;
   unitPrice: number;
   price?: number; // Package price
-  packageSize: string;
+  packageSize: number; // Changed to number
   portionSize?: number; // Average per use
+  costPerPortion?: number; // Auto-calculated cost per portion
   unit: string;
   notes?: string;
   updatedAt: string;
@@ -147,6 +148,7 @@ const Ingredients = () => {
                   <TableHead>Package Price</TableHead>
                   <TableHead>Package Size</TableHead>
                   <TableHead>Portion Size</TableHead>
+                  <TableHead>Cost/Portion</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead>Actions</TableHead>
@@ -167,11 +169,14 @@ const Ingredients = () => {
                         <TableCell className="font-medium">{ingredient.name}</TableCell>
                         <TableCell>{ingredient.category}</TableCell>
                         <TableCell>
-                          ฿{ingredient.price || ingredient.unitPrice} / {ingredient.packageSize}
+                          ฿{ingredient.price || ingredient.unitPrice} / {ingredient.packageSize}{ingredient.unit}
                         </TableCell>
-                        <TableCell>{ingredient.packageSize}</TableCell>
+                        <TableCell>{ingredient.packageSize}{ingredient.unit}</TableCell>
                         <TableCell>
                           {ingredient.portionSize ? `${ingredient.portionSize}${ingredient.unit}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {ingredient.costPerPortion ? `฿${parseFloat(ingredient.costPerPortion.toString()).toFixed(2)}` : '-'}
                         </TableCell>
                         <TableCell>{ingredient.supplier}</TableCell>
                         <TableCell className="text-sm text-gray-500">
@@ -224,11 +229,19 @@ const EditForm = ({ ingredient, onSave, onCancel, isUpdating }: EditFormProps) =
     category: ingredient.category,
     supplier: ingredient.supplier,
     price: ingredient.price || ingredient.unitPrice,
-    packageSize: ingredient.packageSize,
+    packageSize: ingredient.packageSize || 0,
     portionSize: ingredient.portionSize || 0,
     unit: ingredient.unit,
     notes: ingredient.notes || '',
   });
+
+  // Calculate cost per portion in real-time
+  const calculateCostPerPortion = () => {
+    const price = parseFloat(data.price?.toString() || '0');
+    const packageSize = parseFloat(data.packageSize?.toString() || '1');
+    const portionSize = parseFloat(data.portionSize?.toString() || '1');
+    return price / (packageSize / portionSize) || 0;
+  };
 
   const handleChange = (field: keyof Ingredient, value: string | number) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -276,9 +289,11 @@ const EditForm = ({ ingredient, onSave, onCancel, isUpdating }: EditFormProps) =
       </TableCell>
       <TableCell>
         <Input 
-          value={data.packageSize || ''} 
-          onChange={(e) => handleChange('packageSize', e.target.value)}
-          placeholder="300g"
+          type="number"
+          step="0.01"
+          value={data.packageSize || 0} 
+          onChange={(e) => handleChange('packageSize', parseFloat(e.target.value) || 0)}
+          placeholder="300"
           className="w-20"
         />
       </TableCell>
@@ -290,6 +305,7 @@ const EditForm = ({ ingredient, onSave, onCancel, isUpdating }: EditFormProps) =
             value={data.portionSize || 0} 
             onChange={(e) => handleChange('portionSize', parseFloat(e.target.value) || 0)}
             className="w-16"
+            placeholder="30"
           />
           <Input 
             value={data.unit || ''} 
@@ -298,6 +314,11 @@ const EditForm = ({ ingredient, onSave, onCancel, isUpdating }: EditFormProps) =
             placeholder="g"
           />
         </div>
+      </TableCell>
+      <TableCell>
+        <span className="text-sm font-medium">
+          ฿{calculateCostPerPortion().toFixed(2)}
+        </span>
       </TableCell>
       <TableCell>
         <Input 

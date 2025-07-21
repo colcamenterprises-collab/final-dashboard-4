@@ -281,8 +281,9 @@ export const ingredients = pgTable("ingredients", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   // Enhanced packaging and pricing fields
   price: decimal("price", { precision: 10, scale: 2 }), // Package price (e.g., jar 89 THB)
-  packageSize: text("package_size").notNull(), // Package size (e.g., 300g)
+  packageSize: decimal("package_size", { precision: 10, scale: 2 }), // Package size (e.g., 300g)
   portionSize: decimal("portion_size", { precision: 10, scale: 2 }), // Average per use (e.g., 30g)
+  costPerPortion: decimal("cost_per_portion", { precision: 10, scale: 2 }), // Auto-calculated: price / (packageSize / portionSize)
   unit: text("unit").notNull(),
   notes: text("notes"),
   lastUpdated: timestamp("last_updated").defaultNow(),
