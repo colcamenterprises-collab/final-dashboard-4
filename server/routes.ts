@@ -570,6 +570,41 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Search daily stock sales forms
+  app.get("/api/daily-stock-sales/search", async (req: Request, res: Response) => {
+    try {
+      const query = req.query.query as string || '';
+      const forms = await storage.searchDailyStockSales(query);
+      res.json(forms);
+    } catch (err) {
+      console.error("Error searching daily stock sales:", err);
+      res.status(500).json({ error: "Failed to search daily stock sales" });
+    }
+  });
+
+  // Get drafts only
+  app.get("/api/daily-stock-sales/drafts", async (req: Request, res: Response) => {
+    try {
+      const forms = await storage.searchDailyStockSales('');
+      const drafts = forms.filter(form => form.isDraft);
+      res.json(drafts);
+    } catch (err) {
+      console.error("Error fetching drafts:", err);
+      res.status(500).json({ error: "Failed to fetch drafts" });
+    }
+  });
+
+  // Get all forms (completed and drafts)
+  app.get("/api/daily-stock-sales/all", async (req: Request, res: Response) => {
+    try {
+      const forms = await storage.searchDailyStockSales('');
+      res.json(forms);
+    } catch (err) {
+      console.error("Error fetching all forms:", err);
+      res.status(500).json({ error: "Failed to fetch all forms" });
+    }
+  });
+
   // ─── Manual "pull receipts now" endpoint ───────────────────────────────
   app.post("/api/loyverse/pull", async (_req: Request, res: Response) => {
     try {
@@ -865,6 +900,9 @@ export function registerRoutes(app: express.Application): Server {
       // Ensure proper date conversion for timestamp fields
       const processedItems = items.map(item => ({
         ...item,
+        supplier: item.supplier || 'General', // Provide default supplier
+        pricePerUnit: item.pricePerUnit || '0.00', // Provide default price
+        priority: item.priority || 'medium', // Provide default priority
         listDate: item.listDate ? (item.listDate instanceof Date ? item.listDate : new Date(item.listDate)) : new Date(),
         createdAt: item.createdAt ? (item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt)) : new Date(),
         updatedAt: item.updatedAt ? (item.updatedAt instanceof Date ? item.updatedAt : new Date(item.updatedAt)) : new Date(),
