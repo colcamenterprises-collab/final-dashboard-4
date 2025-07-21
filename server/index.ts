@@ -4,6 +4,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
 import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
+import { OllieAgent } from './agents/ollie.js';
+import { SallyAgent } from './agents/sally.js';
+import { MarloAgent } from './agents/marlo.js';
+import { db } from './utils/dbUtils.js';
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));
@@ -55,6 +59,67 @@ app.use((req, res, next) => {
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
+  
+  // Initialize AI agents
+  const ollie = new OllieAgent();
+  const sally = new SallyAgent();
+  const marlo = new MarloAgent();
+
+  // Multi-agent chat routes
+  app.post('/chat/:agent', async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const { agent } = req.params;
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    let response = '';
+    let agentName = '';
+
+    try {
+      switch (agent.toLowerCase()) {
+        case 'ollie':
+          response = await ollie.handleMessage(message);
+          agentName = ollie.name;
+          break;
+        case 'sally':
+          response = await sally.handleMessage(message);
+          agentName = sally.name;
+          break;
+        case 'marlo':
+          response = await marlo.handleMessage(message);
+          agentName = marlo.name;
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, or marlo.' });
+      }
+
+      const responseTime = Date.now() - startTime;
+
+      // Log the interaction to database
+      try {
+        const { chatLogs } = await import('./utils/dbUtils.js');
+        await db.insert(chatLogs).values({
+          agentName,
+          userMessage: message,
+          agentResponse: response,
+          responseTime
+        });
+      } catch (dbError) {
+        console.error('Error logging chat interaction:', dbError);
+      }
+
+      res.json({ reply: response, responseTime });
+    } catch (error: any) {
+      console.error(`Error with ${agent} agent:`, error);
+      res.status(500).json({ error: 'Agent is currently unavailable. Please try again.' });
+    }
+  });
+
+  // Serve static files from public directory
+  app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks
   schedulerService.start();
