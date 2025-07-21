@@ -7,6 +7,7 @@ import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
 import { OllieAgent } from './agents/ollie.js';
 import { SallyAgent } from './agents/sally.js';
 import { MarloAgent } from './agents/marlo.js';
+import { BigBossAgent } from './agents/bigboss.js';
 import { db } from './utils/dbUtils.js';
 
 const app = express();
@@ -64,6 +65,7 @@ app.use((req, res, next) => {
   const ollie = new OllieAgent();
   const sally = new SallyAgent();
   const marlo = new MarloAgent();
+  const bigboss = new BigBossAgent();
 
   // Multi-agent chat routes
   app.post('/chat/:agent', async (req: Request, res: Response) => {
@@ -92,8 +94,12 @@ app.use((req, res, next) => {
           response = await marlo.handleMessage(message);
           agentName = marlo.name;
           break;
+        case 'bigboss':
+          response = await bigboss.handleMessage(message);
+          agentName = bigboss.name;
+          break;
         default:
-          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, or marlo.' });
+          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, or bigboss.' });
       }
 
       const responseTime = Date.now() - startTime;

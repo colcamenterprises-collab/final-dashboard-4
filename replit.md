@@ -4,6 +4,41 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
+## Multi-Agent AI System - Production Ready (July 21, 2025)
+
+### Four Specialized AI Agents
+- **Ollie** - Operations & Stock Management specialist handling inventory tracking, daily operations, food safety, and staff scheduling
+- **Sally** - Finance & Expenses specialist managing expense tracking, financial analysis, budget planning, and profitability insights  
+- **Marlo** - Marketing & Content specialist creating social media strategies, promotional campaigns, and brand messaging
+- **Big Boss** - Director & Team Oversight providing strategic oversight, team coordination, executive decisions, and operational leadership
+
+### Technical Implementation
+- **OpenAI GPT-4o Integration** - All agents use the latest GPT-4o model for intelligent, contextual responses
+- **Modular Chatbox System** - Template-based interface (/chatbox-template.html) with agent-specific URLs using ?agent= parameters
+- **Database Integration** - Chat interactions logged with response times for analytics and performance tracking
+- **Winston Logging** - Comprehensive logging system for debugging and monitoring agent performance
+- **Real-time Conversations** - Direct /chat/:agentName endpoints for immediate AI assistance
+
+### Chatbox Interface System
+- **Unified Template** - Single chatbox-template.html handles all agents with parameter-based configuration
+- **Agent-Specific Styling** - Color-coded interfaces (Ollie: green, Sally: orange, Marlo: purple, Big Boss: red)
+- **Responsive Design** - Mobile-optimized interface with adaptive layouts and touch-friendly controls
+- **Embedded Ready** - Iframe-compatible for dashboard integration with AIChatWidget component
+
+### Live Testing Results
+- **Ollie**: Provided comprehensive burger bun ordering guidance with 6-step operational framework
+- **Sally**: Delivered detailed expense category analysis with actionable cost optimization recommendations
+- **Marlo**: Created complete Facebook marketing campaign with "Smoky Mountain Burger" promotional strategy
+- **Big Boss**: Delivered executive team status overview with departmental directives and strategic guidance
+
+### Access Points
+- `/chatbox.html` - Original standalone interface with agent selection
+- `/chatbox-template.html?agent=ollie` - Direct Ollie interface
+- `/chatbox-template.html?agent=sally` - Direct Sally interface  
+- `/chatbox-template.html?agent=marlo` - Direct Marlo interface
+- `/chatbox-template.html?agent=bigboss` - Direct Big Boss interface
+- `/chatbox-[agent].html` - Redirect shortcuts for easy access
+
 ## Recent Changes (July 21, 2025)
 
 ### Enhanced Recipe Management with Portion Selection & Auto-Updates - Production Ready
