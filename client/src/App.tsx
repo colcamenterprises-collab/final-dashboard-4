@@ -20,6 +20,7 @@ import Analysis from "@/pages/Analysis";
 import ShiftAnalytics from "@/pages/ShiftAnalytics";
 import WebhookManagement from "@/pages/WebhookManagement";
 import Marketing from "@/pages/Marketing";
+import Receipts from "@/pages/Receipts";
 import Placeholder from "@/pages/Placeholder";
 
 import NotFound from "@/pages/not-found";
@@ -45,6 +46,7 @@ function Router() {
         <Route path="/analysis" component={Analysis} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/marketing" component={Marketing} />
+        <Route path="/receipts" component={Receipts} />
         
         {/* Placeholder routes */}
         <Route path="/placeholder/business-info" component={() => <Placeholder title="Business Info" description="Update business email, contact details, and company information." />} />

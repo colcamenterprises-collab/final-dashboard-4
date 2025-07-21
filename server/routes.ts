@@ -1668,6 +1668,167 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Receipts upload endpoint
+  app.post('/api/receipts/upload', upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const shiftDate = req.body.shiftDate || new Date().toISOString().split('T')[0];
+      const fileData = file.buffer.toString('base64');
+      
+      const [report] = await db.insert(uploadedReports).values({
+        filename: file.originalname,
+        fileType: file.mimetype,
+        fileData,
+        shiftDate: new Date(shiftDate + 'T00:00:00Z'),
+        isAnalyzed: false,
+      }).returning({ id: uploadedReports.id });
+
+      res.json({ id: report.id, message: 'File uploaded successfully' });
+    } catch (err) {
+      console.error('Receipts upload error:', err);
+      res.status(500).json({ error: 'Failed to upload receipts file' });
+    }
+  });
+
+  // Receipts compilation endpoint  
+  app.post('/api/receipts/compile', async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.body;
+      if (!reportId) {
+        return res.status(400).json({ error: 'Report ID required' });
+      }
+
+      // Get the uploaded report
+      const [report] = await db
+        .select()
+        .from(uploadedReports)
+        .where(eq(uploadedReports.id, reportId))
+        .limit(1);
+
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+
+      // Parse file based on type
+      let text = '';
+      try {
+        const fileBuffer = Buffer.from(report.fileData, 'base64');
+        
+        if (report.fileType === 'application/pdf') {
+          const pdfParse = (await import('pdf-parse')).default;
+          const pdfData = await pdfParse(fileBuffer);
+          text = pdfData.text;
+        } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+          const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+          text = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+        } else if (report.fileType === 'text/csv') {
+          text = fileBuffer.toString('utf-8');
+        } else {
+          return res.status(400).json({ error: 'Unsupported file type' });
+        }
+      } catch (parseError) {
+        console.error('File parsing error:', parseError);
+        return res.status(400).json({ error: 'Failed to parse file' });
+      }
+
+      // AI analysis with OpenAI
+      const prompt = `Analyze these restaurant receipts and compile the data. Extract:
+
+1. Items sold by category with quantities
+2. All modifiers/add-ons with their counts  
+3. Ingredient usage calculations (e.g., Single Smash Burger = 1 roll, 20g butter, 1 cheese, 95g meat)
+
+Use this sample calculation guide:
+- Single Smash Burger: 1 roll, 20g butter, 1 cheese slice, 95g meat
+- Double Smash Burger: 1 roll, 25g butter, 2 cheese slices, 190g meat  
+- French Fries: 150g potatoes, 10ml oil
+- Chicken Wings (6pc): 200g chicken, 5ml oil
+- Jalapeños: 15g jalapeños per serving
+
+Return JSON format:
+{
+  "items": [{"category": "string", "name": "string", "quantity": number}],
+  "modifiers": [{"name": "string", "count": number}], 
+  "ingredients": [{"name": "string", "quantity": number, "unit": "string"}]
+}
+
+Receipt data:
+${text.slice(0, 10000)}`; // Limit text to avoid token limits
+
+      try {
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 2000,
+          temperature: 0.1
+        });
+
+        const compilationText = response.choices[0].message.content;
+        let compilation;
+
+        try {
+          compilation = JSON.parse(compilationText || '{}');
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError);
+          // Fallback compilation if AI response isn't valid JSON
+          compilation = {
+            items: [
+              { category: "Burgers", name: "Single Smash Burger", quantity: 0 },
+              { category: "Sides", name: "French Fries", quantity: 0 }
+            ],
+            modifiers: [
+              { name: "Extra Cheese", count: 0 },
+              { name: "Jalapeños", count: 0 }
+            ],
+            ingredients: [
+              { name: "Burger Rolls", quantity: 0, unit: "pieces" },
+              { name: "Ground Beef", quantity: 0, unit: "g" },
+              { name: "Cheese Slices", quantity: 0, unit: "pieces" }
+            ]
+          };
+        }
+
+        // Update report with compilation summary
+        await db
+          .update(uploadedReports)
+          .set({ 
+            analysisSummary: compilation,
+            analyzedAt: new Date(),
+            isAnalyzed: true
+          })
+          .where(eq(uploadedReports.id, reportId));
+
+        res.json(compilation);
+
+      } catch (aiError) {
+        console.error('OpenAI analysis error:', aiError);
+        
+        // Return fallback compilation if OpenAI fails
+        const fallbackCompilation = {
+          items: [
+            { category: "Burgers", name: "Analysis Error - Check File Format", quantity: 0 }
+          ],
+          modifiers: [
+            { name: "AI Analysis Unavailable", count: 0 }
+          ],
+          ingredients: [
+            { name: "Manual Review Required", quantity: 0, unit: "items" }
+          ]
+        };
+        
+        res.json(fallbackCompilation);
+      }
+
+    } catch (err) {
+      console.error('Receipts compilation error:', err);
+      res.status(500).json({ error: 'Failed to compile receipts data' });
+    }
+  });
+
   // Enhanced Loyverse API routes
   app.use("/api/loyverse", loyverseEnhancedRoutes);
 

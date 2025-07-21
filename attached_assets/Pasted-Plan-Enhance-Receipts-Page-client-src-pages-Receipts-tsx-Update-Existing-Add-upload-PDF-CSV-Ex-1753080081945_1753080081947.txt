@@ -1,0 +1,148 @@
+Plan
+Enhance Receipts Page (client/src/pages/Receipts.tsx - Update Existing):
+Add upload (PDF/CSV/Excel), trigger compilation, display items/modifiers, ingredient summary.
+Backend (server/routes.ts - Update Receipts Endpoints):
+Handle upload, compile items/modifiers, calculate ingredient usage with AI.
+DB (shared/schema.ts - Ensure Table Exists):
+Verify/update uploadedReceipts table.
+Updated Code
+Receipts Page (client/src/pages/Receipts.tsx - Replace Existing)
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useState } from 'react';
+import { Card, CardHeader, CardContent, Button, Input } from "@/components/ui";
+
+const Receipts = () => {
+  const [file, setFile] = useState(null);
+  const [shiftDate, setShiftDate] = useState('');
+  const [reportId, setReportId] = useState(null);
+  const [compilation, setCompilation] = useState(null);
+
+  const handleUpload = async () => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('shiftDate', shiftDate);
+    const response = await fetch('/api/receipts/upload', { method: 'POST', body: formData });
+    const data = await response.json();
+    setReportId(data.id);
+  };
+
+  const triggerCompilation = async () => {
+    const response = await fetch('/api/receipts/compile', { method: 'POST', body: JSON.stringify({ reportId }) });
+    const data = await response.json();
+    setCompilation(data);
+  };
+
+  return (
+    <Card>
+      <CardHeader>Receipts for Shift</CardHeader>
+      <CardContent>
+        <Input type="date" onChange={(e) => setShiftDate(e.target.value)} />
+        <Input type="file" onChange={(e) => setFile(e.target.files[0])} />
+        <Button onClick={handleUpload}>Upload Receipts</Button>
+        {reportId && <Button onClick={triggerCompilation}>Compile Items & Modifiers</Button>}
+        {compilation && (
+          <div>
+            <h3>Items Sold by Category</h3>
+            <ul>{compilation.items.map((item, i) => <li key={i}>{item.category}: {item.name} ({item.quantity})</li>)}</ul>
+            <h3>Modifiers Sold</h3>
+            <ul>{compilation.modifiers.map((mod, i) => <li key={i}>{mod.name} ({mod.count})</li>)}</ul>
+            <h3>Ingredient Usage Summary</h3>
+            <ul>{compilation.ingredients.map((ing, i) => <li key={i}>{ing.name}: {ing.quantity} {ing.unit}</li>)}</ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default Receipts;
+Backend Routes (server/routes.ts - Update Receipts Section)
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import multer from 'multer';
+import OpenAI from 'openai';
+import { db } from '../db';
+import { uploadedReceipts } from '../../shared/schema';
+import pdfParse from 'pdf-parse';
+import xlsx from 'xlsx';
+
+const upload = multer({ memoryStorage: true });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Upload receipts
+app.post('/api/receipts/upload', upload.single('file'), async (req, res) => {
+  const file = req.file;
+  const shiftDate = req.body.shiftDate || DateTime.now().setZone('Asia/Bangkok').toISODate();
+  const fileData = file.buffer;
+  const [report] = await db.insert(uploadedReceipts).values({
+    filename: file.originalname,
+    fileType: file.mimetype,
+    fileData,
+    shiftDate,
+  }).returning({ id: uploadedReceipts.id });
+  res.json({ id: report.id });
+});
+
+// Compile items, modifiers, ingredient summary
+app.post('/api/receipts/compile', async (req, res) => {
+  const reportId = req.body.reportId;
+  const report = await db.select().from(uploadedReceipts).where(eq(uploadedReceipts.id, reportId)).limit(1)[0];
+
+  let text;
+  if (report.fileType === 'application/pdf') {
+    text = (await pdfParse(report.fileData)).text;
+  } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    const workbook = xlsx.read(report.fileData, { type: 'buffer' });
+    text = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+  } else if (report.fileType === 'text/csv') {
+    text = report.fileData.toString('utf-8');
+  }
+
+  const prompt = `Analyze receipts: List items sold by category, include quantities, list all modifiers with counts, calculate ingredient usage (e.g., Single Smash Burger: 1 roll, 20g butter, 1 cheese, 95g meat). JSON output: { items: [{ category: string, name: string, quantity: number }], modifiers: [{ name: string, count: number }], ingredients: [{ name: string, quantity: number, unit: string }] }. Use sample: 20 Single Smash Burgers = 20 rolls, 400g butter, 20 cheeses, 1.9kg meat.`;
+  const response = await openai.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt + text }] });
+  const compilation = JSON.parse(response.choices[0].message.content);
+
+  await db.update(uploadedReceipts).set({ compilationSummary: compilation }).where(eq(uploadedReceipts.id, reportId));
+  res.json(compilation);
+});
+DB Schema (shared/schema.ts - Verify/Adjust uploadedReceipts)
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+export const uploadedReceipts = pgTable('uploaded_receipts', {
+  id: serial('id').primaryKey(),
+  filename: varchar('filename', { length: 255 }),
+  fileType: varchar('file_type', { length: 50 }),
+  fileData: bytea('file_data'),
+  shiftDate: timestamp('shift_date'),
+  compilationSummary: jsonb('compilation_summary'), // Stores items, modifiers, ingredients
+});
+Run npx drizzle-kit migrate if not updated.
+Verification (01:39 PM +07, July 21, 2025)
+Install: npm i multer pdf-parse xlsx (if not done).
+Test:
+Load /ops-sales/receipts.
+Upload a test receipt file (e.g., "1 receipts.csv" from prior).
+Trigger compilation.
+Expected: Displays items (e.g., Single Smash Burger: 3), modifiers (e.g., Jalapenos: 2), ingredients (e.g., 3 rolls, 60g butter).
+Check DB: SELECT compilationSummary FROM uploadedReceipts WHERE id = [latest_id];.
+Fix if Fail: Share error/console log. Likely parsing issue—adjust prompt for format.
