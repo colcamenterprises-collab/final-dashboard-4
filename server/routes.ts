@@ -1257,11 +1257,12 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Recipe Management endpoints
+  // Enhanced Recipe Management endpoints with cost calculation
   app.get("/api/recipes", async (req: Request, res: Response) => {
     try {
-      const recipes = await storage.getRecipes();
-      res.json(recipes);
+      const { recipes } = await import("../shared/schema");
+      const recipesList = await db.select().from(recipes).orderBy(recipes.name);
+      res.json(recipesList);
     } catch (err) {
       console.error("Error fetching recipes:", err);
       res.status(500).json({ error: "Failed to fetch recipes" });
@@ -1270,10 +1271,44 @@ export function registerRoutes(app: express.Application): Server {
 
   app.post("/api/recipes", async (req: Request, res: Response) => {
     try {
-      const { insertRecipeSchema } = await import("../shared/schema");
-      const validatedData = insertRecipeSchema.parse(req.body);
-      const recipe = await storage.createRecipe(validatedData);
-      res.json(recipe);
+      const { recipes, ingredients: ingredientsTable } = await import("../shared/schema");
+      const data = req.body;
+      
+      // Auto-calculate cost and breakdown
+      let costPerServing = 0;
+      const breakDown = [];
+      
+      for (const ing of data.ingredients || []) {
+        const ingData = await db.select().from(ingredientsTable)
+          .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
+          
+        if (ingData[0]) {
+          const ingCost = ing.portion * parseFloat(ingData[0].costPerPortion || '0');
+          costPerServing += ingCost;
+          breakDown.push({ 
+            name: ingData[0].name, 
+            portion: ing.portion, 
+            cost: ingCost 
+          });
+        }
+      }
+      
+      const [result] = await db.insert(recipes).values({
+        name: data.name,
+        description: data.description,
+        category: data.category || 'Main Course',
+        servingSize: data.servingSize || 1,
+        preparationTime: data.preparationTime || 0,
+        ingredients: data.ingredients || [],
+        costPerServing: costPerServing.toString(),
+        breakDown: breakDown,
+        totalCost: data.totalCost || costPerServing.toString(),
+        profitMargin: data.profitMargin || '30',
+        sellingPrice: data.sellingPrice || (costPerServing * 1.3).toString(),
+        isActive: data.isActive ?? true,
+      }).returning();
+      
+      res.json(result);
     } catch (err) {
       console.error("Error creating recipe:", err);
       res.status(500).json({ error: "Failed to create recipe" });
@@ -1282,9 +1317,46 @@ export function registerRoutes(app: express.Application): Server {
 
   app.put("/api/recipes/:id", async (req: Request, res: Response) => {
     try {
+      const { recipes, ingredients: ingredientsTable } = await import("../shared/schema");
       const id = parseInt(req.params.id);
-      const recipe = await storage.updateRecipe(id, req.body);
-      res.json(recipe);
+      const data = req.body;
+      
+      // Auto-calculate cost and breakdown
+      let costPerServing = 0;
+      const breakDown = [];
+      
+      for (const ing of data.ingredients || []) {
+        const ingData = await db.select().from(ingredientsTable)
+          .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
+          
+        if (ingData[0]) {
+          const ingCost = ing.portion * parseFloat(ingData[0].costPerPortion || '0');
+          costPerServing += ingCost;
+          breakDown.push({ 
+            name: ingData[0].name, 
+            portion: ing.portion, 
+            cost: ingCost 
+          });
+        }
+      }
+      
+      const [result] = await db.update(recipes).set({
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        servingSize: data.servingSize,
+        preparationTime: data.preparationTime,
+        ingredients: data.ingredients || [],
+        costPerServing: costPerServing.toString(),
+        breakDown: breakDown,
+        totalCost: data.totalCost || costPerServing.toString(),
+        profitMargin: data.profitMargin,
+        sellingPrice: data.sellingPrice,
+        isActive: data.isActive,
+        updatedAt: new Date(),
+      }).where(eq(recipes.id, id)).returning();
+      
+      res.json(result);
     } catch (err) {
       console.error("Error updating recipe:", err);
       res.status(500).json({ error: "Failed to update recipe" });
@@ -1293,8 +1365,9 @@ export function registerRoutes(app: express.Application): Server {
 
   app.delete("/api/recipes/:id", async (req: Request, res: Response) => {
     try {
+      const { recipes } = await import("../shared/schema");
       const id = parseInt(req.params.id);
-      await storage.deleteRecipe(id);
+      await db.delete(recipes).where(eq(recipes.id, id));
       res.json({ success: true });
     } catch (err) {
       console.error("Error deleting recipe:", err);
@@ -1430,6 +1503,43 @@ export function registerRoutes(app: express.Application): Server {
         }
       } catch (shoppingErr) {
         console.log("Shopping list update skipped (table may not exist):", shoppingErr.message);
+      }
+      
+      // Update recipes that use this ingredient - recalculate costs
+      try {
+        const { recipes } = await import("../shared/schema");
+        const recipesUsingIngredient = await db.select().from(recipes)
+          .where(sql`ingredients::jsonb @> '[{"ingredientId": ${id}}]'`);
+          
+        for (const recipe of recipesUsingIngredient) {
+          let newCost = 0;
+          const newBreakDown = [];
+          
+          for (const ing of recipe.ingredients) {
+            const ingData = await db.select().from(ingredientsTable)
+              .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
+            
+            if (ingData[0]) {
+              const ingCost = ing.portion * parseFloat(ingData[0].costPerPortion || '0');
+              newCost += ingCost;
+              newBreakDown.push({ 
+                name: ingData[0].name, 
+                portion: ing.portion, 
+                cost: ingCost 
+              });
+            }
+          }
+          
+          await db.update(recipes)
+            .set({ 
+              costPerServing: newCost.toString(),
+              breakDown: newBreakDown,
+              updatedAt: new Date()
+            })
+            .where(eq(recipes.id, recipe.id));
+        }
+      } catch (recipeErr) {
+        console.log("Recipe cost update skipped:", recipeErr.message);
       }
       
       res.json(result);

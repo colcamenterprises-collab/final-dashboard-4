@@ -4,6 +4,27 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
+## Recent Changes (July 21, 2025)
+
+### Enhanced Recipe Management with Portion Selection & Auto-Updates - Production Ready
+- **Complete Recipe System Implementation**: Created comprehensive recipe management with ingredient portion selection and automatic cost calculation
+- **Database Schema Enhancement**: Enhanced recipes table with ingredients JSONB field (ingredientId, portion), costPerServing, breakDown fields for complete cost tracking
+- **Auto-Cost Calculation**: Implemented real-time cost calculation: costPerServing = Σ(ingredient.portion × ingredient.costPerPortion)
+- **Ingredient Price Impact**: When ingredient prices change, all recipes using that ingredient automatically recalculate costs and update breakDown
+- **Enhanced Recipe API**: Direct database operations with cost calculation logic, supporting CREATE/READ/UPDATE/DELETE operations
+- **Professional Recipe Interface**: Clean shadcn/ui interface with ingredient selection, portion input, cost preview, and recipe management
+- **PDF Generation**: Client-side PDF download using jsPDF with complete recipe details, cost breakdown, and professional formatting
+- **Real-Time Updates**: Live cost calculation display as ingredients are added/modified in recipe creation form
+- **Production Testing**: Successfully tested recipe creation, cost calculation, ingredient price updates, and automatic recipe cost recalculation
+
+### Technical Implementation Details
+- **Database**: Added ingredients (JSONB), costPerServing, breakDown fields to recipes table with automatic timestamp updates
+- **API Enhancement**: Enhanced recipe routes with automatic cost calculation and ingredient price change propagation
+- **Frontend Integration**: New standalone Recipes page with complete CRUD functionality and real-time cost preview
+- **Navigation Update**: Added Recipes link to Menu Management section in sidebar navigation
+- **Cost Accuracy**: Auto-calculation ensures cost per serving = sum of (portion × ingredient cost per portion) for data accuracy
+- **Package Installation**: Added jsPDF for client-side PDF generation without external dependencies
+
 ## Recent Changes (July 20, 2025)
 
 ### Minimal Collapsible Sidebar Implementation - Dribbble Design Match

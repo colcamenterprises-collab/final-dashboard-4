@@ -299,6 +299,10 @@ export const recipes = pgTable("recipes", {
   category: text("category").notNull(),
   servingSize: integer("serving_size").notNull(),
   preparationTime: integer("preparation_time"),
+  // Enhanced ingredient portion fields
+  ingredients: jsonb("ingredients").$type<{ ingredientId: number; portion: number }[]>(), // [{ ingredientId: id, portion: number }]
+  costPerServing: decimal("cost_per_serving", { precision: 10, scale: 2 }), // Auto-calculated cost per serving
+  breakDown: jsonb("break_down").$type<{ name: string; portion: number; cost: number }[]>(), // Stored breakdown JSON
   totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }),
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
@@ -309,7 +313,7 @@ export const recipes = pgTable("recipes", {
   socialContent: text("social_content"), // JSON string for social media content
   marketingNotes: text("marketing_notes"), // Additional notes for marketing content generation
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });
 
 // Recipe Ingredients junction table

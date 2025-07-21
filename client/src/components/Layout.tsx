@@ -65,7 +65,7 @@ const navigationStructure = [
     icon: Utensils,
     expandable: true,
     items: [
-      { path: "/recipe-management", label: "Recipes", icon: ChefHat },
+      { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
       { path: "/placeholder/pricing", label: "Pricing", icon: DollarSign },
       { path: "/placeholder/food-costs", label: "Food Costs", icon: Calculator },
