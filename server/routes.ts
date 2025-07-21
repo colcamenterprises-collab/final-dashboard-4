@@ -1787,7 +1787,7 @@ export function registerRoutes(app: express.Application): Server {
 
       // Parse file based on type
       let textContent: string;
-      const fileBuffer = Buffer.from((report.fileData as any).data, 'base64');
+      const fileBuffer = Buffer.from(report.fileData as string, 'base64');
       
       if (report.fileType === 'application/pdf') {
         const pdfParse = (await import('pdf-parse')).default;
