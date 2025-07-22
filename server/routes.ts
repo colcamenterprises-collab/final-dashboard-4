@@ -335,19 +335,21 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      console.log("Received daily stock sales data:", data);
+      console.log("Enhanced form submission data:", data);
       
       // Ensure shiftDate is a Date object
       if (data.shiftDate && typeof data.shiftDate === 'string') {
         data.shiftDate = new Date(data.shiftDate);
       }
       
-      // Parse numeric fields to ensure proper number types
+      // Parse numeric fields including new drink fields
       const numericFields = [
-        'startingCash', 'endingCash', 'grabSales', 'foodPandaSales', 'aroiDeeSales', 
-        'qrScanSales', 'cashSales', 'totalSales', 'salaryWages', 'shopping', 
-        'gasExpense', 'totalExpenses', 'burgerBunsStock', 'rollsOrderedCount', 
-        'meatWeight', 'drinkStockCount'
+        'startingCash', 'endCash', 'bankedAmount', 'grabSales', 'aroiDeeSales', 
+        'qrScanSales', 'cashSales', 'totalSales', 'gasExpense', 'totalExpenses', 
+        'burgerBunsStock', 'meatWeight', 'drinkStockCount',
+        // Individual drink fields
+        'coke', 'cokeZero', 'sprite', 'schweppesManow', 'fantaOrange', 
+        'fantaStrawberry', 'sodaWater', 'water', 'kidsOrange', 'kidsApple'
       ];
       
       numericFields.forEach(field => {
@@ -355,6 +357,21 @@ export function registerRoutes(app: express.Application): Server {
           data[field] = parseFloat(data[field] || '0');
         }
       });
+
+      // Parse wages and shopping arrays
+      if (data.wages && Array.isArray(data.wages)) {
+        data.wages = JSON.stringify(data.wages.map(w => ({
+          ...w,
+          amount: parseFloat(w.amount || '0')
+        })));
+      }
+
+      if (data.shopping && Array.isArray(data.shopping)) {
+        data.shopping = JSON.stringify(data.shopping.map(s => ({
+          ...s,
+          amount: parseFloat(s.amount || '0')
+        })));
+      }
       
       // Check for cash anomalies (manual vs calculated)
       const calculatedCash = Number(data.startingCash || 0) + Number(data.cashSales || 0) - Number(data.totalExpenses || 0);
@@ -379,32 +396,53 @@ export function registerRoutes(app: express.Application): Server {
       
       // Non-blocking post-processing for non-draft submissions
       if (!data.isDraft) {
-        // Generate shopping list from requirements (only items >0, exclude sales/stock counts)
-        const requirements = {
-          freshFood: Object.entries(data.freshFood || {}).filter(([_, value]) => Number(value) > 0),
-          frozenFood: Object.entries(data.frozenFood || {}).filter(([_, value]) => Number(value) > 0),
-          shelfItems: Object.entries(data.shelfItems || {}).filter(([_, value]) => Number(value) > 0),
-          kitchenItems: Object.entries(data.kitchenItems || {}).filter(([_, value]) => Number(value) > 0),
-          packagingItems: Object.entries(data.packagingItems || {}).filter(([_, value]) => Number(value) > 0),
-          drinkStock: Object.entries(data.drinkStock || {}).filter(([_, value]) => Number(value) > 0)
-        };
+        // Generate shopping list from enhanced requirements (exclude in-hand items like drinks/buns/meat)
+        const requirements = [];
         
-        const shoppingItems = Object.entries(requirements).flatMap(([category, items]) => 
-          items.map(([itemName, quantity]) => ({
-            itemName,
-            quantity: Number(quantity).toString(),
-            unit: 'units', // Default unit
-            supplier: 'TBD', // Default supplier
-            pricePerUnit: '0', // Default price
-            priority: 'medium', // Default priority
-            formId: result.id,
-            listDate: data.shiftDate instanceof Date ? data.shiftDate : new Date(data.shiftDate),
-            category,
-            isCompleted: false,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }))
-        );
+        // Process array-based categories
+        if (data.freshFood && Array.isArray(data.freshFood)) {
+          requirements.push(...data.freshFood.filter(item => item.value > 0).map(item => ({ 
+            itemName: item.name, 
+            quantity: item.value, 
+            category: 'Fresh Food' 
+          })));
+        }
+        
+        if (data.freshFoodAdditional && Array.isArray(data.freshFoodAdditional)) {
+          requirements.push(...data.freshFoodAdditional.filter(item => item.quantity > 0).map(item => ({ 
+            itemName: item.item, 
+            quantity: item.quantity, 
+            category: 'Fresh Food Additional' 
+          })));
+        }
+        
+        // Similar processing for other categories
+        ['frozenFood', 'frozenFoodAdditional', 'shelfItems', 'shelfItemsAdditional', 
+         'kitchenItems', 'kitchenItemsAdditional', 'packagingItems', 'packagingItemsAdditional'].forEach(category => {
+          if (data[category] && Array.isArray(data[category])) {
+            const items = data[category].filter(item => (item.value || item.quantity) > 0);
+            requirements.push(...items.map(item => ({
+              itemName: item.name || item.item,
+              quantity: item.value || item.quantity,
+              category: category.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+            })));
+          }
+        });
+        
+        const shoppingItems = requirements.map(req => ({
+          itemName: req.itemName,
+          quantity: Number(req.quantity),
+          unit: 'units',
+          supplier: 'TBD',
+          pricePerUnit: parseFloat('0'),
+          priority: 'medium',
+          formId: result.id,
+          listDate: data.shiftDate instanceof Date ? data.shiftDate : new Date(data.shiftDate),
+          notes: req.category,
+          isCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
         
         // Insert shopping items if any exist
         if (shoppingItems.length > 0) {
@@ -864,6 +902,45 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error creating shopping list item:", err);
       res.status(500).json({ error: "Failed to create shopping list item" });
+    }
+  });
+
+  // Shopping List bulk endpoint for enhanced form
+  app.post("/api/shopping-list/bulk", async (req: Request, res: Response) => {
+    try {
+      const shoppingItems = req.body;
+      console.log("Creating bulk shopping list items:", shoppingItems.length);
+
+      if (!Array.isArray(shoppingItems) || shoppingItems.length === 0) {
+        return res.json({ message: "No items to add", count: 0 });
+      }
+
+      // Validate and format each item
+      const formattedItems = shoppingItems.map(item => ({
+        itemName: item.itemName || 'Unknown Item',
+        quantity: Number(item.quantity) || 0,
+        unit: item.unit || 'unit',
+        formId: item.formId,
+        listDate: item.listDate ? new Date(item.listDate) : new Date(),
+        estimatedCost: parseFloat(item.estimatedCost || '0'),
+        supplier: item.supplier || '',
+        pricePerUnit: parseFloat(item.pricePerUnit || '0'),
+        notes: item.notes || '',
+        priority: item.priority || 'medium',
+        selected: false,
+        aiGenerated: false,
+        isCompleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+
+      const results = await db.insert(shoppingList).values(formattedItems).returning();
+      console.log(`✅ Created ${results.length} shopping list items`);
+
+      res.json({ message: "Shopping list created successfully", count: results.length, items: results });
+    } catch (err) {
+      console.error("❌ Error creating bulk shopping list:", err);
+      res.status(500).json({ error: "Failed to create shopping list" });
     }
   });
 

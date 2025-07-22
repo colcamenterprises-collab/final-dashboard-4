@@ -20,6 +20,55 @@ export const dailySales = pgTable("daily_sales", {
   staffMember: text("staff_member").notNull(),
 });
 
+// Enhanced Daily Stock Sales table
+export const dailyStockSales = pgTable('daily_stock_sales', {
+  id: serial('id').primaryKey(),
+  completedBy: varchar('completedBy', { length: 255 }),
+  shiftType: varchar('shiftType', { length: 50 }),
+  shiftDate: timestamp('shiftDate'),
+  startingCash: decimal('startingCash', { precision: 10, scale: 2 }).default('0'),
+  grabSales: decimal('grabSales', { precision: 10, scale: 2 }).default('0'),
+  aroiDeeSales: decimal('aroiDeeSales', { precision: 10, scale: 2 }).default('0'),
+  qrScanSales: decimal('qrScanSales', { precision: 10, scale: 2 }).default('0'),
+  cashSales: decimal('cashSales', { precision: 10, scale: 2 }).default('0'),
+  totalSales: decimal('totalSales', { precision: 10, scale: 2 }).default('0'),
+  wages: jsonb('wages'),
+  shopping: jsonb('shopping'),
+  gasExpense: decimal('gasExpense', { precision: 10, scale: 2 }).default('0'),
+  totalExpenses: decimal('totalExpenses', { precision: 10, scale: 2 }).default('0'),
+  endCash: decimal('endCash', { precision: 10, scale: 2 }).default('0'),
+  bankedAmount: decimal('bankedAmount', { precision: 10, scale: 2 }).default('0'),
+  burgerBunsStock: integer('burgerBunsStock').default(0),
+  meatWeight: decimal('meatWeight', { precision: 10, scale: 2 }).default('0'),
+  drinkStockCount: integer('drinkStockCount').default(0),
+  // Individual drink stock fields
+  coke: integer('coke').default(0),
+  cokeZero: integer('cokeZero').default(0),
+  sprite: integer('sprite').default(0),
+  schweppesManow: integer('schweppesManow').default(0),
+  fantaOrange: integer('fantaOrange').default(0),
+  fantaStrawberry: integer('fantaStrawberry').default(0),
+  sodaWater: integer('sodaWater').default(0),
+  water: integer('water').default(0),
+  kidsOrange: integer('kidsOrange').default(0),
+  kidsApple: integer('kidsApple').default(0),
+  // Food category fields
+  freshFood: jsonb('freshFood'),
+  freshFoodAdditional: jsonb('freshFoodAdditional'),
+  frozenFood: jsonb('frozenFood'),
+  frozenFoodAdditional: jsonb('frozenFoodAdditional'),
+  shelfItems: jsonb('shelfItems'),
+  shelfItemsAdditional: jsonb('shelfItemsAdditional'),
+  kitchenItems: jsonb('kitchenItems'),
+  kitchenItemsAdditional: jsonb('kitchenItemsAdditional'),
+  packagingItems: jsonb('packagingItems'),
+  packagingItemsAdditional: jsonb('packagingItemsAdditional'),
+  status: varchar('status', { length: 50 }).default('draft'),
+  isDraft: boolean('isDraft').default(true),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
 // Menu Items table
 export const menuItems = pgTable("menu_items", {
   id: serial("id").primaryKey(),
@@ -45,26 +94,27 @@ export const inventory = pgTable("inventory", {
 // Shopping List table
 export const shoppingList = pgTable("shopping_list", {
   id: serial("id").primaryKey(),
-  itemName: text("item_name").notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
-  unit: text("unit").notNull(),
-  supplier: text("supplier").notNull(),
-  pricePerUnit: decimal("price_per_unit", { precision: 8, scale: 2 }).notNull(),
-  priority: text("priority").notNull(), // 'high', 'medium', 'low'
+  itemName: varchar("item_name", { length: 255 }),
+  quantity: integer("quantity"),
+  unit: varchar("unit", { length: 50 }).default('unit'),
+  formId: integer("form_id"),
+  listDate: timestamp("list_date"),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }).default('0'),
+  supplier: varchar("supplier", { length: 255 }).default(''),
+  pricePerUnit: decimal("price_per_unit", { precision: 10, scale: 2 }).default('0'),
+  notes: varchar("notes", { length: 255 }).default(''),
+  priority: text("priority").default('medium'), // 'high', 'medium', 'low'
   selected: boolean("selected").default(false),
   aiGenerated: boolean("ai_generated").default(false),
-  // Enhanced shopping list functionality
-  listDate: timestamp("list_date").defaultNow(), // Date when shopping list was generated
-  formId: integer("form_id"), // Reference to Daily Stock Sales form that generated this list
   listName: text("list_name"), // Name/title for the shopping list
   isCompleted: boolean("is_completed").default(false), // Mark entire list as completed
   completedAt: timestamp("completed_at"), // When the list was completed
-  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }).default('0'), // Estimated cost based on ingredient prices
   actualCost: decimal("actual_cost", { precision: 10, scale: 2 }).default('0'), // Actual cost when completed
-  notes: text("notes"), // Additional notes
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+
 
 // Receipts table - Enhanced receipt management system
 export const receipts = pgTable("receipts", {
@@ -241,63 +291,6 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
   reportData: jsonb("report_data").notNull(), // Full shift report data
   completedBy: text("completed_by"), // Staff member who completed the report
   completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow()
-});
-
-// Daily Stock and Sales Form table
-export const dailyStockSales = pgTable("daily_stock_sales", {
-  id: serial("id").primaryKey(),
-  completedBy: text("completed_by").notNull(),
-  shiftType: text("shift_type").notNull(), // Night Shift, Day Shift
-  shiftDate: timestamp("shift_date").notNull(),
-  
-  // Cash Management - Optional
-  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }).default('0'),
-  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }).default('0'),
-  
-  // Sales Data - Optional
-  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }).default('0'),
-  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }).default('0'),
-  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }).default('0'),
-  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }).default('0'),
-  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).default('0'),
-  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default('0'),
-  
-  // Expenses - Optional
-  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }).default('0'),
-  shopping: decimal("shopping", { precision: 10, scale: 2 }).default('0'),
-  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }).default('0'),
-  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }).default('0'),
-  wageEntries: jsonb("wage_entries").notNull().default('[]'), // Array of {name, amount, notes}
-  shoppingEntries: jsonb("shopping_entries").notNull().default('[]'), // Array of {item, amount, notes, shop, customShop}
-  expenseDescription: text("expense_description"),
-  
-  // Stock Counts - Optional
-  burgerBunsStock: integer("burger_buns_stock").default(0),
-  rollsOrderedCount: integer("rolls_ordered_count").default(0),
-  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }).default('0'), // in kg
-  drinkStockCount: integer("drink_stock_count").default(0),
-  
-  // Food Items Required - Optional
-  freshFood: jsonb("fresh_food").notNull().default('{}'), // Fresh food items (Salad, Tomatos, etc.) with otherItems array
-  frozenFood: jsonb("frozen_food").notNull().default('{}'), // Frozen food items (Bacon, Cheese, etc.)
-  shelfItems: jsonb("shelf_items").notNull().default('{}'), // Shelf stable items
-  
-  // Keep existing food items for backward compatibility - Optional
-  foodItems: jsonb("food_items").notNull().default('{}'), // Contains all food item requirements
-  drinkStock: jsonb("drink_stock").notNull().default('{}'), // Current drink inventory
-  kitchenItems: jsonb("kitchen_items").notNull().default('{}'),
-  packagingItems: jsonb("packaging_items").notNull().default('{}'),
-  
-  // Confirmation - Optional
-  rollsOrderedConfirmed: boolean("rolls_ordered_confirmed").default(false),
-  
-
-  
-  // Draft status
-  isDraft: boolean("is_draft").notNull().default(false),
-  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
