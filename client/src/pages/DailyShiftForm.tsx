@@ -11,9 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
-  completedBy: z.string().min(1, "Required"),
-  shiftType: z.enum(['opening', 'closing']),
-  shiftDate: z.string().datetime("Required"),
+  completedBy: z.string().optional().default(""),
+  shiftType: z.enum(['opening', 'closing']).optional().default('closing'),
+  shiftDate: z.string().optional().default(""),
   startingCash: z.coerce.number().optional().default(0),
   grabSales: z.coerce.number().optional().default(0),
   aroiDeeSales: z.coerce.number().optional().default(0),
@@ -21,14 +21,14 @@ const formSchema = z.object({
   cashSales: z.coerce.number().optional().default(0),
   totalSales: z.coerce.number().optional().default(0),
   wages: z.array(z.object({ 
-    staffName: z.string().min(1), 
+    staffName: z.string().optional().default(""), 
     amount: z.coerce.number().min(0).optional().default(0), 
-    type: z.enum(['wages', 'overtime', 'other']) 
+    type: z.enum(['wages', 'overtime', 'other']).optional().default('wages')
   })).optional().default([]),
   shopping: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     amount: z.coerce.number().min(0).optional().default(0), 
-    shopName: z.string().optional() 
+    shopName: z.string().optional().default("") 
   })).optional().default([]),
   gasExpense: z.coerce.number().optional().default(0),
   totalExpenses: z.coerce.number().optional().default(0),
@@ -64,9 +64,9 @@ const formSchema = z.object({
     { name: 'Butter', value: 0 }
   ]),
   freshFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   frozenFood: z.array(z.object({ 
@@ -77,9 +77,9 @@ const formSchema = z.object({
     { name: 'Sweet Potato Fries', value: 0 }
   ]),
   frozenFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   shelfItems: z.array(z.object({ 
@@ -97,9 +97,9 @@ const formSchema = z.object({
     { name: 'Chipotle Mayonnaise', value: 0 }
   ]),
   shelfItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   kitchenItems: z.array(z.object({ 
@@ -119,9 +119,9 @@ const formSchema = z.object({
     { name: 'Sticky Tape', value: 0 }
   ]),
   kitchenItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   packagingItems: z.array(z.object({ 
@@ -143,9 +143,9 @@ const formSchema = z.object({
     { name: 'Burger Sweets Takeaway', value: 0 }
   ]),
   packagingItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   isDraft: z.boolean().optional().default(false),
@@ -155,9 +155,98 @@ const DailyShiftForm = () => {
   const { toast } = useToast();
   const form = useForm({ 
     resolver: zodResolver(formSchema), 
-    defaultValues: formSchema.parse({ 
-      shiftDate: new Date().toISOString()
-    }) 
+    defaultValues: {
+      completedBy: "",
+      shiftType: 'closing' as const,
+      shiftDate: new Date().toISOString(),
+      startingCash: 0,
+      grabSales: 0,
+      aroiDeeSales: 0,
+      qrScanSales: 0,
+      cashSales: 0,
+      totalSales: 0,
+      wages: [],
+      shopping: [],
+      gasExpense: 0,
+      totalExpenses: 0,
+      endCash: 0,
+      bankedAmount: 0,
+      burgerBunsStock: 0,
+      meatWeight: 0,
+      drinkStockCount: 0,
+      coke: 0,
+      cokeZero: 0,
+      sprite: 0,
+      schweppesManow: 0,
+      fantaOrange: 0,
+      fantaStrawberry: 0,
+      sodaWater: 0,
+      water: 0,
+      kidsOrange: 0,
+      kidsApple: 0,
+      freshFood: [
+        { name: 'Topside Beef', value: 0 },
+        { name: 'Brisket Point End', value: 0 },
+        { name: 'Chuck Roll Beef', value: 0 },
+        { name: 'Salad (Iceberg Lettuce)', value: 0 },
+        { name: 'Tomatos', value: 0 },
+        { name: 'White Cabbage', value: 0 },
+        { name: 'Purple Cabbage', value: 0 },
+        { name: 'Bacon Short', value: 0 },
+        { name: 'Bacon Long', value: 0 },
+        { name: 'Milk', value: 0 },
+        { name: 'Butter', value: 0 }
+      ],
+      freshFoodAdditional: [],
+      frozenFood: [
+        { name: 'Chicken Nuggets', value: 0 },
+        { name: 'Sweet Potato Fries', value: 0 }
+      ],
+      frozenFoodAdditional: [],
+      shelfItems: [
+        { name: 'Dill Pickles', value: 0 },
+        { name: 'Sweet Pickles', value: 0 },
+        { name: 'Cajun Spice', value: 0 },
+        { name: 'White Vinegar', value: 0 },
+        { name: 'Crispy Fried Onions', value: 0 },
+        { name: 'Paprika (Smoked)', value: 0 },
+        { name: 'Jalapenos', value: 0 },
+        { name: 'Sriracha Mayonnaise', value: 0 },
+        { name: 'Chipotle Mayonnaise', value: 0 }
+      ],
+      shelfItemsAdditional: [],
+      kitchenItems: [
+        { name: 'Kitchen Cleaner', value: 0 },
+        { name: 'Floor Cleaner', value: 0 },
+        { name: 'Gloves Medium', value: 0 },
+        { name: 'Gloves Large', value: 0 },
+        { name: 'Gloves Small', value: 0 },
+        { name: 'Plastic Meat Gloves', value: 0 },
+        { name: 'Paper Towel Long', value: 0 },
+        { name: 'Paper Towel Short', value: 0 },
+        { name: 'Bin Bags 30x40', value: 0 },
+        { name: 'Printer Rolls', value: 0 },
+        { name: 'Sticky Tape', value: 0 }
+      ],
+      kitchenItemsAdditional: [],
+      packagingItems: [
+        { name: 'Loaded Fries Box', value: 0 },
+        { name: 'French Fries Box 600ml', value: 0 },
+        { name: 'Takeaway Sauce Container', value: 0 },
+        { name: 'Burger Wrapping Paper', value: 0 },
+        { name: 'French Fries Paper', value: 0 },
+        { name: 'Paper Bags', value: 0 },
+        { name: 'Plastic Bags 8x16', value: 0 },
+        { name: 'Plastic Bags 9x18', value: 0 },
+        { name: 'Knife and Fork Set', value: 0 },
+        { name: 'Bag Close Stickers', value: 0 },
+        { name: 'Sauce Container Stickers', value: 0 },
+        { name: 'Flag Stickers', value: 0 },
+        { name: 'Burger Sweets Takeaway', value: 0 }
+      ],
+      packagingItemsAdditional: [],
+      isDraft: false
+    }
   });
   
   const { watch, setValue } = form;
