@@ -21,14 +21,14 @@ const formSchema = z.object({
   cashSales: z.coerce.number().optional().default(0),
   totalSales: z.coerce.number().optional().default(0),
   wages: z.array(z.object({ 
-    staffName: z.string().min(1), 
+    staffName: z.string().optional().default(""), 
     amount: z.coerce.number().min(0).optional().default(0), 
-    type: z.enum(['wages', 'overtime', 'other']) 
+    type: z.enum(['wages', 'overtime', 'other']).optional().default('wages')
   })).optional().default([]),
   shopping: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     amount: z.coerce.number().min(0).optional().default(0), 
-    shopName: z.string().optional() 
+    shopName: z.string().optional().default("") 
   })).optional().default([]),
   gasExpense: z.coerce.number().optional().default(0),
   totalExpenses: z.coerce.number().optional().default(0),
@@ -66,9 +66,9 @@ const formSchema = z.object({
     { name: 'Butter', value: 0 }
   ]),
   freshFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   frozenFood: z.array(z.object({ 
@@ -79,9 +79,9 @@ const formSchema = z.object({
     { name: 'Sweet Potato Fries', value: 0 }
   ]),
   frozenFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   shelfItems: z.array(z.object({ 
@@ -99,9 +99,9 @@ const formSchema = z.object({
     { name: 'Chipotle Mayonnaise', value: 0 }
   ]),
   shelfItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   kitchenItems: z.array(z.object({ 
@@ -121,9 +121,9 @@ const formSchema = z.object({
     { name: 'Sticky Tape', value: 0 }
   ]),
   kitchenItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   packagingItems: z.array(z.object({ 
@@ -145,9 +145,9 @@ const formSchema = z.object({
     { name: 'Burger Sweets Takeaway', value: 0 }
   ]),
   packagingItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
+    item: z.string().optional().default(""), 
     quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
+    note: z.string().optional().default(""), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
   isDraft: z.boolean().optional().default(false),
