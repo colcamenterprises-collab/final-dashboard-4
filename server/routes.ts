@@ -303,6 +303,79 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Daily Shift Forms endpoints (new consolidated structure)
+  app.post("/api/daily-shift-forms", async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      console.log("Daily shift form submission:", data);
+      
+      // Ensure shiftDate is a Date object
+      if (data.shiftDate && typeof data.shiftDate === 'string') {
+        data.shiftDate = new Date(data.shiftDate);
+      }
+      
+      // Parse numeric fields
+      const numericFields = ['startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales'];
+      numericFields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null) {
+          data[field] = parseFloat(data[field] || '0');
+        }
+      });
+
+      // Parse wages and shopping arrays
+      if (data.wages && Array.isArray(data.wages)) {
+        data.wages = data.wages.map(w => ({
+          ...w,
+          amount: parseFloat(w.amount || '0')
+        }));
+      }
+
+      if (data.shopping && Array.isArray(data.shopping)) {
+        data.shopping = data.shopping.map(s => ({
+          ...s,
+          amount: parseFloat(s.amount || '0')
+        }));
+      }
+
+      // Convert category data to JSON
+      ['fresh', 'frozen', 'shelf', 'kitchen', 'packaging'].forEach(category => {
+        if (data[category]) {
+          data[category] = JSON.stringify(data[category]);
+        }
+      });
+
+      if (data.drinkStock) {
+        data.drinkStock = JSON.stringify(data.drinkStock);
+      }
+
+      if (data.wages) {
+        data.wages = JSON.stringify(data.wages);
+      }
+
+      if (data.shopping) {
+        data.shopping = JSON.stringify(data.shopping);
+      }
+      
+      // Set defaults
+      data.status = 'completed';
+      data.isDraft = false;
+      
+      let result;
+      
+      // Use database transaction
+      await db.transaction(async (tx) => {
+        [result] = await tx.insert(dailyStockSales).values(data).returning();
+      });
+      
+      console.log("✅ Daily shift form saved successfully with ID:", result.id);
+      res.json(result);
+      
+    } catch (err) {
+      console.error("Error saving daily shift form:", err);
+      res.status(500).json({ error: "Failed to save daily shift form" });
+    }
+  });
+
   // Daily Stock Sales endpoints
   app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
@@ -342,14 +415,9 @@ export function registerRoutes(app: express.Application): Server {
         data.shiftDate = new Date(data.shiftDate);
       }
       
-      // Parse numeric fields including new drink fields
+      // Parse numeric fields for new form structure
       const numericFields = [
-        'startingCash', 'endCash', 'bankedAmount', 'grabSales', 'aroiDeeSales', 
-        'qrScanSales', 'cashSales', 'totalSales', 'gasExpense', 'totalExpenses', 
-        'burgerBunsStock', 'meatWeight', 'drinkStockCount',
-        // Individual drink fields
-        'coke', 'cokeZero', 'sprite', 'schweppesManow', 'fantaOrange', 
-        'fantaStrawberry', 'sodaWater', 'water', 'kidsOrange', 'kidsApple'
+        'startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales'
       ];
       
       numericFields.forEach(field => {
@@ -396,36 +464,38 @@ export function registerRoutes(app: express.Application): Server {
       
       // Non-blocking post-processing for non-draft submissions
       if (!data.isDraft) {
-        // Generate shopping list from enhanced requirements (exclude in-hand items like drinks/buns/meat)
+        // Generate shopping list from new form structure (exclude in-hand items)
         const requirements = [];
         
-        // Process array-based categories
-        if (data.freshFood && Array.isArray(data.freshFood)) {
-          requirements.push(...data.freshFood.filter(item => item.value > 0).map(item => ({ 
-            itemName: item.name, 
-            quantity: item.value, 
-            category: 'Fresh Food' 
-          })));
-        }
+        // Process new consolidated food categories
+        const categories = ['fresh', 'frozen', 'shelf', 'kitchen', 'packaging'];
         
-        if (data.freshFoodAdditional && Array.isArray(data.freshFoodAdditional)) {
-          requirements.push(...data.freshFoodAdditional.filter(item => item.quantity > 0).map(item => ({ 
-            itemName: item.item, 
-            quantity: item.quantity, 
-            category: 'Fresh Food Additional' 
-          })));
-        }
-        
-        // Similar processing for other categories
-        ['frozenFood', 'frozenFoodAdditional', 'shelfItems', 'shelfItemsAdditional', 
-         'kitchenItems', 'kitchenItemsAdditional', 'packagingItems', 'packagingItemsAdditional'].forEach(category => {
-          if (data[category] && Array.isArray(data[category])) {
-            const items = data[category].filter(item => (item.value || item.quantity) > 0);
-            requirements.push(...items.map(item => ({
-              itemName: item.name || item.item,
-              quantity: item.value || item.quantity,
-              category: category.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
-            })));
+        categories.forEach(categoryKey => {
+          const categoryData = data[categoryKey];
+          if (categoryData && typeof categoryData === 'object') {
+            // Process base items
+            Object.entries(categoryData).forEach(([itemKey, quantity]) => {
+              if (itemKey !== 'additionalItems' && Number(quantity) > 0) {
+                requirements.push({
+                  itemName: itemKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+                  quantity: Number(quantity),
+                  category: categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1)
+                });
+              }
+            });
+            
+            // Process additional items
+            if (categoryData.additionalItems && Array.isArray(categoryData.additionalItems)) {
+              categoryData.additionalItems.forEach(item => {
+                if (item.name && Number(item.quantity) > 0) {
+                  requirements.push({
+                    itemName: item.name,
+                    quantity: Number(item.quantity),
+                    category: categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1) + ' (Additional)'
+                  });
+                }
+              });
+            }
           }
         });
         
