@@ -387,6 +387,27 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Stock Lodge API for quick inventory management (Burger Buns, Drinks, Meat)
+  app.post('/api/lodge-stock', async (req: Request, res: Response) => {
+    try {
+      const { burgerBuns, drinks, meat } = req.body;
+      const lodgeData = {
+        burgerBuns: parseInt(burgerBuns) || 0,
+        drinks: parseInt(drinks) || 0,
+        meat: parseInt(meat) || 0,
+        lodgeDate: new Date().toISOString(),
+        lodgedBy: req.body.lodgedBy || 'Unknown',
+      };
+      
+      console.log('Stock lodged:', lodgeData);
+      
+      res.json({ success: true, data: lodgeData, message: 'Stock lodged successfully' });
+    } catch (error) {
+      console.error('Error lodging stock:', error);
+      res.status(500).json({ error: 'Failed to lodge stock' });
+    }
+  });
+
   app.get("/api/daily-stock-sales/search", async (req: Request, res: Response) => {
     try {
       const { query } = req.query;

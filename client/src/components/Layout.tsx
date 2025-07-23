@@ -44,11 +44,11 @@ const navigationStructure = [
         path: "/daily-shift-form",
         expandable: true,
         items: [
-          { path: "/ops-sales/draft-forms", label: "Draft Forms", icon: FolderOpen },
-          { path: "/ops-sales/form-library", label: "Form Library", icon: FileText },
+          { path: "/draft-forms", label: "Draft Forms", icon: FolderOpen },
+          { path: "/form-library", label: "Form Library", icon: FileText },
         ]
       },
-      { path: "/ops-sales/shopping-requirements", label: "Shopping Requirements (inc. Purchasing)", icon: Package },
+      { path: "/purchasing", label: "Shopping Requirements", icon: Package },
       { path: "/ops-sales/quick-lodge", label: "Burger Bun, Drinks, Meat - Quick Lodge", icon: Activity },
       {
         id: "sales",

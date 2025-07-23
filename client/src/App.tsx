@@ -11,6 +11,8 @@ import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
 import DailyShiftForm from "@/pages/DailyShiftForm";
 import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
 import PastForms from "@/pages/PastForms";
+import DraftForms from "@/pages/DraftForms";
+import FormLibrary from "@/pages/FormLibrary";
 import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import ExpensesMerged from "@/pages/ExpensesMerged";
@@ -55,10 +57,13 @@ function Router() {
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
+        <Route path="/draft-forms" component={DraftForms} />
+        <Route path="/form-library" component={FormLibrary} />
+        <Route path="/purchasing" component={ShoppingList} />
         
         {/* Operations & Sales sub-routes */}
-        <Route path="/ops-sales/draft-forms" component={() => <Placeholder title="Draft Forms" description="View and edit drafts. Buttons for shopping form and stock management." />} />
-        <Route path="/ops-sales/form-library" component={() => <Placeholder title="Form Library" description="Browse and manage historical forms and templates." />} />
+        <Route path="/ops-sales/draft-forms" component={DraftForms} />
+        <Route path="/ops-sales/form-library" component={FormLibrary} />
         <Route path="/ops-sales/purchasing" component={() => <Placeholder title="Purchasing" description="Manage procurement and supplier relationships." />} />
         <Route path="/ops-sales/shopping-requirements" component={() => <Placeholder title="Shopping Requirements" description="Track shopping requirements and generate purchase orders." />} />
         <Route path="/ops-sales/quick-lodge" component={() => <Placeholder title="Burger Bun, Drinks, Meat - Quick Lodge" description="Quick inventory management for key items." />} />
