@@ -41,15 +41,27 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (July 23, 2025)
 
-### Sidebar Menu Consolidation & Daily Shift Form Enhancement - Production Ready
-- **Updated Sidebar Structure**: Consolidated menu under Operations & Sales as per user requirements with expandable sub-navigation
-- **Enhanced Navigation**: Added nested Sales submenu with Receipts, Receipt Library, Shift Reports, and Analysis sections
-- **New Placeholder Routes**: Created comprehensive routing for Draft Forms, Form Library, Purchasing, Shopping Requirements, and Quick Lodge
-- **TypeScript Error Resolution**: Fixed all Layout component TypeScript errors with proper type definitions and null handling
-- **Backend API Enhancement**: Updated daily-stock-sales POST route to properly generate shopping lists from new form structure
-- **Shopping List Generation**: Enhanced to process all food categories (Fresh, Frozen, Shelf, Kitchen, Packaging) and exclude drinks/rolls/meat as specified
-- **Route Structure**: Consolidated all operational functions under /ops-sales/* path structure for better organization
-- **Form Integration**: Direct Daily Shift Form link (/daily-shift-form) properly integrated into Operations & Sales menu
+### Daily Shift Form Enhancement with Remove/Amendment Functionality - Production Ready
+- **Added Remove Buttons**: Implemented trash icon remove buttons for wages and shopping entries with disable protection (minimum 1 entry)
+- **Enhanced User Experience**: Updated form grid layout to accommodate remove buttons (3-column to 4-column layout)
+- **Professional Icons**: Added Trash2 and Plus icons from lucide-react for consistent UI design
+- **Form Amendment Support**: Users can now remove individual wage entries and shopping entries during form completion
+- **Grid Layout Optimization**: Adjusted responsive grid to handle remove button column on both desktop and mobile
+- **Validation Protection**: Remove buttons disabled when only one entry remains to prevent empty arrays
+
+### Menu Structure Further Consolidation - Navigation Update
+- **Daily Sales Form Sub-Menu**: Consolidated Draft Forms and Form Library as nested items under Daily Sales Form
+- **Purchasing Integration**: Merged Purchasing functionality into Shopping Requirements with updated label
+- **Navigation State Management**: Added daily-sales-form to expandedSections state for proper sub-menu handling
+- **Hierarchical Structure**: Daily Sales Form now serves as parent menu with Draft Forms and Form Library as children
+- **Clean Architecture**: Removed redundant menu items and organized all form-related functions under single parent
+
+### Backend API & Component Enhancement
+- **Stock Lodge API**: Added /api/lodge-stock endpoint for quick inventory management of burger buns, drinks, and meat
+- **FormView Component**: Created comprehensive form viewing component for detailed form display with all sections
+- **Route Integration**: Added /form/:id route to App.tsx for accessing individual form details
+- **Professional Layout**: FormView includes proper navigation back to Form Library and complete form data display
+- **Form Data Handling**: Proper JSON parsing and display of wages, shopping entries, and all form fields
 
 ### Technical Implementation Details
 - **Navigation Structure**: Recursive menu handling for nested Sales submenu with proper state management

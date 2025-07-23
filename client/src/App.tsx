@@ -25,6 +25,7 @@ import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
+import FormView from "@/pages/FormView";
 
 import NotFound from "@/pages/not-found";
 
@@ -53,6 +54,7 @@ function Router() {
         <Route path="/receipts" component={Receipts} />
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/recipes" component={Recipes} />
+        <Route path="/form/:id" component={FormView} />
         
         {/* Operations & Sales sub-routes */}
         <Route path="/ops-sales/draft-forms" component={() => <Placeholder title="Draft Forms" description="View and edit drafts. Buttons for shopping form and stock management." />} />

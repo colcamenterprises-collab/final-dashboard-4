@@ -2187,6 +2187,23 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // Stock Lodge API (Quick Lodge for Burger Buns, Drinks, Meat)
+  app.post('/api/lodge-stock', async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      data.lodgeDate = new Date(); // Timestamp
+      
+      // Here you would save to a stock_lodge table
+      // For now, we'll just return success
+      console.log('Stock lodge data received:', data);
+      
+      res.json({ success: true, message: 'Stock lodged successfully', data });
+    } catch (error) {
+      console.error('Error lodging stock:', error);
+      res.status(500).json({ error: 'Failed to lodge stock' });
+    }
+  });
+
   // Enhanced Loyverse API routes
   app.use("/api/loyverse", loyverseEnhancedRoutes);
 

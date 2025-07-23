@@ -37,11 +37,18 @@ const navigationStructure = [
     icon: ShoppingCart,
     expandable: true,
     items: [
-      { path: "/daily-shift-form", label: "Daily Sales & Stock", icon: ClipboardList },
-      { path: "/ops-sales/draft-forms", label: "Draft Forms", icon: FolderOpen },
-      { path: "/ops-sales/form-library", label: "Form Library", icon: FileText },
-      { path: "/ops-sales/purchasing", label: "Purchasing", icon: ShoppingCart },
-      { path: "/ops-sales/shopping-requirements", label: "Shopping Requirements", icon: Package },
+      {
+        id: "daily-sales-form",
+        label: "Daily Sales Form",
+        icon: ClipboardList,
+        path: "/daily-shift-form",
+        expandable: true,
+        items: [
+          { path: "/ops-sales/draft-forms", label: "Draft Forms", icon: FolderOpen },
+          { path: "/ops-sales/form-library", label: "Form Library", icon: FileText },
+        ]
+      },
+      { path: "/ops-sales/shopping-requirements", label: "Shopping Requirements (inc. Purchasing)", icon: Package },
       { path: "/ops-sales/quick-lodge", label: "Burger Bun, Drinks, Meat - Quick Lodge", icon: Activity },
       {
         id: "sales",
@@ -113,7 +120,8 @@ export default function Layout({ children }: LayoutProps) {
     operations: false,
     finance: false,
     menu: false,
-    sales: false
+    sales: false,
+    "daily-sales-form": false
   });
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {

@@ -5,6 +5,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { Trash2, Plus } from 'lucide-react';
 
 interface FormData {
   completedBy: string;
@@ -192,6 +193,39 @@ const DailyShiftForm = () => {
     }));
   };
 
+  const removeWageEntry = (index: number) => {
+    if (formData.wages.length > 1) {
+      const newWages = formData.wages.filter((_, i) => i !== index);
+      const newData = { ...formData, wages: newWages };
+      setFormData(newData);
+      setTimeout(() => updateTotals(newData), 0);
+    }
+  };
+
+  const removeShoppingEntry = (index: number) => {
+    if (formData.shopping.length > 1) {
+      const newShopping = formData.shopping.filter((_, i) => i !== index);
+      const newData = { ...formData, shopping: newShopping };
+      setFormData(newData);
+      setTimeout(() => updateTotals(newData), 0);
+    }
+  };
+
+  const addFoodItem = (category: 'freshFood' | 'frozenFood' | 'shelfItems' | 'kitchenItems' | 'packagingItems') => {
+    setFormData(prev => ({
+      ...prev,
+      [category]: [...prev[category], { name: '', value: 0 }]
+    }));
+  };
+
+  const removeFoodItem = (category: 'freshFood' | 'frozenFood' | 'shelfItems' | 'kitchenItems' | 'packagingItems', index: number) => {
+    const categoryItems = formData[category];
+    if (categoryItems.length > 1) {
+      const newItems = categoryItems.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, [category]: newItems }));
+    }
+  };
+
   const handleSubmit = async (isDraft: boolean = false) => {
     if (!formData.completedBy.trim()) {
       toast({ title: "Error", description: "Please enter who completed this form", variant: "destructive" });
@@ -360,7 +394,7 @@ const DailyShiftForm = () => {
             
             <h4 className="font-medium">Wages</h4>
             {formData.wages.map((wage, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded">
+              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded">
                 <div>
                   <Label>Staff Name</Label>
                   <Input 
@@ -388,13 +422,28 @@ const DailyShiftForm = () => {
                     <option value="other">Other</option>
                   </select>
                 </div>
+                <div className="flex items-end">
+                  <Button 
+                    type="button" 
+                    onClick={() => removeWageEntry(index)}
+                    variant="outline"
+                    size="sm"
+                    disabled={formData.wages.length <= 1}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
-            <Button type="button" onClick={addWageEntry} variant="outline">Add Wage Entry</Button>
+            <Button type="button" onClick={addWageEntry} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Wage Entry
+            </Button>
 
             <h4 className="font-medium">Shopping</h4>
             {formData.shopping.map((shop, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded">
+              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded">
                 <div>
                   <Label>Item Purchased</Label>
                   <Input 
@@ -417,9 +466,24 @@ const DailyShiftForm = () => {
                     onChange={(e) => handleArrayChange('shopping', index, 'shopName', e.target.value)}
                   />
                 </div>
+                <div className="flex items-end">
+                  <Button 
+                    type="button" 
+                    onClick={() => removeShoppingEntry(index)}
+                    variant="outline"
+                    size="sm"
+                    disabled={formData.shopping.length <= 1}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
-            <Button type="button" onClick={addShoppingEntry} variant="outline">Add Shopping Entry</Button>
+            <Button type="button" onClick={addShoppingEntry} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Shopping Entry
+            </Button>
 
             <div>
               <Label>Gas Expense (฿)</Label>
