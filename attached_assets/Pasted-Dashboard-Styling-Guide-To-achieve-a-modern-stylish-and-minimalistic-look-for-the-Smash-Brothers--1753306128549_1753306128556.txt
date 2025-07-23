@@ -1,0 +1,200 @@
+Dashboard Styling Guide
+
+To achieve a modern, stylish, and minimalistic look for the Smash Brothers Burgers dashboard in Replit, we'll use a clean design language that emphasizes data readability, whitespace, and subtle accents. This ensures the focus remains on data accuracy and usability while being sleek and secure (direct CSS, no 3rd party CDNs). The guide is based on Poppins font (imported via Google Fonts in index.html for Replit compatibility), bold headings at 800 weight, a neutral color palette with burger-themed accents (e.g., red for alerts, green for positives), and minimalistic layouts (grid/flex for responsive, shadcn components for base UI).
+
+Core Principles
+Modern & Stylish: Smooth transitions, rounded corners, shadow effects for depth without clutter.
+Minimalistic: Ample whitespace, hidden elements until needed (e.g., expand subs), no unnecessary decorations.
+Data-Focused: High contrast for text/tables, bold headings for hierarchy, responsive for mobile/desktop.
+Replit-Friendly: Use Tailwind CSS (if setup) or custom CSS in global.css; avoid external libs for security.
+Accessibility: WCAG compliant (contrast ratios >4.5:1, keyboard nav, aria labels).
+Typography
+Font Family: Poppins (sans-serif fallback).
+Primary Headings (h1, h2): Weight 800 (bold), size 1.5rem–2.25rem.
+Secondary Headings (h3, h4): Weight 600, size 1.25rem–1.5rem.
+Body Text: Weight 400, size 1rem.
+Labels/Inputs: Weight 500, size 0.875rem.
+Line Height: 1.5 for body, 1.2 for headings.
+Color: #111827 (dark gray) for text, #6B7280 for labels.
+Color Palette
+Primary: #F59E0B (amber for accents/buttons).
+Secondary: #EF4444 (red for errors/alerts).
+Success: #22C55E (green for positives/balanced).
+Background: #FFFFFF (white) or #F9FAFB (light gray) for cards.
+Dark Mode: Toggle (bg #1F2937, text #D1D5DB).
+Borders: #E5E7EB (light gray).
+Layout & Spacing
+Grid/Flex: Use grid for sections (e.g., 3-col for stock), flex for rows.
+Spacing: 1rem (16px) base, multiples for margins/padding.
+Responsive: Mobile: Stack columns; Desktop: Multi-col.
+Cards: Rounded (0.5rem), shadow-sm, padding 1.5rem.
+Components
+Buttons: Rounded, bold text, primary amber, hover shadow.
+Inputs: Border gray, focus amber ring.
+Tables: Striped rows, hover highlight.
+Chat: Fixed bottom-right, expandable.
+Global CSS (client/src/styles/global.css - Replace Existing)
+Import in App.tsx: import './styles/global.css';
+
+css
+
+Collapse
+
+Unwrap
+
+Copy
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;800&display=swap');
+
+:root {
+  --primary: #F59E0B;
+  --secondary: #EF4444;
+  --success: #22C55E;
+  --background: #FFFFFF;
+  --text: #111827;
+  --label: #6B7280;
+  --border: #E5E7EB;
+}
+
+.dark {
+  --background: #1F2937;
+  --text: #D1D5DB;
+  --label: #9CA3AF;
+  --border: #4B5563;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--background);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+h1, h2 {
+  font-weight: 800;
+}
+
+h3, h4 {
+  font-weight: 600;
+}
+
+button {
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+button:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+input {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+}
+
+input:focus {
+  outline: none;
+  ring: 2px solid var(--primary);
+}
+
+.card {
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th, .table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.table tr:hover {
+  background: var(--border);
+}
+Backend Fix for Submit (server/routes.ts - Update)
+Add try/catch, data defaults.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post('/api/daily-stock-sales', async (req, res) => {
+  try {
+    const data = req.body;
+    data.shiftDate = new Date(data.shiftDate);
+    data.wages = data.wages || [];
+    data.shopping = data.shopping || [];
+    data.freshFood = data.freshFood || [];
+    data.freshFoodAdditional = data.freshFoodAdditional || [];
+    data.frozenFood = data.frozenFood || [];
+    data.frozenFoodAdditional = data.frozenFoodAdditional || [];
+    data.shelfItems = data.shelfItems || [];
+    data.shelfItemsAdditional = data.shelfItemsAdditional || [];
+    data.kitchenItems = data.kitchenItems || [];
+    data.kitchenItemsAdditional = data.kitchenItemsAdditional || [];
+    data.packagingItems = data.packagingItems || [];
+    data.packagingItemsAdditional = data.packagingItemsAdditional || [];
+    const [result] = await db.insert(dailyStockSales).values(data).returning({ id: dailyStockSales.id });
+    res.json(result);
+    if (!data.isDraft) {
+      const purchaseItems = [
+        ...data.freshFood.filter(f => f.value > 0),
+        ...data.freshFoodAdditional.filter(f => f.quantity > 0),
+        ...data.frozenFood.filter(f => f.value > 0),
+        ...data.frozenFoodAdditional.filter(f => f.quantity > 0),
+        ...data.shelfItems.filter(f => f.value > 0),
+        ...data.shelfItemsAdditional.filter(f => f.quantity > 0),
+        ...data.kitchenItems.filter(f => f.value > 0),
+        ...data.kitchenItemsAdditional.filter(f => f.quantity > 0),
+        ...data.packagingItems.filter(f => f.value > 0),
+        ...data.packagingItemsAdditional.filter(f => f.quantity > 0),
+      ].filter(item => item.name !== 'Burger Buns' && item.name !== 'Meat' && !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name));
+      const shoppingList = purchaseItems.map(i => ({
+        itemName: i.name || i.item,
+        quantity: i.value || i.quantity,
+        unit: 'unit',
+        formId: result.id,
+        listDate: data.shiftDate,
+      }));
+      await db.insert(shoppingList).values(shoppingList);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+Frontend Form Amendment for Remove/Amend (client/src/pages/DailyShiftForm.tsx - Update)
+Add "Remove" button per added entry (e.g., wages, shopping, additional).
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+// For wages example (repeat for shopping/additional)
+{[...Array(wagesEntries)].map((_, i) => (
+  <div key={i}>
+    <Input placeholder="Staff Name" {...form.register(`wages.${i}.staffName`)} />
+    <Input type="number" placeholder="Amount" {...form.register(`wages.${i}.amount`)} />
+    <select {...form.register(`wages.${i}.type`)}>
+      <option value="wages">Wages</option>
+      <option value="overtime">Overtime</option>
+      <option value="other">Other</option>
+    </select>
+    <Button type="button" variant="destructive" onClick={() => setWagesEntries(wagesEntries - 1)}>Remove</Button>
+  </div>
+))}
+Test: Load form, add/remove wages/shopping/additional entries—amend by editing inputs, remove by button.
+This fixes the form items, adds remove/amend, ensures functionality. Test—share screenshot/error.

@@ -169,14 +169,14 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
-      <div className={`min-h-screen font-inter flex ${darkMode ? 'dark' : ''}`}>
+      <div className={`min-h-screen font-poppins flex ${darkMode ? 'dark' : ''}`}>
         {/* Minimal Collapsible Sidebar - Icons Only by Default */}
-        <div className={`${isExpanded ? 'w-64' : 'w-16'} bg-gray-100 dark:bg-gray-900 flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-200 dark:border-gray-700 transition-all duration-300`}>
+        <div className={`${isExpanded ? 'w-64' : 'w-16'} sidebar-menu flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-700 transition-all duration-300`}>
           {/* Expand/Collapse Toggle */}
           <Button
             variant="ghost"
             onClick={toggleExpanded}
-            className="mb-4 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+            className="mb-4 p-2 text-white hover:bg-white/10"
             title={isExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -189,7 +189,7 @@ export default function Layout({ children }: LayoutProps) {
               alt="Restaurant Hub Logo" 
               className="h-8 w-8 object-contain"
             />
-            {isExpanded && <span className="font-semibold text-gray-900 dark:text-white">Restaurant Hub</span>}
+            {isExpanded && <span className="font-semibold text-white">Restaurant Hub</span>}
           </div>
           
           {/* Dashboard Link */}
@@ -198,8 +198,8 @@ export default function Layout({ children }: LayoutProps) {
               variant="ghost"
               className={`w-full mb-2 p-2 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'} ${
                 location === "/" 
-                  ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white" 
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                  ? "bg-white/20 text-white" 
+                  : "text-white hover:bg-white/10"
               }`}
               title="Dashboard"
             >
@@ -221,8 +221,8 @@ export default function Layout({ children }: LayoutProps) {
                       variant="ghost"
                       className={`w-full p-2 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'} ${
                         location === section.path
-                          ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
-                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                          ? "bg-white/20 text-white"
+                          : "text-white hover:bg-white/10"
                       }`}
                       title={section.label}
                     >
@@ -246,8 +246,8 @@ export default function Layout({ children }: LayoutProps) {
                         variant="ghost"
                         className={`w-full p-2 justify-center ${
                           hasActiveChild || location === mainItemPath
-                            ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+                            ? "bg-white/20 text-white"
+                            : "text-white hover:bg-white/10"
                         }`}
                         title={section.label}
                       >
@@ -258,8 +258,8 @@ export default function Layout({ children }: LayoutProps) {
                     // Expanded state - section header with expand/collapse
                     <Button
                       variant="ghost"
-                      className={`w-full p-2 justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 ${
-                        hasActiveChild ? "bg-gray-50 dark:bg-gray-800/50" : ""
+                      className={`w-full p-2 justify-between text-white hover:bg-white/10 ${
+                        hasActiveChild ? "bg-white/10" : ""
                       }`}
                       onClick={() => toggleSection(section.id)}
                       title={section.label}
@@ -288,7 +288,7 @@ export default function Layout({ children }: LayoutProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="w-full justify-between text-sm p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                className="w-full justify-between text-sm p-2 text-white/80 hover:bg-white/10"
                                 onClick={() => toggleSection(item.id)}
                                 title={item.label}
                               >
@@ -314,8 +314,8 @@ export default function Layout({ children }: LayoutProps) {
                                           size="sm"
                                           className={`w-full justify-start text-xs p-2 ${
                                             location === subItem.path
-                                              ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
-                                              : "text-gray-500 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                              ? "bg-white/20 text-white"
+                                              : "text-white/70 hover:bg-white/10"
                                           } ${isSubPlaceholder ? 'opacity-60' : ''}`}
                                           title={subItem.label}
                                         >
@@ -340,8 +340,8 @@ export default function Layout({ children }: LayoutProps) {
                               size="sm"
                               className={`w-full justify-start text-sm p-2 ${
                                 location === item.path
-                                  ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
-                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                  ? "bg-white/20 text-white"
+                                  : "text-white/80 hover:bg-white/10"
                               } ${isPlaceholder ? 'opacity-60' : ''}`}
                               title={item.label}
                             >
@@ -364,7 +364,7 @@ export default function Layout({ children }: LayoutProps) {
             <Link href="/placeholder/chat">
               <Button 
                 variant="ghost" 
-                className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+                className={`w-full p-2 text-white hover:bg-white/10 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
                 title="Chat Support"
               >
                 <MessageCircle className="h-4 w-4" />
@@ -375,13 +375,13 @@ export default function Layout({ children }: LayoutProps) {
             {isExpanded && (
               <div className="flex items-center justify-center px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <Sun className="h-4 w-4 text-white/60" />
                   <Switch 
                     checked={darkMode}
                     onCheckedChange={toggleDarkMode}
-                    className="data-[state=checked]:bg-gray-700"
+                    className="data-[state=checked]:bg-white/20"
                   />
-                  <Moon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <Moon className="h-4 w-4 text-white/60" />
                 </div>
               </div>
             )}
@@ -389,7 +389,7 @@ export default function Layout({ children }: LayoutProps) {
             <Link href="/placeholder/employees">
               <Button 
                 variant="ghost" 
-                className={`w-full p-2 text-gray-700 dark:text-gray-300 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
+                className={`w-full p-2 text-white hover:bg-white/10 ${!isExpanded && 'justify-center'} ${isExpanded && 'justify-start'}`}
                 title="Employees"
               >
                 <UserPlus className="h-4 w-4" />
