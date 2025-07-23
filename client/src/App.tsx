@@ -27,6 +27,7 @@ import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
+import Purchasing from "@/pages/Purchasing";
 import FormView from "@/pages/FormView";
 
 import NotFound from "@/pages/not-found";
@@ -59,7 +60,7 @@ function Router() {
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />
         <Route path="/form-library" component={FormLibrary} />
-        <Route path="/purchasing" component={ShoppingList} />
+        <Route path="/purchasing" component={Purchasing} />
         
         {/* Operations & Sales sub-routes */}
         <Route path="/ops-sales/draft-forms" component={DraftForms} />

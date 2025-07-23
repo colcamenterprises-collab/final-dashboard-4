@@ -41,6 +41,16 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (July 23, 2025)
 
+### Purchasing Page Implementation - Complete Structure with Quick Lodge Table
+- **Created Dedicated Purchasing Page**: Built comprehensive Purchasing.tsx with proper heading structure and two distinct sections
+- **Section 1 - Shopping**: Added Shopping section with styled container ready for future functionality implementation
+- **Section 2 - Quick Lodge**: Implemented table format for entering purchases of Burger Buns, Meat (kg), and Drinks with form validation
+- **Simple Form Integration**: Added React Hook Form with Zod validation and API integration to /api/lodge-stock endpoint
+- **Professional Table Design**: Created bordered table with proper headers, input fields, and submit functionality
+- **Navigation Integration**: Updated App.tsx routing to use dedicated Purchasing component instead of ShoppingList
+- **No Placeholder Data**: Removed all placeholder text while maintaining professional box styling and structure
+- **User Experience**: Added loading states, success/error toasts, and form reset functionality
+
 ### Sidebar Menu Consolidation Complete - Operations & Sales Navigation Structure
 - **Consolidated Navigation Structure**: Successfully implemented consolidated sidebar menu with "Operations & Sales" as main heading per user specifications
 - **Daily Sales Form Sub-Menu**: Added nested navigation under Daily Sales Form with Draft Forms and Form Library as sub-items
