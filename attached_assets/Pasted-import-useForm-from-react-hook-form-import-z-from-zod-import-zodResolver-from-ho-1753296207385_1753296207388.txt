@@ -1,0 +1,378 @@
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input, Button, Card, CardHeader, CardContent, Label, Select, Checkbox } from "@/components/ui";
+import { useState, useEffect } from 'react';
+
+const formSchema = z.object({
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']),
+  shiftDate: z.string().datetime("Required"),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wages: z.array(z.object({ staffName: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), type: z.enum(['wages', 'overtime', 'other']) })).optional().default([]),
+  shopping: z.array(z.object({ item: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), shopName: z.string().optional() })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  startingCash: z.coerce.number().optional().default(0),
+  endCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  drinkStockCount: z.coerce.number().optional().default(0),
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  freshFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Salad (Iceberg Lettuce)', value: 0 }, { name: 'Tomatos', value: 0 }, { name: 'White Cabbage', value: 0 }, { name: 'Purple Cabbage', value: 0 }, { name: 'Bacon Short', value: 0 }, { name: 'Bacon Long', value: 0 }, { name: 'Milk', value: 0 }, { name: 'Butter', value: 0 }]),
+  freshFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  frozenFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Chicken Nuggets', value: 0 }, { name: 'Sweet Potato Fries', value: 0 }, { name: 'French Fries (7mm)', value: 0 }, { name: 'Chicken Fillets', value: 0 }]),
+  frozenFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  shelfItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Mayonnaise', value: 0 }, { name: 'Mustard', value: 0 }, { name: 'Dill Pickles', value: 0 }, { name: 'Sweet Pickles', value: 0 }, { name: 'Salt', value: 0 }, { name: 'Pepper', value: 0 }, { name: 'Cajun Spice', value: 0 }, { name: 'White Vinegar', value: 0 }, { name: 'Crispy Fried Onions', value: 0 }, { name: 'Paprika (Smoked)', value: 0 }, { name: 'Jalapenos', value: 0 }, { name: 'Sriracha Mayonnaise', value: 0 }, { name: 'Chipotle Sauce', value: 0 }, { name: 'Flour', value: 0 }, { name: 'French Fries Seasoning BBQ', value: 0 }]),
+  shelfItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  kitchenItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Kitchen Cleaner', value: 0 }, { name: 'Floor Cleaner', value: 0 }, { name: 'Gloves Medium', value: 0 }, { name: 'Gloves Large', value: 0 }, { name: 'Gloves Small', value: 0 }, { name: 'Plastic Meat Gloves', value: 0 }, { name: 'Paper Towel Long', value: 0 }, { name: 'Paper Towel Short', value: 0 }, { name: 'Bin Bags 30x40', value: 0 }, { name: 'Printer Rolls', value: 0 }, { name: 'Sticky Tape', value: 0 }, { name: 'Hand Sanitiser', value: 0 }, { name: 'Dish Washing Liquid', value: 0 }, { name: 'Dish Washing Sponges', value: 0 }]),
+  kitchenItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  packagingItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Loaded Fries Box', value: 0 }, { name: 'French Fries Box 600ml', value: 0 }, { name: 'Takeaway Sauce Container', value: 0 }, { name: 'Coleslaw Container', value: 0 }, { name: 'Burger Wrapping Paper', value: 0 }, { name: 'French Fries Paper', value: 0 }, { name: 'Paper Bags', value: 0 }, { name: 'Plastic Bags 8x16', value: 0 }, { name: 'Plastic Bags 9x18', value: 0 }, { name: 'Knife and Fork Set', value: 0 }, { name: 'Bag Close Stickers', value: 0 }, { name: 'Sauce Container Stickers', value: 0 }, { name: 'Flag Stickers', value: 0 }, { name: 'Burger Sweets Takeaway', value: 0 }]),
+  packagingItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  isDraft: z.boolean().optional().default(false),
+});
+
+const DailyShiftForm = () => {
+  const form = useForm({ resolver: zodResolver(formSchema), defaultValues: formSchema.parse({}) });
+  const { watch, setValue } = form;
+  const [wagesEntries, setWagesEntries] = useState(1);
+  const [shoppingEntries, setShoppingEntries] = useState(1);
+  const [freshAdditional, setFreshAdditional] = useState(0);
+  const [frozenAdditional, setFrozenAdditional] = useState(0);
+  const [shelfAdditional, setShelfAdditional] = useState(0);
+  const [kitchenAdditional, setKitchenAdditional] = useState(0);
+  const [packagingAdditional, setPackagingAdditional] = useState(0);
+
+  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenses = watch(['gasExpense']);
+  const wages = watch('wages');
+  const shopping = watch('shopping');
+
+  useEffect(() => {
+    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalSales', salesTotal);
+  }, [sales, setValue]);
+
+  useEffect(() => {
+    const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+    const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+    const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0);
+    setValue('totalExpenses', expTotal);
+  }, [wages, shopping, expenses, setValue]);
+
+  const onSubmit = async (data) => {
+    await fetch('/api/daily-stock-sales', { method: 'POST', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'} });
+    if (!data.isDraft) {
+      const purchaseItems = [
+        ...data.freshFood.filter(f => f.value > 0),
+        ...data.freshFoodAdditional.filter(f => f.quantity > 0),
+        ...data.frozenFood.filter(f => f.value > 0),
+        ...data.frozenFoodAdditional.filter(f => f.quantity > 0),
+        ...data.shelfItems.filter(f => f.value > 0),
+        ...data.shelfItemsAdditional.filter(f => f.quantity > 0),
+        ...data.kitchenItems.filter(f => f.value > 0),
+        ...data.kitchenItemsAdditional.filter(f => f.quantity > 0),
+        ...data.packagingItems.filter(f => f.value > 0),
+        ...data.packagingItemsAdditional.filter(f => f.quantity > 0),
+      ];
+      const shoppingList = purchaseItems.map(i => ({ itemName: i.name || i.item, quantity: i.value || i.quantity, unit: 'unit', formId: result.id, listDate: data.shiftDate }));
+      await fetch('/api/shopping-list', { method: 'POST', body: JSON.stringify(shoppingList) });
+    }
+    // Permanent add if checked
+    for (const add of [...data.freshFoodAdditional.filter(f => f.addPermanently), ...data.frozenFoodAdditional.filter(f => f.addPermanently), ...data.shelfItemsAdditional.filter(f => f.addPermanently), ...data.kitchenItemsAdditional.filter(f => f.addPermanently), ...data.packagingItemsAdditional.filter(f => f.addPermanently)]) {
+      await fetch('/api/ingredients', { method: 'POST', body: JSON.stringify({ name: add.item, price: 0, packageSize: 0, portionSize: 0, unit: 'unit' }) });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>Daily Sales & Stock Form</CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <Label>Completed By*</Label>
+          <Input {...form.register("completedBy")} />
+          <Label>Shift Type</Label>
+          <select {...form.register("shiftType")}>
+            <option value="opening">Opening</option>
+            <option value="closing">Closing</option>
+          </select>
+          <Label>Shift Date*</Label>
+          <Input type="datetime-local" {...form.register("shiftDate")} />
+          <Label>Starting Cash (฿)</Label>
+          <Input type="number" {...form.register("startingCash")} />
+
+          <h3>Sales Information</h3>
+          <Label>Grab Sales (฿)</Label>
+          <Input type="number" {...form.register("grabSales")} />
+          <Label>Aroi Dee Sales (฿)</Label>
+          <Input type="number" {...form.register("aroiDeeSales")} />
+          <Label>QR Scan Sales (฿)</Label>
+          <Input type="number" {...form.register("qrScanSales")} />
+          <Label>Cash Sales (฿)</Label>
+          <Input type="number" {...form.register("cashSales")} />
+          <Label>Total Sales (฿)</Label>
+          <Input disabled value={form.watch('totalSales')} />
+
+          <h3>Expenses</h3>
+          <Label>Wages</Label>
+          {[...Array(wagesEntries)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Staff Name" {...form.register(`wages.${i}.staffName`)} />
+              <Input type="number" placeholder="Amount" {...form.register(`wages.${i}.amount`)} />
+              <select {...form.register(`wages.${i}.type`)}>
+                <option value="wages">Wages</option>
+                <option value="overtime">Overtime</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          ))}
+          <Button type="button" onClick={() => setWagesEntries(wagesEntries + 1)}>Add Wage Entry</Button>
+
+          <Label>Shopping</Label>
+          {[...Array(shoppingEntries)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item Purchased" {...form.register(`shopping.${i}.item`)} />
+              <Input type="number" placeholder="Amount" {...form.register(`shopping.${i}.amount`)} />
+              <Input placeholder="Shop Name" {...form.register(`shopping.${i}.shopName`)} />
+            </div>
+          ))}
+          <Button type="button" onClick={() => setShoppingEntries(shoppingEntries + 1)}>Add Shopping Entry</Button>
+
+          <Label>Gas Expense (฿)</Label>
+          <Input type="number" {...form.register("gasExpense")} />
+
+          <Label>Total Expenses (฿)</Label>
+          <Input disabled value={form.watch('totalExpenses')} />
+
+          <h3>Summary</h3>
+          <p>Total Sales: ฿{form.watch('totalSales')}</p>
+          <p>Breakdown: Grab ฿{form.watch('grabSales')}, Aroi Dee ฿{form.watch('aroiDeeSales')}, QR ฿{form.watch('qrScanSales')}, Cash ฿{form.watch('cashSales')}</p>
+          <p>Total Expenses: ฿{form.watch('totalExpenses')}</p>
+          <p>Breakdown: Wages ฿{form.watch('wages').reduce((sum, w) => sum + Number(w.amount || 0), 0)}, Shopping ฿{form.watch('shopping').reduce((sum, s) => sum + Number(s.amount || 0), 0)}, Gas ฿{form.watch('gasExpense')}</p>
+          <p>Drink Stock: Coke {form.watch('coke')}, Coke Zero {form.watch('cokeZero')}, Sprite {form.watch('sprite')}, Schweppes Manow {form.watch('schweppesManow')}, Fanta Orange {form.watch('fantaOrange')}, Fanta Strawberry {form.watch('fantaStrawberry')}, Soda Water {form.watch('sodaWater')}, Water {form.watch('water')}, Kids Orange {form.watch('kidsOrange')}, Kids Apple {form.watch('kidsApple')}</p>
+          <Label>Total Cash in Register at Closing (฿)</Label>
+          <Input type="number" {...form.register("endCash")} />
+          <Label>Amount to be Banked (฿)</Label>
+          <Input type="number" {...form.register("bankedAmount")} />
+
+          <h3>Stock and Produce</h3>
+          <Label>Burger Buns Stock (In Hand)</Label>
+          <Input type="number" {...form.register("burgerBunsStock")} />
+          <Label>Meat Weight (In Hand, kg)</Label>
+          <Input type="number" {...form.register("meatWeight")} />
+          <Label>Drink Stock Count (In Hand)</Label>
+          <Input type="number" {...form.register("drinkStockCount")} />
+          <h4>Drink Details (In Hand)</h4>
+          <Label>Coke</Label>
+          <Input type="number" {...form.register("coke")} />
+          <Label>Coke Zero</Label>
+          <Input type="number" {...form.register("cokeZero")} />
+          <Label>Sprite</Label>
+          <Input type="number" {...form.register("sprite")} />
+          <Label>Schweppes Manow</Label>
+          <Input type="number" {...form.register("schweppesManow")} />
+          <Label>Fanta Orange</Label>
+          <Input type="number" {...form.register("fantaOrange")} />
+          <Label>Fanta Strawberry</Label>
+          <Input type="number" {...form.register("fantaStrawberry")} />
+          <Label>Soda Water</Label>
+          <Input type="number" {...form.register("sodaWater")} />
+          <Label>Water</Label>
+          <Input type="number" {...form.register("water")} />
+          <Label>Kids Orange</Label>
+          <Input type="number" {...form.register("kidsOrange")} />
+          <Label>Kids Apple</Label>
+          <Input type="number" {...form.register("kidsApple")} />
+
+          <h3>Fresh Food</h3>
+          <Label>Salad (Iceberg Lettuce)</Label>
+          <Input type="number" {...form.register("freshFood.0.value")} />
+          <Label>Tomatos</Label>
+          <Input type="number" {...form.register("freshFood.1.value")} />
+          <Label>White Cabbage</Label>
+          <Input type="number" {...form.register("freshFood.2.value")} />
+          <Label>Purple Cabbage</Label>
+          <Input type="number" {...form.register("freshFood.3.value")} />
+          <Label>Bacon Short</Label>
+          <Input type="number" {...form.register("freshFood.4.value")} />
+          <Label>Bacon Long</Label>
+          <Input type="number" {...form.register("freshFood.5.value")} />
+          <Label>Milk</Label>
+          <Input type="number" {...form.register("freshFood.6.value")} />
+          <Label>Butter</Label>
+          <Input type="number" {...form.register("freshFood.7.value")} />
+
+          <h4>Additional Items Not Listed</h4>
+          {[...Array(freshAdditional)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item to be Purchased" {...form.register(`freshFoodAdditional.${i}.item`)} />
+              <Input type="number" placeholder="Quantity" {...form.register(`freshFoodAdditional.${i}.quantity`)} />
+              <Input placeholder="Note" {...form.register(`freshFoodAdditional.${i}.note`)} />
+              <Checkbox {...form.register(`freshFoodAdditional.${i}.addPermanently`)} /> Add Permanently
+            </div>
+          ))}
+          <Button type="button" onClick={() => setFreshAdditional(freshAdditional + 1)}>Add Item</Button>
+
+          <h3>Frozen Food</h3>
+          <Label>Chicken Nuggets</Label>
+          <Input type="number" {...form.register("frozenFood.0.value")} />
+          <Label>Sweet Potato Fries</Label>
+          <Input type="number" {...form.register("frozenFood.1.value")} />
+          <Label>French Fries (7mm)</Label>
+          <Input type="number" {...form.register("frozenFood.2.value")} />
+          <Label>Chicken Fillets</Label>
+          <Input type="number" {...form.register("frozenFood.3.value")} />
+
+          <h4>Additional Items Not Listed</h4>
+          {[...Array(frozenAdditional)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item to be Purchased" {...form.register(`frozenFoodAdditional.${i}.item`)} />
+              <Input type="number" placeholder="Quantity" {...form.register(`frozenFoodAdditional.${i}.quantity`)} />
+              <Input placeholder="Note" {...form.register(`frozenFoodAdditional.${i}.note`)} />
+              <Checkbox {...form.register(`frozenFoodAdditional.${i}.addPermanently`)} /> Add Permanently
+            </div>
+          ))}
+          <Button type="button" onClick={() => setFrozenAdditional(frozenAdditional + 1)}>Add Item</Button>
+
+          <h3>Shelf Items</h3>
+          <Label>Mayonnaise</Label>
+          <Input type="number" {...form.register("shelfItems.0.value")} />
+          <Label>Mustard</Label>
+          <Input type="number" {...form.register("shelfItems.1.value")} />
+          <Label>Dill Pickles</Label>
+          <Input type="number" {...form.register("shelfItems.2.value")} />
+          <Label>Sweet Pickles</Label>
+          <Input type="number" {...form.register("shelfItems.3.value")} />
+          <Label>Salt</Label>
+          <Input type="number" {...form.register("shelfItems.4.value")} />
+          <Label>Pepper</Label>
+          <Input type="number" {...form.register("shelfItems.5.value")} />
+          <Label>Cajun Spice</Label>
+          <Input type="number" {...form.register("shelfItems.6.value")} />
+          <Label>White Vinegar</Label>
+          <Input type="number" {...form.register("shelfItems.7.value")} />
+          <Label>Crispy Fried Onions</Label>
+          <Input type="number" {...form.register("shelfItems.8.value")} />
+          <Label>Paprika (Smoked)</Label>
+          <Input type="number" {...form.register("shelfItems.9.value")} />
+          <Label>Jalapenos</Label>
+          <Input type="number" {...form.register("shelfItems.10.value")} />
+          <Label>Sriracha Mayonnaise</Label>
+          <Input type="number" {...form.register("shelfItems.11.value")} />
+          <Label>Chipotle Sauce</Label>
+          <Input type="number" {...form.register("shelfItems.12.value")} />
+          <Label>Flour</Label>
+          <Input type="number" {...form.register("shelfItems.13.value")} />
+          <Label>French Fries Seasoning BBQ</Label>
+          <Input type="number" {...form.register("shelfItems.14.value")} />
+
+          <h4>Additional Items Not Listed</h4>
+          {[...Array(shelfAdditional)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item to be Purchased" {...form.register(`shelfItemsAdditional.${i}.item`)} />
+              <Input type="number" placeholder="Quantity" {...form.register(`shelfItemsAdditional.${i}.quantity`)} />
+              <Input placeholder="Note" {...form.register(`shelfItemsAdditional.${i}.note`)} />
+              <Checkbox {...form.register(`shelfItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+            </div>
+          ))}
+          <Button type="button" onClick={() => setShelfAdditional(shelfAdditional + 1)}>Add Item</Button>
+
+          <h3>Kitchen Items</h3>
+          <Label>Kitchen Cleaner</Label>
+          <Input type="number" {...form.register("kitchenItems.0.value")} />
+          <Label>Floor Cleaner</Label>
+          <Input type="number" {...form.register("kitchenItems.1.value")} />
+          <Label>Gloves Medium</Label>
+          <Input type="number" {...form.register("kitchenItems.2.value")} />
+          <Label>Gloves Large</Label>
+          <Input type="number" {...form.register("kitchenItems.3.value")} />
+          <Label>Gloves Small</Label>
+          <Input type="number" {...form.register("kitchenItems.4.value")} />
+          <Label>Plastic Meat Gloves</Label>
+          <Input type="number" {...form.register("kitchenItems.5.value")} />
+          <Label>Paper Towel Long</Label>
+          <Input type="number" {...form.register("kitchenItems.6.value")} />
+          <Label>Paper Towel Short</Label>
+          <Input type="number" {...form.register("kitchenItems.7.value")} />
+          <Label>Bin Bags 30x40</Label>
+          <Input type="number" {...form.register("kitchenItems.8.value")} />
+          <Label>Printer Rolls</Label>
+          <Input type="number" {...form.register("kitchenItems.9.value")} />
+          <Label>Sticky Tape</Label>
+          <Input type="number" {...form.register("kitchenItems.10.value")} />
+
+          <h4>Additional Items Not Listed</h4>
+          {[...Array(kitchenAdditional)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item to be Purchased" {...form.register(`kitchenItemsAdditional.${i}.item`)} />
+              <Input type="number" placeholder="Quantity" {...form.register(`kitchenItemsAdditional.${i}.quantity`)} />
+              <Input placeholder="Note" {...form.register(`kitchenItemsAdditional.${i}.note`)} />
+              <Checkbox {...form.register(`kitchenItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+            </div>
+          ))}
+          <Button type="button" onClick={() => setKitchenAdditional(kitchenAdditional + 1)}>Add Item</Button>
+
+          <h3>Packaging Items</h3>
+          <Label>Loaded Fries Box</Label>
+          <Input type="number" {...form.register("packagingItems.0.value")} />
+          <Label>French Fries Box 600ml</Label>
+          <Input type="number" {...form.register("packagingItems.1.value")} />
+          <Label>Takeaway Sauce Container</Label>
+          <Input type="number" {...form.register("packagingItems.2.value")} />
+          <Label>Coleslaw Container</Label>
+          <Input type="number" {...form.register("packagingItems.3.value")} />
+          <Label>Burger Wrapping Paper</Label>
+          <Input type="number" {...form.register("packagingItems.4.value")} />
+          <Label>French Fries Paper</Label>
+          <Input type="number" {...form.register("packagingItems.5.value")} />
+          <Label>Paper Bags</Label>
+          <Input type="number" {...form.register("packagingItems.6.value")} />
+          <Label>Plastic Bags 8x16</Label>
+          <Input type="number" {...form.register("packagingItems.7.value")} />
+          <Label>Plastic Bags 9x18</Label>
+          <Input type="number" {...form.register("packagingItems.8.value")} />
+          <Label>Knife and Fork Set</Label>
+          <Input type="number" {...form.register("packagingItems.9.value")} />
+          <Label>Bag Close Stickers</Label>
+          <Input type="number" {...form.register("packagingItems.10.value")} />
+          <Label>Sauce Container Stickers</Label>
+          <Input type="number" {...form.register("packagingItems.11.value")} />
+          <Label>Flag Stickers</Label>
+          <Input type="number" {...form.register("packagingItems.12.value")} />
+          <Label>Burger Sweets Takeaway</Label>
+          <Input type="number" {...form.register("packagingItems.13.value")} />
+
+          <h4>Additional Items Not Listed</h4>
+          {[...Array(packagingAdditional)].map((_, i) => (
+            <div key={i}>
+              <Input placeholder="Item to be Purchased" {...form.register(`packagingItemsAdditional.${i}.item`)} />
+              <Input type="number" placeholder="Quantity" {...form.register(`packagingItemsAdditional.${i}.quantity`)} />
+              <Input placeholder="Note" {...form.register(`packagingItemsAdditional.${i}.note`)} />
+              <Checkbox {...form.register(`packagingItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+            </div>
+          ))}
+          <Button type="button" onClick={() => setPackagingAdditional(packagingAdditional + 1)}>Add Item</Button>
+
+          <Button type="submit">Save</Button>
+          <Button type="submit" onClick={() => form.setValue('isDraft', true)}>Save Draft</Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default DailyShiftForm;
