@@ -362,14 +362,14 @@ const DailyShiftForm = () => {
             <Button 
               variant="ghost" 
               onClick={() => setActiveSection('form')}
-              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
             >
               Back to Form
             </Button>
             <Button 
               variant="ghost" 
               onClick={() => setActiveSection('library')}
-              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
             >
               <FileText className="h-4 w-4 mr-2" />
               Form Library
@@ -393,14 +393,14 @@ const DailyShiftForm = () => {
             <Button 
               variant="ghost" 
               onClick={() => setActiveSection('form')}
-              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
             >
               Back to Form
             </Button>
             <Button 
               variant="ghost" 
               onClick={() => setActiveSection('drafts')}
-              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
             >
               <FolderOpen className="h-4 w-4 mr-2" />
               Draft Forms
@@ -423,7 +423,7 @@ const DailyShiftForm = () => {
           <Button 
             variant="ghost" 
             onClick={() => setActiveSection('drafts')}
-            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
           >
             <FolderOpen className="h-4 w-4 mr-2" />
             Drafts
@@ -431,7 +431,7 @@ const DailyShiftForm = () => {
           <Button 
             variant="ghost" 
             onClick={() => setActiveSection('library')}
-            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
           >
             <FileText className="h-4 w-4 mr-2" />
             Form Library
