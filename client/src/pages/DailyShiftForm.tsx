@@ -7,8 +7,10 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, FileText } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import DraftForms from "./DraftForms";
+import FormLibrary from "./FormLibrary";
 
 const formSchema = z.object({
   completedBy: z.string().min(1, "Required"),
@@ -153,6 +155,7 @@ const formSchema = z.object({
 
 const DailyShiftForm = () => {
   const { toast } = useToast();
+  const [activeSection, setActiveSection] = useState<'form' | 'drafts' | 'library'>('form');
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -346,11 +349,70 @@ const DailyShiftForm = () => {
     }
   };
 
+  // Render different sections based on activeSection
+  if (activeSection === 'drafts') {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Draft Forms</h1>
+            <p className="text-gray-600 mt-2">Manage your saved draft forms</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setActiveSection('form')}>
+              Back to Form
+            </Button>
+            <Button variant="outline" onClick={() => setActiveSection('library')}>
+              <FileText className="h-4 w-4 mr-2" />
+              Form Library
+            </Button>
+          </div>
+        </div>
+        <DraftForms />
+      </div>
+    );
+  }
+
+  if (activeSection === 'library') {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Form Library</h1>
+            <p className="text-gray-600 mt-2">View and manage completed forms</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setActiveSection('form')}>
+              Back to Form
+            </Button>
+            <Button variant="outline" onClick={() => setActiveSection('drafts')}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Draft Forms
+            </Button>
+          </div>
+        </div>
+        <FormLibrary />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">Daily Sales & Stock Form</h1>
-        <p className="text-gray-600 mt-2">Complete your shift reporting with auto-calculations</p>
+      <div className="flex justify-between items-center">
+        <div className="text-center flex-1">
+          <h1 className="text-3xl font-bold text-gray-900">Daily Sales & Stock Form</h1>
+          <p className="text-gray-600 mt-2">Complete your shift reporting with auto-calculations</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setActiveSection('drafts')}>
+            <FolderOpen className="h-4 w-4 mr-2" />
+            Drafts
+          </Button>
+          <Button variant="outline" onClick={() => setActiveSection('library')}>
+            <FileText className="h-4 w-4 mr-2" />
+            Form Library
+          </Button>
+        </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

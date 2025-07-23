@@ -41,14 +41,9 @@ const navigationStructure = [
         id: "daily-sales-form",
         label: "Daily Sales Form",
         icon: ClipboardList,
-        path: "/daily-shift-form",
-        expandable: true,
-        items: [
-          { path: "/draft-forms", label: "Draft Forms", icon: FolderOpen },
-          { path: "/form-library", label: "Form Library", icon: FileText },
-        ]
+        path: "/daily-shift-form"
       },
-      { path: "/purchasing", label: "Shopping Requirements", icon: Package },
+      { path: "/purchasing", label: "Purchasing", icon: Package },
       { path: "/ops-sales/quick-lodge", label: "Burger Bun, Drinks, Meat - Quick Lodge", icon: Activity },
       {
         id: "sales",
