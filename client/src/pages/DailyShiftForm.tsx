@@ -414,8 +414,8 @@ const DailyShiftForm = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="text-center flex-1">
+      <div className="flex justify-between items-start">
+        <div>
           <h1 className="text-3xl font-bold text-gray-900">Daily Sales & Stock Form</h1>
           <p className="text-gray-600 mt-2">Complete your shift reporting with auto-calculations</p>
         </div>
