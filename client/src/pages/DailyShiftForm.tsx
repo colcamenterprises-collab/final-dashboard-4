@@ -358,11 +358,19 @@ const DailyShiftForm = () => {
             <h1 className="text-3xl font-bold text-gray-900">Draft Forms</h1>
             <p className="text-gray-600 mt-2">Manage your saved draft forms</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setActiveSection('form')}>
+          <div className="flex gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => setActiveSection('form')}
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            >
               Back to Form
             </Button>
-            <Button variant="outline" onClick={() => setActiveSection('library')}>
+            <Button 
+              variant="ghost" 
+              onClick={() => setActiveSection('library')}
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            >
               <FileText className="h-4 w-4 mr-2" />
               Form Library
             </Button>
@@ -381,11 +389,19 @@ const DailyShiftForm = () => {
             <h1 className="text-3xl font-bold text-gray-900">Form Library</h1>
             <p className="text-gray-600 mt-2">View and manage completed forms</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setActiveSection('form')}>
+          <div className="flex gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => setActiveSection('form')}
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            >
               Back to Form
             </Button>
-            <Button variant="outline" onClick={() => setActiveSection('drafts')}>
+            <Button 
+              variant="ghost" 
+              onClick={() => setActiveSection('drafts')}
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+            >
               <FolderOpen className="h-4 w-4 mr-2" />
               Draft Forms
             </Button>
@@ -403,12 +419,20 @@ const DailyShiftForm = () => {
           <h1 className="text-3xl font-bold text-gray-900">Daily Sales & Stock Form</h1>
           <p className="text-gray-600 mt-2">Complete your shift reporting with auto-calculations</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setActiveSection('drafts')}>
+        <div className="flex gap-3">
+          <Button 
+            variant="ghost" 
+            onClick={() => setActiveSection('drafts')}
+            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+          >
             <FolderOpen className="h-4 w-4 mr-2" />
             Drafts
           </Button>
-          <Button variant="outline" onClick={() => setActiveSection('library')}>
+          <Button 
+            variant="ghost" 
+            onClick={() => setActiveSection('library')}
+            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
+          >
             <FileText className="h-4 w-4 mr-2" />
             Form Library
           </Button>
