@@ -39,6 +39,25 @@ This is a comprehensive restaurant management dashboard application built with a
 - `/chatbox-template.html?agent=bigboss` - Direct Big Boss interface
 - `/chatbox-[agent].html` - Redirect shortcuts for easy access
 
+## Recent Changes (July 23, 2025)
+
+### Sidebar Menu Consolidation & Daily Shift Form Enhancement - Production Ready
+- **Updated Sidebar Structure**: Consolidated menu under Operations & Sales as per user requirements with expandable sub-navigation
+- **Enhanced Navigation**: Added nested Sales submenu with Receipts, Receipt Library, Shift Reports, and Analysis sections
+- **New Placeholder Routes**: Created comprehensive routing for Draft Forms, Form Library, Purchasing, Shopping Requirements, and Quick Lodge
+- **TypeScript Error Resolution**: Fixed all Layout component TypeScript errors with proper type definitions and null handling
+- **Backend API Enhancement**: Updated daily-stock-sales POST route to properly generate shopping lists from new form structure
+- **Shopping List Generation**: Enhanced to process all food categories (Fresh, Frozen, Shelf, Kitchen, Packaging) and exclude drinks/rolls/meat as specified
+- **Route Structure**: Consolidated all operational functions under /ops-sales/* path structure for better organization
+- **Form Integration**: Direct Daily Shift Form link (/daily-shift-form) properly integrated into Operations & Sales menu
+
+### Technical Implementation Details
+- **Navigation Structure**: Recursive menu handling for nested Sales submenu with proper state management
+- **TypeScript Safety**: Record<string, boolean> type for expandedSections state to handle dynamic section IDs
+- **Route Mapping**: All new placeholder pages with descriptive content for future development
+- **Backend Optimization**: Streamlined shopping list generation with proper error handling and database transactions
+- **User Experience**: Sleek, minimal, and secure navigation with icons, labels, and expandable sections
+
 ## Recent Changes (July 22, 2025)
 
 ### ZodError Validation Fix - Daily Shift Form Production Ready

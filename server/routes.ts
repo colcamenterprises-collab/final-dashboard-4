@@ -464,76 +464,51 @@ export function registerRoutes(app: express.Application): Server {
       
       // Non-blocking post-processing for non-draft submissions
       if (!data.isDraft) {
-        // Generate shopping list from new form structure (exclude in-hand items)
-        const requirements = [];
-        
-        // Process new consolidated food categories
-        const categories = ['fresh', 'frozen', 'shelf', 'kitchen', 'packaging'];
-        
-        categories.forEach(categoryKey => {
-          const categoryData = data[categoryKey];
-          if (categoryData && typeof categoryData === 'object') {
-            // Process base items
-            Object.entries(categoryData).forEach(([itemKey, quantity]) => {
-              if (itemKey !== 'additionalItems' && Number(quantity) > 0) {
-                requirements.push({
-                  itemName: itemKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-                  quantity: Number(quantity),
-                  category: categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1)
-                });
-              }
-            });
-            
-            // Process additional items
-            if (categoryData.additionalItems && Array.isArray(categoryData.additionalItems)) {
-              categoryData.additionalItems.forEach(item => {
-                if (item.name && Number(item.quantity) > 0) {
-                  requirements.push({
-                    itemName: item.name,
-                    quantity: Number(item.quantity),
-                    category: categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1) + ' (Additional)'
-                  });
-                }
-              });
-            }
+        try {
+          // Generate shopping list from form data (exclude drinks/rolls/meat as specified)
+          const purchaseItems = [];
+          
+          // Process all food categories for items > 0
+          if (data.freshFood && Array.isArray(data.freshFood)) {
+            purchaseItems.push(...data.freshFood.filter(f => f.value > 0));
           }
-        });
-        
-        const shoppingItems = requirements.map(req => ({
-          itemName: req.itemName,
-          quantity: Number(req.quantity),
-          unit: 'units',
-          supplier: 'TBD',
-          pricePerUnit: parseFloat('0'),
-          priority: 'medium',
-          formId: result.id,
-          listDate: data.shiftDate instanceof Date ? data.shiftDate : new Date(data.shiftDate),
-          notes: req.category,
-          isCompleted: false,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }));
-        
-        // Insert shopping items if any exist
-        if (shoppingItems.length > 0) {
-          await db.insert(shoppingList).values(shoppingItems)
-            .then(() => console.log(`Generated ${shoppingItems.length} shopping items`))
-            .catch(error => console.error("Failed to save shopping items:", error));
+          
+          if (data.frozenFood && Array.isArray(data.frozenFood)) {
+            purchaseItems.push(...data.frozenFood.filter(f => f.value > 0));
+          }
+          
+          if (data.shelfItems && Array.isArray(data.shelfItems)) {
+            purchaseItems.push(...data.shelfItems.filter(f => f.value > 0));
+          }
+          
+          if (data.kitchenItems && Array.isArray(data.kitchenItems)) {
+            purchaseItems.push(...data.kitchenItems.filter(f => f.value > 0));
+          }
+          
+          if (data.packagingItems && Array.isArray(data.packagingItems)) {
+            purchaseItems.push(...data.packagingItems.filter(f => f.value > 0));
+          }
+
+          // Create shopping list entries if there are purchase items
+          if (purchaseItems.length > 0) {
+            const shoppingListEntries = purchaseItems.map(item => ({
+              itemName: item.name,
+              quantity: item.value,
+              unit: 'unit',
+              formId: result.id,
+              listDate: data.shiftDate,
+              isCompleted: false,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }));
+
+            // Insert shopping list items
+            await db.insert(shoppingList).values(shoppingListEntries);
+            console.log(`✅ Generated ${shoppingListEntries.length} shopping list items`);
+          }
+        } catch (error) {
+          console.error("Error generating shopping list:", error);
         }
-        
-        // Send email notification (completely optional)
-        import('./services/gmailService')
-          .then(({ sendManagementSummary }) => {
-            const emailData = {
-              formData: result,
-              shoppingList: shoppingItems,
-              submissionTime: new Date()
-            };
-            
-            return sendManagementSummary(emailData);
-          })
-          .then(() => console.log("Email notification sent successfully"))
-          .catch(error => console.error("Failed to send email notification:", error));
       }
       
     } catch (err: any) {

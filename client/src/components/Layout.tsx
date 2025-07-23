@@ -29,39 +29,44 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Minimal navigation structure - shortened labels for collapsed view
+// Updated consolidated navigation structure as per user requirements
 const navigationStructure = [
   {
     id: "operations",
-    label: "Ops & Sales",
+    label: "Operations & Sales",
     icon: ShoppingCart,
     expandable: true,
     items: [
-      { path: "/daily-stock-sales", label: "Daily Shift Form", icon: ClipboardList },
-      { path: "/shopping-list", label: "Purchasing", icon: ShoppingCart },
-      { path: "/pos-loyverse", label: "Receipts", icon: Receipt },
-      { path: "/analysis", label: "AI Analysis", icon: TrendingUp },
-      { path: "/past-forms", label: "Critical Stock", icon: Package },
-      { path: "/shift-analytics", label: "Items Sold", icon: PieChart },
-      { path: "/loyverse-live", label: "Stock vs Purchased", icon: Activity },
+      { path: "/daily-shift-form", label: "Daily Sales & Stock", icon: ClipboardList },
+      { path: "/ops-sales/draft-forms", label: "Draft Forms", icon: FolderOpen },
+      { path: "/ops-sales/form-library", label: "Form Library", icon: FileText },
+      { path: "/ops-sales/purchasing", label: "Purchasing", icon: ShoppingCart },
+      { path: "/ops-sales/shopping-requirements", label: "Shopping Requirements", icon: Package },
+      { path: "/ops-sales/quick-lodge", label: "Burger Bun, Drinks, Meat - Quick Lodge", icon: Activity },
+      {
+        id: "sales",
+        label: "Sales",
+        icon: BarChart3,
+        expandable: true,
+        items: [
+          { path: "/receipts", label: "Receipts", icon: Receipt },
+          { path: "/ops-sales/sales/receipt-library", label: "Receipt Library (by Date)", icon: FileText },
+          { path: "/pos-loyverse", label: "Shift Reports (POS)", icon: PieChart },
+          { path: "/analysis", label: "Shift Report vs Daily Shift Form Analysis", icon: TrendingUp },
+        ]
+      },
+      { path: "/ops-sales/analysis", label: "Analysis", icon: LineChart },
     ]
   },
   {
     id: "finance",
     label: "Finance",
     icon: DollarSign,
-    expandable: true,
-    items: [
-      { path: "/expenses", label: "Expenses", icon: Receipt },
-      { path: "/finance", label: "Profit & Loss", icon: LineChart },
-      { path: "/placeholder/financial-analysis", label: "Analysis (AI)", icon: BarChart3 },
-      { path: "/placeholder/ratios", label: "Ratios", icon: Calculator },
-      { path: "/placeholder/bank-statements", label: "Bank Statements", icon: FileText },
-    ]
+    path: "/finance"
   },
   {
     id: "menu",
-    label: "Menu Mgmt",
+    label: "Menu and Costing",
     icon: Utensils,
     expandable: true,
     items: [
@@ -69,8 +74,13 @@ const navigationStructure = [
       { path: "/ingredients", label: "Ingredients", icon: Package },
       { path: "/placeholder/pricing", label: "Pricing", icon: DollarSign },
       { path: "/placeholder/food-costs", label: "Food Costs", icon: Calculator },
-      { path: "/placeholder/ai-descriptions", label: "AI Descriptions", icon: TrendingUp },
     ]
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    icon: BarChart3,
+    path: "/analysis"
   },
   {
     id: "marketing",
@@ -99,10 +109,11 @@ export default function Layout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currency, setCurrency] = useState("THB");
   const [isExpanded, setIsExpanded] = useState(false); // Collapsed by default - icons only
-  const [expandedSections, setExpandedSections] = useState({
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     operations: false,
     finance: false,
-    menu: false
+    menu: false,
+    sales: false
   });
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -140,7 +151,8 @@ export default function Layout({ children }: LayoutProps) {
       setExpandedSections({
         operations: false,
         finance: false,
-        menu: false
+        menu: false,
+        sales: false
       });
     }
   };
@@ -264,10 +276,62 @@ export default function Layout({ children }: LayoutProps) {
                     <div className="ml-6 space-y-1 mt-1">
                       {section.items.map((item) => {
                         const ItemIcon = item.icon;
-                        const isPlaceholder = item.path.startsWith('/placeholder');
+                        const isPlaceholder = item.path?.startsWith('/placeholder');
                         
+                        // Handle nested items (like Sales submenu)
+                        if (item.expandable && item.items) {
+                          return (
+                            <div key={item.id}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-between text-sm p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                onClick={() => toggleSection(item.id)}
+                                title={item.label}
+                              >
+                                <div className="flex items-center">
+                                  <ItemIcon className="h-3 w-3" />
+                                  <span className="ml-2">{item.label}</span>
+                                </div>
+                                {expandedSections[item.id] ? 
+                                  <ChevronDown className="h-3 w-3" /> : 
+                                  <ChevronRight className="h-3 w-3" />
+                                }
+                              </Button>
+                              {expandedSections[item.id] && (
+                                <div className="ml-6 space-y-1 mt-1">
+                                  {item.items.map((subItem) => {
+                                    const SubItemIcon = subItem.icon;
+                                    const isSubPlaceholder = subItem.path.startsWith('/placeholder');
+                                    
+                                    return (
+                                      <Link key={subItem.path} href={subItem.path}>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={`w-full justify-start text-xs p-2 ${
+                                            location === subItem.path
+                                              ? "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white"
+                                              : "text-gray-500 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                          } ${isSubPlaceholder ? 'opacity-60' : ''}`}
+                                          title={subItem.label}
+                                        >
+                                          <SubItemIcon className="h-3 w-3" />
+                                          <span className="ml-2">{subItem.label}</span>
+                                          {isSubPlaceholder && <span className="ml-auto text-xs">Soon</span>}
+                                        </Button>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Regular menu item
                         return (
-                          <Link key={item.path} href={item.path}>
+                          <Link key={item.path} href={item.path || '#'}>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -462,7 +526,7 @@ export default function Layout({ children }: LayoutProps) {
                             {section.items.map((item) => {
                               const ItemIcon = item.icon;
                               return (
-                                <Link key={item.path} href={item.path}>
+                                <Link key={item.path} href={item.path || '#'}>
                                   <Button
                                     variant={location === item.path ? "default" : "ghost"}
                                     className="w-full justify-start px-4 py-2 rounded-lg text-sm"

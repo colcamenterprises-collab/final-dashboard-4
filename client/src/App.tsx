@@ -54,6 +54,15 @@ function Router() {
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/recipes" component={Recipes} />
         
+        {/* Operations & Sales sub-routes */}
+        <Route path="/ops-sales/draft-forms" component={() => <Placeholder title="Draft Forms" description="View and edit drafts. Buttons for shopping form and stock management." />} />
+        <Route path="/ops-sales/form-library" component={() => <Placeholder title="Form Library" description="Browse and manage historical forms and templates." />} />
+        <Route path="/ops-sales/purchasing" component={() => <Placeholder title="Purchasing" description="Manage procurement and supplier relationships." />} />
+        <Route path="/ops-sales/shopping-requirements" component={() => <Placeholder title="Shopping Requirements" description="Track shopping requirements and generate purchase orders." />} />
+        <Route path="/ops-sales/quick-lodge" component={() => <Placeholder title="Burger Bun, Drinks, Meat - Quick Lodge" description="Quick inventory management for key items." />} />
+        <Route path="/ops-sales/sales/receipt-library" component={() => <Placeholder title="Receipt Library (by Date)" description="Browse receipts organized by date ranges." />} />
+        <Route path="/ops-sales/analysis" component={() => <Placeholder title="Analysis" description="Comprehensive operational analysis and insights." />} />
+        
         {/* Placeholder routes */}
         <Route path="/placeholder/business-info" component={() => <Placeholder title="Business Info" description="Update business email, contact details, and company information." />} />
         <Route path="/placeholder/logo" component={() => <Placeholder title="Amend Logo" description="Upload and manage your restaurant logo." />} />
