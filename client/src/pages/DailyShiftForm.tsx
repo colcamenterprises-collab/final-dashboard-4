@@ -1,745 +1,366 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from 'react';
 
-// Form schema with all optional fields except completedBy and shiftType
 const formSchema = z.object({
-  completedBy: z.string().min(1, "Name is required"),
-  shiftType: z.enum(["morning", "evening", "night"], {
-    required_error: "Shift type is required",
-  }),
-  shiftDate: z.string().optional(),
-  
-  // Sales data - all optional
-  grabSales: z.coerce.number().default(0),
-  foodpandaSales: z.coerce.number().default(0),
-  walkInSales: z.coerce.number().default(0),
-  
-  // Wages - optional array
-  wages: z.array(z.object({
-    staffName: z.string().optional(),
-    amount: z.coerce.number().default(0),
-    type: z.string().optional(),
-  })).optional().default([]),
-  
-  // Shopping - optional array  
-  shopping: z.array(z.object({
-    item: z.string().optional(),
-    amount: z.coerce.number().default(0),
-    shop: z.string().optional(),
-  })).optional().default([]),
-  
-  // Drink stock - individual tracking for 10 beverages
-  drinkStock: z.object({
-    coke: z.coerce.number().default(0),
-    cokeZero: z.coerce.number().default(0),
-    sprite: z.coerce.number().default(0),
-    fanta: z.coerce.number().default(0),
-    water: z.coerce.number().default(0),
-    sparklingWater: z.coerce.number().default(0),
-    orangeJuice: z.coerce.number().default(0),
-    appleJuice: z.coerce.number().default(0),
-    energyDrink: z.coerce.number().default(0),
-    iceTea: z.coerce.number().default(0),
-  }).optional().default({}),
-  
-  // Food categories with additional items
-  fresh: z.object({
-    lettuce: z.coerce.number().default(0),
-    tomatoes: z.coerce.number().default(0),
-    onions: z.coerce.number().default(0),
-    pickles: z.coerce.number().default(0),
-    cheese: z.coerce.number().default(0),
-    additionalItems: z.array(z.object({
-      name: z.string().optional().default(""),
-      quantity: z.coerce.number().default(0),
-      addPermanently: z.boolean().default(false),
-    })).optional().default([]),
-  }).optional().default({}),
-  
-  frozen: z.object({
-    burgerPatties: z.coerce.number().default(0),
-    chickenFillets: z.coerce.number().default(0),
-    fries: z.coerce.number().default(0),
-    nuggets: z.coerce.number().default(0),
-    additionalItems: z.array(z.object({
-      name: z.string().optional().default(""),
-      quantity: z.coerce.number().default(0),
-      addPermanently: z.boolean().default(false),
-    })).optional().default([]),
-  }).optional().default({}),
-  
-  shelf: z.object({
-    buns: z.coerce.number().default(0),
-    sauces: z.coerce.number().default(0),
-    seasonings: z.coerce.number().default(0),
-    oil: z.coerce.number().default(0),
-    additionalItems: z.array(z.object({
-      name: z.string().optional().default(""),
-      quantity: z.coerce.number().default(0),
-      addPermanently: z.boolean().default(false),
-    })).optional().default([]),
-  }).optional().default({}),
-  
-  kitchen: z.object({
-    cleaningSupplies: z.coerce.number().default(0),
-    paperTowels: z.coerce.number().default(0),
-    gloves: z.coerce.number().default(0),
-    bags: z.coerce.number().default(0),
-    additionalItems: z.array(z.object({
-      name: z.string().optional().default(""),
-      quantity: z.coerce.number().default(0),
-      addPermanently: z.boolean().default(false),
-    })).optional().default([]),
-  }).optional().default({}),
-  
-  packaging: z.object({
-    burgerBoxes: z.coerce.number().default(0),
-    friesContainers: z.coerce.number().default(0),
-    cups: z.coerce.number().default(0),
-    napkins: z.coerce.number().default(0),
-    additionalItems: z.array(z.object({
-      name: z.string().optional().default(""),
-      quantity: z.coerce.number().default(0),
-      addPermanently: z.boolean().default(false),
-    })).optional().default([]),
-  }).optional().default({}),
-  
-  // Cash and notes
-  startingCash: z.coerce.number().default(0),
-  endingCash: z.coerce.number().default(0),
-  notes: z.string().optional(),
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']),
+  shiftDate: z.string().min(1, "Required"),
+  startingCash: z.coerce.number().optional().default(0),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wages: z.array(z.object({ staffName: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), type: z.enum(['wages', 'overtime', 'other']) })).optional().default([]),
+  shopping: z.array(z.object({ item: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), shopName: z.string().optional() })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  endCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  drinkStockCount: z.coerce.number().optional().default(0),
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  freshFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Salad (Iceberg Lettuce)', value: 0 }, { name: 'Tomatos', value: 0 }, { name: 'White Cabbage', value: 0 }, { name: 'Purple Cabbage', value: 0 }, { name: 'Bacon Short', value: 0 }, { name: 'Bacon Long', value: 0 }, { name: 'Milk', value: 0 }, { name: 'Butter', value: 0 }]),
+  freshFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  frozenFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Chicken Nuggets', value: 0 }, { name: 'Sweet Potato Fries', value: 0 }, { name: 'French Fries (7mm)', value: 0 }, { name: 'Chicken Fillets', value: 0 }]),
+  frozenFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  shelfItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Mayonnaise', value: 0 }, { name: 'Mustard', value: 0 }, { name: 'Dill Pickles', value: 0 }, { name: 'Sweet Pickles', value: 0 }, { name: 'Salt', value: 0 }, { name: 'Pepper', value: 0 }, { name: 'Cajun Spice', value: 0 }, { name: 'White Vinegar', value: 0 }, { name: 'Crispy Fried Onions', value: 0 }, { name: 'Paprika (Smoked)', value: 0 }, { name: 'Jalapenos', value: 0 }, { name: 'Sriracha Mayonnaise', value: 0 }, { name: 'Chipotle Sauce', value: 0 }, { name: 'Flour', value: 0 }, { name: 'French Fries Seasoning BBQ', value: 0 }]),
+  shelfItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  kitchenItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Kitchen Cleaner', value: 0 }, { name: 'Floor Cleaner', value: 0 }, { name: 'Gloves Medium', value: 0 }, { name: 'Gloves Large', value: 0 }, { name: 'Gloves Small', value: 0 }, { name: 'Plastic Meat Gloves', value: 0 }, { name: 'Paper Towel Long', value: 0 }, { name: 'Paper Towel Short', value: 0 }, { name: 'Bin Bags 30x40', value: 0 }, { name: 'Printer Rolls', value: 0 }, { name: 'Sticky Tape', value: 0 }]),
+  kitchenItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  packagingItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Loaded Fries Box', value: 0 }, { name: 'French Fries Box 600ml', value: 0 }, { name: 'Takeaway Sauce Container', value: 0 }, { name: 'Coleslaw Container', value: 0 }, { name: 'Burger Wrapping Paper', value: 0 }, { name: 'French Fries Paper', value: 0 }, { name: 'Paper Bags', value: 0 }, { name: 'Plastic Bags 8x16', value: 0 }, { name: 'Plastic Bags 9x18', value: 0 }, { name: 'Knife and Fork Set', value: 0 }, { name: 'Bag Close Stickers', value: 0 }, { name: 'Sauce Container Stickers', value: 0 }, { name: 'Flag Stickers', value: 0 }, { name: 'Burger Sweets Takeaway', value: 0 }]),
+  packagingItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  isDraft: z.boolean().optional().default(false),
 });
 
-type FormData = z.infer<typeof formSchema>;
+const DailyShiftForm = () => {
+  const form = useForm({ resolver: zodResolver(formSchema), defaultValues: formSchema.parse({ shiftDate: new Date().toISOString().split('T')[0] }) });
+  const { watch, setValue, handleSubmit } = form;
+  const [wagesEntries, setWagesEntries] = useState(1);
+  const [shoppingEntries, setShoppingEntries] = useState(1);
+  const [freshAdditional, setFreshAdditional] = useState(0);
+  const [frozenAdditional, setFrozenAdditional] = useState(0);
+  const [shelfAdditional, setShelfAdditional] = useState(0);
+  const [kitchenAdditional, setKitchenAdditional] = useState(0);
+  const [packagingAdditional, setPackagingAdditional] = useState(0);
 
-export default function DailyShiftForm() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      completedBy: "",
-      shiftType: undefined,
-      shiftDate: new Date().toISOString().split('T')[0],
-      grabSales: 0,
-      foodpandaSales: 0, 
-      walkInSales: 0,
-      wages: [],
-      shopping: [],
-      drinkStock: {
-        coke: 0,
-        cokeZero: 0,
-        sprite: 0,
-        fanta: 0,
-        water: 0,
-        sparklingWater: 0,
-        orangeJuice: 0,
-        appleJuice: 0,
-        energyDrink: 0,
-        iceTea: 0,
-      },
-      fresh: {
-        lettuce: 0,
-        tomatoes: 0,
-        onions: 0,
-        pickles: 0,
-        cheese: 0,
-        additionalItems: [],
-      },
-      frozen: {
-        burgerPatties: 0,
-        chickenFillets: 0,
-        fries: 0,
-        nuggets: 0,
-        additionalItems: [],
-      },
-      shelf: {
-        buns: 0,
-        sauces: 0,
-        seasonings: 0,
-        oil: 0,
-        additionalItems: [],
-      },
-      kitchen: {
-        cleaningSupplies: 0,
-        paperTowels: 0,
-        gloves: 0,
-        bags: 0,
-        additionalItems: [],
-      },
-      packaging: {
-        burgerBoxes: 0,
-        friesContainers: 0,
-        cups: 0,
-        napkins: 0,
-        additionalItems: [],
-      },
-      startingCash: 0,
-      endingCash: 0,
-      notes: "",
-    },
-  });
+  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenses = watch(['gasExpense']);
+  const wages = watch('wages');
+  const shopping = watch('shopping');
 
-  // Watch values for calculations
-  const watchedValues = form.watch();
-  const totalSales = (watchedValues.grabSales || 0) + (watchedValues.foodpandaSales || 0) + (watchedValues.walkInSales || 0);
-  const totalWages = watchedValues.wages?.reduce((sum, wage) => sum + (wage.amount || 0), 0) || 0;
-  const totalShopping = watchedValues.shopping?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const totalExpenses = totalWages + totalShopping;
+  useEffect(() => {
+    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalSales', salesTotal);
+  }, [sales, setValue]);
 
-  // Submit mutation
-  const submitMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      return apiRequest("/api/daily-shift-forms", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          shiftDate: new Date(data.shiftDate || new Date().toISOString().split('T')[0]),
-        }),
+  useEffect(() => {
+    const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+    const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+    const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0);
+    setValue('totalExpenses', expTotal);
+  }, [wages, shopping, expenses, setValue]);
+
+  const onSubmit = async (data) => {
+    try {
+      const response = await fetch('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, shiftDate: new Date(data.shiftDate).toISOString() }),
+        headers: { 'Content-Type': 'application/json' },
       });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Daily shift form submitted successfully!",
-      });
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ['/api/daily-shift-forms'] });
-    },
-    onError: (error: any) => {
-      console.error("Submit error:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit form",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (data: FormData) => {
-    console.log("Form data:", data);
-    submitMutation.mutate(data);
-  };
-
-  // Helper functions for managing dynamic arrays
-  const addWageEntry = () => {
-    const currentWages = form.getValues("wages") || [];
-    form.setValue("wages", [...currentWages, { staffName: "", amount: 0, type: "" }]);
-  };
-
-  const removeWageEntry = (index: number) => {
-    const currentWages = form.getValues("wages") || [];
-    form.setValue("wages", currentWages.filter((_, i) => i !== index));
-  };
-
-  const addShoppingEntry = () => {
-    const currentShopping = form.getValues("shopping") || [];
-    form.setValue("shopping", [...currentShopping, { item: "", amount: 0, shop: "" }]);
-  };
-
-  const removeShoppingEntry = (index: number) => {
-    const currentShopping = form.getValues("shopping") || [];
-    form.setValue("shopping", currentShopping.filter((_, i) => i !== index));
-  };
-
-  const addAdditionalItem = (category: keyof Pick<FormData, 'fresh' | 'frozen' | 'shelf' | 'kitchen' | 'packaging'>) => {
-    const currentCategory = form.getValues(category) || {};
-    const currentItems = currentCategory.additionalItems || [];
-    form.setValue(`${category}.additionalItems`, [
-      ...currentItems,
-      { name: "", quantity: 0, addPermanently: false }
-    ]);
-  };
-
-  const removeAdditionalItem = (category: keyof Pick<FormData, 'fresh' | 'frozen' | 'shelf' | 'kitchen' | 'packaging'>, index: number) => {
-    const currentCategory = form.getValues(category) || {};
-    const currentItems = currentCategory.additionalItems || [];
-    form.setValue(`${category}.additionalItems`, currentItems.filter((_, i) => i !== index));
+      if (response.ok) {
+        const result = await response.json();
+        if (!data.isDraft) {
+          const purchaseItems = [
+            ...data.freshFood.filter(f => f.value > 0),
+            ...data.freshFoodAdditional.filter(f => f.quantity > 0),
+            ...data.frozenFood.filter(f => f.value > 0),
+            ...data.frozenFoodAdditional.filter(f => f.quantity > 0),
+            ...data.shelfItems.filter(f => f.value > 0),
+            ...data.shelfItemsAdditional.filter(f => f.quantity > 0),
+            ...data.kitchenItems.filter(f => f.value > 0),
+            ...data.kitchenItemsAdditional.filter(f => f.quantity > 0),
+            ...data.packagingItems.filter(f => f.value > 0),
+            ...data.packagingItemsAdditional.filter(f => f.quantity > 0),
+          ].filter(item => item.name !== 'Burger Buns' && item.name !== 'Meat' && !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name));
+          const shoppingList = purchaseItems.map(i => ({
+            itemName: i.name || i.item,
+            quantity: i.value || i.quantity,
+            unit: 'unit',
+            formId: result.id,
+            listDate: new Date(data.shiftDate).toISOString(),
+          }));
+          await fetch('/api/shopping-list/bulk', {
+            method: 'POST',
+            body: JSON.stringify(shoppingList),
+            headers: { 'Content-Type': 'application/json' },
+          });
+          // Permanent add if checked
+          for (const add of [...data.freshFoodAdditional.filter(f => f.addPermanently), ...data.frozenFoodAdditional.filter(f => f.addPermanently), ...data.shelfItemsAdditional.filter(f => f.addPermanently), ...data.kitchenItemsAdditional.filter(f => f.addPermanently), ...data.packagingItemsAdditional.filter(f => f.addPermanently)]) {
+            await fetch('/api/ingredients', {
+              method: 'POST',
+              body: JSON.stringify({ name: add.item, price: 0, packageSize: 0, portionSize: 0, unit: 'unit' }),
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+        form.reset();
+      } else {
+        throw new Error('Submit failed');
+      }
+    } catch (err) {
+      console.error('Form submission error:', err);
+    }
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Daily Shift Form</h1>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Total Sales: ฿{totalSales.toFixed(2)}</p>
-          <p className="text-sm text-muted-foreground">Total Expenses: ฿{totalExpenses.toFixed(2)}</p>
-        </div>
-      </div>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Shift Information</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="completedBy"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Staff Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter your name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="shiftType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shift Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select shift type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="morning">Morning</SelectItem>
-                        <SelectItem value="evening">Evening</SelectItem>
-                        <SelectItem value="night">Night</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="shiftDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shift Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Sales Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Sales Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="grabSales"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Grab Sales (฿)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="foodpandaSales"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>FoodPanda Sales (฿)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="walkInSales"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Walk-in Sales (฿)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Wages */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Wages
-                <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Wage Entry
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {watchedValues.wages?.map((_, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                  <FormField
-                    control={form.control}
-                    name={`wages.${index}.staffName`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Staff Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Staff name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`wages.${index}.amount`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount (฿)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`wages.${index}.type`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="e.g., Daily, Overtime" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeWageEntry(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              {(!watchedValues.wages || watchedValues.wages.length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No wage entries added yet.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Shopping */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Shopping & Expenses
-                <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Expense
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {watchedValues.shopping?.map((_, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                  <FormField
-                    control={form.control}
-                    name={`shopping.${index}.item`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Item</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`shopping.${index}.amount`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount (฿)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`shopping.${index}.shop`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shop</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeShoppingEntry(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              {(!watchedValues.shopping || watchedValues.shopping.length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No shopping entries added yet.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Drink Stock */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Drink Stock (10 Beverages)</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {Object.entries({
-                coke: "Coke",
-                cokeZero: "Coke Zero",
-                sprite: "Sprite", 
-                fanta: "Fanta",
-                water: "Water",
-                sparklingWater: "Sparkling Water",
-                orangeJuice: "Orange Juice",
-                appleJuice: "Apple Juice",
-                energyDrink: "Energy Drink",
-                iceTea: "Ice Tea"
-              }).map(([key, label]) => (
-                <FormField
-                  key={key}
-                  control={form.control}
-                  name={`drinkStock.${key as keyof FormData['drinkStock']}`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{label}</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Food Categories */}
-          {[
-            { key: 'fresh', title: 'Fresh Food', items: { lettuce: 'Lettuce', tomatoes: 'Tomatoes', onions: 'Onions', pickles: 'Pickles', cheese: 'Cheese' }},
-            { key: 'frozen', title: 'Frozen Food', items: { burgerPatties: 'Burger Patties', chickenFillets: 'Chicken Fillets', fries: 'Fries', nuggets: 'Nuggets' }},
-            { key: 'shelf', title: 'Shelf Items', items: { buns: 'Buns', sauces: 'Sauces', seasonings: 'Seasonings', oil: 'Oil' }},
-            { key: 'kitchen', title: 'Kitchen Supplies', items: { cleaningSupplies: 'Cleaning Supplies', paperTowels: 'Paper Towels', gloves: 'Gloves', bags: 'Bags' }},
-            { key: 'packaging', title: 'Packaging', items: { burgerBoxes: 'Burger Boxes', friesContainers: 'Fries Containers', cups: 'Cups', napkins: 'Napkins' }}
-          ].map(({ key, title, items }) => {
-            const categoryKey = key as keyof Pick<FormData, 'fresh' | 'frozen' | 'shelf' | 'kitchen' | 'packaging'>;
-            const categoryData = watchedValues[categoryKey] || {};
+    <div className="max-w-4xl mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <h1 className="text-2xl font-bold">Daily Sales & Stock Form</h1>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Completed By*</Label>
+                <Input {...form.register("completedBy")} />
+              </div>
+              <div>
+                <Label>Shift Type</Label>
+                <select {...form.register("shiftType")} className="w-full p-2 border rounded">
+                  <option value="opening">Opening</option>
+                  <option value="closing">Closing</option>
+                </select>
+              </div>
+              <div>
+                <Label>Shift Date*</Label>
+                <Input type="date" {...form.register("shiftDate")} />
+              </div>
+            </div>
             
-            return (
-              <Card key={key}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {title}
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => addAdditionalItem(categoryKey)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Item
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Base items */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {Object.entries(items).map(([itemKey, label]) => (
-                      <FormField
-                        key={itemKey}
-                        control={form.control}
-                        name={`${categoryKey}.${itemKey as any}`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{label}</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ))}
+            <div>
+              <Label>Starting Cash (฿)</Label>
+              <Input type="number" {...form.register("startingCash")} />
+            </div>
+
+            <h3 className="text-lg font-semibold">Sales Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label>Grab Sales (฿)</Label>
+                <Input type="number" {...form.register("grabSales")} />
+              </div>
+              <div>
+                <Label>Aroi Dee Sales (฿)</Label>
+                <Input type="number" {...form.register("aroiDeeSales")} />
+              </div>
+              <div>
+                <Label>QR Scan Sales (฿)</Label>
+                <Input type="number" {...form.register("qrScanSales")} />
+              </div>
+              <div>
+                <Label>Cash Sales (฿)</Label>
+                <Input type="number" {...form.register("cashSales")} />
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 rounded">
+              <Label>Total Sales (฿)</Label>
+              <Input disabled value={form.watch('totalSales')} />
+            </div>
+
+            <h3 className="text-lg font-semibold">Expenses</h3>
+            <div className="space-y-4">
+              <h4 className="font-medium">Wages</h4>
+              {[...Array(wagesEntries)].map((_, i) => (
+                <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded">
+                  <div>
+                    <Label>Staff Name</Label>
+                    <Input placeholder="Staff Name" {...form.register(`wages.${i}.staffName`)} />
                   </div>
-                  
-                  {/* Additional items */}
-                  {categoryData.additionalItems?.map((_, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end border-t pt-4">
-                      <FormField
-                        control={form.control}
-                        name={`${categoryKey}.additionalItems.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Item name" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`${categoryKey}.additionalItems.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Quantity</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`${categoryKey}.additionalItems.${index}.addPermanently`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Add Permanently</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeAdditionalItem(categoryKey, index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <div>
+                    <Label>Amount (฿)</Label>
+                    <Input type="number" placeholder="Amount" {...form.register(`wages.${i}.amount`)} />
+                  </div>
+                  <div>
+                    <Label>Type</Label>
+                    <select {...form.register(`wages.${i}.type`)} className="w-full p-2 border rounded">
+                      <option value="wages">Wages</option>
+                      <option value="overtime">Overtime</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+              <Button type="button" onClick={() => setWagesEntries(wagesEntries + 1)} variant="outline">Add Wage Entry</Button>
 
-          {/* Cash Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cash Management</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startingCash"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Starting Cash (฿)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endingCash"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ending Cash (฿)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+              <h4 className="font-medium">Shopping</h4>
+              {[...Array(shoppingEntries)].map((_, i) => (
+                <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded">
+                  <div>
+                    <Label>Item Purchased</Label>
+                    <Input placeholder="Item Purchased" {...form.register(`shopping.${i}.item`)} />
+                  </div>
+                  <div>
+                    <Label>Amount (฿)</Label>
+                    <Input type="number" placeholder="Amount" {...form.register(`shopping.${i}.amount`)} />
+                  </div>
+                  <div>
+                    <Label>Shop Name</Label>
+                    <Input placeholder="Shop Name" {...form.register(`shopping.${i}.shopName`)} />
+                  </div>
+                </div>
+              ))}
+              <Button type="button" onClick={() => setShoppingEntries(shoppingEntries + 1)} variant="outline">Add Shopping Entry</Button>
 
-          {/* Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Notes</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Any additional notes about the shift..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+              <div>
+                <Label>Gas Expense (฿)</Label>
+                <Input type="number" {...form.register("gasExpense")} />
+              </div>
+            </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-4">
-            <Button 
-              type="submit" 
-              disabled={submitMutation.isPending}
-              className="bg-black text-white hover:bg-gray-800"
-            >
-              {submitMutation.isPending ? "Submitting..." : "Submit Form"}
-            </Button>
-          </div>
-        </form>
-      </Form>
+            <div className="p-4 bg-gray-50 rounded">
+              <Label>Total Expenses (฿)</Label>
+              <Input disabled value={form.watch('totalExpenses')} />
+            </div>
+
+            <h3 className="text-lg font-semibold">Summary</h3>
+            <div className="space-y-2">
+              <p>Total Sales: ฿{form.watch('totalSales')}</p>
+              <p>Breakdown: Grab ฿{form.watch('grabSales')}, Aroi Dee ฿{form.watch('aroiDeeSales')}, QR ฿{form.watch('qrScanSales')}, Cash ฿{form.watch('cashSales')}</p>
+              <p>Total Expenses: ฿{form.watch('totalExpenses')}</p>
+              <p>Breakdown: Wages ฿{form.watch('wages').reduce((sum, w) => sum + Number(w.amount || 0), 0)}, Shopping ฿{form.watch('shopping').reduce((sum, s) => sum + Number(s.amount || 0), 0)}, Gas ฿{form.watch('gasExpense')}</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Total Cash in Register at Closing (฿)</Label>
+                <Input type="number" {...form.register("endCash")} />
+              </div>
+              <div>
+                <Label>Amount to be Banked (฿)</Label>
+                <Input type="number" {...form.register("bankedAmount")} />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-semibold">Stock and Produce</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Burger Buns Stock (In Hand)</Label>
+                <Input type="number" {...form.register("burgerBunsStock")} />
+              </div>
+              <div>
+                <Label>Meat Weight (In Hand, kg)</Label>
+                <Input type="number" {...form.register("meatWeight")} />
+              </div>
+              <div>
+                <Label>Drink Stock Count (In Hand)</Label>
+                <Input type="number" {...form.register("drinkStockCount")} />
+              </div>
+            </div>
+
+            <h4 className="font-medium">Drink Details (In Hand)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <Label>Coke</Label>
+                <Input type="number" {...form.register("coke")} />
+              </div>
+              <div>
+                <Label>Coke Zero</Label>
+                <Input type="number" {...form.register("cokeZero")} />
+              </div>
+              <div>
+                <Label>Sprite</Label>
+                <Input type="number" {...form.register("sprite")} />
+              </div>
+              <div>
+                <Label>Schweppes Manow</Label>
+                <Input type="number" {...form.register("schweppesManow")} />
+              </div>
+              <div>
+                <Label>Fanta Orange</Label>
+                <Input type="number" {...form.register("fantaOrange")} />
+              </div>
+              <div>
+                <Label>Fanta Strawberry</Label>
+                <Input type="number" {...form.register("fantaStrawberry")} />
+              </div>
+              <div>
+                <Label>Soda Water</Label>
+                <Input type="number" {...form.register("sodaWater")} />
+              </div>
+              <div>
+                <Label>Water</Label>
+                <Input type="number" {...form.register("water")} />
+              </div>
+              <div>
+                <Label>Kids Orange</Label>
+                <Input type="number" {...form.register("kidsOrange")} />
+              </div>
+              <div>
+                <Label>Kids Apple</Label>
+                <Input type="number" {...form.register("kidsApple")} />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-semibold">Fresh Food</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {form.watch('freshFood').map((item, index) => (
+                <div key={index}>
+                  <Label>{item.name}</Label>
+                  <Input type="number" {...form.register(`freshFood.${index}.value`)} />
+                </div>
+              ))}
+            </div>
+
+            <h4 className="font-medium">Additional Items Not Listed</h4>
+            {[...Array(freshAdditional)].map((_, i) => (
+              <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded">
+                <div>
+                  <Label>Item to be Purchased</Label>
+                  <Input placeholder="Item to be Purchased" {...form.register(`freshFoodAdditional.${i}.item`)} />
+                </div>
+                <div>
+                  <Label>Quantity</Label>
+                  <Input type="number" placeholder="Quantity" {...form.register(`freshFoodAdditional.${i}.quantity`)} />
+                </div>
+                <div>
+                  <Label>Note</Label>
+                  <Input placeholder="Note" {...form.register(`freshFoodAdditional.${i}.note`)} />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox {...form.register(`freshFoodAdditional.${i}.addPermanently`)} />
+                  <Label>Add Permanently</Label>
+                </div>
+              </div>
+            ))}
+            <Button type="button" onClick={() => setFreshAdditional(freshAdditional + 1)} variant="outline">Add Item</Button>
+
+            <div className="flex gap-4">
+              <Button type="submit" className="flex-1">Save</Button>
+              <Button type="submit" onClick={() => form.setValue('isDraft', true)} variant="outline" className="flex-1">Save Draft</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
+
+export default DailyShiftForm;
