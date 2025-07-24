@@ -820,7 +820,7 @@ export class MemStorage implements IStorage {
       
       // Sales Data - convert empty strings to null
       grabSales: data.grabSales === '' || data.grabSales === undefined ? null : data.grabSales,
-      foodPandaSales: data.foodPandaSales === '' || data.foodPandaSales === undefined ? null : data.foodPandaSales,
+      foodpandaSales: data.foodPandaSales === '' || data.foodPandaSales === undefined ? null : data.foodPandaSales,
       aroiDeeSales: data.aroiDeeSales === '' || data.aroiDeeSales === undefined ? null : data.aroiDeeSales,
       qrScanSales: data.qrScanSales === '' || data.qrScanSales === undefined ? null : data.qrScanSales,
       cashSales: data.cashSales === '' || data.cashSales === undefined ? null : data.cashSales,

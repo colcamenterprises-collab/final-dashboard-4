@@ -231,7 +231,11 @@ export function registerRoutes(app: express.Application): Server {
 
   app.get('/api/analysis/:id', async (req: Request, res: Response) => {
     try {
-      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, parseInt(req.params.id))).limit(1);
+      const reportId = parseInt(req.params.id);
+      if (isNaN(reportId)) {
+        return res.status(400).json({ error: 'Invalid report ID' });
+      }
+      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
       
       if (!report) {
         return res.status(404).json({ error: 'Report not found' });

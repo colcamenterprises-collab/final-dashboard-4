@@ -3,70 +3,50 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Download } from 'lucide-react';
-import { Link } from 'wouter';
-
-interface Form {
-  id: number;
-  shiftDate: string;
-  completedBy: string;
-  shiftType: string;
-  isDraft: boolean;
-  totalSales?: number;
-  totalExpenses?: number;
-}
+import { Eye, Download, FileText } from "lucide-react";
+import { Link } from "wouter";
 
 const FormLibrary = () => {
-  const { data: forms = [], isLoading } = useQuery<Form[]>({
-    queryKey: ['/api/daily-stock-sales/search'],
+  const { data: forms = [], isLoading } = useQuery({
+    queryKey: ['/api/daily-stock-sales'],
   });
 
-  const downloadForm = async (id: number) => {
-    try {
-      const response = await fetch(`/api/daily-stock-sales/${id}/export`);
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `form-${id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (error) {
-      console.error('Failed to download form:', error);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-4 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="p-6 max-w-7xl mx-auto">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Form Library</h1>
-            <p className="text-gray-600">View and download historical forms</p>
-          </div>
-          <div className="flex gap-2">
-            <Button asChild>
-              <Link href="/daily-shift-form">
-                Create New Form
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/draft-forms">
-                View Drafts
-              </Link>
-            </Button>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-semibold text-left">Form Library</h1>
+            <Link href="/daily-shift-form">
+              <Button className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                New Form
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">Loading forms...</div>
-          ) : forms.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No completed forms found.
+          {forms.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No forms found</p>
+              <Link href="/daily-shift-form">
+                <Button className="mt-4">Create First Form</Button>
+              </Link>
             </div>
           ) : (
             <Table>
@@ -76,42 +56,36 @@ const FormLibrary = () => {
                   <TableHead>Date</TableHead>
                   <TableHead>Completed By</TableHead>
                   <TableHead>Shift Type</TableHead>
-                  <TableHead>Total Sales</TableHead>
-                  <TableHead>Total Expenses</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Total Sales</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {forms.filter((form) => !form.isDraft).map((form) => (
+                {forms.map((form: any) => (
                   <TableRow key={form.id}>
                     <TableCell>{form.id}</TableCell>
                     <TableCell>
-                      {new Date(form.shiftDate).toLocaleDateString()}
+                      {form.shiftDate ? new Date(form.shiftDate).toLocaleDateString() : 'N/A'}
                     </TableCell>
-                    <TableCell>{form.completedBy}</TableCell>
-                    <TableCell>{form.shiftType}</TableCell>
-                    <TableCell>฿{form.totalSales?.toFixed(2) || '0.00'}</TableCell>
-                    <TableCell>฿{form.totalExpenses?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>{form.completedBy || 'Unknown'}</TableCell>
+                    <TableCell>{form.shiftType || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant="default">Complete</Badge>
+                      <Badge variant={form.isDraft ? "secondary" : "default"}>
+                        {form.isDraft ? "Draft" : "Completed"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {form.totalSales ? `฿${parseFloat(form.totalSales).toFixed(2)}` : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                        >
-                          <Link href={`/form/${form.id}`}>
+                        <Link href={`/form/${form.id}`}>
+                          <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadForm(form.id)}
-                        >
+                          </Button>
+                        </Link>
+                        <Button variant="outline" size="sm">
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>

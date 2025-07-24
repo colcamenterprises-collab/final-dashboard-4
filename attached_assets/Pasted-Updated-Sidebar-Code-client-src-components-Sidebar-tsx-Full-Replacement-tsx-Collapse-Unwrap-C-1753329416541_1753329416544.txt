@@ -1,0 +1,228 @@
+Updated Sidebar Code (client/src/components/Sidebar.tsx - Full Replacement)
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { ChevronRight, ChevronDown, Home, ShoppingCart, DollarSign, MenuSquare, BarChart3, Megaphone, Settings, MessageCircle } from 'lucide-react';
+
+const Sidebar = () => {
+  const [expanded, setExpanded] = useState({ operations: false });
+  const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true');
+
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', darkMode);
+  }, [darkMode]);
+
+  const toggleExpand = (section) => setExpanded({ ...expanded, [section]: !expanded[section] });
+
+  const menuItems = [
+    { icon: Home, label: 'Home', path: '/' },
+    { icon: ShoppingCart, label: 'Operations & Sales', path: '/ops-sales', subs: [
+      { label: 'Daily Sales & Stock', path: '/ops-sales/daily-sales-stock' },
+      { label: 'Draft Forms', path: '/ops-sales/draft-forms' },
+      { label: 'Form Library', path: '/ops-sales/form-library' },
+      { label: 'Purchasing', path: '/ops-sales/purchasing' },
+      { label: 'Shopping Requirements', path: '/ops-sales/shopping-requirements' },
+      { label: 'Reporting', path: '/ops-sales/reporting', subs: [
+        { label: 'Receipts', path: '/ops-sales/reporting/receipts' },
+        { label: 'Receipt Library (by Date)', path: '/ops-sales/reporting/receipt-library' },
+        { label: 'Shift Reports (POS)', path: '/ops-sales/reporting/shift-reports' },
+        { label: 'Shift Summary', path: '/ops-sales/reporting/shift-summary' },
+      ] },
+      { label: 'Analysis', path: '/ops-sales/analysis', subs: [
+        { label: 'Receipt Analysis', path: '/ops-sales/analysis/receipt-analysis' },
+        { label: 'Items & Modifiers', path: '/ops-sales/analysis/items-modifiers' },
+        { label: 'Sold vs Purchases', path: '/ops-sales/analysis/sold-vs-purchases' },
+        { label: 'Top 5 Items Sold', path: '/ops-sales/analysis/top-items' },
+        { label: 'Sales Type Summary', path: '/ops-sales/analysis/sales-type-summary' },
+        { label: 'Variances & Anomalies', path: '/ops-sales/analysis/variances-anomalies' },
+        { label: 'Daily Report Library', path: '/ops-sales/analysis/daily-report-library' },
+      ] },
+    ] },
+    { icon: DollarSign, label: 'Finance', path: '/finance' },
+    { icon: MenuSquare, label: 'Menu Mgmt', path: '/menu-mgmt' },
+    { icon: Megaphone, label: 'Marketing', path: '/marketing' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+  ];
+
+  return (
+    <div className="flex flex-col gap-2 p-4 bg-gray-100 h-full min-w-[200px]">
+      {menuItems.map((item, i) => (
+        <div key={i}>
+          <Button variant="ghost" className="w-full justify-start" onClick={item.subs ? () => toggleExpand(item.label) : null} asChild={!item.subs}>
+            <Link to={item.path}>
+              <item.icon size={18} className="mr-2" />
+              {item.label}
+              {item.subs && (expanded[item.label] ? <ChevronDown size={18} /> : <ChevronRight size={18} />)}
+            </Link>
+          </Button>
+          {expanded[item.label] && item.subs && (
+            <div className="pl-4">
+              {item.subs.map((sub, j) => (
+                <div key={j}>
+                  <Button variant="ghost" className="w-full justify-start" onClick={sub.subs ? () => toggleExpand(sub.label) : null} asChild={!sub.subs}>
+                    <Link to={sub.path}>
+                      {sub.label}
+                      {sub.subs && (expanded[sub.label] ? <ChevronDown size={18} /> : <ChevronRight size={18} />)}
+                    </Link>
+                  </Button>
+                  {expanded[sub.label] && sub.subs && (
+                    <div className="pl-4">
+                      {sub.subs.map((subSub, k) => (
+                        <Button key={k} variant="ghost" className="w-full justify-start" asChild>
+                          <Link to={subSub.path}>{subSub.label}</Link>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="mt-auto">
+        <Button variant="ghost" className="w-full justify-start">
+          <MessageCircle size={18} className="mr-2" />
+          Chat Support
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
+Draft Forms Page (client/src/pages/DraftForms.tsx - Update Existing)
+With buttons top right for shopping form/stock management.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardContent, Button, Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui";
+
+const DraftForms = () => {
+  const [forms, setForms] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/daily-stock-sales/drafts').then(r => r.json()).then(setForms);
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>Draft Forms</CardHeader>
+      <CardContent>
+        <div className="flex justify-end gap-2">
+          <Button>Shopping Form</Button>
+          <Button>Stock Management</Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Completed By</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {forms.map(form => (
+              <TableRow key={form.id}>
+                <TableCell>{form.id}</TableCell>
+                <TableCell>{form.shiftDate}</TableCell>
+                <TableCell>{form.completedBy}</TableCell>
+                <TableCell><Button>Edit</Button> <Button>Delete</Button></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default DraftForms;
+Purchasing Page (client/src/pages/Purchasing.tsx - Update Existing)
+Merged with Shopping Requirements, Quick Lodge section.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input, Button, Card, CardHeader, CardContent, Label } from "@/components/ui";
+
+const lodgeSchema = z.object({
+  burgerBuns: z.coerce.number().optional().default(0),
+  drinks: z.coerce.number().optional().default(0),
+  meat: z.coerce.number().optional().default(0),
+});
+
+const Purchasing = () => {
+  const form = useForm({ resolver: zodResolver(lodgeSchema) });
+
+  const onSubmit = async (data) => {
+    data.lodgeDate = new Date().toISOString();
+    await fetch('/api/lodge-quick', { method: 'POST', body: JSON.stringify(data) });
+  };
+
+  return (
+    <Card>
+      <CardHeader>Purchasing / Shopping Requirements</CardHeader>
+      <CardContent>
+        <h3>Burger Bun, Drinks, Meat - Quick Lodge</h3>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <Label>Burger Buns</Label>
+          <Input type="number" {...form.register("burgerBuns")} />
+          <Label>Drinks</Label>
+          <Input type="number" {...form.register("drinks")} />
+          <Label>Meat</Label>
+          <Input type="number" {...form.register("meat")} />
+          <Button type="submit">Lodge</Button>
+        </form>
+        // Shopping requirements list
+      </CardContent>
+    </Card>
+  );
+};
+
+export default Purchasing;
+Backend for Lodge (server/routes.ts - Update)
+Timestamp and save.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post('/api/lodge-quick', async (req, res) => {
+  const data = req.body;
+  data.lodgeDate = new Date();
+  await db.insert(lodgeTable).values(data);
+  res.json({ success: true });
+});
+Test Steps
+Update Sidebar.tsx with the code above.
+Load dashboard—check menu matches your notes.
+Test form submit—shopping gen'd, no errors.
+If error, share console log.

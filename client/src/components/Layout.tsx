@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { 
   Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText,
-  ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils
+  ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle
 } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
@@ -37,27 +37,38 @@ const navigationStructure = [
     icon: ShoppingCart,
     expandable: true,
     items: [
-      {
-        id: "daily-sales-form",
-        label: "Daily Sales Form",
-        icon: ClipboardList,
-        path: "/daily-shift-form"
-      },
+      { path: "/daily-shift-form", label: "Daily Sales & Stock", icon: ClipboardList },
+      { path: "/draft-forms", label: "Draft Forms", icon: FileText },
+      { path: "/form-library", label: "Form Library", icon: FileSpreadsheet },
       { path: "/purchasing", label: "Purchasing", icon: Package },
-      { path: "/ops-sales/quick-lodge", label: "Burger Bun, Drinks, Meat - Quick Lodge", icon: Activity },
+      { path: "/purchasing", label: "Shopping Requirements", icon: ShoppingCart },
       {
-        id: "sales",
-        label: "Sales",
+        id: "reporting",
+        label: "Reporting",
+        icon: Receipt,
+        expandable: true,
+        items: [
+          { path: "/loyverse", label: "Receipts", icon: Receipt },
+          { path: "/loyverse", label: "Receipt Library (by Date)", icon: FileText },
+          { path: "/loyverse", label: "Shift Reports (POS)", icon: PieChart },
+          { path: "/loyverse", label: "Shift Summary", icon: ClipboardList },
+        ]
+      },
+      {
+        id: "analysis",
+        label: "Analysis",
         icon: BarChart3,
         expandable: true,
         items: [
-          { path: "/receipts", label: "Receipts", icon: Receipt },
-          { path: "/ops-sales/sales/receipt-library", label: "Receipt Library (by Date)", icon: FileText },
-          { path: "/pos-loyverse", label: "Shift Reports (POS)", icon: PieChart },
-          { path: "/analysis", label: "Shift Report vs Daily Shift Form Analysis", icon: TrendingUp },
+          { path: "/analysis", label: "Receipt Analysis", icon: Receipt },
+          { path: "/analysis", label: "Items & Modifiers", icon: Package },
+          { path: "/analysis", label: "Sold vs Purchases", icon: TrendingUp },
+          { path: "/analysis", label: "Top 5 Items Sold", icon: BarChart },
+          { path: "/analysis", label: "Sales Type Summary", icon: PieChart },
+          { path: "/analysis", label: "Variances & Anomalies", icon: AlertTriangle },
+          { path: "/analysis", label: "Daily Report Library", icon: FileText },
         ]
       },
-      { path: "/ops-sales/analysis", label: "Analysis", icon: LineChart },
     ]
   },
   {
@@ -67,22 +78,14 @@ const navigationStructure = [
     path: "/finance"
   },
   {
-    id: "menu",
-    label: "Menu and Costing",
+    id: "menu-mgmt",
+    label: "Menu Mgmt",
     icon: Utensils,
     expandable: true,
     items: [
       { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
-      { path: "/placeholder/pricing", label: "Pricing", icon: DollarSign },
-      { path: "/placeholder/food-costs", label: "Food Costs", icon: Calculator },
     ]
-  },
-  {
-    id: "analysis",
-    label: "Analysis",
-    icon: BarChart3,
-    path: "/analysis"
   },
   {
     id: "marketing",
@@ -97,10 +100,10 @@ const navigationStructure = [
     expandable: true,
     items: [
       { path: "/placeholder/business-info", label: "Business Info", icon: FileText },
-      { path: "/placeholder/logo", label: "Amend Logo", icon: Settings },
-      { path: "/placeholder/api-keys", label: "Secret Keys", icon: Settings },
+      { path: "/placeholder/logo", label: "Logo", icon: Settings },
+      { path: "/placeholder/api-keys", label: "API Keys", icon: Settings },
       { path: "/placeholder/theme", label: "Theme", icon: Settings },
-      { path: "/placeholder/employees", label: "Employees", icon: UserPlus },
+      { path: "/placeholder/employees", label: "Employee", icon: UserPlus },
     ]
   }
 ];
@@ -114,9 +117,10 @@ export default function Layout({ children }: LayoutProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     operations: false,
     finance: false,
-    menu: false,
-    sales: false,
-    "daily-sales-form": false
+    "menu-mgmt": false,
+    reporting: false,
+    analysis: false,
+    settings: false
   });
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -154,8 +158,10 @@ export default function Layout({ children }: LayoutProps) {
       setExpandedSections({
         operations: false,
         finance: false,
-        menu: false,
-        sales: false
+        "menu-mgmt": false,
+        reporting: false,
+        analysis: false,
+        settings: false
       });
     }
   };
