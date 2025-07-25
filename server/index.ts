@@ -55,7 +55,37 @@ app.use((req, res, next) => {
   next();
 });
 
+// Schema validation function
+async function checkSchema() {
+  try {
+    const { pool } = await import('./db.js');
+    
+    const result = await pool.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'daily_stock_sales' 
+      AND column_name IN ('wages', 'shopping', 'banked_amount', 'ending_cash')
+    `);
+    
+    const columns = result.rows.map(r => r.column_name);
+    const requiredColumns = ['wages', 'shopping', 'banked_amount', 'ending_cash'];
+    
+    for (const col of requiredColumns) {
+      if (!columns.includes(col)) {
+        throw new Error(`Missing required column: ${col}`);
+      }
+    }
+    
+    console.log('✓ Database schema validation passed');
+    
+  } catch (err) {
+    console.error('❌ Schema check failed:', err.message);
+    console.log('Run: node server/migrations/fix-schema.js to fix schema issues');
+  }
+}
+
 (async () => {
+  // Check schema on startup
+  await checkSchema();
   const server = await registerRoutes(app);
 
   // Setup webhooks for real-time Loyverse data
