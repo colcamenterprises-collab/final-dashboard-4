@@ -522,46 +522,101 @@ export default function Layout({ children }: LayoutProps) {
                   
                   {navigationStructure.map((section) => {
                     const SectionIcon = section.icon;
-                    
-                    if (!section.expandable) {
-                      return (
-                        <Link key={section.id} href={section.path!}>
-                          <Button
-                            variant={location === section.path ? "default" : "ghost"}
-                            className="w-full justify-start px-4 py-3 rounded-lg font-medium transition-colors"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <SectionIcon className="h-4 w-4 mr-3" />
-                            {section.label}
-                          </Button>
-                        </Link>
-                      );
-                    }
+                    const hasActiveChild = section.items?.some(item => 
+                      item.path === location || 
+                      (item.items && item.items.some(subItem => subItem.path === location))
+                    );
                     
                     return (
                       <div key={section.id} className="space-y-1">
+                        {/* Section Header */}
                         <Button
                           variant="ghost"
-                          className="w-full justify-start px-4 py-3 rounded-lg font-medium"
+                          className={`w-full justify-between px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium ${
+                            hasActiveChild ? "bg-gray-100 dark:bg-gray-800" : ""
+                          }`}
                           onClick={() => toggleSection(section.id)}
                         >
-                          <SectionIcon className="h-4 w-4 mr-3" />
-                          {section.label}
+                          <div className="flex items-center">
+                            <SectionIcon className="h-4 w-4 mr-3" />
+                            <span>{section.label}</span>
+                          </div>
+                          {expandedSections[section.id] ? 
+                            <ChevronDown className="h-4 w-4" /> : 
+                            <ChevronRight className="h-4 w-4" />
+                          }
                         </Button>
                         
+                        {/* Section Items */}
                         {expandedSections[section.id] && section.items && (
                           <div className="ml-6 space-y-1">
                             {section.items.map((item) => {
                               const ItemIcon = item.icon;
+                              const isPlaceholder = item.path?.startsWith('/placeholder');
+                              
+                              // Handle nested items (like Sales submenu)
+                              if (item.expandable && item.items) {
+                                return (
+                                  <div key={item.id} className="space-y-1">
+                                    <Button
+                                      variant="ghost"
+                                      className="w-full justify-between px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                      onClick={() => toggleSection(item.id)}
+                                    >
+                                      <div className="flex items-center">
+                                        <ItemIcon className="h-3 w-3 mr-2" />
+                                        <span>{item.label}</span>
+                                      </div>
+                                      {expandedSections[item.id] ? 
+                                        <ChevronDown className="h-3 w-3" /> : 
+                                        <ChevronRight className="h-3 w-3" />
+                                      }
+                                    </Button>
+                                    {expandedSections[item.id] && (
+                                      <div className="ml-6 space-y-1">
+                                        {item.items.map((subItem) => {
+                                          const SubItemIcon = subItem.icon;
+                                          const isSubPlaceholder = subItem.path.startsWith('/placeholder');
+                                          
+                                          return (
+                                            <Link key={subItem.path} href={subItem.path}>
+                                              <Button
+                                                variant="ghost"
+                                                className={`w-full justify-start px-4 py-2 text-xs ${
+                                                  location === subItem.path
+                                                    ? "bg-primary/10 text-primary"
+                                                    : "text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                                } ${isSubPlaceholder ? 'opacity-60' : ''}`}
+                                                onClick={() => setMobileMenuOpen(false)}
+                                              >
+                                                <SubItemIcon className="h-3 w-3 mr-2" />
+                                                <span>{subItem.label}</span>
+                                                {isSubPlaceholder && <span className="ml-auto text-xs">Soon</span>}
+                                              </Button>
+                                            </Link>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              
+                              // Regular menu item
                               return (
                                 <Link key={item.path} href={item.path || '#'}>
                                   <Button
-                                    variant={location === item.path ? "default" : "ghost"}
-                                    className="w-full justify-start px-4 py-2 rounded-lg text-sm"
+                                    variant="ghost"
+                                    className={`w-full justify-start px-4 py-2 text-sm ${
+                                      location === item.path
+                                        ? "bg-primary/10 text-primary"
+                                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    } ${isPlaceholder ? 'opacity-60' : ''}`}
                                     onClick={() => setMobileMenuOpen(false)}
                                   >
                                     <ItemIcon className="h-3 w-3 mr-2" />
-                                    {item.label}
+                                    <span>{item.label}</span>
+                                    {isPlaceholder && <span className="ml-auto text-xs">Soon</span>}
                                   </Button>
                                 </Link>
                               );
@@ -571,18 +626,57 @@ export default function Layout({ children }: LayoutProps) {
                       </div>
                     );
                   })}
-                </div>
-                
-                {/* Mobile Search */}
-                <div className="relative mt-4 md:hidden">
-                  <Input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  
+                  {/* Mobile Menu Management Section */}
+                  <div className="space-y-1 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+                      onClick={() => toggleSection('management')}
+                    >
+                      <div className="flex items-center">
+                        <ChefHat className="h-4 w-4 mr-3" />
+                        <span>Menu Management</span>
+                      </div>
+                      {expandedSections['management'] ? 
+                        <ChevronDown className="h-4 w-4" /> : 
+                        <ChevronRight className="h-4 w-4" />
+                      }
+                    </Button>
+                    
+                    {expandedSections['management'] && (
+                      <div className="ml-6 space-y-1">
+                        <Link href="/recipe-management">
+                          <Button
+                            variant="ghost"
+                            className={`w-full justify-start px-4 py-2 text-sm ${
+                              location === "/recipe-management"
+                                ? "bg-primary/10 text-primary"
+                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Utensils className="h-3 w-3 mr-2" />
+                            <span>Recipes & Ingredients</span>
+                          </Button>
+                        </Link>
+                        <Link href="/marketing">
+                          <Button
+                            variant="ghost"
+                            className={`w-full justify-start px-4 py-2 text-sm ${
+                              location === "/marketing"
+                                ? "bg-primary/10 text-primary"
+                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Megaphone className="h-3 w-3 mr-2" />
+                            <span>Marketing</span>
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
