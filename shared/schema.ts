@@ -28,7 +28,6 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   shiftDate: timestamp('shift_date'),
   startingCash: decimal('starting_cash', { precision: 10, scale: 2 }).default('0'),
   grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
-  foodpandaSales: decimal('foodpanda_sales', { precision: 10, scale: 2 }).default('0'),
   aroiDeeSales: decimal('aroi_dee_sales', { precision: 10, scale: 2 }).default('0'),
   qrScanSales: decimal('qr_scan_sales', { precision: 10, scale: 2 }).default('0'),
   cashSales: decimal('cash_sales', { precision: 10, scale: 2 }).default('0'),

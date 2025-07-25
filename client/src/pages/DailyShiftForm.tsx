@@ -18,7 +18,6 @@ const formSchema = z.object({
   shiftDate: z.string().min(1, "Required"),
   startingCash: z.coerce.number().optional().default(0),
   grabSales: z.coerce.number().optional().default(0),
-  foodpandaSales: z.coerce.number().optional().default(0),
   aroiDeeSales: z.coerce.number().optional().default(0),
   qrScanSales: z.coerce.number().optional().default(0),
   cashSales: z.coerce.number().optional().default(0),
@@ -96,7 +95,7 @@ const DailyShiftForm = () => {
   const [activeSection, setActiveSection] = useState<'form' | 'drafts' | 'library'>('form');
   
   // Fetch suppliers data
-  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery({
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
 
@@ -116,7 +115,6 @@ const DailyShiftForm = () => {
       shiftDate: new Date().toISOString().slice(0, 16),
       startingCash: 0,
       grabSales: 0,
-      foodpandaSales: 0,
       aroiDeeSales: 0,
       qrScanSales: 0,
       cashSales: 0,
@@ -152,7 +150,7 @@ const DailyShiftForm = () => {
   const [packagingAdditional, setPackagingAdditional] = useState(0);
 
   // Watch values for auto-calculations
-  const sales = watch(['grabSales', 'foodpandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
   const expenses = watch(['gasExpense']);
   const wages = watch('wages');
   const shopping = watch('shopping');
@@ -329,10 +327,6 @@ const DailyShiftForm = () => {
               <Input type="number" {...form.register("grabSales")} />
             </div>
             <div>
-              <Label htmlFor="foodpandaSales">FoodPanda Sales (฿)</Label>
-              <Input type="number" {...form.register("foodpandaSales")} />
-            </div>
-            <div>
               <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
               <Input type="number" {...form.register("aroiDeeSales")} />
             </div>
@@ -498,12 +492,15 @@ const DailyShiftForm = () => {
               <div>Loading drinks...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {suppliersByCategory['Drinks']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`drinks.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Drinks']?.map((supplier: Supplier) => {
+                  const fieldName = `drinks.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -519,12 +516,15 @@ const DailyShiftForm = () => {
               <div>Loading items...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Fresh Food']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`freshFood.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Fresh Food']?.map((supplier: Supplier) => {
+                  const fieldName = `freshFood.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             
@@ -577,12 +577,15 @@ const DailyShiftForm = () => {
               <div>Loading items...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Frozen Food']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`frozenFood.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Frozen Food']?.map((supplier: Supplier) => {
+                  const fieldName = `frozenFood.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             
@@ -635,12 +638,15 @@ const DailyShiftForm = () => {
               <div>Loading items...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Shelf Items']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`shelfItems.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Shelf Items']?.map((supplier: Supplier) => {
+                  const fieldName = `shelfItems.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             
@@ -693,12 +699,15 @@ const DailyShiftForm = () => {
               <div>Loading items...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Kitchen Supplies']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`kitchenItems.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Kitchen Supplies']?.map((supplier: Supplier) => {
+                  const fieldName = `kitchenItems.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             
@@ -751,12 +760,15 @@ const DailyShiftForm = () => {
               <div>Loading items...</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Packaging']?.map((supplier) => (
-                  <div key={supplier.id}>
-                    <Label>{supplier.item}</Label>
-                    <Input type="number" {...form.register(`packagingItems.${supplier.item}`)} />
-                  </div>
-                ))}
+                {suppliersByCategory['Packaging']?.map((supplier: Supplier) => {
+                  const fieldName = `packagingItems.${supplier.item}` as const;
+                  return (
+                    <div key={supplier.id}>
+                      <Label>{supplier.item}</Label>
+                      <Input type="number" {...form.register(fieldName as any)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             
