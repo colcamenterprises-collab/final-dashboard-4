@@ -418,6 +418,173 @@ const DailyShiftFormSimple = () => {
           </CardContent>
         </Card>
 
+        {/* Expenses Section */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Wages & Staff Payments</h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.wages.map((wage, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+                <div>
+                  <Label htmlFor={`staffName-${index}`}>Staff Name</Label>
+                  <input 
+                    id={`staffName-${index}`}
+                    value={wage.staffName}
+                    onChange={(e) => updateWageEntry(index, 'staffName', e.target.value)}
+                    placeholder="Staff member name" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`wageAmount-${index}`}>Amount (฿)</Label>
+                  <input 
+                    id={`wageAmount-${index}`}
+                    type="number" 
+                    value={wage.amount}
+                    onChange={(e) => updateWageEntry(index, 'amount', parseFloat(e.target.value) || 0)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`wageType-${index}`}>Type</Label>
+                  <Select value={wage.type} onValueChange={(value) => updateWageEntry(index, 'type', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wages">Regular Wages</SelectItem>
+                      <SelectItem value="overtime">Overtime</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => removeWageEntry(index)}
+                    className="h-10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={addWageEntry}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Wage Entry
+            </Button>
+            <div className="pt-2 border-t">
+              <div className="flex justify-between font-semibold">
+                <span>Total Wages:</span>
+                <span>฿{totalWages.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Shopping & Expenses</h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.shopping.map((item, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+                <div>
+                  <Label htmlFor={`shoppingItem-${index}`}>Item</Label>
+                  <input 
+                    id={`shoppingItem-${index}`}
+                    value={item.item}
+                    onChange={(e) => updateShoppingEntry(index, 'item', e.target.value)}
+                    placeholder="Item purchased" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`shoppingAmount-${index}`}>Amount (฿)</Label>
+                  <input 
+                    id={`shoppingAmount-${index}`}
+                    type="number" 
+                    value={item.amount}
+                    onChange={(e) => updateShoppingEntry(index, 'amount', parseFloat(e.target.value) || 0)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`shopName-${index}`}>Shop Name</Label>
+                  <input 
+                    id={`shopName-${index}`}
+                    value={item.shopName}
+                    onChange={(e) => updateShoppingEntry(index, 'shopName', e.target.value)}
+                    placeholder="Where purchased" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => removeShoppingEntry(index)}
+                    className="h-10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={addShoppingEntry}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Shopping Item
+            </Button>
+            <div className="pt-2 border-t">
+              <div className="flex justify-between font-semibold">
+                <span>Total Shopping:</span>
+                <span>฿{totalShopping.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Total Expenses Summary */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Expense Summary</h2>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between">
+              <span>Total Wages:</span>
+              <span>฿{totalWages.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Shopping:</span>
+              <span>฿{totalShopping.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Gas Expense:</span>
+              <span>฿{formData.gasExpense.toFixed(2)}</span>
+            </div>
+            <div className="border-t pt-2">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total Expenses:</span>
+                <span>฿{totalExpenses.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Drink Stock */}
         <Card>
           <CardHeader>
@@ -709,173 +876,6 @@ const DailyShiftFormSimple = () => {
                 onChange={(e) => updateField('bankedAmount', parseFloat(e.target.value) || 0)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
               />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Expenses Section */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Wages & Staff Payments</h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {formData.wages.map((wage, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
-                <div>
-                  <Label htmlFor={`staffName-${index}`}>Staff Name</Label>
-                  <input 
-                    id={`staffName-${index}`}
-                    value={wage.staffName}
-                    onChange={(e) => updateWageEntry(index, 'staffName', e.target.value)}
-                    placeholder="Staff member name" 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`wageAmount-${index}`}>Amount (฿)</Label>
-                  <input 
-                    id={`wageAmount-${index}`}
-                    type="number" 
-                    value={wage.amount}
-                    onChange={(e) => updateWageEntry(index, 'amount', parseFloat(e.target.value) || 0)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`wageType-${index}`}>Type</Label>
-                  <Select value={wage.type} onValueChange={(value) => updateWageEntry(index, 'type', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="wages">Regular Wages</SelectItem>
-                      <SelectItem value="overtime">Overtime</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => removeWageEntry(index)}
-                    className="h-10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={addWageEntry}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Wage Entry
-            </Button>
-            <div className="pt-2 border-t">
-              <div className="flex justify-between font-semibold">
-                <span>Total Wages:</span>
-                <span>฿{totalWages.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Shopping & Expenses</h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {formData.shopping.map((item, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
-                <div>
-                  <Label htmlFor={`shoppingItem-${index}`}>Item</Label>
-                  <input 
-                    id={`shoppingItem-${index}`}
-                    value={item.item}
-                    onChange={(e) => updateShoppingEntry(index, 'item', e.target.value)}
-                    placeholder="Item purchased" 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`shoppingAmount-${index}`}>Amount (฿)</Label>
-                  <input 
-                    id={`shoppingAmount-${index}`}
-                    type="number" 
-                    value={item.amount}
-                    onChange={(e) => updateShoppingEntry(index, 'amount', parseFloat(e.target.value) || 0)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`shopName-${index}`}>Shop Name</Label>
-                  <input 
-                    id={`shopName-${index}`}
-                    value={item.shopName}
-                    onChange={(e) => updateShoppingEntry(index, 'shopName', e.target.value)}
-                    placeholder="Where purchased" 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => removeShoppingEntry(index)}
-                    className="h-10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={addShoppingEntry}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Shopping Item
-            </Button>
-            <div className="pt-2 border-t">
-              <div className="flex justify-between font-semibold">
-                <span>Total Shopping:</span>
-                <span>฿{totalShopping.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Total Expenses Summary */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Expense Summary</h2>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between">
-              <span>Total Wages:</span>
-              <span>฿{totalWages.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Shopping:</span>
-              <span>฿{totalShopping.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Gas Expense:</span>
-              <span>฿{formData.gasExpense.toFixed(2)}</span>
-            </div>
-            <div className="border-t pt-2">
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total Expenses:</span>
-                <span>฿{totalExpenses.toFixed(2)}</span>
-              </div>
             </div>
           </CardContent>
         </Card>
