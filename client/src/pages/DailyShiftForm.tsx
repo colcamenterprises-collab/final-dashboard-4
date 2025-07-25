@@ -144,7 +144,7 @@ const DailyShiftForm = () => {
     }
   });
 
-  const { watch, setValue } = form;
+  const { watch, setValue, register } = form;
   const [freshAdditional, setFreshAdditional] = useState(0);
   const [frozenAdditional, setFrozenAdditional] = useState(0);
   const [shelfAdditional, setShelfAdditional] = useState(0);
@@ -845,16 +845,13 @@ const DailyShiftForm = () => {
                             <td className="px-4 py-2 border-r text-sm text-gray-700">{item.portionSize}</td>
                             <td className="px-4 py-2 border-r text-sm text-gray-700">{item.minStock}</td>
                             <td className="px-4 py-2">
-                              <Input
+                              <input
                                 type="number"
                                 placeholder="0"
-                                className="w-20 h-8 text-sm"
+                                className="w-20 h-8 text-sm border border-gray-300 rounded px-2"
                                 min="0"
                                 step="0.01"
-                                onChange={(e) => {
-                                  const value = e.target.value === '' ? 0 : Number(e.target.value);
-                                  setValue(`purchasedAmounts.${item.id}` as any, value);
-                                }}
+                                {...register(`purchasedAmounts.${item.id}` as any)}
                               />
                             </td>
                           </tr>

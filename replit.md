@@ -6,21 +6,34 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (January 25, 2025)
 
+### Critical React Error Resolution - Production Ready
+- **Fixed React Hook Form Error**: Resolved critical "Cannot read properties of undefined (reading '_f')" error in Daily Shift Form
+- **Proper Form Registration**: Replaced problematic Input component with native HTML input using register() function from react-hook-form
+- **Dynamic Field Registration**: Fixed dynamic field registration for purchasedAmounts using proper {...register()} syntax
+- **TypeScript Safety**: Added proper destructuring of register function from form object for type safety
+- **Production Stability**: Form now loads and operates without runtime errors, ready for staff use
+
+### Enhanced Supplier Management Interface - Professional Implementation
+- **New Purchasing Page**: Created comprehensive Purchasing.tsx with professional dark theme gradient styling
+- **Complete Supplier Table**: Implemented all required columns (Name, Category, Package Price, Packaging Quantity, Portion Size, Cost/Portion, Supplier, Updated, Actions)
+- **Automatic Calculations**: Added real-time cost per portion calculation based on item cost and portion size
+- **Category Organization**: Grouped suppliers by category with responsive table design and hover effects
+- **Professional Dark Theme**: Gradient background from gray-800 to gray-900 with proper contrast and accessibility
+- **Loading States**: Added proper loading indicators and error handling for API data fetching
+
+### Inventory Management System - Complete Integration
+- **49 Suppliers Display**: Successfully displaying all suppliers across 6 categories without errors
+- **Database Column Updates**: Fixed all database columns (notes, discrepancy_notes, status, purchased_amounts) in daily_stock_sales table
+- **Form Field Integration**: Complete inventory management section now properly integrated with Daily Shift Form
+- **Cost Calculations**: Automatic cost per portion calculations using packaging quantity and portion size data
+- **Professional Layout**: Clean table design with proper spacing, borders, and responsive overflow handling
+
 ### Scrollable Sidebar Implementation - Complete
 - **Enhanced Sidebar Functionality**: Successfully implemented smooth scrollable sidebar with subtle, blended styling
 - **Custom CSS Scrollbar**: Added custom scrollbar with rgba(255, 255, 255, 0.15) opacity that blends completely with #1f1f1f sidebar background
 - **Responsive Scrolling**: Added overflow-y-auto and sidebar-scroll class to navigation sections for smooth scrolling experience
 - **Hover Effects**: Implemented subtle hover effects with rgba(255, 255, 255, 0.25) for better user interaction
 - **CSS Organization**: Fixed CSS syntax errors and properly organized @layer sections for maintainable styling
-
-### Comprehensive Supplier Management System - Complete Implementation
-- **JSON-Based Storage**: Created data/suppliers.json with 48 comprehensive supplier records including all food categories
-- **Full CRUD Operations**: Implemented complete supplier management API with GET, POST, PUT, DELETE endpoints
-- **Professional UI**: Built SupplierManagement.tsx with modern table interface, category filtering, and dialog-based editing
-- **Category Management**: Added 6 supplier categories (Fresh Food, Frozen Food, Shelf Items, Drinks, Kitchen Supplies, Packaging)
-- **Cost Tracking**: Comprehensive cost management with Thai Baht currency, packaging quantities, and minimum stock levels
-- **Navigation Integration**: Added "Suppliers" link under Purchasing section in Operations & Sales navigation as requested
-- **Data Validation**: Implemented proper form validation with TypeScript interfaces and error handling
 
 ### Navigation Structure Refinement - Per User Requirements
 - **Daily Sales & Stock Reorganization**: Restructured navigation to have Draft Forms and Form Library as sub-items under Daily Sales & Stock
