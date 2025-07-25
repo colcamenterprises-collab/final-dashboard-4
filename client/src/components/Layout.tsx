@@ -44,8 +44,7 @@ const navigationStructure = [
         expandable: true,
         items: [
           { path: "/daily-shift-form", label: "Submit Form", icon: ClipboardList },
-          { path: "/draft-forms", label: "Draft Forms", icon: FileText },
-          { path: "/form-library", label: "Form Library", icon: FileSpreadsheet },
+          { path: "/draft-forms", label: "Drafts & Library", icon: FileText },
         ]
       },
       {
