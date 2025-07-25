@@ -8,7 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import DailyStockSales from "@/pages/DailyStockSales";
 import DailyStockSalesQuick from "@/pages/DailyStockSalesQuick";
 import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
-import DailyShiftForm from "@/pages/DailyShiftForm";
+import DailyShiftFormSimple from "@/pages/DailyShiftFormSimple";
 import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
 import PastForms from "@/pages/PastForms";
 import DraftFormsLibrary from "@/pages/DraftFormsLibrary";
@@ -37,8 +37,8 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/daily-stock-sales" component={DailyShiftForm} />
-        <Route path="/daily-shift-form" component={DailyShiftForm} />
+        <Route path="/daily-stock-sales" component={DailyShiftFormSimple} />
+        <Route path="/daily-shift-form" component={DailyShiftFormSimple} />
         <Route path="/daily-stock-sales-quick" component={DailyStockSalesQuick} />
         <Route path="/daily-stock-sales-complex" component={DailyStockSales} />
         <Route path="/daily-stock-sales/search" component={DailyStockSalesSearch} />

@@ -110,9 +110,10 @@ const DailyShiftForm = () => {
 
   const form = useForm({
     resolver: zodResolver(formSchema),
+    mode: "onChange",
     defaultValues: {
       completedBy: '',
-      shiftType: 'closing',
+      shiftType: 'closing' as 'opening' | 'closing',
       shiftDate: new Date().toISOString().slice(0, 16),
       startingCash: 0,
       grabSales: 0,
@@ -120,7 +121,7 @@ const DailyShiftForm = () => {
       qrScanSales: 0,
       cashSales: 0,
       totalSales: 0,
-      wages: [{ staffName: '', amount: 0, type: 'wages' }],
+      wages: [{ staffName: '', amount: 0, type: 'wages' as 'wages' | 'overtime' | 'other' }],
       shopping: [{ item: '', amount: 0, shopName: '' }],
       gasExpense: 0,
       totalExpenses: 0,
@@ -129,22 +130,22 @@ const DailyShiftForm = () => {
       burgerBunsStock: 0,
       meatWeight: 0,
       drinkStockCount: 0,
-      drinks: {},
-      freshFood: {},
+      drinks: {} as Record<string, number>,
+      freshFood: {} as Record<string, number>,
       freshFoodAdditional: [],
-      frozenFood: {},
+      frozenFood: {} as Record<string, number>,
       frozenFoodAdditional: [],
-      shelfItems: {},
+      shelfItems: {} as Record<string, number>,
       shelfItemsAdditional: [],
-      kitchenItems: {},
+      kitchenItems: {} as Record<string, number>,
       kitchenItemsAdditional: [],
-      packagingItems: {},
+      packagingItems: {} as Record<string, number>,
       packagingItemsAdditional: [],
-      purchasedAmounts: {}
+      purchasedAmounts: {} as Record<string, number>
     }
   });
 
-  const { watch, setValue, register } = form;
+  const { watch, setValue, register, formState: { errors } } = form;
   const [freshAdditional, setFreshAdditional] = useState(0);
   const [frozenAdditional, setFrozenAdditional] = useState(0);
   const [shelfAdditional, setShelfAdditional] = useState(0);
@@ -265,6 +266,17 @@ const DailyShiftForm = () => {
     );
   }
 
+  // Safety check to ensure form is properly initialized
+  if (!form || !form.register) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p>Loading form...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-start">
@@ -293,7 +305,12 @@ const DailyShiftForm = () => {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="completedBy">Completed By*</Label>
-              <input {...form.register("completedBy")} placeholder="Staff name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
+              <input 
+                {...form.register("completedBy")} 
+                placeholder="Staff name" 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+              />
+              {errors.completedBy && <p className="text-red-500 text-sm mt-1">{errors.completedBy.message}</p>}
             </div>
             <div>
               <Label htmlFor="shiftType">Shift Type</Label>
@@ -309,7 +326,12 @@ const DailyShiftForm = () => {
             </div>
             <div>
               <Label htmlFor="shiftDate">Shift Date*</Label>
-              <input type="datetime-local" {...form.register("shiftDate")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
+              <input 
+                type="datetime-local" 
+                {...form.register("shiftDate")} 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+              />
+              {errors.shiftDate && <p className="text-red-500 text-sm mt-1">{errors.shiftDate.message}</p>}
             </div>
             <div>
               <Label htmlFor="startingCash">Starting Cash (฿)</Label>
