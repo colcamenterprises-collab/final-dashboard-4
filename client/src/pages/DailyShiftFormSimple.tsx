@@ -40,38 +40,60 @@ const DailyShiftFormSimple = () => {
     water: 0,
     kidsOrange: 0,
     kidsApple: 0,
-    // Fresh Food
-    lettuce: 0,
-    tomatoes: 0,
-    onions: 0,
+    // Fresh Food (from authentic supplier list)
+    topsideBeef: 0,
+    brisketPointEnd: 0,
+    chuckRollBeef: 0,
+    otherBeefMixed: 0,
+    saladIcebergLettuce: 0,
+    milk: 0,
+    burgerBun: 0,
+    tomatos: 0,
+    whiteCabbage: 0,
+    purpleCabbage: 0,
+    onionsBulk10kg: 0,
+    onionsSmallBags: 0,
     cheese: 0,
-    pickles: 0,
-    bacon: 0,
-    mushrooms: 0,
-    // Frozen Food
+    baconShort: 0,
+    baconLong: 0,
+    jalapenos: 0,
+    // Frozen Food (from authentic supplier list)
+    frenchFries7mm: 0,
     chickenNuggets: 0,
     chickenFillets: 0,
-    frenchFries: 0,
-    onionRings: 0,
-    // Shelf Items
-    ketchup: 0,
+    sweetPotatoFries: 0,
+    // Shelf Items (from authentic supplier list)
+    cajunFriesSeasoning: 0,
+    crispyFriedOnions: 0,
+    picklesStandardDill: 0,
+    picklesSweet: 0,
     mustard: 0,
-    mayo: 0,
+    mayonnaise: 0,
+    tomatoSauce: 0,
+    chiliSauceSriracha: 0,
     bbqSauce: 0,
-    hotsauce: 0,
-    salt: 0,
-    pepper: 0,
-    oil: 0,
-    // Kitchen Items
-    napkins: 0,
-    straws: 0,
-    cups: 0,
-    lids: 0,
-    // Packaging Items
-    burgerBoxes: 0,
-    friesBoxes: 0,
-    nuggetBoxes: 0,
-    bags: 0,
+    srirachaSauce: 0,
+    saltCoarseSeaSalt: 0,
+    // Kitchen Supplies (from authentic supplier list)
+    oilFryer: 0,
+    plasticFoodWrap: 0,
+    paperTowelLong: 0,
+    paperTowelShort: 0,
+    foodGlovesLarge: 0,
+    foodGlovesMedium: 0,
+    foodGlovesSmall: 0,
+    aluminumFoil: 0,
+    plasticMeatGloves: 0,
+    kitchenCleaner: 0,
+    alcoholSanitiser: 0,
+    // Packaging (from authentic supplier list)
+    frenchFriesBox: 0,
+    plasticCarryBags6x14: 0,
+    plasticCarryBags9x18: 0,
+    brownPaperFoodBags: 0,
+    loadedFriesBoxes: 0,
+    packagingLabels: 0,
+    knifeForkSpoonSet: 0,
     // Wages and Shopping entries
     wages: [{ staffName: '', amount: 0, type: 'wages' }],
     shopping: [{ item: '', amount: 0, shopName: '' }]
@@ -181,11 +203,12 @@ const DailyShiftFormSimple = () => {
           // Reset all inventory items
           coke: 0, cokeZero: 0, sprite: 0, schweppesManow: 0, fantaOrange: 0, fantaStrawberry: 0,
           sodaWater: 0, water: 0, kidsOrange: 0, kidsApple: 0,
-          lettuce: 0, tomatoes: 0, onions: 0, cheese: 0, pickles: 0, bacon: 0, mushrooms: 0,
-          chickenNuggets: 0, chickenFillets: 0, frenchFries: 0, onionRings: 0,
-          ketchup: 0, mustard: 0, mayo: 0, bbqSauce: 0, hotsauce: 0, salt: 0, pepper: 0, oil: 0,
-          napkins: 0, straws: 0, cups: 0, lids: 0,
-          burgerBoxes: 0, friesBoxes: 0, nuggetBoxes: 0, bags: 0,
+          // Reset authentic inventory items
+          topsideBeef: 0, brisketPointEnd: 0, chuckRollBeef: 0, otherBeefMixed: 0, saladIcebergLettuce: 0, milk: 0, burgerBun: 0, tomatos: 0, whiteCabbage: 0, purpleCabbage: 0, onionsBulk10kg: 0, onionsSmallBags: 0, cheese: 0, baconShort: 0, baconLong: 0, jalapenos: 0,
+          frenchFries7mm: 0, chickenNuggets: 0, chickenFillets: 0, sweetPotatoFries: 0,
+          cajunFriesSeasoning: 0, crispyFriedOnions: 0, picklesStandardDill: 0, picklesSweet: 0, mustard: 0, mayonnaise: 0, tomatoSauce: 0, chiliSauceSriracha: 0, bbqSauce: 0, srirachaSauce: 0, saltCoarseSeaSalt: 0,
+          oilFryer: 0, plasticFoodWrap: 0, paperTowelLong: 0, paperTowelShort: 0, foodGlovesLarge: 0, foodGlovesMedium: 0, foodGlovesSmall: 0, aluminumFoil: 0, plasticMeatGloves: 0, kitchenCleaner: 0, alcoholSanitiser: 0,
+          frenchFriesBox: 0, plasticCarryBags6x14: 0, plasticCarryBags9x18: 0, brownPaperFoodBags: 0, loadedFriesBoxes: 0, packagingLabels: 0, knifeForkSpoonSet: 0,
           wages: [{ staffName: '', amount: 0, type: 'wages' }],
           shopping: [{ item: '', amount: 0, shopName: '' }]
         });
@@ -451,32 +474,48 @@ const DailyShiftFormSimple = () => {
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="lettuce">Lettuce</Label>
-              <input id="lettuce" type="number" value={formData.lettuce} onChange={(e) => updateField('lettuce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="topsideBeef">Topside Beef (kg)</Label>
+              <input id="topsideBeef" type="number" step="0.1" value={formData.topsideBeef} onChange={(e) => updateField('topsideBeef', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="tomatoes">Tomatoes</Label>
-              <input id="tomatoes" type="number" value={formData.tomatoes} onChange={(e) => updateField('tomatoes', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="brisketPointEnd">Brisket Point End (kg)</Label>
+              <input id="brisketPointEnd" type="number" step="0.1" value={formData.brisketPointEnd} onChange={(e) => updateField('brisketPointEnd', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="onions">Onions</Label>
-              <input id="onions" type="number" value={formData.onions} onChange={(e) => updateField('onions', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="chuckRollBeef">Chuck Roll Beef (kg)</Label>
+              <input id="chuckRollBeef" type="number" step="0.1" value={formData.chuckRollBeef} onChange={(e) => updateField('chuckRollBeef', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="cheese">Cheese</Label>
+              <Label htmlFor="saladIcebergLettuce">Salad (Iceberg Lettuce) (kg)</Label>
+              <input id="saladIcebergLettuce" type="number" step="0.1" value={formData.saladIcebergLettuce} onChange={(e) => updateField('saladIcebergLettuce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="burgerBun">Burger Bun (count)</Label>
+              <input id="burgerBun" type="number" value={formData.burgerBun} onChange={(e) => updateField('burgerBun', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="tomatos">Tomatos (kg)</Label>
+              <input id="tomatos" type="number" step="0.1" value={formData.tomatos} onChange={(e) => updateField('tomatos', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="onionsBulk10kg">Onions Bulk 10kg</Label>
+              <input id="onionsBulk10kg" type="number" value={formData.onionsBulk10kg} onChange={(e) => updateField('onionsBulk10kg', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="cheese">Cheese (slices)</Label>
               <input id="cheese" type="number" value={formData.cheese} onChange={(e) => updateField('cheese', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="pickles">Pickles</Label>
-              <input id="pickles" type="number" value={formData.pickles} onChange={(e) => updateField('pickles', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="baconShort">Bacon Short (kg)</Label>
+              <input id="baconShort" type="number" step="0.1" value={formData.baconShort} onChange={(e) => updateField('baconShort', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="bacon">Bacon</Label>
-              <input id="bacon" type="number" value={formData.bacon} onChange={(e) => updateField('bacon', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="baconLong">Bacon Long (kg)</Label>
+              <input id="baconLong" type="number" step="0.1" value={formData.baconLong} onChange={(e) => updateField('baconLong', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="mushrooms">Mushrooms</Label>
-              <input id="mushrooms" type="number" value={formData.mushrooms} onChange={(e) => updateField('mushrooms', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="jalapenos">Jalapenos (kg)</Label>
+              <input id="jalapenos" type="number" step="0.1" value={formData.jalapenos} onChange={(e) => updateField('jalapenos', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </CardContent>
         </Card>
@@ -488,20 +527,20 @@ const DailyShiftFormSimple = () => {
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="chickenNuggets">Chicken Nuggets</Label>
-              <input id="chickenNuggets" type="number" value={formData.chickenNuggets} onChange={(e) => updateField('chickenNuggets', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="frenchFries7mm">French Fries 7mm (kg)</Label>
+              <input id="frenchFries7mm" type="number" step="0.1" value={formData.frenchFries7mm} onChange={(e) => updateField('frenchFries7mm', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="chickenFillets">Chicken Fillets</Label>
-              <input id="chickenFillets" type="number" value={formData.chickenFillets} onChange={(e) => updateField('chickenFillets', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="chickenNuggets">Chicken Nuggets (kg)</Label>
+              <input id="chickenNuggets" type="number" step="0.1" value={formData.chickenNuggets} onChange={(e) => updateField('chickenNuggets', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="frenchFries">French Fries</Label>
-              <input id="frenchFries" type="number" value={formData.frenchFries} onChange={(e) => updateField('frenchFries', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="chickenFillets">Chicken Fillets (kg)</Label>
+              <input id="chickenFillets" type="number" step="0.1" value={formData.chickenFillets} onChange={(e) => updateField('chickenFillets', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="onionRings">Onion Rings</Label>
-              <input id="onionRings" type="number" value={formData.onionRings} onChange={(e) => updateField('onionRings', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="sweetPotatoFries">Sweet Potato Fries (kg)</Label>
+              <input id="sweetPotatoFries" type="number" step="0.1" value={formData.sweetPotatoFries} onChange={(e) => updateField('sweetPotatoFries', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </CardContent>
         </Card>
@@ -513,86 +552,134 @@ const DailyShiftFormSimple = () => {
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="ketchup">Ketchup</Label>
-              <input id="ketchup" type="number" value={formData.ketchup} onChange={(e) => updateField('ketchup', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="cajunFriesSeasoning">Cajun Fries Seasoning (g)</Label>
+              <input id="cajunFriesSeasoning" type="number" value={formData.cajunFriesSeasoning} onChange={(e) => updateField('cajunFriesSeasoning', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="mustard">Mustard</Label>
-              <input id="mustard" type="number" value={formData.mustard} onChange={(e) => updateField('mustard', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="crispyFriedOnions">Crispy Fried Onions (g)</Label>
+              <input id="crispyFriedOnions" type="number" value={formData.crispyFriedOnions} onChange={(e) => updateField('crispyFriedOnions', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="mayo">Mayo</Label>
-              <input id="mayo" type="number" value={formData.mayo} onChange={(e) => updateField('mayo', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="picklesStandardDill">Pickles (Standard Dill) (g)</Label>
+              <input id="picklesStandardDill" type="number" value={formData.picklesStandardDill} onChange={(e) => updateField('picklesStandardDill', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="bbqSauce">BBQ Sauce</Label>
+              <Label htmlFor="picklesSweet">Pickles Sweet (g)</Label>
+              <input id="picklesSweet" type="number" value={formData.picklesSweet} onChange={(e) => updateField('picklesSweet', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="mustard">Mustard (kg)</Label>
+              <input id="mustard" type="number" step="0.1" value={formData.mustard} onChange={(e) => updateField('mustard', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="mayonnaise">Mayonnaise (litre)</Label>
+              <input id="mayonnaise" type="number" step="0.1" value={formData.mayonnaise} onChange={(e) => updateField('mayonnaise', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="tomatoSauce">Tomato Sauce (litre)</Label>
+              <input id="tomatoSauce" type="number" step="0.1" value={formData.tomatoSauce} onChange={(e) => updateField('tomatoSauce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="bbqSauce">BBQ Sauce (g)</Label>
               <input id="bbqSauce" type="number" value={formData.bbqSauce} onChange={(e) => updateField('bbqSauce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="hotsauce">Hot Sauce</Label>
-              <input id="hotsauce" type="number" value={formData.hotsauce} onChange={(e) => updateField('hotsauce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="srirachaSauce">Sriracha Sauce (g)</Label>
+              <input id="srirachaSauce" type="number" value={formData.srirachaSauce} onChange={(e) => updateField('srirachaSauce', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="salt">Salt</Label>
-              <input id="salt" type="number" value={formData.salt} onChange={(e) => updateField('salt', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <Label htmlFor="pepper">Pepper</Label>
-              <input id="pepper" type="number" value={formData.pepper} onChange={(e) => updateField('pepper', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <Label htmlFor="oil">Oil</Label>
-              <input id="oil" type="number" value={formData.oil} onChange={(e) => updateField('oil', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="saltCoarseSeaSalt">Salt (Coarse Sea Salt) (kg)</Label>
+              <input id="saltCoarseSeaSalt" type="number" step="0.1" value={formData.saltCoarseSeaSalt} onChange={(e) => updateField('saltCoarseSeaSalt', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Kitchen Items */}
+        {/* Kitchen Supplies */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Kitchen Items</h2>
+            <h2 className="text-xl font-semibold">Kitchen Supplies</h2>
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="napkins">Napkins</Label>
-              <input id="napkins" type="number" value={formData.napkins} onChange={(e) => updateField('napkins', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="oilFryer">Oil (Fryer) (litre)</Label>
+              <input id="oilFryer" type="number" step="0.1" value={formData.oilFryer} onChange={(e) => updateField('oilFryer', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="straws">Straws</Label>
-              <input id="straws" type="number" value={formData.straws} onChange={(e) => updateField('straws', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="plasticFoodWrap">Plastic Food Wrap</Label>
+              <input id="plasticFoodWrap" type="number" value={formData.plasticFoodWrap} onChange={(e) => updateField('plasticFoodWrap', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="cups">Cups</Label>
-              <input id="cups" type="number" value={formData.cups} onChange={(e) => updateField('cups', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="paperTowelLong">Paper Towel Long</Label>
+              <input id="paperTowelLong" type="number" value={formData.paperTowelLong} onChange={(e) => updateField('paperTowelLong', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="lids">Lids</Label>
-              <input id="lids" type="number" value={formData.lids} onChange={(e) => updateField('lids', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="paperTowelShort">Paper Towel Short (Serviettes)</Label>
+              <input id="paperTowelShort" type="number" value={formData.paperTowelShort} onChange={(e) => updateField('paperTowelShort', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="foodGlovesLarge">Food Gloves (Large)</Label>
+              <input id="foodGlovesLarge" type="number" value={formData.foodGlovesLarge} onChange={(e) => updateField('foodGlovesLarge', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="foodGlovesMedium">Food Gloves (Medium)</Label>
+              <input id="foodGlovesMedium" type="number" value={formData.foodGlovesMedium} onChange={(e) => updateField('foodGlovesMedium', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="foodGlovesSmall">Food Gloves (Small)</Label>
+              <input id="foodGlovesSmall" type="number" value={formData.foodGlovesSmall} onChange={(e) => updateField('foodGlovesSmall', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="aluminumFoil">Aluminum Foil</Label>
+              <input id="aluminumFoil" type="number" value={formData.aluminumFoil} onChange={(e) => updateField('aluminumFoil', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="plasticMeatGloves">Plastic Meat Gloves</Label>
+              <input id="plasticMeatGloves" type="number" value={formData.plasticMeatGloves} onChange={(e) => updateField('plasticMeatGloves', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="kitchenCleaner">Kitchen Cleaner (litre)</Label>
+              <input id="kitchenCleaner" type="number" step="0.1" value={formData.kitchenCleaner} onChange={(e) => updateField('kitchenCleaner', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="alcoholSanitiser">Alcohol Sanitiser (g)</Label>
+              <input id="alcoholSanitiser" type="number" value={formData.alcoholSanitiser} onChange={(e) => updateField('alcoholSanitiser', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Packaging Items */}
+        {/* Packaging */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Packaging Items</h2>
+            <h2 className="text-xl font-semibold">Packaging</h2>
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="burgerBoxes">Burger Boxes</Label>
-              <input id="burgerBoxes" type="number" value={formData.burgerBoxes} onChange={(e) => updateField('burgerBoxes', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="frenchFriesBox">French Fries Box</Label>
+              <input id="frenchFriesBox" type="number" value={formData.frenchFriesBox} onChange={(e) => updateField('frenchFriesBox', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="friesBoxes">Fries Boxes</Label>
-              <input id="friesBoxes" type="number" value={formData.friesBoxes} onChange={(e) => updateField('friesBoxes', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="plasticCarryBags6x14">Plastic Carry Bags (6×14)</Label>
+              <input id="plasticCarryBags6x14" type="number" value={formData.plasticCarryBags6x14} onChange={(e) => updateField('plasticCarryBags6x14', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="nuggetBoxes">Nugget Boxes</Label>
-              <input id="nuggetBoxes" type="number" value={formData.nuggetBoxes} onChange={(e) => updateField('nuggetBoxes', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="plasticCarryBags9x18">Plastic Carry Bags (9×18)</Label>
+              <input id="plasticCarryBags9x18" type="number" value={formData.plasticCarryBags9x18} onChange={(e) => updateField('plasticCarryBags9x18', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
             <div>
-              <Label htmlFor="bags">Bags</Label>
-              <input id="bags" type="number" value={formData.bags} onChange={(e) => updateField('bags', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="brownPaperFoodBags">Brown Paper Food Bags</Label>
+              <input id="brownPaperFoodBags" type="number" value={formData.brownPaperFoodBags} onChange={(e) => updateField('brownPaperFoodBags', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="loadedFriesBoxes">Loaded Fries Boxes</Label>
+              <input id="loadedFriesBoxes" type="number" value={formData.loadedFriesBoxes} onChange={(e) => updateField('loadedFriesBoxes', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="packagingLabels">Packaging Labels</Label>
+              <input id="packagingLabels" type="number" value={formData.packagingLabels} onChange={(e) => updateField('packagingLabels', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <Label htmlFor="knifeForkSpoonSet">Knife, Fork, Spoon Set</Label>
+              <input id="knifeForkSpoonSet" type="number" value={formData.knifeForkSpoonSet} onChange={(e) => updateField('knifeForkSpoonSet', parseFloat(e.target.value) || 0)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </CardContent>
         </Card>
