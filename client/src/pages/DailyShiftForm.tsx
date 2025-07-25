@@ -853,7 +853,7 @@ const DailyShiftForm = () => {
                                 step="0.01"
                                 onChange={(e) => {
                                   const value = e.target.value === '' ? 0 : Number(e.target.value);
-                                  setValue(`purchasedAmounts.${item.id}`, value);
+                                  setValue(`purchasedAmounts.${item.id}` as any, value);
                                 }}
                               />
                             </td>
