@@ -378,33 +378,12 @@ const DailyShiftFormSimple = () => {
           </CardContent>
         </Card>
 
-        {/* Stock Information */}
+        {/* Expenses Section */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Main Stock Items</h2>
+            <h2 className="text-xl font-semibold">Gas Expense</h2>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="burgerBunsStock">Burger Buns (count)</Label>
-              <input 
-                id="burgerBunsStock"
-                type="number" 
-                value={formData.burgerBunsStock}
-                onChange={(e) => updateField('burgerBunsStock', parseFloat(e.target.value) || 0)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
-              />
-            </div>
-            <div>
-              <Label htmlFor="meatWeight">Meat Weight (kg)</Label>
-              <input 
-                id="meatWeight"
-                type="number" 
-                step="0.1"
-                value={formData.meatWeight}
-                onChange={(e) => updateField('meatWeight', parseFloat(e.target.value) || 0)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
-              />
-            </div>
+          <CardContent>
             <div>
               <Label htmlFor="gasExpense">Gas Expense (฿)</Label>
               <input 
@@ -418,7 +397,7 @@ const DailyShiftFormSimple = () => {
           </CardContent>
         </Card>
 
-        {/* Expenses Section */}
+        {/* Wages & Staff Payments */}
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold">Wages & Staff Payments</h2>
@@ -558,7 +537,7 @@ const DailyShiftFormSimple = () => {
           </CardContent>
         </Card>
 
-        {/* Total Expenses Summary */}
+        {/* Expense Summary */}
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold">Expense Summary</h2>
@@ -585,10 +564,80 @@ const DailyShiftFormSimple = () => {
           </CardContent>
         </Card>
 
-        {/* Drink Stock */}
+        {/* Cash Management */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Drink Stock (10 Beverages)</h2>
+            <h2 className="text-xl font-semibold">Cash Management</h2>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="startingCash">Starting Cash (฿)</Label>
+              <input 
+                id="startingCash"
+                type="number" 
+                value={formData.startingCash}
+                onChange={(e) => updateField('startingCash', parseFloat(e.target.value) || 0)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+              />
+            </div>
+            <div>
+              <Label htmlFor="endingCash">Ending Cash (฿)</Label>
+              <input 
+                id="endingCash"
+                type="number" 
+                value={formData.endingCash}
+                onChange={(e) => updateField('endingCash', parseFloat(e.target.value) || 0)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+              />
+            </div>
+            <div>
+              <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
+              <input 
+                id="bankedAmount"
+                type="number" 
+                value={formData.bankedAmount}
+                onChange={(e) => updateField('bankedAmount', parseFloat(e.target.value) || 0)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Food & Stock Items */}
+        {/* Rolls, Meat */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Rolls, Meat</h2>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="burgerBunsStock">Burger Buns (count)</Label>
+              <input 
+                id="burgerBunsStock"
+                type="number" 
+                value={formData.burgerBunsStock}
+                onChange={(e) => updateField('burgerBunsStock', parseFloat(e.target.value) || 0)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+              />
+            </div>
+            <div>
+              <Label htmlFor="meatWeight">Meat Weight (kg)</Label>
+              <input 
+                id="meatWeight"
+                type="number" 
+                step="0.1"
+                value={formData.meatWeight}
+                onChange={(e) => updateField('meatWeight', parseFloat(e.target.value) || 0)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Drink Count */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Drink Count</h2>
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
