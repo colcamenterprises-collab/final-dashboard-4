@@ -40,8 +40,16 @@ const navigationStructure = [
       { path: "/daily-shift-form", label: "Daily Sales & Stock", icon: ClipboardList },
       { path: "/draft-forms", label: "Draft Forms", icon: FileText },
       { path: "/form-library", label: "Form Library", icon: FileSpreadsheet },
-      { path: "/purchasing", label: "Purchasing", icon: Package },
-      { path: "/purchasing", label: "Shopping Requirements", icon: ShoppingCart },
+      {
+        id: "purchasing",
+        label: "Purchasing",
+        icon: Package,
+        expandable: true,
+        items: [
+          { path: "/purchasing", label: "Shopping Requirements", icon: ShoppingCart },
+          { path: "/supplier-management", label: "Suppliers", icon: Package },
+        ]
+      },
       {
         id: "reporting",
         label: "Reporting",
@@ -85,7 +93,6 @@ const navigationStructure = [
     items: [
       { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
-      { path: "/supplier-management", label: "Suppliers", icon: Package },
     ]
   },
   {
@@ -121,6 +128,7 @@ export default function Layout({ children }: LayoutProps) {
     "menu-mgmt": false,
     reporting: false,
     analysis: false,
+    purchasing: false,
     settings: false
   });
   const [darkMode, setDarkMode] = useState(() => {
@@ -162,6 +170,7 @@ export default function Layout({ children }: LayoutProps) {
         "menu-mgmt": false,
         reporting: false,
         analysis: false,
+        purchasing: false,
         settings: false
       });
     }

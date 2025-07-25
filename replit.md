@@ -19,7 +19,7 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Professional UI**: Built SupplierManagement.tsx with modern table interface, category filtering, and dialog-based editing
 - **Category Management**: Added 6 supplier categories (Fresh Food, Frozen Food, Shelf Items, Drinks, Kitchen Supplies, Packaging)
 - **Cost Tracking**: Comprehensive cost management with Thai Baht currency, packaging quantities, and minimum stock levels
-- **Navigation Integration**: Added "Suppliers" link under Menu Management section in sidebar navigation
+- **Navigation Integration**: Added "Suppliers" link under Purchasing section in Operations & Sales navigation as requested
 - **Data Validation**: Implemented proper form validation with TypeScript interfaces and error handling
 
 ## Multi-Agent AI System - Production Ready (July 21, 2025)
