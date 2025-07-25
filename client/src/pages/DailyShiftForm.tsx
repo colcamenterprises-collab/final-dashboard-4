@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from 'react';
 import { Trash2, Plus, FolderOpen, FileText } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import DraftForms from "./DraftForms";
-import FormLibrary from "./FormLibrary";
+import { useQuery } from "@tanstack/react-query";
+import DraftFormsLibrary from "./DraftFormsLibrary";
 
 const formSchema = z.object({
   completedBy: z.string().min(1, "Required"),
@@ -39,112 +39,36 @@ const formSchema = z.object({
   burgerBunsStock: z.coerce.number().optional().default(0),
   meatWeight: z.coerce.number().optional().default(0),
   drinkStockCount: z.coerce.number().optional().default(0),
-  coke: z.coerce.number().optional().default(0),
-  cokeZero: z.coerce.number().optional().default(0),
-  sprite: z.coerce.number().optional().default(0),
-  schweppesManow: z.coerce.number().optional().default(0),
-  fantaOrange: z.coerce.number().optional().default(0),
-  fantaStrawberry: z.coerce.number().optional().default(0),
-  sodaWater: z.coerce.number().optional().default(0),
-  water: z.coerce.number().optional().default(0),
-  kidsOrange: z.coerce.number().optional().default(0),
-  kidsApple: z.coerce.number().optional().default(0),
-  freshFood: z.array(z.object({ 
-    name: z.string(), 
-    value: z.coerce.number().optional().default(0) 
-  })).optional().default([
-    { name: 'Salad (Iceberg Lettuce)', value: 0 }, 
-    { name: 'Tomatos', value: 0 }, 
-    { name: 'White Cabbage', value: 0 }, 
-    { name: 'Purple Cabbage', value: 0 }, 
-    { name: 'Bacon Short', value: 0 }, 
-    { name: 'Bacon Long', value: 0 }, 
-    { name: 'Milk', value: 0 }, 
-    { name: 'Butter', value: 0 }
-  ]),
+  drinks: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
+  freshFood: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
   freshFoodAdditional: z.array(z.object({ 
     item: z.string().min(1), 
     quantity: z.coerce.number().min(0).optional().default(0), 
     note: z.string().optional(), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
-  frozenFood: z.array(z.object({ 
-    name: z.string(), 
-    value: z.coerce.number().optional().default(0) 
-  })).optional().default([
-    { name: 'Chicken Nuggets', value: 0 }, 
-    { name: 'Sweet Potato Fries', value: 0 }
-  ]),
+  frozenFood: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
   frozenFoodAdditional: z.array(z.object({ 
     item: z.string().min(1), 
     quantity: z.coerce.number().min(0).optional().default(0), 
     note: z.string().optional(), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
-  shelfItems: z.array(z.object({ 
-    name: z.string(), 
-    value: z.coerce.number().optional().default(0) 
-  })).optional().default([
-    { name: 'Burger Sauce', value: 0 }, 
-    { name: 'Mayo', value: 0 }, 
-    { name: 'Ketchup', value: 0 }, 
-    { name: 'Mustard', value: 0 }, 
-    { name: 'BBQ Sauce', value: 0 }, 
-    { name: 'Sweet Chili', value: 0 }, 
-    { name: 'Sriracha', value: 0 }, 
-    { name: 'Salt', value: 0 }, 
-    { name: 'Pepper', value: 0 }, 
-    { name: 'Oil', value: 0 }, 
-    { name: 'Vinegar', value: 0 }, 
-    { name: 'Sugar', value: 0 }, 
-    { name: 'Flour', value: 0 }
-  ]),
+  shelfItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
   shelfItemsAdditional: z.array(z.object({ 
     item: z.string().min(1), 
     quantity: z.coerce.number().min(0).optional().default(0), 
     note: z.string().optional(), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
-  kitchenItems: z.array(z.object({ 
-    name: z.string(), 
-    value: z.coerce.number().optional().default(0) 
-  })).optional().default([
-    { name: 'Gloves', value: 0 }, 
-    { name: 'Aprons', value: 0 }, 
-    { name: 'Cleaning Supplies', value: 0 }, 
-    { name: 'Paper Towels', value: 0 }, 
-    { name: 'Toilet Paper', value: 0 }, 
-    { name: 'Hand Soap', value: 0 }, 
-    { name: 'Dish Soap', value: 0 }, 
-    { name: 'Sanitizer', value: 0 }, 
-    { name: 'Trash Bags', value: 0 }, 
-    { name: 'Food Wrap', value: 0 }, 
-    { name: 'Aluminum Foil', value: 0 }, 
-    { name: 'Parchment Paper', value: 0 }
-  ]),
+  kitchenItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
   kitchenItemsAdditional: z.array(z.object({ 
     item: z.string().min(1), 
     quantity: z.coerce.number().min(0).optional().default(0), 
     note: z.string().optional(), 
     addPermanently: z.boolean().optional().default(false) 
   })).optional().default([]),
-  packagingItems: z.array(z.object({ 
-    name: z.string(), 
-    value: z.coerce.number().optional().default(0) 
-  })).optional().default([
-    { name: 'Burger Boxes', value: 0 }, 
-    { name: 'Fries Containers', value: 0 }, 
-    { name: 'Drink Cups', value: 0 }, 
-    { name: 'Lids', value: 0 }, 
-    { name: 'Straws', value: 0 }, 
-    { name: 'Napkins', value: 0 }, 
-    { name: 'Wet Wipes', value: 0 }, 
-    { name: 'Takeaway Bags', value: 0 }, 
-    { name: 'Delivery Bags', value: 0 }, 
-    { name: 'Sauce Cups', value: 0 }, 
-    { name: 'Cutlery Sets', value: 0 }, 
-    { name: 'Receipt Paper', value: 0 }
-  ]),
+  packagingItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
   packagingItemsAdditional: z.array(z.object({ 
     item: z.string().min(1), 
     quantity: z.coerce.number().min(0).optional().default(0), 
@@ -153,9 +77,36 @@ const formSchema = z.object({
   })).optional().default([])
 });
 
+interface Supplier {
+  id: number;
+  item: string;
+  category: string;
+  supplier: string;
+  brand: string;
+  cost: number;
+  packagingQty: string;
+  unit: string;
+  portionSize: string;
+  minStock: string;
+}
+
 const DailyShiftForm = () => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<'form' | 'drafts' | 'library'>('form');
+  
+  // Fetch suppliers data
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery({
+    queryKey: ["/api/suppliers"],
+  });
+
+  // Organize suppliers by category
+  const suppliersByCategory = suppliers.reduce((acc: Record<string, Supplier[]>, supplier: Supplier) => {
+    const category = supplier.category;
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(supplier);
+    return acc;
+  }, {});
+
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -177,77 +128,16 @@ const DailyShiftForm = () => {
       burgerBunsStock: 0,
       meatWeight: 0,
       drinkStockCount: 0,
-      coke: 0,
-      cokeZero: 0,
-      sprite: 0,
-      schweppesManow: 0,
-      fantaOrange: 0,
-      fantaStrawberry: 0,
-      sodaWater: 0,
-      water: 0,
-      kidsOrange: 0,
-      kidsApple: 0,
-      freshFood: [
-        { name: 'Salad (Iceberg Lettuce)', value: 0 }, 
-        { name: 'Tomatos', value: 0 }, 
-        { name: 'White Cabbage', value: 0 }, 
-        { name: 'Purple Cabbage', value: 0 }, 
-        { name: 'Bacon Short', value: 0 }, 
-        { name: 'Bacon Long', value: 0 }, 
-        { name: 'Milk', value: 0 }, 
-        { name: 'Butter', value: 0 }
-      ],
+      drinks: {},
+      freshFood: {},
       freshFoodAdditional: [],
-      frozenFood: [
-        { name: 'Chicken Nuggets', value: 0 }, 
-        { name: 'Sweet Potato Fries', value: 0 }
-      ],
+      frozenFood: {},
       frozenFoodAdditional: [],
-      shelfItems: [
-        { name: 'Burger Sauce', value: 0 }, 
-        { name: 'Mayo', value: 0 }, 
-        { name: 'Ketchup', value: 0 }, 
-        { name: 'Mustard', value: 0 }, 
-        { name: 'BBQ Sauce', value: 0 }, 
-        { name: 'Sweet Chili', value: 0 }, 
-        { name: 'Sriracha', value: 0 }, 
-        { name: 'Salt', value: 0 }, 
-        { name: 'Pepper', value: 0 }, 
-        { name: 'Oil', value: 0 }, 
-        { name: 'Vinegar', value: 0 }, 
-        { name: 'Sugar', value: 0 }, 
-        { name: 'Flour', value: 0 }
-      ],
+      shelfItems: {},
       shelfItemsAdditional: [],
-      kitchenItems: [
-        { name: 'Gloves', value: 0 }, 
-        { name: 'Aprons', value: 0 }, 
-        { name: 'Cleaning Supplies', value: 0 }, 
-        { name: 'Paper Towels', value: 0 }, 
-        { name: 'Toilet Paper', value: 0 }, 
-        { name: 'Hand Soap', value: 0 }, 
-        { name: 'Dish Soap', value: 0 }, 
-        { name: 'Sanitizer', value: 0 }, 
-        { name: 'Trash Bags', value: 0 }, 
-        { name: 'Food Wrap', value: 0 }, 
-        { name: 'Aluminum Foil', value: 0 }, 
-        { name: 'Parchment Paper', value: 0 }
-      ],
+      kitchenItems: {},
       kitchenItemsAdditional: [],
-      packagingItems: [
-        { name: 'Burger Boxes', value: 0 }, 
-        { name: 'Fries Containers', value: 0 }, 
-        { name: 'Drink Cups', value: 0 }, 
-        { name: 'Lids', value: 0 }, 
-        { name: 'Straws', value: 0 }, 
-        { name: 'Napkins', value: 0 }, 
-        { name: 'Wet Wipes', value: 0 }, 
-        { name: 'Takeaway Bags', value: 0 }, 
-        { name: 'Delivery Bags', value: 0 }, 
-        { name: 'Sauce Cups', value: 0 }, 
-        { name: 'Cutlery Sets', value: 0 }, 
-        { name: 'Receipt Paper', value: 0 }
-      ],
+      packagingItems: {},
       packagingItemsAdditional: []
     }
   });
@@ -350,13 +240,13 @@ const DailyShiftForm = () => {
   };
 
   // Render different sections based on activeSection
-  if (activeSection === 'drafts') {
+  if (activeSection === 'drafts' || activeSection === 'library') {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Draft Forms</h1>
-            <p className="text-gray-600 mt-2">Manage your saved draft forms</p>
+            <h1 className="text-3xl font-bold text-gray-900">Drafts & Library</h1>
+            <p className="text-gray-600 mt-2">Manage draft forms and view completed forms</p>
           </div>
           <div className="flex gap-3">
             <Button 
@@ -366,48 +256,9 @@ const DailyShiftForm = () => {
             >
               Back to Form
             </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => setActiveSection('library')}
-              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Form Library
-            </Button>
           </div>
         </div>
-        <DraftForms />
-      </div>
-    );
-  }
-
-  if (activeSection === 'library') {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Form Library</h1>
-            <p className="text-gray-600 mt-2">View and manage completed forms</p>
-          </div>
-          <div className="flex gap-3">
-            <Button 
-              variant="ghost" 
-              onClick={() => setActiveSection('form')}
-              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-            >
-              Back to Form
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => setActiveSection('drafts')}
-              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-            >
-              <FolderOpen className="h-4 w-4 mr-2" />
-              Draft Forms
-            </Button>
-          </div>
-        </div>
-        <FormLibrary />
+        <DraftFormsLibrary />
       </div>
     );
   }
@@ -426,15 +277,7 @@ const DailyShiftForm = () => {
             className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
           >
             <FolderOpen className="h-4 w-4 mr-2" />
-            Drafts
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => setActiveSection('library')}
-            className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Form Library
+            Drafts & Library
           </Button>
         </div>
       </div>
@@ -644,47 +487,19 @@ const DailyShiftForm = () => {
           <CardHeader>
             <h2 className="text-xl font-semibold">Individual Drink Tracking</h2>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div>
-              <Label htmlFor="coke">Coke</Label>
-              <Input type="number" {...form.register("coke")} />
-            </div>
-            <div>
-              <Label htmlFor="cokeZero">Coke Zero</Label>
-              <Input type="number" {...form.register("cokeZero")} />
-            </div>
-            <div>
-              <Label htmlFor="sprite">Sprite</Label>
-              <Input type="number" {...form.register("sprite")} />
-            </div>
-            <div>
-              <Label htmlFor="schweppesManow">Schweppes Manow</Label>
-              <Input type="number" {...form.register("schweppesManow")} />
-            </div>
-            <div>
-              <Label htmlFor="fantaOrange">Fanta Orange</Label>
-              <Input type="number" {...form.register("fantaOrange")} />
-            </div>
-            <div>
-              <Label htmlFor="fantaStrawberry">Fanta Strawberry</Label>
-              <Input type="number" {...form.register("fantaStrawberry")} />
-            </div>
-            <div>
-              <Label htmlFor="sodaWater">Soda Water</Label>
-              <Input type="number" {...form.register("sodaWater")} />
-            </div>
-            <div>
-              <Label htmlFor="water">Water</Label>
-              <Input type="number" {...form.register("water")} />
-            </div>
-            <div>
-              <Label htmlFor="kidsOrange">Kids Orange</Label>
-              <Input type="number" {...form.register("kidsOrange")} />
-            </div>
-            <div>
-              <Label htmlFor="kidsApple">Kids Apple</Label>
-              <Input type="number" {...form.register("kidsApple")} />
-            </div>
+          <CardContent>
+            {suppliersLoading ? (
+              <div>Loading drinks...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {suppliersByCategory['Drinks']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`drinks.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -694,14 +509,18 @@ const DailyShiftForm = () => {
             <h2 className="text-xl font-semibold">Fresh Food Inventory</h2>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {form.watch('freshFood').map((item, index) => (
-                <div key={index}>
-                  <Label>{item.name}</Label>
-                  <Input type="number" {...form.register(`freshFood.${index}.value`)} />
-                </div>
-              ))}
-            </div>
+            {suppliersLoading ? (
+              <div>Loading items...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {suppliersByCategory['Fresh Food']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`freshFood.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {freshAdditional > 0 && Array.from({ length: freshAdditional }, (_, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -748,14 +567,18 @@ const DailyShiftForm = () => {
             <h2 className="text-xl font-semibold">Frozen Food Inventory</h2>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {form.watch('frozenFood').map((item, index) => (
-                <div key={index}>
-                  <Label>{item.name}</Label>
-                  <Input type="number" {...form.register(`frozenFood.${index}.value`)} />
-                </div>
-              ))}
-            </div>
+            {suppliersLoading ? (
+              <div>Loading items...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {suppliersByCategory['Frozen Food']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`frozenFood.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {frozenAdditional > 0 && Array.from({ length: frozenAdditional }, (_, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -802,14 +625,18 @@ const DailyShiftForm = () => {
             <h2 className="text-xl font-semibold">Shelf Items Inventory</h2>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {form.watch('shelfItems').map((item, index) => (
-                <div key={index}>
-                  <Label>{item.name}</Label>
-                  <Input type="number" {...form.register(`shelfItems.${index}.value`)} />
-                </div>
-              ))}
-            </div>
+            {suppliersLoading ? (
+              <div>Loading items...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {suppliersByCategory['Shelf Items']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`shelfItems.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {shelfAdditional > 0 && Array.from({ length: shelfAdditional }, (_, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -856,14 +683,18 @@ const DailyShiftForm = () => {
             <h2 className="text-xl font-semibold">Kitchen Items Inventory</h2>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {form.watch('kitchenItems').map((item, index) => (
-                <div key={index}>
-                  <Label>{item.name}</Label>
-                  <Input type="number" {...form.register(`kitchenItems.${index}.value`)} />
-                </div>
-              ))}
-            </div>
+            {suppliersLoading ? (
+              <div>Loading items...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {suppliersByCategory['Kitchen Supplies']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`kitchenItems.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {kitchenAdditional > 0 && Array.from({ length: kitchenAdditional }, (_, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -910,14 +741,18 @@ const DailyShiftForm = () => {
             <h2 className="text-xl font-semibold">Packaging Items Inventory</h2>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {form.watch('packagingItems').map((item, index) => (
-                <div key={index}>
-                  <Label>{item.name}</Label>
-                  <Input type="number" {...form.register(`packagingItems.${index}.value`)} />
-                </div>
-              ))}
-            </div>
+            {suppliersLoading ? (
+              <div>Loading items...</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {suppliersByCategory['Packaging']?.map((supplier) => (
+                  <div key={supplier.id}>
+                    <Label>{supplier.item}</Label>
+                    <Input type="number" {...form.register(`packagingItems.${supplier.item}`)} />
+                  </div>
+                ))}
+              </div>
+            )}
             
             {packagingAdditional > 0 && Array.from({ length: packagingAdditional }, (_, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
