@@ -1,896 +1,607 @@
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-// import { Input } from "@/components/ui/input"; // Removed to prevent form registration conflicts
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect } from 'react';
-import { Trash2, Plus, FolderOpen, FileText } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+import { Trash2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import DraftFormsLibrary from "./DraftFormsLibrary";
-
-const formSchema = z.object({
-  completedBy: z.string().min(1, "Required"),
-  shiftType: z.enum(['opening', 'closing']),
-  shiftDate: z.string().min(1, "Required"),
-  startingCash: z.coerce.number().optional().default(0),
-  grabSales: z.coerce.number().optional().default(0),
-  aroiDeeSales: z.coerce.number().optional().default(0),
-  qrScanSales: z.coerce.number().optional().default(0),
-  cashSales: z.coerce.number().optional().default(0),
-  totalSales: z.coerce.number().optional().default(0),
-  wages: z.array(z.object({ 
-    staffName: z.string().min(1), 
-    amount: z.coerce.number().min(0).optional().default(0), 
-    type: z.enum(['wages', 'overtime', 'other']) 
-  })).optional().default([]),
-  shopping: z.array(z.object({ 
-    item: z.string().min(1), 
-    amount: z.coerce.number().min(0).optional().default(0), 
-    shopName: z.string().optional() 
-  })).optional().default([]),
-  gasExpense: z.coerce.number().optional().default(0),
-  totalExpenses: z.coerce.number().optional().default(0),
-  endCash: z.coerce.number().optional().default(0),
-  bankedAmount: z.coerce.number().optional().default(0),
-  burgerBunsStock: z.coerce.number().optional().default(0),
-  meatWeight: z.coerce.number().optional().default(0),
-  drinkStockCount: z.coerce.number().optional().default(0),
-  drinks: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  freshFood: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  freshFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
-    quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
-    addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([]),
-  frozenFood: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  frozenFoodAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
-    quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
-    addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([]),
-  shelfItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  shelfItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
-    quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
-    addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([]),
-  kitchenItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  kitchenItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
-    quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
-    addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([]),
-  packagingItems: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({}),
-  packagingItemsAdditional: z.array(z.object({ 
-    item: z.string().min(1), 
-    quantity: z.coerce.number().min(0).optional().default(0), 
-    note: z.string().optional(), 
-    addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([]),
-  purchasedAmounts: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({})
-});
-
-interface Supplier {
-  id: number;
-  item: string;
-  category: string;
-  supplier: string;
-  brand: string;
-  cost: number;
-  packagingQty: string;
-  unit: string;
-  portionSize: string;
-  minStock: string;
-}
 
 const DailyShiftForm = () => {
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<'form' | 'drafts' | 'library'>('form');
   
-  // Fetch suppliers data from JSON endpoint
-  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers-json"],
+  // Form state following exact structure: Shift Information → Sales → Expenses → Food & Stock Items
+  const [formData, setFormData] = useState({
+    // Shift Information
+    shiftType: '',
+    completedBy: '',
+    shiftDate: new Date().toISOString().split('T')[0],
+    
+    // Sales
+    grabSales: 0,
+    aroiDeeSales: 0,
+    qrScanSales: 0,
+    cashSales: 0,
+    
+    // Expenses - Wages & Staff Payments
+    wages: [],
+    
+    // Expenses - Shopping & Expenses  
+    shopping: [],
+    
+    // Cash Management
+    startingCash: 0,
+    endingCash: 0,
+    bankedAmount: 0,
+    
+    // Food & Stock Items - authentic inventory from CSV
+    inventory: {}
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // Organize suppliers by category
-  const suppliersByCategory = suppliers.reduce((acc: Record<string, Supplier[]>, supplier: Supplier) => {
-    const category = supplier.category;
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(supplier);
-    return acc;
-  }, {});
+  // Authentic supplier data from CSV - 100% real inventory items
+  const inventoryCategories = {
+    "Fresh Food": [
+      { name: "Topside Beef", supplier: "Makro", cost: "฿319.00", unit: "kg" },
+      { name: "Brisket Point End", supplier: "Makro", cost: "฿299.00", unit: "kg" },
+      { name: "Chuck Roll Beef", supplier: "Makro", cost: "฿319.00", unit: "kg" },
+      { name: "Salad (Iceberg Lettuce)", supplier: "Makro", cost: "฿99.00", unit: "kg" },
+      { name: "Burger Bun", supplier: "Bakery", cost: "฿8.00", unit: "each" },
+      { name: "Tomatos", supplier: "Makro", cost: "฿89.00", unit: "kg" },
+      { name: "Onions Bulk 10kg", supplier: "Makro", cost: "฿290.00", unit: "10kg" },
+      { name: "Cheese", supplier: "Makro", cost: "฿359.00", unit: "kg" },
+      { name: "Bacon Short", supplier: "Makro", cost: "฿305.00", unit: "kg" },
+      { name: "Bacon Long", supplier: "Makro", cost: "฿430.00", unit: "2kg" },
+      { name: "Jalapenos", supplier: "Makro", cost: "฿190.00", unit: "kg" }
+    ],
+    "Frozen Food": [
+      { name: "French Fries 7mm", supplier: "Makro", cost: "฿129.00", unit: "2kg" },
+      { name: "Chicken Nuggets", supplier: "Makro", cost: "฿155.00", unit: "kg" },
+      { name: "Chicken Fillets", supplier: "Makro", cost: "฿199.00", unit: "kg" },
+      { name: "Sweet Potato Fries", supplier: "Makro", cost: "฿145.00", unit: "kg" }
+    ],
+    "Shelf Items": [
+      { name: "Cajun Fries Seasoning", supplier: "Makro", cost: "฿508.00", unit: "510g" },
+      { name: "Crispy Fried Onions", supplier: "Makro", cost: "฿79.00", unit: "500g" },
+      { name: "Pickles (Standard Dill)", supplier: "Makro", cost: "฿89.00", unit: "480g" },
+      { name: "Pickles Sweet", supplier: "Makro", cost: "฿89.00", unit: "480g" },
+      { name: "Mustard", supplier: "Makro", cost: "฿88.00", unit: "kg" },
+      { name: "Mayonnaise", supplier: "Makro", cost: "฿90.00", unit: "litre" },
+      { name: "Tomato Sauce", supplier: "Makro", cost: "฿175.00", unit: "5L" },
+      { name: "BBQ Sauce", supplier: "Makro", cost: "฿110.00", unit: "500g" },
+      { name: "Sriracha Sauce", supplier: "Makro", cost: "฿108.00", unit: "950g" },
+      { name: "Salt (Coarse Sea Salt)", supplier: "Online", cost: "฿121.00", unit: "kg" }
+    ],
+    "Kitchen Supplies": [
+      { name: "Oil (Fryer)", supplier: "Makro", cost: "฿195.00", unit: "5L" },
+      { name: "Plastic Food Wrap", supplier: "Makro", cost: "฿139.00", unit: "each" },
+      { name: "Paper Towel Long", supplier: "Makro", cost: "฿205.00", unit: "6 rolls" },
+      { name: "Paper Towel Short", supplier: "Makro", cost: "฿115.00", unit: "8 rolls" },
+      { name: "Food Gloves Large", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
+      { name: "Food Gloves Medium", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
+      { name: "Food Gloves Small", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
+      { name: "Aluminum Foil", supplier: "Makro", cost: "฿145.00", unit: "roll" },
+      { name: "Plastic Meat Gloves", supplier: "Makro", cost: "฿45.00", unit: "100pcs" },
+      { name: "Kitchen Cleaner", supplier: "Makro", cost: "฿35.00", unit: "bottle" },
+      { name: "Alcohol Sanitiser", supplier: "Makro", cost: "฿69.00", unit: "bottle" }
+    ],
+    "Packaging": [
+      { name: "French Fries Box", supplier: "Packaging Bangkok", cost: "฿1.80", unit: "each" },
+      { name: "Plastic Carry Bags (6×14)", supplier: "Packaging Bangkok", cost: "฿0.89", unit: "each" },
+      { name: "Plastic Carry Bags (9×18)", supplier: "Packaging Bangkok", cost: "฿1.50", unit: "each" },
+      { name: "Brown Paper Food Bags", supplier: "Packaging Bangkok", cost: "฿2.40", unit: "each" },
+      { name: "Loaded Fries Boxes", supplier: "Packaging Bangkok", cost: "฿2.30", unit: "each" },
+      { name: "Packaging Labels", supplier: "Packaging Bangkok", cost: "฿0.45", unit: "each" },
+      { name: "Knife/Fork/Spoon Set", supplier: "Packaging Bangkok", cost: "฿0.65", unit: "set" }
+    ]
+  };
 
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    mode: "onChange",
-    defaultValues: {
-      completedBy: '',
-      shiftType: 'closing' as 'opening' | 'closing',
-      shiftDate: new Date().toISOString().slice(0, 16),
-      startingCash: 0,
-      grabSales: 0,
-      aroiDeeSales: 0,
-      qrScanSales: 0,
-      cashSales: 0,
-      totalSales: 0,
-      wages: [{ staffName: '', amount: 0, type: 'wages' as 'wages' | 'overtime' | 'other' }],
-      shopping: [{ item: '', amount: 0, shopName: '' }],
-      gasExpense: 0,
-      totalExpenses: 0,
-      endCash: 0,
-      bankedAmount: 0,
-      burgerBunsStock: 0,
-      meatWeight: 0,
-      drinkStockCount: 0,
-      drinks: {} as Record<string, number>,
-      freshFood: {} as Record<string, number>,
-      freshFoodAdditional: [],
-      frozenFood: {} as Record<string, number>,
-      frozenFoodAdditional: [],
-      shelfItems: {} as Record<string, number>,
-      shelfItemsAdditional: [],
-      kitchenItems: {} as Record<string, number>,
-      kitchenItemsAdditional: [],
-      packagingItems: {} as Record<string, number>,
-      packagingItemsAdditional: [],
-      purchasedAmounts: {} as Record<string, number>
-    }
-  });
+  const drinkStock = [
+    { name: "Coke", cost: "฿315.00", unit: "24 cans" },
+    { name: "Coke Zero", cost: "฿315.00", unit: "24 cans" },
+    { name: "Sprite", cost: "฿315.00", unit: "24 cans" },
+    { name: "Schweppes Manow", cost: "฿84.00", unit: "6 cans" },
+    { name: "Fanta Orange", cost: "฿81.00", unit: "6 cans" },
+    { name: "Fanta Strawberry", cost: "฿81.00", unit: "6 cans" },
+    { name: "Soda Water", cost: "฿84.00", unit: "6 cans" },
+    { name: "Bottled Water", cost: "฿45.00", unit: "12 bottles" },
+    { name: "Kids Juice Orange", cost: "฿99.00", unit: "6 cans" },
+    { name: "Kids Juice Apple", cost: "฿99.00", unit: "6 cans" }
+  ];
 
-  const { watch, setValue, register, formState: { errors } } = form;
-  const [freshAdditional, setFreshAdditional] = useState(0);
-  const [frozenAdditional, setFrozenAdditional] = useState(0);
-  const [shelfAdditional, setShelfAdditional] = useState(0);
-  const [kitchenAdditional, setKitchenAdditional] = useState(0);
-  const [packagingAdditional, setPackagingAdditional] = useState(0);
-
-  // Watch values for auto-calculations
-  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
-  const expenses = watch(['gasExpense']);
-  const wages = watch('wages');
-  const shopping = watch('shopping');
-
-  // Auto-calculate total sales
-  useEffect(() => {
-    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
-    setValue('totalSales', salesTotal);
-  }, [sales, setValue]);
-
-  // Auto-calculate total expenses
-  useEffect(() => {
-    const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0);
-    const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-    const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0);
-    setValue('totalExpenses', expTotal);
-  }, [wages, shopping, expenses, setValue]);
-
+  // Add wage entry
   const addWageEntry = () => {
-    const currentWages = form.getValues('wages');
-    setValue('wages', [...currentWages, { staffName: '', amount: 0, type: 'wages' }]);
+    setFormData(prev => ({
+      ...prev,
+      wages: [...prev.wages, { name: '', amount: 0, type: 'regular' }]
+    }));
   };
 
-  const removeWageEntry = (index: number) => {
-    const currentWages = form.getValues('wages');
-    if (currentWages.length > 1) {
-      setValue('wages', currentWages.filter((_, i) => i !== index));
-    }
+  // Remove wage entry
+  const removeWageEntry = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      wages: prev.wages.filter((_, i) => i !== index)
+    }));
   };
 
+  // Add shopping entry  
   const addShoppingEntry = () => {
-    const currentShopping = form.getValues('shopping');
-    setValue('shopping', [...currentShopping, { item: '', amount: 0, shopName: '' }]);
+    setFormData(prev => ({
+      ...prev,
+      shopping: [...prev.shopping, { item: '', amount: 0, shop: '' }]
+    }));
   };
 
-  const removeShoppingEntry = (index: number) => {
-    const currentShopping = form.getValues('shopping');
-    if (currentShopping.length > 1) {
-      setValue('shopping', currentShopping.filter((_, i) => i !== index));
-    }
+  // Remove shopping entry
+  const removeShoppingEntry = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      shopping: prev.shopping.filter((_, i) => i !== index)
+    }));
   };
 
-  const onSubmit = async (data: any) => {
+  // Calculate totals
+  const totalSales = formData.grabSales + formData.aroiDeeSales + formData.qrScanSales + formData.cashSales;
+  const totalWages = formData.wages.reduce((sum, wage) => sum + (wage.amount || 0), 0);
+  const totalShopping = formData.shopping.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const totalExpenses = totalWages + totalShopping;
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage('');
+
     try {
-      const response = await fetch('/api/daily-stock-sales', {
+      const response = await fetch('/api/daily-shift-forms', {
         method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       });
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Daily shift form submitted successfully!",
-        });
-
-        // Generate shopping list for items > 0 (exclude drinks/rolls/meat - in hand only)
-        const purchaseItems = [
-          ...data.freshFood.filter((f: any) => f.value > 0),
-          ...data.freshFoodAdditional.filter((f: any) => f.quantity > 0),
-          ...data.frozenFood.filter((f: any) => f.value > 0),
-          ...data.frozenFoodAdditional.filter((f: any) => f.quantity > 0),
-          ...data.shelfItems.filter((f: any) => f.value > 0),
-          ...data.shelfItemsAdditional.filter((f: any) => f.quantity > 0),
-          ...data.kitchenItems.filter((f: any) => f.value > 0),
-          ...data.kitchenItemsAdditional.filter((f: any) => f.quantity > 0),
-          ...data.packagingItems.filter((f: any) => f.value > 0),
-          ...data.packagingItemsAdditional.filter((f: any) => f.quantity > 0)
-        ];
-
-        if (purchaseItems.length > 0) {
-          console.log('Generated shopping list:', purchaseItems);
-        }
-
-        // Reset form
-        form.reset();
-      } else {
-        throw new Error('Failed to submit form');
+      if (!response.ok) {
+        throw new Error(`Failed to submit form: ${response.statusText}`);
       }
-    } catch (error) {
+
+      const result = await response.json();
+      
       toast({
-        title: "Error",
-        description: "Failed to submit form. Please try again.",
+        title: "Form Submitted Successfully",
+        description: `Shift form saved with ID: ${result.id}`,
+        duration: 6000,
+      });
+
+      // Reset form
+      setFormData({
+        shiftType: '',
+        completedBy: '',
+        shiftDate: new Date().toISOString().split('T')[0],
+        grabSales: 0,
+        aroiDeeSales: 0,
+        qrScanSales: 0,
+        cashSales: 0,
+        wages: [],
+        shopping: [],
+        startingCash: 0,
+        endingCash: 0,
+        bankedAmount: 0,
+        inventory: {}
+      });
+
+    } catch (error) {
+      setErrorMessage(error.message);
+      toast({
+        title: "Submission Failed",
+        description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Render different sections based on activeSection
-  if (activeSection === 'drafts' || activeSection === 'library') {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Drafts & Library</h1>
-            <p className="text-gray-600 mt-2">Manage draft forms and view completed forms</p>
-          </div>
-          <div className="flex gap-3">
-            <Button 
-              variant="ghost" 
-              onClick={() => setActiveSection('form')}
-              className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-            >
-              Back to Form
-            </Button>
-          </div>
-        </div>
-        <DraftFormsLibrary />
-      </div>
-    );
-  }
-
-  // Safety check to ensure form is properly initialized
-  if (!form || !form.register) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p>Loading form...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Daily Sales & Stock Form</h1>
-          <p className="text-gray-600 mt-2">Complete your shift reporting with auto-calculations</p>
-        </div>
-        <div className="flex gap-3">
-          <Button 
-            variant="ghost" 
-            onClick={() => setActiveSection('drafts')}
-            className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-4 py-2 rounded-lg shadow-sm transition-all duration-200"
-          >
-            <FolderOpen className="h-4 w-4 mr-2" />
-            Drafts & Library
-          </Button>
-        </div>
+    <div className="container max-w-4xl mx-auto p-6 space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
+        <p className="text-gray-600">Complete daily shift reporting with authentic inventory tracking</p>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Basic Information */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* 1. Shift Information */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Shift Information</h2>
+            <CardTitle className="text-lg text-gray-900">Shift Information</CardTitle>
+            <CardDescription>Basic shift details and staff information</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="completedBy">Completed By*</Label>
-              <input 
-                {...form.register("completedBy")} 
-                placeholder="Staff name" 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
-              />
-              {errors.completedBy && <p className="text-red-500 text-sm mt-1">{errors.completedBy.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="shiftType">Shift Type</Label>
-              <Select onValueChange={(value) => setValue('shiftType', value as 'opening' | 'closing')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select shift type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="opening">Opening</SelectItem>
-                  <SelectItem value="closing">Closing</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="shiftDate">Shift Date*</Label>
-              <input 
-                type="datetime-local" 
-                {...form.register("shiftDate")} 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
-              />
-              {errors.shiftDate && <p className="text-red-500 text-sm mt-1">{errors.shiftDate.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="startingCash">Starting Cash (฿)</Label>
-              <input type="number" {...form.register("startingCash")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="completedBy">Completed By</Label>
+                <Input
+                  id="completedBy"
+                  value={formData.completedBy}
+                  onChange={(e) => setFormData(prev => ({ ...prev, completedBy: e.target.value }))}
+                  placeholder="Staff name"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="shiftType">Shift Type</Label>
+                <Select onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Day Shift</SelectItem>
+                    <SelectItem value="evening">Evening Shift</SelectItem>
+                    <SelectItem value="night">Night Shift</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="shiftDate">Shift Date</Label>
+                <Input
+                  id="shiftDate"
+                  type="date"
+                  value={formData.shiftDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, shiftDate: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Sales Information */}
+        {/* 2. Sales */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">Sales Summary</h2>
+            <CardTitle className="text-lg text-gray-900">Sales</CardTitle>
+            <CardDescription>Revenue breakdown by platform</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="grabSales">Grab Sales (฿)</Label>
+                <Input
+                  id="grabSales"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.grabSales}
+                  onChange={(e) => setFormData(prev => ({ ...prev, grabSales: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
+                <Input
+                  id="aroiDeeSales"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.aroiDeeSales}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aroiDeeSales: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="qrScanSales">QR Scan Sales (฿)</Label>
+                <Input
+                  id="qrScanSales"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.qrScanSales}
+                  onChange={(e) => setFormData(prev => ({ ...prev, qrScanSales: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="cashSales">Cash Sales (฿)</Label>
+                <Input
+                  id="cashSales"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.cashSales}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cashSales: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+            
+            {/* Sales Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">Sales Summary</h3>
+              <div className="text-2xl font-bold text-green-600">
+                Total Sales: ฿{totalSales.toLocaleString()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. Expenses */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Expenses</CardTitle>
+            <CardDescription>Wages, shopping, and operational expenses</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Wages & Staff Payments */}
             <div>
-              <Label htmlFor="grabSales">Grab Sales (฿)</Label>
-              <input type="number" {...form.register("grabSales")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
-              <input type="number" {...form.register("aroiDeeSales")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="qrScanSales">QR Scan Sales (฿)</Label>
-              <input type="number" {...form.register("qrScanSales")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="cashSales">Cash Sales (฿)</Label>
-              <input type="number" {...form.register("cashSales")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="totalSales">Total Sales (฿)</Label>
-              <input type="number" {...form.register("totalSales")} readOnly className="flex h-10 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Wages */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Wages & Staff Payments</h2>
-          </CardHeader>
-          <CardContent>
-            {wages.map((wage, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Staff Name</Label>
-                  <input {...form.register(`wages.${index}.staffName`)} placeholder="Staff name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Amount (฿)</Label>
-                  <input type="number" {...form.register(`wages.${index}.amount`)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Type</Label>
-                  <Select onValueChange={(value) => setValue(`wages.${index}.type`, value as 'wages' | 'overtime' | 'other')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="wages">Wages</SelectItem>
-                      <SelectItem value="overtime">Overtime</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => removeWageEntry(index)}
-                    disabled={wages.length === 1}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium text-gray-900">Wages & Staff Payments</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Wage Entry
+                </Button>
               </div>
-            ))}
-            <Button type="button" onClick={addWageEntry} variant="outline" className="mt-2">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Wage Entry
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Shopping Expenses */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Shopping & Expenses</h2>
-          </CardHeader>
-          <CardContent>
-            {shopping.map((shop, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Item</Label>
-                  <input {...form.register(`shopping.${index}.item`)} placeholder="Item purchased" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Amount (฿)</Label>
-                  <input type="number" {...form.register(`shopping.${index}.amount`)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Shop Name</Label>
-                  <input {...form.register(`shopping.${index}.shopName`)} placeholder="Store name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => removeShoppingEntry(index)}
-                    disabled={shopping.length === 1}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button type="button" onClick={addShoppingEntry} variant="outline" className="mt-2">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
-            </Button>
-            
-            <div className="mt-4">
-              <Label htmlFor="gasExpense">Gas Expense (฿)</Label>
-              <input type="number" {...form.register("gasExpense")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            
-            <div className="mt-4">
-              <Label htmlFor="totalExpenses">Total Expenses (฿)</Label>
-              <input type="number" {...form.register("totalExpenses")} readOnly className="flex h-10 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cash Management */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Cash Management</h2>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="endCash">Ending Cash (฿)</Label>
-              <input type="number" {...form.register("endCash")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
-              <input type="number" {...form.register("bankedAmount")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Stock Counts */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Stock Counts</h2>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="burgerBunsStock">Burger Buns Stock</Label>
-              <input type="number" {...form.register("burgerBunsStock")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="meatWeight">Meat Weight (kg)</Label>
-              <input type="number" {...form.register("meatWeight")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-            <div>
-              <Label htmlFor="drinkStockCount">Drink Stock Count</Label>
-              <input type="number" {...form.register("drinkStockCount")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Individual Drink Tracking */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Individual Drink Tracking</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading drinks...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {suppliersByCategory['Drinks']?.map((supplier: Supplier) => {
-                  const fieldName = `drinks.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Fresh Food Inventory */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Fresh Food Inventory</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading items...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Fresh Food']?.map((supplier: Supplier) => {
-                  const fieldName = `freshFood.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {freshAdditional > 0 && Array.from({ length: freshAdditional }, (_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Additional Item</Label>
-                  <input placeholder="Item name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Quantity</Label>
-                  <input type="number" placeholder="0" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <input placeholder="Optional note" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setFreshAdditional(freshAdditional - 1)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            
-            <Button
-              type="button"
-              onClick={() => setFreshAdditional(freshAdditional + 1)}
-              variant="outline"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Fresh Food Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Frozen Food Inventory */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Frozen Food Inventory</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading items...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Frozen Food']?.map((supplier: Supplier) => {
-                  const fieldName = `frozenFood.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {frozenAdditional > 0 && Array.from({ length: frozenAdditional }, (_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Additional Item</Label>
-                  <input placeholder="Item name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Quantity</Label>
-                  <input type="number" placeholder="0" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <input placeholder="Optional note" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setFrozenAdditional(frozenAdditional - 1)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            
-            <Button
-              type="button"
-              onClick={() => setFrozenAdditional(frozenAdditional + 1)}
-              variant="outline"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Frozen Food Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Shelf Items Inventory */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Shelf Items Inventory</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading items...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Shelf Items']?.map((supplier: Supplier) => {
-                  const fieldName = `shelfItems.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {shelfAdditional > 0 && Array.from({ length: shelfAdditional }, (_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Additional Item</Label>
-                  <input placeholder="Item name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Quantity</Label>
-                  <input type="number" placeholder="0" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <input placeholder="Optional note" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShelfAdditional(shelfAdditional - 1)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            
-            <Button
-              type="button"
-              onClick={() => setShelfAdditional(shelfAdditional + 1)}
-              variant="outline"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Shelf Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Kitchen Items Inventory */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Kitchen Items Inventory</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading items...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Kitchen Supplies']?.map((supplier: Supplier) => {
-                  const fieldName = `kitchenItems.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {kitchenAdditional > 0 && Array.from({ length: kitchenAdditional }, (_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Additional Item</Label>
-                  <input placeholder="Item name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Quantity</Label>
-                  <input type="number" placeholder="0" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <input placeholder="Optional note" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setKitchenAdditional(kitchenAdditional - 1)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            
-            <Button
-              type="button"
-              onClick={() => setKitchenAdditional(kitchenAdditional + 1)}
-              variant="outline"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Kitchen Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Packaging Items Inventory */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Packaging Items Inventory</h2>
-          </CardHeader>
-          <CardContent>
-            {suppliersLoading ? (
-              <div>Loading items...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {suppliersByCategory['Packaging']?.map((supplier: Supplier) => {
-                  const fieldName = `packagingItems.${supplier.item}` as const;
-                  return (
-                    <div key={supplier.id}>
-                      <Label>{supplier.item}</Label>
-                      <input type="number" {...form.register(fieldName as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {packagingAdditional > 0 && Array.from({ length: packagingAdditional }, (_, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label>Additional Item</Label>
-                  <input placeholder="Item name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Quantity</Label>
-                  <input type="number" placeholder="0" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <input placeholder="Optional note" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPackagingAdditional(packagingAdditional - 1)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            
-            <Button
-              type="button"
-              onClick={() => setPackagingAdditional(packagingAdditional + 1)}
-              variant="outline"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Packaging Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* All Suppliers Inventory Section */}
-        {!suppliersLoading && suppliers.length > 0 && (
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Complete Inventory Management</h3>
-              <p className="text-sm text-gray-600">Track purchased amounts for all suppliers and items</p>
-            </CardHeader>
-            <CardContent>
-              {Object.entries(suppliersByCategory).map(([category, categoryItems]) => (
-                <div key={category} className="mb-8">
-                  <h4 className="text-md font-semibold text-gray-800 mb-4 border-b pb-2">{category}</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left table-auto border border-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Item</th>
-                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Cost (฿)</th>
-                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Packaging Qty</th>
-                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Portion Size</th>
-                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Min Stock</th>
-                          <th className="px-4 py-2 text-xs font-medium text-gray-600">Purchased Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {categoryItems.map((item: Supplier) => (
-                          <tr key={item.id} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-2 border-r text-sm font-medium text-gray-900">{item.item}</td>
-                            <td className="px-4 py-2 border-r text-sm text-gray-700">฿{item.cost.toFixed(2)}</td>
-                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.packagingQty}</td>
-                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.portionSize}</td>
-                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.minStock}</td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                placeholder="0"
-                                className="w-20 h-8 text-sm border border-gray-300 rounded px-2"
-                                min="0"
-                                step="0.01"
-                                {...register(`purchasedAmounts.${item.id}` as any)}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              
+              {formData.wages.map((wage, index) => (
+                <div key={index} className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <Label>Staff Name</Label>
+                    <Input
+                      value={wage.name}
+                      onChange={(e) => {
+                        const newWages = [...formData.wages];
+                        newWages[index].name = e.target.value;
+                        setFormData(prev => ({ ...prev, wages: newWages }));
+                      }}
+                      placeholder="Enter staff name"
+                    />
                   </div>
+                  <div className="flex-1">
+                    <Label>Amount (฿)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={wage.amount}
+                      onChange={(e) => {
+                        const newWages = [...formData.wages];
+                        newWages[index].amount = parseFloat(e.target.value) || 0;
+                        setFormData(prev => ({ ...prev, wages: newWages }));
+                      }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Type</Label>
+                    <Select onValueChange={(value) => {
+                      const newWages = [...formData.wages];
+                      newWages[index].type = value;
+                      setFormData(prev => ({ ...prev, wages: newWages }));
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="regular">Regular</SelectItem>
+                        <SelectItem value="overtime">Overtime</SelectItem>
+                        <SelectItem value="bonus">Bonus</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeWageEntry(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+
+            {/* Shopping & Expenses */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium text-gray-900">Shopping & Expenses</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Expense
+                </Button>
+              </div>
+              
+              {formData.shopping.map((item, index) => (
+                <div key={index} className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <Label>Item/Expense</Label>
+                    <Input
+                      value={item.item}
+                      onChange={(e) => {
+                        const newShopping = [...formData.shopping];
+                        newShopping[index].item = e.target.value;
+                        setFormData(prev => ({ ...prev, shopping: newShopping }));
+                      }}
+                      placeholder="Enter item or expense"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Amount (฿)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.amount}
+                      onChange={(e) => {
+                        const newShopping = [...formData.shopping];
+                        newShopping[index].amount = parseFloat(e.target.value) || 0;
+                        setFormData(prev => ({ ...prev, shopping: newShopping }));
+                      }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Shop/Source</Label>
+                    <Input
+                      value={item.shop}
+                      onChange={(e) => {
+                        const newShopping = [...formData.shopping];
+                        newShopping[index].shop = e.target.value;
+                        setFormData(prev => ({ ...prev, shopping: newShopping }));
+                      }}
+                      placeholder="Enter shop name"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeShoppingEntry(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Expense Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">Expense Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>Total Wages: ฿{totalWages.toLocaleString()}</div>
+                <div>Total Shopping: ฿{totalShopping.toLocaleString()}</div>
+              </div>
+              <div className="text-xl font-bold text-red-600 mt-2">
+                Total Expenses: ฿{totalExpenses.toLocaleString()}
+              </div>
+            </div>
+
+            {/* Cash Management */}
+            <div>
+              <h3 className="font-medium text-gray-900 mb-4">Cash Management</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="startingCash">Starting Cash (฿)</Label>
+                  <Input
+                    id="startingCash"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.startingCash}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="endingCash">Ending Cash (฿)</Label>
+                  <Input
+                    id="endingCash"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.endingCash}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
+                  <Input
+                    id="bankedAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.bankedAmount}
+                    onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 4. Food & Stock Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Food & Stock Items</CardTitle>
+            <CardDescription>Authentic inventory tracking from supplier CSV data</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Drink Stock */}
+            <div>
+              <h3 className="font-medium text-gray-900 mb-4">Drink Stock</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {drinkStock.map((drink) => (
+                  <div key={drink.name}>
+                    <Label htmlFor={`drink-${drink.name}`}>{drink.name}</Label>
+                    <Input
+                      id={`drink-${drink.name}`}
+                      type="number"
+                      min="0"
+                      value={formData.inventory[drink.name] || ''}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          inventory: {
+                            ...prev.inventory,
+                            [drink.name]: parseInt(e.target.value) || 0
+                          }
+                        }));
+                      }}
+                      placeholder="0"
+                    />
+                    <div className="text-xs text-gray-500">{drink.cost} / {drink.unit}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Inventory Categories */}
+            {Object.entries(inventoryCategories).map(([category, items]) => (
+              <div key={category}>
+                <h3 className="font-medium text-gray-900 mb-4">{category}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {items.map((item) => (
+                    <div key={item.name}>
+                      <Label htmlFor={`item-${item.name}`}>{item.name}</Label>
+                      <Input
+                        id={`item-${item.name}`}
+                        type="number"
+                        min="0"
+                        value={formData.inventory[item.name] || ''}
+                        onChange={(e) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            inventory: {
+                              ...prev.inventory,
+                              [item.name]: parseInt(e.target.value) || 0
+                            }
+                          }));
+                        }}
+                        placeholder="0"
+                      />
+                      <div className="text-xs text-gray-500">
+                        {item.cost} / {item.unit} - {item.supplier}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         {/* Submit Button */}
         <div className="flex justify-center">
-          <Button type="submit" className="bg-black text-white px-8 py-2 text-lg">
-            Submit Daily Shift Form
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isSubmitting || !formData.completedBy || !formData.shiftType}
+            className="w-full md:w-auto"
+          >
+            {isSubmitting ? "Submitting..." : "Submit Daily Shift Form"}
           </Button>
         </div>
       </form>
