@@ -23,11 +23,27 @@ export function registerRoutes(app: express.Application): Server {
   // Suppliers JSON endpoint (loads all suppliers for form)
   app.get('/api/suppliers-json', async (req: Request, res: Response) => {
     try {
-      const suppliers = await supplierService.getAllSuppliers();
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Debug path information
+      const cwd = process.cwd();
+      const suppliersPath = path.join(cwd, 'data', 'suppliers.json');
+      console.log('Current working directory:', cwd);
+      console.log('Looking for suppliers file at:', suppliersPath);
+      console.log('File exists:', fs.existsSync(suppliersPath));
+      
+      if (!fs.existsSync(suppliersPath)) {
+        return res.status(404).json({ error: 'Suppliers file not found', path: suppliersPath });
+      }
+      
+      const suppliersData = fs.readFileSync(suppliersPath, 'utf8');
+      const suppliers = JSON.parse(suppliersData);
+      console.log('Loaded suppliers count:', suppliers.length);
       res.json(suppliers);
     } catch (err) {
-      console.error('CSV load error:', err);
-      res.status(500).json({ error: 'Failed to load suppliers' });
+      console.error('Suppliers load error:', err);
+      res.status(500).json({ error: 'Failed to load suppliers', details: (err as Error).message });
     }
   });
 

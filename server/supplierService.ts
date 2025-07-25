@@ -17,6 +17,8 @@ try {
 export const supplierService = {
   getAll: () => suppliers,
   
+  getAllSuppliers: () => suppliers,
+  
   add: (supplierData: any) => {
     const newSupplier = {
       id: Math.max(...suppliers.map((s: any) => s.id), 0) + 1,
