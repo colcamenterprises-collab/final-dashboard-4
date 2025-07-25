@@ -20,6 +20,17 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export function registerRoutes(app: express.Application): Server {
   // Stock discrepancy endpoint for dashboard
+  // Suppliers JSON endpoint (loads all suppliers for form)
+  app.get('/api/suppliers-json', async (req: Request, res: Response) => {
+    try {
+      const suppliers = await supplierService.getAllSuppliers();
+      res.json(suppliers);
+    } catch (err) {
+      console.error('CSV load error:', err);
+      res.status(500).json({ error: 'Failed to load suppliers' });
+    }
+  });
+
   app.get("/api/dashboard/stock-discrepancies", async (req: Request, res: Response) => {
     try {
       // Pull last shift's receipts right out of DB and analyze against staff forms

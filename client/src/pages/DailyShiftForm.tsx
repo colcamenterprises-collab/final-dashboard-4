@@ -74,7 +74,8 @@ const formSchema = z.object({
     quantity: z.coerce.number().min(0).optional().default(0), 
     note: z.string().optional(), 
     addPermanently: z.boolean().optional().default(false) 
-  })).optional().default([])
+  })).optional().default([]),
+  purchasedAmounts: z.record(z.string(), z.coerce.number().optional().default(0)).optional().default({})
 });
 
 interface Supplier {
@@ -94,9 +95,9 @@ const DailyShiftForm = () => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<'form' | 'drafts' | 'library'>('form');
   
-  // Fetch suppliers data
+  // Fetch suppliers data from JSON endpoint
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/suppliers-json"],
   });
 
   // Organize suppliers by category
@@ -810,6 +811,57 @@ const DailyShiftForm = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* All Suppliers Inventory Section */}
+        {!suppliersLoading && suppliers.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold text-gray-900">Complete Inventory Management</h3>
+              <p className="text-sm text-gray-600">Track purchased amounts for all suppliers and items</p>
+            </CardHeader>
+            <CardContent>
+              {Object.entries(suppliersByCategory).map(([category, categoryItems]) => (
+                <div key={category} className="mb-8">
+                  <h4 className="text-md font-semibold text-gray-800 mb-4 border-b pb-2">{category}</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left table-auto border border-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Item</th>
+                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Cost (฿)</th>
+                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Packaging Qty</th>
+                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Portion Size</th>
+                          <th className="px-4 py-2 border-r text-xs font-medium text-gray-600">Min Stock</th>
+                          <th className="px-4 py-2 text-xs font-medium text-gray-600">Purchased Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categoryItems.map((item: Supplier) => (
+                          <tr key={item.id} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-2 border-r text-sm font-medium text-gray-900">{item.item}</td>
+                            <td className="px-4 py-2 border-r text-sm text-gray-700">฿{item.cost.toFixed(2)}</td>
+                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.packagingQty}</td>
+                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.portionSize}</td>
+                            <td className="px-4 py-2 border-r text-sm text-gray-700">{item.minStock}</td>
+                            <td className="px-4 py-2">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                className="w-20 h-8 text-sm"
+                                min="0"
+                                step="0.01"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Button */}
         <div className="flex justify-center">
