@@ -4,6 +4,24 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
+## Recent Changes (January 25, 2025)
+
+### Scrollable Sidebar Implementation - Complete
+- **Enhanced Sidebar Functionality**: Successfully implemented smooth scrollable sidebar with subtle, blended styling
+- **Custom CSS Scrollbar**: Added custom scrollbar with rgba(255, 255, 255, 0.15) opacity that blends completely with #1f1f1f sidebar background
+- **Responsive Scrolling**: Added overflow-y-auto and sidebar-scroll class to navigation sections for smooth scrolling experience
+- **Hover Effects**: Implemented subtle hover effects with rgba(255, 255, 255, 0.25) for better user interaction
+- **CSS Organization**: Fixed CSS syntax errors and properly organized @layer sections for maintainable styling
+
+### Comprehensive Supplier Management System - Complete Implementation
+- **JSON-Based Storage**: Created data/suppliers.json with 48 comprehensive supplier records including all food categories
+- **Full CRUD Operations**: Implemented complete supplier management API with GET, POST, PUT, DELETE endpoints
+- **Professional UI**: Built SupplierManagement.tsx with modern table interface, category filtering, and dialog-based editing
+- **Category Management**: Added 6 supplier categories (Fresh Food, Frozen Food, Shelf Items, Drinks, Kitchen Supplies, Packaging)
+- **Cost Tracking**: Comprehensive cost management with Thai Baht currency, packaging quantities, and minimum stock levels
+- **Navigation Integration**: Added "Suppliers" link under Menu Management section in sidebar navigation
+- **Data Validation**: Implemented proper form validation with TypeScript interfaces and error handling
+
 ## Multi-Agent AI System - Production Ready (July 21, 2025)
 
 ### Four Specialized AI Agents

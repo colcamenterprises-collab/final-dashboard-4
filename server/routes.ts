@@ -12,6 +12,7 @@ import { eq, desc, sql, inArray } from "drizzle-orm";
 import multer from 'multer';
 import OpenAI from 'openai';
 import xlsx from 'xlsx';
+import { supplierService } from "./supplierService";
 
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -2231,6 +2232,63 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
 
   // Enhanced Loyverse API routes
   app.use("/api/loyverse", loyverseEnhancedRoutes);
+
+  // Supplier Management API
+  // GET /api/suppliers - Return full list
+  app.get('/api/suppliers', (req: Request, res: Response) => {
+    try {
+      const suppliers = supplierService.getAll();
+      res.json(suppliers);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  });
+
+  // POST /api/suppliers - Add new item
+  app.post('/api/suppliers', (req: Request, res: Response) => {
+    try {
+      const newSupplier = supplierService.add(req.body);
+      res.json(newSupplier);
+    } catch (error) {
+      console.error('Error adding supplier:', error);
+      res.status(500).json({ error: 'Failed to add supplier' });
+    }
+  });
+
+  // PUT /api/suppliers/:id - Edit item
+  app.put('/api/suppliers/:id', (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedSupplier = supplierService.update(id, req.body);
+      
+      if (!updatedSupplier) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+      
+      res.json(updatedSupplier);
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      res.status(500).json({ error: 'Failed to update supplier' });
+    }
+  });
+
+  // DELETE /api/suppliers/:id - Remove item
+  app.delete('/api/suppliers/:id', (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = supplierService.delete(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+      
+      res.json({ message: 'Supplier deleted successfully', deleted });
+    } catch (error) {
+      console.error('Error deleting supplier:', error);
+      res.status(500).json({ error: 'Failed to delete supplier' });
+    }
+  });
 
   // Create and return the HTTP server instance
   const httpServer = createServer(app);

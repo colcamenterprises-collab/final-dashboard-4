@@ -85,6 +85,7 @@ const navigationStructure = [
     items: [
       { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
+      { path: "/supplier-management", label: "Suppliers", icon: Package },
     ]
   },
   {
