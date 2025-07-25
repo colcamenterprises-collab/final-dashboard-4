@@ -37,9 +37,17 @@ const navigationStructure = [
     icon: ShoppingCart,
     expandable: true,
     items: [
-      { path: "/daily-shift-form", label: "Daily Sales & Stock", icon: ClipboardList },
-      { path: "/draft-forms", label: "Draft Forms", icon: FileText },
-      { path: "/form-library", label: "Form Library", icon: FileSpreadsheet },
+      {
+        id: "daily-sales-form",
+        label: "Daily Sales & Stock",
+        icon: ClipboardList,
+        expandable: true,
+        items: [
+          { path: "/daily-shift-form", label: "Submit Form", icon: ClipboardList },
+          { path: "/draft-forms", label: "Draft Forms", icon: FileText },
+          { path: "/form-library", label: "Form Library", icon: FileSpreadsheet },
+        ]
+      },
       {
         id: "purchasing",
         label: "Purchasing",
@@ -126,6 +134,7 @@ export default function Layout({ children }: LayoutProps) {
     operations: false,
     finance: false,
     "menu-mgmt": false,
+    "daily-sales-form": false,
     reporting: false,
     analysis: false,
     purchasing: false,
@@ -168,6 +177,7 @@ export default function Layout({ children }: LayoutProps) {
         operations: false,
         finance: false,
         "menu-mgmt": false,
+        "daily-sales-form": false,
         reporting: false,
         analysis: false,
         purchasing: false,
