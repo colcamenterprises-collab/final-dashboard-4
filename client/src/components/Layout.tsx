@@ -214,8 +214,8 @@ export default function Layout({ children }: LayoutProps) {
             </Button>
           </Link>
           
-          {/* Navigation Sections */}
-          <div className="space-y-1 flex-1">
+          {/* Navigation Sections - Scrollable */}
+          <div className="space-y-1 flex-1 overflow-y-auto sidebar-scroll">
             {navigationStructure.map((section) => {
               const SectionIcon = section.icon;
               
