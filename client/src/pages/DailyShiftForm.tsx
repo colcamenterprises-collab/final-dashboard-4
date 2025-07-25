@@ -18,6 +18,7 @@ const formSchema = z.object({
   shiftDate: z.string().min(1, "Required"),
   startingCash: z.coerce.number().optional().default(0),
   grabSales: z.coerce.number().optional().default(0),
+  foodpandaSales: z.coerce.number().optional().default(0),
   aroiDeeSales: z.coerce.number().optional().default(0),
   qrScanSales: z.coerce.number().optional().default(0),
   cashSales: z.coerce.number().optional().default(0),
@@ -115,6 +116,7 @@ const DailyShiftForm = () => {
       shiftDate: new Date().toISOString().slice(0, 16),
       startingCash: 0,
       grabSales: 0,
+      foodpandaSales: 0,
       aroiDeeSales: 0,
       qrScanSales: 0,
       cashSales: 0,
@@ -150,7 +152,7 @@ const DailyShiftForm = () => {
   const [packagingAdditional, setPackagingAdditional] = useState(0);
 
   // Watch values for auto-calculations
-  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const sales = watch(['grabSales', 'foodpandaSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
   const expenses = watch(['gasExpense']);
   const wages = watch('wages');
   const shopping = watch('shopping');
@@ -325,6 +327,10 @@ const DailyShiftForm = () => {
             <div>
               <Label htmlFor="grabSales">Grab Sales (฿)</Label>
               <Input type="number" {...form.register("grabSales")} />
+            </div>
+            <div>
+              <Label htmlFor="foodpandaSales">FoodPanda Sales (฿)</Label>
+              <Input type="number" {...form.register("foodpandaSales")} />
             </div>
             <div>
               <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
