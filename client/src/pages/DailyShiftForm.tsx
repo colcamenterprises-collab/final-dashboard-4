@@ -851,10 +851,10 @@ const DailyShiftForm = () => {
                                 className="w-20 h-8 text-sm"
                                 min="0"
                                 step="0.01"
-                                {...form.register(`purchasedAmounts.${item.id}`, {
-                                  valueAsNumber: true,
-                                  setValueAs: (value) => value === '' ? 0 : Number(value)
-                                })}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? 0 : Number(e.target.value);
+                                  setValue(`purchasedAmounts.${item.id}`, value);
+                                }}
                               />
                             </td>
                           </tr>
