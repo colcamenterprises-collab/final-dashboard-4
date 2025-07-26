@@ -339,204 +339,57 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/daily-shift-forms", async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      console.log("Daily shift form submission:", data);
+      console.log("Form submission:", data);
       
-      // Validate required fields early
-      if (!data.completedBy || !data.shiftType) {
-        return res.status(400).json({ 
-          error: 'Missing required fields: completedBy and shiftType are required' 
-        });
-      }
-      
-      // Parse numberNeeded for numeric fields and store in number_needed column
-      if (data.numberNeeded && typeof data.numberNeeded === 'object') {
-        data.number_needed = Object.fromEntries(
-          Object.entries(data.numberNeeded).map(([key, value]) => [
-            key, 
-            parseFloat(value as string) || 0
-          ])
-        );
-        delete data.numberNeeded; // Remove original field
-      }
-      
-      // Ensure shiftDate is a Date object
-      if (data.shift_date && typeof data.shift_date === 'string') {
-        data.shift_date = new Date(data.shift_date);
-      }
-      
-      // Map frontend field names to actual database column names and parse numeric fields
-      const fieldMapping = {
-        'startingCash': 'starting_cash',
-        'endingCash': 'ending_cash', 
-        'grabSales': 'grab_sales',
-        'aroiDeeSales': 'aroi_dee_sales',
-        'qrScanSales': 'qr_scan_sales',
-        'cashSales': 'cash_sales',
-        'bankedAmount': 'banked_amount'
-      };
-
-      // Parse numeric fields and map to correct database column names
-      Object.keys(fieldMapping).forEach(frontendField => {
-        const dbField = fieldMapping[frontendField];
-        if (data[frontendField] !== undefined && data[frontendField] !== null) {
-          const value = parseFloat(data[frontendField] || '0');
-          data[dbField] = isNaN(value) ? 0 : value;
-          // Remove the frontend field name to avoid conflicts
-          if (frontendField !== dbField) {
-            delete data[frontendField];
-          }
-        }
-      });
-
-      // Map wages and shopping arrays to correct database fields
-      if (data.wages && Array.isArray(data.wages)) {
-        // Map to wage_entries (the actual database field)
-        data.wage_entries = data.wages.map((w: any) => ({
-          ...w,
-          amount: isNaN(parseFloat(w.amount)) ? 0 : parseFloat(w.amount || '0')
-        }));
-        delete data.wages; // Remove the original field
-      }
-
-      if (data.shopping && Array.isArray(data.shopping)) {
-        // Map to shopping_entries (the actual database field)  
-        data.shopping_entries = data.shopping.map((s: any) => ({
-          ...s,
-          amount: isNaN(parseFloat(s.amount)) ? 0 : parseFloat(s.amount || '0')
-        }));
-        delete data.shopping; // Remove the original field
-      }
-
-      // Process inventory data correctly - split the inventory object into proper database fields
-      if (data.inventory && typeof data.inventory === 'object') {
-        // Create separate objects for each category based on item names
-        const drinkItems = ['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Bottled Water', 'Kids Juice Orange', 'Kids Juice Apple'];
-        const freshItems = ['Topside Beef', 'Brisket Point End', 'Chuck Roll Beef', 'Salad (Iceberg Lettuce)', 'Burger Bun', 'Tomatos', 'Onions Bulk 10kg', 'Cheese', 'Bacon Short', 'Bacon Long', 'Jalapenos'];
-        const frozenItems = ['French Fries 7mm', 'Chicken Nuggets', 'Chicken Fillets', 'Sweet Potato Fries'];
-        const shelfItems = ['Cajun Fries Seasoning', 'Crispy Fried Onions', 'Pickles (Standard Dill)', 'Pickles Sweet', 'Mustard', 'Mayonnaise', 'Tomato Sauce', 'BBQ Sauce', 'Sriracha Sauce', 'Salt (Coarse Sea Salt)'];
-        const kitchenItems = ['Oil (Fryer)', 'Plastic Food Wrap', 'Paper Towel Long', 'Paper Towel Short', 'Food Gloves Large', 'Food Gloves Medium', 'Aluminum Foil', 'Plastic Meat Gloves', 'Kitchen Cleaner', 'Alcohol Sanitiser'];
-        const packagingItems = ['Plastic Carry Bags (6×14)', 'Plastic Carry Bags (9×18)', 'Brown Paper Food Bags', 'Loaded Fries Boxes', 'Packaging Labels'];
-
-        // Extract items for each category
-        const drinkStock = {};
-        const freshFood = {};
-        const frozenFood = {};
-        const shelfItemsData = {};
-        const kitchenItemsData = {};
-        const packagingItemsData = {};
-
-        Object.keys(data.inventory).forEach(itemName => {
-          const value = parseFloat(data.inventory[itemName] || '0');
-          const numValue = isNaN(value) ? 0 : value;
-          
-          if (drinkItems.includes(itemName)) {
-            drinkStock[itemName] = numValue;
-          } else if (freshItems.includes(itemName)) {
-            freshFood[itemName] = numValue;
-          } else if (frozenItems.includes(itemName)) {
-            frozenFood[itemName] = numValue;
-          } else if (shelfItems.includes(itemName)) {
-            shelfItemsData[itemName] = numValue;
-          } else if (kitchenItems.includes(itemName)) {
-            kitchenItemsData[itemName] = numValue;
-          } else if (packagingItems.includes(itemName)) {
-            packagingItemsData[itemName] = numValue;
-          }
-        });
-
-        // Set the categorized data
-        data.drinkStock = drinkStock;
-        data.freshFood = freshFood;
-        data.frozenFood = frozenFood;
-        data.shelfItems = shelfItemsData;
-        data.kitchenItems = kitchenItemsData;
-        data.packagingItems = packagingItemsData;
-        
-        // Remove the original inventory field
-        delete data.inventory;
-      }
-
-      // Convert all category data to JSON strings for database storage
-      if (data.drinkStock) {
-        data.drinkStock = JSON.stringify(data.drinkStock);
-      }
-      if (data.freshFood) {
-        data.freshFood = JSON.stringify(data.freshFood);
-      }
-      if (data.frozenFood) {
-        data.frozenFood = JSON.stringify(data.frozenFood);
-      }
-      if (data.shelfItems) {
-        data.shelfItems = JSON.stringify(data.shelfItems);
-      }
-      if (data.kitchenItems) {
-        data.kitchenItems = JSON.stringify(data.kitchenItems);
-      }
-      if (data.packagingItems) {
-        data.packagingItems = JSON.stringify(data.packagingItems);
-      }
-
-      if (data.wage_entries) {
-        data.wage_entries = JSON.stringify(data.wage_entries);
-      }
-
-      if (data.shopping_entries) {
-        data.shopping_entries = JSON.stringify(data.shopping_entries);
-      }
-
-      if (data.number_needed) {
-        data.number_needed = JSON.stringify(data.number_needed);
-      }
-      
-      // Map required fields and set defaults
-      const completedBy = data.completedBy || '';
-      const shiftType = data.shiftType || '';
+      // Debug the exact values being mapped
+      const completedBy = data.completedBy || 'Unknown User';
+      const shiftType = data.shiftType || 'Standard';
       const shiftDate = data.shiftDate ? new Date(data.shiftDate) : new Date();
+      const numberNeeded = data.numberNeeded || {};
       
-      // Remove the camelCase fields to avoid conflicts before inserting
-      delete data.completedBy;
-      delete data.shiftType;
-      delete data.shiftDate;
+      console.log("Mapped values:", { completedBy, shiftType, shiftDate, numberNeeded });
       
-      // Set mapped values
-      data.completed_by = completedBy;
-      data.shift_type = shiftType;
-      data.shift_date = shiftDate;
+      // Use Drizzle ORM with proper schema field mapping
+      const [result] = await db.insert(dailyStockSales).values({
+        completedBy,
+        shiftType, 
+        shiftDate,
+        numberNeeded,
+        isDraft: false,
+        status: 'completed'
+      }).returning();
       
-      // Set defaults
-      data.status = 'completed';
-      data.is_draft = false;
-      
-      let result;
-      
-      // Debug: Log the final data being inserted
-      console.log("Final data for database insertion:", JSON.stringify(data, null, 2));
-      
-      // Simple direct insert with minimal required fields
-      try {
-        [result] = await db.insert(dailyStockSales).values({
-          completedBy: data.completed_by,
-          shiftType: data.shift_type,
-          shiftDate: data.shift_date,
-          numberNeeded: data.number_needed || {},
-          status: 'completed',
-          isDraft: false
-        }).returning();
-      } catch (insertError: any) {
-        console.error('Database insert error:', insertError);
-        throw insertError;
-      }
-      
-      console.log("✅ Daily shift form saved successfully with ID:", result.id);
+      console.log("✅ Form saved successfully with ID:", result.id);
       res.json(result);
-      
     } catch (err: any) {
-      console.error('Submission error:', err.message);
-      let detailedError = 'Failed to save daily shift';
+      console.error("Error:", err.message);
+      let detailedError = 'Failed to save form';
       if (err.code === '22P02') {
-        detailedError = 'Invalid input syntax for type numeric – ensure all fields like numberNeeded are numbers, not text.';
+        detailedError = 'Invalid numeric input – check fields like sales/amounts are numbers (no text/symbols). Reasoning: DB expects decimals; strings cause syntax errors.';
       }
       res.status(500).json({ error: detailedError });
+    }
+  });
+
+  // Draft Forms endpoints
+  app.post("/api/daily-stock-sales/draft", async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      console.log("Draft save request:", data);
+      
+      const [result] = await db.insert(dailyStockSales).values({
+        completedBy: data.completedBy || '',
+        shiftType: data.shiftType || '',
+        shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+        numberNeeded: JSON.stringify(data.numberNeeded || {}),
+        isDraft: true,
+        status: 'draft'
+      }).returning();
+      
+      res.json(result);
+    } catch (err: any) {
+      console.error("Draft save error:", err);
+      res.status(500).json({ error: 'Failed to save draft' });
     }
   });
 
