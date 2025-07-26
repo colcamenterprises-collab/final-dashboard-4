@@ -1,192 +1,463 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect } from 'react';
+
+const formSchema = z.object({
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']),
+  shiftDate: z.string().datetime("Required"),
+  startingCash: z.coerce.number().optional().default(0),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wages: z.array(z.object({ 
+    staffName: z.string().min(1), 
+    amount: z.coerce.number().min(0).optional().default(0), 
+    type: z.enum(['wages', 'overtime', 'other']) 
+  })).optional().default([]),
+  shopping: z.array(z.object({ 
+    item: z.string().min(1), 
+    amount: z.coerce.number().min(0).optional().default(0), 
+    shopName: z.string().optional() 
+  })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  endCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  freshFood: z.array(z.object({ 
+    name: z.string(), 
+    value: z.coerce.number().optional().default(0) 
+  })).optional().default([
+    { name: 'Salad (Iceberg Lettuce)', value: 0 }, 
+    { name: 'Tomatos', value: 0 }, 
+    { name: 'White Cabbage', value: 0 }, 
+    { name: 'Purple Cabbage', value: 0 }, 
+    { name: 'Bacon Short', value: 0 }, 
+    { name: 'Bacon Long', value: 0 }, 
+    { name: 'Milk', value: 0 }, 
+    { name: 'Butter', value: 0 }
+  ]),
+  freshFoodAdditional: z.array(z.object({ 
+    item: z.string().min(1), 
+    quantity: z.coerce.number().min(0).optional().default(0), 
+    note: z.string().optional(), 
+    addPermanently: z.boolean().optional().default(false) 
+  })).optional().default([]),
+  frozenFood: z.array(z.object({ 
+    name: z.string(), 
+    value: z.coerce.number().optional().default(0) 
+  })).optional().default([
+    { name: 'Chicken Nuggets', value: 0 }, 
+    { name: 'Sweet Potato Fries', value: 0 }, 
+    { name: 'French Fries (7mm)', value: 0 }, 
+    { name: 'Chicken Fillets', value: 0 }
+  ]),
+  frozenFoodAdditional: z.array(z.object({ 
+    item: z.string().min(1), 
+    quantity: z.coerce.number().min(0).optional().default(0), 
+    note: z.string().optional(), 
+    addPermanently: z.boolean().optional().default(false) 
+  })).optional().default([]),
+  shelfItems: z.array(z.object({ 
+    name: z.string(), 
+    value: z.coerce.number().optional().default(0) 
+  })).optional().default([
+    { name: 'Mayonnaise', value: 0 }, 
+    { name: 'Mustard', value: 0 }, 
+    { name: 'Dill Pickles', value: 0 }, 
+    { name: 'Sweet Pickles', value: 0 }, 
+    { name: 'Salt', value: 0 }, 
+    { name: 'Pepper', value: 0 }, 
+    { name: 'Cajun Spice', value: 0 }, 
+    { name: 'White Vinegar', value: 0 }, 
+    { name: 'Crispy Fried Onions', value: 0 }, 
+    { name: 'Paprika (Smoked)', value: 0 }, 
+    { name: 'Jalapenos', value: 0 }, 
+    { name: 'Sriracha Mayonnaise', value: 0 }, 
+    { name: 'Chipotle Mayonnaise', value: 0 }, 
+    { name: 'Flour', value: 0 }, 
+    { name: 'French Fries Seasoning BBQ', value: 0 }
+  ]),
+  shelfItemsAdditional: z.array(z.object({ 
+    item: z.string().min(1), 
+    quantity: z.coerce.number().min(0).optional().default(0), 
+    note: z.string().optional(), 
+    addPermanently: z.boolean().optional().default(false) 
+  })).optional().default([]),
+  kitchenItems: z.array(z.object({ 
+    name: z.string(), 
+    value: z.coerce.number().optional().default(0) 
+  })).optional().default([
+    { name: 'Kitchen Cleaner', value: 0 }, 
+    { name: 'Floor Cleaner', value: 0 }, 
+    { name: 'Dishwashing Liquid', value: 0 }, 
+    { name: 'Gloves Medium', value: 0 }, 
+    { name: 'Gloves Large', value: 0 }, 
+    { name: 'Gloves Small', value: 0 }, 
+    { name: 'Plastic Meat Gloves', value: 0 }, 
+    { name: 'Paper Towel Long', value: 0 }, 
+    { name: 'Paper Towel Short', value: 0 }, 
+    { name: 'Bin Bags 30x40', value: 0 }, 
+    { name: 'Printer Rolls', value: 0 }, 
+    { name: 'Sticky Tape', value: 0 }
+  ]),
+  kitchenItemsAdditional: z.array(z.object({ 
+    item: z.string().min(1), 
+    quantity: z.coerce.number().min(0).optional().default(0), 
+    note: z.string().optional(), 
+    addPermanently: z.boolean().optional().default(false) 
+  })).optional().default([]),
+  packagingItems: z.array(z.object({ 
+    name: z.string(), 
+    value: z.coerce.number().optional().default(0) 
+  })).optional().default([
+    { name: 'Loaded Fries Box', value: 0 }, 
+    { name: 'French Fries Box 600ml', value: 0 }, 
+    { name: 'Takeaway Sauce Container', value: 0 }, 
+    { name: 'Coleslaw Container', value: 0 }, 
+    { name: 'Burger Wrapping Paper', value: 0 }, 
+    { name: 'French Fries Paper', value: 0 }, 
+    { name: 'Paper Bags', value: 0 }, 
+    { name: 'Plastic Bags 8x16', value: 0 }, 
+    { name: 'Plastic Bags 9x18', value: 0 }, 
+    { name: 'Knife and Fork Set', value: 0 }, 
+    { name: 'Bag Close Stickers', value: 0 }, 
+    { name: 'Sauce Container Stickers', value: 0 }, 
+    { name: 'Flag Stickers', value: 0 }, 
+    { name: 'Burger Sweets Takeaway', value: 0 }
+  ]),
+  packagingItemsAdditional: z.array(z.object({ 
+    item: z.string().min(1), 
+    quantity: z.coerce.number().min(0).optional().default(0), 
+    note: z.string().optional(), 
+    addPermanently: z.boolean().optional().default(false) 
+  })).optional().default([]),
+  isDraft: z.boolean().optional().default(false),
+});
 
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState({
-    completedBy: '',
-    shiftDate: new Date().toISOString().split('T')[0],
-    grabSales: 0,
-    aroiDeeSales: 0,
-    qrScanSales: 0,
-    cashSales: 0,
-    wages: [],
-    shopping: [],
-    startingCash: 0,
-    endingCash: 0,
-    bankedAmount: 0,
-    rollsStock: 0,
-    meatStock: 0,
-    numberNeeded: {}
+  const form = useForm({ 
+    resolver: zodResolver(formSchema), 
+    defaultValues: formSchema.parse({ 
+      shiftDate: new Date().toISOString(),
+      shiftType: 'closing'
+    }) 
   });
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [errorMessage, setErrorMessage] = useState('');
+  
+  const { watch, setValue, handleSubmit, register } = form;
+  const [wagesEntries, setWagesEntries] = useState(1);
+  const [shoppingEntries, setShoppingEntries] = useState(1);
+  const [freshAdditional, setFreshAdditional] = useState(0);
+  const [frozenAdditional, setFrozenAdditional] = useState(0);
+  const [shelfAdditional, setShelfAdditional] = useState(0);
+  const [kitchenAdditional, setKitchenAdditional] = useState(0);
+  const [packagingAdditional, setPackagingAdditional] = useState(0);
 
-  // CSV items as JSON (full updated list; filtered unwanted in Fresh Food)
-  const items = [
-    { "Item ": "Topside Beef", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "10kg" },
-    // Removed Brisket Point End, Chuck Roll Beef, Other Beef (Mixed) as per PDF
-    { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food", "Packaging Qty": "N/A", "Minimum Stock Amount": "" },
-    { "Item ": "Milk", "Internal Category": "Fresh Food", "Packaging Qty": "1 litre", "Minimum Stock Amount": "" },
-    { "Item ": "Burger Bun", "Internal Category": "Fresh Food", "Packaging Qty": "1", "Minimum Stock Amount": "" },
-    { "Item ": "Tomatos", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "White Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Purple Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Onions Bulk 10kg", "Internal Category": "Fresh Food", "Packaging Qty": "10kg", "Minimum Stock Amount": "" },
-    { "Item ": "Onions (small bags)", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "French Fries 7mm ", "Internal Category": "Frozen Food ", "Packaging Qty": "2kg", "Minimum Stock Amount": "" },
-    { "Item ": "Chicken Nuggets", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Chicken Fillets", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Cajun Fries Seasoning", "Internal Category": "Shelf Items", "Packaging Qty": "510 G", "Minimum Stock Amount": "" },
-    { "Item ": "Sweet Potato Fries", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Crispy Fried Onions", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
-    { "Item ": "Cheese", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
-    { "Item ": "Bacon Short", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
-    { "Item ": "Bacon Long", "Internal Category": "Fresh Food", "Packaging Qty": "2 kg", "Minimum Stock Amount": "" },
-    { "Item ": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items", "Packaging Qty": "480 g", "Minimum Stock Amount": "" },
-    { "Item ": "Pickles Sweet (standard)", "Internal Category": "Shelf Items", "Packaging Qty": "480 gr", "Minimum Stock Amount": "" },
-    { "Item ": "Jalapenos", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
-    { "Item ": "Mustard", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Mayonnaise", "Internal Category": "Shelf Items", "Packaging Qty": "1", "Minimum Stock Amount": "" },
-    { "Item ": "Tomato Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "5 Litres", "Minimum Stock Amount": "" },
-    { "Item ": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items", "Packaging Qty": "1000g", "Minimum Stock Amount": "" },
-    { "Item ": "BBQ Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
-    { "Item ": "Sriracha Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "950g", "Minimum Stock Amount": "" },
-    { "Item ": "Oil (Fryer)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "5 L", "Minimum Stock Amount": "" },
-    { "Item ": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
-    { "Item ": "Coke", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "20" },
-    { "Item ": "Coke Zero", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "16" },
-    { "Item ": "Fanta Orange", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Fanta Strawberry", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Schweppes Manow", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Kids Juice (Orange)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Kids Juice (Apple)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Sprite", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
-    { "Item ": "Soda Water", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "10" },
-    { "Item ": "Bottled Water", "Internal Category": "Drinks", "Packaging Qty": "12", "Minimum Stock Amount": "12" },
-    { "Item ": "French Fries Box", "Internal Category": "Packaging", "Packaging Qty": "1 bag 50 piece", "Minimum Stock Amount": "" },
-    { "Item ": "Plastic Carry Bags (Size- 6×14)", "Internal Category": "Packaging", "Packaging Qty": "500h", "Minimum Stock Amount": "" },
-    { "Item ": "Plastic Carry Bags (Size - 9×18)", "Internal Category": "Packaging", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
-    { "Item ": "Plastic Food Wrap", "Internal Category": "Kitchen Supplies", "Packaging Qty": "500M", "Minimum Stock Amount": "" },
-    { "Item ": "Paper Towel Long", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
-    { "Item ": "Paper Towel Short (Serviettes)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
-    { "Item ": "Food Gloves (Large)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
-    { "Item ": "Food Gloves (Medium)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
-    { "Item ": "Food Gloves (Small)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
-    { "Item ": "Aluminum Foil", "Internal Category": "Kitchen Supplies", "Packaging Qty": "29.5 CM 90M", "Minimum Stock Amount": "" },
-    { "Item ": "Plastic Meat Gloves", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 24 pieces", "Minimum Stock Amount": "" },
-    { "Item ": "Kitchen Cleaner", "Internal Category": "Kitchen Supplies", "Packaging Qty": "3.5 ltre", "Minimum Stock Amount": "" },
-    { "Item ": "Alcohol Sanitiser", "Internal Category": "Kitchen Supplies", "Packaging Qty": "450g", "Minimum Stock Amount": "" },
-    { "Item ": "Brown Paper Food Bags", "Internal Category": "Packaging", "Packaging Qty": "50 Bags ", "Minimum Stock Amount": "" },
-    { "Item ": "Loaded Fries Boxes", "Internal Category": "Packaging", "Packaging Qty": "50 Boxes", "Minimum Stock Amount": "" },
-    { "Item ": "Packaging Labels", "Internal Category": "Packaging", "Packaging Qty": "45 per sheet", "Minimum Stock Amount": "" },
-    { "Item ": "Knife, Fork, Spoon Set", "Internal Category": "Packaging", "Packaging Qty": "50", "Minimum Stock Amount": "" }
-  ];
+  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenses = watch(['gasExpense']);
+  const wages = watch('wages');
+  const shopping = watch('shopping');
 
   useEffect(() => {
-    const savedDraft = localStorage.getItem('dailyShiftDraft');
-    if (savedDraft) {
-      setFormData(JSON.parse(savedDraft));
-    }
-  }, []);
+    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalSales', salesTotal);
+  }, [sales, setValue]);
 
-  const handleNumberNeededChange = (itemName: string, value: string) => {
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setFormData({
-        ...formData,
-        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
-      });
-    } else {
-      setErrorMessage(`Invalid input for ${itemName}: Only numbers or empty. Reasoning: Text/symbols cause DB errors (22P02); keeps form stable.`);
-    }
-  };
+  useEffect(() => {
+    const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+    const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+    const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0);
+    setValue('totalExpenses', expTotal);
+  }, [wages, shopping, expenses, setValue]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newSubmission = { ...formData, date: new Date().toLocaleString() };
-    const updatedSubmissions = [...submissions, newSubmission];
-    setSubmissions(updatedSubmissions);
-    localStorage.setItem('dailyShiftSubmissions', JSON.stringify(updatedSubmissions));
-    setFormData({ 
-      completedBy: '',
-      shiftDate: new Date().toISOString().split('T')[0],
-      grabSales: 0,
-      aroiDeeSales: 0,
-      qrScanSales: 0,
-      cashSales: 0,
-      wages: [],
-      shopping: [],
-      startingCash: 0,
-      endingCash: 0,
-      bankedAmount: 0,
-      rollsStock: 0,
-      meatStock: 0,
-      numberNeeded: {}
-    });
-    localStorage.removeItem('dailyShiftDraft');
-    setErrorMessage('');
-    // Optional backend
+  const onSubmit = async (data: any) => {
     try {
-      await axios.post('/api/daily-shift-forms', newSubmission);
+      const response = await fetch('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Submit failed');
+      const result = await response.json();
+      
+      if (!data.isDraft) {
+        // Generate shopping list from items with quantities > 0
+        const purchaseItems = [
+          ...data.freshFood.filter((f: any) => f.value > 0),
+          ...data.freshFoodAdditional.filter((f: any) => f.quantity > 0),
+          ...data.frozenFood.filter((f: any) => f.value > 0),
+          ...data.frozenFoodAdditional.filter((f: any) => f.quantity > 0),
+          ...data.shelfItems.filter((f: any) => f.value > 0),
+          ...data.shelfItemsAdditional.filter((f: any) => f.quantity > 0),
+          ...data.kitchenItems.filter((f: any) => f.value > 0),
+          ...data.kitchenItemsAdditional.filter((f: any) => f.quantity > 0),
+          ...data.packagingItems.filter((f: any) => f.value > 0),
+          ...data.packagingItemsAdditional.filter((f: any) => f.quantity > 0),
+        ].filter(item => 
+          item.name !== 'Burger Buns' && 
+          item.name !== 'Meat' && 
+          !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name)
+        );
+        
+        const shoppingList = purchaseItems.map(i => ({
+          itemName: i.name || i.item,
+          quantity: i.value || i.quantity,
+          unit: 'unit',
+          formId: result.id,
+          listDate: new Date(data.shiftDate).toISOString(),
+        }));
+        
+        await fetch('/api/shopping-list/bulk', {
+          method: 'POST',
+          body: JSON.stringify(shoppingList),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      
+      form.reset();
+      alert('Form submitted successfully!');
     } catch (err) {
-      setErrorMessage('Backend failed but saved locally. Reasoning: Connection/schema issue – retry later.');
+      console.error('Form submission error:', err);
+      alert('Error submitting form: ' + (err as Error).message);
     }
   };
 
   const saveDraft = () => {
-    localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
-    setErrorMessage('Draft saved.');
+    const data = form.getValues();
+    data.isDraft = true;
+    onSubmit(data);
   };
 
-  const groupedItems = items.reduce((acc: any, item: any) => {
-    const cat = item["Internal Category"] || 'Other';
-    if (cat) {
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(item);
-    }
-    return acc;
-  }, {});
-
   return (
-    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
-      <form onSubmit={handleSubmit}>
-        {Object.entries(groupedItems).map(([category, catItems]: [string, any]) => (
-          <div key={category} className="mb-8 shadow-lg rounded-lg p-6 bg-gray-800">
-            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-gray-600 pb-2">{category}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {catItems.map((item: any) => (
-                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
-                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
-                  <input
-                    type="text"
-                    placeholder="Number Needed"
-                    value={(formData.numberNeeded as any)[item["Item "]] || ''}
-                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
-                  />
-                </div>
-              ))}
+    <div className="min-h-screen bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6">
+      <Card className="max-w-4xl mx-auto bg-gray-800 text-white border-gray-600">
+        <CardHeader>
+          <h1 className="font-bold text-3xl text-center">Daily Sales & Stock Form</h1>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="font-medium text-sm text-white">Completed By*</Label>
+                <Input {...register("completedBy")} className="w-full bg-gray-700 text-white border-gray-600" />
+              </div>
+              <div>
+                <Label className="font-medium text-sm text-white">Shift Type</Label>
+                <select {...register("shiftType")} className="w-full p-2 border rounded bg-gray-700 text-white border-gray-600">
+                  <option value="opening">Opening</option>
+                  <option value="closing">Closing</option>
+                </select>
+              </div>
+              <div>
+                <Label className="font-medium text-sm text-white">Shift Date*</Label>
+                <Input type="datetime-local" {...register("shiftDate")} className="w-full bg-gray-700 text-white border-gray-600" />
+              </div>
+              <div>
+                <Label className="font-medium text-sm text-white">Starting Cash (฿)</Label>
+                <Input type="number" {...register("startingCash")} className="w-full bg-gray-700 text-white border-gray-600" />
+              </div>
             </div>
-          </div>
-        ))}
-        <div className="flex space-x-4">
-          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
-          <button type="submit" className="bg-blue-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
-        </div>
-      </form>
-      {errorMessage && (
-        <div className="mt-4 p-4 bg-red-500 rounded text-white">
-          <strong>Error:</strong> {errorMessage}
-        </div>
-      )}
-      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
-      <ul className="list-disc pl-5">
-        {submissions.map((sub: any, index: number) => (
-          <li key={index} className="mb-4">
-            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
-          </li>
-        ))}
-      </ul>
+
+            {/* Sales Information */}
+            <div className="bg-gray-700 p-6 rounded-lg">
+              <h3 className="font-bold text-xl mb-4">Sales Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="font-medium text-sm text-white">Grab Sales (฿)</Label>
+                  <Input type="number" {...register("grabSales")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Aroi Dee Sales (฿)</Label>
+                  <Input type="number" {...register("aroiDeeSales")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">QR Scan Sales (฿)</Label>
+                  <Input type="number" {...register("qrScanSales")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Cash Sales (฿)</Label>
+                  <Input type="number" {...register("cashSales")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <Label className="font-medium text-sm text-white">Total Sales (฿)</Label>
+                <Input disabled value={watch('totalSales')} className="w-full bg-gray-500 text-white" />
+              </div>
+            </div>
+
+            {/* Expenses */}
+            <div className="bg-gray-700 p-6 rounded-lg">
+              <h3 className="font-bold text-xl mb-4">Expenses</h3>
+              
+              {/* Wages */}
+              <div className="mb-4">
+                <Label className="font-medium text-sm text-white">Wages</Label>
+                {[...Array(wagesEntries)].map((_, i) => (
+                  <div key={i} className="flex gap-2 mb-2">
+                    <Input placeholder="Staff Name" {...register(`wages.${i}.staffName` as const)} className="flex-1 bg-gray-600 text-white border-gray-500" />
+                    <Input type="number" placeholder="Amount" {...register(`wages.${i}.amount` as const)} className="flex-1 bg-gray-600 text-white border-gray-500" />
+                    <select {...register(`wages.${i}.type` as const)} className="flex-1 p-2 border rounded bg-gray-600 text-white border-gray-500">
+                      <option value="wages">Wages</option>
+                      <option value="overtime">Overtime</option>
+                      <option value="other">Other</option>
+                    </select>
+                    {wagesEntries > 1 && (
+                      <Button type="button" variant="destructive" onClick={() => setWagesEntries(wagesEntries - 1)}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" onClick={() => setWagesEntries(wagesEntries + 1)} className="bg-blue-600 hover:bg-blue-700">
+                  Add Wage Entry
+                </Button>
+              </div>
+
+              {/* Shopping */}
+              <div className="mb-4">
+                <Label className="font-medium text-sm text-white">Shopping</Label>
+                {[...Array(shoppingEntries)].map((_, i) => (
+                  <div key={i} className="flex gap-2 mb-2">
+                    <Input placeholder="Item Purchased" {...register(`shopping.${i}.item` as const)} className="flex-1 bg-gray-600 text-white border-gray-500" />
+                    <Input type="number" placeholder="Amount" {...register(`shopping.${i}.amount` as const)} className="flex-1 bg-gray-600 text-white border-gray-500" />
+                    <Input placeholder="Shop Name" {...register(`shopping.${i}.shopName` as const)} className="flex-1 bg-gray-600 text-white border-gray-500" />
+                    {shoppingEntries > 1 && (
+                      <Button type="button" variant="destructive" onClick={() => setShoppingEntries(shoppingEntries - 1)}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" onClick={() => setShoppingEntries(shoppingEntries + 1)} className="bg-blue-600 hover:bg-blue-700">
+                  Add Shopping Entry
+                </Button>
+              </div>
+
+              <div>
+                <Label className="font-medium text-sm text-white">Gas Expense (฿)</Label>
+                <Input type="number" {...register("gasExpense")} className="w-full bg-gray-600 text-white border-gray-500" />
+              </div>
+
+              <div className="mt-4">
+                <Label className="font-medium text-sm text-white">Total Expenses (฿)</Label>
+                <Input disabled value={watch('totalExpenses')} className="w-full bg-gray-500 text-white" />
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-gray-700 p-6 rounded-lg">
+              <h3 className="font-bold text-xl mb-4">Summary</h3>
+              <div className="space-y-2">
+                <p>Total Sales: ฿{watch('totalSales')}</p>
+                <p>Breakdown: Grab ฿{watch('grabSales')}, Aroi Dee ฿{watch('aroiDeeSales')}, QR ฿{watch('qrScanSales')}, Cash ฿{watch('cashSales')}</p>
+                <p>Total Expenses: ฿{watch('totalExpenses')}</p>
+                <p>Breakdown: Wages ฿{watch('wages').reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0)}, Shopping ฿{watch('shopping').reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0)}, Gas ฿{watch('gasExpense')}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label className="font-medium text-sm text-white">Total Cash in Register at Closing (฿)</Label>
+                  <Input type="number" {...register("endCash")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Amount to be Banked (฿)</Label>
+                  <Input type="number" {...register("bankedAmount")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Stock and Produce */}
+            <div className="bg-gray-700 p-6 rounded-lg">
+              <h3 className="font-bold text-xl mb-4">Stock and Produce</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="font-medium text-sm text-white">Burger Buns Stock (In Hand)</Label>
+                  <Input type="number" {...register("burgerBunsStock")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Meat Weight (In Hand, kg)</Label>
+                  <Input type="number" {...register("meatWeight")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+              </div>
+              
+              <h4 className="font-semibold text-lg mt-6 mb-4">Drink Details (In Hand)</h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <Label className="font-medium text-sm text-white">Coke</Label>
+                  <Input type="number" {...register("coke")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Coke Zero</Label>
+                  <Input type="number" {...register("cokeZero")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Sprite</Label>
+                  <Input type="number" {...register("sprite")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Schweppes Manow</Label>
+                  <Input type="number" {...register("schweppesManow")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Fanta Orange</Label>
+                  <Input type="number" {...register("fantaOrange")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Fanta Strawberry</Label>
+                  <Input type="number" {...register("fantaStrawberry")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Soda Water</Label>
+                  <Input type="number" {...register("sodaWater")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Water</Label>
+                  <Input type="number" {...register("water")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Kids Orange</Label>
+                  <Input type="number" {...register("kidsOrange")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+                <div>
+                  <Label className="font-medium text-sm text-white">Kids Apple</Label>
+                  <Input type="number" {...register("kidsApple")} className="w-full bg-gray-600 text-white border-gray-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-4 justify-center">
+              <Button type="button" onClick={saveDraft} className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3">
+                Save as Draft
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3">
+                Submit Form
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
