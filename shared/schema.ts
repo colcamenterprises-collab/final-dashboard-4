@@ -23,9 +23,9 @@ export const dailySales = pgTable("daily_sales", {
 // Enhanced Daily Stock Sales table
 export const dailyStockSales = pgTable('daily_stock_sales', {
   id: serial('id').primaryKey(),
-  completedBy: varchar('completed_by', { length: 255 }),
-  shiftType: varchar('shift_type', { length: 50 }),
-  shiftDate: timestamp('shift_date'),
+  completedBy: text('completed_by').notNull(),
+  shiftType: text('shift_type').notNull(),
+  shiftDate: timestamp('shift_date').notNull(),
   startingCash: decimal('starting_cash', { precision: 10, scale: 2 }).default('0'),
   grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
   aroiDeeSales: decimal('aroi_dee_sales', { precision: 10, scale: 2 }).default('0'),
@@ -49,7 +49,9 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   shelfItems: jsonb('shelf_items'),
   kitchenItems: jsonb('kitchen_items'),
   packagingItems: jsonb('packaging_items'),
-  // Additional fields for enhanced functionality
+  // Number needed field for inventory requirements
+  numberNeeded: jsonb('number_needed').default('{}'),
+  // Additional fields for enhanced functionality  
   notes: text('notes'),
   discrepancyNotes: text('discrepancy_notes'),
   status: varchar('status', { length: 50 }).default('draft'),

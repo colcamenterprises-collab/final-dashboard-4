@@ -341,14 +341,22 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Daily shift form submission:", data);
       
-      // Parse numberNeeded for numeric fields to avoid 22P02 error
+      // Validate required fields early
+      if (!data.completedBy || !data.shiftType) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: completedBy and shiftType are required' 
+        });
+      }
+      
+      // Parse numberNeeded for numeric fields and store in number_needed column
       if (data.numberNeeded && typeof data.numberNeeded === 'object') {
-        data.numberNeeded = Object.fromEntries(
+        data.number_needed = Object.fromEntries(
           Object.entries(data.numberNeeded).map(([key, value]) => [
             key, 
             parseFloat(value as string) || 0
           ])
         );
+        delete data.numberNeeded; // Remove original field
       }
       
       // Ensure shiftDate is a Date object
@@ -475,27 +483,49 @@ export function registerRoutes(app: express.Application): Server {
       if (data.shopping_entries) {
         data.shopping_entries = JSON.stringify(data.shopping_entries);
       }
+
+      if (data.number_needed) {
+        data.number_needed = JSON.stringify(data.number_needed);
+      }
       
       // Map required fields and set defaults
-      data.completed_by = data.completedBy || '';
-      data.shift_type = data.shiftType || '';
-      data.shift_date = data.shiftDate || new Date();
+      const completedBy = data.completedBy || '';
+      const shiftType = data.shiftType || '';
+      const shiftDate = data.shiftDate ? new Date(data.shiftDate) : new Date();
+      
+      // Remove the camelCase fields to avoid conflicts before inserting
+      delete data.completedBy;
+      delete data.shiftType;
+      delete data.shiftDate;
+      
+      // Set mapped values
+      data.completed_by = completedBy;
+      data.shift_type = shiftType;
+      data.shift_date = shiftDate;
       
       // Set defaults
       data.status = 'completed';
       data.is_draft = false;
       
-      // Remove the camelCase fields to avoid conflicts
-      delete data.completedBy;
-      delete data.shiftType;
-      delete data.shiftDate;
-      
       let result;
       
-      // Use database transaction
-      await db.transaction(async (tx) => {
-        [result] = await tx.insert(dailyStockSales).values(data).returning();
-      });
+      // Debug: Log the final data being inserted
+      console.log("Final data for database insertion:", JSON.stringify(data, null, 2));
+      
+      // Simple direct insert with minimal required fields
+      try {
+        [result] = await db.insert(dailyStockSales).values({
+          completedBy: data.completed_by,
+          shiftType: data.shift_type,
+          shiftDate: data.shift_date,
+          numberNeeded: data.number_needed || {},
+          status: 'completed',
+          isDraft: false
+        }).returning();
+      } catch (insertError: any) {
+        console.error('Database insert error:', insertError);
+        throw insertError;
+      }
       
       console.log("✅ Daily shift form saved successfully with ID:", result.id);
       res.json(result);
