@@ -393,6 +393,32 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Daily Shift Forms endpoint (simplified responsive form)
+  app.post("/api/daily-shift-forms", async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      console.log("Daily shift form submission:", data);
+      
+      // Store form data with proper structure
+      const formData = {
+        completedBy: 'Shift Staff',
+        shiftType: 'daily',
+        shiftDate: new Date(),
+        numberNeeded: JSON.stringify(data.numberNeeded || {}),
+        isDraft: false,
+        status: 'completed'
+      };
+      
+      const [result] = await db.insert(dailyStockSales).values(formData).returning();
+      console.log("✅ Daily shift form saved with ID:", result.id);
+      
+      res.json(result);
+    } catch (err: any) {
+      console.error("Daily shift form error:", err);
+      res.status(500).json({ error: 'Failed to save daily shift form', details: err.message });
+    }
+  });
+
   // Daily Stock Sales endpoints
   app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {

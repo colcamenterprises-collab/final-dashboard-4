@@ -1,345 +1,176 @@
-import { useState, useEffect } from 'react';
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+interface FormData {
+  numberNeeded: Record<string, string>;
+}
+
+interface Submission {
+  date: string;
+  numberNeeded: Record<string, string>;
+}
+
+interface Item {
+  "Item ": string;
+  "Internal Category": string;
+}
 
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState({
-    completedBy: '',
-    shiftType: 'opening',
-    shiftDate: new Date().toISOString().slice(0, 16),
-    startingCash: 0,
-    grabSales: 0,
-    aroiDeeSales: 0,
-    qrScanSales: 0,
-    cashSales: 0,
-    wages: [{ staffName: '', amount: 0, type: 'wages' }],
-    shopping: [{ item: '', amount: 0, shopName: '' }],
-    gasExpense: 0,
-    endCash: 0,
-    bankedAmount: 0,
-    burgerBunsStock: 0,
-    meatWeight: 0,
-    coke: 0,
-    cokeZero: 0,
-    sprite: 0,
-    schweppesManow: 0,
-    fantaOrange: 0,
-    fantaStrawberry: 0,
-    sodaWater: 0,
-    water: 0,
-    kidsOrange: 0,
-    kidsApple: 0,
-    freshFood: { 'Salad (Iceberg Lettuce)': 0, Tomatos: 0, 'White Cabbage': 0, 'Purple Cabbage': 0, 'Bacon Short': 0, 'Bacon Long': 0, Milk: 0, Butter: 0 },
-    frozenFood: { 'Chicken Nuggets': 0, 'Sweet Potato Fries': 0, 'French Fries (7mm)': 0, 'Chicken Fillets': 0 },
-    shelfItems: { Mayonnaise: 0, Mustard: 0, 'Dill Pickles': 0, 'Sweet Pickles': 0, Salt: 0, Pepper: 0, 'Cajun Spice': 0, 'White Vinegar': 0, 'Crispy Fried Onions': 0, 'Paprika (Smoked)': 0, Jalapenos: 0, 'Sriracha Mayonnaise': 0, 'Chipotle Mayonnaise': 0, Flour: 0, 'French Fries Seasoning BBQ': 0 },
-    kitchenItems: { 'Kitchen Cleaner': 0, 'Floor Cleaner': 0, 'Dishwashing Liquid': 0, 'Gloves Medium': 0, 'Gloves Large': 0, 'Gloves Small': 0, 'Plastic Meat Gloves': 0, 'Paper Towel Long': 0, 'Paper Towel Short': 0, 'Bin Bags 30x40': 0, 'Printer Rolls': 0, 'Sticky Tape': 0 },
-    packagingItems: { 'Loaded Fries Box': 0, 'French Fries Box 600ml': 0, 'Takeaway Sauce Container': 0, 'Coleslaw Container': 0, 'Burger Wrapping Paper': 0, 'French Fries Paper': 0, 'Paper Bags': 0, 'Plastic Bags 8x16': 0, 'Plastic Bags 9x18': 0, 'Knife and Fork Set': 0, 'Bag Close Stickers': 0, 'Sauce Container Stickers': 0, 'Flag Stickers': 0, 'Burger Sweets Takeaway': 0 },
-    isDraft: false,
-  });
+  const [formData, setFormData] = useState<FormData>({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const [totalSales, setTotalSales] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
+  // Items from CSV (complete supplier list)
+  const items = [
+    { "Item ": "Topside Beef", "Internal Category": "Fresh Food" },
+    { "Item ": "Brisket Point End", "Internal Category": "Fresh Food" },
+    { "Item ": "Chuck Roll Beef", "Internal Category": "Fresh Food" },
+    { "Item ": "Other Beef (Mixed)", "Internal Category": "Fresh Food" },
+    { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food" },
+    { "Item ": "Milk", "Internal Category": "Fresh Food" },
+    { "Item ": "Burger Bun", "Internal Category": "Fresh Food" },
+    { "Item ": "Tomatos", "Internal Category": "Fresh Food" },
+    { "Item ": "White Cabbage", "Internal Category": "Fresh Food" },
+    { "Item ": "Purple Cabbage", "Internal Category": "Fresh Food" },
+    { "Item ": "Onions Bulk 10kg", "Internal Category": "Fresh Food" },
+    { "Item ": "Onions (small bags)", "Internal Category": "Fresh Food" },
+    { "Item ": "Cheese", "Internal Category": "Fresh Food" },
+    { "Item ": "Bacon Short", "Internal Category": "Fresh Food" },
+    { "Item ": "Bacon Long", "Internal Category": "Fresh Food" },
+    { "Item ": "Jalapenos", "Internal Category": "Fresh Food" },
+    { "Item ": "French Fries 7mm", "Internal Category": "Frozen Food" },
+    { "Item ": "Chicken Nuggets", "Internal Category": "Frozen Food" },
+    { "Item ": "Chicken Fillets", "Internal Category": "Frozen Food" },
+    { "Item ": "Sweet Potato Fries", "Internal Category": "Frozen Food" },
+    { "Item ": "Cajun Fries Seasoning", "Internal Category": "Shelf Items" },
+    { "Item ": "Crispy Fried Onions", "Internal Category": "Shelf Items" },
+    { "Item ": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items" },
+    { "Item ": "Pickles Sweet (standard)", "Internal Category": "Shelf Items" },
+    { "Item ": "Mustard", "Internal Category": "Shelf Items" },
+    { "Item ": "Mayonnaise", "Internal Category": "Shelf Items" },
+    { "Item ": "Tomato Sauce", "Internal Category": "Shelf Items" },
+    { "Item ": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items" },
+    { "Item ": "BBQ Sauce", "Internal Category": "Shelf Items" },
+    { "Item ": "Sriracha Sauce", "Internal Category": "Shelf Items" },
+    { "Item ": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items" },
+    { "Item ": "Oil (Fryer)", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Plastic Food Wrap", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Paper Towel Long", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Paper Towel Short (Serviettes)", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Food Gloves (Large)", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Food Gloves (Medium)", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Food Gloves (Small)", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Aluminum Foil", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Plastic Meat Gloves", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Kitchen Cleaner", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Alcohol Sanitiser", "Internal Category": "Kitchen Supplies" },
+    { "Item ": "Coke", "Internal Category": "Drinks" },
+    { "Item ": "Coke Zero", "Internal Category": "Drinks" },
+    { "Item ": "Fanta Orange", "Internal Category": "Drinks" },
+    { "Item ": "Fanta Strawberry", "Internal Category": "Drinks" },
+    { "Item ": "Schweppes Manow", "Internal Category": "Drinks" },
+    { "Item ": "Kids Juice (Orange)", "Internal Category": "Drinks" },
+    { "Item ": "Kids Juice (Apple)", "Internal Category": "Drinks" },
+    { "Item ": "Sprite", "Internal Category": "Drinks" },
+    { "Item ": "Soda Water", "Internal Category": "Drinks" },
+    { "Item ": "Bottled Water", "Internal Category": "Drinks" },
+    { "Item ": "French Fries Box", "Internal Category": "Packaging" },
+    { "Item ": "Plastic Carry Bags (Size- 6×14)", "Internal Category": "Packaging" },
+    { "Item ": "Plastic Carry Bags (Size - 9×18)", "Internal Category": "Packaging" },
+    { "Item ": "Brown Paper Food Bags", "Internal Category": "Packaging" },
+    { "Item ": "Loaded Fries Boxes", "Internal Category": "Packaging" },
+    { "Item ": "Packaging Labels", "Internal Category": "Packaging" },
+    { "Item ": "Knife, Fork, Spoon Set", "Internal Category": "Packaging" }
+  ];
 
   useEffect(() => {
-    const salesTotal = (formData.grabSales || 0) + (formData.aroiDeeSales || 0) + (formData.qrScanSales || 0) + (formData.cashSales || 0);
-    setTotalSales(salesTotal);
-    const wagesTotal = formData.wages.reduce((sum, w) => sum + (w.amount || 0), 0);
-    const shoppingTotal = formData.shopping.reduce((sum, s) => sum + (s.amount || 0), 0);
-    const expTotal = wagesTotal + shoppingTotal + (formData.gasExpense || 0);
-    setTotalExpenses(expTotal);
-  }, [formData.grabSales, formData.aroiDeeSales, formData.qrScanSales, formData.cashSales, formData.wages, formData.shopping, formData.gasExpense]);
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      setFormData(JSON.parse(savedDraft));
+      setErrorMessage('Loaded from draft.');
+    }
+  }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) || value }));
-  };
-
-  const handleArrayChange = (e, index, field) => {
-    const { name, value } = e.target;
-    setFormData(prev => {
-      const newArray = [...prev[field]];
-      newArray[index] = { ...newArray[index], [name.split('.')[1]]: value === '' ? 0 : Number(value) || value };
-      return { ...prev, [field]: newArray };
-    });
-  };
-
-  const addWageEntry = () => setFormData(prev => ({ ...prev, wages: [...prev.wages, { staffName: '', amount: 0, type: 'wages' }] }));
-  const removeWageEntry = (index) => setFormData(prev => ({ ...prev, wages: prev.wages.filter((_, i) => i !== index) }));
-  const addShoppingEntry = () => setFormData(prev => ({ ...prev, shopping: [...prev.shopping, { item: '', amount: 0, shopName: '' }] }));
-  const removeShoppingEntry = (index) => setFormData(prev => ({ ...prev, shopping: prev.shopping.filter((_, i) => i !== index) }));
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('/api/daily-stock-sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+  const handleNumberNeededChange = (itemName: string, value: string) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setFormData({
+        ...formData,
+        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
       });
-      if (!response.ok) throw new Error('Submit failed');
-      const result = await response.json();
-      if (!formData.isDraft) {
-        const purchaseItems = [
-          ...Object.entries(formData.freshFood).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value })),
-          ...Object.entries(formData.frozenFood).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value })),
-          ...Object.entries(formData.shelfItems).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value })),
-          ...Object.entries(formData.kitchenItems).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value })),
-          ...Object.entries(formData.packagingItems).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value })),
-        ].filter(item => item.name !== 'Burger Buns' && item.name !== 'Meat' && !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name));
-        await fetch('/api/shopping-list/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(purchaseItems.map(i => ({ itemName: i.name, quantity: i.value, unit: 'unit', formId: result.id, listDate: formData.shiftDate }))),
-        });
-      }
-      alert('Form submitted successfully');
-      setFormData(prev => ({ ...prev, isDraft: false })); // Reset draft flag on save
-    } catch (err) {
-      console.error('Submit error:', err);
-      alert('Error submitting form: ' + err.message);
+    } else {
+      setErrorMessage(`Invalid input for ${itemName}: Only numbers or empty. Reasoning: Text/symbols cause DB errors (22P02).`);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('/api/daily-shift-forms', formData);
+      setSubmissions([...submissions, { ...response.data, date: new Date().toLocaleString() }]);
+      setFormData({ numberNeeded: {} });
+      localStorage.removeItem('dailyShiftDraft');
+      setErrorMessage('');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Internal Server Error';
+      setErrorMessage(`${msg}. Reasoning: Likely type mismatch (e.g., non-number in numeric field). Check inputs and try again.`);
+    }
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
+    setErrorMessage('Draft saved.');
+  };
+
+  const groupedItems = items.reduce((acc: Record<string, Item[]>, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {});
+
   return (
-    <div className="min-h-screen bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6">
-      <Card className="max-w-4xl mx-auto bg-gray-800 text-white border-gray-600">
-        <CardHeader>
-          <h1 className="font-bold text-3xl text-center">Daily Sales & Stock Form</h1>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-6">
-            {/* Basic Information */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="font-medium text-sm text-white">Completed By*</Label>
-                  <Input name="completedBy" value={formData.completedBy} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
+    <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-6 sm:mb-8 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
+            <h2 className="text-xl font-bold uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-600 pb-2">{category}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-3 sm:p-4 rounded-lg">
+                  <label className="block mb-1 sm:mb-2 font-semibold text-sm sm:text-base">{item["Item "]}</label>
+                  <input
+                    type="text"
+                    placeholder="Number Needed"
+                    value={formData.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-1 sm:p-2 bg-gray-700 text-white rounded border-none focus:outline-none text-sm sm:text-base"
+                  />
                 </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Shift Type</Label>
-                  <select name="shiftType" value={formData.shiftType} onChange={handleChange} className="w-full p-2 border rounded bg-gray-600 text-white border-gray-500">
-                    <option value="opening">Opening</option>
-                    <option value="closing">Closing</option>
-                  </select>
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Shift Date*</Label>
-                  <Input type="datetime-local" name="shiftDate" value={formData.shiftDate} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Starting Cash (฿)</Label>
-                  <Input type="number" name="startingCash" value={formData.startingCash} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Sales Information */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Sales Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="font-medium text-sm text-white">Grab Sales (฿)</Label>
-                  <Input type="number" name="grabSales" value={formData.grabSales} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Aroi Dee Sales (฿)</Label>
-                  <Input type="number" name="aroiDeeSales" value={formData.aroiDeeSales} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">QR Scan Sales (฿)</Label>
-                  <Input type="number" name="qrScanSales" value={formData.qrScanSales} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Cash Sales (฿)</Label>
-                  <Input type="number" name="cashSales" value={formData.cashSales} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <Label className="font-medium text-sm text-white">Total Sales (฿)</Label>
-                <Input type="number" value={totalSales} disabled className="w-full bg-gray-500 text-white" />
-              </div>
-            </div>
-
-            {/* Expenses */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Expenses</h3>
-              
-              {/* Wages */}
-              <div className="mb-4">
-                <Label className="font-medium text-sm text-white">Wages</Label>
-                {formData.wages.map((wage, i) => (
-                  <div key={i} className="flex gap-2 mb-2">
-                    <Input placeholder="Staff Name" name={`wages[${i}].staffName`} value={wage.staffName} onChange={(e) => handleArrayChange(e, i, 'wages')} className="flex-1 bg-gray-600 text-white border-gray-500" />
-                    <Input type="number" placeholder="Amount" name={`wages[${i}].amount`} value={wage.amount} onChange={(e) => handleArrayChange(e, i, 'wages')} className="flex-1 bg-gray-600 text-white border-gray-500" />
-                    <select name={`wages[${i}].type`} value={wage.type} onChange={(e) => handleArrayChange(e, i, 'wages')} className="flex-1 p-2 border rounded bg-gray-600 text-white border-gray-500">
-                      <option value="wages">Wages</option>
-                      <option value="overtime">Overtime</option>
-                      <option value="other">Other</option>
-                    </select>
-                    {formData.wages.length > 1 && <Button type="button" variant="destructive" onClick={() => removeWageEntry(i)} className="ml-2">Remove</Button>}
-                  </div>
-                ))}
-                <Button type="button" onClick={addWageEntry} className="bg-blue-600 hover:bg-blue-700">Add Wage Entry</Button>
-              </div>
-
-              {/* Shopping */}
-              <div className="mb-4">
-                <Label className="font-medium text-sm text-white">Shopping</Label>
-                {formData.shopping.map((shop, i) => (
-                  <div key={i} className="flex gap-2 mb-2">
-                    <Input placeholder="Item Purchased" name={`shopping[${i}].item`} value={shop.item} onChange={(e) => handleArrayChange(e, i, 'shopping')} className="flex-1 bg-gray-600 text-white border-gray-500" />
-                    <Input type="number" placeholder="Amount" name={`shopping[${i}].amount`} value={shop.amount} onChange={(e) => handleArrayChange(e, i, 'shopping')} className="flex-1 bg-gray-600 text-white border-gray-500" />
-                    <Input placeholder="Shop Name" name={`shopping[${i}].shopName`} value={shop.shopName} onChange={(e) => handleArrayChange(e, i, 'shopping')} className="flex-1 bg-gray-600 text-white border-gray-500" />
-                    {formData.shopping.length > 1 && <Button type="button" variant="destructive" onClick={() => removeShoppingEntry(i)} className="ml-2">Remove</Button>}
-                  </div>
-                ))}
-                <Button type="button" onClick={addShoppingEntry} className="bg-blue-600 hover:bg-blue-700">Add Shopping Entry</Button>
-              </div>
-
-              <div>
-                <Label className="font-medium text-sm text-white">Gas Expense (฿)</Label>
-                <Input type="number" name="gasExpense" value={formData.gasExpense} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-              </div>
-
-              <div className="mt-4">
-                <Label className="font-medium text-sm text-white">Total Expenses (฿)</Label>
-                <Input type="number" value={totalExpenses} disabled className="w-full bg-gray-500 text-white" />
-              </div>
-            </div>
-
-            {/* Summary */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Summary</h3>
-              <div className="space-y-2 text-white">
-                <p>Total Sales: ฿{totalSales}</p>
-                <p>Breakdown: Grab ฿{formData.grabSales}, Aroi Dee ฿{formData.aroiDeeSales}, QR ฿{formData.qrScanSales}, Cash ฿{formData.cashSales}</p>
-                <p>Total Expenses: ฿{totalExpenses}</p>
-                <p>Breakdown: Wages ฿{formData.wages.reduce((sum, w) => sum + (w.amount || 0), 0)}, Shopping ฿{formData.shopping.reduce((sum, s) => sum + (s.amount || 0), 0)}, Gas ฿{formData.gasExpense}</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <Label className="font-medium text-sm text-white">Total Cash in Register at Closing (฿)</Label>
-                  <Input type="number" name="endCash" value={formData.endCash} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Amount to be Banked (฿)</Label>
-                  <Input type="number" name="bankedAmount" value={formData.bankedAmount} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-              </div>
-            </div>
-
-            {/* Stock and Produce */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Stock and Produce</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="font-medium text-sm text-white">Burger Buns Stock (In Hand)</Label>
-                  <Input type="number" name="burgerBunsStock" value={formData.burgerBunsStock} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-                <div>
-                  <Label className="font-medium text-sm text-white">Meat Weight (In Hand, kg)</Label>
-                  <Input type="number" name="meatWeight" value={formData.meatWeight} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                </div>
-              </div>
-              
-              <h4 className="font-semibold text-lg mt-6 mb-4">Drink Details (In Hand)</h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {[
-                  { key: 'coke', label: 'Coke' },
-                  { key: 'cokeZero', label: 'Coke Zero' },
-                  { key: 'sprite', label: 'Sprite' },
-                  { key: 'schweppesManow', label: 'Schweppes Manow' },
-                  { key: 'fantaOrange', label: 'Fanta Orange' },
-                  { key: 'fantaStrawberry', label: 'Fanta Strawberry' },
-                  { key: 'sodaWater', label: 'Soda Water' },
-                  { key: 'water', label: 'Water' },
-                  { key: 'kidsOrange', label: 'Kids Orange' },
-                  { key: 'kidsApple', label: 'Kids Apple' }
-                ].map(drink => (
-                  <div key={drink.key}>
-                    <Label className="font-medium text-sm text-white">{drink.label}</Label>
-                    <Input type="number" name={drink.key} value={formData[drink.key]} onChange={handleChange} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Fresh Food */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Fresh Food</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(formData.freshFood).map(([name, value]) => (
-                  <div key={name}>
-                    <Label className="font-medium text-sm text-white">{name}</Label>
-                    <Input type="number" value={value} onChange={(e) => setFormData(prev => ({ ...prev, freshFood: { ...prev.freshFood, [name]: Number(e.target.value) || 0 } }))} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Frozen Food */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Frozen Food</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(formData.frozenFood).map(([name, value]) => (
-                  <div key={name}>
-                    <Label className="font-medium text-sm text-white">{name}</Label>
-                    <Input type="number" value={value} onChange={(e) => setFormData(prev => ({ ...prev, frozenFood: { ...prev.frozenFood, [name]: Number(e.target.value) || 0 } }))} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Shelf Items */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Shelf Items</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {Object.entries(formData.shelfItems).map(([name, value]) => (
-                  <div key={name}>
-                    <Label className="font-medium text-sm text-white">{name}</Label>
-                    <Input type="number" value={value} onChange={(e) => setFormData(prev => ({ ...prev, shelfItems: { ...prev.shelfItems, [name]: Number(e.target.value) || 0 } }))} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Kitchen Items */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Kitchen Items</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {Object.entries(formData.kitchenItems).map(([name, value]) => (
-                  <div key={name}>
-                    <Label className="font-medium text-sm text-white">{name}</Label>
-                    <Input type="number" value={value} onChange={(e) => setFormData(prev => ({ ...prev, kitchenItems: { ...prev.kitchenItems, [name]: Number(e.target.value) || 0 } }))} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Packaging Items */}
-            <div className="bg-gray-700 p-6 rounded-lg">
-              <h3 className="font-bold text-xl mb-4">Packaging Items</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {Object.entries(formData.packagingItems).map(([name, value]) => (
-                  <div key={name}>
-                    <Label className="font-medium text-sm text-white">{name}</Label>
-                    <Input type="number" value={value} onChange={(e) => setFormData(prev => ({ ...prev, packagingItems: { ...prev.packagingItems, [name]: Number(e.target.value) || 0 } }))} className="w-full bg-gray-600 text-white border-gray-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex space-x-4 justify-center">
-              <Button type="submit" onClick={() => setFormData(prev => ({ ...prev, isDraft: true }))} className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3">Save Draft</Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3">Save</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        ))}
+        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-sm sm:text-base">Save as Draft</button>
+          <button type="submit" className="bg-orange-500 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-sm sm:text-base">Submit Form</button>
+        </div>
+      </form>
+      {errorMessage && (
+        <div className="mt-4 p-3 sm:p-4 bg-red-500 rounded text-white text-sm sm:text-base">
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+      <h2 className="text-xl font-bold mt-6 sm:mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5 text-sm sm:text-base">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
