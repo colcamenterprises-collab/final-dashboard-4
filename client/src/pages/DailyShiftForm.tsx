@@ -1,90 +1,93 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState({ 
+  const [formData, setFormData] = useState({
     completedBy: '',
-    shiftType: '',
     shiftDate: new Date().toISOString().split('T')[0],
-    numberNeeded: {} 
+    grabSales: 0,
+    aroiDeeSales: 0,
+    qrScanSales: 0,
+    cashSales: 0,
+    wages: [],
+    shopping: [],
+    startingCash: 0,
+    endingCash: 0,
+    bankedAmount: 0,
+    rollsStock: 0,
+    meatStock: 0,
+    numberNeeded: {}
   });
-  const [submissions, setSubmissions] = useState([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Authentic items from CSV - Full supplier list
+  // CSV items as JSON (full updated list; filtered unwanted in Fresh Food)
   const items = [
-    // Fresh Food
-    { "Item ": "Topside Beef", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿319.00" },
-    { "Item ": "Brisket Point End", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿299.00" },
-    { "Item ": "Chuck Roll Beef", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿319.00" },
-    { "Item ": "Other Beef (Mixed)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿310.00" },
-    { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿99.00" },
-    { "Item ": "Milk", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿80.00" },
-    { "Item ": "Burger Bun", "Internal Category": "Fresh Food", "Supplier": "Bakery", "Cost ": "฿8.00" },
-    { "Item ": "Tomatos", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿89.00" },
-    { "Item ": "White Cabbage", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿45.00" },
-    { "Item ": "Purple Cabbage", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿41.25" },
-    { "Item ": "Onions Bulk 10kg", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿290.00" },
-    { "Item ": "Onions (small bags)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿29.00" },
-    { "Item ": "Cheese", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿359.00" },
-    { "Item ": "Bacon Short", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿305.00" },
-    { "Item ": "Bacon Long", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿430.00" },
-    { "Item ": "Jalapenos", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿190.00" },
-    
-    // Frozen Food
-    { "Item ": "French Fries 7mm", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿129.00" },
-    { "Item ": "Chicken Nuggets", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿155.00" },
-    { "Item ": "Chicken Fillets", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿199.00" },
-    { "Item ": "Sweet Potato Fries", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿145.00" },
-    
-    // Shelf Items
-    { "Item ": "Cajun Fries Seasoning", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿508.00" },
-    { "Item ": "Crispy Fried Onions", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿79.00" },
-    { "Item ": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿89.00" },
-    { "Item ": "Pickles Sweet (standard)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿89.00" },
-    { "Item ": "Mustard", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿88.00" },
-    { "Item ": "Mayonnaise", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿90.00" },
-    { "Item ": "Tomato Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿175.00" },
-    { "Item ": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿108.00" },
-    { "Item ": "BBQ Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿110.00" },
-    { "Item ": "Sriracha Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿108.00" },
-    { "Item ": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items", "Supplier": "Online", "Cost ": "฿121.00" },
-    
-    // Kitchen Supplies
-    { "Item ": "Oil (Fryer)", "Internal Category": "Kitchen Supplies", "Supplier": "Makro", "Cost ": "฿195.00" },
-    
-    // Drinks
-    { "Item ": "Coke", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿315.00" },
-    { "Item ": "Coke Zero", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿315.00" },
-    { "Item ": "Fanta Orange", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
-    { "Item ": "Fanta Strawberry", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
-    { "Item ": "Schweppes Manow", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿84.00" },
-    { "Item ": "Kids Juice (Orange)", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿99.00" },
-    { "Item ": "Kids Juice (Apple)", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿99.00" },
-    { "Item ": "Sprite", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
-    { "Item ": "Soda Water", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿52.00" },
-    { "Item ": "Bottled Water", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿49.00" }
+    { "Item ": "Topside Beef", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "10kg" },
+    // Removed Brisket Point End, Chuck Roll Beef, Other Beef (Mixed) as per PDF
+    { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food", "Packaging Qty": "N/A", "Minimum Stock Amount": "" },
+    { "Item ": "Milk", "Internal Category": "Fresh Food", "Packaging Qty": "1 litre", "Minimum Stock Amount": "" },
+    { "Item ": "Burger Bun", "Internal Category": "Fresh Food", "Packaging Qty": "1", "Minimum Stock Amount": "" },
+    { "Item ": "Tomatos", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "White Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Purple Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Onions Bulk 10kg", "Internal Category": "Fresh Food", "Packaging Qty": "10kg", "Minimum Stock Amount": "" },
+    { "Item ": "Onions (small bags)", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "French Fries 7mm ", "Internal Category": "Frozen Food ", "Packaging Qty": "2kg", "Minimum Stock Amount": "" },
+    { "Item ": "Chicken Nuggets", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Chicken Fillets", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Cajun Fries Seasoning", "Internal Category": "Shelf Items", "Packaging Qty": "510 G", "Minimum Stock Amount": "" },
+    { "Item ": "Sweet Potato Fries", "Internal Category": "Frozen Food ", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Crispy Fried Onions", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item ": "Cheese", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item ": "Bacon Short", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item ": "Bacon Long", "Internal Category": "Fresh Food", "Packaging Qty": "2 kg", "Minimum Stock Amount": "" },
+    { "Item ": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items", "Packaging Qty": "480 g", "Minimum Stock Amount": "" },
+    { "Item ": "Pickles Sweet (standard)", "Internal Category": "Shelf Items", "Packaging Qty": "480 gr", "Minimum Stock Amount": "" },
+    { "Item ": "Jalapenos", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item ": "Mustard", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Mayonnaise", "Internal Category": "Shelf Items", "Packaging Qty": "1", "Minimum Stock Amount": "" },
+    { "Item ": "Tomato Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "5 Litres", "Minimum Stock Amount": "" },
+    { "Item ": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items", "Packaging Qty": "1000g", "Minimum Stock Amount": "" },
+    { "Item ": "BBQ Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item ": "Sriracha Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "950g", "Minimum Stock Amount": "" },
+    { "Item ": "Oil (Fryer)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "5 L", "Minimum Stock Amount": "" },
+    { "Item ": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item ": "Coke", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "20" },
+    { "Item ": "Coke Zero", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "16" },
+    { "Item ": "Fanta Orange", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Fanta Strawberry", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Schweppes Manow", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Kids Juice (Orange)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Kids Juice (Apple)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Sprite", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item ": "Soda Water", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "10" },
+    { "Item ": "Bottled Water", "Internal Category": "Drinks", "Packaging Qty": "12", "Minimum Stock Amount": "12" },
+    { "Item ": "French Fries Box", "Internal Category": "Packaging", "Packaging Qty": "1 bag 50 piece", "Minimum Stock Amount": "" },
+    { "Item ": "Plastic Carry Bags (Size- 6×14)", "Internal Category": "Packaging", "Packaging Qty": "500h", "Minimum Stock Amount": "" },
+    { "Item ": "Plastic Carry Bags (Size - 9×18)", "Internal Category": "Packaging", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item ": "Plastic Food Wrap", "Internal Category": "Kitchen Supplies", "Packaging Qty": "500M", "Minimum Stock Amount": "" },
+    { "Item ": "Paper Towel Long", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
+    { "Item ": "Paper Towel Short (Serviettes)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
+    { "Item ": "Food Gloves (Large)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item ": "Food Gloves (Medium)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item ": "Food Gloves (Small)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item ": "Aluminum Foil", "Internal Category": "Kitchen Supplies", "Packaging Qty": "29.5 CM 90M", "Minimum Stock Amount": "" },
+    { "Item ": "Plastic Meat Gloves", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 24 pieces", "Minimum Stock Amount": "" },
+    { "Item ": "Kitchen Cleaner", "Internal Category": "Kitchen Supplies", "Packaging Qty": "3.5 ltre", "Minimum Stock Amount": "" },
+    { "Item ": "Alcohol Sanitiser", "Internal Category": "Kitchen Supplies", "Packaging Qty": "450g", "Minimum Stock Amount": "" },
+    { "Item ": "Brown Paper Food Bags", "Internal Category": "Packaging", "Packaging Qty": "50 Bags ", "Minimum Stock Amount": "" },
+    { "Item ": "Loaded Fries Boxes", "Internal Category": "Packaging", "Packaging Qty": "50 Boxes", "Minimum Stock Amount": "" },
+    { "Item ": "Packaging Labels", "Internal Category": "Packaging", "Packaging Qty": "45 per sheet", "Minimum Stock Amount": "" },
+    { "Item ": "Knife, Fork, Spoon Set", "Internal Category": "Packaging", "Packaging Qty": "50", "Minimum Stock Amount": "" }
   ];
 
   useEffect(() => {
     const savedDraft = localStorage.getItem('dailyShiftDraft');
     if (savedDraft) {
-      try {
-        setFormData(JSON.parse(savedDraft));
-        setErrorMessage('Draft loaded successfully.');
-      } catch (error) {
-        console.error('Error loading draft:', error);
-        setErrorMessage('Error loading draft from storage.');
-      }
+      setFormData(JSON.parse(savedDraft));
     }
   }, []);
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData({
-      ...formData,
-      [field]: value
-    });
-  };
 
   const handleNumberNeededChange = (itemName: string, value: string) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -92,187 +95,98 @@ const DailyShiftForm = () => {
         ...formData,
         numberNeeded: { ...formData.numberNeeded, [itemName]: value }
       });
-      setErrorMessage(''); // Clear error when valid input
     } else {
-      setErrorMessage(`Invalid input for ${itemName}: Enter positive number or empty. Text/symbols not allowed to avoid database type errors.`);
+      setErrorMessage(`Invalid input for ${itemName}: Only numbers or empty. Reasoning: Text/symbols cause DB errors (22P02); keeps form stable.`);
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate all inputs are numeric before submission
-    for (const [item, value] of Object.entries(formData.numberNeeded)) {
-      if (value && isNaN(parseFloat(value))) {
-        setErrorMessage(`Invalid input for ${item}: Must be a number. Reasoning: Database expects numeric values; text causes syntax errors (22P02).`);
-        return;
-      }
-    }
-    
-    // Prepare data with proper field mapping and numeric parsing
-    const submitData = {
-      completed_by: formData.completedBy,
-      shift_type: formData.shiftType,
-      shift_date: formData.shiftDate,
-      numberNeeded: Object.fromEntries(
-        Object.entries(formData.numberNeeded).map(([k, v]) => [k, parseFloat(v) || 0])
-      ),
-      status: 'completed',
-      is_draft: false
-    };
-
+    const newSubmission = { ...formData, date: new Date().toLocaleString() };
+    const updatedSubmissions = [...submissions, newSubmission];
+    setSubmissions(updatedSubmissions);
+    localStorage.setItem('dailyShiftSubmissions', JSON.stringify(updatedSubmissions));
+    setFormData({ 
+      completedBy: '',
+      shiftDate: new Date().toISOString().split('T')[0],
+      grabSales: 0,
+      aroiDeeSales: 0,
+      qrScanSales: 0,
+      cashSales: 0,
+      wages: [],
+      shopping: [],
+      startingCash: 0,
+      endingCash: 0,
+      bankedAmount: 0,
+      rollsStock: 0,
+      meatStock: 0,
+      numberNeeded: {}
+    });
+    localStorage.removeItem('dailyShiftDraft');
+    setErrorMessage('');
+    // Optional backend
     try {
-      const response = await axios.post('/api/daily-shift-forms', submitData);
-      
-      // Add to submissions display
-      const newSubmission = { 
-        ...response.data, 
-        date: new Date().toLocaleString(),
-        numberNeeded: formData.numberNeeded
-      };
-      setSubmissions([newSubmission, ...submissions]);
-      
-      // Reset form
-      setFormData({ 
-        completedBy: '',
-        shiftType: '',
-        shiftDate: new Date().toISOString().split('T')[0],
-        numberNeeded: {} 
-      });
-      
-      // Clear draft and error
-      localStorage.removeItem('dailyShiftDraft');
-      setErrorMessage('Form submitted successfully!');
-      
+      await axios.post('/api/daily-shift-forms', newSubmission);
     } catch (err) {
-      const msg = err.response?.data?.error || 'Internal Server Error';
-      setErrorMessage(`${msg}. Reasoning: Likely invalid data type in submission (e.g., non-number in numeric field). Check inputs and try again.`);
+      setErrorMessage('Backend failed but saved locally. Reasoning: Connection/schema issue – retry later.');
     }
   };
 
   const saveDraft = () => {
     localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
-    setErrorMessage('Draft saved successfully.');
+    setErrorMessage('Draft saved.');
   };
 
-  const groupedItems = items.reduce((acc, item) => {
+  const groupedItems = items.reduce((acc: any, item: any) => {
     const cat = item["Internal Category"] || 'Other';
     if (cat) {
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(item);
     }
     return acc;
-  }, {} as Record<string, typeof items>);
+  }, {});
 
   return (
     <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 text-center">Daily Sales & Stock</h1>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 rounded-lg bg-gray-700 shadow-lg">
-          <div>
-            <label className="block text-white font-semibold mb-2">Completed By</label>
-            <input
-              type="text"
-              placeholder="Staff Name"
-              value={formData.completedBy}
-              onChange={(e) => handleInputChange('completedBy', e.target.value)}
-              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-white font-semibold mb-2">Shift Type</label>
-            <select
-              value={formData.shiftType}
-              onChange={(e) => handleInputChange('shiftType', e.target.value)}
-              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            >
-              <option value="">Select Shift</option>
-              <option value="Day Shift">Day Shift</option>
-              <option value="Evening Shift">Evening Shift</option>
-              <option value="Night Shift">Night Shift</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-white font-semibold mb-2">Date</label>
-            <input
-              type="date"
-              value={formData.shiftDate}
-              onChange={(e) => handleInputChange('shiftDate', e.target.value)}
-              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-        </div>
-
-        {/* Inventory Categories */}
-        {Object.entries(groupedItems).map(([category, catItems]) => (
-          <div key={category} className="mb-8 p-4 rounded-lg shadow-xl bg-gray-800 border border-gray-600">
-            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b-2 border-orange-500 pb-2 text-orange-500">
-              {category}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {catItems.map((item) => (
-                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg border border-gray-600 hover:bg-white/20 transition-colors">
-                  <label className="block mb-2 font-semibold text-white">{item["Item "]}</label>
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]: [string, any]) => (
+          <div key={category} className="mb-8 shadow-lg rounded-lg p-6 bg-gray-800">
+            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-gray-600 pb-2">{category}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {catItems.map((item: any) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
                   <input
                     type="text"
                     placeholder="Number Needed"
-                    value={formData.numberNeeded[item["Item "]] || ''}
+                    value={(formData.numberNeeded as any)[item["Item "]] || ''}
                     onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
                   />
                 </div>
               ))}
             </div>
           </div>
         ))}
-
-        {/* Action Buttons */}
-        <div className="flex space-x-4 justify-center">
-          <button 
-            type="button" 
-            onClick={saveDraft} 
-            className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded font-bold"
-          >
-            Save as Draft
-          </button>
-          <button 
-            type="submit" 
-            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded font-bold"
-          >
-            Submit Form
-          </button>
+        <div className="flex space-x-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
+          <button type="submit" className="bg-blue-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
         </div>
       </form>
-
-      {/* Error/Success Message */}
       {errorMessage && (
-        <div className={`mt-4 p-4 rounded text-white ${errorMessage.includes('successfully') ? 'bg-green-500' : 'bg-red-500'}`}>
-          <strong>{errorMessage.includes('successfully') ? 'Success:' : 'Error:'}</strong> {errorMessage}
+        <div className="mt-4 p-4 bg-red-500 rounded text-white">
+          <strong>Error:</strong> {errorMessage}
         </div>
       )}
-
-      {/* Submission List */}
-      {submissions.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-xl font-bold mb-4 text-white">Recent Submissions</h2>
-          <div className="space-y-2">
-            {submissions.slice(0, 5).map((sub, index) => (
-              <div key={index} className="p-3 bg-gray-700 rounded border border-gray-600">
-                <div className="font-semibold">{sub.completedBy || 'Unknown'} - {sub.shiftType || 'Unknown Shift'}</div>
-                <div className="text-sm text-gray-300">{sub.date}</div>
-                <div className="text-sm text-gray-400">
-                  {Object.entries(sub.numberNeeded || {}).filter(([_, value]) => value && value !== '0').length} items requested
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub: any, index: number) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
