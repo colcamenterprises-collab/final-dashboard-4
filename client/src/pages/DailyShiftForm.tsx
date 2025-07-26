@@ -1,20 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const DailyShiftForm = () => {
-  const { toast } = useToast();
-  const [formValues, setFormValues] = useState({ 
+  const [formData, setFormData] = useState({ 
     completedBy: '',
     shiftType: '',
     shiftDate: new Date().toISOString().split('T')[0],
     numberNeeded: {} 
   });
-  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Authentic items from CSV - Full supplier list
   const items = [
@@ -75,102 +70,89 @@ const DailyShiftForm = () => {
     const savedDraft = localStorage.getItem('dailyShiftDraft');
     if (savedDraft) {
       try {
-        setFormValues(JSON.parse(savedDraft));
-        toast({ title: "Draft Loaded", description: "Your saved draft has been loaded." });
+        setFormData(JSON.parse(savedDraft));
+        setErrorMessage('Draft loaded successfully.');
       } catch (error) {
         console.error('Error loading draft:', error);
+        setErrorMessage('Error loading draft from storage.');
       }
     }
-  }, [toast]);
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormValues({
-      ...formValues,
+    setFormData({
+      ...formData,
       [field]: value
     });
   };
 
   const handleNumberNeededChange = (itemName: string, value: string) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setFormValues({
-        ...formValues,
-        numberNeeded: { ...formValues.numberNeeded, [itemName]: value }
+      setFormData({
+        ...formData,
+        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
       });
+      setErrorMessage(''); // Clear error when valid input
+    } else {
+      setErrorMessage(`Invalid input for ${itemName}: Enter positive number or empty. Text/symbols not allowed to avoid database type errors.`);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage('');
+    
+    // Validate all inputs are numeric before submission
+    for (const [item, value] of Object.entries(formData.numberNeeded)) {
+      if (value && isNaN(parseFloat(value))) {
+        setErrorMessage(`Invalid input for ${item}: Must be a number. Reasoning: Database expects numeric values; text causes syntax errors (22P02).`);
+        return;
+      }
+    }
+    
+    // Prepare data with proper field mapping and numeric parsing
+    const submitData = {
+      completed_by: formData.completedBy,
+      shift_type: formData.shiftType,
+      shift_date: formData.shiftDate,
+      numberNeeded: Object.fromEntries(
+        Object.entries(formData.numberNeeded).map(([k, v]) => [k, parseFloat(v) || 0])
+      ),
+      status: 'completed',
+      is_draft: false
+    };
 
     try {
-      // Map to backend schema fields
-      const submitData = {
-        completed_by: formValues.completedBy,
-        shift_type: formValues.shiftType,
-        shift_date: formValues.shiftDate,
-        numberNeeded: formValues.numberNeeded,
-        status: 'completed',
-        is_draft: false
-      };
-
-      const response = await fetch('/api/daily-shift-forms', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submitData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit form');
-      }
-
-      const result = await response.json();
+      const response = await axios.post('/api/daily-shift-forms', submitData);
       
-      // Add to submissions list for display
+      // Add to submissions display
       const newSubmission = { 
-        ...formValues, 
+        ...response.data, 
         date: new Date().toLocaleString(),
-        id: result.id || Date.now()
+        numberNeeded: formData.numberNeeded
       };
       setSubmissions([newSubmission, ...submissions]);
       
       // Reset form
-      setFormValues({ 
+      setFormData({ 
         completedBy: '',
         shiftType: '',
         shiftDate: new Date().toISOString().split('T')[0],
         numberNeeded: {} 
       });
       
-      // Clear draft
+      // Clear draft and error
       localStorage.removeItem('dailyShiftDraft');
+      setErrorMessage('Form submitted successfully!');
       
-      toast({ 
-        title: "Form Submitted Successfully", 
-        description: "Your daily shift form has been saved to the database.",
-        className: "bg-green-500 text-white"
-      });
-
-    } catch (error: any) {
-      console.error('Submission error:', error);
-      setErrorMessage(error.message || 'Failed to submit form. Please try again.');
-      toast({ 
-        title: "Submission Failed", 
-        description: error.message || 'Please check your inputs and try again.',
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Internal Server Error';
+      setErrorMessage(`${msg}. Reasoning: Likely invalid data type in submission (e.g., non-number in numeric field). Check inputs and try again.`);
     }
   };
 
   const saveDraft = () => {
-    localStorage.setItem('dailyShiftDraft', JSON.stringify(formValues));
-    toast({ title: "Draft Saved", description: "Your form has been saved as a draft." });
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
+    setErrorMessage('Draft saved successfully.');
   };
 
   const groupedItems = items.reduce((acc, item) => {
@@ -184,121 +166,113 @@ const DailyShiftForm = () => {
 
   return (
     <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
-      <Card className="bg-gray-800 border-gray-700 text-white">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center">Daily Sales & Stock</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {/* Basic Information */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 rounded-lg bg-gray-700">
-              <div>
-                <Label className="text-white font-semibold">Completed By</Label>
-                <input
-                  type="text"
-                  placeholder="Staff Name"
-                  value={formValues.completedBy}
-                  onChange={(e) => handleInputChange('completedBy', e.target.value)}
-                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-              <div>
-                <Label className="text-white font-semibold">Shift Type</Label>
-                <select
-                  value={formValues.shiftType}
-                  onChange={(e) => handleInputChange('shiftType', e.target.value)}
-                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                >
-                  <option value="">Select Shift</option>
-                  <option value="Day Shift">Day Shift</option>
-                  <option value="Evening Shift">Evening Shift</option>
-                  <option value="Night Shift">Night Shift</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-white font-semibold">Date</Label>
-                <input
-                  type="date"
-                  value={formValues.shiftDate}
-                  onChange={(e) => handleInputChange('shiftDate', e.target.value)}
-                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-            </div>
+      <h1 className="text-3xl font-bold mb-6 text-center">Daily Sales & Stock</h1>
+      
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 rounded-lg bg-gray-700 shadow-lg">
+          <div>
+            <label className="block text-white font-semibold mb-2">Completed By</label>
+            <input
+              type="text"
+              placeholder="Staff Name"
+              value={formData.completedBy}
+              onChange={(e) => handleInputChange('completedBy', e.target.value)}
+              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-white font-semibold mb-2">Shift Type</label>
+            <select
+              value={formData.shiftType}
+              onChange={(e) => handleInputChange('shiftType', e.target.value)}
+              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+              required
+            >
+              <option value="">Select Shift</option>
+              <option value="Day Shift">Day Shift</option>
+              <option value="Evening Shift">Evening Shift</option>
+              <option value="Night Shift">Night Shift</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-white font-semibold mb-2">Date</label>
+            <input
+              type="date"
+              value={formData.shiftDate}
+              onChange={(e) => handleInputChange('shiftDate', e.target.value)}
+              className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+              required
+            />
+          </div>
+        </div>
 
-            {/* Inventory Categories */}
-            {Object.entries(groupedItems).map(([category, catItems]) => (
-              <div key={category} className="mb-8 p-4 rounded-lg shadow-xl bg-gray-800 border border-gray-600">
-                <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b-2 border-orange-500 pb-2 text-orange-500">
-                  {category}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {catItems.map((item) => (
-                    <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg border border-gray-600 hover:bg-white/20 transition-colors">
-                      <label className="block mb-2 font-semibold text-white">{item["Item "]}</label>
-                      <input
-                        type="text"
-                        placeholder="Number Needed"
-                        value={formValues.numberNeeded[item["Item "]] || ''}
-                        onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                        className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                    </div>
-                  ))}
+        {/* Inventory Categories */}
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8 p-4 rounded-lg shadow-xl bg-gray-800 border border-gray-600">
+            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b-2 border-orange-500 pb-2 text-orange-500">
+              {category}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg border border-gray-600 hover:bg-white/20 transition-colors">
+                  <label className="block mb-2 font-semibold text-white">{item["Item "]}</label>
+                  <input
+                    type="text"
+                    placeholder="Number Needed"
+                    value={formData.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Action Buttons */}
+        <div className="flex space-x-4 justify-center">
+          <button 
+            type="button" 
+            onClick={saveDraft} 
+            className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded font-bold"
+          >
+            Save as Draft
+          </button>
+          <button 
+            type="submit" 
+            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded font-bold"
+          >
+            Submit Form
+          </button>
+        </div>
+      </form>
+
+      {/* Error/Success Message */}
+      {errorMessage && (
+        <div className={`mt-4 p-4 rounded text-white ${errorMessage.includes('successfully') ? 'bg-green-500' : 'bg-red-500'}`}>
+          <strong>{errorMessage.includes('successfully') ? 'Success:' : 'Error:'}</strong> {errorMessage}
+        </div>
+      )}
+
+      {/* Submission List */}
+      {submissions.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-4 text-white">Recent Submissions</h2>
+          <div className="space-y-2">
+            {submissions.slice(0, 5).map((sub, index) => (
+              <div key={index} className="p-3 bg-gray-700 rounded border border-gray-600">
+                <div className="font-semibold">{sub.completedBy || 'Unknown'} - {sub.shiftType || 'Unknown Shift'}</div>
+                <div className="text-sm text-gray-300">{sub.date}</div>
+                <div className="text-sm text-gray-400">
+                  {Object.entries(sub.numberNeeded || {}).filter(([_, value]) => value && value !== '0').length} items requested
                 </div>
               </div>
             ))}
-
-            {/* Action Buttons */}
-            <div className="flex space-x-4 justify-center">
-              <Button 
-                type="button" 
-                onClick={saveDraft} 
-                className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded font-bold"
-                disabled={isSubmitting}
-              >
-                Save as Draft
-              </Button>
-              <Button 
-                type="submit" 
-                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded font-bold"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Form'}
-              </Button>
-            </div>
-          </form>
-
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="mt-4 p-4 bg-red-500 rounded text-white">
-              <strong>Error:</strong> {errorMessage}
-            </div>
-          )}
-
-          {/* Submission List */}
-          {submissions.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-xl font-bold mb-4 text-white">Recent Submissions</h2>
-              <div className="space-y-2">
-                {submissions.slice(0, 5).map((sub, index) => (
-                  <div key={index} className="p-3 bg-gray-700 rounded border border-gray-600">
-                    <div className="font-semibold">{sub.completedBy} - {sub.shiftType}</div>
-                    <div className="text-sm text-gray-300">{sub.date}</div>
-                    <div className="text-sm text-gray-400">
-                      {Object.entries(sub.numberNeeded).filter(([_, value]) => value && value !== '0').length} items requested
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
