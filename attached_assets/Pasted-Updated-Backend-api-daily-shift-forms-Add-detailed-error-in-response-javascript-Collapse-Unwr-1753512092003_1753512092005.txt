@@ -1,0 +1,107 @@
+Updated Backend (/api/daily-shift-forms)
+Add detailed error in response.
+
+javascript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post('/api/daily-shift-forms', async (req, res) => {
+  try {
+    // ... existing code
+  } catch (err) {
+    console.error('Submission error:', err.message);
+    let detailedError = 'Failed to save daily shift';
+    if (err.code === '22P02') {
+      detailedError = 'Invalid input syntax for type numeric – ensure all fields like numberNeeded are numbers, not text.';
+    }
+    res.status(500).json({ error: detailedError });
+  }
+});
+Updated Form Code (DailyShiftForm.tsx)
+Enhance error display with reasoning.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import React, { useState } from 'react';
+
+const DailyShiftForm = () => {
+  const [formValues, setFormValues] = useState({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // ... items JSON as before
+
+  const handleNumberNeededChange = (itemName, value) => {
+    // Client-side validation: only numbers
+    if (value === '' || !isNaN(value)) {
+      setFormValues({
+        ...formValues,
+        numberNeeded: { ...formValues.numberNeeded, [itemName]: value }
+      });
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const newSubmission = { ...formValues, date: new Date().toLocaleString() };
+    setSubmissions([...submissions, newSubmission]);
+    setFormValues({ numberNeeded: {} });
+    setErrorMessage('');
+  };
+
+  // ... groupedItems
+
+  return (
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8">
+            <h2 className="text-xl font-bold uppercase tracking-wide mb-4 border-b border-gray-600 pb-2">{category} Inventory</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
+                  <input
+                    type="text" // Use text to allow empty, but validate on change
+                    placeholder="Number Needed"
+                    value={formValues.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
+      </form>
+      {errorMessage && (
+        <div className="mt-4 p-4 bg-red-500 rounded text-white">
+          <strong>Error:</strong> {errorMessage}  
+          <p className="mt-2">Reasoning: Check if all inputs are valid numbers. Empty fields are okay, but text in number fields causes issues. If persists, verify backend query parameters.</p>
+        </div>
+      )}
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default DailyShiftForm;

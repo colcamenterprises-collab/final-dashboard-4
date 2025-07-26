@@ -346,28 +346,45 @@ export function registerRoutes(app: express.Application): Server {
         data.shiftDate = new Date(data.shiftDate);
       }
       
-      // Parse numeric fields
-      const numericFields = ['startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales'];
+      // Parse ALL numeric fields comprehensively
+      const numericFields = [
+        'startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales',
+        'totalSales', 'totalWages', 'totalShopping', 'totalExpenses', 'gas',
+        'burgerBunsOnHand', 'meatOnHand', 'rollsOrdered'
+      ];
+      
       numericFields.forEach(field => {
         if (data[field] !== undefined && data[field] !== null) {
-          data[field] = parseFloat(data[field] || '0');
+          const value = parseFloat(data[field] || '0');
+          data[field] = isNaN(value) ? 0 : value;
         }
       });
 
-      // Parse wages and shopping arrays
+      // Parse wages and shopping arrays with numeric validation
       if (data.wages && Array.isArray(data.wages)) {
-        data.wages = data.wages.map(w => ({
+        data.wages = data.wages.map((w: any) => ({
           ...w,
-          amount: parseFloat(w.amount || '0')
+          amount: isNaN(parseFloat(w.amount)) ? 0 : parseFloat(w.amount || '0')
         }));
       }
 
       if (data.shopping && Array.isArray(data.shopping)) {
-        data.shopping = data.shopping.map(s => ({
+        data.shopping = data.shopping.map((s: any) => ({
           ...s,
-          amount: parseFloat(s.amount || '0')
+          amount: isNaN(parseFloat(s.amount)) ? 0 : parseFloat(s.amount || '0')
         }));
       }
+
+      // Parse inventory objects and ensure all values are numbers
+      const inventoryCategories = ['inventory', 'drinkStock'];
+      inventoryCategories.forEach(category => {
+        if (data[category] && typeof data[category] === 'object') {
+          Object.keys(data[category]).forEach(key => {
+            const value = parseFloat(data[category][key] || '0');
+            data[category][key] = isNaN(value) ? 0 : value;
+          });
+        }
+      });
 
       // Convert category data to JSON
       ['fresh', 'frozen', 'shelf', 'kitchen', 'packaging'].forEach(category => {
@@ -378,6 +395,10 @@ export function registerRoutes(app: express.Application): Server {
 
       if (data.drinkStock) {
         data.drinkStock = JSON.stringify(data.drinkStock);
+      }
+
+      if (data.inventory) {
+        data.inventory = JSON.stringify(data.inventory);
       }
 
       if (data.wages) {
@@ -402,9 +423,13 @@ export function registerRoutes(app: express.Application): Server {
       console.log("✅ Daily shift form saved successfully with ID:", result.id);
       res.json(result);
       
-    } catch (err) {
-      console.error("Error saving daily shift form:", err);
-      res.status(500).json({ error: "Failed to save daily shift form" });
+    } catch (err: any) {
+      console.error('Submission error:', err.message);
+      let detailedError = 'Failed to save daily shift';
+      if (err.code === '22P02') {
+        detailedError = 'Invalid input syntax for type numeric – ensure all fields like numberNeeded are numbers, not text.';
+      }
+      res.status(500).json({ error: detailedError });
     }
   });
 

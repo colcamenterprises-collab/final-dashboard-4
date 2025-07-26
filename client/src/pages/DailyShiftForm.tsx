@@ -25,10 +25,10 @@ const DailyShiftForm = () => {
     cashSales: 0,
     
     // Expenses - Wages & Staff Payments
-    wages: [],
+    wages: [] as Array<{ name: string; amount: number; type: string }>,
     
     // Expenses - Shopping & Expenses  
-    shopping: [],
+    shopping: [] as Array<{ item: string; amount: number; shop: string }>,
     
     // Cash Management
     startingCash: 0,
@@ -36,7 +36,7 @@ const DailyShiftForm = () => {
     bankedAmount: 0,
     
     // Food & Stock Items - authentic inventory from CSV
-    inventory: {}
+    inventory: {} as Record<string, number>
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,7 +121,7 @@ const DailyShiftForm = () => {
   };
 
   // Remove wage entry
-  const removeWageEntry = (index) => {
+  const removeWageEntry = (index: number) => {
     setFormData(prev => ({
       ...prev,
       wages: prev.wages.filter((_, i) => i !== index)
@@ -137,7 +137,7 @@ const DailyShiftForm = () => {
   };
 
   // Remove shopping entry
-  const removeShoppingEntry = (index) => {
+  const removeShoppingEntry = (index: number) => {
     setFormData(prev => ({
       ...prev,
       shopping: prev.shopping.filter((_, i) => i !== index)
@@ -151,7 +151,7 @@ const DailyShiftForm = () => {
   const totalExpenses = totalWages + totalShopping;
 
   // Handle form submission
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
@@ -192,11 +192,19 @@ const DailyShiftForm = () => {
         inventory: {}
       });
 
-    } catch (error) {
-      setErrorMessage(error.message);
+    } catch (error: any) {
+      let errorMessage = 'Failed to submit form. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setErrorMessage(errorMessage);
       toast({
         title: "Submission Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -214,6 +222,11 @@ const DailyShiftForm = () => {
       {errorMessage && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           <strong>Error:</strong> {errorMessage}
+          <p className="mt-2 text-sm">
+            <strong>Troubleshooting:</strong> Check if all number fields contain valid numbers (not text). 
+            Empty fields are okay, but text in number fields causes database errors. 
+            If the issue persists, verify all inventory quantities are numbers.
+          </p>
         </div>
       )}
 
