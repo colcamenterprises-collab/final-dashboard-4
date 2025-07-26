@@ -341,9 +341,19 @@ export function registerRoutes(app: express.Application): Server {
       const data = req.body;
       console.log("Daily shift form submission:", data);
       
+      // Parse numberNeeded for numeric fields to avoid 22P02 error
+      if (data.numberNeeded && typeof data.numberNeeded === 'object') {
+        data.numberNeeded = Object.fromEntries(
+          Object.entries(data.numberNeeded).map(([key, value]) => [
+            key, 
+            parseFloat(value as string) || 0
+          ])
+        );
+      }
+      
       // Ensure shiftDate is a Date object
-      if (data.shiftDate && typeof data.shiftDate === 'string') {
-        data.shiftDate = new Date(data.shiftDate);
+      if (data.shift_date && typeof data.shift_date === 'string') {
+        data.shift_date = new Date(data.shift_date);
       }
       
       // Map frontend field names to actual database column names and parse numeric fields

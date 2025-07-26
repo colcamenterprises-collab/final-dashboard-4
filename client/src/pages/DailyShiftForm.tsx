@@ -1,623 +1,304 @@
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 const DailyShiftForm = () => {
   const { toast } = useToast();
-  
-  // Form state following exact structure: Shift Information → Sales → Expenses → Food & Stock Items
-  const [formData, setFormData] = useState({
-    // Shift Information
-    shiftType: '',
+  const [formValues, setFormValues] = useState({ 
     completedBy: '',
+    shiftType: '',
     shiftDate: new Date().toISOString().split('T')[0],
-    
-    // Sales
-    grabSales: 0,
-    aroiDeeSales: 0,
-    qrScanSales: 0,
-    cashSales: 0,
-    
-    // Expenses - Wages & Staff Payments
-    wages: [] as Array<{ name: string; amount: number; type: string }>,
-    
-    // Expenses - Shopping & Expenses  
-    shopping: [] as Array<{ item: string; amount: number; shop: string }>,
-    
-    // Cash Management
-    startingCash: 0,
-    endingCash: 0,
-    bankedAmount: 0,
-    
-    // Food & Stock Items - authentic inventory from CSV
-    inventory: {} as Record<string, number>
+    numberNeeded: {} 
   });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Authentic supplier data from CSV - 100% real inventory items
-  const inventoryCategories = {
-    "Fresh Food": [
-      { name: "Topside Beef", supplier: "Makro", cost: "฿319.00", unit: "kg" },
-      { name: "Brisket Point End", supplier: "Makro", cost: "฿299.00", unit: "kg" },
-      { name: "Chuck Roll Beef", supplier: "Makro", cost: "฿319.00", unit: "kg" },
-      { name: "Salad (Iceberg Lettuce)", supplier: "Makro", cost: "฿99.00", unit: "kg" },
-      { name: "Burger Bun", supplier: "Bakery", cost: "฿8.00", unit: "each" },
-      { name: "Tomatos", supplier: "Makro", cost: "฿89.00", unit: "kg" },
-      { name: "Onions Bulk 10kg", supplier: "Makro", cost: "฿290.00", unit: "10kg" },
-      { name: "Cheese", supplier: "Makro", cost: "฿359.00", unit: "kg" },
-      { name: "Bacon Short", supplier: "Makro", cost: "฿305.00", unit: "kg" },
-      { name: "Bacon Long", supplier: "Makro", cost: "฿430.00", unit: "2kg" },
-      { name: "Jalapenos", supplier: "Makro", cost: "฿190.00", unit: "kg" }
-    ],
-    "Frozen Food": [
-      { name: "French Fries 7mm", supplier: "Makro", cost: "฿129.00", unit: "2kg" },
-      { name: "Chicken Nuggets", supplier: "Makro", cost: "฿155.00", unit: "kg" },
-      { name: "Chicken Fillets", supplier: "Makro", cost: "฿199.00", unit: "kg" },
-      { name: "Sweet Potato Fries", supplier: "Makro", cost: "฿145.00", unit: "kg" }
-    ],
-    "Shelf Items": [
-      { name: "Cajun Fries Seasoning", supplier: "Makro", cost: "฿508.00", unit: "510g" },
-      { name: "Crispy Fried Onions", supplier: "Makro", cost: "฿79.00", unit: "500g" },
-      { name: "Pickles (Standard Dill)", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Pickles Sweet", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Mustard", supplier: "Makro", cost: "฿88.00", unit: "kg" },
-      { name: "Mayonnaise", supplier: "Makro", cost: "฿90.00", unit: "litre" },
-      { name: "Tomato Sauce", supplier: "Makro", cost: "฿175.00", unit: "5L" },
-      { name: "BBQ Sauce", supplier: "Makro", cost: "฿110.00", unit: "500g" },
-      { name: "Sriracha Sauce", supplier: "Makro", cost: "฿108.00", unit: "950g" },
-      { name: "Salt (Coarse Sea Salt)", supplier: "Online", cost: "฿121.00", unit: "kg" }
-    ],
-    "Kitchen Supplies": [
-      { name: "Oil (Fryer)", supplier: "Makro", cost: "฿195.00", unit: "5L" },
-      { name: "Plastic Food Wrap", supplier: "Makro", cost: "฿139.00", unit: "each" },
-      { name: "Paper Towel Long", supplier: "Makro", cost: "฿205.00", unit: "6 rolls" },
-      { name: "Paper Towel Short", supplier: "Makro", cost: "฿115.00", unit: "8 rolls" },
-      { name: "Food Gloves Large", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
-      { name: "Food Gloves Medium", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
-      { name: "Food Gloves Small", supplier: "Makro", cost: "฿89.00", unit: "100pcs" },
-      { name: "Aluminum Foil", supplier: "Makro", cost: "฿145.00", unit: "roll" },
-      { name: "Plastic Meat Gloves", supplier: "Makro", cost: "฿45.00", unit: "100pcs" },
-      { name: "Kitchen Cleaner", supplier: "Makro", cost: "฿35.00", unit: "bottle" },
-      { name: "Alcohol Sanitiser", supplier: "Makro", cost: "฿69.00", unit: "bottle" }
-    ],
-    "Packaging": [
-      { name: "French Fries Box", supplier: "Packaging Bangkok", cost: "฿1.80", unit: "each" },
-      { name: "Plastic Carry Bags (6×14)", supplier: "Packaging Bangkok", cost: "฿0.89", unit: "each" },
-      { name: "Plastic Carry Bags (9×18)", supplier: "Packaging Bangkok", cost: "฿1.50", unit: "each" },
-      { name: "Brown Paper Food Bags", supplier: "Packaging Bangkok", cost: "฿2.40", unit: "each" },
-      { name: "Loaded Fries Boxes", supplier: "Packaging Bangkok", cost: "฿2.30", unit: "each" },
-      { name: "Packaging Labels", supplier: "Packaging Bangkok", cost: "฿0.45", unit: "each" },
-      { name: "Knife/Fork/Spoon Set", supplier: "Packaging Bangkok", cost: "฿0.65", unit: "set" }
-    ]
-  };
-
-  const drinkStock = [
-    { name: "Coke", cost: "฿315.00", unit: "24 cans" },
-    { name: "Coke Zero", cost: "฿315.00", unit: "24 cans" },
-    { name: "Sprite", cost: "฿315.00", unit: "24 cans" },
-    { name: "Schweppes Manow", cost: "฿84.00", unit: "6 cans" },
-    { name: "Fanta Orange", cost: "฿81.00", unit: "6 cans" },
-    { name: "Fanta Strawberry", cost: "฿81.00", unit: "6 cans" },
-    { name: "Soda Water", cost: "฿84.00", unit: "6 cans" },
-    { name: "Bottled Water", cost: "฿45.00", unit: "12 bottles" },
-    { name: "Kids Juice Orange", cost: "฿99.00", unit: "6 cans" },
-    { name: "Kids Juice Apple", cost: "฿99.00", unit: "6 cans" }
+  // Authentic items from CSV - Full supplier list
+  const items = [
+    // Fresh Food
+    { "Item ": "Topside Beef", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿319.00" },
+    { "Item ": "Brisket Point End", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿299.00" },
+    { "Item ": "Chuck Roll Beef", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿319.00" },
+    { "Item ": "Other Beef (Mixed)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿310.00" },
+    { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿99.00" },
+    { "Item ": "Milk", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿80.00" },
+    { "Item ": "Burger Bun", "Internal Category": "Fresh Food", "Supplier": "Bakery", "Cost ": "฿8.00" },
+    { "Item ": "Tomatos", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿89.00" },
+    { "Item ": "White Cabbage", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿45.00" },
+    { "Item ": "Purple Cabbage", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿41.25" },
+    { "Item ": "Onions Bulk 10kg", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿290.00" },
+    { "Item ": "Onions (small bags)", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿29.00" },
+    { "Item ": "Cheese", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿359.00" },
+    { "Item ": "Bacon Short", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿305.00" },
+    { "Item ": "Bacon Long", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿430.00" },
+    { "Item ": "Jalapenos", "Internal Category": "Fresh Food", "Supplier": "Makro", "Cost ": "฿190.00" },
+    
+    // Frozen Food
+    { "Item ": "French Fries 7mm", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿129.00" },
+    { "Item ": "Chicken Nuggets", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿155.00" },
+    { "Item ": "Chicken Fillets", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿199.00" },
+    { "Item ": "Sweet Potato Fries", "Internal Category": "Frozen Food", "Supplier": "Makro", "Cost ": "฿145.00" },
+    
+    // Shelf Items
+    { "Item ": "Cajun Fries Seasoning", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿508.00" },
+    { "Item ": "Crispy Fried Onions", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿79.00" },
+    { "Item ": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿89.00" },
+    { "Item ": "Pickles Sweet (standard)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿89.00" },
+    { "Item ": "Mustard", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿88.00" },
+    { "Item ": "Mayonnaise", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿90.00" },
+    { "Item ": "Tomato Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿175.00" },
+    { "Item ": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿108.00" },
+    { "Item ": "BBQ Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿110.00" },
+    { "Item ": "Sriracha Sauce", "Internal Category": "Shelf Items", "Supplier": "Makro", "Cost ": "฿108.00" },
+    { "Item ": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items", "Supplier": "Online", "Cost ": "฿121.00" },
+    
+    // Kitchen Supplies
+    { "Item ": "Oil (Fryer)", "Internal Category": "Kitchen Supplies", "Supplier": "Makro", "Cost ": "฿195.00" },
+    
+    // Drinks
+    { "Item ": "Coke", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿315.00" },
+    { "Item ": "Coke Zero", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿315.00" },
+    { "Item ": "Fanta Orange", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
+    { "Item ": "Fanta Strawberry", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
+    { "Item ": "Schweppes Manow", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿84.00" },
+    { "Item ": "Kids Juice (Orange)", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿99.00" },
+    { "Item ": "Kids Juice (Apple)", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿99.00" },
+    { "Item ": "Sprite", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿81.00" },
+    { "Item ": "Soda Water", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿52.00" },
+    { "Item ": "Bottled Water", "Internal Category": "Drinks", "Supplier": "Makro", "Cost ": "฿49.00" }
   ];
 
-  // Add wage entry
-  const addWageEntry = () => {
-    setFormData(prev => ({
-      ...prev,
-      wages: [...prev.wages, { name: '', amount: 0, type: 'regular' }]
-    }));
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      try {
+        setFormValues(JSON.parse(savedDraft));
+        toast({ title: "Draft Loaded", description: "Your saved draft has been loaded." });
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    }
+  }, [toast]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormValues({
+      ...formValues,
+      [field]: value
+    });
   };
 
-  // Remove wage entry
-  const removeWageEntry = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      wages: prev.wages.filter((_, i) => i !== index)
-    }));
+  const handleNumberNeededChange = (itemName: string, value: string) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setFormValues({
+        ...formValues,
+        numberNeeded: { ...formValues.numberNeeded, [itemName]: value }
+      });
+    }
   };
 
-  // Add shopping entry  
-  const addShoppingEntry = () => {
-    setFormData(prev => ({
-      ...prev,
-      shopping: [...prev.shopping, { item: '', amount: 0, shop: '' }]
-    }));
-  };
-
-  // Remove shopping entry
-  const removeShoppingEntry = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      shopping: prev.shopping.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Calculate totals
-  const totalSales = formData.grabSales + formData.aroiDeeSales + formData.qrScanSales + formData.cashSales;
-  const totalWages = formData.wages.reduce((sum, wage) => sum + (wage.amount || 0), 0);
-  const totalShopping = formData.shopping.reduce((sum, item) => sum + (item.amount || 0), 0);
-  const totalExpenses = totalWages + totalShopping;
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
 
     try {
+      // Map to backend schema fields
+      const submitData = {
+        completed_by: formValues.completedBy,
+        shift_type: formValues.shiftType,
+        shift_date: formValues.shiftDate,
+        numberNeeded: formValues.numberNeeded,
+        status: 'completed',
+        is_draft: false
+      };
+
       const response = await fetch('/api/daily-shift-forms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to submit form: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit form');
       }
 
       const result = await response.json();
       
-      toast({
-        title: "Form Submitted Successfully",
-        description: `Shift form saved with ID: ${result.id}`,
-        duration: 6000,
-      });
-
+      // Add to submissions list for display
+      const newSubmission = { 
+        ...formValues, 
+        date: new Date().toLocaleString(),
+        id: result.id || Date.now()
+      };
+      setSubmissions([newSubmission, ...submissions]);
+      
       // Reset form
-      setFormData({
-        shiftType: '',
+      setFormValues({ 
         completedBy: '',
+        shiftType: '',
         shiftDate: new Date().toISOString().split('T')[0],
-        grabSales: 0,
-        aroiDeeSales: 0,
-        qrScanSales: 0,
-        cashSales: 0,
-        wages: [],
-        shopping: [],
-        startingCash: 0,
-        endingCash: 0,
-        bankedAmount: 0,
-        inventory: {}
+        numberNeeded: {} 
+      });
+      
+      // Clear draft
+      localStorage.removeItem('dailyShiftDraft');
+      
+      toast({ 
+        title: "Form Submitted Successfully", 
+        description: "Your daily shift form has been saved to the database.",
+        className: "bg-green-500 text-white"
       });
 
     } catch (error: any) {
-      let errorMessage = 'Failed to submit form. Please try again.';
-      
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setErrorMessage(errorMessage);
-      toast({
-        title: "Submission Failed",
-        description: errorMessage,
-        variant: "destructive",
+      console.error('Submission error:', error);
+      setErrorMessage(error.message || 'Failed to submit form. Please try again.');
+      toast({ 
+        title: "Submission Failed", 
+        description: error.message || 'Please check your inputs and try again.',
+        variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formValues));
+    toast({ title: "Draft Saved", description: "Your form has been saved as a draft." });
+  };
+
+  const groupedItems = items.reduce((acc, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {} as Record<string, typeof items>);
+
   return (
-    <div className="container max-w-4xl mx-auto p-6 space-y-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
-        <p className="text-gray-600">Complete daily shift reporting with authentic inventory tracking</p>
-      </div>
-
-      {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          <strong>Error:</strong> {errorMessage}
-          <p className="mt-2 text-sm">
-            <strong>Troubleshooting:</strong> Check if all number fields contain valid numbers (not text). 
-            Empty fields are okay, but text in number fields causes database errors. 
-            If the issue persists, verify all inventory quantities are numbers.
-          </p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* 1. Shift Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Shift Information</CardTitle>
-            <CardDescription>Basic shift details and staff information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="completedBy">Completed By</Label>
-                <Input
-                  id="completedBy"
-                  value={formData.completedBy}
-                  onChange={(e) => setFormData(prev => ({ ...prev, completedBy: e.target.value }))}
-                  placeholder="Staff name"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="shiftType">Shift Type</Label>
-                <Select onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select shift" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day Shift</SelectItem>
-                    <SelectItem value="evening">Evening Shift</SelectItem>
-                    <SelectItem value="night">Night Shift</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="shiftDate">Shift Date</Label>
-                <Input
-                  id="shiftDate"
-                  type="date"
-                  value={formData.shiftDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shiftDate: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 2. Sales */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Sales</CardTitle>
-            <CardDescription>Revenue breakdown by platform</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="grabSales">Grab Sales (฿)</Label>
-                <Input
-                  id="grabSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.grabSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, grabSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
-                <Input
-                  id="aroiDeeSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.aroiDeeSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, aroiDeeSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="qrScanSales">QR Scan Sales (฿)</Label>
-                <Input
-                  id="qrScanSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.qrScanSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, qrScanSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="cashSales">Cash Sales (฿)</Label>
-                <Input
-                  id="cashSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.cashSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cashSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <Card className="bg-gray-800 border-gray-700 text-white">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center">Daily Sales & Stock</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Sales Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Sales Summary</h3>
-              <div className="text-2xl font-bold text-green-600">
-                Total Sales: ฿{totalSales.toLocaleString()}
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 rounded-lg bg-gray-700">
+              <div>
+                <Label className="text-white font-semibold">Completed By</Label>
+                <input
+                  type="text"
+                  placeholder="Staff Name"
+                  value={formValues.completedBy}
+                  onChange={(e) => handleInputChange('completedBy', e.target.value)}
+                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 3. Expenses */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Expenses</CardTitle>
-            <CardDescription>Wages, shopping, and operational expenses</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Wages & Staff Payments */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Wages & Staff Payments</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Wage Entry
-                </Button>
+              <div>
+                <Label className="text-white font-semibold">Shift Type</Label>
+                <select
+                  value={formValues.shiftType}
+                  onChange={(e) => handleInputChange('shiftType', e.target.value)}
+                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                >
+                  <option value="">Select Shift</option>
+                  <option value="Day Shift">Day Shift</option>
+                  <option value="Evening Shift">Evening Shift</option>
+                  <option value="Night Shift">Night Shift</option>
+                </select>
               </div>
-              
-              {formData.wages.map((wage, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Staff Name</Label>
-                    <Input
-                      value={wage.name}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].name = e.target.value;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-                      placeholder="Enter staff name"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={wage.amount}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Type</Label>
-                    <Select onValueChange={(value) => {
-                      const newWages = [...formData.wages];
-                      newWages[index].type = value;
-                      setFormData(prev => ({ ...prev, wages: newWages }));
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="regular">Regular</SelectItem>
-                        <SelectItem value="overtime">Overtime</SelectItem>
-                        <SelectItem value="bonus">Bonus</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeWageEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Shopping & Expenses */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Shopping & Expenses</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Expense
-                </Button>
-              </div>
-              
-              {formData.shopping.map((item, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Item/Expense</Label>
-                    <Input
-                      value={item.item}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].item = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="Enter item or expense"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.amount}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Shop/Source</Label>
-                    <Input
-                      value={item.shop}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].shop = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="Enter shop name"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeShoppingEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Expense Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Expense Summary</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>Total Wages: ฿{totalWages.toLocaleString()}</div>
-                <div>Total Shopping: ฿{totalShopping.toLocaleString()}</div>
-              </div>
-              <div className="text-xl font-bold text-red-600 mt-2">
-                Total Expenses: ฿{totalExpenses.toLocaleString()}
-              </div>
-            </div>
-
-            {/* Cash Management */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Cash Management</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="startingCash">Starting Cash (฿)</Label>
-                  <Input
-                    id="startingCash"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.startingCash}
-                    onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endingCash">Ending Cash (฿)</Label>
-                  <Input
-                    id="endingCash"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.endingCash}
-                    onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
-                  <Input
-                    id="bankedAmount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.bankedAmount}
-                    onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 4. Food & Stock Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Food & Stock Items</CardTitle>
-            <CardDescription>Authentic inventory tracking from supplier CSV data</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Drink Stock */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Drink Stock</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {drinkStock.map((drink) => (
-                  <div key={drink.name}>
-                    <Label htmlFor={`drink-${drink.name}`}>{drink.name}</Label>
-                    <Input
-                      id={`drink-${drink.name}`}
-                      type="number"
-                      min="0"
-                      value={formData.inventory[drink.name] || ''}
-                      onChange={(e) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          inventory: {
-                            ...prev.inventory,
-                            [drink.name]: parseInt(e.target.value) || 0
-                          }
-                        }));
-                      }}
-                      placeholder="0"
-                    />
-                    <div className="text-xs text-gray-500">{drink.cost} / {drink.unit}</div>
-                  </div>
-                ))}
+              <div>
+                <Label className="text-white font-semibold">Date</Label>
+                <input
+                  type="date"
+                  value={formValues.shiftDate}
+                  onChange={(e) => handleInputChange('shiftDate', e.target.value)}
+                  className="w-full p-2 bg-gray-600 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
               </div>
             </div>
 
             {/* Inventory Categories */}
-            {Object.entries(inventoryCategories).map(([category, items]) => (
-              <div key={category}>
-                <h3 className="font-medium text-gray-900 mb-4">{category}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {items.map((item) => (
-                    <div key={item.name}>
-                      <Label htmlFor={`item-${item.name}`}>{item.name}</Label>
-                      <Input
-                        id={`item-${item.name}`}
-                        type="number"
-                        min="0"
-                        value={formData.inventory[item.name] || ''}
-                        onChange={(e) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            inventory: {
-                              ...prev.inventory,
-                              [item.name]: parseInt(e.target.value) || 0
-                            }
-                          }));
-                        }}
-                        placeholder="0"
+            {Object.entries(groupedItems).map(([category, catItems]) => (
+              <div key={category} className="mb-8 p-4 rounded-lg shadow-xl bg-gray-800 border border-gray-600">
+                <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b-2 border-orange-500 pb-2 text-orange-500">
+                  {category}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {catItems.map((item) => (
+                    <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg border border-gray-600 hover:bg-white/20 transition-colors">
+                      <label className="block mb-2 font-semibold text-white">{item["Item "]}</label>
+                      <input
+                        type="text"
+                        placeholder="Number Needed"
+                        value={formValues.numberNeeded[item["Item "]] || ''}
+                        onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                        className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
-                      <div className="text-xs text-gray-500">
-                        {item.cost} / {item.unit} - {item.supplier}
-                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
 
-        {/* Submit Button */}
-        <div className="flex justify-center">
-          <Button
-            type="submit"
-            size="lg"
-            disabled={isSubmitting || !formData.completedBy || !formData.shiftType}
-            className="w-full md:w-auto"
-          >
-            {isSubmitting ? "Submitting..." : "Submit Daily Shift Form"}
-          </Button>
-        </div>
-      </form>
+            {/* Action Buttons */}
+            <div className="flex space-x-4 justify-center">
+              <Button 
+                type="button" 
+                onClick={saveDraft} 
+                className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded font-bold"
+                disabled={isSubmitting}
+              >
+                Save as Draft
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded font-bold"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Form'}
+              </Button>
+            </div>
+          </form>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mt-4 p-4 bg-red-500 rounded text-white">
+              <strong>Error:</strong> {errorMessage}
+            </div>
+          )}
+
+          {/* Submission List */}
+          {submissions.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold mb-4 text-white">Recent Submissions</h2>
+              <div className="space-y-2">
+                {submissions.slice(0, 5).map((sub, index) => (
+                  <div key={index} className="p-3 bg-gray-700 rounded border border-gray-600">
+                    <div className="font-semibold">{sub.completedBy} - {sub.shiftType}</div>
+                    <div className="text-sm text-gray-300">{sub.date}</div>
+                    <div className="text-sm text-gray-400">
+                      {Object.entries(sub.numberNeeded).filter(([_, value]) => value && value !== '0').length} items requested
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
