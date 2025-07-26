@@ -375,30 +375,73 @@ export function registerRoutes(app: express.Application): Server {
         }));
       }
 
-      // Parse inventory objects and ensure all values are numbers
-      const inventoryCategories = ['inventory', 'drinkStock'];
-      inventoryCategories.forEach(category => {
-        if (data[category] && typeof data[category] === 'object') {
-          Object.keys(data[category]).forEach(key => {
-            const value = parseFloat(data[category][key] || '0');
-            data[category][key] = isNaN(value) ? 0 : value;
-          });
-        }
-      });
+      // Process inventory data correctly - split the inventory object into proper database fields
+      if (data.inventory && typeof data.inventory === 'object') {
+        // Create separate objects for each category based on item names
+        const drinkItems = ['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Bottled Water', 'Kids Juice Orange', 'Kids Juice Apple'];
+        const freshItems = ['Topside Beef', 'Brisket Point End', 'Chuck Roll Beef', 'Salad (Iceberg Lettuce)', 'Burger Bun', 'Tomatos', 'Onions Bulk 10kg', 'Cheese', 'Bacon Short', 'Bacon Long', 'Jalapenos'];
+        const frozenItems = ['French Fries 7mm', 'Chicken Nuggets', 'Chicken Fillets', 'Sweet Potato Fries'];
+        const shelfItems = ['Cajun Fries Seasoning', 'Crispy Fried Onions', 'Pickles (Standard Dill)', 'Pickles Sweet', 'Mustard', 'Mayonnaise', 'Tomato Sauce', 'BBQ Sauce', 'Sriracha Sauce', 'Salt (Coarse Sea Salt)'];
+        const kitchenItems = ['Oil (Fryer)', 'Plastic Food Wrap', 'Paper Towel Long', 'Paper Towel Short', 'Food Gloves Large', 'Food Gloves Medium', 'Aluminum Foil', 'Plastic Meat Gloves', 'Kitchen Cleaner', 'Alcohol Sanitiser'];
+        const packagingItems = ['Plastic Carry Bags (6×14)', 'Plastic Carry Bags (9×18)', 'Brown Paper Food Bags', 'Loaded Fries Boxes', 'Packaging Labels'];
 
-      // Convert category data to JSON
-      ['fresh', 'frozen', 'shelf', 'kitchen', 'packaging'].forEach(category => {
-        if (data[category]) {
-          data[category] = JSON.stringify(data[category]);
-        }
-      });
+        // Extract items for each category
+        const drinkStock = {};
+        const freshFood = {};
+        const frozenFood = {};
+        const shelfItemsData = {};
+        const kitchenItemsData = {};
+        const packagingItemsData = {};
 
+        Object.keys(data.inventory).forEach(itemName => {
+          const value = parseFloat(data.inventory[itemName] || '0');
+          const numValue = isNaN(value) ? 0 : value;
+          
+          if (drinkItems.includes(itemName)) {
+            drinkStock[itemName] = numValue;
+          } else if (freshItems.includes(itemName)) {
+            freshFood[itemName] = numValue;
+          } else if (frozenItems.includes(itemName)) {
+            frozenFood[itemName] = numValue;
+          } else if (shelfItems.includes(itemName)) {
+            shelfItemsData[itemName] = numValue;
+          } else if (kitchenItems.includes(itemName)) {
+            kitchenItemsData[itemName] = numValue;
+          } else if (packagingItems.includes(itemName)) {
+            packagingItemsData[itemName] = numValue;
+          }
+        });
+
+        // Set the categorized data
+        data.drinkStock = drinkStock;
+        data.freshFood = freshFood;
+        data.frozenFood = frozenFood;
+        data.shelfItems = shelfItemsData;
+        data.kitchenItems = kitchenItemsData;
+        data.packagingItems = packagingItemsData;
+        
+        // Remove the original inventory field
+        delete data.inventory;
+      }
+
+      // Convert all category data to JSON strings for database storage
       if (data.drinkStock) {
         data.drinkStock = JSON.stringify(data.drinkStock);
       }
-
-      if (data.inventory) {
-        data.inventory = JSON.stringify(data.inventory);
+      if (data.freshFood) {
+        data.freshFood = JSON.stringify(data.freshFood);
+      }
+      if (data.frozenFood) {
+        data.frozenFood = JSON.stringify(data.frozenFood);
+      }
+      if (data.shelfItems) {
+        data.shelfItems = JSON.stringify(data.shelfItems);
+      }
+      if (data.kitchenItems) {
+        data.kitchenItems = JSON.stringify(data.kitchenItems);
+      }
+      if (data.packagingItems) {
+        data.packagingItems = JSON.stringify(data.packagingItems);
       }
 
       if (data.wages) {
