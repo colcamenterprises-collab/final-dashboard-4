@@ -506,25 +506,35 @@ export function registerRoutes(app: express.Application): Server {
           // Generate shopping list from form data (exclude drinks/rolls/meat as specified)
           const purchaseItems = [];
           
-          // Process all food categories for items > 0
-          if (data.freshFood && Array.isArray(data.freshFood)) {
-            purchaseItems.push(...data.freshFood.filter(f => f.value > 0));
+          // Process all food categories for items > 0 - handle object format from simplified form
+          if (data.freshFood && typeof data.freshFood === 'object') {
+            Object.entries(data.freshFood).forEach(([name, value]) => {
+              if (value > 0) purchaseItems.push({ name, value });
+            });
           }
           
-          if (data.frozenFood && Array.isArray(data.frozenFood)) {
-            purchaseItems.push(...data.frozenFood.filter(f => f.value > 0));
+          if (data.frozenFood && typeof data.frozenFood === 'object') {
+            Object.entries(data.frozenFood).forEach(([name, value]) => {
+              if (value > 0) purchaseItems.push({ name, value });
+            });
           }
           
-          if (data.shelfItems && Array.isArray(data.shelfItems)) {
-            purchaseItems.push(...data.shelfItems.filter(f => f.value > 0));
+          if (data.shelfItems && typeof data.shelfItems === 'object') {
+            Object.entries(data.shelfItems).forEach(([name, value]) => {
+              if (value > 0) purchaseItems.push({ name, value });
+            });
           }
           
-          if (data.kitchenItems && Array.isArray(data.kitchenItems)) {
-            purchaseItems.push(...data.kitchenItems.filter(f => f.value > 0));
+          if (data.kitchenItems && typeof data.kitchenItems === 'object') {
+            Object.entries(data.kitchenItems).forEach(([name, value]) => {
+              if (value > 0) purchaseItems.push({ name, value });
+            });
           }
           
-          if (data.packagingItems && Array.isArray(data.packagingItems)) {
-            purchaseItems.push(...data.packagingItems.filter(f => f.value > 0));
+          if (data.packagingItems && typeof data.packagingItems === 'object') {
+            Object.entries(data.packagingItems).forEach(([name, value]) => {
+              if (value > 0) purchaseItems.push({ name, value });
+            });
           }
 
           // Create shopping list entries if there are purchase items
