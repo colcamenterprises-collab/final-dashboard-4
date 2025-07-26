@@ -11,8 +11,10 @@ import { apiRequest } from "@/lib/queryClient";
 
 interface DraftForm {
   id: number;
-  name: string;
-  shift: string;
+  completedBy?: string;
+  shiftType?: string;
+  name?: string;
+  shift?: string;
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
@@ -20,15 +22,17 @@ interface DraftForm {
 
 interface Form {
   id: number;
-  name: string;
-  shift: string;
+  completedBy?: string;
+  shiftType?: string;
+  name?: string;
+  shift?: string;
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
-  grabSales?: number;
-  aroiDeeSales?: number;
-  qrScanSales?: number;
-  cashSales?: number;
+  grabSales?: number | string;
+  aroiDeeSales?: number | string;
+  qrScanSales?: number | string;
+  cashSales?: number | string;
 }
 
 export default function DraftFormsLibrary() {
@@ -57,18 +61,18 @@ export default function DraftFormsLibrary() {
   });
 
   const filteredDrafts = drafts.filter((draft: DraftForm) =>
-    draft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    draft.shift.toLowerCase().includes(searchQuery.toLowerCase())
+    (draft.name?.toLowerCase() || draft.completedBy?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (draft.shift?.toLowerCase() || draft.shiftType?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   const filteredForms = forms.filter((form: Form) =>
-    form.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    form.shift.toLowerCase().includes(searchQuery.toLowerCase())
+    (form.name?.toLowerCase() || form.completedBy?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (form.shift?.toLowerCase() || form.shiftType?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return "฿0.00";
-    return `฿${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | undefined | string) => {
+    if (!amount || isNaN(Number(amount))) return "฿0.00";
+    return `฿${Number(amount).toFixed(2)}`;
   };
 
   const calculateTotal = (form: Form) => {
@@ -147,12 +151,12 @@ export default function DraftFormsLibrary() {
                 <Card key={draft.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{draft.name}</CardTitle>
+                      <CardTitle className="text-lg">{draft.name || draft.completedBy || 'Unnamed'}</CardTitle>
                       <Badge variant="outline" className="text-orange-600 border-orange-600">
                         Draft
                       </Badge>
                     </div>
-                    <CardDescription>{draft.shift}</CardDescription>
+                    <CardDescription>{draft.shift || draft.shiftType || 'No shift info'}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -224,12 +228,12 @@ export default function DraftFormsLibrary() {
                 <Card key={form.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{form.name}</CardTitle>
+                      <CardTitle className="text-lg">{form.name || form.completedBy || 'Unnamed'}</CardTitle>
                       <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
                         Completed
                       </Badge>
                     </div>
-                    <CardDescription>{form.shift}</CardDescription>
+                    <CardDescription>{form.shift || form.shiftType || 'No shift info'}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">

@@ -466,14 +466,14 @@ export function registerRoutes(app: express.Application): Server {
 
       // Parse wages and shopping arrays
       if (data.wages && Array.isArray(data.wages)) {
-        data.wages = JSON.stringify(data.wages.map(w => ({
+        data.wages = JSON.stringify(data.wages.map((w: any) => ({
           ...w,
           amount: parseFloat(w.amount || '0')
         })));
       }
 
       if (data.shopping && Array.isArray(data.shopping)) {
-        data.shopping = JSON.stringify(data.shopping.map(s => ({
+        data.shopping = JSON.stringify(data.shopping.map((s: any) => ({
           ...s,
           amount: parseFloat(s.amount || '0')
         })));
@@ -488,7 +488,7 @@ export function registerRoutes(app: express.Application): Server {
         console.log(`📊 Cash breakdown: Starting ${data.startingCash} + Cash Sales ${data.cashSales} - Expenses ${data.totalExpenses} = ${calculatedCash}`);
       }
       
-      let result;
+      let result: any;
       
       // Use database transaction to ensure data integrity
       await db.transaction(async (tx) => {
@@ -543,6 +543,9 @@ export function registerRoutes(app: express.Application): Server {
               itemName: item.name,
               quantity: item.value,
               unit: 'unit',
+              supplier: 'General', // Default supplier
+              pricePerUnit: '0',
+              priority: 'medium',
               formId: result.id,
               listDate: data.shiftDate,
               isCompleted: false,
