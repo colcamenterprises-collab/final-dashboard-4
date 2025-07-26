@@ -1,23 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-interface FormData {
-  numberNeeded: Record<string, string>;
-}
-
-interface Submission {
-  date: string;
-  numberNeeded: Record<string, string>;
-}
-
-interface Item {
-  "Item ": string;
-  "Internal Category": string;
-}
-
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState<FormData>({ numberNeeded: {} });
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [formData, setFormData] = useState({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Items from CSV (complete supplier list)
@@ -91,7 +77,7 @@ const DailyShiftForm = () => {
     }
   }, []);
 
-  const handleNumberNeededChange = (itemName: string, value: string) => {
+  const handleNumberNeededChange = (itemName, value) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setFormData({
         ...formData,
@@ -102,7 +88,7 @@ const DailyShiftForm = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const response = await axios.post('/api/daily-shift-forms', formData);
@@ -110,7 +96,7 @@ const DailyShiftForm = () => {
       setFormData({ numberNeeded: {} });
       localStorage.removeItem('dailyShiftDraft');
       setErrorMessage('');
-    } catch (err: any) {
+    } catch (err) {
       const msg = err.response?.data?.error || 'Internal Server Error';
       setErrorMessage(`${msg}. Reasoning: Likely type mismatch (e.g., non-number in numeric field). Check inputs and try again.`);
     }
@@ -121,7 +107,7 @@ const DailyShiftForm = () => {
     setErrorMessage('Draft saved.');
   };
 
-  const groupedItems = items.reduce((acc: Record<string, Item[]>, item) => {
+  const groupedItems = items.reduce((acc, item) => {
     const cat = item["Internal Category"] || 'Other';
     if (cat) {
       if (!acc[cat]) acc[cat] = [];
