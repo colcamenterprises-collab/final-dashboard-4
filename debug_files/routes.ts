@@ -346,47 +346,33 @@ export function registerRoutes(app: express.Application): Server {
         data.shiftDate = new Date(data.shiftDate);
       }
       
-      // Map frontend field names to actual database column names and parse numeric fields
-      const fieldMapping = {
-        'startingCash': 'starting_cash',
-        'endingCash': 'ending_cash', 
-        'grabSales': 'grab_sales',
-        'aroiDeeSales': 'aroi_dee_sales',
-        'qrScanSales': 'qr_scan_sales',
-        'cashSales': 'cash_sales',
-        'bankedAmount': 'banked_amount'
-      };
-
-      // Parse numeric fields and map to correct database column names
-      Object.keys(fieldMapping).forEach(frontendField => {
-        const dbField = fieldMapping[frontendField];
-        if (data[frontendField] !== undefined && data[frontendField] !== null) {
-          const value = parseFloat(data[frontendField] || '0');
-          data[dbField] = isNaN(value) ? 0 : value;
-          // Remove the frontend field name to avoid conflicts
-          if (frontendField !== dbField) {
-            delete data[frontendField];
-          }
+      // Parse ALL numeric fields comprehensively
+      const numericFields = [
+        'startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales',
+        'totalSales', 'totalWages', 'totalShopping', 'totalExpenses', 'gas',
+        'burgerBunsOnHand', 'meatOnHand', 'rollsOrdered'
+      ];
+      
+      numericFields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null) {
+          const value = parseFloat(data[field] || '0');
+          data[field] = isNaN(value) ? 0 : value;
         }
       });
 
-      // Map wages and shopping arrays to correct database fields
+      // Parse wages and shopping arrays with numeric validation
       if (data.wages && Array.isArray(data.wages)) {
-        // Map to wage_entries (the actual database field)
-        data.wage_entries = data.wages.map((w: any) => ({
+        data.wages = data.wages.map((w: any) => ({
           ...w,
           amount: isNaN(parseFloat(w.amount)) ? 0 : parseFloat(w.amount || '0')
         }));
-        delete data.wages; // Remove the original field
       }
 
       if (data.shopping && Array.isArray(data.shopping)) {
-        // Map to shopping_entries (the actual database field)  
-        data.shopping_entries = data.shopping.map((s: any) => ({
+        data.shopping = data.shopping.map((s: any) => ({
           ...s,
           amount: isNaN(parseFloat(s.amount)) ? 0 : parseFloat(s.amount || '0')
         }));
-        delete data.shopping; // Remove the original field
       }
 
       // Process inventory data correctly - split the inventory object into proper database fields
@@ -458,27 +444,17 @@ export function registerRoutes(app: express.Application): Server {
         data.packagingItems = JSON.stringify(data.packagingItems);
       }
 
-      if (data.wage_entries) {
-        data.wage_entries = JSON.stringify(data.wage_entries);
+      if (data.wages) {
+        data.wages = JSON.stringify(data.wages);
       }
 
-      if (data.shopping_entries) {
-        data.shopping_entries = JSON.stringify(data.shopping_entries);
+      if (data.shopping) {
+        data.shopping = JSON.stringify(data.shopping);
       }
-      
-      // Map required fields and set defaults
-      data.completed_by = data.completedBy || '';
-      data.shift_type = data.shiftType || '';
-      data.shift_date = data.shiftDate || new Date();
       
       // Set defaults
       data.status = 'completed';
-      data.is_draft = false;
-      
-      // Remove the camelCase fields to avoid conflicts
-      delete data.completedBy;
-      delete data.shiftType;
-      delete data.shiftDate;
+      data.isDraft = false;
       
       let result;
       
