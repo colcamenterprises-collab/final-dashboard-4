@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Save, X, Download } from "lucide-react";
+import { Plus, Edit, Save, X, Download, ChefHat, Package2 } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import jsPDF from 'jspdf';
@@ -236,16 +237,37 @@ const Recipes = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Recipes Management</h2>
-            <div className="text-sm text-gray-600">
-              Create recipes with ingredient portions and auto-calculated costs
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Menu Management</h1>
+        <p className="text-gray-600 text-sm sm:text-base">Manage recipes, ingredients, and menu items</p>
+        
+        {/* Navigation to Menu Management sections */}
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <ChefHat className="h-5 w-5" />
+            <span className="text-sm font-medium">Recipes</span>
+            <span className="text-xs text-gray-600">(Current)</span>
+          </Button>
+          <Link href="/ingredients">
+            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <Package2 className="h-5 w-5" />
+              <span className="text-sm font-medium">Ingredients</span>
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Recipes Management</h2>
+              <div className="text-sm text-gray-600">
+                Create recipes with ingredient portions and auto-calculated costs
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
         <CardContent className="space-y-4">
           {/* Recipe Form */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
@@ -433,6 +455,7 @@ const Recipes = () => {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

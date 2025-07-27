@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from "date-fns";
 import { Calendar, Plus, DollarSign, FileText, TrendingUp, Receipt, Upload, Search, Filter, Download, BarChart3, ShoppingCart, Beef, Wheat } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -699,14 +700,47 @@ function ExpensesMerged() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6 max-w-7xl">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Expense Management</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Comprehensive expense tracking with AI-powered bank statement analysis
-          </p>
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Operations & Sales</h1>
+        <p className="text-gray-600 text-sm sm:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
+        
+        {/* Navigation to other Operations sections */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+          <Link href="/daily-sales-stock">
+            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <FileText className="h-5 w-5" />
+              <span className="text-sm font-medium">Daily Sales & Stock</span>
+            </Button>
+          </Link>
+          <Link href="/purchasing">
+            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <ShoppingCart className="h-5 w-5" />
+              <span className="text-sm font-medium">Purchasing</span>
+            </Button>
+          </Link>
+          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <DollarSign className="h-5 w-5" />
+            <span className="text-sm font-medium">Expenses</span>
+            <span className="text-xs text-gray-600">(Current)</span>
+          </Button>
+          <Link href="/reports-analysis">
+            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <BarChart3 className="h-5 w-5" />
+              <span className="text-sm font-medium">Reports & Analysis</span>
+            </Button>
+          </Link>
         </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Expense Management</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Comprehensive expense tracking with AI-powered bank statement analysis
+            </p>
+          </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
           <div className="flex gap-2">
             <Button 
@@ -1531,6 +1565,7 @@ function ExpensesMerged() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -7,7 +7,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Edit, Save, X } from "lucide-react";
+import { Plus, Edit, Save, X, ChefHat, Package2 } from "lucide-react";
+import { Link } from "wouter";
 
 interface Ingredient {
   id: number;
@@ -112,15 +113,36 @@ const Ingredients = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Ingredients Management</h2>
-          <Button onClick={handleAddIngredient} disabled={addMutation.isPending}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Ingredient
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Menu Management</h1>
+        <p className="text-gray-600 text-sm sm:text-base">Manage recipes, ingredients, and menu items</p>
+        
+        {/* Navigation to Menu Management sections */}
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Link href="/recipes">
+            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <ChefHat className="h-5 w-5" />
+              <span className="text-sm font-medium">Recipes</span>
+            </Button>
+          </Link>
+          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <Package2 className="h-5 w-5" />
+            <span className="text-sm font-medium">Ingredients</span>
+            <span className="text-xs text-gray-600">(Current)</span>
           </Button>
-        </CardHeader>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Ingredients Management</h2>
+            <Button onClick={handleAddIngredient} disabled={addMutation.isPending}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Ingredient
+            </Button>
+          </CardHeader>
         <CardContent>
           {/* Category Filter */}
           <div className="mb-4">
@@ -212,6 +234,7 @@ const Ingredients = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
