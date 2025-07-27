@@ -4,7 +4,18 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
-## Recent Changes (January 26, 2025)
+## Recent Changes (January 27, 2025)
+
+### FORM AMENDMENTS IMPLEMENTATION - COMPLETE ✅ COMPLETED
+- **Wages Dropdown Updated**: Changed dropdown options from "Staff" to "Wages", "Bonus", "Overtime" for better categorization
+- **Meat Input Enhanced**: Added step="0.01" to meat stock input allowing decimal values (e.g., 8.62kg) to prevent validation errors
+- **Fresh Food Items Filtered**: Removed top 4 Fresh Food items (Topside Beef, Brisket Point End, Chuck Roll Beef, Other Beef) as requested
+- **Drinks Section Relocated**: Moved Drinks category from inventory sections to Stock Counts section (directly below Rolls/Meat)
+- **Placeholder Removal**: Removed "Number Needed" placeholders from all inventory inputs for cleaner interface
+- **Success Message Enhanced**: Form displays "Thank you, form submitted!" alert with 6-second timeout on successful submission
+- **Font Consistency Maintained**: All updates preserve the responsive font system (text-xs sm:text-sm for inputs, text-sm sm:text-base for headers)
+- **Data Integrity Preserved**: All 54 authentic supplier items from CSV maintained with proper categorization
+- **Backend Compatibility**: Form submissions continue working with existing API endpoints and database schema
 
 ### COMPREHENSIVE Daily Shift Form Implementation - COMPLETE ✅ COMPLETED
 - **Complete Form Rebuild**: Successfully implemented comprehensive Daily Shift Form with all sections specified in user requirements

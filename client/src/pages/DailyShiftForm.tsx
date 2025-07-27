@@ -62,12 +62,8 @@ const DailyShiftForm = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Items from CSV (complete supplier list)
+  // Items from CSV (filtered - removed top 4 Fresh Food items as requested)
   const items: Item[] = [
-    { "Item ": "Topside Beef", "Internal Category": "Fresh Food" },
-    { "Item ": "Brisket Point End", "Internal Category": "Fresh Food" },
-    { "Item ": "Chuck Roll Beef", "Internal Category": "Fresh Food" },
-    { "Item ": "Other Beef (Mixed)", "Internal Category": "Fresh Food" },
     { "Item ": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food" },
     { "Item ": "Milk", "Internal Category": "Fresh Food" },
     { "Item ": "Burger Bun", "Internal Category": "Fresh Food" },
@@ -195,7 +191,7 @@ const DailyShiftForm = () => {
   const addWageEntry = () => {
     setFormData({
       ...formData,
-      wages: [...formData.wages, { name: '', amount: 0, type: 'staff' }]
+      wages: [...formData.wages, { name: '', amount: 0, type: 'wages' }]
     });
   };
 
@@ -345,7 +341,7 @@ const DailyShiftForm = () => {
                   onChange={(e) => updateWage(index, 'type', e.target.value)}
                   className="flex-1 p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
                 >
-                  <option value="staff">Staff</option>
+                  <option value="wages">Wages</option>
                   <option value="bonus">Bonus</option>
                   <option value="overtime">Overtime</option>
                 </select>
@@ -486,16 +482,33 @@ const DailyShiftForm = () => {
               <label className="block mb-2 text-xs sm:text-sm font-semibold">Meat Stock (kg)</label>
               <input
                 type="number"
+                step="0.01"
                 value={formData.meatStock}
                 onChange={(e) => setFormData({ ...formData, meatStock: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
           </div>
+          
+          {/* Drinks Section */}
+          <h3 className="text-xs sm:text-sm font-bold mb-3 border-b border-gray-200 pb-1">Drinks</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {items.filter(item => item["Internal Category"] === "Drinks").map((item) => (
+              <div key={item["Item "]} className="bg-white p-3 rounded-lg border border-gray-300">
+                <label className="block mb-1 text-xs font-semibold text-gray-900">{item["Item "]}</label>
+                <input
+                  type="number"
+                  value={formData.numberNeeded[item["Item "]] || ''}
+                  onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                  className="w-full p-1 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs"
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Inventory Categories */}
-        {Object.entries(groupedItems).map(([category, catItems]) => (
+        {/* Inventory Categories (excluding Drinks - moved to Stock Counts) */}
+        {Object.entries(groupedItems).filter(([category]) => category !== "Drinks").map(([category, catItems]) => (
           <div key={category} className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
             <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-200 pb-2">{category}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -504,7 +517,6 @@ const DailyShiftForm = () => {
                   <label className="block mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-gray-900">{item["Item "]}</label>
                   <input
                     type="number"
-                    placeholder="Number Needed"
                     value={formData.numberNeeded[item["Item "]] || ''}
                     onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
                     className="w-full p-1 sm:p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
