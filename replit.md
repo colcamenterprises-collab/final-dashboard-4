@@ -18,6 +18,7 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Single Page Structure**: Removed sub-menu navigation, created unified DailySalesStock.tsx component combining DailyShiftForm and DraftFormsLibrary
 - **Reports & Analysis Consolidation**: Combined Reporting and Analysis sections into single "Reports & Analysis" page with tabbed interface
 - **Purchasing Consolidation**: Merged Shopping Requirements and Suppliers into single "Purchasing" page with tabbed interface
+- **Expenses Section Moved**: Relocated Expenses from Finance menu to Operations & Sales menu between Purchasing and Reports & Analysis
 - **Menu Simplification**: Eliminated complex sub-menu structure under Operations, replaced with direct single-page navigation items
 - **Code Cleanup**: Removed unused submissions state and localStorage handling for cleaner codebase
 - **Font Consistency Maintained**: All updates preserve the responsive font system (text-xs sm:text-sm for inputs, text-sm sm:text-base for headers)

@@ -39,6 +39,7 @@ const navigationStructure = [
     items: [
       { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
       { path: "/purchasing", label: "Purchasing", icon: ShoppingCart },
+      { path: "/expenses", label: "Expenses", icon: DollarSign },
       { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
     ]
   },
