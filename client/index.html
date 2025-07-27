@@ -64,23 +64,58 @@
       }
     </style>
     <script>
-      // Aggressive tablet cache clearing
-      if (window.innerWidth >= 768 && window.innerWidth <= 1024) {
-        console.log('TABLET DETECTED - Clearing all caches');
+      // NUCLEAR TABLET CACHE CLEARING - Most aggressive possible
+      function isTablet() {
+        return window.innerWidth >= 768 && window.innerWidth <= 1024;
+      }
+      
+      if (isTablet()) {
+        console.log('TABLET DETECTED - Nuclear cache clearing initiated');
         
-        // Clear all possible caches
+        // Clear ALL storage types
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+          if (window.indexedDB) {
+            indexedDB.deleteDatabase('keyval-store');
+          }
+        } catch(e) { console.log('Storage clear:', e); }
+        
+        // Clear service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(reg => reg.unregister());
+          });
+        }
+        
+        // Clear all caches
         if ('caches' in window) {
           caches.keys().then(names => {
             names.forEach(name => caches.delete(name));
           });
         }
         
-        // Add timestamp to force reload
-        const timestamp = Date.now();
-        const meta = document.createElement('meta');
-        meta.httpEquiv = 'refresh';
-        meta.content = '0;url=' + window.location.href.split('?')[0] + '?bust=' + timestamp;
-        document.head.appendChild(meta);
+        // Check if we've already tried to reload
+        const urlParams = new URLSearchParams(window.location.search);
+        const reloadAttempt = urlParams.get('tablet-reload');
+        const currentTimestamp = Date.now();
+        
+        if (!reloadAttempt || (currentTimestamp - parseInt(reloadAttempt)) > 5000) {
+          console.log('TABLET: Force reloading with cache bust...');
+          
+          // Multiple reload strategies
+          setTimeout(() => {
+            window.location.href = window.location.pathname + '?tablet-reload=' + currentTimestamp + '&v=' + currentTimestamp;
+          }, 500);
+          
+          setTimeout(() => {
+            window.location.reload(true);
+          }, 1000);
+          
+          setTimeout(() => {
+            window.location.replace(window.location.pathname + '?force-reload=' + currentTimestamp);
+          }, 1500);
+        }
       }
     </script>
   </head>

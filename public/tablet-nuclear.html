@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="-1">
+    <title>Tablet Nuclear Cache Clear</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            min-width: 200px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #10b981;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .step {
+            margin: 0.5rem 0;
+            opacity: 0.6;
+        }
+        .step.active {
+            opacity: 1;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Tablet Cache Nuclear Clear</h1>
+        <p>Your tablet is showing old content. This will completely clear all caches and force reload the fresh responsive design.</p>
+        
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div id="steps">
+            <div class="step" id="step1">1. Clearing localStorage & sessionStorage</div>
+            <div class="step" id="step2">2. Unregistering service workers</div>
+            <div class="step" id="step3">3. Clearing browser caches</div>
+            <div class="step" id="step4">4. Clearing IndexedDB</div>
+            <div class="step" id="step5">5. Force reloading application</div>
+        </div>
+        
+        <button class="button" onclick="nuclearClear()" id="clearBtn">START NUCLEAR CLEAR</button>
+        <button class="button" onclick="manualReload()" id="reloadBtn">MANUAL RELOAD</button>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+        
+        function updateProgress(step) {
+            if (currentStep > 0) {
+                document.getElementById(steps[currentStep - 1]).classList.remove('active');
+            }
+            document.getElementById(steps[step]).classList.add('active');
+            document.getElementById('progressBar').style.width = ((step + 1) / steps.length * 100) + '%';
+            currentStep = step;
+        }
+        
+        async function nuclearClear() {
+            document.getElementById('clearBtn').disabled = true;
+            document.getElementById('clearBtn').textContent = 'CLEARING...';
+            
+            // Step 1: Clear storage
+            updateProgress(0);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                console.log('✅ Storage cleared');
+            } catch(e) { console.log('Storage error:', e); }
+            
+            // Step 2: Service workers
+            updateProgress(1);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(reg => reg.unregister()));
+                    console.log('✅ Service workers cleared');
+                } catch(e) { console.log('SW error:', e); }
+            }
+            
+            // Step 3: Caches
+            updateProgress(2);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if ('caches' in window) {
+                try {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(name => caches.delete(name)));
+                    console.log('✅ Caches cleared');
+                } catch(e) { console.log('Cache error:', e); }
+            }
+            
+            // Step 4: IndexedDB
+            updateProgress(3);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+                if (window.indexedDB) {
+                    indexedDB.deleteDatabase('keyval-store');
+                    indexedDB.deleteDatabase('workbox-expiration');
+                }
+                console.log('✅ IndexedDB cleared');
+            } catch(e) { console.log('IDB error:', e); }
+            
+            // Step 5: Force reload
+            updateProgress(4);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const timestamp = Date.now();
+            console.log('🚀 Nuclear reload initiated');
+            
+            // Multiple reload strategies
+            window.location.href = '/?nuclear=' + timestamp;
+        }
+        
+        function manualReload() {
+            const timestamp = Date.now();
+            window.location.href = '/?manual=' + timestamp;
+        }
+        
+        // Auto-start after 3 seconds
+        setTimeout(() => {
+            nuclearClear();
+        }, 3000);
+    </script>
+</body>
+</html>

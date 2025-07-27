@@ -14,21 +14,34 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// Add AGGRESSIVE cache control headers to prevent tablet caching issues
+// NUCLEAR cache control headers - most aggressive possible
 app.use((req, res, next) => {
-  // Disable caching for ALL files to ensure changes flow through to tablets
-  res.set('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate');
+  // Nuclear cache disabling for ALL requests
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate, private, max-age=0');
   res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
+  res.set('Expires', '-1');
   res.set('Surrogate-Control', 'no-store');
   res.set('Last-Modified', new Date().toUTCString());
-  res.set('ETag', '"' + Date.now() + '"');
+  res.set('ETag', '"' + Date.now() + '-' + Math.random() + '"');
   
-  // Add tablet-specific headers
+  // Force browsers to never cache
+  res.set('X-Accel-Expires', '0');
+  res.set('X-Cache-Control', 'no-cache');
+  
+  // Tablet-specific nuclear headers
   const userAgent = req.get('User-Agent') || '';
-  if (userAgent.includes('iPad') || userAgent.includes('Android')) {
-    res.set('X-Tablet-Cache-Bust', Date.now().toString());
-    res.set('Vary', 'User-Agent');
+  const isTablet = userAgent.includes('iPad') || 
+                   userAgent.includes('Android') || 
+                   userAgent.includes('Tablet') ||
+                   (req.get('Accept') && req.get('Accept').includes('text/html'));
+                   
+  if (isTablet) {
+    res.set('X-Tablet-Nuclear-Bust', Date.now().toString());
+    res.set('X-Force-Reload', 'true');
+    res.set('Vary', 'User-Agent, Accept');
+    
+    // Force no transform or optimization
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate, private, max-age=0, s-maxage=0');
   }
   
   next();
@@ -48,9 +61,13 @@ app.use('/attached_assets', express.static(path.resolve(process.cwd(), 'attached
 // Serve tablet cache clear page
 app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
 
-// Special tablet reload route
+// Special tablet reload routes
 app.get('/tablet-reload', (req, res) => {
   res.sendFile(path.resolve(process.cwd(), 'public/tablet-reload.html'));
+});
+
+app.get('/tablet-nuclear', (req, res) => {
+  res.sendFile(path.resolve(process.cwd(), 'public/tablet-nuclear.html'));
 });
 
 app.use((req, res, next) => {
