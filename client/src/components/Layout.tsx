@@ -48,33 +48,7 @@ const navigationStructure = [
           { path: "/supplier-management", label: "Suppliers", icon: Package },
         ]
       },
-      {
-        id: "reporting",
-        label: "Reporting",
-        icon: Receipt,
-        expandable: true,
-        items: [
-          { path: "/loyverse", label: "Receipts", icon: Receipt },
-          { path: "/loyverse", label: "Receipt Library (by Date)", icon: FileText },
-          { path: "/loyverse", label: "Shift Reports (POS)", icon: PieChart },
-          { path: "/loyverse", label: "Shift Summary", icon: ClipboardList },
-        ]
-      },
-      {
-        id: "analysis",
-        label: "Analysis",
-        icon: BarChart3,
-        expandable: true,
-        items: [
-          { path: "/analysis", label: "Receipt Analysis", icon: Receipt },
-          { path: "/analysis", label: "Items & Modifiers", icon: Package },
-          { path: "/analysis", label: "Sold vs Purchases", icon: TrendingUp },
-          { path: "/analysis", label: "Top 5 Items Sold", icon: BarChart },
-          { path: "/analysis", label: "Sales Type Summary", icon: PieChart },
-          { path: "/analysis", label: "Variances & Anomalies", icon: AlertTriangle },
-          { path: "/analysis", label: "Daily Report Library", icon: FileText },
-        ]
-      },
+      { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
     ]
   },
   {

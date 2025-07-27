@@ -21,6 +21,7 @@ import POSLoyverse from "@/pages/POSLoyverse";
 import LoyverseLive from "@/pages/LoyverseLive";
 import RecipeIngredientManagement from "@/pages/RecipeIngredientManagement";
 import Analysis from "@/pages/Analysis";
+import ReportsAnalysis from "@/pages/ReportsAnalysis";
 import ShiftAnalytics from "@/pages/ShiftAnalytics";
 import WebhookManagement from "@/pages/WebhookManagement";
 import Marketing from "@/pages/Marketing";
@@ -55,6 +56,7 @@ function Router() {
         <Route path="/loyverse-live" component={LoyverseLive} />
         <Route path="/recipe-management" component={RecipeIngredientManagement} />
         <Route path="/ingredient-management" component={RecipeIngredientManagement} />
+        <Route path="/reports-analysis" component={ReportsAnalysis} />
         <Route path="/analysis" component={Analysis} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/marketing" component={Marketing} />
