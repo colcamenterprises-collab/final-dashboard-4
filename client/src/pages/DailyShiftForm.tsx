@@ -1,8 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+interface WageEntry {
+  name: string;
+  amount: number;
+  type: string;
+}
+
+interface ShoppingEntry {
+  item: string;
+  amount: number;
+  shop: string;
+}
+
+interface FormData {
+  completedBy: string;
+  shiftDate: string;
+  grabSales: number;
+  aroiDeeSales: number;
+  qrScanSales: number;
+  cashSales: number;
+  wages: WageEntry[];
+  shopping: ShoppingEntry[];
+  gasExpense: number;
+  startingCash: number;
+  endingCash: number;
+  bankedAmount: number;
+  rollsStock: number;
+  meatStock: number;
+  numberNeeded: Record<string, string>;
+}
+
+interface Submission extends FormData {
+  date: string;
+}
+
+interface Item {
+  "Item ": string;
+  "Internal Category": string;
+}
+
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     completedBy: '',
     shiftDate: new Date().toISOString().split('T')[0],
     grabSales: 0,
@@ -19,12 +58,12 @@ const DailyShiftForm = () => {
     meatStock: 0,
     numberNeeded: {}
   });
-  const [submissions, setSubmissions] = useState([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   // Items from CSV (complete supplier list)
-  const items = [
+  const items: Item[] = [
     { "Item ": "Topside Beef", "Internal Category": "Fresh Food" },
     { "Item ": "Brisket Point End", "Internal Category": "Fresh Food" },
     { "Item ": "Chuck Roll Beef", "Internal Category": "Fresh Food" },
@@ -94,7 +133,7 @@ const DailyShiftForm = () => {
     }
   }, []);
 
-  const handleNumberNeededChange = (itemName, value) => {
+  const handleNumberNeededChange = (itemName: string, value: string) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setFormData({
         ...formData,
@@ -105,7 +144,7 @@ const DailyShiftForm = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newSubmission = { ...formData, date: new Date().toLocaleString() };
     const updatedSubmissions = [...submissions, newSubmission];
@@ -160,14 +199,14 @@ const DailyShiftForm = () => {
     });
   };
 
-  const removeWageEntry = (index) => {
+  const removeWageEntry = (index: number) => {
     setFormData({
       ...formData,
       wages: formData.wages.filter((_, i) => i !== index)
     });
   };
 
-  const updateWage = (index, field, value) => {
+  const updateWage = (index: number, field: keyof WageEntry, value: string | number) => {
     const updatedWages = [...formData.wages];
     updatedWages[index] = { ...updatedWages[index], [field]: value };
     setFormData({ ...formData, wages: updatedWages });
@@ -181,14 +220,14 @@ const DailyShiftForm = () => {
     });
   };
 
-  const removeShoppingEntry = (index) => {
+  const removeShoppingEntry = (index: number) => {
     setFormData({
       ...formData,
       shopping: formData.shopping.filter((_, i) => i !== index)
     });
   };
 
-  const updateShopping = (index, field, value) => {
+  const updateShopping = (index: number, field: keyof ShoppingEntry, value: string | number) => {
     const updatedShopping = [...formData.shopping];
     updatedShopping[index] = { ...updatedShopping[index], [field]: value };
     setFormData({ ...formData, shopping: updatedShopping });
@@ -204,31 +243,31 @@ const DailyShiftForm = () => {
   }, {});
 
   return (
-    <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Daily Sales & Stock</h1>
+    <div className="p-4 sm:p-6 bg-white text-gray-900 min-h-screen">
+      <h1 className="font-bold text-[12px] mb-4 sm:mb-6">Daily Sales & Stock</h1>
       
       <form onSubmit={handleSubmit}>
         {/* Basic Information */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Basic Information</h2>
+        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-50">
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 font-semibold">Completed By</label>
+              <label className="block mb-2 text-[11px] font-semibold">Completed By</label>
               <input
                 type="text"
                 value={formData.completedBy}
                 onChange={(e) => setFormData({ ...formData, completedBy: e.target.value })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Shift Date</label>
+              <label className="block mb-2 text-[11px] font-semibold">Shift Date</label>
               <input
                 type="date"
                 value={formData.shiftDate}
                 onChange={(e) => setFormData({ ...formData, shiftDate: e.target.value })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
                 required
               />
             </div>
@@ -236,48 +275,48 @@ const DailyShiftForm = () => {
         </div>
 
         {/* Sales Information */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Sales Information</h2>
+        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-50">
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Sales Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="block mb-2 font-semibold">Grab Sales</label>
+              <label className="block mb-2 text-[11px] font-semibold">Grab Sales</label>
               <input
                 type="number"
                 value={formData.grabSales}
                 onChange={(e) => setFormData({ ...formData, grabSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Aroi Dee Sales</label>
+              <label className="block mb-2 text-[11px] font-semibold">Aroi Dee Sales</label>
               <input
                 type="number"
                 value={formData.aroiDeeSales}
                 onChange={(e) => setFormData({ ...formData, aroiDeeSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">QR Scan Sales</label>
+              <label className="block mb-2 text-[11px] font-semibold">QR Scan Sales</label>
               <input
                 type="number"
                 value={formData.qrScanSales}
                 onChange={(e) => setFormData({ ...formData, qrScanSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Cash Sales</label>
+              <label className="block mb-2 text-[11px] font-semibold">Cash Sales</label>
               <input
                 type="number"
                 value={formData.cashSales}
                 onChange={(e) => setFormData({ ...formData, cashSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
-          <div className="mt-4 p-3 bg-green-700 rounded">
-            <strong>Total Sales: ฿{totalSales.toFixed(2)}</strong>
+          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded text-green-800">
+            <strong className="text-[11px]">Total Sales: ฿{totalSales.toFixed(2)}</strong>
           </div>
         </div>
 
@@ -478,8 +517,8 @@ const DailyShiftForm = () => {
 
         {/* Submit Buttons */}
         <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-sm sm:text-base">Save as Draft</button>
-          <button type="submit" className="bg-orange-500 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-sm sm:text-base">Submit Form</button>
+          <button type="button" onClick={saveDraft} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-[11px] sm:text-base">Save as Draft</button>
+          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-[11px] sm:text-base">Save and Submit</button>
         </div>
       </form>
       {successMessage && (

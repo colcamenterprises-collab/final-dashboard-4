@@ -40,6 +40,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/daily-stock-sales" component={DailyShiftForm} />
         <Route path="/daily-shift-form" component={DailyShiftForm} />
+        <Route path="/daily-sales-form" component={DailyShiftForm} />
         <Route path="/daily-stock-sales-quick" component={DailyStockSalesQuick} />
         <Route path="/daily-stock-sales-complex" component={DailyStockSales} />
         <Route path="/daily-stock-sales/search" component={DailyStockSalesSearch} />
