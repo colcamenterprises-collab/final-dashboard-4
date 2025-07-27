@@ -13,6 +13,7 @@ import DailyShiftForm from "@/pages/DailyShiftForm";
 import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
 import PastForms from "@/pages/PastForms";
 import DraftFormsLibrary from "@/pages/DraftFormsLibrary";
+import DailySalesStock from "@/pages/DailySalesStock";
 import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import ExpensesMerged from "@/pages/ExpensesMerged";
@@ -38,6 +39,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/daily-sales-stock" component={DailySalesStock} />
         <Route path="/daily-stock-sales" component={DailyShiftForm} />
         <Route path="/daily-shift-form" component={DailyShiftForm} />
         <Route path="/daily-sales-form" component={DailyShiftForm} />

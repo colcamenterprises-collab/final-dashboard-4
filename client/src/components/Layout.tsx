@@ -37,16 +37,7 @@ const navigationStructure = [
     icon: ShoppingCart,
     expandable: true,
     items: [
-      {
-        id: "daily-sales-form",
-        label: "Daily Sales & Stock",
-        icon: ClipboardList,
-        expandable: true,
-        items: [
-          { path: "/daily-shift-form", label: "Submit Form", icon: ClipboardList },
-          { path: "/draft-forms", label: "Drafts & Library", icon: FileText },
-        ]
-      },
+      { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
       {
         id: "purchasing",
         label: "Purchasing",
