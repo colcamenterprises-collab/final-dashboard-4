@@ -145,9 +145,9 @@ const Ingredients = () => {
           </CardHeader>
         <CardContent>
           {/* Category Filter */}
-          <div className="mb-4">
+          <div className="mb-3 sm:mb-4">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48 text-sm">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
@@ -165,15 +165,15 @@ const Ingredients = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Package Price</TableHead>
-                  <TableHead>Package Size</TableHead>
-                  <TableHead>Portion Size</TableHead>
-                  <TableHead>Cost/Portion</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Category</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Price</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Package Size</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Portion Size</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Cost/Portion</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Supplier</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Updated</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -188,26 +188,24 @@ const Ingredients = () => {
                       />
                     ) : (
                       <>
-                        <TableCell className="font-medium">{ingredient.name}</TableCell>
-                        <TableCell>{ingredient.category}</TableCell>
-                        <TableCell>
-                          ฿{ingredient.price || ingredient.unitPrice} / {ingredient.packageSize}{ingredient.unit}
+                        <TableCell className="font-medium text-xs sm:text-sm">{ingredient.name}</TableCell>
+                        <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{ingredient.category}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">
+                          ฿{ingredient.price || ingredient.unitPrice}
                         </TableCell>
-                        <TableCell>{ingredient.packageSize}{ingredient.unit}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm hidden md:table-cell">{ingredient.packageSize}{ingredient.unit}</TableCell>
+                        <TableCell className="text-xs sm:text-sm hidden md:table-cell">
                           {ingredient.portionSize ? `${ingredient.portionSize}${ingredient.unit}` : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           {ingredient.costPerPortion ? `฿${parseFloat(ingredient.costPerPortion.toString()).toFixed(2)}` : '-'}
                         </TableCell>
-                        <TableCell>{ingredient.supplier}</TableCell>
-                        <TableCell className="text-sm text-gray-500">
+                        <TableCell className="text-xs sm:text-sm hidden lg:table-cell">{ingredient.supplier}</TableCell>
+                        <TableCell className="text-xs sm:text-sm text-gray-500 hidden lg:table-cell">
                           {new Date(ingredient.updatedAt).toLocaleDateString('en-GB', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
                           })}
                         </TableCell>
                         <TableCell>
@@ -215,8 +213,9 @@ const Ingredients = () => {
                             variant="outline" 
                             size="sm"
                             onClick={() => setEditingId(ingredient.id)}
+                            className="h-8 w-8 p-0"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
                         </TableCell>
                       </>

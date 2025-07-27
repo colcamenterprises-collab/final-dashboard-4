@@ -237,50 +237,51 @@ const Recipes = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Menu Management</h1>
-        <p className="text-gray-600 text-sm sm:text-base">Manage recipes, ingredients, and menu items</p>
+    <div className="container mx-auto p-3 sm:p-4 lg:p-6 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Menu Management</h1>
+        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage recipes, ingredients, and menu items</p>
         
         {/* Navigation to Menu Management sections */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
-            <ChefHat className="h-5 w-5" />
-            <span className="text-sm font-medium">Recipes</span>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sm:mt-4">
+          <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <ChefHat className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="text-xs sm:text-sm font-medium">Recipes</span>
             <span className="text-xs text-gray-600">(Current)</span>
           </Button>
           <Link href="/ingredients">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <Package2 className="h-5 w-5" />
-              <span className="text-sm font-medium">Ingredients</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <Package2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Ingredients</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Recipes Management</h2>
-              <div className="text-sm text-gray-600">
+          <CardHeader className="pb-3 sm:pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Recipes Management</h2>
+              <div className="text-xs sm:text-sm text-gray-600">
                 Create recipes with ingredient portions and auto-calculated costs
               </div>
             </div>
           </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4">
           {/* Recipe Form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg">
             <Input
               placeholder="Recipe name (e.g., Smash Burger)"
               value={newRecipe.name || ''}
               onChange={(e) => setNewRecipe({ ...newRecipe, name: e.target.value })}
+              className="text-sm"
             />
             <Select
               value={newRecipe.category || ''}
               onValueChange={(value) => setNewRecipe({ ...newRecipe, category: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>

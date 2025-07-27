@@ -103,14 +103,14 @@ const ReportsAnalysis = () => {
       className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
       onClick={() => handleItemClick(item.path)}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 sm:pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <item.icon className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
+              <item.icon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">{item.title}</CardTitle>
+              <CardTitle className="text-sm sm:text-base font-semibold">{item.title}</CardTitle>
               <Badge variant={item.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
                 {item.status}
               </Badge>
@@ -118,8 +118,8 @@ const ReportsAnalysis = () => {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <CardDescription className="text-sm text-gray-600">
+      <CardContent className="pt-0">
+        <CardDescription className="text-xs sm:text-sm text-gray-600">
           {item.description}
         </CardDescription>
       </CardContent>
@@ -127,62 +127,68 @@ const ReportsAnalysis = () => {
   );
 
   return (
-    <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Reports & Analysis</h1>
-        <p className="text-gray-600 text-sm sm:text-base">Access reporting tools and analytical insights for your restaurant operations</p>
+    <div className="container mx-auto p-3 sm:p-4 lg:p-6 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Reports & Analysis</h1>
+        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Access reporting tools and analytical insights for your restaurant operations</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="reporting" className="text-sm sm:text-base">
-            <Receipt className="mr-2 h-4 w-4" />
-            Reporting
+        <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+          <TabsTrigger value="reporting" className="text-xs sm:text-sm lg:text-base">
+            <Receipt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Reporting</span>
+            <span className="sm:hidden">Reports</span>
           </TabsTrigger>
-          <TabsTrigger value="analysis" className="text-sm sm:text-base">
-            <BarChart className="mr-2 h-4 w-4" />
-            Analysis
+          <TabsTrigger value="analysis" className="text-xs sm:text-sm lg:text-base">
+            <BarChart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Analysis</span>
+            <span className="sm:hidden">Analysis</span>
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="reporting" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Reporting Tools</h2>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
-                Filter
+        <TabsContent value="reporting" className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Reporting Tools</h2>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Filter className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Filter</span>
+                <span className="sm:hidden">Filter</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <Calendar className="mr-2 h-4 w-4" />
-                Date Range
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Calendar className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Date Range</span>
+                <span className="sm:hidden">Date</span>
               </Button>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {reportingItems.map((item, index) => (
               <ItemCard key={index} item={item} />
             ))}
           </div>
         </TabsContent>
         
-        <TabsContent value="analysis" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Analysis Tools</h2>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Search className="mr-2 h-4 w-4" />
-                Search
+        <TabsContent value="analysis" className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Analysis Tools</h2>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Search className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Search</span>
+                <span className="sm:hidden">Search</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Export</span>
+                <span className="sm:hidden">Export</span>
               </Button>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {analysisItems.map((item, index) => (
               <ItemCard key={index} item={item} />
             ))}

@@ -46,63 +46,66 @@ const Purchasing = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Operations & Sales</h1>
-        <p className="text-gray-600 text-sm sm:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
+    <div className="container mx-auto p-3 sm:p-4 lg:p-6 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Operations & Sales</h1>
+        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
         
         {/* Navigation to other Operations sections */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4">
           <Link href="/daily-sales-stock">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <FileText className="h-5 w-5" />
-              <span className="text-sm font-medium">Daily Sales & Stock</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Daily Sales & Stock</span>
             </Button>
           </Link>
-          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
-            <ShoppingCart className="h-5 w-5" />
-            <span className="text-sm font-medium">Purchasing</span>
+          <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="text-xs sm:text-sm font-medium">Purchasing</span>
             <span className="text-xs text-gray-600">(Current)</span>
           </Button>
           <Link href="/expenses">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <DollarSign className="h-5 w-5" />
-              <span className="text-sm font-medium">Expenses</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Expenses</span>
             </Button>
           </Link>
           <Link href="/reports-analysis">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <BarChart3 className="h-5 w-5" />
-              <span className="text-sm font-medium">Reports & Analysis</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Reports & Analysis</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Purchasing</h2>
-        <p className="text-gray-600 text-sm sm:text-base">Manage shopping requirements and supplier information</p>
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 sm:mb-2">Purchasing</h2>
+        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage shopping requirements and supplier information</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="shopping" className="text-sm sm:text-base">
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            Shopping Requirements
+        <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+          <TabsTrigger value="shopping" className="text-xs sm:text-sm lg:text-base">
+            <ShoppingCart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Shopping Requirements</span>
+            <span className="sm:hidden">Shopping</span>
           </TabsTrigger>
-          <TabsTrigger value="suppliers" className="text-sm sm:text-base">
-            <Package className="mr-2 h-4 w-4" />
-            Suppliers
+          <TabsTrigger value="suppliers" className="text-xs sm:text-sm lg:text-base">
+            <Package className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Suppliers</span>
+            <span className="sm:hidden">Suppliers</span>
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="shopping" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Shopping Requirements</h2>
+        <TabsContent value="shopping" className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Shopping Requirements</h3>
             <div className="flex space-x-2">
-              <Button variant="outline">
-                <Search className="mr-2 h-4 w-4" />
-                Search Items
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Search className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Search Items</span>
+                <span className="sm:hidden">Search</span>
               </Button>
             </div>
           </div>

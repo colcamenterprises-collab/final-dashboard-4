@@ -700,55 +700,55 @@ function ExpensesMerged() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Operations & Sales</h1>
-        <p className="text-gray-600 text-sm sm:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
+    <div className="container mx-auto p-3 sm:p-4 lg:p-6 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Operations & Sales</h1>
+        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
         
         {/* Navigation to other Operations sections */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4">
           <Link href="/daily-sales-stock">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <FileText className="h-5 w-5" />
-              <span className="text-sm font-medium">Daily Sales & Stock</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Daily Sales & Stock</span>
             </Button>
           </Link>
           <Link href="/purchasing">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="text-sm font-medium">Purchasing</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Purchasing</span>
             </Button>
           </Link>
-          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
-            <DollarSign className="h-5 w-5" />
-            <span className="text-sm font-medium">Expenses</span>
+          <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="text-xs sm:text-sm font-medium">Expenses</span>
             <span className="text-xs text-gray-600">(Current)</span>
           </Button>
           <Link href="/reports-analysis">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <BarChart3 className="h-5 w-5" />
-              <span className="text-sm font-medium">Reports & Analysis</span>
+            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm font-medium">Reports & Analysis</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Expense Management</h2>
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Expense Management</h2>
+            <p className="text-xs sm:text-sm lg:text-base text-muted-foreground">
               Comprehensive expense tracking with AI-powered bank statement analysis
             </p>
           </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2">
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => generateExpenseReport('monthly')}
               disabled={reportGenerating}
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none"
             >
               <BarChart3 className="w-3 h-3 mr-1" />
               {reportGenerating ? 'Generating...' : 'Monthly'}
@@ -758,7 +758,7 @@ function ExpensesMerged() {
               size="sm"
               onClick={() => generateExpenseReport('quarterly')}
               disabled={reportGenerating}
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none"
             >
               <BarChart3 className="w-3 h-3 mr-1" />
               {reportGenerating ? 'Generating...' : 'Quarterly'}
