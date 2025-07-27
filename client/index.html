@@ -2,9 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/png" href="/attached_assets/Yellow Circle - Black Logo_1751274091742.png" />
     <title>RestaurantOS - Restaurant Management Dashboard</title>
+    <!-- Force CSS reload on tablets -->
+    <style>
+      * { 
+        box-sizing: border-box; 
+      }
+      @media screen and (min-width: 768px) and (max-width: 1024px) {
+        /* Tablet-specific overrides to ensure changes flow through */
+        .container { 
+          max-width: 100% !important; 
+          padding: 1rem !important; 
+        }
+        /* Force responsive text sizing on tablets */
+        .text-xs { font-size: 0.75rem !important; }
+        .text-sm { font-size: 0.875rem !important; }
+        .text-base { font-size: 1rem !important; }
+        .text-lg { font-size: 1.125rem !important; }
+        .text-xl { font-size: 1.25rem !important; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

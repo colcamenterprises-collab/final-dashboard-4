@@ -14,6 +14,17 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
+// Add cache control headers to prevent tablet caching issues
+app.use((req, res, next) => {
+  // Disable caching for all HTML, CSS, and JS files to ensure changes flow through
+  if (req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path === '/') {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
+
 // Set server timeout for large uploads
 app.use((req, res, next) => {
   // Set timeout to 5 minutes for large uploads
@@ -78,7 +89,7 @@ async function checkSchema() {
     console.log('✓ Database schema validation passed');
     
   } catch (err) {
-    console.error('❌ Schema check failed:', err.message);
+    console.error('❌ Schema check failed:', (err as Error).message);
     console.log('Run: node server/migrations/fix-schema.js to fix schema issues');
   }
 }
