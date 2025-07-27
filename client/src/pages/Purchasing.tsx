@@ -67,10 +67,6 @@ const Purchasing = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Shopping Requirements</h2>
             <div className="flex space-x-2">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="mr-2 h-4 w-4" />
-                Quick Lodge
-              </Button>
               <Button variant="outline">
                 <Search className="mr-2 h-4 w-4" />
                 Search Items
@@ -80,126 +76,12 @@ const Purchasing = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Quick Lodge Items</CardTitle>
-              <CardDescription>Enter purchasing quantities for common items</CardDescription>
+              <CardTitle className="text-lg font-semibold">Shopping Requirements</CardTitle>
+              <CardDescription>View and manage shopping requirements generated from daily forms</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Burger Buns</label>
-                  <input 
-                    type="number" 
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Meat (kg)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Rolls Ordered</label>
-                  <input 
-                    type="number" 
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Drinks Purchased</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Coke</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Coke Zero</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Sprite</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Schweppes Manow</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Fanta Orange</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Fanta Strawberry</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Soda Water</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Bottled Water</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Kids Juice Orange</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">Kids Juice Apple</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-2 border border-gray-300 rounded-md text-xs sm:text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <Button className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white">Submit Purchase Order</Button>
+              <div className="text-center py-8 text-gray-500">
+                Shopping requirements will appear here when generated from Daily Sales & Stock forms.
               </div>
             </CardContent>
           </Card>

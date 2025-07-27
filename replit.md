@@ -6,6 +6,13 @@ This is a comprehensive restaurant management dashboard application built with a
 
 ## Recent Changes (January 27, 2025)
 
+### QUICK LODGE REMOVAL FROM PURCHASING - COMPLETE ✅ COMPLETED
+- **Superior Quick Lodge Retained**: Kept comprehensive Quick Lodge functionality in Expenses section which has advanced roll, drink, and meat purchase tracking
+- **Purchasing Page Simplified**: Removed redundant Quick Lodge from Shopping Requirements page to eliminate functional duplication  
+- **Data Storage Clarification**: Expenses Quick Lodge data stored in multiple database tables (expenses, stockPurchaseRolls, stockPurchaseDrinks, stockPurchaseMeat)
+- **API Integration Preserved**: Maintained all existing API endpoints (/api/expenses, /api/stock-purchase/rolls, /drinks, /meat) for variance analysis
+- **Navigation Optimized**: Shopping Requirements now focused solely on shopping list management generated from Daily Sales & Stock forms
+
 ### FORM AMENDMENTS IMPLEMENTATION - COMPLETE ✅ COMPLETED
 - **Wages Dropdown Updated**: Changed dropdown options from "Staff" to "Wages", "Bonus", "Overtime" for better categorization
 - **Meat Input Enhanced**: Added step="0.01" to meat stock input allowing decimal values (e.g., 8.62kg) to prevent validation errors
