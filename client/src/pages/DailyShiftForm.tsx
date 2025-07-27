@@ -239,7 +239,7 @@ const DailyShiftForm = () => {
       acc[cat].push(item);
     }
     return acc;
-  }, {});
+  }, {} as Record<string, Item[]>);
 
   return (
     <div className="max-w-6xl mx-auto p-2 sm:p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
