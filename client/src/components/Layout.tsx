@@ -36,6 +36,7 @@ const navigationStructure = [
     label: "Operations & Sales",
     icon: ShoppingCart,
     expandable: true,
+    path: "/daily-sales-stock", // Main page for collapsed state
     items: [
       { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
       { path: "/purchasing", label: "Purchasing", icon: ShoppingCart },
@@ -54,6 +55,7 @@ const navigationStructure = [
     label: "Menu Mgmt",
     icon: Utensils,
     expandable: true,
+    path: "/recipes", // Main page for collapsed state
     items: [
       { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
@@ -70,6 +72,7 @@ const navigationStructure = [
     label: "Settings",
     icon: Settings,
     expandable: true,
+    path: "/placeholder/business-info", // Main page for collapsed state
     items: [
       { path: "/placeholder/business-info", label: "Business Info", icon: FileText },
       { path: "/placeholder/logo", label: "Logo", icon: Settings },
@@ -217,7 +220,7 @@ export default function Layout({ children }: LayoutProps) {
               
               // Expandable section with main item link
               const hasActiveChild = section.items?.some(item => location === item.path);
-              const mainItemPath = section.items?.[0]?.path || section.path || '#';
+              const mainItemPath = section.path || section.items?.[0]?.path || '#';
               
               return (
                 <div key={section.id}>
