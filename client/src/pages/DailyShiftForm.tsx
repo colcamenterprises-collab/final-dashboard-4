@@ -137,7 +137,7 @@ const DailyShiftForm = () => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setFormData({
         ...formData,
-        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
+        numberNeeded: { ...formData.numberNeeded, [itemName]: parseFloat(value) || 0 }
       });
     } else {
       setErrorMessage(`Invalid input for ${itemName}: Only numbers or empty. Reasoning: Text/symbols cause DB errors (22P02).`);
@@ -531,7 +531,7 @@ const DailyShiftForm = () => {
                 <Label className="text-xs sm:text-sm font-medium">{item["Item "]}</Label>
                 <Input
                   type="number"
-                  value={formData.numberNeeded[item["Item "]] || ''}
+                  value={formData.numberNeeded[item["Item "]] || 0}
                   onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
                   className="text-xs sm:text-sm"
                   placeholder=""
@@ -554,7 +554,7 @@ const DailyShiftForm = () => {
                     <Label className="text-xs sm:text-sm font-medium">{item["Item "]}</Label>
                     <Input
                       type="number"
-                      value={formData.numberNeeded[item["Item "]] || ''}
+                      value={formData.numberNeeded[item["Item "]] || 0}
                       onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
                       className="text-xs sm:text-sm"
                       placeholder=""
