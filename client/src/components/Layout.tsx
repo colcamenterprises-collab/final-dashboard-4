@@ -38,16 +38,7 @@ const navigationStructure = [
     expandable: true,
     items: [
       { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
-      {
-        id: "purchasing",
-        label: "Purchasing",
-        icon: Package,
-        expandable: true,
-        items: [
-          { path: "/purchasing", label: "Shopping Requirements", icon: ShoppingCart },
-          { path: "/supplier-management", label: "Suppliers", icon: Package },
-        ]
-      },
+      { path: "/purchasing", label: "Purchasing", icon: ShoppingCart },
       { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
     ]
   },
