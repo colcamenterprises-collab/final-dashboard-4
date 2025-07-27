@@ -52,27 +52,26 @@ const Purchasing = () => {
         <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage daily operations, purchasing, expenses, and reporting</p>
         
         {/* Navigation to other Operations sections */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4">
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-4">
           <Link href="/daily-sales-stock">
-            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="text-xs sm:text-sm font-medium">Daily Sales & Stock</span>
+            <Button variant="outline" className="px-3 py-2">
+              <FileText className="h-4 w-4 mr-2" />
+              Daily Sales & Stock
             </Button>
           </Link>
-          <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
-            <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="text-xs sm:text-sm font-medium">Purchasing</span>
-            <span className="text-xs text-gray-600">(Current)</span>
+          <Button variant="outline" className="px-3 py-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Purchasing (Current)
           </Button>
           <Link href="/expenses">
-            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="text-xs sm:text-sm font-medium">Expenses</span>
+            <Button variant="outline" className="px-3 py-2">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Expenses
             </Button>
           </Link>
           <Link href="/reports-analysis">
-            <Button variant="outline" className="w-full h-auto p-2 sm:p-3 lg:p-4 flex flex-col items-center space-y-1 sm:space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+            <Button variant="outline" className="px-3 py-2">
+              <BarChart3 className="h-4 w-4 mr-2" />
               <span className="text-xs sm:text-sm font-medium">Reports & Analysis</span>
             </Button>
           </Link>
