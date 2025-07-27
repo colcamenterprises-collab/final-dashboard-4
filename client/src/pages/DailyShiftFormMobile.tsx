@@ -288,21 +288,21 @@ const DailyShiftFormMobile = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Mobile-first container with proper padding */}
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="w-full max-w-4xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           
           {/* Header */}
-          <div className="text-center pb-4 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Daily Shift Form</h1>
-            <p className="text-gray-600 text-sm">Complete your end-of-shift reporting</p>
+          <div className="text-center pb-3 sm:pb-4 border-b border-gray-200">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Daily Shift Form</h1>
+            <p className="text-gray-600 text-sm sm:text-base">Complete your end-of-shift reporting</p>
           </div>
 
           {/* Basic Information */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Basic Information</CardTitle>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg font-semibold">Basic Information</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="completedBy">Staff Name *</Label>
                 <Input
