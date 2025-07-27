@@ -248,7 +248,7 @@ const DailyShiftForm = () => {
       
       <form onSubmit={handleSubmit}>
         {/* Basic Information */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-50">
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
           <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -275,7 +275,7 @@ const DailyShiftForm = () => {
         </div>
 
         {/* Sales Information */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-50">
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
           <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Sales Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -321,29 +321,29 @@ const DailyShiftForm = () => {
         </div>
 
         {/* Wages Section */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Wages & Staff Payments</h2>
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Wages & Staff Payments</h2>
           {formData.wages.map((wage, index) => (
-            <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-3 bg-gray-700 rounded">
+            <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-3 bg-white rounded border border-gray-300">
               <input
                 type="text"
                 placeholder="Staff Name"
                 value={wage.name}
                 onChange={(e) => updateWage(index, 'name', e.target.value)}
-                className="p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                className="p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
               <input
                 type="number"
                 placeholder="Amount"
                 value={wage.amount}
                 onChange={(e) => updateWage(index, 'amount', parseFloat(e.target.value) || 0)}
-                className="p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                className="p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
               <div className="flex gap-2">
                 <select
                   value={wage.type}
                   onChange={(e) => updateWage(index, 'type', e.target.value)}
-                  className="flex-1 p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                  className="flex-1 p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
                 >
                   <option value="staff">Staff</option>
                   <option value="bonus">Bonus</option>
@@ -352,7 +352,7 @@ const DailyShiftForm = () => {
                 <button
                   type="button"
                   onClick={() => removeWageEntry(index)}
-                  className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-[11px]"
                 >
                   ✕
                 </button>
@@ -362,39 +362,39 @@ const DailyShiftForm = () => {
           <button
             type="button"
             onClick={addWageEntry}
-            className="mb-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mb-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-[11px]"
           >
             + Add Wage Entry
           </button>
-          <div className="mt-4 p-3 bg-blue-700 rounded">
-            <strong>Total Wages: ฿{totalWages.toFixed(2)}</strong>
+          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded text-green-800">
+            <strong className="text-[11px]">Total Wages: ฿{totalWages.toFixed(2)}</strong>
           </div>
         </div>
 
         {/* Shopping & Expenses */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Shopping & Expenses</h2>
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Shopping & Expenses</h2>
           {formData.shopping.map((item, index) => (
-            <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-3 bg-gray-700 rounded">
+            <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-3 bg-white rounded border border-gray-300">
               <input
                 type="text"
                 placeholder="Item/Expense"
                 value={item.item}
                 onChange={(e) => updateShopping(index, 'item', e.target.value)}
-                className="p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                className="p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
               <input
                 type="number"
                 placeholder="Amount"
                 value={item.amount}
                 onChange={(e) => updateShopping(index, 'amount', parseFloat(e.target.value) || 0)}
-                className="p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                className="p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
               <div className="flex gap-2">
                 <select
                   value={item.shop}
                   onChange={(e) => updateShopping(index, 'shop', e.target.value)}
-                  className="flex-1 p-2 bg-gray-600 text-white rounded border-none focus:outline-none"
+                  className="flex-1 p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
                 >
                   <option value="Big C">Big C</option>
                   <option value="Tesco Lotus">Tesco Lotus</option>
@@ -404,7 +404,7 @@ const DailyShiftForm = () => {
                 <button
                   type="button"
                   onClick={() => removeShoppingEntry(index)}
-                  className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-[11px]"
                 >
                   ✕
                 </button>
@@ -414,81 +414,81 @@ const DailyShiftForm = () => {
           <button
             type="button"
             onClick={addShoppingEntry}
-            className="mb-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mb-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-[11px]"
           >
             + Add Expense
           </button>
           
           <div className="mt-4">
-            <label className="block mb-2 font-semibold">Gas Expense</label>
+            <label className="block mb-2 text-[11px] font-semibold">Gas Expense</label>
             <input
               type="number"
               value={formData.gasExpense}
               onChange={(e) => setFormData({ ...formData, gasExpense: parseFloat(e.target.value) || 0 })}
-              className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+              className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
             />
           </div>
           
-          <div className="mt-4 p-3 bg-orange-700 rounded">
-            <strong>Total Shopping: ฿{totalShopping.toFixed(2)}</strong><br/>
-            <strong>Total Expenses: ฿{totalExpenses.toFixed(2)}</strong>
+          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded text-green-800">
+            <strong className="text-[11px]">Total Shopping: ฿{totalShopping.toFixed(2)}</strong><br/>
+            <strong className="text-[11px]">Total Expenses: ฿{totalExpenses.toFixed(2)}</strong>
           </div>
         </div>
 
         {/* Cash Management */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Cash Management</h2>
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Cash Management</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block mb-2 font-semibold">Starting Cash</label>
+              <label className="block mb-2 text-[11px] font-semibold">Starting Cash</label>
               <input
                 type="number"
                 value={formData.startingCash}
                 onChange={(e) => setFormData({ ...formData, startingCash: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Ending Cash (Manual)</label>
+              <label className="block mb-2 text-[11px] font-semibold">Ending Cash (Manual)</label>
               <input
                 type="number"
                 value={formData.endingCash}
                 onChange={(e) => setFormData({ ...formData, endingCash: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Banked Amount</label>
+              <label className="block mb-2 text-[11px] font-semibold">Banked Amount</label>
               <input
                 type="number"
                 value={formData.bankedAmount}
                 onChange={(e) => setFormData({ ...formData, bankedAmount: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
             </div>
           </div>
         </div>
 
         {/* Stock Information */}
-        <div className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-          <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">Stock Counts</h2>
+        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
+          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Stock Counts</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block mb-2 font-semibold">Burger Rolls Stock</label>
+              <label className="block mb-2 text-[11px] font-semibold">Burger Rolls Stock</label>
               <input
                 type="number"
                 value={formData.rollsStock}
                 onChange={(e) => setFormData({ ...formData, rollsStock: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
             </div>
             <div>
-              <label className="block mb-2 font-semibold">Meat Stock (kg)</label>
+              <label className="block mb-2 text-[11px] font-semibold">Meat Stock (kg)</label>
               <input
                 type="number"
                 value={formData.meatStock}
                 onChange={(e) => setFormData({ ...formData, meatStock: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
               />
             </div>
           </div>
@@ -496,18 +496,18 @@ const DailyShiftForm = () => {
 
         {/* Inventory Categories */}
         {Object.entries(groupedItems).map(([category, catItems]) => (
-          <div key={category} className="mb-6 shadow-md rounded-lg p-4 sm:p-6 bg-gray-800">
-            <h2 className="text-xl font-bold uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-600 pb-2">{category}</h2>
+          <div key={category} className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
+            <h2 className="font-bold text-[12px] uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-200 pb-2">{category}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {catItems.map((item) => (
-                <div key={item["Item "]} className="bg-white/10 p-3 sm:p-4 rounded-lg">
-                  <label className="block mb-1 sm:mb-2 font-semibold text-sm sm:text-base">{item["Item "]}</label>
+                <div key={item["Item "]} className="bg-white p-3 sm:p-4 rounded-lg border border-gray-300">
+                  <label className="block mb-1 sm:mb-2 text-[11px] font-semibold text-gray-900">{item["Item "]}</label>
                   <input
                     type="number"
                     placeholder="Number Needed"
                     value={formData.numberNeeded[item["Item "]] || ''}
                     onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                    className="w-full p-1 sm:p-2 bg-gray-700 text-white rounded border-none focus:outline-none text-sm sm:text-base"
+                    className="w-full p-1 sm:p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
                   />
                 </div>
               ))}
@@ -522,26 +522,26 @@ const DailyShiftForm = () => {
         </div>
       </form>
       {successMessage && (
-        <div className="mt-4 p-3 sm:p-4 bg-green-500 rounded text-white text-sm sm:text-base">
+        <div className="mt-4 p-3 sm:p-4 bg-green-100 border border-green-300 rounded text-green-800 text-[11px]">
           <strong>Success:</strong> {successMessage}
         </div>
       )}
       
       {errorMessage && (
-        <div className="mt-4 p-3 sm:p-4 bg-red-500 rounded text-white text-sm sm:text-base">
+        <div className="mt-4 p-3 sm:p-4 bg-red-100 border border-red-300 rounded text-red-800 text-[11px]">
           <strong>Error:</strong> {errorMessage}
         </div>
       )}
       
-      <h2 className="text-xl font-bold mt-6 sm:mt-8 mb-4">Previous Submissions</h2>
+      <h2 className="font-bold text-[12px] mt-6 sm:mt-8 mb-4">Previous Submissions</h2>
       {submissions.length === 0 ? (
-        <p className="text-gray-300">No submissions yet.</p>
+        <p className="text-gray-500 text-[11px]">No submissions yet.</p>
       ) : (
         <div className="space-y-4">
           {submissions.map((sub, index) => (
-            <div key={index} className="bg-gray-700 p-4 rounded-lg">
-              <h3 className="font-bold mb-2">Submission {index + 1} - {sub.date}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div key={index} className="bg-white border border-gray-300 p-4 rounded-lg" style={{backgroundColor: '#f3f4f6'}}>
+              <h3 className="font-bold text-[11px] mb-2">Submission {index + 1} - {sub.date}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
                 <div>
                   <strong>Completed by:</strong> {sub.completedBy}<br/>
                   <strong>Date:</strong> {sub.shiftDate}<br/>
