@@ -31,9 +31,7 @@ interface FormData {
   numberNeeded: Record<string, string>;
 }
 
-interface Submission extends FormData {
-  date: string;
-}
+
 
 interface Item {
   "Item ": string;
@@ -58,7 +56,7 @@ const DailyShiftForm = () => {
     meatStock: 0,
     numberNeeded: {}
   });
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -142,10 +140,8 @@ const DailyShiftForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newSubmission = { ...formData, date: new Date().toLocaleString() };
-    const updatedSubmissions = [...submissions, newSubmission];
-    setSubmissions(updatedSubmissions);
-    localStorage.setItem('dailyShiftSubmissions', JSON.stringify(updatedSubmissions));
+    
+    // Reset form data
     setFormData({
       completedBy: '',
       shiftDate: new Date().toISOString().split('T')[0],
@@ -163,14 +159,15 @@ const DailyShiftForm = () => {
       meatStock: 0,
       numberNeeded: {}
     });
+    
     localStorage.removeItem('dailyShiftDraft');
     setErrorMessage('');
     setSuccessMessage('Thank you, form submitted!');
     setTimeout(() => setSuccessMessage(''), 6000);
     
-    // Optional backend
+    // Optional backend submission
     try {
-      await axios.post('/api/daily-shift-forms', newSubmission);
+      await axios.post('/api/daily-shift-forms', formData);
     } catch (err) {
       setErrorMessage('Backend failed but saved locally. Reasoning: Connection/schema issue – retry later.');
     }
@@ -544,31 +541,7 @@ const DailyShiftForm = () => {
           <strong>Error:</strong> {errorMessage}
         </div>
       )}
-      
-      <h2 className="text-sm sm:text-base font-bold mt-6 sm:mt-8 mb-4">Previous Submissions</h2>
-      {submissions.length === 0 ? (
-        <p className="text-gray-500 text-xs sm:text-sm">No submissions yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {submissions.map((sub, index) => (
-            <div key={index} className="bg-white border border-gray-300 p-4 rounded-lg" style={{backgroundColor: '#f3f4f6'}}>
-              <h3 className="text-xs sm:text-sm font-bold mb-2">Submission {index + 1} - {sub.date}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
-                <div>
-                  <strong>Completed by:</strong> {sub.completedBy}<br/>
-                  <strong>Date:</strong> {sub.shiftDate}<br/>
-                  <strong>Total Sales:</strong> ฿{(sub.grabSales + sub.aroiDeeSales + sub.qrScanSales + sub.cashSales).toFixed(2)}
-                </div>
-                <div>
-                  <strong>Total Wages:</strong> ฿{sub.wages.reduce((sum, wage) => sum + (wage.amount || 0), 0).toFixed(2)}<br/>
-                  <strong>Total Shopping:</strong> ฿{sub.shopping.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}<br/>
-                  <strong>Gas Expense:</strong> ฿{sub.gasExpense.toFixed(2)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+
     </div>
   );
 };

@@ -13,6 +13,8 @@ This is a comprehensive restaurant management dashboard application built with a
 - **Drinks Section Relocated**: Moved Drinks category from inventory sections to Stock Counts section (directly below Rolls/Meat)
 - **Placeholder Removal**: Removed "Number Needed" placeholders from all inventory inputs for cleaner interface
 - **Success Message Enhanced**: Form displays "Thank you, form submitted!" alert with 6-second timeout on successful submission
+- **Previous Submissions Removed**: Eliminated local "Previous Submissions" section - all forms now handled through draft/archive system in form library
+- **Code Cleanup**: Removed unused submissions state and localStorage handling for cleaner codebase
 - **Font Consistency Maintained**: All updates preserve the responsive font system (text-xs sm:text-sm for inputs, text-sm sm:text-base for headers)
 - **Data Integrity Preserved**: All 54 authentic supplier items from CSV maintained with proper categorization
 - **Backend Compatibility**: Form submissions continue working with existing API endpoints and database schema
