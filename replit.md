@@ -4,6 +4,66 @@
 
 This is a comprehensive restaurant management dashboard application built with a full-stack architecture. The system provides AI-powered analytics for restaurant operations, integrating with external services like Loyverse POS, OpenAI, and Google Gemini for automated sales analysis and inventory management. The application focuses on streamlining daily operations through intelligent automation and real-time insights.
 
+## Button Style Guide
+
+### Button Types and Usage Standards
+
+Based on the dashboard design patterns, the application uses three primary button styles:
+
+#### 1. **Primary Buttons** (Dark Blue/Black Background)
+- **Usage**: Main actions, form submissions, primary navigation
+- **Style**: `bg-blue-600 text-white hover:bg-blue-700` or `bg-black text-white`
+- **Examples**: "Get in touch", "Submit Form", main action buttons
+- **Implementation**: Use `variant="default"` or custom classes with blue/black background
+- **Accessibility**: Always use white text for proper contrast with dark backgrounds
+
+#### 2. **Outline Buttons** (Light Background with Border)
+- **Usage**: Secondary actions, toggles, navigation items
+- **Style**: `variant="outline"` with `border border-input bg-background`
+- **Examples**: Heart icon, bookmark icon, filter buttons, secondary navigation
+- **Implementation**: Use `variant="outline"` from shadcn/ui button component
+- **Accessibility**: Maintains proper contrast with border and background colors
+
+#### 3. **Current Page Indicators** (Gray Background)
+- **Usage**: Show active/current page in navigation
+- **Style**: `bg-gray-200 text-gray-800 border-gray-300 cursor-default`
+- **Examples**: Current page indicators in navigation breadcrumbs
+- **Implementation**: Custom styling with disabled state and gray background
+- **Note**: Non-interactive, purely visual indication of current location
+
+### Button Implementation Standards
+
+#### Component Structure
+```tsx
+// Primary button (blue)
+<Button className="bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
+  Action Text
+</Button>
+
+// Outline button
+<Button variant="outline">
+  Secondary Action
+</Button>
+
+// Current page indicator
+<Button variant="outline" className="bg-gray-200 text-gray-800 border-gray-300 cursor-default">
+  Current Page
+</Button>
+```
+
+#### Responsive Design
+- All buttons maintain consistent sizing across breakpoints
+- Icon + text combinations use proper spacing (`space-y-1 sm:space-y-2`)
+- Text sizing: `text-xs sm:text-sm` for responsive text
+- Icon sizing: `h-4 w-4 sm:h-5 sm:w-5` for responsive icons
+
+#### Design Consistency Rules
+- **Blue buttons require white text** for proper contrast
+- **Outline buttons use system border colors** for consistency
+- **Current page indicators are non-interactive** (cursor-default)
+- **All buttons maintain rounded corners** (rounded-md standard)
+- **Hover effects are consistent** within each button type
+
 ## Recent Changes (January 27, 2025)
 
 ### TABLET RESPONSIVE FIXES - COMPLETE ✅ COMPLETED
