@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Tablet Cache Clear</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f3f4f6;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tablet Cache Clear</h1>
+        <p>Click the button below to clear tablet cache and reload with fresh responsive design:</p>
+        <button onclick="clearCacheAndReload()">Clear Cache & Reload</button>
+        <button onclick="forceHardReload()">Force Hard Reload</button>
+        <script>
+            function clearCacheAndReload() {
+                console.log('Clearing tablet cache...');
+                
+                // Clear all storage
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Clear service workers
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(registrations => {
+                        registrations.forEach(registration => registration.unregister());
+                    });
+                }
+                
+                // Clear caches
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+                
+                // Redirect with cache bust
+                const timestamp = Date.now();
+                window.location.href = '/?v=' + timestamp + '&tablet-reload=true';
+            }
+            
+            function forceHardReload() {
+                // Most aggressive reload possible
+                window.location.reload(true);
+            }
+            
+            // Auto-redirect to main app after 3 seconds
+            setTimeout(() => {
+                clearCacheAndReload();
+            }, 3000);
+        </script>
+    </div>
+</body>
+</html>

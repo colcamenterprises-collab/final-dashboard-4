@@ -14,14 +14,23 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// Add cache control headers to prevent tablet caching issues
+// Add AGGRESSIVE cache control headers to prevent tablet caching issues
 app.use((req, res, next) => {
-  // Disable caching for all HTML, CSS, and JS files to ensure changes flow through
-  if (req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path === '/') {
-    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+  // Disable caching for ALL files to ensure changes flow through to tablets
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  res.set('Last-Modified', new Date().toUTCString());
+  res.set('ETag', '"' + Date.now() + '"');
+  
+  // Add tablet-specific headers
+  const userAgent = req.get('User-Agent') || '';
+  if (userAgent.includes('iPad') || userAgent.includes('Android')) {
+    res.set('X-Tablet-Cache-Bust', Date.now().toString());
+    res.set('Vary', 'User-Agent');
   }
+  
   next();
 });
 
@@ -35,6 +44,14 @@ app.use((req, res, next) => {
 
 // Serve static files from attached_assets folder
 app.use('/attached_assets', express.static(path.resolve(process.cwd(), 'attached_assets')));
+
+// Serve tablet cache clear page
+app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
+
+// Special tablet reload route
+app.get('/tablet-reload', (req, res) => {
+  res.sendFile(path.resolve(process.cwd(), 'public/tablet-reload.html'));
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

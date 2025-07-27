@@ -13,20 +13,76 @@
       * { 
         box-sizing: border-box; 
       }
+      /* AGGRESSIVE TABLET CACHE BUSTING - VERSION 2.0 */
       @media screen and (min-width: 768px) and (max-width: 1024px) {
-        /* Tablet-specific overrides to ensure changes flow through */
+        /* Remove placeholder text on tablets */
+        input[placeholder*="Number Needed"]::placeholder {
+          color: transparent !important;
+          content: "" !important;
+        }
+        
+        /* Force container responsiveness */
         .container { 
           max-width: 100% !important; 
           padding: 1rem !important; 
         }
-        /* Force responsive text sizing on tablets */
-        .text-xs { font-size: 0.75rem !important; }
-        .text-sm { font-size: 0.875rem !important; }
-        .text-base { font-size: 1rem !important; }
-        .text-lg { font-size: 1.125rem !important; }
-        .text-xl { font-size: 1.25rem !important; }
+        
+        /* FORCE all text sizing to be responsive */
+        .text-xs, .sm\\:text-xs { font-size: 0.75rem !important; }
+        .text-sm, .sm\\:text-sm { font-size: 0.875rem !important; }
+        .text-base, .sm\\:text-base { font-size: 1rem !important; }
+        .text-lg, .sm\\:text-lg { font-size: 1.125rem !important; }
+        .text-xl, .sm\\:text-xl { font-size: 1.25rem !important; }
+        
+        /* FORCE all spacing to be responsive */
+        .p-3, .sm\\:p-3 { padding: 0.75rem !important; }
+        .p-4, .sm\\:p-4 { padding: 1rem !important; }
+        .p-6, .sm\\:p-6 { padding: 1.5rem !important; }
+        
+        .mb-4, .sm\\:mb-4 { margin-bottom: 1rem !important; }
+        .mb-6, .sm\\:mb-6 { margin-bottom: 1.5rem !important; }
+        
+        .gap-2, .sm\\:gap-2 { gap: 0.5rem !important; }
+        .gap-3, .sm\\:gap-3 { gap: 0.75rem !important; }
+        .gap-4, .sm\\:gap-4 { gap: 1rem !important; }
+        
+        /* FORCE grid layouts */
+        .grid-cols-2, .sm\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .grid-cols-3, .sm\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        .grid-cols-4, .sm\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+        
+        /* FORCE modern appearance */
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+        }
+        
+        /* FORCE fresh styling */
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
       }
     </style>
+    <script>
+      // Aggressive tablet cache clearing
+      if (window.innerWidth >= 768 && window.innerWidth <= 1024) {
+        console.log('TABLET DETECTED - Clearing all caches');
+        
+        // Clear all possible caches
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+          });
+        }
+        
+        // Add timestamp to force reload
+        const timestamp = Date.now();
+        const meta = document.createElement('meta');
+        meta.httpEquiv = 'refresh';
+        meta.content = '0;url=' + window.location.href.split('?')[0] + '?bust=' + timestamp;
+        document.head.appendChild(meta);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
