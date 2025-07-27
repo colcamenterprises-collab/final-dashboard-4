@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import DailyShiftForm from './DailyShiftForm';
+import DailyShiftForm from './DailyShiftFormMobile';
 import DraftFormsLibrary from './DraftFormsLibrary';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
