@@ -244,30 +244,30 @@ const DailyShiftForm = () => {
 
   return (
     <div className="p-4 sm:p-6 bg-white text-gray-900 min-h-screen">
-      <h1 className="font-bold text-[12px] mb-4 sm:mb-6">Daily Sales & Stock</h1>
+      <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">Daily Sales & Stock</h1>
       
       <form onSubmit={handleSubmit}>
         {/* Basic Information */}
         <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Basic Information</h2>
+          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Completed By</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Completed By</label>
               <input
                 type="text"
                 value={formData.completedBy}
                 onChange={(e) => setFormData({ ...formData, completedBy: e.target.value })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Shift Date</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Shift Date</label>
               <input
                 type="date"
                 value={formData.shiftDate}
                 onChange={(e) => setFormData({ ...formData, shiftDate: e.target.value })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
                 required
               />
             </div>
@@ -276,33 +276,33 @@ const DailyShiftForm = () => {
 
         {/* Sales Information */}
         <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Sales Information</h2>
+          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Sales Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Grab Sales</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Grab Sales</label>
               <input
                 type="number"
                 value={formData.grabSales}
                 onChange={(e) => setFormData({ ...formData, grabSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Aroi Dee Sales</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Aroi Dee Sales</label>
               <input
                 type="number"
                 value={formData.aroiDeeSales}
                 onChange={(e) => setFormData({ ...formData, aroiDeeSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">QR Scan Sales</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">QR Scan Sales</label>
               <input
                 type="number"
                 value={formData.qrScanSales}
                 onChange={(e) => setFormData({ ...formData, qrScanSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
@@ -437,33 +437,33 @@ const DailyShiftForm = () => {
 
         {/* Cash Management */}
         <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Cash Management</h2>
+          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Cash Management</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Starting Cash</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Starting Cash</label>
               <input
                 type="number"
                 value={formData.startingCash}
                 onChange={(e) => setFormData({ ...formData, startingCash: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Ending Cash (Manual)</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Ending Cash (Manual)</label>
               <input
                 type="number"
                 value={formData.endingCash}
                 onChange={(e) => setFormData({ ...formData, endingCash: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Banked Amount</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Banked Amount</label>
               <input
                 type="number"
                 value={formData.bankedAmount}
                 onChange={(e) => setFormData({ ...formData, bankedAmount: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -471,24 +471,24 @@ const DailyShiftForm = () => {
 
         {/* Stock Information */}
         <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="font-bold text-[12px] mb-4 border-b border-gray-200 pb-2">Stock Counts</h2>
+          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Stock Counts</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Burger Rolls Stock</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Burger Rolls Stock</label>
               <input
                 type="number"
                 value={formData.rollsStock}
                 onChange={(e) => setFormData({ ...formData, rollsStock: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <label className="block mb-2 text-[11px] font-semibold">Meat Stock (kg)</label>
+              <label className="block mb-2 text-xs sm:text-sm font-semibold">Meat Stock (kg)</label>
               <input
                 type="number"
                 value={formData.meatStock}
                 onChange={(e) => setFormData({ ...formData, meatStock: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -497,17 +497,17 @@ const DailyShiftForm = () => {
         {/* Inventory Categories */}
         {Object.entries(groupedItems).map(([category, catItems]) => (
           <div key={category} className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-            <h2 className="font-bold text-[12px] uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-200 pb-2">{category}</h2>
+            <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-200 pb-2">{category}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {catItems.map((item) => (
                 <div key={item["Item "]} className="bg-white p-3 sm:p-4 rounded-lg border border-gray-300">
-                  <label className="block mb-1 sm:mb-2 text-[11px] font-semibold text-gray-900">{item["Item "]}</label>
+                  <label className="block mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-gray-900">{item["Item "]}</label>
                   <input
                     type="number"
                     placeholder="Number Needed"
                     value={formData.numberNeeded[item["Item "]] || ''}
                     onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                    className="w-full p-1 sm:p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-[11px]"
+                    className="w-full p-1 sm:p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
                   />
                 </div>
               ))}
@@ -517,31 +517,31 @@ const DailyShiftForm = () => {
 
         {/* Submit Buttons */}
         <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-          <button type="button" onClick={saveDraft} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-[11px] sm:text-base">Save as Draft</button>
-          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-[11px] sm:text-base">Save and Submit</button>
+          <button type="button" onClick={saveDraft} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-xs sm:text-sm">Save as Draft</button>
+          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-xs sm:text-sm">Save and Submit</button>
         </div>
       </form>
       {successMessage && (
-        <div className="mt-4 p-3 sm:p-4 bg-green-100 border border-green-300 rounded text-green-800 text-[11px]">
+        <div className="mt-4 p-3 sm:p-4 bg-green-100 border border-green-300 rounded text-green-800 text-xs sm:text-sm">
           <strong>Success:</strong> {successMessage}
         </div>
       )}
       
       {errorMessage && (
-        <div className="mt-4 p-3 sm:p-4 bg-red-100 border border-red-300 rounded text-red-800 text-[11px]">
+        <div className="mt-4 p-3 sm:p-4 bg-red-100 border border-red-300 rounded text-red-800 text-xs sm:text-sm">
           <strong>Error:</strong> {errorMessage}
         </div>
       )}
       
-      <h2 className="font-bold text-[12px] mt-6 sm:mt-8 mb-4">Previous Submissions</h2>
+      <h2 className="text-sm sm:text-base font-bold mt-6 sm:mt-8 mb-4">Previous Submissions</h2>
       {submissions.length === 0 ? (
-        <p className="text-gray-500 text-[11px]">No submissions yet.</p>
+        <p className="text-gray-500 text-xs sm:text-sm">No submissions yet.</p>
       ) : (
         <div className="space-y-4">
           {submissions.map((sub, index) => (
             <div key={index} className="bg-white border border-gray-300 p-4 rounded-lg" style={{backgroundColor: '#f3f4f6'}}>
-              <h3 className="font-bold text-[11px] mb-2">Submission {index + 1} - {sub.date}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
+              <h3 className="text-xs sm:text-sm font-bold mb-2">Submission {index + 1} - {sub.date}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
                 <div>
                   <strong>Completed by:</strong> {sub.completedBy}<br/>
                   <strong>Date:</strong> {sub.shiftDate}<br/>
