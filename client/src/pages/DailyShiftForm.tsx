@@ -569,18 +569,18 @@ const DailyShiftForm = () => {
         {/* Submit Buttons */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
               <Button 
                 type="button" 
                 onClick={saveDraft} 
                 variant="outline"
-                className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-semibold"
+                className="bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-medium px-6 py-2"
               >
                 Save as Draft
               </Button>
               <Button 
                 type="submit" 
-                className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-semibold"
+                className="bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-medium px-6 py-2"
               >
                 Save and Submit
               </Button>
