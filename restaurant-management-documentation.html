@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smash Brothers Burgers - Restaurant Management System Documentation</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            line-height: 1.2;
+            margin: 20px;
+            background: white;
+            color: black;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #000;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .toc {
+            background: #f5f5f5;
+            padding: 15px;
+            border: 1px solid #ccc;
+            margin-bottom: 30px;
+        }
+        .toc h2 {
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        .file-section {
+            border-top: 2px solid #333;
+            margin-top: 20px;
+            padding-top: 10px;
+        }
+        .file-header {
+            font-size: 12px;
+            font-weight: bold;
+            background: #e0e0e0;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+        .code-block {
+            background: #f9f9f9;
+            border-left: 3px solid #333;
+            padding: 10px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 9px;
+            overflow-wrap: break-word;
+        }
+        @media print {
+            body { font-size: 8px; }
+            .code-block { font-size: 7px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">SMASH BROTHERS BURGERS</div>
+        <div class="title">RESTAURANT MANAGEMENT SYSTEM</div>
+        <div class="subtitle">Complete Source Code Documentation</div>
+        <div class="subtitle">Generated: ${new Date().toISOString()}</div>
+        <div class="subtitle">AI-Powered Daily Operations & Inventory Management</div>
+    </div>
+
+    <div class="toc">
+        <h2>PROJECT OVERVIEW</h2>
+        <p><strong>Technology Stack:</strong> React + TypeScript frontend, Node.js/Express backend, PostgreSQL with Drizzle ORM</p>
+        <p><strong>Key Features:</strong> Daily Shift Forms, Inventory Tracking, AI Analytics, Loyverse POS Integration</p>
+        <p><strong>AI Integration:</strong> OpenAI GPT-4o for receipt analysis and operational insights</p>
+        <p><strong>Database:</strong> PostgreSQL with 54 authentic supplier items from CSV data</p>
+        <p><strong>Responsive Design:</strong> Mobile-first approach with tablet optimization</p>
+        <p><strong>Form Management:</strong> React Hook Form + Zod validation for robust data handling</p>
+        
+        <h2>CRITICAL FILES INCLUDED</h2>
+        <ul>
+            <li><strong>Daily Shift Form:</strong> client/src/pages/DailyShiftForm.tsx (Main operational form)</li>
+            <li><strong>Dashboard:</strong> client/src/pages/Dashboard.tsx (KPI overview)</li>
+            <li><strong>Database Schema:</strong> shared/schema.ts (Complete data model)</li>
+            <li><strong>API Routes:</strong> server/routes.ts (All backend endpoints)</li>
+            <li><strong>Configuration:</strong> package.json, tsconfig.json, vite.config.ts</li>
+            <li><strong>Styling:</strong> tailwind.config.ts, client/src/index.css</li>
+            <li><strong>Documentation:</strong> replit.md (Project state and changes)</li>
+        </ul>
+    </div>
+
+    <!-- File contents will be inserted here -->
+    <div id="file-contents">
+        <p><em>Complete source code follows on next pages...</em></p>
+    </div>
+
+    <script>
+        // This script reads the text file and inserts it into the HTML
+        fetch('./restaurant-management-complete.txt')
+            .then(response => response.text())
+            .then(data => {
+                const lines = data.split('\n');
+                let htmlContent = '';
+                let currentFile = '';
+                let currentContent = '';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    if (line.startsWith('FILE ') && line.includes(':')) {
+                        // New file section
+                        if (currentFile) {
+                            htmlContent += `<div class="file-section">
+                                <div class="file-header">${currentFile}</div>
+                                <div class="code-block">${currentContent}</div>
+                            </div>`;
+                        }
+                        currentFile = line;
+                        currentContent = '';
+                    } else if (line.match(/^=+$/)) {
+                        // Skip separator lines
+                        continue;
+                    } else {
+                        currentContent += line + '\n';
+                    }
+                }
+                
+                // Add the last file
+                if (currentFile) {
+                    htmlContent += `<div class="file-section">
+                        <div class="file-header">${currentFile}</div>
+                        <div class="code-block">${currentContent}</div>
+                    </div>`;
+                }
+                
+                document.getElementById('file-contents').innerHTML = htmlContent;
+            })
+            .catch(error => {
+                document.getElementById('file-contents').innerHTML = 
+                    '<p style="color: red;">Error loading file contents. Please ensure restaurant-management-complete.txt is in the same directory.</p>';
+            });
+    </script>
+</body>
+</html>
