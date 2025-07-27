@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2, Plus } from "lucide-react";
 
 interface WageEntry {
   name: string;
@@ -28,7 +34,7 @@ interface FormData {
   bankedAmount: number;
   rollsStock: number;
   meatStock: number;
-  numberNeeded: Record<string, string>;
+  numberNeeded: Record<string, number>;
 }
 
 
@@ -236,82 +242,112 @@ const DailyShiftForm = () => {
   }, {});
 
   return (
-    <div className="p-4 sm:p-6 bg-white text-gray-900 min-h-screen">
-      <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">Daily Sales & Stock</h1>
+    <div className="max-w-6xl mx-auto p-2 sm:p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
       
-      <form onSubmit={handleSubmit}>
-        {/* Basic Information */}
-        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Basic Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block mb-2 text-xs sm:text-sm font-semibold">Completed By</label>
-              <input
-                type="text"
-                value={formData.completedBy}
-                onChange={(e) => setFormData({ ...formData, completedBy: e.target.value })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-xs sm:text-sm font-semibold">Shift Date</label>
-              <input
-                type="date"
-                value={formData.shiftDate}
-                onChange={(e) => setFormData({ ...formData, shiftDate: e.target.value })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-                required
-              />
-            </div>
-          </div>
+      {successMessage && (
+        <div className="mb-4 p-3 sm:p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm sm:text-base">
+          {successMessage}
         </div>
+      )}
+      {errorMessage && (
+        <div className="mb-4 p-3 sm:p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm sm:text-base">
+          {errorMessage}
+        </div>
+      )}
+
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Daily Shift Form</CardTitle>
+        </CardHeader>
+      </Card>
+      
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        {/* Basic Information */}
+        <Card>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Basic Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="completedBy" className="text-xs sm:text-sm font-medium">Completed By</Label>
+                <Input
+                  id="completedBy"
+                  type="text"
+                  value={formData.completedBy}
+                  onChange={(e) => setFormData({ ...formData, completedBy: e.target.value })}
+                  className="text-xs sm:text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="shiftDate" className="text-xs sm:text-sm font-medium">Shift Date</Label>
+                <Input
+                  id="shiftDate"
+                  type="date"
+                  value={formData.shiftDate}
+                  onChange={(e) => setFormData({ ...formData, shiftDate: e.target.value })}
+                  className="text-xs sm:text-sm"
+                  required
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Sales Information */}
-        <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-          <h2 className="text-sm sm:text-base font-bold mb-4 border-b border-gray-200 pb-2">Sales Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block mb-2 text-xs sm:text-sm font-semibold">Grab Sales</label>
-              <input
-                type="number"
-                value={formData.grabSales}
-                onChange={(e) => setFormData({ ...formData, grabSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-              />
+        <Card>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Sales Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="grabSales" className="text-xs sm:text-sm font-medium">Grab Sales</Label>
+                <Input
+                  id="grabSales"
+                  type="number"
+                  value={formData.grabSales}
+                  onChange={(e) => setFormData({ ...formData, grabSales: parseFloat(e.target.value) || 0 })}
+                  className="text-xs sm:text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="aroiDeeSales" className="text-xs sm:text-sm font-medium">Aroi Dee Sales</Label>
+                <Input
+                  id="aroiDeeSales"
+                  type="number"
+                  value={formData.aroiDeeSales}
+                  onChange={(e) => setFormData({ ...formData, aroiDeeSales: parseFloat(e.target.value) || 0 })}
+                  className="text-xs sm:text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="qrScanSales" className="text-xs sm:text-sm font-medium">QR Scan Sales</Label>
+                <Input
+                  id="qrScanSales"
+                  type="number"
+                  value={formData.qrScanSales}
+                  onChange={(e) => setFormData({ ...formData, qrScanSales: parseFloat(e.target.value) || 0 })}
+                  className="text-xs sm:text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cashSales" className="text-xs sm:text-sm font-medium">Cash Sales</Label>
+                <Input
+                  id="cashSales"
+                  type="number"
+                  value={formData.cashSales}
+                  onChange={(e) => setFormData({ ...formData, cashSales: parseFloat(e.target.value) || 0 })}
+                  className="text-xs sm:text-sm"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block mb-2 text-xs sm:text-sm font-semibold">Aroi Dee Sales</label>
-              <input
-                type="number"
-                value={formData.aroiDeeSales}
-                onChange={(e) => setFormData({ ...formData, aroiDeeSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-              />
+            <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs sm:text-sm font-semibold text-green-800">Total Sales: ฿{totalSales.toFixed(2)}</p>
             </div>
-            <div>
-              <label className="block mb-2 text-xs sm:text-sm font-semibold">QR Scan Sales</label>
-              <input
-                type="number"
-                value={formData.qrScanSales}
-                onChange={(e) => setFormData({ ...formData, qrScanSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-[11px] font-semibold">Cash Sales</label>
-              <input
-                type="number"
-                value={formData.cashSales}
-                onChange={(e) => setFormData({ ...formData, cashSales: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-          <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded text-green-800">
-            <strong className="text-[11px]">Total Sales: ฿{totalSales.toFixed(2)}</strong>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Wages Section */}
         <div className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
@@ -488,16 +524,17 @@ const DailyShiftForm = () => {
           </div>
           
           {/* Drinks Section */}
-          <h3 className="text-xs sm:text-sm font-bold mb-3 border-b border-gray-200 pb-1">Drinks</h3>
+          <h3 className="text-xs sm:text-sm font-semibold mb-3 border-b border-gray-200 pb-2">Drinks</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {items.filter(item => item["Internal Category"] === "Drinks").map((item) => (
-              <div key={item["Item "]} className="bg-white p-3 rounded-lg border border-gray-300">
-                <label className="block mb-1 text-xs font-semibold text-gray-900">{item["Item "]}</label>
-                <input
+              <div key={item["Item "]} className="space-y-2">
+                <Label className="text-xs sm:text-sm font-medium">{item["Item "]}</Label>
+                <Input
                   type="number"
                   value={formData.numberNeeded[item["Item "]] || ''}
                   onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                  className="w-full p-1 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs"
+                  className="text-xs sm:text-sm"
+                  placeholder=""
                 />
               </div>
             ))}
@@ -506,29 +543,50 @@ const DailyShiftForm = () => {
 
         {/* Inventory Categories (excluding Drinks - moved to Stock Counts) */}
         {Object.entries(groupedItems).filter(([category]) => category !== "Drinks").map(([category, catItems]) => (
-          <div key={category} className="mb-6 shadow-sm rounded-lg p-4 sm:p-6" style={{backgroundColor: '#f3f4f6'}}>
-            <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide mb-3 sm:mb-4 border-b border-gray-200 pb-2">{category}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {catItems.map((item) => (
-                <div key={item["Item "]} className="bg-white p-3 sm:p-4 rounded-lg border border-gray-300">
-                  <label className="block mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-gray-900">{item["Item "]}</label>
-                  <input
-                    type="number"
-                    value={formData.numberNeeded[item["Item "]] || ''}
-                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
-                    className="w-full p-1 sm:p-2 bg-gray-100 text-gray-900 rounded border border-gray-300 focus:outline-none focus:border-blue-500 text-xs sm:text-sm"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+          <Card key={category}>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 uppercase tracking-wide">{category}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {(catItems as any[]).map((item: any) => (
+                  <div key={item["Item "]} className="space-y-2">
+                    <Label className="text-xs sm:text-sm font-medium">{item["Item "]}</Label>
+                    <Input
+                      type="number"
+                      value={formData.numberNeeded[item["Item "]] || ''}
+                      onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                      className="text-xs sm:text-sm"
+                      placeholder=""
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         ))}
 
         {/* Submit Buttons */}
-        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-          <button type="button" onClick={saveDraft} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-xs sm:text-sm">Save as Draft</button>
-          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded font-bold text-xs sm:text-sm">Save and Submit</button>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Button 
+                type="button" 
+                onClick={saveDraft} 
+                variant="outline"
+                className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-semibold"
+              >
+                Save as Draft
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600 text-xs sm:text-sm font-semibold"
+              >
+                Save and Submit
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </form>
       {successMessage && (
         <div className="mt-4 p-3 sm:p-4 bg-green-100 border border-green-300 rounded text-green-800 text-xs sm:text-sm">
