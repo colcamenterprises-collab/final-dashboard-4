@@ -52,6 +52,9 @@ export default function Expenses() {
     meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
   }>({
     queryKey: ["/api/stock-purchase/monthly-summary"],
+    enabled: true,
+    retry: 3,
+    refetchOnWindowFocus: false,
   });
 
   // Debug logging
@@ -90,7 +93,7 @@ export default function Expenses() {
 
   // Mutations
   const addExpenseMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expenses", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expenses", { method: "POST", body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/expenses/month-to-date"] });
@@ -112,7 +115,7 @@ export default function Expenses() {
   });
 
   const addSupplierMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expense-suppliers", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expense-suppliers", { method: "POST", body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-suppliers"] });
       setIsAddSupplierOpen(false);
@@ -132,7 +135,7 @@ export default function Expenses() {
   });
 
   const addCategoryMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expense-categories", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expense-categories", { method: "POST", body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expense-categories"] });
       setIsAddCategoryOpen(false);
@@ -543,8 +546,8 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
-      {/* Monthly Stock Purchases Summary - VISIBLE SECTION */}
-      <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+      {/* Monthly Stock Purchases Summary - FORCED VISIBLE SECTION */}
+      <Card className="border-4 border-blue-500 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-600 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
             <Package className="h-5 w-5" />
