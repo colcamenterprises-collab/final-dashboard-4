@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Calendar, Plus, DollarSign, FileText, TrendingUp } from "lucide-react";
+import { Calendar, Plus, DollarSign, FileText, TrendingUp, Package } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,14 @@ export default function Expenses() {
 
   const { data: expensesByCategory = {} } = useQuery<Record<string, number>>({
     queryKey: ["/api/expenses/by-category"],
+  });
+
+  const { data: monthlyStockSummary } = useQuery<{
+    rolls: Array<{ quantity: number; totalCost: string; date: string }>;
+    drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
+    meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
+  }>({
+    queryKey: ["/api/stock-purchase/monthly-summary"],
   });
 
   // Forms
@@ -525,6 +533,103 @@ export default function Expenses() {
                     </div>
                   </div>
                 ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Monthly Stock Purchases Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Monthly Stock Purchases
+          </CardTitle>
+          <CardDescription>
+            Summary of drinks, rolls, and meat lodged this month from Stock Count section
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!monthlyStockSummary ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-3 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Rolls Section */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3 text-gray-900 dark:text-gray-100">Rolls Purchased</h4>
+                {monthlyStockSummary.rolls.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No rolls purchased this month</p>
+                ) : (
+                  <div className="space-y-2">
+                    {monthlyStockSummary.rolls.map((roll, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <div>
+                          <span className="text-sm font-medium">{roll.quantity} rolls</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                            {format(new Date(roll.date), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold">{formatCurrency(roll.totalCost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Drinks Section */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3 text-gray-900 dark:text-gray-100">Drinks Purchased</h4>
+                {monthlyStockSummary.drinks.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No drinks purchased this month</p>
+                ) : (
+                  <div className="space-y-2">
+                    {monthlyStockSummary.drinks.map((drink, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <div>
+                          <span className="text-sm font-medium">{drink.drinkName}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                            {drink.quantity} units • {format(new Date(drink.date), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold">{formatCurrency(drink.totalCost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Meat Section */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3 text-gray-900 dark:text-gray-100">Meat Purchased</h4>
+                {monthlyStockSummary.meat.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No meat purchased this month</p>
+                ) : (
+                  <div className="space-y-2">
+                    {monthlyStockSummary.meat.map((meat, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <div>
+                          <span className="text-sm font-medium">{meat.meatType}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                            {meat.weight}kg • {format(new Date(meat.date), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold">{formatCurrency(meat.totalCost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

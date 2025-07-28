@@ -987,6 +987,17 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Monthly stock purchases summary endpoint
+  app.get("/api/stock-purchase/monthly-summary", async (req: Request, res: Response) => {
+    try {
+      const summary = await storage.getMonthlyStockPurchaseSummary();
+      res.json(summary);
+    } catch (err) {
+      console.error("Error fetching monthly stock purchase summary:", err);
+      res.status(500).json({ error: "Failed to fetch monthly stock purchase summary" });
+    }
+  });
+
   // Shopping List endpoints
   app.get("/api/shopping-list", async (req: Request, res: Response) => {
     try {

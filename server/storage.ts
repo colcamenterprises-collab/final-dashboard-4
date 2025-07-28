@@ -153,6 +153,11 @@ export interface IStorage {
   createStockPurchaseDrinks(data: InsertStockPurchaseDrinks): Promise<StockPurchaseDrinks>;
   getStockPurchaseMeat(expenseId: number): Promise<StockPurchaseMeat[]>;
   createStockPurchaseMeat(data: InsertStockPurchaseMeat): Promise<StockPurchaseMeat>;
+  getMonthlyStockPurchaseSummary(): Promise<{
+    rolls: Array<{ quantity: number; totalCost: string; date: string }>;
+    drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
+    meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -1449,6 +1454,55 @@ export class MemStorage implements IStorage {
     }).returning();
     
     return result;
+  }
+
+  async getMonthlyStockPurchaseSummary(): Promise<{
+    rolls: Array<{ quantity: number; totalCost: string; date: string }>;
+    drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
+    meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
+  }> {
+    const { db } = await import("./db");
+    const { stockPurchaseRolls, stockPurchaseDrinks, stockPurchaseMeat } = await import("@shared/schema");
+    const { gte, desc } = await import("drizzle-orm");
+    
+    // Get current month start date
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Get rolls for current month
+    const rolls = await db.select().from(stockPurchaseRolls)
+      .where(gte(stockPurchaseRolls.date, monthStart))
+      .orderBy(desc(stockPurchaseRolls.date));
+    
+    // Get drinks for current month
+    const drinks = await db.select().from(stockPurchaseDrinks)
+      .where(gte(stockPurchaseDrinks.date, monthStart))
+      .orderBy(desc(stockPurchaseDrinks.date));
+    
+    // Get meat for current month
+    const meat = await db.select().from(stockPurchaseMeat)
+      .where(gte(stockPurchaseMeat.date, monthStart))
+      .orderBy(desc(stockPurchaseMeat.date));
+    
+    return {
+      rolls: rolls.map(r => ({
+        quantity: r.quantity,
+        totalCost: r.totalCost,
+        date: r.date.toISOString().split('T')[0]
+      })),
+      drinks: drinks.map(d => ({
+        drinkName: d.drinkName,
+        quantity: d.quantity,
+        totalCost: d.totalCost,
+        date: d.date.toISOString().split('T')[0]
+      })),
+      meat: meat.map(m => ({
+        meatType: m.meatType,
+        weight: m.weight,
+        totalCost: m.totalCost,
+        date: m.date.toISOString().split('T')[0]
+      }))
+    };
   }
 
   async generateShoppingList(formData: DailyStockSales): Promise<ShoppingList[]> {
