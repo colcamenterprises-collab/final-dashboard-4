@@ -1,624 +1,249 @@
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+interface FormData {
+  completedBy: string;
+  shiftDate: string;
+  grabSales: string;
+  aroiDeeSales: string;
+  qrScanSales: string;
+  cashSales: string;
+  wages: any[];
+  shopping: any[];
+  gasExpense: string;
+  startingCash: string;
+  endingCash: string;
+  bankedAmount: string;
+  rollsStock: string;
+  meatStock: string;
+  numberNeeded: Record<string, string>;
+}
+
+interface SubmissionData extends FormData {
+  date: string;
+}
+
+interface InventoryItem {
+  Item: string;
+  "Internal Category": string;
+  "Packaging Qty": string;
+  "Minimum Stock Amount": string;
+}
 
 const DailyShiftForm = () => {
-  const { toast } = useToast();
-  
-  // Form state following exact structure: Shift Information → Sales → Expenses → Food & Stock Items
-  const [formData, setFormData] = useState({
-    // Shift Information
+  const [formData, setFormData] = useState<FormData>({
     completedBy: '',
-    shiftType: 'evening',
     shiftDate: new Date().toISOString().split('T')[0],
-    
-    // Sales
-    grabSales: 0,
-    aroiDeeSales: 0,
-    qrScanSales: 0,
-    cashSales: 0,
-    
-    // Expenses - Wages & Staff Payments
-    wages: [] as Array<{ name: string; amount: number; type: string }>,
-    
-    // Expenses - Shopping & Expenses  
-    shopping: [] as Array<{ item: string; amount: number; shop: string }>,
-    
-    // Cash Management
-    startingCash: 0,
-    endingCash: 0,
-    bankedAmount: 0,
-    
-    // Food & Stock Items - authentic inventory from CSV
-    inventory: {} as Record<string, number>
+    grabSales: '',
+    aroiDeeSales: '',
+    qrScanSales: '',
+    cashSales: '',
+    wages: [],
+    shopping: [],
+    gasExpense: '',
+    startingCash: '',
+    endingCash: '',
+    bankedAmount: '',
+    rollsStock: '',
+    meatStock: '',
+    numberNeeded: {}
   });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissions, setSubmissions] = useState<SubmissionData[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Authentic supplier data from CSV - 100% real inventory items
-  const inventoryCategories = {
-    "Fresh Food": [
-      { name: "Salad (Iceberg Lettuce)", supplier: "Makro", cost: "฿99.00", unit: "kg" },
-      { name: "Milk", supplier: "Makro", cost: "฿80.00", unit: "litre" },
-      { name: "Burger Bun", supplier: "Bakery", cost: "฿8.00", unit: "each" },
-      { name: "Tomatos", supplier: "Makro", cost: "฿89.00", unit: "kg" },
-      { name: "White Cabbage", supplier: "Makro", cost: "฿45.00", unit: "kg" },
-      { name: "Purple Cabbage", supplier: "Makro", cost: "฿41.25", unit: "kg" },
-      { name: "Onions Bulk 10kg", supplier: "Makro", cost: "฿290.00", unit: "10kg" },
-      { name: "Onions (small bags)", supplier: "Makro", cost: "฿29.00", unit: "kg" },
-      { name: "Cheese", supplier: "Makro", cost: "฿359.00", unit: "kg" },
-      { name: "Bacon Short", supplier: "Makro", cost: "฿305.00", unit: "kg" },
-      { name: "Bacon Long", supplier: "Makro", cost: "฿430.00", unit: "2kg" },
-      { name: "Jalapenos", supplier: "Makro", cost: "฿190.00", unit: "kg" }
-    ],
-    "Frozen Food": [
-      { name: "French Fries 7mm", supplier: "Makro", cost: "฿129.00", unit: "2kg" },
-      { name: "Chicken Nuggets", supplier: "Makro", cost: "฿155.00", unit: "kg" },
-      { name: "Chicken Fillets", supplier: "Makro", cost: "฿199.00", unit: "kg" },
-      { name: "Sweet Potato Fries", supplier: "Makro", cost: "฿145.00", unit: "kg" }
-    ],
-    "Shelf Items": [
-      { name: "Cajun Fries Seasoning", supplier: "Makro", cost: "฿508.00", unit: "510g" },
-      { name: "Crispy Fried Onions", supplier: "Makro", cost: "฿79.00", unit: "500g" },
-      { name: "Pickles (Standard Dill)", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Pickles Sweet", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Mustard", supplier: "Makro", cost: "฿88.00", unit: "kg" },
-      { name: "Mayonnaise", supplier: "Makro", cost: "฿90.00", unit: "litre" },
-      { name: "Tomato Sauce", supplier: "Makro", cost: "฿175.00", unit: "5L" },
-      { name: "BBQ Sauce", supplier: "Makro", cost: "฿110.00", unit: "500g" },
-      { name: "Sriracha Sauce", supplier: "Makro", cost: "฿108.00", unit: "950g" },
-      { name: "Salt (Coarse Sea Salt)", supplier: "Online", cost: "฿121.00", unit: "kg" }
-    ],
-    "Kitchen Supplies": [
-      { name: "Oil (Fryer)", supplier: "Makro", cost: "฿195.00", unit: "5L" },
-      { name: "Plastic Food Wrap", supplier: "Makro", cost: "฿375.00", unit: "500M" },
-      { name: "Paper Towel Long", supplier: "Makro", cost: "฿79.00", unit: "1 bag 6 pieces" },
-      { name: "Paper Towel Short (Serviettes)", supplier: "Makro", cost: "฿116.00", unit: "1 bag 6 pieces" },
-      { name: "Food Gloves (Large)", supplier: "Makro", cost: "฿197.00", unit: "100" },
-      { name: "Food Gloves (Medium)", supplier: "Supercheap", cost: "฿133.00", unit: "100" },
-      { name: "Food Gloves (Small)", supplier: "Makro", cost: "฿133.00", unit: "100" },
-      { name: "Aluminum Foil", supplier: "Makro", cost: "฿385.00", unit: "29.5 CM 90M" },
-      { name: "Plastic Meat Gloves", supplier: "Makro", cost: "฿22.50", unit: "1 bag 24 pieces" },
-      { name: "Kitchen Cleaner", supplier: "Makro", cost: "฿149.00", unit: "3.5 ltre" },
-      { name: "Alcohol Sanitiser", supplier: "Makro", cost: "฿69.00", unit: "450g" }
-    ],
-    "Packaging": [
-      { name: "French Fries Box", supplier: "Makro", cost: "฿105.00", unit: "1 bag 50 piece" },
-      { name: "Plastic Carry Bags (Size- 6×14)", supplier: "Makro", cost: "฿36.00", unit: "500h" },
-      { name: "Plastic Carry Bags (Size - 9×18)", supplier: "Makro", cost: "฿36.00", unit: "500g" },
-      { name: "Brown Paper Food Bags", supplier: "Online", cost: "฿139.00", unit: "50 Bags " },
-      { name: "Loaded Fries Boxes", supplier: "Makro", cost: "฿89.00", unit: "50 Boxes" },
-      { name: "Packaging Labels", supplier: "", cost: "฿50.00", unit: "45 per sheet" },
-      { name: "Knife, Fork, Spoon Set", supplier: "", cost: "฿89.00", unit: "50" }
-    ]
-  };
-
-  const drinkStock = [
-    { name: "Coke", cost: "฿315.00", unit: "24" },
-    { name: "Coke Zero", cost: "฿315.00", unit: "24" },
-    { name: "Fanta Orange", cost: "฿81.00", unit: "6" },
-    { name: "Fanta Strawberry", cost: "฿81.00", unit: "6" },
-    { name: "Schweppes Manow", cost: "฿84.00", unit: "6" },
-    { name: "Kids Juice (Orange)", cost: "฿99.00", unit: "6" },
-    { name: "Kids Juice (Apple)", cost: "฿99.00", unit: "6" },
-    { name: "Sprite", cost: "฿81.00", unit: "6" },
-    { name: "Soda Water", cost: "฿52.00", unit: "6" },
-    { name: "Bottled Water", cost: "฿49.00", unit: "12" }
+  // CSV items as JSON (full updated from tool; filtered extras in Fresh Food)
+  const items = [
+    { "Item": "Salad (Iceberg Lettuce)", "Internal Category": "Fresh Food", "Packaging Qty": "N/A", "Minimum Stock Amount": "" },
+    { "Item": "Milk", "Internal Category": "Fresh Food", "Packaging Qty": "1 litre", "Minimum Stock Amount": "" },
+    { "Item": "Burger Bun", "Internal Category": "Fresh Food", "Packaging Qty": "1", "Minimum Stock Amount": "" },
+    { "Item": "Tomatos", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "White Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Purple Cabbage", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Onions Bulk 10kg", "Internal Category": "Fresh Food", "Packaging Qty": "10kg", "Minimum Stock Amount": "" },
+    { "Item": "Onions (small bags)", "Internal Category": "Fresh Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "French Fries 7mm", "Internal Category": "Frozen Food", "Packaging Qty": "2kg", "Minimum Stock Amount": "" },
+    { "Item": "Chicken Nuggets", "Internal Category": "Frozen Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Chicken Fillets", "Internal Category": "Frozen Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Cajun Fries Seasoning", "Internal Category": "Shelf Items", "Packaging Qty": "510 G", "Minimum Stock Amount": "" },
+    { "Item": "Sweet Potato Fries", "Internal Category": "Frozen Food", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Crispy Fried Onions", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item": "Cheese", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item": "Bacon Short", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item": "Bacon Long", "Internal Category": "Fresh Food", "Packaging Qty": "2 kg", "Minimum Stock Amount": "" },
+    { "Item": "Pickles(standard dill pickles)", "Internal Category": "Shelf Items", "Packaging Qty": "480 g", "Minimum Stock Amount": "" },
+    { "Item": "Pickles Sweet (standard)", "Internal Category": "Shelf Items", "Packaging Qty": "480 gr", "Minimum Stock Amount": "" },
+    { "Item": "Jalapenos", "Internal Category": "Fresh Food", "Packaging Qty": "1 kg", "Minimum Stock Amount": "" },
+    { "Item": "Mustard", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Mayonnaise", "Internal Category": "Shelf Items", "Packaging Qty": "1", "Minimum Stock Amount": "" },
+    { "Item": "Tomato Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "5 Litres", "Minimum Stock Amount": "" },
+    { "Item": "Chili Sauce (Sriracha)", "Internal Category": "Shelf Items", "Packaging Qty": "1000g", "Minimum Stock Amount": "" },
+    { "Item": "BBQ Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item": "Sriracha Sauce", "Internal Category": "Shelf Items", "Packaging Qty": "950g", "Minimum Stock Amount": "" },
+    { "Item": "Oil (Fryer)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "5 L", "Minimum Stock Amount": "" },
+    { "Item": "Salt (Coarse Sea Salt)", "Internal Category": "Shelf Items", "Packaging Qty": "1kg", "Minimum Stock Amount": "" },
+    { "Item": "Coke", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "20" },
+    { "Item": "Coke Zero", "Internal Category": "Drinks", "Packaging Qty": "24", "Minimum Stock Amount": "16" },
+    { "Item": "Fanta Orange", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Fanta Strawberry", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Schweppes Manow", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Kids Juice (Orange)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Kids Juice (Apple)", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Sprite", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "12" },
+    { "Item": "Soda Water", "Internal Category": "Drinks", "Packaging Qty": "6", "Minimum Stock Amount": "10" },
+    { "Item": "Bottled Water", "Internal Category": "Drinks", "Packaging Qty": "12", "Minimum Stock Amount": "12" },
+    { "Item": "French Fries Box", "Internal Category": "Packaging", "Packaging Qty": "1 bag 50 piece", "Minimum Stock Amount": "" },
+    { "Item": "Plastic Carry Bags (Size- 6×14)", "Internal Category": "Packaging", "Packaging Qty": "500h", "Minimum Stock Amount": "" },
+    { "Item": "Plastic Carry Bags (Size - 9×18)", "Internal Category": "Packaging", "Packaging Qty": "500g", "Minimum Stock Amount": "" },
+    { "Item": "Plastic Food Wrap", "Internal Category": "Kitchen Supplies", "Packaging Qty": "500M", "Minimum Stock Amount": "" },
+    { "Item": "Paper Towel Long", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
+    { "Item": "Paper Towel Short (Serviettes)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 6 pieces", "Minimum Stock Amount": "" },
+    { "Item": "Food Gloves (Large)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item": "Food Gloves (Medium)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item": "Food Gloves (Small)", "Internal Category": "Kitchen Supplies", "Packaging Qty": "100", "Minimum Stock Amount": "" },
+    { "Item": "Aluminum Foil", "Internal Category": "Kitchen Supplies", "Packaging Qty": "29.5 CM 90M", "Minimum Stock Amount": "" },
+    { "Item": "Plastic Meat Gloves", "Internal Category": "Kitchen Supplies", "Packaging Qty": "1 bag 24 pieces", "Minimum Stock Amount": "" },
+    { "Item": "Kitchen Cleaner", "Internal Category": "Kitchen Supplies", "Packaging Qty": "3.5 ltre", "Minimum Stock Amount": "" },
+    { "Item": "Alcohol Sanitiser", "Internal Category": "Kitchen Supplies", "Packaging Qty": "450g", "Minimum Stock Amount": "" },
+    { "Item": "Brown Paper Food Bags", "Internal Category": "Packaging", "Packaging Qty": "50 Bags ", "Minimum Stock Amount": "" },
+    { "Item": "Loaded Fries Boxes", "Internal Category": "Packaging", "Packaging Qty": "50 Boxes", "Minimum Stock Amount": "" },
+    { "Item": "Packaging Labels", "Internal Category": "Packaging", "Packaging Qty": "45 per sheet", "Minimum Stock Amount": "" },
+    { "Item": "Knife, Fork, Spoon Set", "Internal Category": "Packaging", "Packaging Qty": "50", "Minimum Stock Amount": "" }
   ];
 
-  // Add wage entry
-  const addWageEntry = () => {
-    setFormData(prev => ({
-      ...prev,
-      wages: [...prev.wages, { name: '', amount: 0, type: 'Wages' }]
-    }));
-  };
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      setFormData(JSON.parse(savedDraft));
+      setErrorMessage('Loaded from draft.');
+    }
+  }, []);
 
-  // Remove wage entry
-  const removeWageEntry = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      wages: prev.wages.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Add shopping entry  
-  const addShoppingEntry = () => {
-    setFormData(prev => ({
-      ...prev,
-      shopping: [...prev.shopping, { item: '', amount: 0, shop: '' }]
-    }));
-  };
-
-  // Remove shopping entry
-  const removeShoppingEntry = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      shopping: prev.shopping.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Calculate totals
-  const totalSales = Number(formData.grabSales || 0) + Number(formData.aroiDeeSales || 0) + Number(formData.qrScanSales || 0) + Number(formData.cashSales || 0);
-  const totalWages = formData.wages.reduce((sum, wage) => sum + Number(wage.amount || 0), 0);
-  const totalShopping = formData.shopping.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const totalExpenses = totalWages + totalShopping;
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage('');
-
-    try {
-      const response = await fetch('/api/daily-shift-forms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to submit form: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      toast({
-        title: "Form Submitted Successfully",
-        description: `Shift form saved with ID: ${result.id}`,
-        duration: 6000,
-      });
-
-      // Reset form
+  const handleNumberNeededChange = (itemName: string, value: string) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setFormData({
-        completedBy: '',
-        shiftType: 'evening',
-        shiftDate: new Date().toISOString().split('T')[0],
-        grabSales: 0,
-        aroiDeeSales: 0,
-        qrScanSales: 0,
-        cashSales: 0,
-        wages: [],
-        shopping: [],
-        startingCash: 0,
-        endingCash: 0,
-        bankedAmount: 0,
-        inventory: {}
+        ...formData,
+        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
       });
-
-    } catch (error: any) {
-      let errorMessage = 'Failed to submit form. Please try again.';
-      
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setErrorMessage(errorMessage);
-      toast({
-        title: "Submission Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      setErrorMessage(`Invalid input for ${itemName}: Only numbers or empty. Reasoning: Text/symbols cause DB errors (22P02).`);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newSubmission = { ...formData, date: new Date().toLocaleString() };
+    const updatedSubmissions = [...submissions, newSubmission];
+    setSubmissions(updatedSubmissions);
+    localStorage.setItem('dailyShiftSubmissions', JSON.stringify(updatedSubmissions));
+    setFormData({ ...formData, numberNeeded: {} });
+    localStorage.removeItem('dailyShiftDraft');
+    setErrorMessage('');
+    
+    // Show success message with timeout
+    setErrorMessage('Thank you, form submitted!');
+    setTimeout(() => {
+      setErrorMessage('');
+    }, 6000);
+    
+    // Optional backend
+    try {
+      await axios.post('/api/daily-shift-forms', newSubmission);
+    } catch (err) {
+      setErrorMessage('Backend failed but saved locally. Reasoning: Connection/schema issue – retry later.');
+    }
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
+    setErrorMessage('Draft saved.');
+    setTimeout(() => {
+      setErrorMessage('');
+    }, 3000);
+  };
+
+  const groupedItems = items.reduce((acc: Record<string, InventoryItem[]>, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {});
+
   return (
-    <div className="container max-w-6xl mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
-        <p className="text-gray-600 text-sm sm:text-base">Complete daily shift reporting with authentic inventory tracking</p>
-      </div>
-
-      {/* Error Display */}
-      {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          <strong>Error:</strong> {errorMessage}
-          <p className="mt-2 text-sm">
-            <strong>Troubleshooting:</strong> Check if all number fields contain valid numbers (not text). 
-            Empty fields are okay, but text in number fields causes database errors. 
-            If the issue persists, verify all inventory quantities are numbers.
-          </p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 1. Shift Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Shift Information</CardTitle>
-            <CardDescription>Basic shift details and staff information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="completedBy">Completed By</Label>
-                <Input
-                  id="completedBy"
-                  value={formData.completedBy}
-                  onChange={(e) => setFormData(prev => ({ ...prev, completedBy: e.target.value }))}
-                  placeholder="Staff name"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="shiftType">Shift Type</Label>
-                <Select value={formData.shiftType} onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select shift" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day Shift</SelectItem>
-                    <SelectItem value="evening">Evening Shift</SelectItem>
-                    <SelectItem value="night">Night Shift</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="shiftDate">Shift Date</Label>
-                <Input
-                  id="shiftDate"
-                  type="date"
-                  value={formData.shiftDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shiftDate: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 2. Sales */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Sales</CardTitle>
-            <CardDescription>Revenue breakdown by platform</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="grabSales">Grab Sales (฿)</Label>
-                <Input
-                  id="grabSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.grabSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, grabSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="aroiDeeSales">Aroi Dee Sales (฿)</Label>
-                <Input
-                  id="aroiDeeSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.aroiDeeSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, aroiDeeSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="qrScanSales">QR Scan Sales (฿)</Label>
-                <Input
-                  id="qrScanSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.qrScanSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, qrScanSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="cashSales">Cash Sales (฿)</Label>
-                <Input
-                  id="cashSales"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.cashSales}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cashSales: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-            
-            {/* Sales Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Sales Summary</h3>
-              <div className="text-xl sm:text-2xl font-bold text-green-600">
-                Total Sales: ฿{totalSales.toLocaleString()}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 3. Expenses */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Expenses</CardTitle>
-            <CardDescription>Wages, shopping, and operational expenses</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Wages & Staff Payments */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Wages & Staff Payments</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Wage Entry
-                </Button>
-              </div>
-              
-              {formData.wages.map((wage, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Staff Name</Label>
-                    <Input
-                      value={wage.name}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].name = e.target.value;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-                      placeholder="Enter staff name"
-                    />
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8 shadow-lg rounded-lg p-6 bg-gray-800">
+            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-orange-500 pb-2 text-orange-400">{category}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item"]} className="bg-white/10 p-4 rounded-lg border border-gray-600 shadow-sm">
+                  <label className="block mb-2 font-semibold text-sm">{item["Item"]}</label>
+                  <input
+                    type="text"
+                    value={formData.numberNeeded[item["Item"]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item"], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border border-gray-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    {item["Packaging Qty"]}
                   </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={wage.amount}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Type</Label>
-                    <Select value={wage.type} onValueChange={(value) => {
-                      const newWages = [...formData.wages];
-                      newWages[index].type = value;
-                      setFormData(prev => ({ ...prev, wages: newWages }));
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Wages">Wages</SelectItem>
-                        <SelectItem value="Bonus">Bonus</SelectItem>
-                        <SelectItem value="Overtime">Overtime</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeWageEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
                 </div>
               ))}
             </div>
-
-            {/* Shopping & Expenses */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Shopping & Expenses</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Shopping Entry
-                </Button>
-              </div>
-              
-              {formData.shopping.map((item, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Item</Label>
-                    <Input
-                      value={item.item}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].item = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="Enter item name"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.amount}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Shop</Label>
-                    <Input
-                      value={item.shop}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].shop = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                      placeholder="Enter shop name"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeShoppingEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Expenses Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Expense Summary</h3>
-              <div className="space-y-1 text-sm">
-                <div>Total Wages: ฿{totalWages.toLocaleString()}</div>
-                <div>Total Shopping: ฿{totalShopping.toLocaleString()}</div>
-                <div className="text-lg font-bold text-red-600 pt-2 border-t">
-                  Total Expenses: ฿{totalExpenses.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 4. Cash Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Cash Management</CardTitle>
-            <CardDescription>Cash flow tracking and banking</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="startingCash">Starting Cash (฿)</Label>
-                <Input
-                  id="startingCash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.startingCash}
-                  onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="endingCash">Ending Cash (฿)</Label>
-                <Input
-                  id="endingCash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.endingCash}
-                  onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
-                <Input
-                  id="bankedAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.bankedAmount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 5. Stock Counts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Stock Counts</CardTitle>
-            <CardDescription>Current inventory levels by category</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            
-            {/* Drink Stock */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4 pb-2 border-b border-orange-200">
-                Drinks
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {drinkStock.map((drink) => (
-                  <div key={drink.name}>
-                    <Label htmlFor={`drink-${drink.name}`} className="text-xs sm:text-sm">
-                      {drink.name} <span className="text-gray-500">({drink.unit})</span>
-                    </Label>
-                    <Input
-                      id={`drink-${drink.name}`}
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.inventory[drink.name] || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        inventory: { ...prev.inventory, [drink.name]: parseInt(e.target.value) || 0 }
-                      }))}
-                      className="text-xs sm:text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Inventory Categories */}
-            {Object.entries(inventoryCategories).map(([category, items]) => (
-              <div key={category}>
-                <h3 className="font-medium text-gray-900 mb-4 pb-2 border-b border-orange-200">
-                  {category}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {items.map((item) => (
-                    <div key={item.name}>
-                      <Label htmlFor={`inventory-${item.name}`} className="text-xs sm:text-sm">
-                        {item.name} <span className="text-gray-500">({item.unit})</span>
-                      </Label>
-                      <Input
-                        id={`inventory-${item.name}`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.inventory[item.name] || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          inventory: { ...prev.inventory, [item.name]: parseFloat(e.target.value) || 0 }
-                        }))}
-                        className="text-xs sm:text-sm"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Submit Button */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-6">
-          <Button 
-            type="submit" 
-            disabled={isSubmitting}
-            className="flex-1 bg-blue-600 text-white hover:bg-blue-700 border-blue-600"
+          </div>
+        ))}
+        <div className="flex space-x-4 mt-8">
+          <button 
+            type="button" 
+            onClick={saveDraft} 
+            className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 transition-colors"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Form'}
-          </Button>
+            Save as Draft
+          </button>
+          <button 
+            type="submit" 
+            className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 transition-colors"
+          >
+            Submit Form
+          </button>
         </div>
       </form>
+      
+      {errorMessage && (
+        <div className={`mt-4 p-4 rounded text-white font-medium ${
+          errorMessage.includes('Thank you') || errorMessage.includes('Draft saved') 
+            ? 'bg-green-600' 
+            : 'bg-red-600'
+        }`}>
+          {errorMessage.includes('Error') ? <strong>Error:</strong> : null} {errorMessage}
+        </div>
+      )}
+      
+      <h2 className="text-xl font-bold mt-8 mb-4">Recent Submissions</h2>
+      <div className="bg-gray-800 rounded-lg p-4">
+        {submissions.length === 0 ? (
+          <p className="text-gray-400">No submissions yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {submissions.slice(-3).map((sub, index) => (
+              <li key={index} className="bg-white/10 p-3 rounded border-l-4 border-orange-500">
+                <div className="font-semibold text-orange-400">{sub.date}</div>
+                <div className="text-sm text-gray-300">
+                  {Object.entries(sub.numberNeeded)
+                    .filter(([, value]) => value)
+                    .slice(0, 5)
+                    .map(([item, value]) => `${item}: ${value}`)
+                    .join(', ')}
+                  {Object.entries(sub.numberNeeded).filter(([, value]) => value).length > 5 && '...'}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };
