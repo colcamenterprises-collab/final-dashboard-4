@@ -419,11 +419,13 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Daily Stock Sales endpoints
+  // Daily Stock Sales endpoints - completed forms only
   app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
       const forms = await storage.getAllDailyStockSales();
-      res.json(forms);
+      // Filter to only return completed forms (isDraft = false)
+      const completedForms = forms.filter(form => form.isDraft === false);
+      res.json(completedForms);
     } catch (err) {
       console.error("Error fetching daily stock sales:", err);
       res.status(500).json({ error: "Failed to fetch daily stock sales" });
@@ -751,11 +753,12 @@ export function registerRoutes(app: express.Application): Server {
   app.get("/api/daily-stock-sales/drafts", async (req: Request, res: Response) => {
     try {
       const forms = await storage.searchDailyStockSales('');
-      // Include both drafts AND completed forms as requested by user
-      res.json(forms);
+      // Filter to only return draft forms (isDraft = true)
+      const drafts = forms.filter(form => form.isDraft === true);
+      res.json(drafts);
     } catch (err) {
-      console.error("Error fetching forms:", err);
-      res.status(500).json({ error: "Failed to fetch forms" });
+      console.error("Error fetching drafts:", err);
+      res.status(500).json({ error: "Failed to fetch drafts" });
     }
   });
 
