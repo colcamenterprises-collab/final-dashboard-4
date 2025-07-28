@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, Upload, FileText } from 'lucide-react';
@@ -14,27 +14,10 @@ interface ComparisonItem {
   match: boolean;
 }
 
-interface ShiftData {
-  grab_sales?: number;
-  qr_sales?: number;
-  aroi_sales?: number;
-  cash_sales?: number;
-  total_sales?: number;
-  register_balance?: number;
-}
 
-interface DailyData {
-  grab_sales?: number;
-  qr_sales?: number;
-  aroi_sales?: number;
-  cash_sales?: number;
-  total_sales?: number;
-  register_balance?: number;
-}
 
 const ShiftComparison = () => {
-  const [shiftData, setShiftData] = useState<ShiftData | null>(null);
-  const [dailyData, setDailyData] = useState<DailyData | null>(null);
+
   const [comparison, setComparison] = useState<ComparisonItem[] | null>(null);
   const [shiftFileName, setShiftFileName] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -69,7 +52,7 @@ const ShiftComparison = () => {
       if (response.ok) {
         const result = await response.json();
         
-        if (result.error === 'No matching daily form found') {
+        if (result.error === 'No Daily Sales Form found for this shift date') {
           setNoMatchFound(true);
           toast({
             title: "No Daily Sales Form found",
@@ -77,12 +60,20 @@ const ShiftComparison = () => {
             variant: "destructive"
           });
         } else {
-          setShiftData(result.shiftData);
-          setDailyData(result.dailyData);
+          // Convert the API response format to match our component expectations
+          const convertedComparisons = result.comparisons.map((comp: any) => ({
+            label: comp.label,
+            shift: comp.shiftValue,
+            daily: comp.formValue,
+            difference: comp.difference,
+            match: comp.status === 'match'
+          }));
+          
+          setComparison(convertedComparisons);
           setShiftFileName(file.name);
           toast({
             title: "File uploaded successfully",
-            description: `${file.name} processed and matched with Daily Sales Form`,
+            description: `${file.name} processed and matched with Daily Sales Form from ${result.matchedDate}`,
           });
         }
       } else {
@@ -100,36 +91,7 @@ const ShiftComparison = () => {
     }
   };
 
-  useEffect(() => {
-    if (shiftData && dailyData) {
-      const result = compareReports(shiftData, dailyData);
-      setComparison(result);
-    }
-  }, [shiftData, dailyData]);
 
-  const compareReports = (shift: ShiftData, daily: DailyData): ComparisonItem[] => {
-    const categories = [
-      { key: 'grab_sales', label: 'GRAB Sales' },
-      { key: 'cash_sales', label: 'Cash Sales' },
-      { key: 'qr_sales', label: 'QR Code Sales' },
-      { key: 'aroi_sales', label: 'Aroi Dee' },
-      { key: 'total_sales', label: 'Total Sales' },
-      { key: 'register_balance', label: 'Register Balance' }
-    ];
-
-    return categories.map(cat => {
-      const shiftValue = Number(shift[cat.key as keyof ShiftData] || 0);
-      const dailyValue = Number(daily[cat.key as keyof DailyData] || 0);
-      const diff = shiftValue - dailyValue;
-      return {
-        label: cat.label,
-        shift: shiftValue,
-        daily: dailyValue,
-        difference: diff,
-        match: Math.abs(diff) <= 50 // 50 THB tolerance
-      };
-    });
-  };
 
   const formatCurrency = (amount: number) => {
     return `฿${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

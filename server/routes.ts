@@ -12,6 +12,9 @@ import { eq, desc, sql, inArray } from "drizzle-orm";
 import multer from 'multer';
 import OpenAI from 'openai';
 import xlsx from 'xlsx';
+import csv from 'csv-parser';
+import fs from 'fs';
+import path from 'path';
 import { supplierService } from "./supplierService";
 
 
@@ -2312,59 +2315,57 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
-  // Shift Comparison API - CSV upload with automatic database matching
+  // Enhanced Shift Comparison API - CSV upload with automatic database matching
   app.post('/api/shift-comparison', upload.single('shiftReport'), async (req: Request, res: Response) => {
+    const TOLERANCE = 50; // Tolerance in THB
+    
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No CSV file uploaded' });
       }
 
-      // Parse CSV file to extract shift data
-      const csvText = req.file.buffer.toString('utf-8');
-      const lines = csvText.split('\n').filter(line => line.trim());
+      // Write buffer to temporary file for csv-parser
+      const tempFilePath = path.join(process.cwd(), 'temp', `${Date.now()}-shift.csv`);
       
-      if (lines.length < 2) {
-        return res.status(400).json({ error: 'Invalid CSV format - no data rows found' });
+      // Ensure temp directory exists
+      const tempDir = path.dirname(tempFilePath);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
       }
-
-      // Parse CSV headers and data
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const dataRow = lines[1].split(',').map(d => d.trim());
       
-      // Create shift data object from CSV
-      const shiftData: any = {};
-      headers.forEach((header, index) => {
-        const value = dataRow[index];
-        if (header.includes('date')) {
-          shiftData.date = value;
-        } else if (header.includes('grab') && header.includes('sales')) {
-          shiftData.grab_sales = parseFloat(value) || 0;
-        } else if (header.includes('cash') && header.includes('sales')) {
-          shiftData.cash_sales = parseFloat(value) || 0;
-        } else if (header.includes('qr') && header.includes('sales')) {
-          shiftData.qr_sales = parseFloat(value) || 0;
-        } else if (header.includes('aroi') && header.includes('sales')) {
-          shiftData.aroi_sales = parseFloat(value) || 0;
-        } else if (header.includes('total') && header.includes('sales')) {
-          shiftData.total_sales = parseFloat(value) || 0;
-        } else if (header.includes('register') && header.includes('balance')) {
-          shiftData.register_balance = parseFloat(value) || 0;
-        }
+      fs.writeFileSync(tempFilePath, req.file.buffer);
+
+      // Parse CSV using csv-parser
+      const shiftData: any[] = await new Promise((resolve, reject) => {
+        const results: any[] = [];
+        fs.createReadStream(tempFilePath)
+          .pipe(csv())
+          .on('data', (data) => results.push(data))
+          .on('end', () => resolve(results))
+          .on('error', reject);
       });
 
-      // Extract date for matching (handle various date formats)
-      let matchDate = shiftData.date;
-      if (!matchDate) {
+      // Clean up temp file
+      fs.unlinkSync(tempFilePath);
+
+      if (shiftData.length === 0) {
+        return res.status(400).json({ error: 'No data found in CSV file' });
+      }
+
+      const shift = shiftData[0]; // Use first row of data
+
+      // Extract date from CSV for database matching
+      const shiftDate = shift.date || shift.Date || shift.DATE;
+      if (!shiftDate) {
         return res.status(400).json({ error: 'No date field found in CSV' });
       }
 
-      // Try to parse date and format for database matching
-      const parsedDate = new Date(matchDate);
+      // Parse and format date for database search
+      const parsedDate = new Date(shiftDate);
       if (isNaN(parsedDate.getTime())) {
         return res.status(400).json({ error: 'Invalid date format in CSV' });
       }
 
-      // Format date for database search (YYYY-MM-DD)
       const searchDate = parsedDate.toISOString().split('T')[0];
 
       // Query database for matching Daily Sales Form
@@ -2376,27 +2377,64 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         .limit(1);
 
       if (matchingForms.length === 0) {
-        return res.json({ error: 'No matching daily form found' });
+        return res.json({ error: 'No Daily Sales Form found for this shift date' });
       }
 
       const dailyForm = matchingForms[0];
 
-      // Extract comparable data from daily form
-      const dailyData = {
-        grab_sales: parseFloat(dailyForm.grabSales?.toString() || '0'),
-        cash_sales: parseFloat(dailyForm.cashSales?.toString() || '0'),
-        qr_sales: parseFloat(dailyForm.qrScanSales?.toString() || '0'),
-        aroi_sales: parseFloat(dailyForm.aroiDeeSales?.toString() || '0'),
-        total_sales: parseFloat(dailyForm.totalSales?.toString() || '0'),
-        register_balance: parseFloat(dailyForm.endingCash?.toString() || '0')
+      // Helper function to perform comparison
+      const compare = (label: string, shiftVal: number, formVal: number) => {
+        const diff = Math.abs(shiftVal - formVal);
+        return {
+          label,
+          shiftValue: shiftVal,
+          formValue: formVal,
+          difference: diff,
+          withinTolerance: diff <= TOLERANCE,
+          status: diff <= TOLERANCE ? 'match' : 'discrepancy'
+        };
       };
 
-      // Return both datasets for comparison
+      // Perform comparisons with proper field mapping
+      const comparisons = [
+        compare('Total Sales', 
+          parseFloat(shift['total_sales'] || shift['Total Sales'] || '0'), 
+          parseFloat(dailyForm.totalSales?.toString() || '0')
+        ),
+        compare('Cash Sales', 
+          parseFloat(shift['cash_sales'] || shift['Cash'] || '0'), 
+          parseFloat(dailyForm.cashSales?.toString() || '0')
+        ),
+        compare('QR Code Sales', 
+          parseFloat(shift['qr_sales'] || shift['QR Code'] || '0'), 
+          parseFloat(dailyForm.qrScanSales?.toString() || '0')
+        ),
+        compare('Grab Sales', 
+          parseFloat(shift['grab_sales'] || shift['Grab'] || '0'), 
+          parseFloat(dailyForm.grabSales?.toString() || '0')
+        ),
+        compare('Aroi Dee Sales', 
+          parseFloat(shift['aroi_sales'] || shift['Aroi Dee'] || '0'), 
+          parseFloat(dailyForm.aroiDeeSales?.toString() || '0')
+        ),
+        compare('Register Balance', 
+          parseFloat(shift['register_balance'] || shift['Register Balance'] || '0'), 
+          parseFloat(dailyForm.endingCash?.toString() || '0')
+        )
+      ];
+
+      // Return comprehensive comparison data
       res.json({
-        shiftData,
-        dailyData,
+        comparisons,
         matchedFormId: dailyForm.id,
-        matchedDate: searchDate
+        matchedDate: searchDate,
+        shiftDate: shiftDate,
+        tolerance: TOLERANCE,
+        summary: {
+          totalComparisons: comparisons.length,
+          matches: comparisons.filter(c => c.status === 'match').length,
+          discrepancies: comparisons.filter(c => c.status === 'discrepancy').length
+        }
       });
 
     } catch (error) {
