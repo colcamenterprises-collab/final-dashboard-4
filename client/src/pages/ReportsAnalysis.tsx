@@ -93,6 +93,13 @@ const ReportsAnalysis = () => {
       icon: FileText,
       path: "/analysis",
       status: "Active"
+    },
+    {
+      title: "Shift vs Daily Comparison",
+      description: "AI detects mismatches between shift reports and manual forms",
+      icon: AlertTriangle,
+      path: "/shift-comparison",
+      status: "Active"
     }
   ];
 

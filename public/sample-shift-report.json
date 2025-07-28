@@ -1,0 +1,14 @@
+{
+  "shift_id": "shift_542",
+  "date": "2025-01-28",
+  "shift_start": "17:00",
+  "shift_end": "03:00",
+  "grab_sales": 14900.00,
+  "cash_sales": 5200.00,
+  "qr_sales": 1000.00,
+  "aroi_sales": 0.00,
+  "total_sales": 21100.00,
+  "register_balance": 21100.00,
+  "orders_count": 68,
+  "staff": "Manager shift 542"
+}
