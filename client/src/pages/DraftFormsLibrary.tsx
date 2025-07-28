@@ -76,7 +76,11 @@ export default function DraftFormsLibrary() {
   };
 
   const calculateTotal = (form: Form) => {
-    const total = (form.grabSales || 0) + (form.aroiDeeSales || 0) + (form.qrScanSales || 0) + (form.cashSales || 0);
+    const grabSales = Number(form.grabSales) || 0;
+    const aroiDeeSales = Number(form.aroiDeeSales) || 0;
+    const qrScanSales = Number(form.qrScanSales) || 0;
+    const cashSales = Number(form.cashSales) || 0;
+    const total = grabSales + aroiDeeSales + qrScanSales + cashSales;
     return formatCurrency(total);
   };
 

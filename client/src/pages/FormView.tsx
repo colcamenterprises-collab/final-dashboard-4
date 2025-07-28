@@ -121,27 +121,27 @@ const FormView = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <Label>Starting Cash (฿)</Label>
-                <Input disabled value={formData.startingCash} />
+                <Input disabled value={Number(formData.startingCash || 0).toFixed(2)} />
               </div>
               <div>
                 <Label>Grab Sales (฿)</Label>
-                <Input disabled value={formData.grabSales} />
+                <Input disabled value={Number(formData.grabSales || 0).toFixed(2)} />
               </div>
               <div>
                 <Label>Aroi Dee Sales (฿)</Label>
-                <Input disabled value={formData.aroiDeeSales} />
+                <Input disabled value={Number(formData.aroiDeeSales || 0).toFixed(2)} />
               </div>
               <div>
                 <Label>QR Scan Sales (฿)</Label>
-                <Input disabled value={formData.qrScanSales} />
+                <Input disabled value={Number(formData.qrScanSales || 0).toFixed(2)} />
               </div>
               <div>
                 <Label>Cash Sales (฿)</Label>
-                <Input disabled value={formData.cashSales} />
+                <Input disabled value={Number(formData.cashSales || 0).toFixed(2)} />
               </div>
               <div className="bg-gray-50 p-2 rounded">
                 <Label>Total Sales (฿)</Label>
-                <Input disabled value={formData.totalSales} className="font-semibold" />
+                <Input disabled value={Number(formData.totalSales || 0).toFixed(2)} className="font-semibold" />
               </div>
             </div>
           </div>
@@ -159,7 +159,7 @@ const FormView = () => {
                     </div>
                     <div>
                       <Label>Amount (฿)</Label>
-                      <Input disabled value={wage.amount} />
+                      <Input disabled value={Number(wage.amount || 0).toFixed(2)} />
                     </div>
                     <div>
                       <Label>Type</Label>
@@ -184,7 +184,7 @@ const FormView = () => {
                     </div>
                     <div>
                       <Label>Amount (฿)</Label>
-                      <Input disabled value={shop.amount} />
+                      <Input disabled value={Number(shop.amount || 0).toFixed(2)} />
                     </div>
                     <div>
                       <Label>Shop Name</Label>
