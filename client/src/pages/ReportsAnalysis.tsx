@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -166,7 +167,7 @@ const ReportsAnalysis = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
           <TabsTrigger value="reporting" className="text-xs sm:text-sm lg:text-base">
             <Receipt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Reporting</span>
@@ -176,6 +177,11 @@ const ReportsAnalysis = () => {
             <BarChart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Analysis</span>
             <span className="sm:hidden">Analysis</span>
+          </TabsTrigger>
+          <TabsTrigger value="stock-summary" className="text-xs sm:text-sm lg:text-base">
+            <Package className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Stock Summary</span>
+            <span className="sm:hidden">Stock</span>
           </TabsTrigger>
         </TabsList>
         
@@ -224,6 +230,26 @@ const ReportsAnalysis = () => {
             {analysisItems.map((item, index) => (
               <ItemCard key={index} item={item} />
             ))}
+          </div>
+        </TabsContent>
+
+        {/* Monthly Stock Summary Tab */}
+        <TabsContent value="stock-summary" className="space-y-6">
+          <div className="grid gap-6">
+            <Card className="border-2 border-green-500 bg-green-50 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-green-900">
+                  <Package className="h-5 w-5" />
+                  Monthly Stock Purchases Summary
+                </CardTitle>
+                <CardDescription className="text-green-700">
+                  Complete summary of rolls, drinks, and meat purchased this month from stock management forms
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MonthlyStockDisplay />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
