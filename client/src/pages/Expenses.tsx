@@ -538,14 +538,14 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
-      {/* Monthly Stock Purchases Summary */}
-      <Card>
+      {/* Monthly Stock Purchases Summary - VISIBLE SECTION */}
+      <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
             <Package className="h-5 w-5" />
-            Monthly Stock Purchases
+            📦 Monthly Stock Purchases (NEW FEATURE)
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-blue-700 dark:text-blue-200">
             Summary of drinks, rolls, and meat lodged this month from Stock Count section
           </CardDescription>
         </CardHeader>
