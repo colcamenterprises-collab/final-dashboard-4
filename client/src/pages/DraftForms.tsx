@@ -1,14 +1,55 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { ShoppingCart, ClipboardList } from "lucide-react";
+import { ShoppingCart, ClipboardList, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface DraftForm {
+  id: number;
+  shiftDate: string;
+  completedBy: string;
+  shiftType: string;
+  burgerBunsStock: number;
+  meatWeight: number;
+}
 
 const DraftForms = () => {
-  const { data: forms = [], isLoading } = useQuery({
+  const { toast } = useToast();
+  
+  const { data: forms = [], isLoading } = useQuery<DraftForm[]>({
     queryKey: ['/api/daily-stock-sales/drafts'],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (formId: number) => {
+      return apiRequest(`/api/daily-stock-sales/${formId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales/drafts'] });
+      toast({
+        title: "Success",
+        description: "Draft form deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete draft form",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = (formId: number) => {
+    if (window.confirm('Are you sure you want to delete this draft form?')) {
+      deleteMutation.mutate(formId);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -63,24 +104,34 @@ const DraftForms = () => {
                   <TableHead>Date</TableHead>
                   <TableHead>Completed By</TableHead>
                   <TableHead>Shift Type</TableHead>
+                  <TableHead>Rolls</TableHead>
+                  <TableHead>Meat (g)</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {forms.map((form: any) => (
+                {forms.map((form: DraftForm) => (
                   <TableRow key={form.id}>
                     <TableCell>{form.id}</TableCell>
-                    <TableCell>
-                      {form.shiftDate ? new Date(form.shiftDate).toLocaleDateString() : 'N/A'}
-                    </TableCell>
+                    <TableCell>{form.shiftDate ? new Date(form.shiftDate).toLocaleDateString() : 'N/A'}</TableCell>
                     <TableCell>{form.completedBy || 'Unknown'}</TableCell>
                     <TableCell>{form.shiftType || 'N/A'}</TableCell>
+                    <TableCell>{form.burgerBunsStock ?? '—'}</TableCell>
+                    <TableCell>{form.meatWeight ?? '—'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Link href={`/daily-shift-form?draft=${form.id}`}>
                           <Button variant="outline" size="sm">Edit</Button>
                         </Link>
-                        <Button variant="destructive" size="sm">Delete</Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleDelete(form.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -33,6 +33,7 @@ import Purchasing from "@/pages/Purchasing";
 import FormView from "@/pages/FormView";
 import SupplierManagement from "@/pages/SupplierManagement";
 import TestMonthlyStock from "@/pages/TestMonthlyStock";
+import DraftForms from "@/pages/DraftForms";
 
 import NotFound from "@/pages/not-found";
 
@@ -65,7 +66,7 @@ function Router() {
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
-        <Route path="/draft-forms" component={DraftFormsLibrary} />
+        <Route path="/draft-forms" component={DraftForms} />
         <Route path="/form-library" component={DraftFormsLibrary} />
         <Route path="/purchasing" component={Purchasing} />
         <Route path="/supplier-management" component={SupplierManagement} />
