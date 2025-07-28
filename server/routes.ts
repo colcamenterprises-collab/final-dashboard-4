@@ -936,6 +936,52 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Loyverse OAuth callback endpoint
+  app.get("/auth/loyverse/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Authorization code not provided" });
+      }
+
+      // Exchange authorization code for access token
+      const tokenResponse = await fetch('https://api.loyverse.com/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code as string,
+          client_id: process.env.LOYVERSE_CLIENT_ID!,
+          client_secret: process.env.LOYVERSE_CLIENT_SECRET!,
+          redirect_uri: `${req.protocol}://${req.get('host')}/auth/loyverse/callback`
+        })
+      });
+
+      const tokenData = await tokenResponse.json();
+      
+      if (tokenData.error) {
+        return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+      }
+
+      // Store the tokens securely (in production, save to database)
+      console.log('Loyverse OAuth Success:', {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in
+      });
+
+      // Redirect to success page or dashboard
+      res.redirect('/?loyverse_connected=true');
+
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      res.status(500).json({ error: 'OAuth callback failed' });
+    }
+  });
+
   // Stock Purchase endpoints
   app.get("/api/stock-purchase/rolls/:expenseId", async (req: Request, res: Response) => {
     try {
