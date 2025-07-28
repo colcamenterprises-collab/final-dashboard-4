@@ -46,13 +46,18 @@ export default function Expenses() {
     queryKey: ["/api/expenses/by-category"],
   });
 
-  const { data: monthlyStockSummary } = useQuery<{
+  const { data: monthlyStockSummary, isLoading: monthlyStockLoading, error: monthlyStockError } = useQuery<{
     rolls: Array<{ quantity: number; totalCost: string; date: string }>;
     drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
     meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
   }>({
     queryKey: ["/api/stock-purchase/monthly-summary"],
   });
+
+  // Debug logging
+  console.log("Monthly stock summary data:", monthlyStockSummary);
+  console.log("Monthly stock loading:", monthlyStockLoading);
+  console.log("Monthly stock error:", monthlyStockError);
 
   // Forms
   const expenseForm = useForm({
@@ -550,7 +555,7 @@ export default function Expenses() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!monthlyStockSummary ? (
+          {monthlyStockLoading ? (
             <div className="animate-pulse space-y-4">
               <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
               <div className="space-y-2">
@@ -558,6 +563,15 @@ export default function Expenses() {
                   <div key={i} className="h-3 bg-gray-300 dark:bg-gray-600 rounded"></div>
                 ))}
               </div>
+            </div>
+          ) : monthlyStockError ? (
+            <div className="text-center py-8 text-red-500">
+              <p>Error loading monthly stock summary</p>
+              <p className="text-sm">{monthlyStockError.message}</p>
+            </div>
+          ) : !monthlyStockSummary ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No monthly stock data available</p>
             </div>
           ) : (
             <div className="space-y-6">
