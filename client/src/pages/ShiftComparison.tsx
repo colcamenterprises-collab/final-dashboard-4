@@ -187,7 +187,7 @@ const ShiftComparison = () => {
                       <th className="text-left py-3 px-2 font-semibold text-gray-900">Metric</th>
                       <th className="text-right py-3 px-2 font-semibold text-gray-900">Daily Sales Form</th>
                       <th className="text-right py-3 px-2 font-semibold text-gray-900">POS Shift Report</th>
-                      <th className="text-center py-3 px-2 font-semibold text-gray-900">Status</th>
+                      <th className="text-left py-3 px-2 font-semibold text-gray-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -201,7 +201,7 @@ const ShiftComparison = () => {
                         <td className="py-3 px-2 font-medium text-gray-900">{item.label}</td>
                         <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.daily)}</td>
                         <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.shift)}</td>
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-left">
                           {item.match ? (
                             <CheckCircle className="inline h-5 w-5 text-green-500" />
                           ) : (
