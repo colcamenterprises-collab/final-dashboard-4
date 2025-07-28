@@ -550,6 +550,55 @@ const DailyShiftForm = () => {
             <CardDescription>Current inventory levels</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Stock Count - Rolls & Meat */}
+            <div>
+              <h3 className="font-medium text-gray-900 mb-4">Stock Count</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="burgerRollsStock">Burger Rolls Stock</Label>
+                  <Input
+                    id="burgerRollsStock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.inventory["Burger Rolls Stock"] || ''}
+                    onChange={(e) =>
+                      setFormData(prev => ({
+                        ...prev,
+                        inventory: {
+                          ...prev.inventory,
+                          ["Burger Rolls Stock"]: parseInt(e.target.value) || 0
+                        }
+                      }))
+                    }
+                    placeholder="0"
+                  />
+                  <div className="text-xs text-gray-500">Total number of buns in stock</div>
+                </div>
+                <div>
+                  <Label htmlFor="meatStock">Meat Stock (kg)</Label>
+                  <Input
+                    id="meatStock"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.inventory["Meat Stock"] || ''}
+                    onChange={(e) =>
+                      setFormData(prev => ({
+                        ...prev,
+                        inventory: {
+                          ...prev.inventory,
+                          ["Meat Stock"]: parseFloat(e.target.value) || 0
+                        }
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                  <div className="text-xs text-gray-500">Weight of meat in kilograms</div>
+                </div>
+              </div>
+            </div>
+
             {/* Drinks */}
             <div>
               <h3 className="font-medium text-gray-900 mb-4">Drinks</h3>
