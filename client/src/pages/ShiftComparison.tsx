@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, Upload, FileText } from 'lucide-react';
+// No icons needed
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
@@ -102,16 +102,16 @@ const ShiftComparison = () => {
     
     const mismatches = comparison.filter(item => !item.match);
     if (mismatches.length === 0) {
-      return "✅ All fields match within tolerance. Excellent work by the staff!";
+      return "All fields match within tolerance. Excellent work by the staff!";
     }
     
     const comments = mismatches.map(item => 
-      `⚠️ Discrepancy in ${item.label}: difference of ${formatCurrency(Math.abs(item.difference))}`
+      `Discrepancy in ${item.label}: difference of ${formatCurrency(Math.abs(item.difference))}`
     );
     
     const matchCount = comparison.length - mismatches.length;
     if (matchCount > 0) {
-      comments.push(`✅ ${matchCount} other field${matchCount > 1 ? 's' : ''} match within tolerance.`);
+      comments.push(`${matchCount} other field${matchCount > 1 ? 's' : ''} match within tolerance.`);
     }
     
     return comments.join('\n');
@@ -122,7 +122,7 @@ const ShiftComparison = () => {
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
-          🧠 Jussi's Shift Integrity Checker
+          Jussi's Shift Integrity Checker
         </h1>
         <p className="text-sm sm:text-base text-gray-600">
           Compare POS Shift Reports with Daily Sales & Stock Forms to detect discrepancies
@@ -133,8 +133,7 @@ const ShiftComparison = () => {
       <div className="max-w-2xl mx-auto mb-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-lg font-semibold">
               Upload POS Shift Report CSV File
             </CardTitle>
           </CardHeader>
@@ -150,20 +149,17 @@ const ShiftComparison = () => {
               (Daily Sales Form will be automatically matched from system records)
             </p>
             {loading && (
-              <p className="text-sm text-blue-600 flex items-center gap-1">
-                <Upload className="h-4 w-4 animate-spin" />
+              <p className="text-sm text-blue-600">
                 Processing CSV and matching with Daily Sales Form...
               </p>
             )}
             {shiftFileName && !loading && (
-              <p className="text-sm text-green-600 flex items-center gap-1">
-                <CheckCircle className="h-4 w-4" />
+              <p className="text-sm text-green-600">
                 {shiftFileName} processed and matched successfully
               </p>
             )}
             {noMatchFound && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
+              <p className="text-sm text-red-600">
                 No Daily Sales Form found for this shift date
               </p>
             )}
@@ -177,7 +173,7 @@ const ShiftComparison = () => {
           {/* Comparison Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">🔍 Shift Comparison Results</CardTitle>
+              <CardTitle className="text-lg font-semibold">Shift Comparison Results</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -220,7 +216,7 @@ const ShiftComparison = () => {
           <Card className="border-blue-200 bg-blue-50">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-blue-900">
-                🧠 Jussi's Analysis
+                Jussi's Analysis
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -234,7 +230,7 @@ const ShiftComparison = () => {
           <Card className="border-gray-300 bg-gray-50">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-700">
-                🚀 Future Enhancements
+                Future Enhancements
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -254,7 +250,7 @@ const ShiftComparison = () => {
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-blue-900">
-              📋 Instructions
+              Instructions
             </CardTitle>
           </CardHeader>
           <CardContent>
