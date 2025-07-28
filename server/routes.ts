@@ -598,7 +598,13 @@ export function registerRoutes(app: express.Application): Server {
   app.get("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const result = await storage.getDailyStockSalesById(parseInt(id));
+      const numericId = parseInt(id);
+      
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid ID parameter - must be a number" });
+      }
+      
+      const result = await storage.getDailyStockSalesById(numericId);
       
       if (!result) {
         return res.status(404).json({ error: "Daily stock sales not found" });
@@ -631,7 +637,8 @@ export function registerRoutes(app: express.Application): Server {
       
       numericFields.forEach(field => {
         if (data[field] !== undefined && data[field] !== null) {
-          data[field] = parseFloat(data[field] || '0');
+          const parsed = parseFloat(data[field] || '0');
+          data[field] = isNaN(parsed) ? 0 : parsed;
         }
       });
       
@@ -649,8 +656,14 @@ export function registerRoutes(app: express.Application): Server {
   app.put("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      const numericId = parseInt(id);
+      
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid ID parameter - must be a number" });
+      }
+      
       const data = req.body;
-      console.log("Updating daily stock sales:", { id, data });
+      console.log("Updating daily stock sales:", { id: numericId, data });
       
       // Ensure shiftDate is a Date object
       if (data.shiftDate && typeof data.shiftDate === 'string') {
@@ -667,11 +680,12 @@ export function registerRoutes(app: express.Application): Server {
       
       numericFields.forEach(field => {
         if (data[field] !== undefined && data[field] !== null) {
-          data[field] = parseFloat(data[field] || '0');
+          const parsed = parseFloat(data[field] || '0');
+          data[field] = isNaN(parsed) ? 0 : parsed;
         }
       });
       
-      const result = await storage.updateDailyStockSales(parseInt(id), data);
+      const result = await storage.updateDailyStockSales(numericId, data);
       
       if (!result) {
         return res.status(404).json({ error: "Daily stock sales not found" });
@@ -745,8 +759,7 @@ export function registerRoutes(app: express.Application): Server {
   // Get drafts only
   app.get("/api/daily-stock-sales/drafts", async (req: Request, res: Response) => {
     try {
-      const forms = await storage.searchDailyStockSales('');
-      const drafts = forms.filter(form => form.isDraft);
+      const drafts = await storage.getDraftForms();
       res.json(drafts);
     } catch (err) {
       console.error("Error fetching drafts:", err);
