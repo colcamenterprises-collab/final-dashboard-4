@@ -553,6 +553,12 @@ export default function Expenses() {
           <CardDescription className="text-blue-700 dark:text-blue-200">
             Summary of drinks, rolls, and meat lodged this month from Stock Count section
           </CardDescription>
+          <div className="text-xs text-blue-600 dark:text-blue-300 mt-2 p-2 bg-white dark:bg-gray-800 rounded">
+            Debug: Loading={monthlyStockLoading ? 'true' : 'false'} | 
+            Data={monthlyStockSummary ? 'available' : 'null'} | 
+            Error={monthlyStockError ? 'yes' : 'no'}
+            {monthlyStockError && <span> | Error: {monthlyStockError.message}</span>}
+          </div>
         </CardHeader>
         <CardContent>
           {monthlyStockLoading ? (
