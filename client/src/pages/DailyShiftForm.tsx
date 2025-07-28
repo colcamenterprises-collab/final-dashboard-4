@@ -1,37 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-interface FormData {
-  completedBy: string;
-  shiftDate: string;
-  grabSales: string;
-  aroiDeeSales: string;
-  qrScanSales: string;
-  cashSales: string;
-  wages: any[];
-  shopping: any[];
-  gasExpense: string;
-  startingCash: string;
-  endingCash: string;
-  bankedAmount: string;
-  rollsStock: string;
-  meatStock: string;
-  numberNeeded: Record<string, string>;
-}
-
-interface SubmissionData extends FormData {
-  date: string;
-}
-
-interface InventoryItem {
-  Item: string;
-  "Internal Category": string;
-  "Packaging Qty": string;
-  "Minimum Stock Amount": string;
-}
-
 const DailyShiftForm = () => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     completedBy: '',
     shiftDate: new Date().toISOString().split('T')[0],
     grabSales: '',
@@ -48,7 +19,7 @@ const DailyShiftForm = () => {
     meatStock: '',
     numberNeeded: {}
   });
-  const [submissions, setSubmissions] = useState<SubmissionData[]>([]);
+  const [submissions, setSubmissions] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   // CSV items as JSON (full updated from tool; filtered extras in Fresh Food)
@@ -118,7 +89,7 @@ const DailyShiftForm = () => {
     }
   }, []);
 
-  const handleNumberNeededChange = (itemName: string, value: string) => {
+  const handleNumberNeededChange = (itemName, value) => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setFormData({
         ...formData,
@@ -129,7 +100,7 @@ const DailyShiftForm = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newSubmission = { ...formData, date: new Date().toLocaleString() };
     const updatedSubmissions = [...submissions, newSubmission];
@@ -138,13 +109,7 @@ const DailyShiftForm = () => {
     setFormData({ ...formData, numberNeeded: {} });
     localStorage.removeItem('dailyShiftDraft');
     setErrorMessage('');
-    
-    // Show success message with timeout
-    setErrorMessage('Thank you, form submitted!');
-    setTimeout(() => {
-      setErrorMessage('');
-    }, 6000);
-    
+    alert('Thank you, form submitted!');
     // Optional backend
     try {
       await axios.post('/api/daily-shift-forms', newSubmission);
@@ -156,12 +121,9 @@ const DailyShiftForm = () => {
   const saveDraft = () => {
     localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
     setErrorMessage('Draft saved.');
-    setTimeout(() => {
-      setErrorMessage('');
-    }, 3000);
   };
 
-  const groupedItems = items.reduce((acc: Record<string, InventoryItem[]>, item) => {
+  const groupedItems = items.reduce((acc, item) => {
     const cat = item["Internal Category"] || 'Other';
     if (cat) {
       if (!acc[cat]) acc[cat] = [];
@@ -176,74 +138,41 @@ const DailyShiftForm = () => {
       <form onSubmit={handleSubmit}>
         {Object.entries(groupedItems).map(([category, catItems]) => (
           <div key={category} className="mb-8 shadow-lg rounded-lg p-6 bg-gray-800">
-            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-orange-500 pb-2 text-orange-400">{category}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-gray-600 pb-2">{category}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {catItems.map((item) => (
-                <div key={item["Item"]} className="bg-white/10 p-4 rounded-lg border border-gray-600 shadow-sm">
-                  <label className="block mb-2 font-semibold text-sm">{item["Item"]}</label>
+                <div key={item["Item"] } className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item"] }</label>
                   <input
                     type="text"
-                    value={formData.numberNeeded[item["Item"]] || ''}
+                    placeholder="Number Needed"
+                    value={formData.numberNeeded[item["Item"] ] || ''}
                     onChange={(e) => handleNumberNeededChange(item["Item"], e.target.value)}
-                    className="w-full p-2 bg-gray-700 text-white rounded border border-gray-500 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
                   />
-                  <div className="text-xs text-gray-400 mt-1">
-                    {item["Packaging Qty"]}
-                  </div>
                 </div>
               ))}
             </div>
           </div>
         ))}
-        <div className="flex space-x-4 mt-8">
-          <button 
-            type="button" 
-            onClick={saveDraft} 
-            className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 transition-colors"
-          >
-            Save as Draft
-          </button>
-          <button 
-            type="submit" 
-            className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700 transition-colors"
-          >
-            Submit Form
-          </button>
+        <div className="flex space-x-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
+          <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
         </div>
       </form>
-      
       {errorMessage && (
-        <div className={`mt-4 p-4 rounded text-white font-medium ${
-          errorMessage.includes('Thank you') || errorMessage.includes('Draft saved') 
-            ? 'bg-green-600' 
-            : 'bg-red-600'
-        }`}>
-          {errorMessage.includes('Error') ? <strong>Error:</strong> : null} {errorMessage}
+        <div className="mt-4 p-4 bg-red-500 rounded text-white">
+          <strong>Error:</strong> {errorMessage}
         </div>
       )}
-      
-      <h2 className="text-xl font-bold mt-8 mb-4">Recent Submissions</h2>
-      <div className="bg-gray-800 rounded-lg p-4">
-        {submissions.length === 0 ? (
-          <p className="text-gray-400">No submissions yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {submissions.slice(-3).map((sub, index) => (
-              <li key={index} className="bg-white/10 p-3 rounded border-l-4 border-orange-500">
-                <div className="font-semibold text-orange-400">{sub.date}</div>
-                <div className="text-sm text-gray-300">
-                  {Object.entries(sub.numberNeeded)
-                    .filter(([, value]) => value)
-                    .slice(0, 5)
-                    .map(([item, value]) => `${item}: ${value}`)
-                    .join(', ')}
-                  {Object.entries(sub.numberNeeded).filter(([, value]) => value).length > 5 && '...'}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
