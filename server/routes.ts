@@ -595,27 +595,7 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  app.get("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const numericId = parseInt(id);
-      
-      if (isNaN(numericId)) {
-        return res.status(400).json({ error: "Invalid ID parameter - must be a number" });
-      }
-      
-      const result = await storage.getDailyStockSalesById(numericId);
-      
-      if (!result) {
-        return res.status(404).json({ error: "Daily stock sales not found" });
-      }
-      
-      res.json(result);
-    } catch (err) {
-      console.error("Error fetching daily stock sales:", err);
-      res.status(500).json({ error: "Failed to fetch daily stock sales" });
-    }
-  });
+  // Move :id route after specific routes to avoid routing conflicts
 
   app.post("/api/daily-stock-sales/draft", async (req: Request, res: Response) => {
     try {
@@ -756,18 +736,7 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get drafts only
-  app.get("/api/daily-stock-sales/drafts", async (req: Request, res: Response) => {
-    try {
-      const drafts = await storage.getDraftForms();
-      res.json(drafts);
-    } catch (err) {
-      console.error("Error fetching drafts:", err);
-      res.status(500).json({ error: "Failed to fetch drafts" });
-    }
-  });
-
-  // Get all forms (completed and drafts)
+  // Get all forms (completed and drafts) - moved before specific routes
   app.get("/api/daily-stock-sales/all", async (req: Request, res: Response) => {
     try {
       const forms = await storage.searchDailyStockSales('');
@@ -775,6 +744,41 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error fetching all forms:", err);
       res.status(500).json({ error: "Failed to fetch all forms" });
+    }
+  });
+
+  // Get drafts only - moved before :id route to avoid conflicts
+  app.get("/api/daily-stock-sales/drafts", async (req: Request, res: Response) => {
+    try {
+      const forms = await storage.searchDailyStockSales('');
+      // Include both drafts AND completed forms as requested by user
+      res.json(forms);
+    } catch (err) {
+      console.error("Error fetching forms:", err);
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  // Get individual daily stock sales by ID (moved after specific routes)
+  app.get("/api/daily-stock-sales/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const numericId = parseInt(id);
+      
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid ID parameter - must be a number" });
+      }
+      
+      const result = await storage.getDailyStockSalesById(numericId);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Daily stock sales not found" });
+      }
+      
+      res.json(result);
+    } catch (err) {
+      console.error("Error fetching daily stock sales:", err);
+      res.status(500).json({ error: "Failed to fetch daily stock sales" });
     }
   });
 
