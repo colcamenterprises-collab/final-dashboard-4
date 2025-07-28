@@ -2312,6 +2312,99 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // Shift Comparison API - CSV upload with automatic database matching
+  app.post('/api/shift-comparison', upload.single('shiftReport'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No CSV file uploaded' });
+      }
+
+      // Parse CSV file to extract shift data
+      const csvText = req.file.buffer.toString('utf-8');
+      const lines = csvText.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ error: 'Invalid CSV format - no data rows found' });
+      }
+
+      // Parse CSV headers and data
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const dataRow = lines[1].split(',').map(d => d.trim());
+      
+      // Create shift data object from CSV
+      const shiftData: any = {};
+      headers.forEach((header, index) => {
+        const value = dataRow[index];
+        if (header.includes('date')) {
+          shiftData.date = value;
+        } else if (header.includes('grab') && header.includes('sales')) {
+          shiftData.grab_sales = parseFloat(value) || 0;
+        } else if (header.includes('cash') && header.includes('sales')) {
+          shiftData.cash_sales = parseFloat(value) || 0;
+        } else if (header.includes('qr') && header.includes('sales')) {
+          shiftData.qr_sales = parseFloat(value) || 0;
+        } else if (header.includes('aroi') && header.includes('sales')) {
+          shiftData.aroi_sales = parseFloat(value) || 0;
+        } else if (header.includes('total') && header.includes('sales')) {
+          shiftData.total_sales = parseFloat(value) || 0;
+        } else if (header.includes('register') && header.includes('balance')) {
+          shiftData.register_balance = parseFloat(value) || 0;
+        }
+      });
+
+      // Extract date for matching (handle various date formats)
+      let matchDate = shiftData.date;
+      if (!matchDate) {
+        return res.status(400).json({ error: 'No date field found in CSV' });
+      }
+
+      // Try to parse date and format for database matching
+      const parsedDate = new Date(matchDate);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format in CSV' });
+      }
+
+      // Format date for database search (YYYY-MM-DD)
+      const searchDate = parsedDate.toISOString().split('T')[0];
+
+      // Query database for matching Daily Sales Form
+      const matchingForms = await db
+        .select()
+        .from(dailyStockSales)
+        .where(sql`DATE(${dailyStockSales.createdAt}) = ${searchDate}`)
+        .orderBy(desc(dailyStockSales.createdAt))
+        .limit(1);
+
+      if (matchingForms.length === 0) {
+        return res.json({ error: 'No matching daily form found' });
+      }
+
+      const dailyForm = matchingForms[0];
+
+      // Extract comparable data from daily form
+      const dailyData = {
+        grab_sales: parseFloat(dailyForm.grabSales?.toString() || '0'),
+        cash_sales: parseFloat(dailyForm.cashSales?.toString() || '0'),
+        qr_sales: parseFloat(dailyForm.qrScanSales?.toString() || '0'),
+        aroi_sales: parseFloat(dailyForm.aroiDeeSales?.toString() || '0'),
+        total_sales: parseFloat(dailyForm.totalSales?.toString() || '0'),
+        register_balance: parseFloat(dailyForm.endingCash?.toString() || '0')
+      };
+
+      // Return both datasets for comparison
+      res.json({
+        shiftData,
+        dailyData,
+        matchedFormId: dailyForm.id,
+        matchedDate: searchDate
+      });
+
+    } catch (error) {
+      console.error('Shift comparison error:', error);
+      res.status(500).json({ error: 'Failed to process shift comparison' });
+    }
+  });
+
   // Enhanced Loyverse API routes
   app.use("/api/loyverse", loyverseEnhancedRoutes);
 

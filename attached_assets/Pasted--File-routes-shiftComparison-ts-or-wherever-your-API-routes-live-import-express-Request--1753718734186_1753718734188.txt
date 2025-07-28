@@ -1,0 +1,82 @@
+// File: /routes/shiftComparison.ts (or wherever your API routes live)
+
+import express, { Request, Response } from 'express';
+import multer from 'multer';
+import csv from 'csv-parser';
+import fs from 'fs';
+import path from 'path';
+import { db } from '../lib/db'; // Update path as needed to access your DB client
+
+const router = express.Router();
+const upload = multer({ dest: 'uploads/' });
+
+// Tolerance in THB
+const TOLERANCE = 50;
+
+// Helper to parse CSV
+const parseCSV = async (filePath: string): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const results: any[] = [];
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => resolve(results))
+      .on('error', reject);
+  });
+};
+
+// Route: POST /api/shift-comparison
+router.post(
+  '/shift-comparison',
+  upload.fields([
+    { name: 'shiftReport', maxCount: 1 },
+    { name: 'dailyForm', maxCount: 1 },
+  ]),
+  async (req: Request, res: Response) => {
+    try {
+      const shiftFile = req.files['shiftReport'][0];
+      const formFile = req.files['dailyForm'][0];
+
+      if (!shiftFile || !formFile) {
+        return res.status(400).json({ error: 'Both files are required.' });
+      }
+
+      const shiftData = await parseCSV(shiftFile.path);
+      const formData = await parseCSV(formFile.path);
+
+      // Example: use first row if there's only one per file
+      const shift = shiftData[0];
+      const form = formData[0];
+
+      const comparisons = [];
+
+      const compare = (label: string, shiftVal: number, formVal: number) => {
+        const diff = Math.abs(shiftVal - formVal);
+        comparisons.push({
+          label,
+          shiftVal,
+          formVal,
+          difference: diff,
+          withinTolerance: diff <= TOLERANCE,
+        });
+      };
+
+      compare('Total Sales', parseFloat(shift['Total Sales']), parseFloat(form['Total Sales']));
+      compare('Cash', parseFloat(shift['Cash']), parseFloat(form['Cash']));
+      compare('QR Code', parseFloat(shift['QR Code']), parseFloat(form['QR Code']));
+      compare('Grab', parseFloat(shift['Grab']), parseFloat(form['Grab']));
+      compare('Aroi Dee', parseFloat(shift['Aroi Dee']), parseFloat(form['Aroi Dee']));
+
+      // Clean up uploaded files
+      fs.unlinkSync(shiftFile.path);
+      fs.unlinkSync(formFile.path);
+
+      res.json({ comparisons });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Comparison failed.' });
+    }
+  }
+);
+
+export default router;

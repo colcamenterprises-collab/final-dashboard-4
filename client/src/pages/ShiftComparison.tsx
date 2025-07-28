@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, Upload, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface ComparisonItem {
   label: string;
@@ -36,37 +37,67 @@ const ShiftComparison = () => {
   const [dailyData, setDailyData] = useState<DailyData | null>(null);
   const [comparison, setComparison] = useState<ComparisonItem[] | null>(null);
   const [shiftFileName, setShiftFileName] = useState<string>('');
-  const [dailyFileName, setDailyFileName] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [noMatchFound, setNoMatchFound] = useState(false);
   const { toast } = useToast();
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'shift' | 'daily') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result as string);
-        if (type === 'shift') {
-          setShiftData(parsed);
-          setShiftFileName(file.name);
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a CSV file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    setNoMatchFound(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('shiftReport', file);
+
+      const response = await fetch('/api/shift-comparison', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.error === 'No matching daily form found') {
+          setNoMatchFound(true);
+          toast({
+            title: "No Daily Sales Form found",
+            description: "No Daily Sales Form found for this shift date.",
+            variant: "destructive"
+          });
         } else {
-          setDailyData(parsed);
-          setDailyFileName(file.name);
+          setShiftData(result.shiftData);
+          setDailyData(result.dailyData);
+          setShiftFileName(file.name);
+          toast({
+            title: "File uploaded successfully",
+            description: `${file.name} processed and matched with Daily Sales Form`,
+          });
         }
-        toast({
-          title: "File uploaded successfully",
-          description: `${file.name} has been loaded`,
-        });
-      } catch (error) {
-        toast({
-          title: "Upload failed",
-          description: "Invalid JSON file. Please check the file format.",
-          variant: "destructive"
-        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
-    };
-    reader.readAsText(file);
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to process CSV file",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -137,48 +168,41 @@ const ShiftComparison = () => {
       </div>
 
       {/* File Upload Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
+      <div className="max-w-2xl mx-auto mb-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" />
-              Upload POS Shift Report
+              Upload POS Shift Report CSV File
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input 
               type="file" 
-              accept=".json,application/json" 
-              onChange={(e) => handleFileUpload(e, 'shift')}
+              accept=".csv,text/csv" 
+              onChange={handleFileUpload}
               className="cursor-pointer"
+              disabled={loading}
             />
-            {shiftFileName && (
-              <p className="text-sm text-green-600 flex items-center gap-1">
-                <CheckCircle className="h-4 w-4" />
-                {shiftFileName} loaded successfully
+            <p className="text-sm text-gray-600">
+              (Daily Sales Form will be automatically matched from system records)
+            </p>
+            {loading && (
+              <p className="text-sm text-blue-600 flex items-center gap-1">
+                <Upload className="h-4 w-4 animate-spin" />
+                Processing CSV and matching with Daily Sales Form...
               </p>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Upload className="h-5 w-5 text-green-600" />
-              Upload Daily Sales Form
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input 
-              type="file" 
-              accept=".json,application/json" 
-              onChange={(e) => handleFileUpload(e, 'daily')}
-              className="cursor-pointer"
-            />
-            {dailyFileName && (
+            {shiftFileName && !loading && (
               <p className="text-sm text-green-600 flex items-center gap-1">
                 <CheckCircle className="h-4 w-4" />
-                {dailyFileName} loaded successfully
+                {shiftFileName} processed and matched successfully
+              </p>
+            )}
+            {noMatchFound && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                No Daily Sales Form found for this shift date
               </p>
             )}
           </CardContent>
@@ -273,9 +297,9 @@ const ShiftComparison = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-blue-800">
-              <p>1. Upload your POS Shift Report JSON file</p>
-              <p>2. Upload your Daily Sales & Stock Form JSON file</p>
-              <p>3. Jussi will automatically compare the data and highlight any discrepancies</p>
+              <p>1. Upload your POS Shift Report CSV file</p>
+              <p>2. Jussi will auto-match the corresponding Daily Sales & Stock Form based on date</p>
+              <p>3. The system compares both reports and highlights discrepancies</p>
               <p>4. Tolerance level: ±50 THB for all comparisons</p>
             </div>
           </CardContent>
