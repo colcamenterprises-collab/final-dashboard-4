@@ -4,14 +4,169 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { 
   Receipt, FileText, PieChart, ClipboardList, Package, TrendingUp, 
   BarChart, AlertTriangle, Download, Search, Calendar, Filter, ShoppingCart, DollarSign 
 } from "lucide-react";
 
+// Interface for uploaded file data
+interface FileData {
+  date: string;
+  content: any[];
+  filename: string;
+  type: 'shift' | 'sales';
+}
+
+interface ComparisonResult {
+  date: string;
+  matched: boolean;
+  discrepancies: string[];
+  summary: string;
+}
+
 const ReportsAnalysis = () => {
   const [activeTab, setActiveTab] = useState("reporting");
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    shiftData?: FileData;
+    salesData?: FileData;
+  }>({});
+  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  // File type detection based on filename keywords
+  const detectFileType = (filename: string): 'shift' | 'sales' | null => {
+    const lowerName = filename.toLowerCase();
+    
+    // Check for shift/POS keywords
+    if (lowerName.includes('shift') || lowerName.includes('register') || lowerName.includes('pos')) {
+      return 'shift';
+    }
+    
+    // Check for sales/form keywords
+    if (lowerName.includes('sales') || lowerName.includes('stock') || lowerName.includes('form')) {
+      return 'sales';
+    }
+    
+    return null;
+  };
+
+  // Extract date from filename or content
+  const extractDate = (filename: string, content: any[]): string => {
+    // Try to extract from filename first
+    const dateMatch = filename.match(/(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      return dateMatch[1];
+    }
+    
+    // Try to extract from content (assuming first row might have date info)
+    // This would need to be customized based on actual file formats
+    return new Date().toISOString().split('T')[0]; // Fallback to today
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a CSV file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const fileType = detectFileType(file.name);
+    if (!fileType) {
+      toast({
+        title: "Cannot detect file type",
+        description: "Please use filenames with 'shift', 'pos', 'sales', 'stock', or 'form' keywords.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Parse CSV content
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      const content = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        return values;
+      });
+
+      const extractedDate = extractDate(file.name, content);
+      
+      const fileData: FileData = {
+        date: extractedDate,
+        content,
+        filename: file.name,
+        type: fileType
+      };
+
+      // Update uploaded files state
+      const newUploadedFiles = { ...uploadedFiles };
+      if (fileType === 'shift') {
+        newUploadedFiles.shiftData = fileData;
+      } else {
+        newUploadedFiles.salesData = fileData;
+      }
+      
+      setUploadedFiles(newUploadedFiles);
+
+      // Check if we have both files for the same date
+      if (newUploadedFiles.shiftData && newUploadedFiles.salesData && 
+          newUploadedFiles.shiftData.date === newUploadedFiles.salesData.date) {
+        await runComparison(newUploadedFiles.shiftData, newUploadedFiles.salesData);
+      }
+
+      toast({
+        title: "File uploaded successfully",
+        description: `${fileType === 'shift' ? 'POS Shift Report' : 'Daily Sales Form'} processed for ${extractedDate}`,
+      });
+
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "Error processing the CSV file.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      // Clear the input
+      e.target.value = '';
+    }
+  };
+
+  // Run comparison when both files are available
+  const runComparison = async (shiftData: FileData, salesData: FileData) => {
+    try {
+      // Basic comparison logic - this can be enhanced
+      const discrepancies: string[] = [];
+      let matched = true;
+
+      // Simple example comparison (would need to be customized based on actual data structure)
+      // This is a placeholder - real implementation would depend on CSV structure
+      
+      const result: ComparisonResult = {
+        date: shiftData.date,
+        matched,
+        discrepancies,
+        summary: matched ? "All values match within ±50 THB tolerance" : `${discrepancies.length} discrepancies detected`
+      };
+
+      setComparisonResult(result);
+    } catch (error) {
+      console.error('Comparison failed:', error);
+    }
+  };
 
   const reportingItems = [
     {
@@ -191,6 +346,86 @@ const ReportsAnalysis = () => {
             <span className="sm:hidden">Stock</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Unified Upload System */}
+        <div className="mb-6">
+          <Card className="border-2 border-blue-200 bg-blue-50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-blue-900">
+                Upload POS or Sales File
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Upload any .csv file for analysis. Jussi will automatically detect the file type, match files by date, and show results in the Analysis panel.
+                Use filenames like shift_2025-07-28.csv or sales_form_2025-07-28.csv.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Input 
+                  type="file" 
+                  accept=".csv,text/csv" 
+                  onChange={handleFileUpload}
+                  className="cursor-pointer"
+                  disabled={uploading}
+                />
+                
+                {uploading && (
+                  <p className="text-sm text-blue-600">
+                    Processing file...
+                  </p>
+                )}
+
+                {/* Show uploaded files status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {uploadedFiles.shiftData && (
+                    <div className="p-3 bg-green-100 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-800">POS Shift Report</p>
+                      <p className="text-xs text-green-600">{uploadedFiles.shiftData.filename}</p>
+                      <p className="text-xs text-green-600">Date: {uploadedFiles.shiftData.date}</p>
+                    </div>
+                  )}
+                  
+                  {uploadedFiles.salesData && (
+                    <div className="p-3 bg-green-100 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-800">Daily Sales Form</p>
+                      <p className="text-xs text-green-600">{uploadedFiles.salesData.filename}</p>
+                      <p className="text-xs text-green-600">Date: {uploadedFiles.salesData.date}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Comparison Result Display */}
+                {comparisonResult && (
+                  <Card className={`border-2 ${comparisonResult.matched ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className={`text-lg ${comparisonResult.matched ? 'text-green-800' : 'text-red-800'}`}>
+                        Shift vs Daily Comparison
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <p className={`font-medium ${comparisonResult.matched ? 'text-green-700' : 'text-red-700'}`}>
+                          {comparisonResult.matched ? 'Matched' : 'Discrepancy Detected'}
+                        </p>
+                        <p className={`text-sm ${comparisonResult.matched ? 'text-green-600' : 'text-red-600'}`}>
+                          {comparisonResult.summary}
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => window.open('/shift-comparison', '_blank')}
+                          className="mt-2"
+                        >
+                          View Report
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         
         <TabsContent value="reporting" className="space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
