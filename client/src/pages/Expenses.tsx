@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { insertExpenseSchema, insertExpenseSupplierSchema, insertExpenseCategorySchema } from "@shared/schema";
 import type { Expense, ExpenseSupplier, ExpenseCategory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
 
 export default function Expenses() {
   const { toast } = useToast();
@@ -546,7 +547,7 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
-      {/* Monthly Stock Purchases Summary - FORCED VISIBLE SECTION */}
+      {/* Monthly Stock Purchases Summary - BULLETPROOF VERSION */}
       <Card className="border-4 border-blue-500 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-600 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
@@ -655,6 +656,21 @@ export default function Expenses() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+      {/* Monthly Stock Purchases Summary - BULLETPROOF VERSION */}
+      <Card className="border-4 border-green-500 bg-green-50 dark:bg-green-900/30 dark:border-green-600 shadow-lg mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
+            <Package className="h-5 w-5" />
+            Monthly Stock Purchases Summary
+          </CardTitle>
+          <CardDescription className="text-green-700 dark:text-green-200">
+            Rolls, drinks, and meat purchased this month from stock management forms
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MonthlyStockDisplay />
         </CardContent>
       </Card>
     </div>
