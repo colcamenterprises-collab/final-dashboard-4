@@ -729,12 +729,6 @@ function ExpensesMerged() {
               Reports & Analysis
             </Button>
           </Link>
-          <Link href="/reports-analysis">
-            <Button variant="outline" className="px-3 py-2">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Reports & Analysis
-            </Button>
-          </Link>
         </div>
       </div>
 
