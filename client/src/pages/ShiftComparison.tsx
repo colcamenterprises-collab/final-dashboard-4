@@ -203,9 +203,9 @@ const ShiftComparison = () => {
                         <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.shift)}</td>
                         <td className="py-3 px-2 text-left">
                           {item.match ? (
-                            <CheckCircle className="inline h-5 w-5 text-green-500" />
+                            <span className="text-green-600 font-medium">Match</span>
                           ) : (
-                            <AlertTriangle className="inline h-5 w-5 text-red-500" />
+                            <span className="text-red-600 font-medium">Discrepancy</span>
                           )}
                         </td>
                       </tr>
