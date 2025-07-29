@@ -2628,12 +2628,14 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
       
       // Generate summary data with banking differences
       const summary = reports.map(report => {
-        // Calculate banking difference from sales data if available
+        // Calculate banking difference from sales data if available with safety checks
         let bankingDiff = 0;
         if (report.salesData && report.shiftData) {
-          // Expected banked amount should include both cash and QR sales
-          const expectedBanked = (report.salesData.cashSales || 0) + (report.salesData.qrSales || 0);
-          const actualRegister = report.shiftData.registerBalance || 0;
+          // Expected banked amount should include both cash and QR sales with safety parsing
+          const safeCashSales = parseFloat(report.salesData.cashSales?.toString() || '0');
+          const safeQrSales = parseFloat(report.salesData.qrSales?.toString() || '0');
+          const expectedBanked = safeCashSales + safeQrSales;
+          const actualRegister = parseFloat(report.shiftData.registerBalance?.toString() || '0');
           bankingDiff = actualRegister - expectedBanked;
         }
         
@@ -2667,8 +2669,11 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
       const summary = reports.map(report => {
         let bankingDiff = 0;
         if (report.salesData && report.shiftData) {
-          const expectedBanked = (report.salesData.cashSales || 0) + (report.salesData.qrSales || 0);
-          const actualRegister = report.shiftData.registerBalance || 0;
+          // Safe parsing to prevent NaN values
+          const safeCashSales = parseFloat(report.salesData.cashSales?.toString() || '0');
+          const safeQrSales = parseFloat(report.salesData.qrSales?.toString() || '0');
+          const expectedBanked = safeCashSales + safeQrSales;
+          const actualRegister = parseFloat(report.shiftData.registerBalance?.toString() || '0');
           bankingDiff = actualRegister - expectedBanked;
         }
         

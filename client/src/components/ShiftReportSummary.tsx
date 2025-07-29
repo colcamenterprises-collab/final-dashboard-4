@@ -87,8 +87,8 @@ const ShiftReportSummary = () => {
               <div className="text-sm">
                 <div>
                   <span className="font-semibold">Balance:</span>{" "}
-                  {item.banking_diff >= 0 ? "+" : "-"}฿
-                  {Math.abs(item.banking_diff).toFixed(2)}
+                  {isNaN(item.banking_diff) || item.banking_diff == null ? 'N/A' : 
+                    `${item.banking_diff >= 0 ? '+' : ''}฿${item.banking_diff.toFixed(2)}`}
                 </div>
                 {item.anomalies > 0 && (
                   <div className="mt-1 text-yellow-200 font-medium">
