@@ -68,20 +68,12 @@ const ShiftReportSummary = () => {
           return (
             <div
               key={`${item.date}-${index}`}
-              className={cn(
-                "rounded-lg shadow p-4 text-white",
-                isBalanced ? "bg-green-600" : "bg-red-600"
-              )}
+              className="rounded-lg shadow p-4 bg-white border border-gray-200 text-gray-900"
             >
               <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">{formattedDate}</span>
-                <span
-                  className={cn(
-                    "text-sm px-2 py-1 rounded",
-                    isBalanced ? "bg-green-800" : "bg-red-800"
-                  )}
-                >
-                  {isBalanced ? "Balanced" : "Attention"}
+                <span className="text-sm px-2 py-1 rounded bg-gray-100 text-gray-700">
+                  Status
                 </span>
               </div>
               <div className="text-sm">
@@ -92,11 +84,10 @@ const ShiftReportSummary = () => {
                 </div>
 
               </div>
-              <div className="mt-3 pt-2 border-t border-white/20">
+              <div className="mt-3 pt-2 border-t border-gray-200">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
                   onClick={() => setLocation(`/analysis/shift-report/${encodeURIComponent(item.date)}`)}
                 >
                   View Details
@@ -107,7 +98,7 @@ const ShiftReportSummary = () => {
         })}
 
         <div className="text-sm text-gray-700 border-t pt-2">
-          <strong>Note:</strong> Green = balance within ±฿50. Red = exceeds ±฿50 and requires review. Yellow text = anomalies found based on sales vs POS report mismatch.
+          <strong>Note:</strong> Shift report balance review and anomaly tracking for daily operations.
         </div>
       </CardContent>
     </Card>
