@@ -1,0 +1,85 @@
+// ✅ shiftReportModal.tsx — Component for viewing shift report in detail
+
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import axios from 'axios';
+
+export default function ShiftReportModal({ date, open, onClose }) {
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (open && date) {
+      setLoading(true);
+      axios.get(`/api/shift-report?date=${date}`)
+        .then((res) => {
+          setReportData(res.data);
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError('Failed to load report.');
+          setLoading(false);
+        });
+    }
+  }, [open, date]);
+
+  const handleRecheck = () => {
+    setLoading(true);
+    axios.post(`/api/shift-report/recheck`, { date })
+      .then((res) => setReportData(res.data))
+      .finally(() => setLoading(false));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogTitle>Shift Report for {date}</DialogTitle>
+
+        {loading && <p>Loading...</p>}
+        {error && <p className="text-red-500">{error}</p>}
+
+        {reportData && (
+          <div className="grid grid-cols-2 gap-6 mt-4">
+            {/* Left: Daily Sales Form */}
+            <div>
+              <h3 className="text-lg font-semibold">Daily Sales Form</h3>
+              <p>Cash Sales: ฿{reportData.dailyForm?.cash || 'N/A'}</p>
+              <p>QR Sales: ฿{reportData.dailyForm?.qr || 'N/A'}</p>
+              <p>Total Expenses: ฿{reportData.dailyForm?.expenses || 'N/A'}</p>
+              <p>Banked Amount: ฿{reportData.dailyForm?.banked || 'N/A'}</p>
+            </div>
+
+            {/* Right: POS Shift Report */}
+            <div>
+              <h3 className="text-lg font-semibold">POS Shift Report</h3>
+              <p>Total Sales: ฿{reportData.pos?.total || 'N/A'}</p>
+              <p>Cash: ฿{reportData.pos?.cash || 'N/A'}</p>
+              <p>QR Code: ฿{reportData.pos?.qr || 'N/A'}</p>
+              <p>Register Status: {reportData.pos?.register_ok ? 'Balanced' : 'Imbalance'}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Anomalies */}
+        {reportData?.anomalies?.length > 0 && (
+          <div className="mt-6">
+            <h4 className="font-semibold text-red-600">Anomalies Detected:</h4>
+            <ul className="list-disc list-inside text-sm text-red-500">
+              {reportData.anomalies.map((issue, i) => (
+                <li key={i}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Manual Recheck */}
+        <div className="flex justify-end mt-6 gap-4">
+          <Button variant="outline" onClick={handleRecheck}>Manual Recheck</Button>
+          <Button onClick={onClose}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

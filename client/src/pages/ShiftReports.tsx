@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, Calendar, FileText, Download, Eye, Trash2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import ShiftReportModal from "@/components/ShiftReportModal";
 
 interface ShiftReport {
   id: string;
@@ -28,6 +29,8 @@ export function ShiftReports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedReport, setSelectedReport] = useState<ShiftReport | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Fetch shift reports
@@ -273,7 +276,8 @@ export function ShiftReports() {
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedReport(report);
+                            setSelectedReportId(report.id);
+                            setModalOpen(true);
                           }}
                         >
                           <Eye className="h-4 w-4 mr-1" />
@@ -468,6 +472,16 @@ export function ShiftReports() {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Shift Report Detail Modal */}
+        <ShiftReportModal
+          reportId={selectedReportId}
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setSelectedReportId(null);
+          }}
+        />
       </div>
     </div>
   );
