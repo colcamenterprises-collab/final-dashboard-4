@@ -6,7 +6,7 @@ import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema } from "../shared/schema"; // Adjust path
 import { z } from "zod";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import multer from 'multer';
@@ -2546,6 +2546,101 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     } catch (error) {
       console.error('Error deleting supplier:', error);
       res.status(500).json({ error: 'Failed to delete supplier' });
+    }
+  });
+
+  // Shift Reports API routes
+  app.get('/api/shift-reports', async (req: Request, res: Response) => {
+    try {
+      const reports = await storage.getShiftReports();
+      res.json(reports);
+    } catch (error) {
+      console.error('Error fetching shift reports:', error);
+      res.status(500).json({ error: 'Failed to fetch shift reports' });
+    }
+  });
+
+  app.get('/api/shift-reports/:id', async (req: Request, res: Response) => {
+    try {
+      const report = await storage.getShiftReportById(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: 'Shift report not found' });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error('Error fetching shift report:', error);
+      res.status(500).json({ error: 'Failed to fetch shift report' });
+    }
+  });
+
+  app.get('/api/shift-reports/date/:date', async (req: Request, res: Response) => {
+    try {
+      const report = await storage.getShiftReportByDate(req.params.date);
+      if (!report) {
+        return res.status(404).json({ error: 'Shift report not found for this date' });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error('Error fetching shift report by date:', error);
+      res.status(500).json({ error: 'Failed to fetch shift report' });
+    }
+  });
+
+  app.post('/api/shift-reports', async (req: Request, res: Response) => {
+    try {
+      const reportData = insertShiftReportSchema.parse(req.body);
+      const report = await storage.createShiftReport(reportData);
+      res.status(201).json(report);
+    } catch (error) {
+      console.error('Error creating shift report:', error);
+      res.status(500).json({ error: 'Failed to create shift report' });
+    }
+  });
+
+  app.put('/api/shift-reports/:id', async (req: Request, res: Response) => {
+    try {
+      const updates = req.body;
+      const report = await storage.updateShiftReport(req.params.id, updates);
+      res.json(report);
+    } catch (error) {
+      console.error('Error updating shift report:', error);
+      res.status(500).json({ error: 'Failed to update shift report' });
+    }
+  });
+
+  app.delete('/api/shift-reports/:id', async (req: Request, res: Response) => {
+    try {
+      const success = await storage.deleteShiftReport(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: 'Shift report not found' });
+      }
+      res.json({ message: 'Shift report deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting shift report:', error);
+      res.status(500).json({ error: 'Failed to delete shift report' });
+    }
+  });
+
+  app.get('/api/shift-reports/search', async (req: Request, res: Response) => {
+    try {
+      const query = req.query.q as string;
+      const status = req.query.status as string;
+      const reports = await storage.searchShiftReports(query, status);
+      res.json(reports);
+    } catch (error) {
+      console.error('Error searching shift reports:', error);
+      res.status(500).json({ error: 'Failed to search shift reports' });
+    }
+  });
+
+  app.post('/api/shift-reports/:id/generate-pdf', async (req: Request, res: Response) => {
+    try {
+      const { shiftReportsService } = await import('./services/shiftReportsService');
+      const pdfUrl = await shiftReportsService.generatePDFReport(req.params.id);
+      res.json({ pdfUrl });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      res.status(500).json({ error: 'Failed to generate PDF report' });
     }
   });
 

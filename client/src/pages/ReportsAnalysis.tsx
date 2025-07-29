@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
@@ -9,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { 
   Receipt, FileText, PieChart, ClipboardList, Package, TrendingUp, 
-  BarChart, AlertTriangle, Download, Search, Calendar, Filter, ShoppingCart, DollarSign 
+  BarChart, AlertTriangle, Download, Search, Calendar, Filter, ShoppingCart, DollarSign,
+  CheckCircle, Eye, Trash2 
 } from "lucide-react";
 
 // Interface for uploaded file data
@@ -26,6 +29,166 @@ interface ComparisonResult {
   discrepancies: string[];
   summary: string;
 }
+
+// Shift Reports Component
+interface ShiftReport {
+  id: string;
+  reportDate: string;
+  hasDailySales: boolean;
+  hasShiftReport: boolean;
+  status: string;
+  bankingCheck?: string;
+  anomaliesDetected?: string[];
+  manualReviewNeeded: boolean;
+  pdfUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const ShiftReportsContent = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const { toast } = useToast();
+
+  // Fetch shift reports
+  const { data: reports = [], isLoading } = useQuery<ShiftReport[]>({
+    queryKey: ['/api/shift-reports'],
+  });
+
+  const getStatusBadge = (report: ShiftReport) => {
+    switch (report.status) {
+      case 'complete':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Complete</Badge>;
+      case 'partial':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Partial</Badge>;
+      case 'manual_review':
+        return <Badge className="bg-red-100 text-red-800 border-red-200">Review Needed</Badge>;
+      case 'missing':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Missing</Badge>;
+      default:
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Unknown</Badge>;
+    }
+  };
+
+  const getBankingBadge = (bankingCheck?: string) => {
+    switch (bankingCheck) {
+      case 'Accurate':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Accurate</Badge>;
+      case 'Mismatch':
+        return <Badge className="bg-red-100 text-red-800 border-red-200">Mismatch</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">N/A</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Shift Reports System
+          </CardTitle>
+          <CardDescription>
+            Side-by-side comparison of Daily Sales Forms and POS Shift Reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search and Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              placeholder="Search by date (YYYY-MM-DD)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div>
+              {/* Filter will be added later */}
+            </div>
+          </div>
+          
+          {/* Reports Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isLoading ? (
+              <div className="col-span-3 text-center py-8">
+                <div className="text-muted-foreground">Loading shift reports...</div>
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="col-span-3 text-center py-8">
+                <div className="text-muted-foreground">No shift reports found. Upload POS and Sales files to generate reports.</div>
+              </div>
+            ) : (
+              reports.map((report) => (
+                <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{report.reportDate}</CardTitle>
+                        <CardDescription>
+                          {new Date(report.createdAt).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      {getStatusBadge(report)}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Daily Sales Form</span>
+                        {report.hasDailySales ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>POS Shift Report</span>
+                        {report.hasShiftReport ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Banking Check</span>
+                        {getBankingBadge(report.bankingCheck)}
+                      </div>
+                    </div>
+                    
+                    {report.anomaliesDetected && report.anomaliesDetected.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-md p-2">
+                        <div className="text-sm text-red-800 font-medium">
+                          {report.anomaliesDetected.length} Anomal{report.anomaliesDetected.length === 1 ? 'y' : 'ies'} Detected
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <Button size="sm" variant="outline">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      
+                      {report.pdfUrl && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(report.pdfUrl, '_blank')}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const ReportsAnalysis = () => {
   const [activeTab, setActiveTab] = useState("reporting");
@@ -329,7 +492,7 @@ const ReportsAnalysis = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6">
           <TabsTrigger value="reporting" className="text-xs sm:text-sm lg:text-base">
             <Receipt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Reporting</span>
@@ -339,6 +502,11 @@ const ReportsAnalysis = () => {
             <BarChart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Analysis</span>
             <span className="sm:hidden">Analysis</span>
+          </TabsTrigger>
+          <TabsTrigger value="shift-reports" className="text-xs sm:text-sm lg:text-base">
+            <ClipboardList className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Shift Reports</span>
+            <span className="sm:hidden">Shifts</span>
           </TabsTrigger>
           <TabsTrigger value="stock-summary" className="text-xs sm:text-sm lg:text-base">
             <Package className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
@@ -473,6 +641,11 @@ const ReportsAnalysis = () => {
               <ItemCard key={index} item={item} />
             ))}
           </div>
+        </TabsContent>
+
+        {/* Shift Reports Tab */}
+        <TabsContent value="shift-reports" className="space-y-6">
+          <ShiftReportsContent />
         </TabsContent>
 
         {/* Monthly Stock Summary Tab */}

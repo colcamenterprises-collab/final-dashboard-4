@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -602,5 +602,47 @@ export type StockPurchaseDrinks = typeof stockPurchaseDrinks.$inferSelect;
 export type InsertStockPurchaseDrinks = z.infer<typeof insertStockPurchaseDrinksSchema>;
 export type StockPurchaseMeat = typeof stockPurchaseMeat.$inferSelect;
 export type InsertStockPurchaseMeat = z.infer<typeof insertStockPurchaseMeatSchema>;
+
+// Shift Reports table for automatic daily comparison
+export const shiftReports = pgTable('shift_reports', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  reportDate: date('report_date').notNull(),
+  
+  // Data availability flags
+  hasDailySales: boolean('has_daily_sales').default(false),
+  hasShiftReport: boolean('has_shift_report').default(false),
+  
+  // Raw data storage
+  salesData: jsonb('sales_data'),
+  shiftData: jsonb('shift_data'),
+  
+  // Analysis results
+  bankingCheck: text('banking_check'), // 'Accurate' | 'Mismatch' | 'Not available'
+  anomaliesDetected: text('anomalies_detected').array(),
+  shoppingList: jsonb('shopping_list'),
+  meatRollsDrinks: jsonb('meat_rolls_drinks'),
+  
+  // Report management
+  pdfUrl: text('pdf_url'),
+  status: text('status').default('partial'), // 'complete', 'partial', 'missing', 'manual_review'
+  manualReviewNeeded: boolean('manual_review_needed').default(false),
+  lastReviewedAt: timestamp('last_reviewed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => {
+  return {
+    reportDateIdx: index('report_date_idx').on(table.reportDate),
+  };
+});
+
+// Insert schema and types for shift reports
+export const insertShiftReportSchema = createInsertSchema(shiftReports).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type ShiftReport = typeof shiftReports.$inferSelect;
+export type InsertShiftReport = z.infer<typeof insertShiftReportSchema>;
 
 

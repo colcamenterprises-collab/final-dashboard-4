@@ -2,7 +2,7 @@ import {
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
   expenseSuppliers, expenseCategories, bankStatements, ingredients, recipes, recipeIngredients,
-  quickNotes, marketingCalendar,
+  quickNotes, marketingCalendar, shiftReports,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
@@ -17,6 +17,7 @@ import {
   type RecipeIngredient, type InsertRecipeIngredient,
   type QuickNote, type InsertQuickNote,
   type MarketingCalendar, type InsertMarketingCalendar,
+  type ShiftReport, type InsertShiftReport,
   type StockPurchaseRolls, type InsertStockPurchaseRolls,
   type StockPurchaseDrinks, type InsertStockPurchaseDrinks,
   type StockPurchaseMeat, type InsertStockPurchaseMeat,
@@ -158,6 +159,15 @@ export interface IStorage {
     drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
     meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
   }>;
+  
+  // Shift Reports
+  getShiftReports(): Promise<ShiftReport[]>;
+  getShiftReportById(id: string): Promise<ShiftReport | undefined>;
+  getShiftReportByDate(date: string): Promise<ShiftReport | undefined>;
+  createShiftReport(report: InsertShiftReport): Promise<ShiftReport>;
+  updateShiftReport(id: string, updates: Partial<ShiftReport>): Promise<ShiftReport>;
+  deleteShiftReport(id: string): Promise<boolean>;
+  searchShiftReports(query?: string, status?: string): Promise<ShiftReport[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -1634,6 +1644,42 @@ export class MemStorage implements IStorage {
     }
     
     return [];
+  }
+
+  // Shift Reports methods - using database service
+  async getShiftReports(): Promise<ShiftReport[]> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.getShiftReports();
+  }
+
+  async getShiftReportById(id: string): Promise<ShiftReport | undefined> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.getShiftReportById(id);
+  }
+
+  async getShiftReportByDate(date: string): Promise<ShiftReport | undefined> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.getShiftReportByDate(date);
+  }
+
+  async createShiftReport(report: InsertShiftReport): Promise<ShiftReport> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.createShiftReport(report);
+  }
+
+  async updateShiftReport(id: string, updates: Partial<ShiftReport>): Promise<ShiftReport> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.updateShiftReport(id, updates);
+  }
+
+  async deleteShiftReport(id: string): Promise<boolean> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.deleteShiftReport(id);
+  }
+
+  async searchShiftReports(query?: string, status?: string): Promise<ShiftReport[]> {
+    const { shiftReportsService } = await import('./services/shiftReportsService');
+    return shiftReportsService.searchShiftReports(query, status);
   }
 }
 
