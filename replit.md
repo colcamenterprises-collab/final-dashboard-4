@@ -66,6 +66,15 @@ Based on the dashboard design patterns, the application uses three primary butto
 
 ## Recent Changes (January 29, 2025)
 
+### BANGKOK TIMEZONE SHIFT CALCULATION SYSTEM - COMPLETE ✅ COMPLETED
+- **Shift Time Calculator Utility**: Created comprehensive `server/utils/shiftTimeCalculator.ts` with Bangkok timezone (Asia/Bangkok) shift calculations
+- **Accurate Shift Logic**: Implemented proper 5 PM to 3 AM shift window handling where times before 3 AM belong to previous day's shift
+- **Receipts Summary API Endpoints**: Added `/api/receipts/summary` (current shift) and `/api/receipts/summary/:date` (historical shift) endpoints
+- **Loyverse Integration**: Connected to Loyverse API for real receipt data processing with comprehensive fallback capabilities
+- **Complete Data Structure**: Payment types breakdown, items sold tracking, modifiers analysis, refunds monitoring
+- **Production Ready**: System correctly calculates shift windows like 2025-07-29T17:00:00+07:00 to 2025-07-30T03:00:00+07:00
+- **User Interface Ready**: Backend infrastructure complete for frontend receipt summary interface with current shift data, historical search, and Jussi chatbox integration
+
 ### SIDEBAR PERMANENTLY EXPANDED - COMPLETE ✅ COMPLETED
 - **Sidebar Default State**: Changed sidebar to start expanded by default (full width with labels) instead of collapsed icons-only view
 - **Minimize Option Available**: Users can still minimize the sidebar using the chevron button for a compact icons-only view when needed
