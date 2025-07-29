@@ -226,6 +226,14 @@ export default function ShiftReportModal({ reportId, open, onClose }: ShiftRepor
                           <Separator className="col-span-2" />
                           <div className="font-medium">Total Sales:</div>
                           <div className="text-right font-medium">฿{reportData.salesData.totalSales?.toLocaleString()}</div>
+                          <div className="text-blue-600 bg-blue-50 col-span-2 p-2 rounded mt-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div className="font-medium">Expected Banked (Cash + QR):</div>
+                              <div className="text-right font-medium">
+                                ฿{((reportData.salesData.cashSales || 0) + (reportData.salesData.qrSales || 0)).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 

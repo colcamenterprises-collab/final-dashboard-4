@@ -2631,9 +2631,10 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         // Calculate banking difference from sales data if available
         let bankingDiff = 0;
         if (report.salesData && report.shiftData) {
-          const expectedCash = report.salesData.cashSales || 0;
+          // Expected banked amount should include both cash and QR sales
+          const expectedBanked = (report.salesData.cashSales || 0) + (report.salesData.qrSales || 0);
           const actualRegister = report.shiftData.registerBalance || 0;
-          bankingDiff = actualRegister - expectedCash;
+          bankingDiff = actualRegister - expectedBanked;
         }
         
         // Determine status based on difference (±50 threshold)
