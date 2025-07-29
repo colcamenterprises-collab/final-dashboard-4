@@ -2621,6 +2621,156 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // New endpoint: Pull shift reports from Loyverse and match with Daily Sales Forms
+  app.get('/api/loyverse/shift-reports', async (req: Request, res: Response) => {
+    try {
+      const { start_date, end_date } = req.query;
+      
+      if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'start_date and end_date parameters are required' });
+      }
+
+      // Get Loyverse shift reports using existing enhanced routes
+      const loyverseResponse = await fetch(`${req.protocol}://${req.get('host')}/api/loyverse/shifts?start_created_at=${start_date}&end_created_at=${end_date}`);
+      
+      if (!loyverseResponse.ok) {
+        throw new Error('Failed to fetch Loyverse shift data');
+      }
+
+      const loyverseShifts = await loyverseResponse.json();
+      const processedReports = [];
+
+      // Process each shift and match with Daily Sales Forms
+      for (const shift of loyverseShifts) {
+        const shiftDate = new Date(shift.created_at).toISOString().split('T')[0];
+        
+        // Check if Daily Sales Form exists for this date
+        const dailySalesForm = await storage.getDailyStockSalesByDate(shiftDate);
+        
+        // Prepare shift data
+        const shiftData = {
+          shiftId: shift.id,
+          totalSales: Number(shift.total_sales || 0),
+          cashSales: Number(shift.total_cash || 0),
+          cardSales: Number(shift.total_card || 0),
+          qrSales: Number(shift.total_other || 0),
+          registerOpening: Number(shift.opening_balance || 0),
+          registerClosing: Number(shift.closing_balance || 0),
+          bankedAmount: Number(shift.banked_amount || 0),
+          totalOrders: shift.receipts_count || 0,
+          shiftDuration: shift.duration || 0
+        };
+
+        // Prepare daily sales data if available
+        let salesData = null;
+        if (dailySalesForm) {
+          salesData = {
+            formId: dailySalesForm.id,
+            totalSales: Number(dailySalesForm.grabSales || 0) + Number(dailySalesForm.aroiDeeSales || 0) + Number(dailySalesForm.qrScanSales || 0) + Number(dailySalesForm.cashSales || 0),
+            cashSales: Number(dailySalesForm.cashSales || 0),
+            grabSales: Number(dailySalesForm.grabSales || 0),
+            aroiDeeSales: Number(dailySalesForm.aroiDeeSales || 0),
+            qrScanSales: Number(dailySalesForm.qrScanSales || 0),
+            totalExpenses: Number(dailySalesForm.totalWages || 0) + Number(dailySalesForm.totalShopping || 0) + Number(dailySalesForm.gasBill || 0),
+            endingCash: Number(dailySalesForm.endingCash || 0),
+            bankedAmount: Number(dailySalesForm.bankedAmount || 0)
+          };
+        }
+
+        // Determine status and analyze discrepancies
+        let status = 'missing';
+        let bankingCheck = null;
+        let anomalies: string[] = [];
+        let manualReviewNeeded = false;
+
+        if (dailySalesForm && shift) {
+          status = 'complete';
+          
+          // Banking accuracy check
+          const cashVariance = Math.abs((salesData?.cashSales || 0) - shiftData.cashSales);
+          const salesVariance = Math.abs((salesData?.totalSales || 0) - shiftData.totalSales);
+          
+          bankingCheck = cashVariance <= 50 ? 'Accurate' : 'Mismatch';
+          
+          // Detect anomalies
+          if (salesVariance > 100) {
+            anomalies.push(`Total sales variance: ฿${salesVariance.toFixed(2)}`);
+          }
+          
+          if (cashVariance > 50) {
+            anomalies.push(`Cash variance: ฿${cashVariance.toFixed(2)}`);
+          }
+          
+          if (anomalies.length > 0) {
+            status = 'manual_review';
+            manualReviewNeeded = true;
+          }
+        } else if (dailySalesForm && !shift) {
+          status = 'partial';
+          anomalies.push('POS shift report missing');
+        } else if (!dailySalesForm && shift) {
+          status = 'partial';
+          anomalies.push('Daily Sales Form missing');
+        }
+
+        // Create or update shift report in database
+        const existingReport = await storage.getShiftReportByDate(shiftDate);
+        
+        if (existingReport) {
+          await storage.updateShiftReport(existingReport.id, {
+            hasDailySales: !!salesData,
+            hasShiftReport: !!shiftData,
+            salesData,
+            shiftData,
+            status,
+            bankingCheck,
+            anomaliesDetected: anomalies,
+            manualReviewNeeded
+          });
+        } else {
+          await storage.createShiftReport({
+            reportDate: shiftDate,
+            hasDailySales: !!salesData,
+            hasShiftReport: !!shiftData,
+            salesData,
+            shiftData,
+            status,
+            bankingCheck,
+            anomaliesDetected: anomalies,
+            manualReviewNeeded
+          });
+        }
+
+        processedReports.push({
+          date: shiftDate,
+          status,
+          hasDailySales: !!salesData,
+          hasShiftReport: !!shiftData,
+          bankingCheck,
+          anomalies,
+          salesData,
+          shiftData
+        });
+      }
+
+      res.json({
+        message: `Processed ${processedReports.length} shift reports`,
+        reports: processedReports,
+        summary: {
+          total: processedReports.length,
+          complete: processedReports.filter(r => r.status === 'complete').length,
+          partial: processedReports.filter(r => r.status === 'partial').length,
+          manual_review: processedReports.filter(r => r.status === 'manual_review').length,
+          missing: processedReports.filter(r => r.status === 'missing').length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error processing Loyverse shift reports:', error);
+      res.status(500).json({ error: 'Failed to process Loyverse shift reports' });
+    }
+  });
+
   app.get('/api/shift-reports/search', async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string;

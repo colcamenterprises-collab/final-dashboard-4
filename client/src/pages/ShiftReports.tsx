@@ -92,6 +92,36 @@ export function ShiftReports() {
     }
   });
 
+  // Sync Loyverse data mutation
+  const syncLoyverseMutation = useMutation({
+    mutationFn: async ({ startDate, endDate }: { startDate: string, endDate: string }) => {
+      const response = await fetch(`/api/loyverse/shift-reports?start_date=${startDate}&end_date=${endDate}`);
+      if (!response.ok) throw new Error('Failed to sync Loyverse data');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Loyverse Sync Complete",
+        description: `Processed ${data.summary.total} shift reports. Complete: ${data.summary.complete}, Partial: ${data.summary.partial}, Manual Review: ${data.summary.manual_review}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/shift-reports'] });
+    },
+    onError: () => {
+      toast({
+        title: "Sync Error",
+        description: "Failed to sync Loyverse shift reports. Please check your API connection.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handle Loyverse sync
+  const handleSyncLoyverse = () => {
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 30 days ago
+    syncLoyverseMutation.mutate({ startDate, endDate });
+  };
+
   const displayReports = searchQuery || statusFilter ? searchResults : reports;
 
   const getStatusBadge = (report: ShiftReport) => {
@@ -130,6 +160,13 @@ export function ShiftReports() {
               Side-by-side comparison of Daily Sales Forms and POS Shift Reports
             </p>
           </div>
+          <Button 
+            onClick={handleSyncLoyverse}
+            disabled={syncLoyverseMutation.isPending}
+            className="bg-blue-600 text-white hover:bg-blue-700"
+          >
+            {syncLoyverseMutation.isPending ? 'Syncing...' : 'Sync Loyverse Data'}
+          </Button>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4">

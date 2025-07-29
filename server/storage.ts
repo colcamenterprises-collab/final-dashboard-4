@@ -108,6 +108,7 @@ export interface IStorage {
   createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
   searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]>;
   getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined>;
+  getDailyStockSalesByDate(date: string): Promise<DailyStockSales | undefined>;
   getDraftForms(): Promise<DailyStockSales[]>;
   updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales>;
   deleteDailyStockSales(id: number): Promise<boolean>;
@@ -920,6 +921,19 @@ export class MemStorage implements IStorage {
       .from(dailyStockSales)
       .where(whereClause)
       .orderBy(desc(dailyStockSales.shiftDate));
+  }
+
+  async getDailyStockSalesByDate(date: string): Promise<DailyStockSales | undefined> {
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db.select()
+      .from(dailyStockSales)
+      .where(eq(dailyStockSales.shiftDate, new Date(date)))
+      .limit(1);
+    
+    return result || undefined;
   }
 
   async getDailyStockSalesById(id: number): Promise<DailyStockSales | undefined> {

@@ -42,7 +42,7 @@ export class ShiftReportsService {
   // Delete shift report
   async deleteShiftReport(id: string): Promise<boolean> {
     const result = await db.delete(shiftReports).where(eq(shiftReports.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Search shift reports
@@ -152,8 +152,8 @@ export class ShiftReportsService {
   }
 
   // Generate shopping list from sales data
-  private generateShoppingListFromSales(salesData: any): any[] {
-    const shoppingList = [];
+  private generateShoppingListFromSales(salesData: any): Array<{item: string, category: string, quantity: number, priority: string}> {
+    const shoppingList: Array<{item: string, category: string, quantity: number, priority: string}> = [];
     
     // Process inventory categories
     const categories = ['freshFood', 'frozenFood', 'shelfItems', 'kitchenItems', 'packagingItems'];
@@ -264,7 +264,7 @@ export class ShiftReportsService {
       fs.mkdirSync(pdfDir, { recursive: true });
     }
     
-    fs.writeFileSync(pdfPath, doc.output('arraybuffer'));
+    fs.writeFileSync(pdfPath, Buffer.from(doc.output('arraybuffer')));
     
     // Update report with PDF URL
     const pdfUrl = `/exports/shift-report-${report.reportDate}.pdf`;
