@@ -90,18 +90,14 @@ const ShiftReportSummary = () => {
                   {isNaN(item.banking_diff) || item.banking_diff == null ? 'N/A' : 
                     `${item.banking_diff >= 0 ? '+' : ''}฿${item.banking_diff.toFixed(2)}`}
                 </div>
-                {item.anomalies > 0 && (
-                  <div className="mt-1 text-yellow-200 font-medium">
-                    {item.anomalies} Anomaly{item.anomalies > 1 ? "ies" : "y"} Detected
-                  </div>
-                )}
+
               </div>
               <div className="mt-3 pt-2 border-t border-white/20">
                 <Button
                   size="sm"
                   variant="outline"
                   className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
-                  onClick={() => setLocation(`/reports-analysis?tab=analysis&date=${encodeURIComponent(item.date)}`)}
+                  onClick={() => setLocation(`/analysis/shift-report/${encodeURIComponent(item.date)}`)}
                 >
                   View Details
                 </Button>

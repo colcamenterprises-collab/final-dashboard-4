@@ -35,6 +35,7 @@ import SupplierManagement from "@/pages/SupplierManagement";
 import TestMonthlyStock from "@/pages/TestMonthlyStock";
 import DraftForms from "@/pages/DraftForms";
 import ShiftComparison from "@/pages/ShiftComparison";
+import ShiftReportDetail from "@/pages/ShiftReportDetail";
 
 import NotFound from "@/pages/not-found";
 
@@ -63,6 +64,7 @@ function Router() {
         <Route path="/analysis" component={Analysis} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/shift-comparison" component={ShiftComparison} />
+        <Route path="/analysis/shift-report/:date" component={ShiftReportDetail} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/receipts" component={Receipts} />
         <Route path="/ingredients" component={Ingredients} />
