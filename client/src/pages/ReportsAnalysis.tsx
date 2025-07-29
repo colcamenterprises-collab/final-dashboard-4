@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
+import ShiftReportSummary from "@/components/ShiftReportSummary";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -48,7 +49,145 @@ interface ShiftReport {
   updatedAt: string;
 }
 
+// Shift Reports Component
+const ShiftReportsContent = ({ searchQuery = "", statusFilter = "" }: { searchQuery?: string; statusFilter?: string }) => {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
+  // Fetch shift reports
+  const { data: reports = [], isLoading } = useQuery<ShiftReport[]>({
+    queryKey: ['/api/shift-reports'],
+  });
+
+  const getStatusBadge = (report: ShiftReport) => {
+    switch (report.status) {
+      case 'complete':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Complete</Badge>;
+      case 'partial':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Partial</Badge>;
+      case 'manual_review':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Review Needed</Badge>;
+      case 'missing':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Missing</Badge>;
+      default:
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Unknown</Badge>;
+    }
+  };
+
+  const getBankingBadge = (bankingCheck?: string) => {
+    switch (bankingCheck) {
+      case 'Accurate':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Accurate</Badge>;
+      case 'Mismatch':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Mismatch</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">N/A</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Shift Reports System
+          </CardTitle>
+          <CardDescription>
+            Side-by-side comparison of Daily Sales Forms and POS Shift Reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search and Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              placeholder="Search by date (YYYY-MM-DD)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div>
+              {/* Filter will be added later */}
+            </div>
+          </div>
+          
+          {/* Reports Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isLoading ? (
+              <div className="col-span-3 text-center py-8">
+                <div className="text-muted-foreground">Loading shift reports...</div>
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="col-span-3 text-center py-8">
+                <div className="text-muted-foreground">No shift reports found. Upload POS and Sales files to generate reports.</div>
+              </div>
+            ) : (
+              reports.map((report) => (
+                <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{report.reportDate}</CardTitle>
+                        <CardDescription>
+                          {new Date(report.createdAt).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      {getStatusBadge(report)}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Daily Sales Form</span>
+                        {report.hasDailySales ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>POS Shift Report</span>
+                        {report.hasShiftReport ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Banking Check</span>
+                        {getBankingBadge(report.bankingCheck)}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setLocation(`/analysis/shift-report/${report.reportDate}`)}
+                      >
+                        View Details
+                      </Button>
+                      
+                      {report.pdfUrl && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(report.pdfUrl, '_blank')}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const ReportsAnalysis = () => {
   const [activeTab, setActiveTab] = useState("reporting");
@@ -519,7 +658,51 @@ const ReportsAnalysis = () => {
             ))}
           </div>
 
+          {/* Shift Report Summary Section */}
+          <div className="mt-8 border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4">Shift Report Summary</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Summary Cards */}
+              <div className="space-y-4">
+                <ShiftReportSummary />
+              </div>
 
+              {/* Right Column: Search and Filter for Shift Reports */}
+              <div className="lg:col-span-2 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Search Shift Reports</CardTitle>
+                    <CardDescription>Find specific shift reports by date or status</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        placeholder="Search by date (YYYY-MM-DD)..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
+                      />
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                          <SelectItem value="partial">Partial</SelectItem>
+                          <SelectItem value="manual_review">Manual Review</SelectItem>
+                          <SelectItem value="missing">Missing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Shift Reports Display */}
+                <ShiftReportsContent searchQuery={searchQuery} statusFilter={statusFilter} />
+              </div>
+            </div>
+          </div>
 
           {/* Jussi Chat Section - Resized to 2 columns by 1 section */}
           <div className="mt-10 border-t pt-6">
