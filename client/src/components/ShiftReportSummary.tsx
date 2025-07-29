@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarDays, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 
 interface ShiftSummary {
   date: string;
@@ -38,45 +38,41 @@ const ShiftReportSummary = () => {
           </div>
         )}
         
-        {summary.map((item) => (
-          <div
-            key={item.date}
-            className={cn(
-              "rounded-md p-3 text-white",
-              item.status === "balanced" ? "bg-green-600" : "bg-red-600"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <CalendarDays size={18} />
-              <span>{item.date}</span>
-              <span
-                className={cn(
-                  "ml-auto text-sm font-semibold px-2 py-0.5 rounded",
-                  item.status === "balanced"
-                    ? "bg-green-700 text-white"
-                    : "bg-red-700 text-white"
-                )}
-              >
-                {item.status === "balanced" ? "Balanced" : "Attention"}
-              </span>
+        {summary.map((item) => {
+          const isBalanced = item.status === "balanced";
+          const formattedDate = format(new Date(item.date), "dd/MM/yyyy");
+          
+          return (
+            <div
+              key={item.date}
+              className={cn(
+                "rounded-lg shadow p-4 text-white",
+                isBalanced ? "bg-green-600" : "bg-red-600"
+              )}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold">{formattedDate}</span>
+                <span
+                  className={cn(
+                    "text-sm px-2 py-1 rounded",
+                    isBalanced ? "bg-green-800" : "bg-red-800"
+                  )}
+                >
+                  {isBalanced ? "Balanced" : "Attention"}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="font-semibold">Balance:</span>{" "}
+                {item.banking_diff >= 0 ? "+" : "-"}฿
+                {Math.abs(item.banking_diff).toFixed(2)}
+              </div>
             </div>
-            <div className="flex items-center gap-2 pt-1">
-              <DollarSign size={18} />
-              <span>Balance</span>
-              <span className="ml-auto font-mono">
-                {item.banking_diff >= 0
-                  ? `+฿${item.banking_diff.toFixed(2)}`
-                  : `-฿${Math.abs(item.banking_diff).toFixed(2)}`}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
-        <p className="text-xs text-muted-foreground border-t pt-2">
-          <strong>Note:</strong> Green boxes indicate register difference within
-          ±50 (acceptable range). Red boxes indicate difference exceeding
-          ±50 (requires attention).
-        </p>
+        <div className="text-sm text-gray-700 border-t pt-2">
+          <strong>Note:</strong> Green = balance within ±฿50. Red = exceeds ±฿50 and requires review.
+        </div>
       </CardContent>
     </Card>
   );
