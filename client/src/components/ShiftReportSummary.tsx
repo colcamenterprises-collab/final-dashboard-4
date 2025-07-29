@@ -41,7 +41,26 @@ const ShiftReportSummary = () => {
         
         {summary.map((item) => {
           const isBalanced = item.status === "balanced";
-          const formattedDate = format(new Date(item.date), "dd/MM/yyyy");
+          
+          // Safe date parsing with fallback
+          let formattedDate = item.date;
+          try {
+            // Check if the date is already formatted (dd/MM/yyyy)
+            if (item.date && item.date.includes('/')) {
+              formattedDate = item.date;
+            } else {
+              // Try to parse as ISO date or other format
+              const dateObj = new Date(item.date);
+              if (!isNaN(dateObj.getTime())) {
+                formattedDate = format(dateObj, "dd/MM/yyyy");
+              } else {
+                formattedDate = item.date || 'Invalid Date';
+              }
+            }
+          } catch (error) {
+            console.error('Date formatting error:', error, 'for date:', item.date);
+            formattedDate = item.date || 'Invalid Date';
+          }
           
           return (
             <div
