@@ -283,10 +283,9 @@ export function ShiftReports() {
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log('View button clicked for report:', report.id);
+                            alert(`View button clicked for report: ${report.id}`);
                             setSelectedReportId(report.id);
                             setModalOpen(true);
-                            console.log('Modal state set - reportId:', report.id, 'modalOpen:', true);
                           }}
                         >
                           <Eye className="h-4 w-4 mr-1" />

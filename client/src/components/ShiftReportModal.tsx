@@ -163,7 +163,10 @@ export default function ShiftReportModal({ reportId, open, onClose }: ShiftRepor
   console.log('ShiftReportModal render - open:', open, 'reportId:', reportId, 'reportData:', reportData);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      console.log('Dialog onOpenChange:', isOpen);
+      if (!isOpen) onClose();
+    }}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
@@ -180,6 +183,15 @@ export default function ShiftReportModal({ reportId, open, onClose }: ShiftRepor
         {loading && (
           <div className="flex justify-center py-8">
             <div className="text-muted-foreground">Loading shift report details...</div>
+          </div>
+        )}
+        
+        {/* Debug info */}
+        {!reportData && !loading && !error && (
+          <div className="flex justify-center py-8">
+            <div className="text-muted-foreground">
+              Debug: open={String(open)}, reportId={reportId || 'null'}
+            </div>
           </div>
         )}
 
