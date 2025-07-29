@@ -281,11 +281,8 @@ export function ShiftReports() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert(`View button clicked for report: ${report.id}`);
-                            setSelectedReportId(report.id);
-                            setModalOpen(true);
+                          onClick={() => {
+                            setSelectedReport(report);
                           }}
                         >
                           <Eye className="h-4 w-4 mr-1" />
@@ -483,15 +480,8 @@ export function ShiftReports() {
           </TabsContent>
         </Tabs>
 
-        {/* Shift Report Detail Modal */}
-        <ShiftReportModal
-          reportId={selectedReportId}
-          open={modalOpen}
-          onClose={() => {
-            setModalOpen(false);
-            setSelectedReportId(null);
-          }}
-        />
+        {/* Shift Report Detail Modal - REMOVED BROKEN MODAL */}
+        {/* Replace with direct display in Detail View tab */}
       </div>
     </div>
   );
