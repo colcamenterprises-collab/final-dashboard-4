@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 
 interface ShiftSummary {
   date: string;
@@ -12,6 +14,7 @@ interface ShiftSummary {
 }
 
 const ShiftReportSummary = () => {
+  const [, setLocation] = useLocation();
   const { data: summary = [], isLoading, error } = useQuery<ShiftSummary[]>({
     queryKey: ['/api/shift-reports/balance-review'],
   });
@@ -92,6 +95,16 @@ const ShiftReportSummary = () => {
                     {item.anomalies} Anomaly{item.anomalies > 1 ? "ies" : "y"} Detected
                   </div>
                 )}
+              </div>
+              <div className="mt-3 pt-2 border-t border-white/20">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
+                  onClick={() => setLocation(`/reports-analysis?tab=analysis&date=${encodeURIComponent(item.date)}`)}
+                >
+                  View Details
+                </Button>
               </div>
             </div>
           );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import ShiftReportSummary from "@/components/ShiftReportSummary";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -49,6 +49,7 @@ interface ShiftReport {
 }
 
 const ShiftReportsContent = ({ searchQuery = "", statusFilter = "" }: { searchQuery?: string; statusFilter?: string }) => {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Fetch shift reports
@@ -164,7 +165,11 @@ const ShiftReportsContent = ({ searchQuery = "", statusFilter = "" }: { searchQu
                     )}
 
                     <div className="flex gap-2 pt-2">
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setLocation(`/reports-analysis?tab=analysis&report=${report.id}`)}
+                      >
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>
@@ -202,6 +207,26 @@ const ReportsAnalysis = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
+
+  // Handle URL parameters for tab switching and filtering
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    const date = urlParams.get('date');
+    const reportId = urlParams.get('report');
+    
+    if (tab) {
+      setActiveTab(tab);
+    }
+    
+    if (date) {
+      setSearchQuery(date);
+    }
+    
+    if (reportId) {
+      setSearchQuery(reportId);
+    }
+  }, []);
 
   // File type detection based on filename keywords
   const detectFileType = (filename: string): 'shift' | 'sales' | null => {
