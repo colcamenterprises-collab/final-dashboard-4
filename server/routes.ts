@@ -2621,6 +2621,38 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // Balance Review Summary for ShiftReportSummary component
+  app.get('/api/shift-reports/balance-review', async (req: Request, res: Response) => {
+    try {
+      const reports = await storage.getShiftReports();
+      
+      // Generate summary data with banking differences
+      const summary = reports.map(report => {
+        // Calculate banking difference from sales data if available
+        let bankingDiff = 0;
+        if (report.salesData && report.shiftData) {
+          const expectedCash = report.salesData.cashSales || 0;
+          const actualRegister = report.shiftData.registerBalance || 0;
+          bankingDiff = actualRegister - expectedCash;
+        }
+        
+        // Determine status based on difference (±50 threshold)
+        const status = Math.abs(bankingDiff) <= 50 ? 'balanced' : 'attention';
+        
+        return {
+          date: report.reportDate,
+          banking_diff: bankingDiff,
+          status
+        };
+      }).slice(0, 7); // Show last 7 reports
+      
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching balance review summary:', error);
+      res.status(500).json({ error: 'Failed to fetch balance review summary' });
+    }
+  });
+
   // New endpoint: Pull shift reports from Loyverse and match with Daily Sales Forms
   app.get('/api/loyverse/shift-reports', async (req: Request, res: Response) => {
     try {

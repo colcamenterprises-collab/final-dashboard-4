@@ -10,6 +10,7 @@ import { AlertCircle, CheckCircle, Calendar, FileText, Download, Eye, Trash2 } f
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ShiftReportModal from "@/components/ShiftReportModal";
+import ShiftReportSummary from "@/components/ShiftReportSummary";
 
 interface ShiftReport {
   id: string;
@@ -179,42 +180,48 @@ export function ShiftReports() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
-            {/* Search and Filter Controls */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Search & Filter</CardTitle>
-                <CardDescription>Find specific shift reports by date or status</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Input
-                      placeholder="Search by date (YYYY-MM-DD)..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">All Statuses</SelectItem>
-                        <SelectItem value="complete">Complete</SelectItem>
-                        <SelectItem value="partial">Partial</SelectItem>
-                        <SelectItem value="manual_review">Manual Review</SelectItem>
-                        <SelectItem value="missing">Missing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Search, Filter & Summary */}
+              <div className="space-y-4">
+                {/* Search and Filter Controls */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Search & Filter</CardTitle>
+                    <CardDescription>Find specific shift reports by date or status</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Input
+                        placeholder="Search by date (YYYY-MM-DD)..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All Statuses</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                          <SelectItem value="partial">Partial</SelectItem>
+                          <SelectItem value="manual_review">Manual Review</SelectItem>
+                          <SelectItem value="missing">Missing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Reports Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Shift Report Summary */}
+                <ShiftReportSummary />
+              </div>
+
+              {/* Right Column: Reports Grid */}
+              <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 gap-6">
               {isLoading ? (
                 <div className="col-span-3 text-center py-8">
                   <div className="text-muted-foreground">Loading shift reports...</div>
@@ -315,6 +322,8 @@ export function ShiftReports() {
                   </Card>
                 ))
               )}
+                </div>
+              </div>
             </div>
           </TabsContent>
 
