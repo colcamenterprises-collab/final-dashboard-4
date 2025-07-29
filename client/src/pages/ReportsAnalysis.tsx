@@ -200,7 +200,7 @@ const ReportsAnalysis = () => {
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
   // File type detection based on filename keywords
@@ -669,7 +669,7 @@ const ReportsAnalysis = () => {
                           <SelectValue placeholder="Filter by status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">All Statuses</SelectItem>
+                          <SelectItem value="all">All Statuses</SelectItem>
                           <SelectItem value="complete">Complete</SelectItem>
                           <SelectItem value="partial">Partial</SelectItem>
                           <SelectItem value="manual_review">Manual Review</SelectItem>

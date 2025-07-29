@@ -39,7 +39,7 @@ const ShiftReportSummary = () => {
           </div>
         )}
         
-        {summary.map((item) => {
+        {summary.map((item, index) => {
           const isBalanced = item.status === "balanced";
           
           // Safe date parsing with fallback
@@ -64,7 +64,7 @@ const ShiftReportSummary = () => {
           
           return (
             <div
-              key={item.date}
+              key={`${item.date}-${index}`}
               className={cn(
                 "rounded-lg shadow p-4 text-white",
                 isBalanced ? "bg-green-600" : "bg-red-600"
