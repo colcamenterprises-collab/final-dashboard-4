@@ -88,7 +88,7 @@ export default function Layout({ children }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currency, setCurrency] = useState("THB");
-  const [isExpanded, setIsExpanded] = useState(false); // Collapsed by default - icons only
+  const [isExpanded, setIsExpanded] = useState(true); // Expanded by default - full sidebar
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     operations: false,
     finance: false,
@@ -130,7 +130,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
-    // Close all sections when collapsing
+    // Close all sections when minimizing
     if (isExpanded) {
       setExpandedSections({
         operations: false,
@@ -155,14 +155,14 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
       <div className={`min-h-screen font-poppins flex ${darkMode ? 'dark' : ''}`}>
-        {/* Minimal Collapsible Sidebar - Icons Only by Default */}
+        {/* Expanded Sidebar with Minimize Option */}
         <div className={`${isExpanded ? 'w-64' : 'w-16'} sidebar-menu flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-700 transition-all duration-300`}>
-          {/* Expand/Collapse Toggle */}
+          {/* Minimize/Expand Toggle */}
           <Button
             variant="ghost"
             onClick={toggleExpanded}
             className="mb-4 p-2 text-white hover:bg-white/10"
-            title={isExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+            title={isExpanded ? "Minimize Sidebar" : "Expand Sidebar"}
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </Button>
@@ -433,9 +433,8 @@ export default function Layout({ children }: LayoutProps) {
                   
                   {navigationStructure.map((section) => {
                     const SectionIcon = section.icon;
-                    const hasActiveChild = section.items?.some(item => 
-                      item.path === location || 
-                      (item.items && item.items.some(subItem => subItem.path === location))
+                    const hasActiveChild = section.items?.some((item: any) => 
+                      item.path === location
                     );
                     
                     return (

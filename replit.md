@@ -66,6 +66,13 @@ Based on the dashboard design patterns, the application uses three primary butto
 
 ## Recent Changes (January 29, 2025)
 
+### SIDEBAR PERMANENTLY EXPANDED - COMPLETE ✅ COMPLETED
+- **Sidebar Default State**: Changed sidebar to start expanded by default (full width with labels) instead of collapsed icons-only view
+- **Minimize Option Available**: Users can still minimize the sidebar using the chevron button for a compact icons-only view when needed
+- **Enhanced User Experience**: Provides immediate access to full navigation labels while maintaining the option to minimize for more screen space
+- **Smooth Transitions**: Maintains existing CSS transitions for width changes and section expansions/collapses
+- **Comment Updates**: Updated code comments to reflect "Minimize/Expand" functionality instead of "Collapse/Expand"
+
 ### FINAL FIXES AND ENHANCEMENTS - COMPLETE ✅ COMPLETED
 - **Fixed "View Details" Button**: Enhanced shift report summary cards with functional "View Details" buttons that navigate to Analysis tab with proper URL parameters
 - **URL Parameter Handling**: Implemented complete URL parameter support for date filtering and report viewing in Analysis tab
