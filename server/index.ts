@@ -8,6 +8,7 @@ import { OllieAgent } from './agents/ollie.js';
 import { SallyAgent } from './agents/sally.js';
 import { MarloAgent } from './agents/marlo.js';
 import { BigBossAgent } from './agents/bigboss.js';
+import { JussiAgent } from './agents/jussi.js';
 import { db } from './utils/dbUtils.js';
 
 const app = express();
@@ -141,6 +142,7 @@ async function checkSchema() {
   const sally = new SallyAgent();
   const marlo = new MarloAgent();
   const bigboss = new BigBossAgent();
+  const jussi = new JussiAgent();
 
   // Multi-agent chat routes
   app.post('/chat/:agent', async (req: Request, res: Response) => {
@@ -173,8 +175,12 @@ async function checkSchema() {
           response = await bigboss.handleMessage(message);
           agentName = bigboss.name;
           break;
+        case 'jussi':
+          response = await jussi.handleMessage(message);
+          agentName = jussi.name;
+          break;
         default:
-          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, or bigboss.' });
+          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, bigboss, or jussi.' });
       }
 
       const responseTime = Date.now() - startTime;

@@ -4,6 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
+import { AIChatWidget } from "@/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Link } from "wouter";
 import { 
   Receipt, FileText, PieChart, ClipboardList, Package, TrendingUp, 
   BarChart, AlertTriangle, Download, Search, Calendar, Filter, ShoppingCart, DollarSign,
-  CheckCircle, Eye, Trash2 
+  CheckCircle, Eye, Trash2, MessageCircle, Upload
 } from "lucide-react";
 
 // Interface for uploaded file data
@@ -640,6 +641,36 @@ const ReportsAnalysis = () => {
             {analysisItems.map((item, index) => (
               <ItemCard key={index} item={item} />
             ))}
+          </div>
+
+          {/* Jussi Chat Section */}
+          <div className="mt-10 border-t pt-6">
+            <Card className="border-2 border-blue-500 bg-blue-50 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-900">
+                  <MessageCircle className="h-5 w-5" />
+                  Ask Jussi - Head of Operations
+                </CardTitle>
+                <CardDescription className="text-blue-700">
+                  Upload a dataset or select a date, and ask Jussi to review anomalies, trends, or anything else.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 p-3 bg-blue-100 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Upload className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">Quick Upload Instructions:</span>
+                  </div>
+                  <ul className="text-xs text-blue-700 space-y-1 ml-6">
+                    <li>• Upload CSV files with shift data, sales reports, or inventory information</li>
+                    <li>• Ask questions like "What anomalies do you see in this data?"</li>
+                    <li>• Get insights on trends, discrepancies, and operational improvements</li>
+                    <li>• Request specific analysis on banking, sales patterns, or staff performance</li>
+                  </ul>
+                </div>
+                <AIChatWidget agent="jussi" height="600px" />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

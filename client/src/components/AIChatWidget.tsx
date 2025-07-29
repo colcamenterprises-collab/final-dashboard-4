@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface AIChatWidgetProps {
-  agent: 'ollie' | 'sally' | 'marlo' | 'bigboss';
+  agent: 'ollie' | 'sally' | 'marlo' | 'bigboss' | 'jussi';
   height?: string;
   width?: string;
 }
