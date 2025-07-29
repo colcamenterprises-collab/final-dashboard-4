@@ -2658,6 +2658,36 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // Legacy endpoint for HomePage compatibility
+  app.get('/api/shift-report/summary', async (req: Request, res: Response) => {
+    try {
+      const reports = await storage.getShiftReports();
+      
+      // Convert our data format to what the homepage expects
+      const summary = reports.map(report => {
+        let bankingDiff = 0;
+        if (report.salesData && report.shiftData) {
+          const expectedBanked = (report.salesData.cashSales || 0) + (report.salesData.qrSales || 0);
+          const actualRegister = report.shiftData.registerBalance || 0;
+          bankingDiff = actualRegister - expectedBanked;
+        }
+        
+        const anomaliesCount = Array.isArray(report.anomalies) ? report.anomalies.length : 0;
+        
+        return {
+          date: report.reportDate,
+          register_difference: bankingDiff,
+          anomalies: anomaliesCount
+        };
+      }).slice(0, 7);
+      
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching shift report summary:', error);
+      res.status(500).json({ error: 'Failed to fetch shift report summary' });
+    }
+  });
+
   // New endpoint: Pull shift reports from Loyverse and match with Daily Sales Forms
   app.get('/api/loyverse/shift-reports', async (req: Request, res: Response) => {
     try {
