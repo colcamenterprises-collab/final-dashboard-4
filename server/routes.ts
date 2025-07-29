@@ -2640,10 +2640,14 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         // Determine status based on difference (±50 threshold)
         const status = Math.abs(bankingDiff) <= 50 ? 'balanced' : 'attention';
         
+        // Count anomalies from the anomalies array
+        const anomaliesCount = Array.isArray(report.anomalies) ? report.anomalies.length : 0;
+        
         return {
           date: report.reportDate,
           banking_diff: bankingDiff,
-          status
+          status,
+          anomalies: anomaliesCount
         };
       }).slice(0, 7); // Show last 7 reports
       

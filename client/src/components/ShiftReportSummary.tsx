@@ -8,6 +8,7 @@ interface ShiftSummary {
   date: string;
   banking_diff: number;
   status: "attention" | "balanced";
+  anomalies: number;
 }
 
 const ShiftReportSummary = () => {
@@ -62,16 +63,23 @@ const ShiftReportSummary = () => {
                 </span>
               </div>
               <div className="text-sm">
-                <span className="font-semibold">Balance:</span>{" "}
-                {item.banking_diff >= 0 ? "+" : "-"}฿
-                {Math.abs(item.banking_diff).toFixed(2)}
+                <div>
+                  <span className="font-semibold">Balance:</span>{" "}
+                  {item.banking_diff >= 0 ? "+" : "-"}฿
+                  {Math.abs(item.banking_diff).toFixed(2)}
+                </div>
+                {item.anomalies > 0 && (
+                  <div className="mt-1 text-yellow-200 font-medium">
+                    {item.anomalies} Anomaly{item.anomalies > 1 ? "ies" : "y"} Detected
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
 
         <div className="text-sm text-gray-700 border-t pt-2">
-          <strong>Note:</strong> Green = balance within ±฿50. Red = exceeds ±฿50 and requires review.
+          <strong>Note:</strong> Green = balance within ±฿50. Red = exceeds ±฿50 and requires review. Yellow text = anomalies found based on sales vs POS report mismatch.
         </div>
       </CardContent>
     </Card>
