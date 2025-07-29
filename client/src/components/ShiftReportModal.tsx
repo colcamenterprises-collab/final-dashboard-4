@@ -53,16 +53,20 @@ export default function ShiftReportModal({ reportId, open, onClose }: ShiftRepor
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    console.log('useEffect triggered - open:', open, 'reportId:', reportId);
     if (open && reportId) {
       setLoading(true);
       setError(null);
+      console.log('Fetching report data for ID:', reportId);
       fetch(`/api/shift-reports/${reportId}`)
         .then(async (res) => {
           if (!res.ok) throw new Error('Failed to load report');
           const data = await res.json();
+          console.log('Report data loaded:', data);
           setReportData(data);
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error('Error loading report:', err);
           setError('Failed to load shift report details.');
         })
         .finally(() => setLoading(false));
@@ -154,6 +158,9 @@ export default function ShiftReportModal({ reportId, open, onClose }: ShiftRepor
         return <Badge className="bg-gray-100 text-gray-800 border-gray-200">N/A</Badge>;
     }
   };
+
+  // Debug logging
+  console.log('ShiftReportModal render - open:', open, 'reportId:', reportId, 'reportData:', reportData);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
