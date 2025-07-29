@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import ShiftReportSummary from "@/components/ShiftReportSummary";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Receipt, FileText, PieChart, ClipboardList, Package, TrendingUp, 
   BarChart, AlertTriangle, Download, Search, Calendar, Filter, ShoppingCart, DollarSign,
@@ -46,9 +48,7 @@ interface ShiftReport {
   updatedAt: string;
 }
 
-const ShiftReportsContent = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+const ShiftReportsContent = ({ searchQuery = "", statusFilter = "" }: { searchQuery?: string; statusFilter?: string }) => {
   const { toast } = useToast();
 
   // Fetch shift reports
@@ -199,6 +199,8 @@ const ReportsAnalysis = () => {
   }>({});
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const { toast } = useToast();
 
   // File type detection based on filename keywords
@@ -493,7 +495,7 @@ const ReportsAnalysis = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
           <TabsTrigger value="reporting" className="text-xs sm:text-sm lg:text-base">
             <Receipt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Reporting</span>
@@ -503,11 +505,6 @@ const ReportsAnalysis = () => {
             <BarChart className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Analysis</span>
             <span className="sm:hidden">Analysis</span>
-          </TabsTrigger>
-          <TabsTrigger value="shift-reports" className="text-xs sm:text-sm lg:text-base">
-            <ClipboardList className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Shift Reports</span>
-            <span className="sm:hidden">Shifts</span>
           </TabsTrigger>
           <TabsTrigger value="stock-summary" className="text-xs sm:text-sm lg:text-base">
             <Package className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
@@ -643,6 +640,52 @@ const ReportsAnalysis = () => {
             ))}
           </div>
 
+          {/* Shift Report Summary Section */}
+          <div className="mt-8 border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4">Shift Report Summary</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Summary Cards */}
+              <div className="space-y-4">
+                <ShiftReportSummary />
+              </div>
+
+              {/* Right Column: Search and Filter for Shift Reports */}
+              <div className="lg:col-span-2 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Search Shift Reports</CardTitle>
+                    <CardDescription>Find specific shift reports by date or status</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        placeholder="Search by date (YYYY-MM-DD)..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
+                      />
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All Statuses</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                          <SelectItem value="partial">Partial</SelectItem>
+                          <SelectItem value="manual_review">Manual Review</SelectItem>
+                          <SelectItem value="missing">Missing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Shift Reports Display */}
+                <ShiftReportsContent searchQuery={searchQuery} statusFilter={statusFilter} />
+              </div>
+            </div>
+          </div>
+
           {/* Jussi Chat Section */}
           <div className="mt-10 border-t pt-6">
             <Card className="border-2 border-blue-500 bg-blue-50 shadow-lg">
@@ -674,10 +717,7 @@ const ReportsAnalysis = () => {
           </div>
         </TabsContent>
 
-        {/* Shift Reports Tab */}
-        <TabsContent value="shift-reports" className="space-y-6">
-          <ShiftReportsContent />
-        </TabsContent>
+
 
         {/* Monthly Stock Summary Tab */}
         <TabsContent value="stock-summary" className="space-y-6">

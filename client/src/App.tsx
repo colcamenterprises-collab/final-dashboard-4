@@ -73,6 +73,13 @@ function Router() {
         <Route path="/purchasing" component={Purchasing} />
         <Route path="/supplier-management" component={SupplierManagement} />
         <Route path="/test-monthly-stock" component={TestMonthlyStock} />
+        {/* Redirect old shift-reports to analysis tab */}
+        <Route path="/shift-reports">
+          {() => {
+            window.location.href = "/reports-analysis?tab=analysis";
+            return null;
+          }}
+        </Route>
         
         {/* Operations & Sales sub-routes */}
         <Route path="/ops-sales/draft-forms" component={DraftFormsLibrary} />
