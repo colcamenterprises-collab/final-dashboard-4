@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
-import ShiftReportSummary from "@/components/ShiftReportSummary";
+
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -103,7 +103,7 @@ const ShiftReportsContent = ({ searchQuery = "", statusFilter = "" }: { searchQu
             <Input
               placeholder="Search by date (YYYY-MM-DD)..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              readOnly
             />
             <div>
               {/* Filter will be added later */}
@@ -658,49 +658,40 @@ const ReportsAnalysis = () => {
             ))}
           </div>
 
-          {/* Shift Report Summary Section */}
+          {/* Shift Reports System */}
           <div className="mt-8 border-t pt-6">
-            <h3 className="text-lg font-semibold mb-4">Shift Report Summary</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Summary Cards */}
-              <div className="space-y-4">
-                <ShiftReportSummary />
-              </div>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Search Shift Reports</CardTitle>
+                  <CardDescription>Find specific shift reports by date or status</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      placeholder="Search by date (YYYY-MM-DD)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="complete">Complete</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
+                        <SelectItem value="manual_review">Manual Review</SelectItem>
+                        <SelectItem value="missing">Missing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {/* Right Column: Search and Filter for Shift Reports */}
-              <div className="lg:col-span-2 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Search Shift Reports</CardTitle>
-                    <CardDescription>Find specific shift reports by date or status</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input
-                        placeholder="Search by date (YYYY-MM-DD)..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full"
-                      />
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="complete">Complete</SelectItem>
-                          <SelectItem value="partial">Partial</SelectItem>
-                          <SelectItem value="manual_review">Manual Review</SelectItem>
-                          <SelectItem value="missing">Missing</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Shift Reports Display */}
-                <ShiftReportsContent searchQuery={searchQuery} statusFilter={statusFilter} />
-              </div>
+              {/* Shift Reports Display */}
+              <ShiftReportsContent searchQuery={searchQuery} statusFilter={statusFilter} />
             </div>
           </div>
 
