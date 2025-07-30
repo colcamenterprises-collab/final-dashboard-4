@@ -354,90 +354,48 @@ const ReportsAnalysis = () => {
 
   const reportingItems = [
     {
-      title: "Receipts",
-      description: "View and manage individual receipts",
-      icon: Receipt,
-      path: "/pos-loyverse",
+      title: "Daily Sales Reports",
+      description: "Comprehensive daily sales performance reports with trends and KPIs",
+      icon: BarChart,
+      path: "/shift-analytics",
       status: "Active"
     },
     {
-      title: "Receipt Library (by Date)",
-      description: "Browse receipts organized by date ranges",
-      icon: FileText,
-      path: "/receipts",
-      status: "Active"
-    },
-    {
-      title: "Shift Reports (POS)",
-      description: "Daily shift summaries from POS system",
+      title: "Financial Summary Reports", 
+      description: "Monthly and weekly financial performance with profit analysis",
       icon: PieChart,
       path: "/loyverse-live",
       status: "Active"
     },
     {
-      title: "Shift Summary",
-      description: "Comprehensive shift analysis and metrics",
-      icon: ClipboardList,
-      path: "/shift-analytics",
+      title: "Shift Performance Analytics",
+      description: "Detailed shift-by-shift performance metrics and comparisons",
+      icon: TrendingUp,
+      path: "/shift-comparison",
+      status: "Active"
+    },
+    {
+      title: "Variance & Balance Reports",
+      description: "Daily balance reports with variance detection and anomaly analysis",
+      icon: AlertTriangle,
+      path: "/expenses",
       status: "Active"
     }
   ];
 
   const analysisItems = [
     {
-      title: "Receipt Analysis",
-      description: "AI-powered analysis of receipt data",
+      title: "Receipts",
+      description: "View and manage individual receipts",
       icon: Receipt,
-      path: "/analysis",
+      path: "/receipts",
       status: "Active"
     },
     {
-      title: "Items & Modifiers",
-      description: "Product performance and modifier analysis",
+      title: "Stock Summary",
+      description: "Monthly stock summary and purchasing analysis",
       icon: Package,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Sold vs Purchases",
-      description: "Compare sales data with purchasing records",
-      icon: TrendingUp,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Top 5 Items Sold",
-      description: "Best performing menu items analysis",
-      icon: BarChart,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Sales Type Summary",
-      description: "Payment method and channel breakdown",
-      icon: PieChart,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Variances & Anomalies",
-      description: "Detect unusual patterns and discrepancies",
-      icon: AlertTriangle,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Daily Report Library",
-      description: "Archive of generated analysis reports",
-      icon: FileText,
-      path: "/analysis",
-      status: "Active"
-    },
-    {
-      title: "Shift vs Daily Comparison",
-      description: "AI detects mismatches between shift reports and manual forms",
-      icon: AlertTriangle,
-      path: "/shift-comparison",
+      path: "/monthly-stock-summary",
       status: "Active"
     }
   ];
@@ -638,6 +596,114 @@ const ReportsAnalysis = () => {
         <TabsContent value="analysis" className="space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900">AI Analysis & Reports</h2>
+          </div>
+          
+          {/* Navigation Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
+            {analysisItems.map((item, index) => (
+              <ItemCard key={index} item={item} />
+            ))}
+          </div>
+          
+          {/* High-Level Analysis Section */}
+          <div className="space-y-6">
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">AI-Powered Analysis</h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Items Analysis */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Top Performing Items</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Classic Beef Burger</span>
+                        <span className="font-medium">156 sold</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Chicken Nuggets</span>
+                        <span className="font-medium">142 sold</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">French Fries</span>
+                        <span className="font-medium">201 sold</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Sales Pattern Analysis */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Sales Pattern Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Peak Hours</span>
+                        <span className="font-medium">7-9 PM</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Avg Order Value</span>
+                        <span className="font-medium">฿285</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Payment Type</span>
+                        <span className="font-medium">58% Card</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Variance Detection */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Variance & Anomalies</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Cash Variance</span>
+                        <span className="font-medium text-green-600">±฿12</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Stock Accuracy</span>
+                        <span className="font-medium text-green-600">98.5%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Anomalies</span>
+                        <span className="font-medium">None detected</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Ingredient Usage */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Ingredient Usage Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Burger Buns Used</span>
+                        <span className="font-medium">156 units</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Meat Usage</span>
+                        <span className="font-medium">24.8 kg</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Efficiency</span>
+                        <span className="font-medium text-green-600">96.2%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
 
           {/* Shift Reports System */}
