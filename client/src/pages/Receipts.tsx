@@ -73,10 +73,10 @@ export default function Receipts() {
 
   // Filter receipts by search term
   const filteredReceipts = displayReceipts?.filter(receipt => 
-    receipt.receipt_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    receipt.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    receipt.line_items.some(item => 
-      item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
+    receipt.receipt_number?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+    receipt.customer_name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+    receipt.line_items?.some(item => 
+      item.item_name?.toLowerCase()?.includes(searchTerm.toLowerCase())
     )
   ) || [];
 
