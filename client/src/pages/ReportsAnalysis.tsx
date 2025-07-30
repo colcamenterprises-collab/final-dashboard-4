@@ -637,25 +637,7 @@ const ReportsAnalysis = () => {
         
         <TabsContent value="analysis" className="space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Analysis Tools</h2>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                <Search className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Search</span>
-                <span className="sm:hidden">Search</span>
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Export</span>
-                <span className="sm:hidden">Export</span>
-              </Button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {analysisItems.map((item, index) => (
-              <ItemCard key={index} item={item} />
-            ))}
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">AI Analysis & Reports</h2>
           </div>
 
           {/* Shift Reports System */}
