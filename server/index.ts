@@ -9,7 +9,7 @@ import { SallyAgent } from './agents/sally.js';
 import { MarloAgent } from './agents/marlo.js';
 import { BigBossAgent } from './agents/bigboss.js';
 import { JussiAgent } from './agents/jussi.js';
-import { db } from './utils/dbUtils.js';
+import { db } from './db.js';
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));
@@ -31,10 +31,11 @@ app.use((req, res, next) => {
   
   // Tablet-specific nuclear headers
   const userAgent = req.get('User-Agent') || '';
+  const accept = req.get('Accept') || '';
   const isTablet = userAgent.includes('iPad') || 
                    userAgent.includes('Android') || 
                    userAgent.includes('Tablet') ||
-                   (req.get('Accept') && req.get('Accept').includes('text/html'));
+                   accept.includes('text/html');
                    
   if (isTablet) {
     res.set('X-Tablet-Nuclear-Bust', Date.now().toString());
@@ -187,7 +188,7 @@ async function checkSchema() {
 
       // Log the interaction to database
       try {
-        const { chatLogs } = await import('./utils/dbUtils.js');
+        const { chatLogs } = await import('../shared/schema.js');
         await db.insert(chatLogs).values({
           agentName,
           userMessage: message,

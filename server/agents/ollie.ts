@@ -1,5 +1,6 @@
 import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../utils/dbUtils.js";
+import { db } from "../db.js";
+import { dailyStockSales } from "../../shared/schema.js";
 import { eq, desc } from "drizzle-orm";
 
 export class OllieAgent {
@@ -32,8 +33,8 @@ export class OllieAgent {
     try {
       const [recentForm] = await db
         .select()
-        .from(db.schema.dailyStockSales)
-        .orderBy(desc(db.schema.dailyStockSales.createdAt))
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.createdAt))
         .limit(1);
 
       return recentForm ? {

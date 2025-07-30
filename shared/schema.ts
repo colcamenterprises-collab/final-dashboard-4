@@ -645,4 +645,22 @@ export const insertShiftReportSchema = createInsertSchema(shiftReports).omit({
 export type ShiftReport = typeof shiftReports.$inferSelect;
 export type InsertShiftReport = z.infer<typeof insertShiftReportSchema>;
 
+// Chat logs for agent interactions
+export const chatLogs = pgTable('chat_logs', {
+  id: serial('id').primaryKey(),
+  agentName: varchar('agent_name', { length: 50 }).notNull(),
+  userMessage: text('user_message').notNull(),
+  agentResponse: text('agent_response').notNull(),
+  responseTime: integer('response_time'), // Response time in milliseconds
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const insertChatLogSchema = createInsertSchema(chatLogs).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export type ChatLog = typeof chatLogs.$inferSelect;
+export type InsertChatLog = z.infer<typeof insertChatLogSchema>;
+
 

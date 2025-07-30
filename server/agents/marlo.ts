@@ -1,5 +1,6 @@
 import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../utils/dbUtils.js";
+import { db } from "../db.js";
+import { dailyStockSales, aiInsights } from "../../shared/schema.js";
 import { desc } from "drizzle-orm";
 
 export class MarloAgent {
@@ -34,15 +35,15 @@ export class MarloAgent {
       // Get recent sales for popular items analysis
       const [recentSales] = await db
         .select()
-        .from(db.schema.dailyStockSales)
-        .orderBy(desc(db.schema.dailyStockSales.createdAt))
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.createdAt))
         .limit(1);
 
       // Get recent AI insights for trends
       const recentInsights = await db
         .select()
-        .from(db.schema.aiInsights)
-        .orderBy(desc(db.schema.aiInsights.createdAt))
+        .from(aiInsights)
+        .orderBy(desc(aiInsights.createdAt))
         .limit(5);
 
       return `Recent sales data for trend analysis: ${recentSales ? JSON.stringify(recentSales.salesData) : 'No recent sales data'}

@@ -1,5 +1,6 @@
 import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../utils/dbUtils.js";
+import { db } from "../db.js";
+import { chatLogs, aiInsights } from "../../shared/schema.js";
 import { desc } from "drizzle-orm";
 
 export class BigBossAgent {
@@ -38,8 +39,8 @@ export class BigBossAgent {
       // Get recent chat interactions from all agents
       const recentChats = await db
         .select()
-        .from(db.schema.chatLogs)
-        .orderBy(desc(db.schema.chatLogs.createdAt))
+        .from(chatLogs)
+        .orderBy(desc(chatLogs.createdAt))
         .limit(10);
 
       // Get recent AI insights

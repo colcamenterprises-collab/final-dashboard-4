@@ -1,5 +1,6 @@
 import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../utils/dbUtils.js";
+import { db } from "../db.js";
+import { expenses } from "../../shared/schema.js";
 import { desc, sql } from "drizzle-orm";
 
 export class SallyAgent {
@@ -33,15 +34,15 @@ export class SallyAgent {
       // Get recent expenses
       const recentExpenses = await db
         .select()
-        .from(db.schema.expenses)
-        .orderBy(desc(db.schema.expenses.createdAt))
+        .from(expenses)
+        .orderBy(desc(expenses.createdAt))
         .limit(10);
 
       // Get expense summary for current month
       const monthlyExpenses = await db
         .select({
-          category: db.schema.expenses.category,
-          total: sql<number>`sum(${db.schema.expenses.amount})`
+          category: expenses.category,
+          total: sql<number>`sum(${expenses.amount})`
         })
         .from(db.schema.expenses)
         .where(sql`extract(month from ${db.schema.expenses.date}) = extract(month from current_date)`)

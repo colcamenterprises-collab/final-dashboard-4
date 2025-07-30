@@ -1,5 +1,6 @@
 import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../utils/dbUtils.js";
+import { db } from "../db.js";
+import { dailyStockSales, shiftReports, receipts, uploadedReports } from "../../shared/schema.js";
 import { eq, desc } from "drizzle-orm";
 
 export class JussiAgent {
