@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Package, Plus, Search, FileText, DollarSign, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
+import { JussiChatBubble } from '@/components/JussiChatBubble';
 
 interface Supplier {
   id: number;
@@ -185,6 +186,9 @@ const Purchasing = () => {
           ))}
         </TabsContent>
       </Tabs>
+      
+      {/* Jussi Chat Bubble */}
+      <JussiChatBubble />
     </div>
   );
 };

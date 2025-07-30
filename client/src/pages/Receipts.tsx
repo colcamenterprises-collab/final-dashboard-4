@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar, Clock, DollarSign, Receipt, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { JussiChatBubble } from '@/components/JussiChatBubble';
 import { format } from 'date-fns';
 
 interface LoyverseReceipt {
@@ -314,6 +315,9 @@ export default function Receipts() {
           </div>
         </div>
       )}
+      
+      {/* Jussi Chat Bubble */}
+      <JussiChatBubble />
     </div>
   );
 }
