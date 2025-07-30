@@ -29,11 +29,37 @@ interface ReceiptsSummaryData {
   shiftDate: string;
 }
 
+interface ReceiptsSummaryWithIds {
+  total_receipts: number;
+  gross_sales: number;
+  net_sales: number;
+  first_receipt: string | null;
+  last_receipt: string | null;
+  payment_breakdown: Array<{
+    payment_method: string;
+    count: number;
+  }>;
+  items_sold: Record<string, number>;
+  modifiers_sold: Record<string, number>;
+  refunds: Array<{
+    receipt_number: string;
+    time: string;
+    amount: number;
+    reason: string;
+  }>;
+}
+
 export default function Receipts() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{type: 'user' | 'assistant', message: string}>>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+
+  // Query receipt summary with IDs (permanent summary section)
+  const { data: summaryWithIds, isLoading: summaryLoading } = useQuery<ReceiptsSummaryWithIds>({
+    queryKey: ['/api/receipts/summary-with-ids'],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
   // Query current shift receipts summary
   const { data: currentShiftData, isLoading: currentLoading } = useQuery<ReceiptsSummaryData>({
@@ -98,6 +124,11 @@ export default function Receipts() {
     setSelectedDate('');
   };
 
+  // Handle CSV download
+  const handleDownloadCSV = () => {
+    window.location.href = '/api/receipts/download';
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -131,6 +162,88 @@ export default function Receipts() {
           {selectedDate ? `Selected: ${selectedDate}` : 'Current Shift'}
         </Badge>
       </div>
+
+      {/* Permanent Receipt ID Summary Section */}
+      {summaryWithIds && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              🧾 Receipt ID Summary - Current Shift
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border">
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">Receipt Range</div>
+                <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                  {summaryWithIds.first_receipt && summaryWithIds.last_receipt
+                    ? `${summaryWithIds.first_receipt} → ${summaryWithIds.last_receipt}`
+                    : 'No receipts'}
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border">
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">Total Receipts</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+                  {summaryWithIds.total_receipts}
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border">
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sales Summary</div>
+                <div className="mt-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Gross Sales</div>
+                  <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    ฿{Number(summaryWithIds.gross_sales).toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Net Sales</div>
+                  <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                    ฿{Number(summaryWithIds.net_sales).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border">
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Payment Types</div>
+                <div className="space-y-2">
+                  {summaryWithIds.payment_breakdown.map((payment, idx) => (
+                    <div key={idx} className="flex justify-between items-center">
+                      <span className="text-gray-700 dark:text-gray-300">{payment.payment_method}</span>
+                      <span className="font-semibold text-blue-600 dark:text-blue-400">{payment.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border">
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Actions</div>
+                <Button
+                  onClick={handleDownloadCSV}
+                  className="w-full bg-black text-white hover:bg-gray-800"
+                  size="lg"
+                >
+                  ⬇️ Download Full Receipt CSV
+                </Button>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+                  Export complete receipt data for this shift
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {summaryLoading && (
+        <Card className="mb-6">
+          <CardContent className="p-8">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              Loading receipt summary...
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search Section */}
       <Card>
