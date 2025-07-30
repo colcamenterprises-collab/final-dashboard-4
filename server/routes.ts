@@ -1371,6 +1371,83 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Jussi Daily Summary endpoints
+  app.post("/api/receipts/summary/generate/:date", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      
+      const summary = await JussiDailySummaryService.generateJussiSummaryForDate(date);
+      
+      if (!summary) {
+        return res.status(404).json({ 
+          success: false, 
+          error: `No receipts found for date ${date}` 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Summary generated for ${date}`, 
+        summary 
+      });
+    } catch (err) {
+      console.error("Error generating Jussi summary:", err);
+      res.status(500).json({ error: "Failed to generate summary" });
+    }
+  });
+
+  // Get latest Jussi summary
+  app.get("/api/receipts/jussi-summary/latest", async (req: Request, res: Response) => {
+    try {
+      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      
+      const summary = await JussiDailySummaryService.getLatestShiftSummary();
+      
+      if (!summary) {
+        return res.status(404).json({ error: "No summaries found" });
+      }
+      
+      res.json(summary);
+    } catch (err) {
+      console.error("Error fetching latest Jussi summary:", err);
+      res.status(500).json({ error: "Failed to fetch latest summary" });
+    }
+  });
+
+  // Get Jussi summary by date
+  app.get("/api/receipts/jussi-summary/:date", async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      
+      const summary = await JussiDailySummaryService.getSummaryByDate(date);
+      
+      if (!summary) {
+        return res.status(404).json({ error: `No summary found for ${date}` });
+      }
+      
+      res.json(summary);
+    } catch (err) {
+      console.error(`Error fetching Jussi summary for ${req.params.date}:`, err);
+      res.status(500).json({ error: "Failed to fetch summary" });
+    }
+  });
+
+  // Get last 31 days Jussi summaries
+  app.get("/api/receipts/jussi-summaries", async (req: Request, res: Response) => {
+    try {
+      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      
+      const summaries = await JussiDailySummaryService.getLast31DaysSummaries();
+      
+      res.json(summaries);
+    } catch (err) {
+      console.error("Error fetching Jussi summaries:", err);
+      res.status(500).json({ error: "Failed to fetch summaries" });
+    }
+  });
+
   // NEW: Get receipts for POSLoyverse page
   app.get("/api/loyverse/receipts", async (req: Request, res: Response) => {
     try {

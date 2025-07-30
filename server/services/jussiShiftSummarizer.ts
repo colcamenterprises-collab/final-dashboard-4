@@ -135,7 +135,7 @@ export class JussiShiftSummarizer {
       const refunds: Array<{ receipt_number: string; amount: number; reason?: string }> = [];
 
       receipts.forEach(receipt => {
-        const totalMoney = parseFloat(receipt.total_money || '0');
+        const totalMoney = parseFloat((receipt.total_money || 0).toString());
         grossSales += totalMoney;
         netSales += totalMoney; // Assuming no discounts for now
 
