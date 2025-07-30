@@ -563,13 +563,13 @@ export const dailyShiftReceiptSummary = pgTable("daily_shift_receipt_summary", {
 });
 
 // ─── INSERT SCHEMA & TYPES ────────────────────────────────────────────
-export const insertDailyReceiptSummarySchema =
+export const insertDailyShiftReceiptSummarySchema =
   createInsertSchema(dailyShiftReceiptSummary).omit({ id: true, createdAt: true });
 
 export type DailyShiftReceiptSummary =
   typeof dailyShiftReceiptSummary.$inferSelect;
 export type InsertDailyShiftReceiptSummary =
-  z.infer<typeof insertDailyReceiptSummarySchema>;
+  z.infer<typeof insertDailyShiftReceiptSummarySchema>;
 
 // Daily Shift Summary table for burger roll variance tracking
 export const dailyShiftSummary = pgTable("daily_shift_summary", {
@@ -662,5 +662,40 @@ export const insertChatLogSchema = createInsertSchema(chatLogs).omit({
 
 export type ChatLog = typeof chatLogs.$inferSelect;
 export type InsertChatLog = z.infer<typeof insertChatLogSchema>;
+
+// Daily receipt summaries processed by Jussi
+export const dailyReceiptSummaries = pgTable('daily_receipt_summaries', {
+  id: serial('id').primaryKey(),
+  date: date('date').notNull().unique(), // Shift date (YYYY-MM-DD)
+  shiftStart: timestamp('shift_start').notNull(),
+  shiftEnd: timestamp('shift_end').notNull(),
+  firstReceipt: varchar('first_receipt', { length: 50 }),
+  lastReceipt: varchar('last_receipt', { length: 50 }),
+  totalReceipts: integer('total_receipts').default(0),
+  grossSales: decimal('gross_sales', { precision: 10, scale: 2 }).default('0'),
+  netSales: decimal('net_sales', { precision: 10, scale: 2 }).default('0'),
+  paymentBreakdown: jsonb('payment_breakdown'), // Array of {payment_method, count, amount}
+  itemsSold: jsonb('items_sold'), // Object with item names and quantities
+  modifiersSold: jsonb('modifiers_sold'), // Object with modifier names and quantities
+  drinksSummary: jsonb('drinks_summary'), // Detailed drinks breakdown
+  rollsUsed: integer('rolls_used').default(0), // Calculated from burger items
+  refunds: jsonb('refunds'), // Array of refund details
+  processedAt: timestamp('processed_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => {
+  return {
+    dateIdx: index('daily_receipt_summaries_date_idx').on(table.date),
+    shiftStartIdx: index('daily_receipt_summaries_shift_start_idx').on(table.shiftStart),
+  };
+});
+
+export const insertDailyReceiptSummarySchema = createInsertSchema(dailyReceiptSummaries).omit({ 
+  id: true, 
+  processedAt: true,
+  updatedAt: true 
+});
+
+export type DailyReceiptSummary = typeof dailyReceiptSummaries.$inferSelect;
+export type InsertDailyReceiptSummary = z.infer<typeof insertDailyReceiptSummarySchema>;
 
 

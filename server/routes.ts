@@ -6,7 +6,7 @@ import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries } from "../shared/schema"; // Adjust path
 import { z } from "zod";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import multer from 'multer';
@@ -3272,6 +3272,85 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     } catch (error) {
       console.error('Error generating CSV download:', error);
       res.status(500).json({ error: 'Failed to fetch live receipt data from Loyverse API for CSV export' });
+    }
+  });
+
+  // ===== DAILY SUMMARIES API ROUTES =====
+  
+  // Process last 31 days (for automated cron job)
+  app.post('/api/daily-summaries/process-all', async (req: Request, res: Response) => {
+    try {
+      const { jussiShiftSummarizer } = await import('./services/jussiShiftSummarizer');
+      await jussiShiftSummarizer.processLast31Days();
+      res.json({ message: 'Processing completed for last 31 days' });
+    } catch (error) {
+      console.error('Error processing daily summaries:', error);
+      res.status(500).json({ error: 'Failed to process daily summaries' });
+    }
+  });
+
+  // Process specific date (for manual triggers)
+  app.post('/api/daily-summaries/process/:date', async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const { jussiShiftSummarizer } = await import('./services/jussiShiftSummarizer');
+      await jussiShiftSummarizer.processSpecificDate(date);
+      res.json({ message: `Summary processed for ${date}` });
+    } catch (error) {
+      console.error(`Error processing summary for ${req.params.date}:`, error);
+      res.status(500).json({ error: 'Failed to process daily summary' });
+    }
+  });
+
+  // Get latest shift summary (for receipts page default view)
+  app.get('/api/daily-summaries/latest', async (req: Request, res: Response) => {
+    try {
+      const { jussiShiftSummarizer } = await import('./services/jussiShiftSummarizer');
+      const latestSummary = await jussiShiftSummarizer.getLatestShiftSummary();
+      
+      if (!latestSummary) {
+        return res.status(404).json({ error: 'No shift summaries found' });
+      }
+      
+      res.json(latestSummary);
+    } catch (error) {
+      console.error('Error fetching latest summary:', error);
+      res.status(500).json({ error: 'Failed to fetch latest summary' });
+    }
+  });
+
+  // Get summary for specific date
+  app.get('/api/daily-summaries/:date', async (req: Request, res: Response) => {
+    try {
+      const { date } = req.params;
+      const { jussiShiftSummarizer } = await import('./services/jussiShiftSummarizer');
+      const summary = await jussiShiftSummarizer.getShiftSummaryByDate(date);
+      
+      if (!summary) {
+        return res.status(404).json({ error: `No summary found for ${date}` });
+      }
+      
+      res.json(summary);
+    } catch (error) {
+      console.error(`Error fetching summary for ${req.params.date}:`, error);
+      res.status(500).json({ error: 'Failed to fetch summary' });
+    }
+  });
+
+  // Get all summaries (for receipts page search)
+  app.get('/api/daily-summaries', async (req: Request, res: Response) => {
+    try {
+      const { limit } = req.query;
+      const summaries = await db
+        .select()
+        .from(dailyReceiptSummaries)
+        .orderBy(desc(dailyReceiptSummaries.date))
+        .limit(limit ? parseInt(limit as string) : 31);
+      
+      res.json(summaries);
+    } catch (error) {
+      console.error('Error fetching summaries:', error);
+      res.status(500).json({ error: 'Failed to fetch summaries' });
     }
   });
 
