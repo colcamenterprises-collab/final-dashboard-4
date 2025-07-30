@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
-import { AIChatWidget } from "@/components/AIChatWidget";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -744,25 +744,7 @@ const ReportsAnalysis = () => {
             </div>
           </div>
 
-          {/* Jussi Chat Section - Resized to 2 columns by 1 section */}
-          <div className="mt-10 border-t pt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-2 border-blue-500 bg-blue-50 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
-                    <MessageCircle className="h-5 w-5" />
-                    Ask Jussi - Head of Operations
-                  </CardTitle>
-                  <CardDescription className="text-blue-700">
-                    Ask Jussi to review anomalies, trends, or operational insights from your data.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AIChatWidget agent="jussi" height="400px" />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+
         </TabsContent>
 
 
