@@ -37,13 +37,22 @@ export class LiveReceiptService {
   }
 
   async fetchReceiptsForPeriod(startTime: string, endTime: string): Promise<ReceiptSummary> {
-    console.log(`🔍 Fetching live receipts from Loyverse API: ${startTime} to ${endTime}`);
+    // Limit to last month to prevent fetching thousands of receipts
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    
+    // Use the more restrictive date range (last month vs requested range)
+    const limitedStartTime = new Date(Math.max(new Date(startTime).getTime(), oneMonthAgo.getTime())).toISOString();
+    const limitedEndTime = endTime;
+    
+    console.log(`🔍 Fetching live receipts from Loyverse API (limited to last month): ${limitedStartTime} to ${limitedEndTime}`);
     
     try {
       const allReceipts: LoyverseReceipt[] = [];
       let cursor: string | undefined;
       let pagesProcessed = 0;
       let totalFetched = 0;
+      const MAX_PAGES = 20; // Limit to 20 pages (5,000 receipts max)
 
       do {
         const params = new URLSearchParams({
