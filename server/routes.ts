@@ -2888,16 +2888,17 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         }>
       };
       
-      // Try to get receipts from Loyverse API if available
+      // Get receipts from Loyverse API - LIVE DATA ONLY
       try {
-        const loyverseOrchestrator = new LoyverseDataOrchestrator();
+        const { LiveReceiptService } = await import('./services/liveReceiptService');
+        const liveReceiptService = LiveReceiptService.getInstance();
         
         // Convert Bangkok timezone shift times to UTC for API query
         const shiftStartUTC = new Date(shiftStart).toISOString();
         const shiftEndUTC = new Date(shiftEnd).toISOString();
         
-        // Get receipts from Loyverse API
-        const receiptsData = await loyverseOrchestrator.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
+        // Get receipts from Loyverse API using live service
+        const receiptsData = await liveReceiptService.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
         
         if (receiptsData && receiptsData.receipts) {
           const receipts = receiptsData.receipts;
@@ -2949,25 +2950,21 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
           }
         }
       } catch (loyverseError) {
-        console.log('Loyverse API not available, using fallback data:', loyverseError);
-        // Fallback to demo data for development
-        summary.totalReceipts = 25;
-        summary.grossSales = 7353;
-        summary.netSales = 7353;
-        summary.paymentTypes = { 'Cash': 12, 'Card': 8, 'QR Payment': 5 };
-        summary.itemsSold = { 
-          'Smash Burger': 15, 
-          'Chicken Burger': 8, 
-          'French Fries': 20, 
-          'Coke': 12, 
-          'Sprite': 6 
-        };
-        summary.modifiersSold = { 
-          'Extra Cheese': 5, 
-          'No Onions': 3, 
-          'Extra Sauce': 8 
-        };
-        summary.refunds = [];
+        console.error('Loyverse API Error:', loyverseError);
+        // Do not use fallback data - return empty summary with error
+        res.status(503).json({ 
+          error: 'Loyverse API unavailable - only live data supported',
+          summary: {
+            totalReceipts: 0,
+            grossSales: 0,
+            netSales: 0,
+            paymentTypes: {},
+            itemsSold: {},
+            modifiersSold: {},
+            refunds: []
+          }
+        });
+        return;
       }
       
       res.json({
@@ -2978,7 +2975,7 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
       });
     } catch (error) {
       console.error('Error in /api/receipts/summary:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Failed to fetch live receipt data from Loyverse API' });
     }
   });
 
@@ -3004,16 +3001,17 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         }>
       };
       
-      // Try to get receipts from Loyverse API if available
+      // Get receipts from Loyverse API - LIVE DATA ONLY
       try {
-        const loyverseOrchestrator = new LoyverseDataOrchestrator();
+        const { LiveReceiptService } = await import('./services/liveReceiptService');
+        const liveReceiptService = LiveReceiptService.getInstance();
         
         // Convert Bangkok timezone shift times to UTC for API query
         const shiftStartUTC = new Date(shiftStart).toISOString();
         const shiftEndUTC = new Date(shiftEnd).toISOString();
         
-        // Get receipts from Loyverse API
-        const receiptsData = await loyverseOrchestrator.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
+        // Get receipts from Loyverse API using live service
+        const receiptsData = await liveReceiptService.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
         
         if (receiptsData && receiptsData.receipts) {
           const receipts = receiptsData.receipts;
@@ -3065,15 +3063,21 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
           }
         }
       } catch (loyverseError) {
-        console.log('Loyverse API not available for date query, using historical data:', loyverseError);
-        // Return empty summary for historical dates when API unavailable
-        summary.totalReceipts = 0;
-        summary.grossSales = 0;
-        summary.netSales = 0;
-        summary.paymentTypes = {};
-        summary.itemsSold = {};
-        summary.modifiersSold = {};
-        summary.refunds = [];
+        console.error('Loyverse API Error for date query:', loyverseError);
+        // Do not use fallback data - return empty summary with error
+        res.status(503).json({ 
+          error: 'Loyverse API unavailable - only live data supported',
+          summary: {
+            totalReceipts: 0,
+            grossSales: 0,
+            netSales: 0,
+            paymentTypes: {},
+            itemsSold: {},
+            modifiersSold: {},
+            refunds: []
+          }
+        });
+        return;
       }
       
       res.json({
@@ -3112,27 +3116,26 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
         }>
       };
       
-      // Try to get receipts from Loyverse API if available
-      try {
-        const { LoyverseDataOrchestrator } = await import('./services/loyverseDataOrchestrator');
-        const loyverseOrchestrator = new LoyverseDataOrchestrator();
-        
-        // Convert Bangkok timezone shift times to UTC for API query
-        const shiftStartUTC = new Date(shiftStart).toISOString();
-        const shiftEndUTC = new Date(shiftEnd).toISOString();
-        
-        // Get receipts from Loyverse API
-        const receiptsData = await loyverseOrchestrator.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
+      // Get receipts from Loyverse API - LIVE DATA ONLY
+      const { LiveReceiptService } = await import('./services/liveReceiptService');
+      const liveReceiptService = LiveReceiptService.getInstance();
+      
+      // Convert Bangkok timezone shift times to UTC for API query
+      const shiftStartUTC = new Date(shiftStart).toISOString();
+      const shiftEndUTC = new Date(shiftEnd).toISOString();
+      
+      // Get receipts from Loyverse API
+      const receiptsData = await liveReceiptService.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
         
         if (receiptsData && receiptsData.receipts) {
           const receipts = receiptsData.receipts;
           summary.totalReceipts = receipts.length;
           
           if (receipts.length > 0) {
-            // Sort receipts by receipt number to get first and last
-            const sortedReceipts = receipts.sort((a, b) => {
-              const aNum = parseInt(a.receipt_number || '0');
-              const bNum = parseInt(b.receipt_number || '0');
+            // Sort receipts by receipt number to get first and last (handles real format like 6-36175)
+            const sortedReceipts = receipts.sort((a: any, b: any) => {
+              const aNum = parseInt(a.receipt_number?.split('-')[1] || a.receipt_number || '0');
+              const bNum = parseInt(b.receipt_number?.split('-')[1] || b.receipt_number || '0');
               return aNum - bNum;
             });
             
@@ -3185,29 +3188,6 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
             }
           }
         }
-      } catch (loyverseError) {
-        console.log('Loyverse API not available, using fallback data:', loyverseError);
-        // Fallback data with receipt IDs
-        summary.totalReceipts = 25;
-        summary.grossSales = 7353;
-        summary.netSales = 7353;
-        summary.firstReceipt = '1001';
-        summary.lastReceipt = '1025';
-        summary.paymentTypes = { 'Cash': 12, 'Card': 8, 'QR Payment': 5 };
-        summary.itemsSold = { 
-          'Smash Burger': 15, 
-          'Chicken Burger': 8, 
-          'French Fries': 20, 
-          'Coke': 12, 
-          'Sprite': 6 
-        };
-        summary.modifiersSold = { 
-          'Extra Cheese': 5, 
-          'No Onions': 3, 
-          'Extra Sauce': 8 
-        };
-        summary.refunds = [];
-      }
       
       // Format payment breakdown as requested
       const paymentBreakdown = Object.entries(summary.paymentTypes).map(([method, count]) => ({
@@ -3243,39 +3223,24 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
       
       let receiptsForExport: any[] = [];
       
-      try {
-        const { LoyverseDataOrchestrator } = await import('./services/loyverseDataOrchestrator');
-        const loyverseOrchestrator = new LoyverseDataOrchestrator();
+      const { LiveReceiptService } = await import('./services/liveReceiptService');
+      const liveReceiptService = LiveReceiptService.getInstance();
+      
+      const shiftStartUTC = new Date(shiftStart).toISOString();
+      const shiftEndUTC = new Date(shiftEnd).toISOString();
+      
+      const receiptsData = await liveReceiptService.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
         
-        const shiftStartUTC = new Date(shiftStart).toISOString();
-        const shiftEndUTC = new Date(shiftEnd).toISOString();
-        
-        const receiptsData = await loyverseOrchestrator.fetchReceiptsForPeriod(shiftStartUTC, shiftEndUTC);
-        
-        if (receiptsData && receiptsData.receipts) {
-          receiptsForExport = receiptsData.receipts.map((receipt: any) => ({
-            receipt_number: receipt.receipt_number || '',
-            created_at: receipt.created_at || '',
-            total_amount: (parseFloat(receipt.total_money?.toString() || '0') / 100).toFixed(2),
-            payment_method: receipt.payment_type_name || 'Unknown',
-            customer_name: receipt.customer_name || 'Walk-in',
-            items_count: receipt.receipt_items?.length || 0,
-            refunded: receipt.refunded_by ? 'Yes' : 'No',
-            store_name: receipt.source || 'Smash Brothers Burgers'
-          }));
-        }
-      } catch (loyverseError) {
-        console.log('Loyverse API not available, generating sample data for CSV export:', loyverseError);
-        // Fallback sample data for CSV export
-        receiptsForExport = Array.from({ length: 25 }, (_, i) => ({
-          receipt_number: (1001 + i).toString(),
-          created_at: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-          total_amount: (Math.random() * 500 + 50).toFixed(2),
-          payment_method: ['Cash', 'Card', 'QR Payment'][Math.floor(Math.random() * 3)],
-          customer_name: 'Walk-in',
-          items_count: Math.floor(Math.random() * 5) + 1,
-          refunded: 'No',
-          store_name: 'Smash Brothers Burgers'
+      if (receiptsData && receiptsData.receipts) {
+        receiptsForExport = receiptsData.receipts.map((receipt: any) => ({
+          receipt_number: receipt.receipt_number || '',
+          created_at: receipt.created_at || '',
+          total_amount: (parseFloat(receipt.total_money?.toString() || '0') / 100).toFixed(2),
+          payment_method: receipt.payment_type_name || 'Unknown',
+          customer_name: receipt.customer_name || 'Walk-in',
+          items_count: receipt.receipt_items?.length || 0,
+          refunded: receipt.refunded_by ? 'Yes' : 'No',
+          store_name: receipt.source || 'Smash Brothers Burgers'
         }));
       }
       
@@ -3306,7 +3271,7 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
       
     } catch (error) {
       console.error('Error generating CSV download:', error);
-      res.status(500).json({ error: 'Failed to generate CSV download' });
+      res.status(500).json({ error: 'Failed to fetch live receipt data from Loyverse API for CSV export' });
     }
   });
 

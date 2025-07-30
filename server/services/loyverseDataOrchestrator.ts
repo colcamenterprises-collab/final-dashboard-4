@@ -74,6 +74,43 @@ export class LoyverseDataOrchestrator {
     }
   }
 
+  // Fetch receipts for period from Loyverse API
+  async fetchReceiptsForPeriod(startTime: string, endTime: string): Promise<{
+    receipts: any[];
+    metadata: {
+      totalFetched: number;
+      validReceipts: number;
+      invalidReceipts: number;
+      pagesProcessed: number;
+    };
+  }> {
+    try {
+      logger.info(`Fetching receipts from Loyverse API for period: ${startTime} to ${endTime}`);
+      
+      const result = await this.loyverseAPI.fetchAllReceiptsForShift(new Date(startTime));
+      
+      // Transform to expected format for receipt endpoints
+      const transformedReceipts = result.receipts.map((receipt: any) => ({
+        receipt_number: receipt.receipt_number,
+        created_at: receipt.created_at,
+        total_money: receipt.total_money,
+        payment_type_name: receipt.payment_type?.name || 'Unknown',
+        customer_name: receipt.customer?.name || 'Walk-in',
+        receipt_items: receipt.line_items || [],
+        refunded_by: receipt.refunded_by,
+        source: receipt.source || 'Smash Brothers Burgers'
+      }));
+
+      return {
+        receipts: transformedReceipts,
+        metadata: result.metadata
+      };
+    } catch (error) {
+      logger.error('Error fetching receipts from Loyverse API:', error);
+      throw error;
+    }
+  }
+
   // Process complete shift data (receipts + analysis)
   async processShiftData(shiftDate: Date): Promise<ProcessingResult> {
     if (this.isProcessing) {
