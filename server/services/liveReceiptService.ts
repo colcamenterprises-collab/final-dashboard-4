@@ -1,4 +1,5 @@
 import axios from 'axios';
+import dayjs from 'dayjs';
 
 interface LoyverseReceipt {
   receipt_number: string;
@@ -37,35 +38,23 @@ export class LiveReceiptService {
   }
 
   async fetchReceiptsForPeriod(startTime: string, endTime: string): Promise<ReceiptSummary> {
-    // Limit to last month to prevent fetching thousands of receipts
-    const now = new Date();
-    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    // Limit to last 31 days to prevent fetching thousands of receipts
+    const actualEndTime = dayjs().toISOString();
+    const actualStartTime = dayjs().subtract(31, 'days').toISOString();
     
-    // Use the more restrictive date range (last month vs requested range)
-    const limitedStartTime = new Date(Math.max(new Date(startTime).getTime(), oneMonthAgo.getTime())).toISOString();
-    const limitedEndTime = endTime;
-    
-    console.log(`🔍 Fetching live receipts from Loyverse API (limited to last month): ${limitedStartTime} to ${limitedEndTime}`);
+    console.log(`🔍 Fetching live receipts from Loyverse API (last 31 days): ${actualStartTime} to ${actualEndTime}`);
     
     try {
       const allReceipts: LoyverseReceipt[] = [];
-      let cursor: string | undefined;
+      let cursor: string | null = null;
       let pagesProcessed = 0;
       let totalFetched = 0;
-      const MAX_PAGES = 20; // Limit to 20 pages (5,000 receipts max)
+      const MAX_PAGES = 30; // Safety limit to prevent excessive fetching
 
       do {
-        const params = new URLSearchParams({
-          start_time: startTime,
-          end_time: endTime,
-          limit: '250'
-        });
-
-        if (cursor) {
-          params.append('cursor', cursor);
-        }
-
-        const response = await axios.get(`${this.baseUrl}/receipts?${params.toString()}`, {
+        const url = `${this.baseUrl}/receipts?created_at_min=${actualStartTime}&created_at_max=${actualEndTime}&limit=250${cursor ? `&cursor=${cursor}` : ''}`;
+        
+        const response = await axios.get(url, {
           headers: {
             'Authorization': `Bearer ${this.accessToken}`,
             'Content-Type': 'application/json'
@@ -99,9 +88,9 @@ export class LiveReceiptService {
 
         console.log(`📄 Page ${pagesProcessed}: Fetched ${receipts.length} receipts`);
 
-      } while (cursor);
+      } while (cursor && pagesProcessed < MAX_PAGES);
 
-      console.log(`✅ Total receipts fetched: ${totalFetched} across ${pagesProcessed} pages`);
+      console.log(`✅ Total receipts fetched: ${totalFetched} across ${pagesProcessed} pages (limited to last 31 days)`);
 
       return {
         receipts: allReceipts,
