@@ -1,6 +1,6 @@
-import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../db.js";
-import { dailyStockSales } from "../../shared/schema.js";
+import { askGPT } from "../utils/gptUtils";
+import { db } from "../db";
+import { dailyStockSales } from "../../shared/schema";
 import { eq, desc } from "drizzle-orm";
 
 export class OllieAgent {
@@ -40,8 +40,8 @@ export class OllieAgent {
       return recentForm ? {
         date: recentForm.shiftDate,
         burgerBuns: recentForm.burgerBunsStock,
-        salesData: recentForm.salesData,
-        stockData: recentForm.stockData
+        startingCash: recentForm.startingCash,
+        totalSales: recentForm.totalSales
       } : null;
     } catch (error) {
       console.error("Error fetching stock data:", error);

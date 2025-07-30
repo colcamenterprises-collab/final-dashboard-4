@@ -1,6 +1,6 @@
-import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../db.js";
-import { dailyStockSales, aiInsights } from "../../shared/schema.js";
+import { askGPT } from "../utils/gptUtils";
+import { db } from "../db";
+import { dailyStockSales, aiInsights } from "../../shared/schema";
 import { desc } from "drizzle-orm";
 
 export class MarloAgent {
@@ -46,7 +46,7 @@ export class MarloAgent {
         .orderBy(desc(aiInsights.createdAt))
         .limit(5);
 
-      return `Recent sales data for trend analysis: ${recentSales ? JSON.stringify(recentSales.salesData) : 'No recent sales data'}
+      return `Recent sales data for trend analysis: ${recentSales ? JSON.stringify(recentSales.totalSales) : 'No recent sales data'}
 Recent business insights: ${JSON.stringify(recentInsights)}
 Restaurant type: Burger restaurant with delivery focus
 Target audience: Local customers and delivery platform users`;

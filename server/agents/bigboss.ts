@@ -1,6 +1,6 @@
-import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../db.js";
-import { chatLogs, aiInsights } from "../../shared/schema.js";
+import { askGPT } from "../utils/gptUtils";
+import { db } from "../db";
+import { chatLogs, aiInsights, dailyStockSales } from "../../shared/schema";
 import { desc } from "drizzle-orm";
 
 export class BigBossAgent {
@@ -46,15 +46,15 @@ export class BigBossAgent {
       // Get recent AI insights
       const recentInsights = await db
         .select()
-        .from(db.schema.aiInsights)
-        .orderBy(desc(db.schema.aiInsights.createdAt))
+        .from(aiInsights)
+        .orderBy(desc(aiInsights.createdAt))
         .limit(5);
 
       // Get recent operational data
       const [recentOperations] = await db
         .select()
-        .from(db.schema.dailyStockSales)
-        .orderBy(desc(db.schema.dailyStockSales.createdAt))
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.createdAt))
         .limit(1);
 
       return `Recent team interactions: ${JSON.stringify(recentChats.slice(0, 3))}

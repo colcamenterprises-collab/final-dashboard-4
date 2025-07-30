@@ -4,12 +4,12 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
 import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
-import { OllieAgent } from './agents/ollie.js';
-import { SallyAgent } from './agents/sally.js';
-import { MarloAgent } from './agents/marlo.js';
-import { BigBossAgent } from './agents/bigboss.js';
-import { JussiAgent } from './agents/jussi.js';
-import { db } from './db.js';
+import { OllieAgent } from './agents/ollie';
+import { SallyAgent } from './agents/sally';
+import { MarloAgent } from './agents/marlo';
+import { BigBossAgent } from './agents/bigboss';
+import { JussiAgent } from './agents/jussi';
+import { db } from './db';
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));

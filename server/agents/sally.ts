@@ -1,6 +1,6 @@
-import { askGPT } from "../utils/gptUtils.js";
-import { db } from "../db.js";
-import { expenses } from "../../shared/schema.js";
+import { askGPT } from "../utils/gptUtils";
+import { db } from "../db";
+import { expenses, dailyStockSales } from "../../shared/schema";
 import { desc, sql } from "drizzle-orm";
 
 export class SallyAgent {
@@ -44,20 +44,20 @@ export class SallyAgent {
           category: expenses.category,
           total: sql<number>`sum(${expenses.amount})`
         })
-        .from(db.schema.expenses)
-        .where(sql`extract(month from ${db.schema.expenses.date}) = extract(month from current_date)`)
-        .groupBy(db.schema.expenses.category);
+        .from(expenses)
+        .where(sql`extract(month from ${expenses.date}) = extract(month from current_date)`)
+        .groupBy(expenses.category);
 
       // Get recent sales data
       const [recentSales] = await db
         .select()
-        .from(db.schema.dailyStockSales)
-        .orderBy(desc(db.schema.dailyStockSales.createdAt))
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.createdAt))
         .limit(1);
 
       return `Recent expenses: ${JSON.stringify(recentExpenses.slice(0, 5))}
 Monthly expense summary: ${JSON.stringify(monthlyExpenses)}
-Recent sales data: ${recentSales ? JSON.stringify(recentSales.salesData) : 'No recent sales data'}`;
+Recent sales data: ${recentSales ? JSON.stringify(recentSales.totalSales) : 'No recent sales data'}`;
 
     } catch (error) {
       console.error("Error fetching financial data:", error);
