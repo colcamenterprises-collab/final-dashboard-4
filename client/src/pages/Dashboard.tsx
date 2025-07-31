@@ -14,8 +14,8 @@ import MonthlyRevenueChart from "@/components/SalesChart";
 import MonthlyExpensesChart from "@/components/MonthlyExpensesChart";
 import ShiftSummaryCard from "@/components/ShiftSummaryCard";
 import RollVarianceCard from "@/components/RollVarianceCard";
-import ShiftReportReview from "@/components/ShiftReportReview";
-import LatestShiftSummaryCard from "@/components/LatestShiftSummaryCard";
+
+
 
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -257,13 +257,13 @@ export default function Dashboard() {
       <div className="mb-6 lg:mb-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
-            <LatestShiftSummaryCard />
+            <ShiftSummaryCard />
           </div>
           <div className="lg:col-span-3">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <RollVarianceCard />
               <ShiftSummaryCard />
-              <ShiftReportReview />
+
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
-import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
+
 import { OllieAgent } from './agents/ollie';
 import { SallyAgent } from './agents/sally';
 import { MarloAgent } from './agents/marlo';
@@ -135,8 +135,7 @@ async function checkSchema() {
   await checkSchema();
   const server = await registerRoutes(app);
 
-  // Setup webhooks for real-time Loyverse data
-  setupWebhooks(app);
+
   
   // Initialize AI agents
   const ollie = new OllieAgent();
