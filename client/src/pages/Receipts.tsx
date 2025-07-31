@@ -265,7 +265,7 @@ export default function Receipts() {
                     {formatShiftTime(displaySummary.shiftStart, displaySummary.shiftEnd)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(displaySummary.date), 'MMM dd, yyyy')}
+                    {format(new Date(displaySummary.shiftDate), 'MMM dd, yyyy')}
                   </p>
                 </CardContent>
               </Card>
