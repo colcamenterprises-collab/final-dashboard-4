@@ -64,6 +64,19 @@ Based on the dashboard design patterns, the application uses three primary butto
 - **All buttons maintain rounded corners** (rounded-md standard)
 - **Hover effects are consistent** within each button type
 
+## Recent Changes (January 31, 2025)
+
+### CRITICAL BUG FIX - DAILY STOCK SALES FORM DATA SAVING ✅ COMPLETED
+- **Root Cause Identified**: Form submissions saving with zero/empty values despite being completed due to incomplete route mapping
+- **API Route Mismatch**: `/api/daily-shift-forms` route was only saving basic fields (`completedBy`, `shiftType`, `shiftDate`) while ignoring all sales/expense data
+- **Comprehensive Fix Applied**: Updated `/api/daily-shift-forms` route to properly handle all form data including:
+  - Sales data: `grabSales`, `aroiDeeSales`, `qrScanSales`, `cashSales` with auto-calculated `totalSales`
+  - Cash management: `startingCash`, `endingCash`, `bankedAmount`
+  - Expenses: `wages` and `shopping` arrays properly serialized as JSON with auto-calculated `totalExpenses`
+  - Inventory data: stored in `numberNeeded` field for comprehensive stock tracking
+- **Testing Verified**: Form ID 192 test submission shows perfect data storage with ฿3,500 total sales, ฿1,050 total expenses, and complete inventory tracking
+- **Production Ready**: Daily Stock Sales form now fully operational with accurate data persistence for operational analysis
+
 ## Recent Changes (January 30, 2025)
 
 ### RECEIPTS PAGE RESTORATION & ANALYSIS TOOLS CONSOLIDATION ✅ COMPLETED

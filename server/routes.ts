@@ -339,39 +339,58 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Daily Shift Forms endpoints (new consolidated structure)
+  // Daily Shift Forms endpoints (comprehensive form data handling)
   app.post("/api/daily-shift-forms", async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      console.log("Form submission:", data);
+      console.log("Comprehensive form submission:", data);
       
-      // Debug the exact values being mapped
-      const completedBy = data.completedBy || 'Unknown User';
-      const shiftType = data.shiftType || 'Standard';
-      const shiftDate = data.shiftDate ? new Date(data.shiftDate) : new Date();
-      const numberNeeded = data.numberNeeded || {};
-      
-      console.log("Mapped values:", { completedBy, shiftType, shiftDate, numberNeeded });
-      
-      // Use Drizzle ORM with proper schema field mapping
-      const [result] = await db.insert(dailyStockSales).values({
-        completedBy,
-        shiftType, 
-        shiftDate,
-        numberNeeded,
+      // Prepare data for database insertion
+      const formData = {
+        completedBy: data.completedBy || 'Unknown User',
+        shiftType: data.shiftType || 'Standard',
+        shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+        
+        // Sales data
+        startingCash: parseFloat(data.startingCash || '0'),
+        grabSales: parseFloat(data.grabSales || '0'),
+        aroiDeeSales: parseFloat(data.aroiDeeSales || '0'),
+        qrScanSales: parseFloat(data.qrScanSales || '0'),
+        cashSales: parseFloat(data.cashSales || '0'),
+        totalSales: parseFloat(data.grabSales || '0') + parseFloat(data.aroiDeeSales || '0') + parseFloat(data.qrScanSales || '0') + parseFloat(data.cashSales || '0'),
+        
+        // Cash management
+        endingCash: parseFloat(data.endingCash || '0'),
+        bankedAmount: parseFloat(data.bankedAmount || '0'),
+        
+        // Expenses
+        wages: JSON.stringify(data.wages || []),
+        shopping: JSON.stringify(data.shopping || []),
+        totalExpenses: (data.wages || []).reduce((sum: number, wage: any) => sum + parseFloat(wage.amount || '0'), 0) + 
+                       (data.shopping || []).reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0),
+        
+        // Inventory data
+        numberNeeded: JSON.stringify(data.inventory || {}),
+        
+        // Status
         isDraft: false,
         status: 'completed'
-      }).returning();
+      };
       
-      console.log("✅ Form saved successfully with ID:", result.id);
+      console.log("Processed form data:", formData);
+      
+      // Use Drizzle ORM with proper schema field mapping
+      const [result] = await db.insert(dailyStockSales).values(formData).returning();
+      
+      console.log("✅ Comprehensive form saved successfully with ID:", result.id);
       res.json(result);
     } catch (err: any) {
-      console.error("Error:", err.message);
+      console.error("Form submission error:", err.message);
       let detailedError = 'Failed to save form';
       if (err.code === '22P02') {
         detailedError = 'Invalid numeric input – check fields like sales/amounts are numbers (no text/symbols). Reasoning: DB expects decimals; strings cause syntax errors.';
       }
-      res.status(500).json({ error: detailedError });
+      res.status(500).json({ error: detailedError, details: err.message });
     }
   });
 
