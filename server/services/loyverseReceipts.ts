@@ -59,6 +59,8 @@ export class LoyverseReceiptService {
     baseUrl: 'https://api.loyverse.com/v1.0'
   };
 
+  private static syncInProgress = false;
+
   // Calculate shift date based on 5pm-3am cycle in Bangkok timezone (UTC+7)
   private getShiftDate(timestamp: Date): Date {
     // Convert to Bangkok time (UTC+7)
@@ -77,6 +79,16 @@ export class LoyverseReceiptService {
   }
 
   async fetchAndStoreReceipts(): Promise<{ success: boolean; receiptsProcessed: number }> {
+    // Check if sync is already in progress
+    if (LoyverseReceiptService.syncInProgress) {
+      console.log('🔒 Sync already in progress, skipping this request');
+      return { success: false, receiptsProcessed: 0 };
+    }
+
+    // Set lock
+    LoyverseReceiptService.syncInProgress = true;
+    console.log('🔐 Starting receipt sync with process lock');
+
     try {
       console.log('Fetching receipts from Loyverse API with Bangkok timezone filtering...');
       
@@ -157,30 +169,45 @@ export class LoyverseReceiptService {
         }
 
         const data = await response.json();
+        console.log(`🔍 API Response structure: ${Object.keys(data).join(', ')}`);
         const receipts = data.receipts || [];
         cursor = data.cursor;
         totalReceipts += receipts.length;
         
         console.log(`📊 Fetched ${receipts.length} receipts from Loyverse API (cursor: ${cursor ? 'has next page' : 'no more pages'})`);
+        console.log(`🔍 About to start processing ${receipts.length} receipts...`);
         
-        // Process receipts from this page
-        for (const receipt of receipts) {
-          try {
-            // Skip receipts with missing essential data
-            if (!receipt.receipt_number || !receipt.created_at) {
-              console.log('Skipping receipt with missing receipt_number/created_at:', {
-                receipt_number: receipt.receipt_number,
-                created_at: receipt.created_at
-              });
-              continue;
+        try {
+          console.log(`🔍 Sample receipt data keys: ${receipts.length > 0 ? Object.keys(receipts[0]).join(', ') : 'no receipts'}`);
+          
+          // Process receipts from this page
+          console.log(`🔄 Processing ${receipts.length} receipts from this API page...`);
+          for (const receipt of receipts) {
+            try {
+              console.log(`📝 Processing receipt: ${receipt.receipt_number} (${receipt.created_at})`);
+              
+              // Skip receipts with missing essential data
+              if (!receipt.receipt_number || !receipt.created_at) {
+                console.log('❌ Skipping receipt with missing receipt_number/created_at:', {
+                  receipt_number: receipt.receipt_number,
+                  created_at: receipt.created_at
+                });
+                continue;
+              }
+              
+              await this.storeReceipt(receipt);
+              processed++;
+              console.log(`✅ Receipt ${receipt.receipt_number} processed successfully (${processed} total)`);
+            } catch (error) {
+              console.error(`❌ Failed to store receipt ${receipt.receipt_number}:`, error);
             }
-            
-            await this.storeReceipt(receipt);
-            processed++;
-          } catch (error) {
-            console.error(`Failed to store receipt ${receipt.receipt_number}:`, error);
           }
+          console.log(`📊 Completed processing page: ${processed} receipts processed so far`);
+        } catch (pageError) {
+          console.error(`❌ Critical error processing receipt page:`, pageError);
+          throw pageError;
         }
+        
         
         // Continue if there's a cursor (more pages available)
       } while (cursor);
@@ -190,13 +217,20 @@ export class LoyverseReceiptService {
     } catch (error) {
       console.error('Failed to fetch receipts:', error);
       throw error;
+    } finally {
+      // Always release the lock
+      LoyverseReceiptService.syncInProgress = false;
+      console.log('🔓 Released sync lock');
     }
   }
 
   private async storeReceipt(receiptData: LoyverseReceiptData): Promise<void> {
+    console.log(`🔍 DEBUG: Processing receipt ${receiptData.receipt_number}`);
+    console.log(`📊 Receipt data keys: ${Object.keys(receiptData).join(', ')}`);
+    
     // Validate required fields - skip receipts with missing essential data
     if (!receiptData.receipt_number || !receiptData.created_at) {
-      console.log('Skipping receipt with missing required fields:', {
+      console.log('❌ Skipping receipt with missing required fields:', {
         receipt_number: receiptData.receipt_number,
         created_at: receiptData.created_at
       });
@@ -213,16 +247,30 @@ export class LoyverseReceiptService {
     // Extract discount amount from raw API data (stored as total_discount in Loyverse response)
     const discountAmount = receiptData.total_discount || 0;
     
+    console.log(`📋 Processed values for receipt ${receiptData.receipt_number}:`, {
+      receiptId,
+      receiptNumber: receiptData.receipt_number,
+      receiptDate: receiptDate.toISOString(),
+      totalAmount: totalAmount.toString(),
+      paymentMethod,
+      shiftDate: shiftDate.toISOString(),
+      hasCustomer: !!receiptData.customer_id,
+      itemsCount: receiptData.line_items?.length || 0
+    });
+    
     // Check if receipt already exists
     const existing = await db.select().from(loyverseReceipts)
       .where(eq(loyverseReceipts.receiptId, receiptId))
       .limit(1);
     
     if (existing.length > 0) {
+      console.log(`⚠️ Receipt ${receiptData.receipt_number} already exists, skipping`);
       return; // Skip if already exists
     }
 
     try {
+      console.log(`💾 Attempting to insert receipt ${receiptData.receipt_number} into database...`);
+      
       await db.insert(loyverseReceipts).values({
         receiptId: receiptId,
         receiptNumber: receiptData.receipt_number,
@@ -238,9 +286,19 @@ export class LoyverseReceiptService {
         shiftDate: shiftDate,
         rawData: receiptData
       });
-      console.log(`Successfully stored receipt ${receiptData.receipt_number}`);
+      
+      console.log(`✅ Successfully stored receipt ${receiptData.receipt_number} | Total: ฿${totalAmount}`);
     } catch (insertError) {
-      console.error(`Database insert failed for receipt ${receiptData.receipt_number}:`, insertError);
+      console.error(`❌ Database insert failed for receipt ${receiptData.receipt_number}:`);
+      console.error(`➡️ Insert values:`, {
+        receiptId,
+        receiptNumber: receiptData.receipt_number,
+        receiptDate: receiptDate.toISOString(),
+        totalAmount: totalAmount.toString(),
+        paymentMethod,
+        shiftDate: shiftDate.toISOString()
+      });
+      console.error(`➡️ Error details:`, insertError);
       throw insertError;
     }
   }
