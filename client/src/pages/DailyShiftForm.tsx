@@ -391,7 +391,6 @@ const DailyShiftForm = () => {
                   id="completedBy"
                   value={formData.completedBy}
                   onChange={(e) => setFormData(prev => ({ ...prev, completedBy: e.target.value }))}
-                  placeholder="Staff name"
                   required
                 />
               </div>
@@ -399,7 +398,7 @@ const DailyShiftForm = () => {
                 <Label htmlFor="shiftType">Shift Type</Label>
                 <Select onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select shift" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="day">Day Shift</SelectItem>
@@ -514,7 +513,7 @@ const DailyShiftForm = () => {
                         newWages[index].name = e.target.value;
                         setFormData(prev => ({ ...prev, wages: newWages }));
                       }}
-                      placeholder="Enter staff name"
+
                     />
                   </div>
                   <div className="flex-1">
@@ -529,7 +528,6 @@ const DailyShiftForm = () => {
                         newWages[index].amount = parseFloat(e.target.value) || 0;
                         setFormData(prev => ({ ...prev, wages: newWages }));
                       }}
-                      placeholder="0.00"
                     />
                   </div>
                   <div className="flex-1">
@@ -582,7 +580,7 @@ const DailyShiftForm = () => {
                         newShopping[index].item = e.target.value;
                         setFormData(prev => ({ ...prev, shopping: newShopping }));
                       }}
-                      placeholder="Item or expense description"
+
                     />
                   </div>
                   <div className="flex-1">
@@ -597,7 +595,6 @@ const DailyShiftForm = () => {
                         newShopping[index].amount = parseFloat(e.target.value) || 0;
                         setFormData(prev => ({ ...prev, shopping: newShopping }));
                       }}
-                      placeholder="0.00"
                     />
                   </div>
                   <div className="flex-1">
@@ -609,7 +606,7 @@ const DailyShiftForm = () => {
                         newShopping[index].shop = e.target.value;
                         setFormData(prev => ({ ...prev, shopping: newShopping }));
                       }}
-                      placeholder="Shop or supplier name"
+
                     />
                   </div>
                   <Button
@@ -653,7 +650,6 @@ const DailyShiftForm = () => {
                   step="0.01"
                   value={formData.startingCash}
                   onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Opening cash amount"
                 />
               </div>
               <div>
@@ -665,7 +661,6 @@ const DailyShiftForm = () => {
                   step="0.01"
                   value={formData.endingCash}
                   onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Closing cash amount"
                 />
               </div>
               <div>
@@ -677,7 +672,6 @@ const DailyShiftForm = () => {
                   step="0.01"
                   value={formData.bankedAmount}
                   onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
-                  placeholder="Amount deposited"
                 />
               </div>
             </div>
@@ -712,9 +706,7 @@ const DailyShiftForm = () => {
                         }
                       }))
                     }
-                    placeholder="0"
                   />
-                  <div className="text-xs text-gray-500">Total number of buns in stock</div>
                 </div>
                 <div>
                   <Label htmlFor="meatStock">Meat Stock (kg)</Label>
@@ -733,9 +725,7 @@ const DailyShiftForm = () => {
                         }
                       }))
                     }
-                    placeholder="0.00"
                   />
-                  <div className="text-xs text-gray-500">Weight of meat in kilograms</div>
                 </div>
               </div>
             </div>
@@ -760,7 +750,6 @@ const DailyShiftForm = () => {
                           }
                         }));
                       }}
-                      placeholder="Quantity"
                     />
                   </div>
                 ))}
@@ -794,9 +783,7 @@ const DailyShiftForm = () => {
                           }
                         }));
                       }}
-                      placeholder="Quantity"
                     />
-                    <p className="text-xs text-gray-500 mt-1">{item.cost} per {item.unit}</p>
                   </div>
                 ))}
               </div>
