@@ -10,7 +10,7 @@ import {
   Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText,
   ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle
 } from "lucide-react";
-
+import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
 // Currency Context
 const CurrencyContext = createContext<{
@@ -169,7 +169,11 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Logo */}
           <div className={`flex items-center gap-3 mb-6 px-1 ${!isExpanded && 'justify-center'}`}>
-            <Utensils className="h-8 w-8 text-white" />
+            <img 
+              src={gradientLogo} 
+              alt="Restaurant Hub Logo" 
+              className="h-8 w-8 object-contain"
+            />
             {isExpanded && <span className="font-semibold text-white">Restaurant Hub</span>}
           </div>
           

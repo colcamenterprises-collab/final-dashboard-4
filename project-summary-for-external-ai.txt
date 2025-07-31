@@ -1,0 +1,79 @@
+RESTAURANT MANAGEMENT SYSTEM - PROJECT SUMMARY FOR EXTERNAL AI
+
+## Project Overview
+A comprehensive restaurant management dashboard for Smash Bros Burgers (Rawai, Thailand) with AI-powered analytics and Loyverse POS integration.
+
+## Key Technologies
+- Frontend: React 18 + TypeScript + Vite
+- Backend: Node.js + Express + TypeScript
+- Database: PostgreSQL + Drizzle ORM
+- UI: Tailwind CSS + shadcn/ui components
+- AI: OpenAI GPT-4o integration
+- POS: Loyverse API integration
+- Email: Gmail API
+- Routing: Wouter
+
+## Architecture
+```
+client/
+├── src/
+│   ├── components/ui/          # shadcn/ui components
+│   ├── components/             # Custom components
+│   ├── pages/                  # Page components
+│   ├── lib/                    # Utilities
+│   └── hooks/                  # Custom hooks
+
+server/
+├── services/                   # Business logic
+├── routes/                     # API routes
+├── constants/                  # Configuration
+└── storage.ts                  # Database interface
+
+shared/
+└── schema.ts                   # TypeScript schemas
+```
+
+## Key Features
+1. **Dashboard**: Real-time KPIs, sales analytics, AI insights
+2. **Daily Stock & Sales**: Staff reporting forms with email notifications
+3. **Shopping List**: Automated procurement management
+4. **Recipe Management**: Menu items with ingredient tracking
+5. **Loyverse Integration**: Live POS data sync
+6. **AI Analytics**: Receipt analysis and anomaly detection
+7. **Expense Tracking**: Business expense management
+8. **Shift Analytics**: 5pm-3am shift cycle tracking (Bangkok timezone)
+
+## Current Status
+- System is live and operational
+- Loyverse API connected (token: c1ba07b4dc304101b8dbff63107a3d87)
+- Enhanced validation and orchestration services deployed
+- AI analysis service with OpenAI integration active
+- Daily sync scheduled at 3:05 AM Bangkok time
+
+## Database Schema Highlights
+- Users, daily_sales, menu_items, inventory, shopping_list
+- expenses, transactions, ai_insights, loyverse_receipts
+- loyverse_shift_reports, quick_notes, marketing_calendar
+- ingredients, recipes, recipe_ingredients
+
+## API Endpoints
+- /api/dashboard/* - KPIs and analytics
+- /api/loyverse/* - POS integration
+- /api/daily-stock-sales/* - Form management
+- /api/shopping-list/* - Procurement
+- /api/expenses/* - Expense tracking
+- /api/loyverse/enhanced/* - Enhanced validation/analysis
+
+## Environment Variables
+- DATABASE_URL, OPENAI_API_KEY, LOYVERSE_API_TOKEN
+- LOYVERSE_STORE_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+- GOOGLE_REFRESH_TOKEN
+
+## Recent Enhancements
+- Enhanced Loyverse API client with retry logic
+- AI-powered analysis service for receipt insights
+- Data validation and orchestration services
+- Comprehensive logging system
+- Bangkok timezone handling for shift cycles
+
+This summary provides context for external AI tools to understand the restaurant management system architecture and current implementation status.

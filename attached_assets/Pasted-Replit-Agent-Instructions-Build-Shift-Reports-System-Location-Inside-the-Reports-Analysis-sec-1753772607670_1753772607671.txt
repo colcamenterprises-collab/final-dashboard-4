@@ -1,0 +1,133 @@
+Replit Agent Instructions: Build Shift Reports System
+📍 Location:
+Inside the Reports & Analysis section
+
+Under the Analysis tab
+
+🧠 Objective:
+Create a system that automatically generates a shift report per day, using:
+
+Daily Sales and Stock Form (internal submission)
+
+POS Shift Report (via Loyverse API or manual upload)
+
+It should generate:
+
+A side-by-side comparison
+
+Flag missing or unmatched data
+
+Output a report with summary and anomalies
+
+Allow manual review/update
+
+Generate and store a downloadable PDF version
+
+1. 🗃 DATABASE: shift_reports Table
+Add a table shift_reports with the following schema:
+
+ts
+Copy
+Edit
+model shift_reports {
+  id             String   @id @default(cuid())
+  report_date    DateTime
+  sales_form     Json?      // Daily Sales form data
+  shift_report   Json?      // POS Shift Report from Loyverse
+  summary        Json       // Combined analysis and insights
+  pdf_url        String?    // Link to downloadable report
+  status         String     // "complete", "partial", "missing", "manual_review"
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  @@unique([report_date])
+}
+2. 🔁 LOGIC: Data Processing Flow
+Create a backend script that:
+
+Triggers when:
+
+A Daily Sales form is submitted
+
+A POS Shift Report file is uploaded
+
+Or a new Shift Report is fetched from the Loyverse API
+
+Matches based on report_date
+
+Compares:
+
+Gross sales
+
+Expenses
+
+Expected vs actual banked amount
+
+Inventory movements (Meat, Rolls, Drinks)
+
+Shift register balance
+
+Detects anomalies and saves summary as structured JSON
+
+Flags status based on data completeness:
+
+complete: Both reports available and matched
+
+partial: Only one report available
+
+missing: Neither found
+
+manual_review: Needs manual trigger to recheck API or DB
+
+3. 📄 PDF Generation
+Create a function:
+
+Takes report_date and compiled summary
+
+Renders a two-column layout:
+
+Column A: Daily Sales Form
+
+Column B: POS Shift Report
+
+Shows shopping list, bank summary, inventory movement, and detected issues
+
+Generates PDF using pdfkit or puppeteer
+
+Saves and stores pdf_url in the database
+
+4. 📋 UI Panel (Frontend)
+On the Reports & Analysis > Analysis tab:
+
+Add a searchable/report viewer UI:
+
+Search by report_date
+
+Filter by status
+
+Show summary cards:
+
+Sales & Expenses
+
+Bank Accuracy
+
+Inventory Analysis
+
+Anomalies (highlighted in red)
+
+Action buttons:
+
+🧠 Manual Review: Recheck for missing source data
+
+📥 Download PDF: Opens pdf_url in new tab
+
+5. ⚠️ Notes
+Use report_date to match and sync data
+
+JSON file upload for sales forms is deprecated. Use internal form submission instead.
+
+Shift Reports can be pulled automatically via Loyverse API or uploaded manually (CSV).
+
+If only one side is available, still generate the report but indicate “Not Available” on the other side.
+
+All components must be reusable for future automation.

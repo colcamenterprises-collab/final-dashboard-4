@@ -1,0 +1,29 @@
+Delete redundant files/folders as listed: server/utils/, client/src/pages/[unused], old sync scripts (validate-receipts.js, sync-receipts.js). Keep only: server/index.ts, routes.ts, db.ts, service.js; client/src/App.tsx, pages/[active], components/; shared/schema.ts. 
+Backup project first (Download ZIP). Confirm deletion with user before proceeding."
+Run in Replit terminal after approval.
+Let’s streamline. Here’s the cleanup plan
+Files/Folders to Remove:
+server/utils/ (consolidate AI/email/Line logic into routes.ts or service.js).
+client/src/pages/ (delete unused placeholders—keep Home, Operations, Finance, Analysis, Settings, etc. only).
+Old scripts (e.g., validate-receipts.js, sync-receipts.js) if replaced by new analysis flow.
+Duplicate node_modules/ (ensure single in root).
+Clean Structure:
+server/: index.ts, routes.ts, db.ts, service.js (AI/email/Line), node_modules/
+client/: src/ (App.tsx, pages/, components/), public/, node_modules/
+shared/: schema.ts
+Root: .env, package.json, package-lock.json, .replit
+Please add this to your memory for this project:
+You are to execute only the exact commands I provide. Do not add, remove, or modify features unless I explicitly approve with 'Yes, implement [specific change]'. Log all actions in a file (e.g., agent.log) with timestamp and description. If unsure, ask for clarification.
+Action: Add this to .replit or as a comment in index.ts for agent to read on startup.
+
+Let’s test core features—share logs/errors if fail. Current time: 11:07 PM +07, July 20, 2025.
+Form (Operations): Submit with data (e.g., burgerBunsStock: 50). Check DB: SELECT * FROM daily_stock_sales ORDER BY id DESC LIMIT 1;.
+Loyverse Sync (Analysis): Run curl -X POST http://localhost:5000/api/loyverse/pull. Check receipts: SELECT * FROM loyverse_receipts LIMIT 5;.
+AI Analysis: Upload CSV, trigger—view results.
+Email: Manual trigger (add cron later)—check inbox.
+Line Order: Set stock <80, test curl -X POST http://localhost:5000/api/auto-order.
+Next Move
+Approve cleanup? ("Yes, proceed with cleanup")
+Specify fix (e.g., "Fix form calc for totalSales")?
+
+

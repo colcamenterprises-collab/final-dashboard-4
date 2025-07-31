@@ -2,9 +2,9 @@ import express, { Request, Response } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
-
+import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import crypto from "crypto"; // For webhook signature
-
+import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
 import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries } from "../shared/schema"; // Adjust path
 import { z } from "zod";
@@ -15,7 +15,7 @@ import xlsx from 'xlsx';
 import csv from 'csv-parser';
 import fs from 'fs';
 import path from 'path';
-
+import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 
 
@@ -53,34 +53,41 @@ export function registerRoutes(app: express.Application): Server {
 
   app.get("/api/dashboard/stock-discrepancies", async (req: Request, res: Response) => {
     try {
-      // Simple stock discrepancy endpoint using actual forms data
+      // Pull last shift's receipts right out of DB and analyze against staff forms
+      const { loyverseReceiptService } = await import("./services/loyverseReceipts");
+      const { getExpectedStockFromReceipts, analyzeStockDiscrepancies } = await import("./services/stockAnalysis");
+      
+      const shift = await loyverseReceiptService.getShiftData("last");
+      const receipts = await loyverseReceiptService.getReceiptsByShift(shift.id.toString());
+      
+      // Calculate expected stock usage from receipts
+      const expectedStock = getExpectedStockFromReceipts(receipts);
+      
+      // Get actual stock from the latest staff form (if available)
       const latestForms = await storage.getAllDailyStockSales();
+      const actualStock: Record<string, number> = latestForms.length > 0 ? {
+        "Burger Buns": Number(latestForms[0].burgerBunsStock) || 0,
+        "French Fries": Number((latestForms[0].frozenFood as any)?.["French Fries"]) || 0,
+        "Chicken Wings": Number((latestForms[0].frozenFood as any)?.["Chicken Wings"]) || 0,
+        "Chicken Nuggets": Number((latestForms[0].frozenFood as any)?.["Chicken Nuggets"]) || 0,
+        "Coke": Number((latestForms[0].drinkStock as any)?.["Coke"]) || 0,
+        "Fanta": Number((latestForms[0].drinkStock as any)?.["Fanta"]) || 0,
+        "Water": Number((latestForms[0].drinkStock as any)?.["Water"]) || 0
+      } : {};
       
-      if (latestForms.length === 0) {
-        return res.json({ discrepancies: [], message: 'No forms available for analysis' });
-      }
-      
-      const form = latestForms[0];
-      const discrepancies = [];
-      
-      // Simple variance analysis from form data
-      if (form.burgerBunsStock && Number(form.burgerBunsStock) < 5) {
-        discrepancies.push({
-          item: 'Burger Buns',
-          expected: 10,
-          actual: Number(form.burgerBunsStock),
-          variance: 10 - Number(form.burgerBunsStock),
-          status: 'low'
-        });
-      }
+      // Analyze discrepancies between expected and actual
+      const discrepancies = analyzeStockDiscrepancies(expectedStock, actualStock);
       
       res.json({ 
-        discrepancies: discrepancies.slice(0, 5),
-        formAnalyzed: form.id,
-        analysisDate: new Date().toISOString()
+        shiftId: shift.id,
+        discrepancies: discrepancies.slice(0, 10), // Top 10 discrepancies
+        receiptsAnalyzed: receipts.length,
+        expectedItems: expectedStock.length 
       });
     } catch (err) {
       console.error("Stock discrepancy analysis failed:", err);
+      
+      // Fallback to simple mock data if analysis fails
       const discrepancies = [
         {
           item: "Burger Buns",
@@ -2632,9 +2639,64 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
   });
 
   // Enhanced Loyverse API routes
+  app.use("/api/loyverse", loyverseEnhancedRoutes);
 
+  // Supplier Management API
+  // GET /api/suppliers - Return full list
+  app.get('/api/suppliers', (req: Request, res: Response) => {
+    try {
+      const suppliers = supplierService.getAll();
+      res.json(suppliers);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  });
 
+  // POST /api/suppliers - Add new item
+  app.post('/api/suppliers', (req: Request, res: Response) => {
+    try {
+      const newSupplier = supplierService.add(req.body);
+      res.json(newSupplier);
+    } catch (error) {
+      console.error('Error adding supplier:', error);
+      res.status(500).json({ error: 'Failed to add supplier' });
+    }
+  });
 
+  // PUT /api/suppliers/:id - Edit item
+  app.put('/api/suppliers/:id', (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedSupplier = supplierService.update(id, req.body);
+      
+      if (!updatedSupplier) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+      
+      res.json(updatedSupplier);
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      res.status(500).json({ error: 'Failed to update supplier' });
+    }
+  });
+
+  // DELETE /api/suppliers/:id - Remove item
+  app.delete('/api/suppliers/:id', (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = supplierService.delete(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Supplier not found' });
+      }
+      
+      res.json({ message: 'Supplier deleted successfully', deleted });
+    } catch (error) {
+      console.error('Error deleting supplier:', error);
+      res.status(500).json({ error: 'Failed to delete supplier' });
+    }
+  });
 
   // Shift Reports API routes
   app.get('/api/shift-reports', async (req: Request, res: Response) => {

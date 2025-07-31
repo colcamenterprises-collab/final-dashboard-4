@@ -1,0 +1,249 @@
+The dashboard is now set up for reliable data ingestion from Loyverse reports via uploads, with AI handling review, summary, and reporting. This aligns with your short-term fix and long-term goal of a simple, scalable system for other restaurants. Data flow is direct (no 3rd party tools), using Replit's backend (Express for API, Drizzle for DB, OpenAI for AI tasks). Setup is minimal: Upload reports to analysis page, trigger processing, view results on analysis and dashboard. Documents are stored in DB for searchability.
+
+Yes, an AI agent is needed for review, summary, and reporting—I'll implement it using the existing OpenAI API (GPT-4o for accuracy in parsing/summarizing PDFs/CSVs/Excel). It's a custom agent script in backend, triggered on analysis, to extract key metrics (sales by item/category/payment, receipts/items/modifiers), calculate totals/discrepancies, generate reports, update DB, and flag issues (e.g., mismatches). No external service—direct and secure.
+
+Setup Instructions
+Install Deps (Run in Replit Terminal):
+
+npm i multer xlsx pdf-parse (multer for uploads, xlsx for Excel, pdf-parse for PDF).
+
+DB Updates (shared/schema.ts - Add Table for Documents)
+
+Add this table for storing uploaded files (binary blob, searchable metadata):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+export const uploadedReports = pgTable('uploaded_reports', {
+  id: serial('id').primaryKey(),
+  filename: varchar('filename', { length: 255 }),
+  fileType: varchar('file_type', { length: 50 }), // pdf, csv, xlsx
+  fileData: bytea('file_data'), // Binary storage
+  uploadDate: timestamp('upload_date').defaultNow(),
+  shiftDate: timestamp('shift_date'), // Extracted from report
+  analysisSummary: jsonb('analysis_summary'), // AI results
+  userId: integer('user_id'), // For multi-restaurant scalability
+});
+Run npx drizzle-kit migrate.
+
+Backend API for Upload & Analysis (server/routes.ts - Add Endpoints)
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import multer from 'multer';
+import xlsx from 'xlsx';
+import pdfParse from 'pdf-parse';
+import OpenAI from 'openai';
+import { db } from '../db';
+import { uploadedReports } from '../../shared/schema';
+
+const upload = multer({ storage: multer.memoryStorage() });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Upload endpoint
+app.post('/api/analysis/upload', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    const shiftDate = DateTime.fromISO(req.body.shiftDate || DateTime.now().toISODate()); // Optional user input
+    const fileData = file.buffer;
+
+    // Insert to DB
+    const [report] = await db.insert(uploadedReports).values({
+      filename: file.originalname,
+      fileType: file.mimetype,
+      fileData,
+      shiftDate: shiftDate.toISO(),
+    }).returning({ id: uploadedReports.id });
+
+    res.json({ success: true, id: report.id, message: 'Uploaded - trigger analysis next' });
+  } catch (err) {
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// Trigger analysis endpoint (manual button call)
+app.post('/api/analysis/trigger', async (req, res) => {
+  try {
+    const reportId = req.body.reportId; // From upload
+    const report = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1)[0];
+
+    // Parse file based on type
+    let textContent;
+    if (report.fileType === 'application/pdf') {
+      textContent = (await pdfParse(report.fileData)).text;
+    } else if (report.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      const workbook = xlsx.read(report.fileData, { type: 'buffer' });
+      textContent = xlsx.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+    } else if (report.fileType === 'text/csv') {
+      textContent = report.fileData.toString('utf-8');
+    } else {
+      throw new Error('Unsupported file type');
+    }
+
+    // AI agent prompt for review/summary/reporting
+    const prompt = `Analyze Loyverse report (sales by item/category/payment, receipts/items/modifiers). Extract totals, discrepancies, stock usage (rolls, meat, drinks), top items. Structure as JSON: { totalSales: number, orders: number, anomalies: array, topItems: array, stockUsage: { rolls: number, meat: number, drinks: number } }.`;
+    const response = await openai.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt + textContent }] });
+    const analysis = JSON.parse(response.choices[0].message.content);
+
+    // Update DB with analysis
+    await db.update(uploadedReports).set({ analysisSummary: analysis }).where(eq(uploadedReports.id, reportId));
+
+    // Update dashboard tables (e.g., dailyShiftSummary, shiftItemSales, inventory) with analysis
+    await db.upsert(dailyShiftSummary).values({
+      shiftDate: report.shiftDate,
+      totalSales: analysis.totalSales,
+      totalOrders: analysis.orders,
+    }).onConflictDoUpdate({ target: dailyShiftSummary.shiftDate, set: { totalSales: analysis.totalSales, totalOrders: analysis.orders } });
+
+    // Top sales
+    await db.delete(shiftItemSales).where(eq(shiftItemSales.shiftDate, report.shiftDate));
+    analysis.topItems.forEach(item => db.insert(shiftItemSales).values({ shiftDate: report.shiftDate, itemName: item.name, quantity: item.quantity, salesTotal: item.sales }));
+
+    // Stock
+    await db.update(inventory).set({ quantity: analysis.stockUsage.rolls }).where(eq(inventory.name, 'Burger Rolls'));
+    await db.update(inventory).set({ quantity: analysis.stockUsage.meat }).where(eq(inventory.name, 'Meat'));
+    await db.update(inventory).set({ quantity: analysis.stockUsage.drinks }).where(eq(inventory.name, 'Drinks'));
+
+    res.json({ success: true, analysis });
+  } catch (err) {
+    res.status(500).json({ error: 'Analysis failed' });
+  }
+});
+
+// View analysis (for analysis page/dashboard)
+app.get('/api/analysis/:id', async (req, res) => {
+  const report = await db.select().from(uploadedReports).where(eq(uploadedReports.id, req.params.id)).limit(1)[0];
+  res.json(report?.analysisSummary || { message: 'No analysis' });
+});
+
+// Search stored documents
+app.get('/api/analysis/search', async (req, res) => {
+  const query = req.query.query;
+  const results = await db.select().from(uploadedReports).where(sql`filename ILIKE %${query}% OR analysisSummary::text ILIKE %${query}%`);
+  res.json(results);
+});
+Frontend for Analysis Page (client/src/pages/Analysis.tsx - Full Code)
+
+Add upload, trigger button, view analysis, search stored documents.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useState } from 'react';
+import { Card, CardHeader, CardContent, Button, Input, Table, TableBody, TableRow, TableCell } from "@/components/ui";
+
+const Analysis = () => {
+  const [file, setFile] = useState(null);
+  const [reportId, setReportId] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  const handleUpload = async () => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch('/api/analysis/upload', { method: 'POST', body: formData });
+    const data = await response.json();
+    setReportId(data.id);
+  };
+
+  const triggerAnalysis = async () => {
+    const response = await fetch('/api/analysis/trigger', { method: 'POST', body: JSON.stringify({ reportId }) });
+    const data = await response.json();
+    setAnalysis(data.analysis);
+  };
+
+  const viewAnalysis = async () => {
+    const response = await fetch(`/api/analysis/${reportId}`);
+    const data = await response.json();
+    setAnalysis(data);
+  };
+
+  const searchDocuments = async () => {
+    const response = await fetch(`/api/analysis/search?query=${searchQuery}`);
+    const data = await response.json();
+    setSearchResults(data);
+  };
+
+  return (
+    <Card>
+      <CardHeader>Analysis</CardHeader>
+      <CardContent>
+        <Input type="file" onChange={(e) => setFile(e.target.files[0])} />
+        <Button onClick={handleUpload}>Upload</Button>
+        {reportId && <Button onClick={triggerAnalysis}>Trigger Analysis</Button>}
+        <Button onClick={viewAnalysis}>View Analysis</Button>
+        <Input placeholder="Search documents" onChange={(e) => setSearchQuery(e.target.value)} />
+        <Button onClick={searchDocuments}>Search</Button>
+        {analysis && <pre>{JSON.stringify(analysis, null, 2)}</pre>}
+        <Table>
+          <TableBody>
+            {searchResults.map((r, i) => <TableRow key={i}><TableCell>{r.filename}</TableCell><TableCell>{r.uploadDate}</TableCell></TableRow>)}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default Analysis;
+Dashboard Home Integration (client/src/pages/Home.tsx - Add Analysis View)
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+// ...existing
+<Card>
+  <CardHeader>Latest Analysis</CardHeader>
+  <CardContent>
+    {analysis ? <pre>{JSON.stringify(analysis, null, 2)}</pre> : 'No analysis - Upload in Analysis page'}
+  </CardContent>
+</Card>
+AI Agent for Tasks (server/ai-agent.js - Call in Trigger Endpoint)
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import OpenAI from 'openai';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export async function analyzeReport(textContent) {
+  const prompt = `Review Loyverse report (sales by item/category/payment, receipts/items/modifiers). Summarize totals, discrepancies, stock usage (rolls, meat, drinks), top items. Structure as JSON: { totalSales: number, orders: number, anomalies: array, topItems: array, stockUsage: { rolls: number, meat: number, drinks: number } }.`;
+  const response = await openai.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt + textContent }] });
+  return JSON.parse(response.choices[0].message.content);
+}
+Run & Verify
+
+Install: npm i multer xlsx pdf-parse.
+Run migration for uploadedReports table.
+Test upload/trigger/view/search in Analysis page.
+Dashboard shows latest analysis.
+This setup is simple, secure (file memory storage, DB blob), scalable for other restaurants (add userId). Automate trigger on upload if needed. Test upload with your reports—share results

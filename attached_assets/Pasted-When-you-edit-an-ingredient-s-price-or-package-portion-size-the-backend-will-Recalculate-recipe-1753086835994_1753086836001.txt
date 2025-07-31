@@ -1,0 +1,108 @@
+When you edit an ingredient's price (or package/portion size), the backend will:
+
+Recalculate recipe costs (sum ingredient portion * price).
+Update estimated costs in shopping lists (quantity * price per unit).
+Timestamp the change (already in schema).
+This aligns with your vision: AI can be added later for analysis (e.g., flag cost increases >10%).
+
+1. DB Schema Update (shared/schema.ts - Add/Update if Needed)
+Add costPerPortion (auto-calc as price / (packageSize / portionSize)), extend recipes with cost calc.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+export const ingredients = pgTable('ingredients', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).unique(),
+  price: decimal('price', { precision: 10, scale: 2 }),
+  packageSize: decimal('package_size', { precision: 10, scale: 2 }),
+  unit: varchar('unit', { length: 50 }),
+  portionSize: decimal('portion_size', { precision: 10, scale: 2 }),
+  costPerPortion: decimal('cost_per_portion', { precision: 10, scale: 2 }), // Auto-calc
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+export const recipes = pgTable('recipes', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }),
+  ingredients: jsonb('ingredients'), // [{ ingredientId: id, quantity: number }]
+  cost: decimal('cost', { precision: 10, scale: 2 }), // Auto-calc sum
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+Run npx drizzle-kit migrate.
+
+2. Backend API Update (server/routes.ts - Update PUT /api/ingredients/:id)
+Auto-recalc costPerPortion, update recipe costs, shopping estimated costs.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.put('/api/ingredients/:id', async (req, res) => {
+  const data = req.body;
+  data.costPerPortion = (parseFloat(data.price) / (parseFloat(data.packageSize) / parseFloat(data.portionSize))) || 0;
+  const [result] = await db.update(ingredients).set(data).where(eq(ingredients.id, req.params.id)).returning();
+
+  // Recalc recipes using this ingredient
+  const recipesUsingIng = await db.select().from(recipes).where(sql`ingredients::jsonb @> '[{"ingredientId": ${req.params.id}}]'`);
+  for (const recipe of recipesUsingIng) {
+    let newCost = 0;
+    for (const ing of recipe.ingredients) {
+      const ingData = await db.select().from(ingredients).where(eq(ingredients.id, ing.ingredientId)).limit(1)[0];
+      newCost += ing.quantity * ingData.costPerPortion;
+    }
+    await db.update(recipes).set({ cost: newCost }).where(eq(recipes.id, recipe.id));
+  }
+
+  // Recalc shopping lists (estimatedCost = quantity * price)
+  const shoppingItems = await db.select().from(shoppingList).where(sql`itemName = ${data.name}`);
+  for (const item of shoppingItems) {
+    const newEstCost = item.quantity * data.price;
+    await db.update(shoppingList).set({ estimatedCost: newEstCost }).where(eq(shoppingList.id, item.id));
+  }
+
+  res.json(result);
+});
+3. Frontend Ingredients Page Update (client/src/pages/Ingredients.tsx - Update EditForm)
+Show costPerPortion, auto-update on save.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+const EditForm = ({ item, onSave, onCancel }) => {
+  const [data, setData] = useState(item);
+
+  const handleChange = (e) => setData({ ...data, [e.target.name]: e.target.value });
+
+  return (
+    <>
+      <TableCell><Input name="name" value={data.name} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="price" type="number" value={data.price} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="packageSize" type="number" value={data.packageSize} onChange={handleChange} /> <Input name="unit" value={data.unit} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="portionSize" type="number" value={data.portionSize} onChange={handleChange} /></TableCell>
+      <TableCell>Cost/Portion: ฿{data.costPerPortion}</TableCell>
+      <TableCell><Button onClick={() => onSave(item.id, data)}>Save</Button> <Button onClick={onCancel}>Cancel</Button></TableCell>
+    </>
+  );
+};
+4. Run & Verify
+Install if needed: npm i.
+Run migration.
+Test: Edit pickles (price 89, package 300, portion 30)—costPerPortion = 8.9 (89 / (300 / 30)), recipes/shopping updated, timestamp new.
+Check DB: SELECT * FROM ingredients ORDER BY updated_at DESC;.
+This keeps simple/secure, data accurate (auto-recalc). Test edit—share DB output if off.

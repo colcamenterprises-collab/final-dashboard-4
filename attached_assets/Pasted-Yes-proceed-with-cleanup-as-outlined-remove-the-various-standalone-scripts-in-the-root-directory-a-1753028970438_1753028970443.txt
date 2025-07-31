@@ -1,0 +1,34 @@
+Yes, proceed with cleanup as outlined—remove the various standalone scripts in the root directory (analyze_authentic_receipts.js, check_shift_540.js, etc.), older test files and exports, and any unused attachments. Keep the core files: server/index.ts, routes.ts, storage.ts; client/App.tsx, all active pages/ and components/; shared/schema.ts; and root configuration files. Log all deletions in agent.log with timestamps.
+
+Once cleanup is done, test core functionality with these steps (focus on data accuracy, direct APIs, no 3rd party):
+
+Form Submit (Operations - Daily Sales and Stock Form):
+Load the form.
+Fill minimal data (completedBy: "Test Staff", shiftDate: "2025-07-20T00:00:00Z", burgerBunsStock: 50, meatWeight: 10, drinkStockCount: 100, freshFood: [{ name: "Tomato", value: 5 }]).
+Submit (not draft).
+Expected: Saves to DB, gen shopping list (Tomato: 5), AI flags if discrepancies, email sent if not draft.
+Check: Run SQL SELECT * FROM daily_stock_sales ORDER BY id DESC LIMIT 1; and SELECT * FROM shoppingList;.
+If 500 error, share agent.log.
+Loyverse Sync & Analysis (Analysis):
+Upload a test CSV (use "1 receipts.csv" from previous).
+Trigger analysis.
+Expected: Parses data, updates shift summary (totalSales: 7934, orders: 26), stock (rolls/meat/drinks usage), top sales, stores in DB.
+Check: SQL SELECT * FROM loyverse_receipts LIMIT 5;, SELECT * FROM aiInsights;.
+View on Analysis page and home dashboard.
+Expenses (Finance - Lodge Expenses):
+Load Finance.
+Add expense (description: "Test", amount: 500, category: "Shopping").
+Expected: Saves to DB.
+Check: SQL SELECT * FROM expenses ORDER BY id DESC LIMIT 1;.
+Email Summary (8am BKK):
+Manual test: POST /api/send-email (add if not, or trigger cron function).
+Expected: Email with sales, discrepancies, shopping list, costs.
+Check inbox.
+Auto-Order (Critical Stock):
+If form burgerBunsStock <80, on submit trigger Line message to supplier (e.g., "Order rolls: 40").
+Test: Submit low stock form, check Line group.
+Homepage Data:
+Reload home.
+Expected: Latest shift sales/orders, stock insights (rolls/meat/drinks), top sales from receipts.
+If blank, run /api/loyverse/pull.
+If any test fails, share agent.log or SQL output. This ensures the system is bulletproof with data integrity.

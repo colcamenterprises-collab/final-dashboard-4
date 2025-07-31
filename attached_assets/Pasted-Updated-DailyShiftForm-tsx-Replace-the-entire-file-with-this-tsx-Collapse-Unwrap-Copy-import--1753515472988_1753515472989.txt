@@ -1,0 +1,129 @@
+Updated DailyShiftForm.tsx
+Replace the entire file with this.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useState, useEffect } from 'react';
+import axios from 'axios'; // For backend submit
+
+const DailyShiftForm = () => {
+  const [formData, setFormData] = useState({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Items from CSV (full list for accuracy; insert all)
+  const items = [
+    // Full CSV JSON (use from your CSV; truncated here - add all 58 as per your data)
+  ];
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      setFormData(JSON.parse(savedDraft));
+      setErrorMessage('Loaded from draft.');
+    }
+  }, []);
+
+  const handleNumberNeededChange = (itemName, value) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setFormData({
+        ...formData,
+        numberNeeded: { ...formData.numberNeeded, [itemName]: value }
+      });
+    } else {
+      setErrorMessage(`Invalid input for ${itemName}: Enter positive number or empty. Text/symbols not allowed to avoid type errors.`);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    for (const [item, value] of Object.entries(formData.numberNeeded)) {
+      if (value && isNaN(parseFloat(value))) {
+        setErrorMessage(`Invalid input for ${item}: Must be a number. Reasoning: Database expects numeric values; text causes syntax errors (22P02).`);
+        return;
+      }
+    }
+    const parsedData = {
+      ...formData,
+      numberNeeded: Object.fromEntries(
+        Object.entries(formData.numberNeeded).map(([k, v]) => [k, parseFloat(v) || 0])
+      )
+    };
+    try {
+      const response = await axios.post('/api/daily-shift-forms', parsedData);
+      setSubmissions([...submissions, { ...response.data, date: new Date().toLocaleString() }]);
+      setFormData({ numberNeeded: {} });
+      localStorage.removeItem('dailyShiftDraft');
+      setErrorMessage('');
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Internal Server Error';
+      setErrorMessage(`${msg}. Reasoning: Likely invalid data type in submission (e.g., non-number in numeric field). Check inputs and try again.`);
+    }
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formData));
+    setErrorMessage('Draft saved.');
+  };
+
+  const groupedItems = items.reduce((acc, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {});
+
+  return (
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8 shadow-lg rounded-lg p-4">
+            <h2 className="text-2xl font-bold uppercase tracking-wide mb-4 border-b border-orange-500 pb-2">{category}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
+                  <input
+                    type="text"
+                    placeholder="Number Needed"
+                    value={formData.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="flex space-x-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
+          <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
+        </div>
+      </form>
+      {errorMessage && (
+        <div className="mt-4 p-4 bg-red-500 rounded text-white">
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default DailyShiftForm;
+This removes costs, makes categories stand out, adds draft, and fixes error with parsing/validation. Test: Enter text in a field – see error with reasoning; enter numbers – submit to list. For DB submit, uncomment axios and ensure backend parses as above. Upload the zip for full fix.

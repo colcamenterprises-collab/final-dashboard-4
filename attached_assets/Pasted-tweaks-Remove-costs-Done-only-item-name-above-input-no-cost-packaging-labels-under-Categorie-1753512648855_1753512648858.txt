@@ -1,0 +1,128 @@
+tweaks:
+
+Remove costs: Done – only item name above input (no cost/packaging labels under).
+Categories stand out: Added bold uppercase headers with padding, border, and shadow for separation.
+Save as draft: Added button to save/load from localStorage (persistent in browser; auto-load on page open).
+Flow to list: Submissions list below form, with detailed entry breakdown.
+Copy this to client/src/pages/DailyShiftForm.tsx. For backend, update /api/daily-shift-forms in routes.ts.
+
+Updated Form Code
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import React, { useState, useEffect } from 'react';
+
+const DailyShiftForm = () => {
+  const [formValues, setFormValues] = useState({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Hard-coded JSON from CSV (full for accuracy; insert all items)
+  const items = [
+    // ... full list from CSV as JSON (use the one from my previous response; truncated here)
+  ];
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      setFormValues(JSON.parse(savedDraft));
+      setErrorMessage('Loaded from draft. Submit or update.');
+    }
+  }, []);
+
+  const handleNumberNeededChange = (itemName, value) => {
+    // Validate: only numbers or empty
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setFormValues({
+        ...formValues,
+        numberNeeded: { ...formValues.numberNeeded, [itemName]: value }
+      });
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Client-side validate before send
+    for (const [item, value] of Object.entries(formValues.numberNeeded)) {
+      if (value && isNaN(parseFloat(value))) {
+        setErrorMessage(`Invalid input for ${item}: Please enter a number (e.g., 5 or 2.5). Text or symbols are not allowed.`);
+        return;
+      }
+    }
+    axios.post('/api/daily-shift-forms', formValues)
+      .then(res => {
+        setSubmissions([...submissions, { ...res.data, date: new Date().toLocaleString() }]);
+        setFormValues({ numberNeeded: {} });
+        localStorage.removeItem('dailyShiftDraft');
+        setErrorMessage('');
+      })
+      .catch(err => {
+        const msg = err.response?.data?.error || 'Failed to submit form. Internal Server Error – check logs for details.';
+        setErrorMessage(msg + ' Reasoning: This usually happens due to invalid data in the submission (e.g., non-numeric value in a number field). Ensure all inputs are numbers and try again.');
+      });
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formValues));
+    setErrorMessage('Draft saved successfully. Load on refresh or continue editing.');
+  };
+
+  const groupedItems = items.reduce((acc, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {});
+
+  return (
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8 shadow-lg rounded-lg p-4">
+            <h2 className="text-xl font-bold uppercase tracking-wide mb-4 border-b-2 border-orange-500 pb-2">{category} Inventory</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
+                  <input
+                    type="text"
+                    placeholder="Number Needed"
+                    value={formValues.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="flex space-x-4 mt-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
+          <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
+        </div>
+      </form>
+      {errorMessage && (
+        <div className="mt-4 p-4 bg-red-500 rounded text-white">
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default DailyShiftForm;

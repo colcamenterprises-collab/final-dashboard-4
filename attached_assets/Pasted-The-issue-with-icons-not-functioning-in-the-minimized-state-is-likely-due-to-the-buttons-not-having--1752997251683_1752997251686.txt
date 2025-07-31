@@ -1,0 +1,92 @@
+The issue with icons not functioning in the minimized state is likely due to the buttons not having proper links or events when collapsed (e.g., the <link> component not triggering). This can happen if the icon-only view doesn't wrap the icon in a clickable element or if hover/click events are missed in Tailwind.
+
+To fix this, we'll update the Sidebar to make icons clickable even when collapsed (link to main section, expand on click for subs). Keeps it sleek/minimal, direct (no 3rd party), and simple.
+
+Updated Sidebar Code (client/src/components/Sidebar.tsx - Full Replacement)
+Replace the entire file with this—icons are now buttons with links, expand toggle on main items, dark mode intact.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { ChevronRight, ChevronDown, Home, ShoppingCart, DollarSign, MenuSquare, BarChart3, Megaphone, Settings, MessageCircle } from 'lucide-react';
+
+const Sidebar = () => {
+  const [expandedSections, setExpandedSections] = useState({}); // Per-section expand
+  const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true');
+
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', darkMode);
+  }, [darkMode]);
+
+  const toggleSection = (section) => setExpandedSections({ ...expandedSections, [section]: !expandedSections[section] });
+
+  const menuItems = [
+    { icon: Home, label: 'Home', path: '/' },
+    { icon: ShoppingCart, label: 'Ops & Sales', path: '/ops-sales', subs: [
+      { label: 'Daily Shift Form', path: '/ops-sales/form' },
+      { label: 'Purchasing', path: '/ops-sales/purchasing' },
+      { label: 'Receipts', path: '/ops-sales/receipts' },
+      { label: 'AI Analysis', path: '/ops-sales/ai' },
+    ] },
+    { icon: DollarSign, label: 'Finance', path: '/finance', subs: [
+      { label: 'Expenses', path: '/finance/expenses' },
+      { label: 'Profit & Loss', path: '/finance/pl' },
+      { label: 'Analysis (AI)', path: '/finance/analysis' },
+    ] },
+    { icon: MenuSquare, label: 'Menu Mgmt', path: '/menu-mgmt', subs: [
+      { label: 'Recipes', path: '/menu-mgmt/recipes' },
+      { label: 'Ingredients', path: '/menu-mgmt/ingredients' },
+    ] },
+    { icon: BarChart3, label: 'Marketing', path: '/marketing' },
+    { icon: Settings, label: 'Settings', path: '/settings', subs: [
+      { label: 'Business Info', path: '/settings/info' },
+      { label: 'Amend Logo', path: '/settings/logo' },
+      { label: 'Secret Keys', path: '/settings/keys' },
+      { label: 'Theme', path: '/settings/theme' },
+      { label: 'Employee Creation', path: '/settings/employees' },
+    ] },
+  ];
+
+  return (
+    <div className="flex flex-col gap-2 p-2 h-full min-w-[60px] bg-gray-100 dark:bg-gray-900 transition-all">
+      {menuItems.map((item, i) => (
+        <div key={i}>
+          <Button variant="ghost" className="w-full justify-start" onClick={item.subs ? () => toggleSection(item.label) : null} asChild={!item.subs}>
+            <Link to={item.path}>
+              <item.icon size={18} className="mr-2" />
+              {expandedSections[item.label] && item.subs ? item.label : (item.subs ? <ChevronRight size={18} className={expandedSections[item.label] ? 'rotate-90' : ''} /> : item.label)}
+            </Link>
+          </Button>
+          {expandedSections[item.label] && item.subs && (
+            <div className="pl-4">
+              {item.subs.map((sub, j) => (
+                <Button key={j} variant="ghost" className="w-full justify-start" asChild>
+                  <Link to={sub.path}>{sub.label}</Link>
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="mt-auto">
+        <Button variant="ghost" className="w-full justify-start">
+          <MessageCircle size={18} className="mr-2" />
+          {expandedSections['Chat'] ? 'Chat' : null}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
+How It Works: Icons always clickable (link to main path), subs expand on main click (chevron rotates), closed by default. Dark mode: Text white on dark bg, icons visible.
+Test: Reload, icons link to pages, click main to expand subs. Share screenshot if off.
+Proactive: Added Chat icon bottom (placeholder for Grok support). Theme toggle in Settings. Menu headings shortened (e.g., "Menu Mgmt").

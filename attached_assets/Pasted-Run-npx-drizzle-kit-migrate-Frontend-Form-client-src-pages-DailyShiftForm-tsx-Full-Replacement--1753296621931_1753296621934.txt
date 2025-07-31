@@ -1,0 +1,46 @@
+Run npx drizzle-kit migrate.
+Frontend Form (client/src/pages/DailyShiftForm.tsx - Full Replacement)
+Sleek card, add buttons, auto-calcs, gen shopping >0 (exclude drinks/rolls/meat—in hand only), report with drinks.
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input, Button, Card, CardHeader, CardContent, Label, Select } from "@/components/ui";
+import { useState, useEffect } from 'react';
+
+const formSchema = z.object({
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']),
+  shiftDate: z.string().datetime("Required"),
+  startingCash: z.coerce.number().optional().default(0),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wages: z.array(z.object({ staffName: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), type: z.enum(['wages', 'overtime', 'other']) })).optional().default([]),
+  shopping: z.array(z.object({ item: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), shopName: z.string().optional() })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  endCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  drinkStockCount: z.coerce.number().optional().default(0),
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  freshFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Salad (Iceberg Lettuce)', value: 0 }, { name: 'Tomatos', value: 0 }, { name: 'White Cabbage', value: 0 }, { name: 'Purple Cabbage', value: 0 }, { name: 'Bacon Short', value: 0 }, { name: 'Bacon Long', value: 0 }, { name: 'Milk', value: 0 }, { name: 'Butter', value: 0 }]),
+freshFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]), frozenFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Chicken Nuggets', value: 0 }, { name: 'Sweet Potato Fries', value: 0 }]), frozenFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]), shelfItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Dill Pickles', value: 0 }, { name: 'Sweet Pickles', value: 0 }, { name: 'Cajun Spice', value: 0 }, { name: 'White Vinegar', value: 0 }, { name: 'Crispy Fried Onions', value: 0 }, { name: 'Paprika (Smoked)', value: 0 }, { name: 'Jalapenos', value: 0 }, { name: 'Sriracha Mayonnaise', value: 0 }, { name: 'Chipotle Sauce', value: 0 }, { name: 'Flour', value: 0 }, { name: 'French Fries Seasoning BBQ', value: 0 }]), shelfItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]), kitchenItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Kitchen Cleaner', value: 0 }, { name: 'Floor Cleaner', value: 0 }, { name: 'Gloves Medium', value: 0 }, { name: 'Gloves Large', value: 0 }, { name: 'Gloves Small', value: 0 }, { name: 'Plastic Meat Gloves', value: 0 }, { name: 'Paper Towel Long', value: 0 }, { name: 'Paper Towel Short', value: 0 }, { name: 'Bin Bags 30x40', value: 0 }, { name: 'Printer Rolls', value: 0 }, { name: 'Sticky Tape', value: 0 }]), kitchenItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]), packagingItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Loaded Fries Box', value: 0 }, { name: 'French Fries Box 600ml', value: 0 }, { name: 'Takeaway Sauce Container', value: 0 }, { name: 'Coleslaw Container', value: 0 }, { name: 'Burger Wrapping Paper', value: 0 }, { name: 'French Fries Paper', value: 0 }, { name: 'Paper Bags', value: 0 }, { name: 'Plastic Bags 8x16', value: 0 }, { name: 'Plastic Bags 9x18', value: 0 }, { name: 'Knife and Fork Set', value: 0 }, { name: 'Bag Close Stickers', value: 0 }, { name: 'Sauce Container Stickers', value: 0 }, { name: 'Flag Stickers', value: 0 }, { name: 'Burger Sweets Takeaway', value: 0 }]), packagingItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]), isDraft: z.boolean().optional().default(false), });
+const DailyShiftForm = () => { const form = useForm({ resolver: zodResolver(formSchema), defaultValues: formSchema.parse({}) }); const { watch, setValue } = form; const [wagesEntries, setWagesEntries] = useState(1); const [shoppingEntries, setShoppingEntries] = useState(1); const [freshAdditional, setFreshAdditional] = useState(0); const [frozenAdditional, setFrozenAdditional] = useState(0); const [shelfAdditional, setShelfAdditional] = useState(0); const [kitchenAdditional, setKitchenAdditional] = useState(0); const [packagingAdditional, setPackagingAdditional] = useState(0);
+const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']); const expenses = watch(['gasExpense']); const wages = watch('wages'); const shopping = watch('shopping');
+useEffect(() => { const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0); setValue('totalSales', salesTotal); }, [sales, setValue]);
+useEffect(() => { const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0); const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0); const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0); setValue('totalExpenses', expTotal); }, [wages, shopping, expenses, setValue]);
+const onSubmit = async (data) => { await fetch('/api/daily-stock-sales', { method: 'POST', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'} }); if (!data.isDraft) { const purchaseItems = [ ...data.freshFood.filter(f => f.value > 0), ...data.freshFoodAdditional.filter(f => f.quantity > 0), ...data.frozenFood.filter(f => f.value > 0), ...data.frozenFoodAdditional.filter(f => f.quantity > 0), ...data.shelfItems.filter(f => f.value > 0), ...data.shelfItemsAdditional.filter(f => f.quantity > 0), ...data.kitchenItems.filter(f => f.value > 0), ...data.kitchenItemsAdditional.filter(f => f.quantity > 0), ...data.packagingItems.filter(f => f.value > 0), ...data.packagingItemsAdditional.filter(f => f.quantity > 0), ]; const shoppingList = purchaseItems.map(i => ({ itemName: i.name || i.item, quantity: i.value || i.quantity, unit: 'unit', formId: result.id, listDate: data.shiftDate })); await fetch('/api/shopping-list', { method: 'POST', body: JSON.stringify(shoppingList) }); } // Permanent add if checked for (const add of [...data.freshFoodAdditional.filter(f => f.addPermanently), ...data.frozenFoodAdditional.filter(f => f.addPermanently), ...data.shelfItemsAdditional.filter(f => f.addPermanently), ...data.kitchenItemsAdditional.filter(f => f.addPermanently), ...data.packagingItemsAdditional.filter(f => f.addPermanently)]) { await fetch('/api/ingredients', { method: 'POST', body: JSON.stringify({ name: add.item, price: 0, packageSize: 0, portionSize: 0, unit: 'unit' }) }); } };
+return (  Daily Sales & Stock Form   Completed By* <Input {...form.register("completedBy")} /> Shift Type <select {...form.register("shiftType")}> Opening Closing  Shift Date* <Input type="datetime-local" {...form.register("shiftDate")} /> Starting Cash (฿) <Input type="number" {...form.register("startingCash")} />

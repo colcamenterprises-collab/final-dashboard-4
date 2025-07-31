@@ -1,0 +1,142 @@
+We'll enhance the existing Ingredients page to include packaging size (e.g., jar 89 THB, 300g), portion size average (e.g., 30g), easy pricing updates, and auto-timestamping on changes (e.g., updatedAt column). This keeps the design sleek/minimal (shadcn cards/table, no clutter), simple to use (edit form per item), and secure (direct DB updates). No 3rd party tools—direct Drizzle for DB. Growth-ready: Add supplierId for multi-restaurant.
+
+BKK time: 01:39 PM +07, July 21, 2025—timestamps will use Luxon.
+
+1. DB Schema Update (shared/schema.ts - Add/Update Ingredients Table)
+Add portionSize, updatedAt (auto-update on change).
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { pgTable, serial, varchar, decimal, timestamp } from 'drizzle-orm/pg-core';
+
+export const ingredients = pgTable('ingredients', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).unique(),
+  price: decimal('price', { precision: 10, scale: 2 }),
+  packageSize: decimal('package_size', { precision: 10, scale: 2 }),
+  unit: varchar('unit', { length: 50 }), // e.g., g, kg, jar
+  portionSize: decimal('portion_size', { precision: 10, scale: 2 }), // Average per use
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+Run npx drizzle-kit migrate.
+
+2. Backend API for Update (server/routes.ts - Add/Update)
+Easy pricing update, auto-timestamp.
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { db } from '../db';
+import { ingredients } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
+
+app.post('/api/ingredients', async (req, res) => {
+  const data = req.body;
+  const [result] = await db.insert(ingredients).values(data).returning();
+  res.json(result);
+});
+
+app.put('/api/ingredients/:id', async (req, res) => {
+  const data = req.body;
+  const [result] = await db.update(ingredients).set(data).where(eq(ingredients.id, req.params.id)).returning();
+  res.json(result);
+});
+
+app.get('/api/ingredients', async (req, res) => {
+  const list = await db.select().from(ingredients);
+  res.json(list);
+});
+3. Ingredients Page (client/src/pages/Ingredients.tsx - Full Code)
+Sleek table with edit form per item (inline), update pricing/package/portion, timestamp shown.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardContent, Table, TableBody, TableRow, TableCell, Input, Button } from "@/components/ui";
+
+const Ingredients = () => {
+  const [list, setList] = useState([]);
+  const [editing, setEditing] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/ingredients').then(r => r.json()).then(setList);
+  }, []);
+
+  const handleUpdate = async (id, data) => {
+    await fetch(`/api/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data), headers: {'Content-Type': 'application/json'} });
+    setEditing(null);
+    fetch('/api/ingredients').then(r => r.json()).then(setList);
+  };
+
+  const addItem = async () => {
+    await fetch('/api/ingredients', { method: 'POST', body: JSON.stringify({ name: 'New Item', price: 0, packageSize: 0, unit: 'g', portionSize: 0 }), headers: {'Content-Type': 'application/json'} });
+    fetch('/api/ingredients').then(r => r.json()).then(setList);
+  };
+
+  return (
+    <Card>
+      <CardHeader>Ingredients List</CardHeader>
+      <CardContent>
+        <Button onClick={addItem}>+ Add Ingredient</Button>
+        <Table>
+          <TableBody>
+            {list.map(item => (
+              <TableRow key={item.id}>
+                {editing === item.id ? (
+                  <EditForm item={item} onSave={handleUpdate} onCancel={() => setEditing(null)} />
+                ) : (
+                  <>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>฿{item.price}/ {item.packageSize} {item.unit}</TableCell>
+                    <TableCell>Portion: {item.portionSize} {item.unit}</TableCell>
+                    <TableCell>Updated: {item.updatedAt}</TableCell>
+                    <TableCell><Button onClick={() => setEditing(item.id)}>Edit</Button></TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+const EditForm = ({ item, onSave, onCancel }) => {
+  const [data, setData] = useState(item);
+
+  const handleChange = (e) => setData({ ...data, [e.target.name]: e.target.value });
+
+  return (
+    <>
+      <TableCell><Input name="name" value={data.name} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="price" type="number" value={data.price} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="packageSize" type="number" value={data.packageSize} onChange={handleChange} /> <Input name="unit" value={data.unit} onChange={handleChange} /></TableCell>
+      <TableCell><Input name="portionSize" type="number" value={data.portionSize} onChange={handleChange} /></TableCell>
+      <TableCell><Button onClick={() => onSave(item.id, data)}>Save</Button> <Button onClick={onCancel}>Cancel</Button></TableCell>
+    </>
+  );
+};
+
+export default Ingredients;
+Test: Load /menu-mgmt/ingredients, edit an item (e.g., pickles price 89, package 300g, portion 30g)—saves with new timestamp.
+Data Accuracy: Timestamp ensures latest pricing (use in shopping cost calc: total = quantity / portionSize * price).
+This is simple, data-focused, secure (direct DB). Test update—share screenshot if off.

@@ -1,0 +1,104 @@
+🔧 REPLIT AGENT TASK: Build "Shift Comparison" Page (/shift-comparison)
+📍 GOAL:
+Create a new page in the Smash Brothers Burgers dashboard that compares POS Shift Reports with the Daily Sales & Stock Form, and highlights discrepancies.
+
+🧠 JUSSI – HEAD OF OPERATIONS
+This agent reads and compares uploaded shift reports and manual sales forms. The goal is to identify inconsistencies in GRAB sales, Cash, QR Code totals, and register balances.
+
+📂 FILE LOCATION
+Add a new route /shift-comparison that renders the ShiftComparison.tsx component.
+
+✅ TASK CHECKLIST
+Frontend UI
+
+Create a new card in the Analysis tab (inside ReportsAnalysis.tsx) for:
+
+makefile
+Copy
+Edit
+Title: Shift vs Daily Comparison
+Description: AI detects mismatches between shift reports and manual forms
+Icon: AlertTriangle
+Path: /shift-comparison
+Status: Active
+On click, route to /shift-comparison.
+
+Page Functionality (ShiftComparison.tsx)
+
+Two file upload fields:
+
+Upload Shift Report JSON (from POS)
+
+Upload Daily Sales & Stock Form JSON (from staff)
+
+On upload:
+
+Parse each JSON
+
+Extract and compare:
+
+GRAB Sales
+
+Cash Sales
+
+QR Code Sales
+
+AroiDee
+
+Total Register Balance
+
+Highlight mismatches:
+
+⚠️ if values differ by more than ±50 THB
+
+✅ if within tolerance
+
+Display Section
+
+Table or side-by-side card layout:
+
+less
+Copy
+Edit
+| Metric            | Daily Sales Form | POS Shift Report | Status |
+|-------------------|------------------|------------------|--------|
+| GRAB Sales        | ฿14,900          | ฿20,300          | ⚠️     |
+| Cash Sales        | ฿5,200           | ฿5,200           | ✅     |
+| QR Code Sales     | ฿1,000           | ฿1,000           | ✅     |
+| Aroi Dee          | ฿0               | ฿0               | ✅     |
+| Register Balance  | ฿21,100          | ฿21,100          | ✅     |
+Jussi's Response Box
+
+Add a summary comment box:
+
+sql
+Copy
+Edit
+Jussi says:
+⚠️ Discrepancy in GRAB Sales: difference of ฿5,400
+✅ All other fields match within tolerance.
+Future Extension Placeholder
+
+Leave a section for:
+
+Receipt item comparison
+
+Modifier matching
+
+Summary of variances
+
+💾 OPTIONAL
+If time allows, add a "Save Comparison" button to write the results into a database table named shift_comparisons.
+
+🧪 TESTING
+Use two mock JSON files (provided or created manually) and ensure:
+
+Uploads parse correctly
+
+Data displays side-by-side
+
+Discrepancies are flagged
+
+Summary message appears from Jussi
+
+Let me know if you want me to attach test JSONs as well, or if you want this turned into a .md or .txt for easy upload to Replit.

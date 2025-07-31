@@ -1,0 +1,97 @@
+update the Daily Shift Form to allow removal/amendment of added entries (e.g., shopping/wages/additional items—add "Remove" button per entry), consolidate the menu structure (Draft Forms and Form Library as sub-menus of Daily Sales Form, with buttons at top right in the form page for quick access; when viewing a draft/completed form, show the full form details not summary), merge Purchasing into Shopping Requirements (single page with section for Burger Buns/Meat/Drinks lodge—timestamped for AI reporting), and add a chat window on all Operations tab pages for Jussi (Operations Manager bot—embedded iframe with agent-specific prompt for daily tasks like analyzing receipts, flagging anomalies, calc usage). This keeps data accuracy (timestamp lodge, full form view), simple (buttons for add/remove, merged pages), sleek/minimal (shadcn with no clutter), secure (direct DB/API for lodge/view, encrypted bot tokens), direct APIs (no 3rd party). Growth-ready: Extend bot prompts for multi-restaurant.
+
+Menu Update (client/src/components/Sidebar.tsx - Update)
+Draft Forms/Form Library as subs under Daily Sales Form; Purchasing merged into Shopping Requirements (no sub).
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post('/api/lodge-stock', async (req, res) => {
+  const data = req.body;
+  data.lodgeDate = new Date(); // Timestamp
+  await db.insert(stockLodge).values(data);
+  res.json({ success: true });
+});
+Chat Window for Operations (client/src/components/OperationsChat.tsx - New)
+Embedded on all Operations pages (e.g., Daily Shift Form).
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+const OperationsChat = () => {
+  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
+
+  const sendMessage = async () => {
+    const prompt = `You are Jussi, Operations Manager bot. Daily tasks: Analyze receipts, flag anomalies, calc ingredient usage, gen report. User: ${message}`;
+    const res = await fetch('/api/chat/jussi', { method: 'POST', body: JSON.stringify({ message: prompt }) });
+    const data = await res.json();
+    setResponse(data.reply);
+  };
+
+  return (
+    <Card>
+      <CardHeader>Chat with Jussi (Ops Manager)</CardHeader>
+      <CardContent>
+        <Input placeholder="Ask about receipts/stock..." onChange={(e) => setMessage(e.target.value)} />
+        <Button onClick={sendMessage}>Send</Button>
+        {response && <p>{response}</p>}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default OperationsChat;
+Embed in Operations pages, e.g., in DailyShiftForm: <operationschat> at bottom.</operationschat>
+
+View Full Form (new page /ops-sales/draft-forms/view/[id])
+Show full form details.
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardContent, Label, Input } from "@/components/ui";
+
+const FormView = () => {
+  const { id } = useParams();
+  const [formData, setFormData] = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/daily-stock-sales/${id}`).then(r => r.json()).then(setFormData);
+  }, [id]);
+
+  if (!formData) return <Card>Loading...</Card>;
+
+  return (
+    <Card>
+      <CardHeader>Full Form View - ID {id}</CardHeader>
+      <CardContent>
+        <Label>Completed By</Label>
+        <Input disabled value={formData.completedBy} />
+        // Repeat for all fields, including JSON arrays as tables
+      </CardContent>
+    </Card>
+  );
+};
+
+export default FormView;
+Test Steps
+Submit form with data (e.g., Grab Sales 100, Coke 10, Fresh Food item 5)—expect success, shopping gen'd (Fresh Food item: 5), no drinks/rolls/meat.
+View full form at /ops-sales/draft-forms/view/[id]—expect complete details.
+This fixes the form, adds chat, updates menu. Test—share screenshot/error. Next: AI agent for receipts?

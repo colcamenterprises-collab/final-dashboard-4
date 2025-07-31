@@ -1,0 +1,131 @@
+Updated Form Code (DailyShiftForm.tsx)
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+import React, { useState, useEffect } from 'react';
+
+const DailyShiftForm = () => {
+  const [formValues, setFormValues] = useState({ numberNeeded: {} });
+  const [submissions, setSubmissions] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Load drafts from localStorage on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('dailyShiftDraft');
+    if (savedDraft) {
+      setFormValues(JSON.parse(savedDraft));
+    }
+  }, []);
+
+  // Hard-coded JSON from CSV (update if CSV changes)
+  const items = [
+    // ... (paste the full JSON array from previous response here to avoid length limit; include all 58 items)
+  ]; // Truncated for brevity; use the full list from earlier
+
+  const handleNumberNeededChange = (itemName, value) => {
+    setFormValues({
+      ...formValues,
+      numberNeeded: { ...formValues.numberNeeded, [itemName]: value }
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const newSubmission = { ...formValues, date: new Date().toLocaleString() };
+    setSubmissions([...submissions, newSubmission]);
+    setFormValues({ numberNeeded: {} }); // Reset
+    localStorage.removeItem('dailyShiftDraft'); // Clear draft on submit
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem('dailyShiftDraft', JSON.stringify(formValues));
+    alert('Draft saved!');
+  };
+
+  const groupedItems = items.reduce((acc, item) => {
+    const cat = item["Internal Category"] || 'Other';
+    if (cat) {
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+    }
+    return acc;
+  }, {});
+
+  return (
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">Daily Sales & Stock</h1>
+      <form onSubmit={handleSubmit}>
+        {Object.entries(groupedItems).map(([category, catItems]) => (
+          <div key={category} className="mb-8">
+            <h2 className="text-xl font-bold uppercase tracking-wide mb-4 border-b border-gray-600 pb-2">{category} Inventory</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {catItems.map((item) => (
+                <div key={item["Item "]} className="bg-white/10 p-4 rounded-lg">
+                  <label className="block mb-2 font-semibold">{item["Item "]}</label>
+                  <input
+                    type="number"
+                    placeholder="Number Needed"
+                    value={formValues.numberNeeded[item["Item "]] || ''}
+                    onChange={(e) => handleNumberNeededChange(item["Item "], e.target.value)}
+                    className="w-full p-2 bg-gray-700 text-white rounded border-none focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="flex space-x-4">
+          <button type="button" onClick={saveDraft} className="bg-gray-500 text-white px-6 py-3 rounded font-bold">Save as Draft</button>
+          <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded font-bold">Submit Form</button>
+        </div>
+      </form>
+      {errorMessage && <p className="text-red-500 mt-4">{errorMessage}</p>}
+      <h2 className="text-xl font-bold mt-8 mb-4">Submission List</h2>
+      <ul className="list-disc pl-5">
+        {submissions.map((sub, index) => (
+          <li key={index} className="mb-4">
+            <strong>{sub.date}</strong>: {Object.entries(sub.numberNeeded).map(([item, value]) => `${item}: ${value}`).join(', ')}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default DailyShiftForm;
+Backend Fix for Submission Error
+The log shows a numeric_in error (22P02) from invalid numeric input in the query (likely non-numeric value for a numeric field like wages, but since wages isn't in the form, it's probably another field). Update /api/daily-shift-forms (or /api/daily-sales) to parse and default values.
+
+javascript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post('/api/daily-shift-forms', async (req, res) => {
+  try {
+    const { numberNeeded } = req.body;
+    // Parse and validate
+    const parsedNeeded = Object.fromEntries(
+      Object.entries(numberNeeded).map([item, value] => [item, parseFloat(value) || 0])
+    );
+    const sql = `
+      INSERT INTO daily_stock_sales (number_needed, shift_date)
+      VALUES ($1, $2)
+      RETURNING *;
+    `;
+    const values = [JSON.stringify(parsedNeeded), new Date().toISOString().split('T')[0]];
+    const result = await neon(sql, values);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Submission error:', err.message);
+    res.status(500).json({ error: 'Failed to save daily shift' });
+  }
+});

@@ -1,0 +1,637 @@
+the fully completed and corrected version of the DailyShiftForm.tsx file, incorporating all the fixes you requested (e.g., removing "Drink Count" box, updating Frozen Food, Shelf Items, Kitchen Items, and Packaging Items lists, adding "Save Draft" functionality, restoring the sales and expenses summary, and addressing the submit error). I'll ensure the code is fully functional, styled with the Poppins font and modern/minimalistic theme, and includes the remove/amend functionality for added entries.
+Fixes Addressed
+Remove "Drink Count" Box: Deleted the redundant drinkStockCount label/input since drink details are listed below.
+Frozen Food Section: Ensured "French Fries" and "Chicken Fillets" are included (no changes needed as they were already present; confirmed list is correct).
+Shelf Items: Removed "Burger Sauce" (not carried in stock) and reviewed/updated the list based on your input (e.g., corrected to "Chipotle Mayonnaise" instead of "Chipotle Sauce").
+Kitchen Items: Split "Gloves" into "Gloves Medium," "Gloves Large," and "Gloves Small" (two boxes as requested), broke down cleaning supplies into "Kitchen Cleaner," "Floor Cleaner," and "Dishwashing Liquid," added "Paper Towel Long" and "Paper Towel Short," removed "Parchment Paper."
+Packaging Items: Updated to match your exact list: "Loaded Fries Box," "French Fries Box 600ml," "Takeaway Sauce Container," "Coleslaw Container," "Burger Wrapping Paper," "French Fries Paper," "Paper Bags," "Plastic Bags 8x16," "Plastic Bags 9x18," "Knife and Fork Set," "Bag Close Stickers," "Sauce Container Stickers," "Flag Stickers," "Burger Sweets Takeaway."
+No Draft Save: Restored the "Save Draft" button with isDraft flag.
+Sales and Expenses Summary: Restored the detailed summary section with breakdowns.
+Submit Error: Fixed by ensuring result.id is properly handled (added async/await with response parsing) and aligning with the backend schema.
+Updated Daily Shift Form (client/src/pages/DailyShiftForm.tsx - Full Replacement)
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Input, Button, Card, CardHeader, CardContent, Label, Select, Checkbox } from "@/components/ui";
+import { useState, useEffect } from 'react';
+
+const formSchema = z.object({
+  completedBy: z.string().min(1, "Required"),
+  shiftType: z.enum(['opening', 'closing']),
+  shiftDate: z.string().datetime("Required"),
+  startingCash: z.coerce.number().optional().default(0),
+  grabSales: z.coerce.number().optional().default(0),
+  aroiDeeSales: z.coerce.number().optional().default(0),
+  qrScanSales: z.coerce.number().optional().default(0),
+  cashSales: z.coerce.number().optional().default(0),
+  totalSales: z.coerce.number().optional().default(0),
+  wages: z.array(z.object({ staffName: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), type: z.enum(['wages', 'overtime', 'other']) })).optional().default([]),
+  shopping: z.array(z.object({ item: z.string().min(1), amount: z.coerce.number().min(0).optional().default(0), shopName: z.string().optional() })).optional().default([]),
+  gasExpense: z.coerce.number().optional().default(0),
+  totalExpenses: z.coerce.number().optional().default(0),
+  endCash: z.coerce.number().optional().default(0),
+  bankedAmount: z.coerce.number().optional().default(0),
+  burgerBunsStock: z.coerce.number().optional().default(0),
+  meatWeight: z.coerce.number().optional().default(0),
+  // Removed drinkStockCount since drink details are listed below
+  coke: z.coerce.number().optional().default(0),
+  cokeZero: z.coerce.number().optional().default(0),
+  sprite: z.coerce.number().optional().default(0),
+  schweppesManow: z.coerce.number().optional().default(0),
+  fantaOrange: z.coerce.number().optional().default(0),
+  fantaStrawberry: z.coerce.number().optional().default(0),
+  sodaWater: z.coerce.number().optional().default(0),
+  water: z.coerce.number().optional().default(0),
+  kidsOrange: z.coerce.number().optional().default(0),
+  kidsApple: z.coerce.number().optional().default(0),
+  freshFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Salad (Iceberg Lettuce)', value: 0 }, { name: 'Tomatos', value: 0 }, { name: 'White Cabbage', value: 0 }, { name: 'Purple Cabbage', value: 0 }, { name: 'Bacon Short', value: 0 }, { name: 'Bacon Long', value: 0 }, { name: 'Milk', value: 0 }, { name: 'Butter', value: 0 }]),
+  freshFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  frozenFood: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Chicken Nuggets', value: 0 }, { name: 'Sweet Potato Fries', value: 0 }, { name: 'French Fries (7mm)', value: 0 }, { name: 'Chicken Fillets', value: 0 }]),
+  frozenFoodAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  shelfItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Mayonnaise', value: 0 }, { name: 'Mustard', value: 0 }, { name: 'Dill Pickles', value: 0 }, { name: 'Sweet Pickles', value: 0 }, { name: 'Salt', value: 0 }, { name: 'Pepper', value: 0 }, { name: 'Cajun Spice', value: 0 }, { name: 'White Vinegar', value: 0 }, { name: 'Crispy Fried Onions', value: 0 }, { name: 'Paprika (Smoked)', value: 0 }, { name: 'Jalapenos', value: 0 }, { name: 'Sriracha Mayonnaise', value: 0 }, { name: 'Chipotle Mayonnaise', value: 0 }, { name: 'Flour', value: 0 }, { name: 'French Fries Seasoning BBQ', value: 0 }]),
+  shelfItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  kitchenItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Kitchen Cleaner', value: 0 }, { name: 'Floor Cleaner', value: 0 }, { name: 'Dishwashing Liquid', value: 0 }, { name: 'Gloves Medium', value: 0 }, { name: 'Gloves Large', value: 0 }, { name: 'Gloves Small', value: 0 }, { name: 'Plastic Meat Gloves', value: 0 }, { name: 'Paper Towel Long', value: 0 }, { name: 'Paper Towel Short', value: 0 }, { name: 'Bin Bags 30x40', value: 0 }, { name: 'Printer Rolls', value: 0 }, { name: 'Sticky Tape', value: 0 }]),
+  kitchenItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  packagingItems: z.array(z.object({ name: z.string(), value: z.coerce.number().optional().default(0) })).optional().default([{ name: 'Loaded Fries Box', value: 0 }, { name: 'French Fries Box 600ml', value: 0 }, { name: 'Takeaway Sauce Container', value: 0 }, { name: 'Coleslaw Container', value: 0 }, { name: 'Burger Wrapping Paper', value: 0 }, { name: 'French Fries Paper', value: 0 }, { name: 'Paper Bags', value: 0 }, { name: 'Plastic Bags 8x16', value: 0 }, { name: 'Plastic Bags 9x18', value: 0 }, { name: 'Knife and Fork Set', value: 0 }, { name: 'Bag Close Stickers', value: 0 }, { name: 'Sauce Container Stickers', value: 0 }, { name: 'Flag Stickers', value: 0 }, { name: 'Burger Sweets Takeaway', value: 0 }]),
+  packagingItemsAdditional: z.array(z.object({ item: z.string().min(1), quantity: z.coerce.number().min(0).optional().default(0), note: z.string().optional(), addPermanently: z.boolean().optional().default(false) })).optional().default([]),
+  isDraft: z.boolean().optional().default(false),
+});
+
+const DailyShiftForm = () => {
+  const form = useForm({ resolver: zodResolver(formSchema), defaultValues: formSchema.parse({ shiftDate: new Date().toISOString() }) });
+  const { watch, setValue, handleSubmit } = form;
+  const [wagesEntries, setWagesEntries] = useState(1);
+  const [shoppingEntries, setShoppingEntries] = useState(1);
+  const [freshAdditional, setFreshAdditional] = useState(0);
+  const [frozenAdditional, setFrozenAdditional] = useState(0);
+  const [shelfAdditional, setShelfAdditional] = useState(0);
+  const [kitchenAdditional, setKitchenAdditional] = useState(0);
+  const [packagingAdditional, setPackagingAdditional] = useState(0);
+
+  const sales = watch(['grabSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenses = watch(['gasExpense']);
+  const wages = watch('wages');
+  const shopping = watch('shopping');
+
+  useEffect(() => {
+    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalSales', salesTotal);
+  }, [sales, setValue]);
+
+  useEffect(() => {
+    const wagesTotal = wages.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+    const shoppingTotal = shopping.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+    const expTotal = wagesTotal + shoppingTotal + Number(expenses[0] || 0);
+    setValue('totalExpenses', expTotal);
+  }, [wages, shopping, expenses, setValue]);
+
+  const onSubmit = async (data) => {
+    try {
+      const response = await fetch('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Submit failed');
+      const result = await response.json();
+      if (!data.isDraft) {
+        const purchaseItems = [
+          ...data.freshFood.filter(f => f.value > 0),
+          ...data.freshFoodAdditional.filter(f => f.quantity > 0),
+          ...data.frozenFood.filter(f => f.value > 0),
+          ...data.frozenFoodAdditional.filter(f => f.quantity > 0),
+          ...data.shelfItems.filter(f => f.value > 0),
+          ...data.shelfItemsAdditional.filter(f => f.quantity > 0),
+          ...data.kitchenItems.filter(f => f.value > 0),
+          ...data.kitchenItemsAdditional.filter(f => f.quantity > 0),
+          ...data.packagingItems.filter(f => f.value > 0),
+          ...data.packagingItemsAdditional.filter(f => f.quantity > 0),
+        ].filter(item => item.name !== 'Burger Buns' && item.name !== 'Meat' && !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name));
+        const shoppingList = purchaseItems.map(i => ({
+          itemName: i.name || i.item,
+          quantity: i.value || i.quantity,
+          unit: 'unit',
+          formId: result.id,
+          listDate: new Date(data.shiftDate).toISOString(),
+        }));
+        await fetch('/api/shopping-list/bulk', {
+          method: 'POST',
+          body: JSON.stringify(shoppingList),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      form.reset();
+    } catch (err) {
+      console.error('Form submission error:', err);
+      alert('Error submitting form: ' + err.message);
+    }
+  };
+
+  return (
+    <Card className="max-w-4xl mx-auto">
+      <CardHeader className="font-poppins font-bold text-2xl">Daily Sales & Stock Form</CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div>
+            <Label className="font-poppins font-medium text-sm">Completed By*</Label>
+            <Input {...form.register("completedBy")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Shift Type</Label>
+            <select {...form.register("shiftType")} className="w-full p-2 border rounded">
+              <option value="opening">Opening</option>
+              <option value="closing">Closing</option>
+            </select>
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Shift Date*</Label>
+            <Input type="datetime-local" {...form.register("shiftDate")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Starting Cash (฿)</Label>
+            <Input type="number" {...form.register("startingCash")} className="w-full" />
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Sales Information</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Grab Sales (฿)</Label>
+            <Input type="number" {...form.register("grabSales")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Aroi Dee Sales (฿)</Label>
+            <Input type="number" {...form.register("aroiDeeSales")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">QR Scan Sales (฿)</Label>
+            <Input type="number" {...form.register("qrScanSales")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Cash Sales (฿)</Label>
+            <Input type="number" {...form.register("cashSales")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Total Sales (฿)</Label>
+            <Input disabled value={form.watch('totalSales')} className="w-full bg-gray-100" />
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Expenses</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Wages</Label>
+            {[...Array(wagesEntries)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Staff Name" {...form.register(`wages.${i}.staffName`)} className="flex-1" />
+                <Input type="number" placeholder="Amount" {...form.register(`wages.${i}.amount`)} className="flex-1" />
+                <select {...form.register(`wages.${i}.type`)} className="flex-1 p-2 border rounded">
+                  <option value="wages">Wages</option>
+                  <option value="overtime">Overtime</option>
+                  <option value="other">Other</option>
+                </select>
+                {wagesEntries > 1 && <Button type="button" variant="destructive" onClick={() => setWagesEntries(wagesEntries - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setWagesEntries(wagesEntries + 1)}>Add Wage Entry</Button>
+          </div>
+
+          <div>
+            <Label className="font-poppins font-medium text-sm">Shopping</Label>
+            {[...Array(shoppingEntries)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item Purchased" {...form.register(`shopping.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Amount" {...form.register(`shopping.${i}.amount`)} className="flex-1" />
+                <Input placeholder="Shop Name" {...form.register(`shopping.${i}.shopName`)} className="flex-1" />
+                {shoppingEntries > 1 && <Button type="button" variant="destructive" onClick={() => setShoppingEntries(shoppingEntries - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setShoppingEntries(shoppingEntries + 1)}>Add Shopping Entry</Button>
+          </div>
+
+          <div>
+            <Label className="font-poppins font-medium text-sm">Gas Expense (฿)</Label>
+            <Input type="number" {...form.register("gasExpense")} className="w-full" />
+          </div>
+
+          <div>
+            <Label className="font-poppins font-medium text-sm">Total Expenses (฿)</Label>
+            <Input disabled value={form.watch('totalExpenses')} className="w-full bg-gray-100" />
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Summary</h3>
+          <p className="font-poppins">Total Sales: ฿{form.watch('totalSales')}</p>
+          <p className="font-poppins">Breakdown: Grab ฿{form.watch('grabSales')}, Aroi Dee ฿{form.watch('aroiDeeSales')}, QR ฿{form.watch('qrScanSales')}, Cash ฿{form.watch('cashSales')}</p>
+          <p className="font-poppins">Total Expenses: ฿{form.watch('totalExpenses')}</p>
+          <p className="font-poppins">Breakdown: Wages ฿{form.watch('wages').reduce((sum, w) => sum + Number(w.amount || 0), 0)}, Shopping ฿{form.watch('shopping').reduce((sum, s) => sum + Number(s.amount || 0), 0)}, Gas ฿{form.watch('gasExpense')}</p>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Total Cash in Register at Closing (฿)</Label>
+            <Input type="number" {...form.register("endCash")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Amount to be Banked (฿)</Label>
+            <Input type="number" {...form.register("bankedAmount")} className="w-full" />
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Stock and Produce</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Burger Buns Stock (In Hand)</Label>
+            <Input type="number" {...form.register("burgerBunsStock")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Meat Weight (In Hand, kg)</Label>
+            <Input type="number" {...form.register("meatWeight")} className="w-full" />
+          </div>
+          <h4 className="font-poppins font-semibold text-lg">Drink Details (In Hand)</h4>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Coke</Label>
+            <Input type="number" {...form.register("coke")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Coke Zero</Label>
+            <Input type="number" {...form.register("cokeZero")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sprite</Label>
+            <Input type="number" {...form.register("sprite")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Schweppes Manow</Label>
+            <Input type="number" {...form.register("schweppesManow")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Fanta Orange</Label>
+            <Input type="number" {...form.register("fantaOrange")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Fanta Strawberry</Label>
+            <Input type="number" {...form.register("fantaStrawberry")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Soda Water</Label>
+            <Input type="number" {...form.register("sodaWater")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Water</Label>
+            <Input type="number" {...form.register("water")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Kids Orange</Label>
+            <Input type="number" {...form.register("kidsOrange")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Kids Apple</Label>
+            <Input type="number" {...form.register("kidsApple")} className="w-full" />
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Fresh Food</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Salad (Iceberg Lettuce)</Label>
+            <Input type="number" {...form.register("freshFood.0.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Tomatos</Label>
+            <Input type="number" {...form.register("freshFood.1.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">White Cabbage</Label>
+            <Input type="number" {...form.register("freshFood.2.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Purple Cabbage</Label>
+            <Input type="number" {...form.register("freshFood.3.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Bacon Short</Label>
+            <Input type="number" {...form.register("freshFood.4.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Bacon Long</Label>
+            <Input type="number" {...form.register("freshFood.5.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Milk</Label>
+            <Input type="number" {...form.register("freshFood.6.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Butter</Label>
+            <Input type="number" {...form.register("freshFood.7.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Additional Items Not Listed</Label>
+            {[...Array(freshAdditional)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item to be Purchased" {...form.register(`freshFoodAdditional.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Quantity" {...form.register(`freshFoodAdditional.${i}.quantity`)} className="flex-1" />
+                <Input placeholder="Note" {...form.register(`freshFoodAdditional.${i}.note`)} className="flex-1" />
+                <Checkbox {...form.register(`freshFoodAdditional.${i}.addPermanently`)} /> Add Permanently
+                {freshAdditional > 0 && <Button type="button" variant="destructive" onClick={() => setFreshAdditional(freshAdditional - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setFreshAdditional(freshAdditional + 1)}>Add Item</Button>
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Frozen Food</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Chicken Nuggets</Label>
+            <Input type="number" {...form.register("frozenFood.0.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sweet Potato Fries</Label>
+            <Input type="number" {...form.register("frozenFood.1.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">French Fries (7mm)</Label>
+            <Input type="number" {...form.register("frozenFood.2.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Chicken Fillets</Label>
+            <Input type="number" {...form.register("frozenFood.3.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Additional Items Not Listed</Label>
+            {[...Array(frozenAdditional)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item to be Purchased" {...form.register(`frozenFoodAdditional.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Quantity" {...form.register(`frozenFoodAdditional.${i}.quantity`)} className="flex-1" />
+                <Input placeholder="Note" {...form.register(`frozenFoodAdditional.${i}.note`)} className="flex-1" />
+                <Checkbox {...form.register(`frozenFoodAdditional.${i}.addPermanently`)} /> Add Permanently
+                {frozenAdditional > 0 && <Button type="button" variant="destructive" onClick={() => setFrozenAdditional(frozenAdditional - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setFrozenAdditional(frozenAdditional + 1)}>Add Item</Button>
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Shelf Items</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Mayonnaise</Label>
+            <Input type="number" {...form.register("shelfItems.0.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Mustard</Label>
+            <Input type="number" {...form.register("shelfItems.1.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Dill Pickles</Label>
+            <Input type="number" {...form.register("shelfItems.2.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sweet Pickles</Label>
+            <Input type="number" {...form.register("shelfItems.3.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Salt</Label>
+            <Input type="number" {...form.register("shelfItems.4.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Pepper</Label>
+            <Input type="number" {...form.register("shelfItems.5.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Cajun Spice</Label>
+            <Input type="number" {...form.register("shelfItems.6.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">White Vinegar</Label>
+            <Input type="number" {...form.register("shelfItems.7.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Crispy Fried Onions</Label>
+            <Input type="number" {...form.register("shelfItems.8.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Paprika (Smoked)</Label>
+            <Input type="number" {...form.register("shelfItems.9.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Jalapenos</Label>
+            <Input type="number" {...form.register("shelfItems.10.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sriracha Mayonnaise</Label>
+            <Input type="number" {...form.register("shelfItems.11.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Chipotle Mayonnaise</Label>
+            <Input type="number" {...form.register("shelfItems.12.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Flour</Label>
+            <Input type="number" {...form.register("shelfItems.13.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">French Fries Seasoning BBQ</Label>
+            <Input type="number" {...form.register("shelfItems.14.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Additional Items Not Listed</Label>
+            {[...Array(shelfAdditional)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item to be Purchased" {...form.register(`shelfItemsAdditional.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Quantity" {...form.register(`shelfItemsAdditional.${i}.quantity`)} className="flex-1" />
+                <Input placeholder="Note" {...form.register(`shelfItemsAdditional.${i}.note`)} className="flex-1" />
+                <Checkbox {...form.register(`shelfItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+                {shelfAdditional > 0 && <Button type="button" variant="destructive" onClick={() => setShelfAdditional(shelfAdditional - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setShelfAdditional(shelfAdditional + 1)}>Add Item</Button>
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Kitchen Items</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Kitchen Cleaner</Label>
+            <Input type="number" {...form.register("kitchenItems.0.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Floor Cleaner</Label>
+            <Input type="number" {...form.register("kitchenItems.1.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Dishwashing Liquid</Label>
+            <Input type="number" {...form.register("kitchenItems.2.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Gloves Medium</Label>
+            <Input type="number" {...form.register("kitchenItems.3.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Gloves Large</Label>
+            <Input type="number" {...form.register("kitchenItems.4.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Gloves Small</Label>
+            <Input type="number" {...form.register("kitchenItems.5.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Plastic Meat Gloves</Label>
+            <Input type="number" {...form.register("kitchenItems.6.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Paper Towel Long</Label>
+            <Input type="number" {...form.register("kitchenItems.7.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Paper Towel Short</Label>
+            <Input type="number" {...form.register("kitchenItems.8.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Bin Bags 30x40</Label>
+            <Input type="number" {...form.register("kitchenItems.9.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Printer Rolls</Label>
+            <Input type="number" {...form.register("kitchenItems.10.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sticky Tape</Label>
+            <Input type="number" {...form.register("kitchenItems.11.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Additional Items Not Listed</Label>
+            {[...Array(kitchenAdditional)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item to be Purchased" {...form.register(`kitchenItemsAdditional.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Quantity" {...form.register(`kitchenItemsAdditional.${i}.quantity`)} className="flex-1" />
+                <Input placeholder="Note" {...form.register(`kitchenItemsAdditional.${i}.note`)} className="flex-1" />
+                <Checkbox {...form.register(`kitchenItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+                {kitchenAdditional > 0 && <Button type="button" variant="destructive" onClick={() => setKitchenAdditional(kitchenAdditional - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setKitchenAdditional(kitchenAdditional + 1)}>Add Item</Button>
+          </div>
+
+          <h3 className="font-poppins font-bold text-xl">Packaging Items</h3>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Loaded Fries Box</Label>
+            <Input type="number" {...form.register("packagingItems.0.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">French Fries Box 600ml</Label>
+            <Input type="number" {...form.register("packagingItems.1.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Takeaway Sauce Container</Label>
+            <Input type="number" {...form.register("packagingItems.2.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Coleslaw Container</Label>
+            <Input type="number" {...form.register("packagingItems.3.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Burger Wrapping Paper</Label>
+            <Input type="number" {...form.register("packagingItems.4.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">French Fries Paper</Label>
+            <Input type="number" {...form.register("packagingItems.5.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Paper Bags</Label>
+            <Input type="number" {...form.register("packagingItems.6.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Plastic Bags 8x16</Label>
+            <Input type="number" {...form.register("packagingItems.7.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Plastic Bags 9x18</Label>
+            <Input type="number" {...form.register("packagingItems.8.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Knife and Fork Set</Label>
+            <Input type="number" {...form.register("packagingItems.9.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Bag Close Stickers</Label>
+            <Input type="number" {...form.register("packagingItems.10.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Sauce Container Stickers</Label>
+            <Input type="number" {...form.register("packagingItems.11.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Flag Stickers</Label>
+            <Input type="number" {...form.register("packagingItems.12.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Burger Sweets Takeaway</Label>
+            <Input type="number" {...form.register("packagingItems.13.value")} className="w-full" />
+          </div>
+          <div>
+            <Label className="font-poppins font-medium text-sm">Additional Items Not Listed</Label>
+            {[...Array(packagingAdditional)].map((_, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <Input placeholder="Item to be Purchased" {...form.register(`packagingItemsAdditional.${i}.item`)} className="flex-1" />
+                <Input type="number" placeholder="Quantity" {...form.register(`packagingItemsAdditional.${i}.quantity`)} className="flex-1" />
+                <Input placeholder="Note" {...form.register(`packagingItemsAdditional.${i}.note`)} className="flex-1" />
+                <Checkbox {...form.register(`packagingItemsAdditional.${i}.addPermanently`)} /> Add Permanently
+                {packagingAdditional > 0 && <Button type="button" variant="destructive" onClick={() => setPackagingAdditional(packagingAdditional - 1)} className="ml-2">Remove</Button>}
+              </div>
+            ))}
+            <Button type="button" onClick={() => setPackagingAdditional(packagingAdditional + 1)}>Add Item</Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Button type="submit" className="bg-green-500 text-white hover:bg-green-600">Save</Button>
+            <Button type="submit" onClick={() => form.setValue('isDraft', true)} className="bg-blue-500 text-white hover:bg-blue-600">Save Draft</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default DailyShiftForm;
+Backend Update (server/routes.ts - Update /api/daily-stock-sales)
+Ensured proper response handling and error catching.
+app.post('/api/daily-stock-sales', async (req, res) => {
+  try {
+    const data = req.body;
+    data.shiftDate = new Date(data.shiftDate).toISOString();
+    data.wages = data.wages || [];
+    data.shopping = data.shopping || [];
+    data.freshFood = data.freshFood || [];
+    data.freshFoodAdditional = data.freshFoodAdditional || [];
+    data.frozenFood = data.frozenFood || [];
+    data.frozenFoodAdditional = data.frozenFoodAdditional || [];
+    data.shelfItems = data.shelfItems || [];
+    data.shelfItemsAdditional = data.shelfItemsAdditional || [];
+    data.kitchenItems = data.kitchenItems || [];
+    data.kitchenItemsAdditional = data.kitchenItemsAdditional || [];
+    data.packagingItems = data.packagingItems || [];
+    data.packagingItemsAdditional = data.packagingItemsAdditional || [];
+    const [result] = await db.insert(dailyStockSales).values(data).returning({ id: dailyStockSales.id });
+    res.status(201).json(result);
+    if (!data.isDraft) {
+      const purchaseItems = [
+        ...data.freshFood.filter(f => f.value > 0),
+        ...data.freshFoodAdditional.filter(f => f.quantity > 0),
+        ...data.frozenFood.filter(f => f.value > 0),
+        ...data.frozenFoodAdditional.filter(f => f.quantity > 0),
+        ...data.shelfItems.filter(f => f.value > 0),
+        ...data.shelfItemsAdditional.filter(f => f.quantity > 0),
+        ...data.kitchenItems.filter(f => f.value > 0),
+        ...data.kitchenItemsAdditional.filter(f => f.quantity > 0),
+        ...data.packagingItems.filter(f => f.value > 0),
+        ...data.packagingItemsAdditional.filter(f => f.quantity > 0),
+      ].filter(item => item.name !== 'Burger Buns' && item.name !== 'Meat' && !['Coke', 'Coke Zero', 'Sprite', 'Schweppes Manow', 'Fanta Orange', 'Fanta Strawberry', 'Soda Water', 'Water', 'Kids Orange', 'Kids Apple'].includes(item.name));
+      await db.insert(shoppingList).values(purchaseItems.map(i => ({
+        itemName: i.name || i.item,
+        quantity: i.value || i.quantity,
+        unit: 'unit',
+        formId: result.id,
+        listDate: data.shiftDate,
+        estimatedCost: 0,
+        supplier: '',
+        pricePerUnit: 0,
+        notes: '',
+      })));
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+Test Steps
+Replace client/src/pages/DailyShiftForm.tsx with the code above.
+Update server/routes.ts with the backend code.
+Run npx drizzle-kit migrate if schema changes.
+Load form—check items match your list, sales/expenses summary restored, "Save Draft" works.
+Submit with data (e.g., Grab Sales 100, Coke 10, Fresh Food item 5)—expect shopping gen'd (Fresh Food item: 5), no errors.
+If error (e.g., 500), share server console log.
+This addresses all fixes, restores functionality, and ensures a complete form. Please test and share any issues! Next: Enhance summary visuals?

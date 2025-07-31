@@ -1,0 +1,110 @@
+✅ Shift time window calculated for Bangkok time:
+
+Shift Start: 2025-07-30T17:00:00+07:00
+
+Shift End: 2025-07-31T03:00:00+07:00
+
+Next up: I’ll generate the full backend route to fetch all Loyverse receipts within this timeframe and create the daily receipts summary report (items sold, totals, payment types, modifiers, refunds, etc.).
+
+Starting the backend code now. 
+
+Here's the full backend code to fetch receipts for the shift (5PM–3AM BKK time), generate a summary, and return it in JSON format. This assumes you have a PostgreSQL table loyverse_receipts already populated.
+
+✅ File: server/routes/receipts.ts
+ts
+Copy
+Edit
+import express from "express";
+import db from "../db"; // Your database connection
+import { format } from "date-fns-tz";
+
+const router = express.Router();
+
+router.get("/api/receipts/summary", async (req, res) => {
+  try {
+    const now = new Date();
+    const timeZone = "Asia/Bangkok";
+
+    const nowInBangkok = new Date(
+      format(now, "yyyy-MM-dd'T'HH:mm:ssXXX", { timeZone })
+    );
+
+    const shiftDate = nowInBangkok.getHours() < 3
+      ? new Date(nowInBangkok.setDate(nowInBangkok.getDate() - 1))
+      : nowInBangkok;
+
+    const shiftStart = new Date(
+      format(shiftDate, "yyyy-MM-dd", { timeZone }) + "T17:00:00+07:00"
+    );
+    const shiftEnd = new Date(
+      format(shiftDate, "yyyy-MM-dd", { timeZone }) + "T03:00:00+07:00"
+    );
+    shiftEnd.setDate(shiftEnd.getDate() + 1); // Shift ends next day
+
+    const { rows: receipts } = await db.query(
+      `
+      SELECT
+        receipt_number,
+        created_at AT TIME ZONE 'Asia/Bangkok' as receipt_time,
+        total_amount,
+        net_sales,
+        payment_method,
+        items,
+        modifiers,
+        refund_status
+      FROM loyverse_receipts
+      WHERE created_at BETWEEN $1 AND $2
+      ORDER BY created_at;
+      `,
+      [shiftStart.toISOString(), shiftEnd.toISOString()]
+    );
+
+    const summary = {
+      totalReceipts: receipts.length,
+      grossSales: 0,
+      netSales: 0,
+      paymentTypes: {},
+      itemsSold: {},
+      modifiersSold: {},
+      refunds: [],
+    };
+
+    for (const r of receipts) {
+      summary.grossSales += parseFloat(r.total_amount || 0);
+      summary.netSales += parseFloat(r.net_sales || 0);
+
+      // Count payment types
+      const method = r.payment_method || "Unknown";
+      summary.paymentTypes[method] = (summary.paymentTypes[method] || 0) + 1;
+
+      // Parse items sold
+      const items = r.items || [];
+      for (const item of items) {
+        summary.itemsSold[item.name] = (summary.itemsSold[item.name] || 0) + item.quantity;
+      }
+
+      // Parse modifiers
+      const modifiers = r.modifiers || [];
+      for (const mod of modifiers) {
+        summary.modifiersSold[mod.name] = (summary.modifiersSold[mod.name] || 0) + mod.quantity;
+      }
+
+      // Refund tracking
+      if (r.refund_status === "refunded") {
+        summary.refunds.push({
+          receipt_number: r.receipt_number,
+          time: r.receipt_time,
+          amount: r.total_amount,
+          reason: r.refund_reason || "N/A",
+        });
+      }
+    }
+
+    res.json({ summary, shiftStart, shiftEnd });
+  } catch (err) {
+    console.error("Error in /api/receipts/summary:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+export default router;

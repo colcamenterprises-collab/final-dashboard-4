@@ -1,0 +1,132 @@
+Immediate Fix for NaN Errors: These occur when Zod/useForm gets non-numeric input (strings/empty), causing parseFloat to NaN. The coerce fixes it by converting strings to numbers, defaults to 0. Applied to all fields.
+
+Full Updated Code for DailyStockSales.tsx (Replace Schema & Hook):
+
+Paste this into client/src/pages/DailyStockSales.tsx (replaces formSchema and useForm—covers sales/expenses/cash auto-calc).
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
+
+const formSchema = z.object({
+  grabSales: z.coerce.number().min(0).optional().default(0),
+  directSales: z.coerce.number().min(0).optional().default(0),
+  aroiDeeSales: z.coerce.number().min(0).optional().default(0),
+  qrScanSales: z.coerce.number().min(0).optional().default(0),
+  cashSales: z.coerce.number().min(0).optional().default(0),
+  totalSalesAmount: z.coerce.number().min(0).optional().default(0),
+  salaryWages: z.coerce.number().min(0).optional().default(0),
+  shopping: z.coerce.number().min(0).optional().default(0),
+  gasExpense: z.coerce.number().min(0).optional().default(0),
+  totalExpenses: z.coerce.number().min(0).optional().default(0),
+  startingCash: z.coerce.number().min(0).optional().default(0),
+  cashInRegister: z.coerce.number().min(0).optional().default(0),
+  // Add other stock/food fields as optional with defaults
+  burgerBunsStock: z.coerce.number().min(0).optional().default(0),
+  // ...etc for all
+});
+
+const DailyStockSales = () => {
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      grabSales: 0,
+      directSales: 0,
+      aroiDeeSales: 0,
+      qrScanSales: 0,
+      cashSales: 0,
+      totalSalesAmount: 0,
+      salaryWages: 0,
+      shopping: 0,
+      gasExpense: 0,
+      totalExpenses: 0,
+      startingCash: 0,
+      cashInRegister: 0,
+    },
+  });
+
+  const { watch, setValue } = form;
+  const sales = watch(['grabSales', 'directSales', 'aroiDeeSales', 'qrScanSales', 'cashSales']);
+  const expenses = watch(['salaryWages', 'shopping', 'gasExpense']);
+  const [starting, cashSalesVal, totalExp] = watch(['startingCash', 'cashSales', 'totalExpenses']);
+
+  useEffect(() => {
+    const salesTotal = sales.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalSalesAmount', salesTotal);
+  }, [sales, setValue]);
+
+  useEffect(() => {
+    const expTotal = expenses.reduce((sum, val) => sum + Number(val || 0), 0);
+    setValue('totalExpenses', expTotal);
+  }, [expenses, setValue]);
+
+  useEffect(() => {
+    const cashEnd = Number(starting || 0) + Number(cashSalesVal || 0) - Number(totalExp || 0);
+    setValue('cashInRegister', cashEnd);
+  }, [starting, cashSalesVal, totalExp, setValue]);
+
+  // ...rest of component
+};
+Update All Inputs to type="number": In JSX, for each sales/expenses/cash field:
+
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+<Input 
+  type="number" 
+  step="0.01" 
+  placeholder="0.00" 
+  {...register("grabSales")} 
+/>
+Repeat for all (grabSales to cashInRegister).
+
+Backend Safe Parse (server/routes.ts - POST/PUT /api/daily-stock-sales):
+
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const parsed = {
+  ...data,
+  grabSales: Number(data.grabSales || 0),
+  directSales: Number(data.directSales || 0),
+  aroiDeeSales: Number(data.aroiDeeSales || 0),
+  qrScanSales: Number(data.qrScanSales || 0),
+  cashSales: Number(data.cashSales || 0),
+  totalSalesAmount: Number(data.totalSalesAmount || 0),
+  salaryWages: Number(data.salaryWages || 0),
+  shopping: Number(data.shopping || 0),
+  gasExpense: Number(data.gasExpense || 0),
+  totalExpenses: Number(data.totalExpenses || 0),
+  startingCash: Number(data.startingCash || 0),
+  cashInRegister: Number(data.cashInRegister || 0),
+};
+// Save parsed
+Test Steps:
+
+Save code, restart app.
+Load form, enter "4667" Grab, "998" QR—totalSalesAmount auto to 5665.
+Enter "1980" shopping—totalExpenses to 1980.
+Enter "2500" starting, "6022" cash—cashInRegister auto to 6542 (2500 + 6022 - 1980).
+Submit—success.
+F12 Console if error, search "NaN" or "expected number", share log.
+Proactive: Auto-calcs prevent manual errors. If total shows wrong (concat), it's watch returning strings—Number() fixes. Form ready—test & confirm.

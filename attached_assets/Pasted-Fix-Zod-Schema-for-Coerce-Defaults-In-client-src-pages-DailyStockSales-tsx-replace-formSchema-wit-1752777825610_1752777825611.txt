@@ -1,0 +1,90 @@
+Fix Zod Schema for Coerce & Defaults
+In client/src/pages/DailyStockSales.tsx, replace formSchema with this (coerce string to number, optional with default 0):
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const formSchema = z.object({
+  totalSalesAmount: z.coerce.number().min(0).optional().default(0),
+  totalExpenses: z.coerce.number().min(0).optional().default(0),
+  cashInRegister: z.coerce.number().min(0).optional().default(0),
+  // Other fields...
+});
+Add Auto-Calc for Totals (useEffect in useForm)
+Add this after useForm hook (watch salaryWages/shopping/gasExpense for totalExpenses; assume cashInRegister = startingCash + cashSales - totalExpenses):
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+const { watch, setValue } = form;
+const [salary, shopping, gas, startingCash, cashSales] = watch(['salaryWages', 'shopping', 'gasExpense', 'startingCash', 'cashSales']);
+useEffect(() => {
+  const expenses = (salary || 0) + (shopping || 0) + (gas || 0);
+  setValue('totalExpenses', expenses);
+  const cashEnd = (startingCash || 0) + (cashSales || 0) - expenses;
+  setValue('cashInRegister', cashEnd);
+}, [salary, shopping, gas, startingCash, cashSales, setValue]);
+Input Type Number (JSX Fix)
+For totalExpenses/cashInRegister inputs, change to type="number" (placeholder "0.00"):
+tsx
+
+Collapse
+
+Unwrap
+
+Copy
+<Input 
+  type="number" 
+  step="0.01" 
+  {...register("totalExpenses", { valueAsNumber: true })} 
+  placeholder="0.00" 
+/>
+<Input 
+  type="number" 
+  step="0.01" 
+  {...register("cashInRegister", { valueAsNumber: true })} 
+  placeholder="0.00" 
+/>
+Backend Parse (server/routes.ts - /api/daily-stock-sales)
+Parse strings to numbers on submit:
+typescript
+
+Collapse
+
+Unwrap
+
+Run
+
+Copy
+app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    const parsed = {
+      ...data,
+      totalSalesAmount: parseFloat(data.totalSalesAmount || '0'),
+      totalExpenses: parseFloat(data.totalExpenses || '0'),
+      cashInRegister: parseFloat(data.cashInRegister || '0'),
+    };
+    // Insert parsed
+    const result = await storage.createDailyStockSales(parsed);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+Test Steps
+Save changes, restart (npm run dev).
+Load form, enter strings (e.g., "1980" for expenses fields).
+Watch totals auto-update without NaN.
+Submit—success, DB has numbers.
+If error, F12 console log, share here.
