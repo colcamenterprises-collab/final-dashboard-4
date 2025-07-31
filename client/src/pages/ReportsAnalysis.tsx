@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
-import { JussiChatBubble } from '@/components/JussiChatBubble';
+
 
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -769,8 +769,8 @@ const ReportsAnalysis = () => {
           </div>
         </TabsContent>
       </Tabs>
-      {/* Jussi Chat Bubble */}
-      <JussiChatBubble />
+
+
     </div>
   );
 };
