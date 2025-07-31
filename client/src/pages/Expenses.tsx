@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { insertExpenseSchema, insertExpenseSupplierSchema, insertExpenseCategorySchema } from "@shared/schema";
 import type { Expense, ExpenseSupplier, ExpenseCategory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import MonthlyStockDisplay from "@/components/MonthlyStockDisplay";
+
 
 export default function Expenses() {
   const { toast } = useToast();
@@ -670,7 +670,18 @@ export default function Expenses() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <MonthlyStockDisplay />
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Stock Analysis</CardTitle>
+              <CardDescription>Stock analysis will be implemented here</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Stock analysis system coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
     </div>

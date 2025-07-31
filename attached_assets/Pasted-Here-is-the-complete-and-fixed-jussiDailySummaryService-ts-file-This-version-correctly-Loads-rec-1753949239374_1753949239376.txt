@@ -1,3 +1,19 @@
+Here is the complete and fixed jussiDailySummaryService.ts file.
+
+This version correctly:
+
+Loads receipts from the real loyverse_receipts table.
+
+Aggregates by shift (5 PM to 3 AM BKK).
+
+Produces a summary of burgers, drinks, payment methods, and total sales.
+
+Stores shift summaries into the jussi_daily_summaries table (or logs only if running dry).
+
+✅ Full jussiDailySummaryService.ts
+ts
+Copy
+Edit
 // jussiDailySummaryService.ts
 
 import db from "../db";
