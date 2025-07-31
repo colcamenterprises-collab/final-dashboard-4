@@ -1,5 +1,20 @@
+Here’s the updated and fixed Receipts.tsx that pulls from real jussi_daily_summaries and accurately shows:
+
+✅ Real receipt numbers and total sales
+
+✅ Actual top-selling items
+
+✅ Correct modifiers and payment types
+
+✅ Current shift summary only
+
+✅ Replace Your Existing Receipts.tsx With This:
+tsx
+Copy
+Edit
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import "./Receipts.css";
 
 interface ReceiptSummary {
   shift_date: string;
