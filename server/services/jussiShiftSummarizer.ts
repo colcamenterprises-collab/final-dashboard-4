@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone';
-import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
 import { db } from '../db';
 import { dailyReceiptSummaries } from '../../shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';

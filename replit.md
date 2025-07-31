@@ -64,7 +64,19 @@ Based on the dashboard design patterns, the application uses three primary butto
 - **All buttons maintain rounded corners** (rounded-md standard)
 - **Hover effects are consistent** within each button type
 
-## Recent Changes (January 31, 2025)
+## Recent Changes (July 31, 2025)
+
+### DEPLOYMENT ES MODULE FIX ✅ COMPLETED (July 31, 2025)
+- **Critical Issue Fixed**: Resolved deployment crash due to missing .js file extensions in ES module imports
+- **Root Cause**: dayjs timezone plugin imports in three service files were missing .js extensions required for ES module resolution
+- **Files Updated**: 
+  - `server/services/jussiLatestShiftService.ts`
+  - `server/services/jussiShiftSummarizer.ts`
+  - `server/services/jussiDailySummaryService.ts`
+- **Fix Applied**: Changed `import timezone from 'dayjs/plugin/timezone'` to `import timezone from 'dayjs/plugin/timezone.js'`
+- **Fix Applied**: Changed `import utc from 'dayjs/plugin/utc'` to `import utc from 'dayjs/plugin/utc.js'`
+- **Production Ready**: Build and production server now working correctly
+- **Status**: Application successfully building and deploying with proper ES module handling
 
 ### CRITICAL BUG FIX - DAILY STOCK SALES FORM DATA SAVING ✅ COMPLETED
 - **Root Cause Identified**: Form submissions saving with zero/empty values despite being completed due to incomplete route mapping
