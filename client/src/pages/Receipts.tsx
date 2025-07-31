@@ -4,33 +4,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Clock, DollarSign, Receipt, Search, RefreshCw, ChevronLeft, ChevronRight, TrendingUp, ShoppingCart, Coffee, Users, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, DollarSign, Receipt, Search, RefreshCw, ChevronLeft, ChevronRight, TrendingUp, ShoppingCart, Coffee, Users, AlertTriangle, Download } from 'lucide-react';
 import { useState } from 'react';
 import { JussiChatBubble } from '@/components/JussiChatBubble';
 import { format } from 'date-fns';
 
-interface DailySummary {
-  id: number;
-  date: string;
+interface LatestShiftSummary {
+  shiftDate: string;
   shiftStart: string;
   shiftEnd: string;
-  firstReceipt?: string;
-  lastReceipt?: string;
+  firstReceipt: string;
+  lastReceipt: string;
   totalReceipts: number;
-  grossSales: string;
-  netSales: string;
+  grossSales: number;
+  netSales: number;
   paymentBreakdown: Record<string, { count: number; amount: number }>;
   itemsSold: Record<string, { quantity: number; total: number }>;
+  drinkQuantities: Record<string, number>;
+  burgerRollsUsed: number;
+  meatUsedKg: number;
   modifiersSold: Record<string, { count: number; total: number }>;
-  drinksSummary: Record<string, { quantity: number }>;
-  rollsUsed: number;
   refunds: Array<{
     receiptNumber: string;
     amount: number;
     date: string;
   }>;
-  processedAt: string;
-  updatedAt: string;
 }
 
 interface LoyverseReceipt {
@@ -70,22 +68,17 @@ export default function Receipts() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'current' | 'search'>('current');
 
-  // Query latest Jussi summary (most recent shift)
-  const { data: latestSummary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<DailySummary>({
+  // Query latest shift summary (most recent 5PM-3AM shift)
+  const { data: latestSummary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<LatestShiftSummary>({
     queryKey: ['/api/receipts/jussi-summary/latest'],
     enabled: viewMode === 'current',
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   // Query summary by date when searching
-  const { data: searchSummary, isLoading: searchLoading, refetch: refetchSearchSummary } = useQuery<DailySummary>({
+  const { data: searchSummary, isLoading: searchLoading, refetch: refetchSearchSummary } = useQuery<LatestShiftSummary>({
     queryKey: ['/api/receipts/jussi-summary', selectedDate],
     enabled: viewMode === 'search' && !!selectedDate,
-  });
-
-  // Query all summaries for date picker
-  const { data: allSummaries } = useQuery<DailySummary[]>({
-    queryKey: ['/api/receipts/jussi-summaries'],
   });
 
   const formatCurrency = (amount: string | number) => {
@@ -140,6 +133,25 @@ export default function Receipts() {
       }
     } catch (error) {
       console.error('Error generating summary:', error);
+    }
+  };
+
+  const downloadCSVReport = async () => {
+    try {
+      const response = await fetch('/api/receipts/export/csv');
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `shift-summary-${displaySummary?.shiftDate || 'latest'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
     }
   };
 
@@ -236,9 +248,9 @@ export default function Receipts() {
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{displaySummary.rollsUsed}</div>
+                  <div className="text-2xl font-bold">{displaySummary.burgerRollsUsed}</div>
                   <p className="text-xs text-muted-foreground">
-                    Calculated from burger sales
+                    1 roll per burger sold
                   </p>
                 </CardContent>
               </Card>
@@ -318,17 +330,20 @@ export default function Receipts() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Coffee className="h-5 w-5" />
-                    Drinks Summary
+                    Drinks Sold
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {Object.entries(displaySummary.drinksSummary).map(([drink, data]) => (
+                    {Object.entries(displaySummary.drinkQuantities).map(([drink, quantity]) => (
                       <div key={drink} className="flex items-center justify-between">
                         <span className="text-sm">{drink}</span>
-                        <Badge variant="secondary">{data.quantity}</Badge>
+                        <Badge variant="secondary">Qty: {quantity}</Badge>
                       </div>
                     ))}
+                    {Object.keys(displaySummary.drinkQuantities).length === 0 && (
+                      <p className="text-sm text-gray-500">No drinks sold this shift</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -384,15 +399,22 @@ export default function Receipts() {
               </Card>
             )}
 
-            {/* Generate Summary Button */}
-            <div className="flex justify-center">
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-4">
               <Button 
-                onClick={() => generateSummaryForDate(displaySummary.date)}
+                onClick={() => generateSummaryForDate(displaySummary.shiftDate)}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
                 Regenerate Summary
+              </Button>
+              <Button 
+                onClick={downloadCSVReport}
+                className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" />
+                Download Report
               </Button>
             </div>
           </div>

@@ -21,6 +21,7 @@ import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 import ShiftSummaryCard from "@/components/ShiftSummaryCard";
 import RollVarianceCard from "@/components/RollVarianceCard";
 import ShiftReportReview from "@/components/ShiftReportReview";
+import LatestShiftSummaryCard from "@/components/LatestShiftSummaryCard";
 
 
 import { api, mutations } from "@/lib/api";
@@ -309,11 +310,20 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Three-column row: Burger Roll Variance, Shift Summary, Shift Report Review */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
-        <RollVarianceCard />
-        <ShiftSummaryCard />
-        <ShiftReportReview />
+      {/* Latest Shift Summary Card - Prominent display */}
+      <div className="mb-6 lg:mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+            <LatestShiftSummaryCard />
+          </div>
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <RollVarianceCard />
+              <ShiftSummaryCard />
+              <ShiftReportReview />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* AI Analysis Insights Card - if we have analysis data */}

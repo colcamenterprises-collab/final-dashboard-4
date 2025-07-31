@@ -1397,44 +1397,96 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get latest Jussi summary
+  // Get latest shift summary (most recent 5PM-3AM shift)
   app.get("/api/receipts/jussi-summary/latest", async (req: Request, res: Response) => {
     try {
-      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      const { JussiLatestShiftService } = await import("./services/jussiLatestShiftService");
       
-      const summary = await JussiDailySummaryService.getLatestShiftSummary();
+      const summary = await JussiLatestShiftService.getLatestShiftSummary();
       
       if (!summary) {
-        return res.status(404).json({ error: "No summaries found" });
+        return res.status(404).json({ error: "No recent shift data found" });
       }
       
       res.json(summary);
     } catch (err) {
-      console.error("Error fetching latest Jussi summary:", err);
-      res.status(500).json({ error: "Failed to fetch latest summary" });
+      console.error("Error fetching latest shift summary:", err);
+      res.status(500).json({ error: "Failed to fetch latest shift summary" });
     }
   });
 
-  // Get Jussi summary by date
+  // Get shift summary by date
   app.get("/api/receipts/jussi-summary/:date", async (req: Request, res: Response) => {
     try {
       const { date } = req.params;
-      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      const { JussiLatestShiftService } = await import("./services/jussiLatestShiftService");
       
-      const summary = await JussiDailySummaryService.getSummaryByDate(date);
+      const summary = await JussiLatestShiftService.getShiftSummaryForDate(date);
       
       if (!summary) {
-        return res.status(404).json({ error: `No summary found for ${date}` });
+        return res.status(404).json({ error: `No shift data found for ${date}` });
       }
       
       res.json(summary);
     } catch (err) {
-      console.error(`Error fetching Jussi summary for ${req.params.date}:`, err);
-      res.status(500).json({ error: "Failed to fetch summary" });
+      console.error(`Error fetching shift summary for ${req.params.date}:`, err);
+      res.status(500).json({ error: "Failed to fetch shift summary" });
     }
   });
 
-  // Get last 31 days Jussi summaries
+  // Export latest shift summary as CSV
+  app.get("/api/receipts/export/csv", async (req: Request, res: Response) => {
+    try {
+      const { JussiLatestShiftService } = await import("./services/jussiLatestShiftService");
+      
+      const csvData = await JussiLatestShiftService.generateCSVExport();
+      const summary = await JussiLatestShiftService.getLatestShiftSummary();
+      
+      if (!summary) {
+        return res.status(404).json({ error: "No shift data available for export" });
+      }
+      
+      const filename = `shift-summary-${summary.shiftDate}.csv`;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csvData);
+    } catch (err) {
+      console.error("Error exporting shift summary:", err);
+      res.status(500).json({ error: "Failed to export shift summary" });
+    }
+  });
+
+  // Get shift data for analysis page (rolls, drinks, meat)
+  app.get("/api/analysis/shift-data", async (req: Request, res: Response) => {
+    try {
+      const { JussiLatestShiftService } = await import("./services/jussiLatestShiftService");
+      
+      const summary = await JussiLatestShiftService.getLatestShiftSummary();
+      
+      if (!summary) {
+        return res.status(404).json({ error: "No shift data available" });
+      }
+      
+      // Extract data for analysis page
+      const analysisData = {
+        shiftDate: summary.shiftDate,
+        burgerRollsUsed: summary.burgerRollsUsed,
+        meatUsedKg: summary.meatUsedKg,
+        drinkQuantities: summary.drinkQuantities,
+        totalReceipts: summary.totalReceipts,
+        grossSales: summary.grossSales,
+        netSales: summary.netSales
+      };
+      
+      res.json(analysisData);
+    } catch (err) {
+      console.error("Error fetching analysis shift data:", err);
+      res.status(500).json({ error: "Failed to fetch analysis data" });
+    }
+  });
+
+  // Get last 31 days summaries (for background MTD calculations)
   app.get("/api/receipts/jussi-summaries", async (req: Request, res: Response) => {
     try {
       const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
