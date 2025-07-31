@@ -27,7 +27,8 @@ export const JussiChatBubble = () => {
           top: '50%',
           right: '30px',
           transform: 'translateY(-50%)',
-          backgroundColor: '#111',
+          backgroundColor: '#fbbf24',
+          border: '2px solid #000',
           borderRadius: '50%',
           width: '50px',
           height: '50px',
@@ -36,7 +37,7 @@ export const JussiChatBubble = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 0 10px rgba(0,0,0,0.3)'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
         }}
         title="Jussi"
       >
