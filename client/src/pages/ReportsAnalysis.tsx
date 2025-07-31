@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
+import JussiChatBubble from "@/components/JussiChatBubble";
 
 
 
@@ -770,7 +771,8 @@ const ReportsAnalysis = () => {
         </TabsContent>
       </Tabs>
 
-
+      {/* Jussi Chat Bubble for Operations Support */}
+      <JussiChatBubble />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import JussiChatBubble from "@/components/JussiChatBubble";
 
 
 const DailyShiftForm = () => {
@@ -812,7 +813,8 @@ const DailyShiftForm = () => {
         </div>
       </form>
 
-
+      {/* Jussi Chat Bubble for Operations Support */}
+      <JussiChatBubble />
     </div>
   );
 };

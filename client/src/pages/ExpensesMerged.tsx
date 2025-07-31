@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from "date-fns";
 import { Calendar, Plus, DollarSign, FileText, TrendingUp, Receipt, Upload, Search, Filter, Download, BarChart3, ShoppingCart, Beef, Wheat } from "lucide-react";
 import { Link } from "wouter";
+import JussiChatBubble from "@/components/JussiChatBubble";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1566,7 +1567,8 @@ function ExpensesMerged() {
         </CardContent>
       </Card>
 
-
+      {/* Jussi Chat Bubble for Operations Support */}
+      <JussiChatBubble />
       </div>
     </div>
   );
