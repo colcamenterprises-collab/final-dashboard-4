@@ -18,14 +18,14 @@ export default function DailyStockSalesSearch() {
   const [selectedForm, setSelectedForm] = useState<DailyStockSales | null>(null);
 
   const { data: forms = [], isLoading } = useQuery({
-    queryKey: ['/api/daily-stock-sales/search', searchQuery, startDate, endDate],
+    queryKey: ['/api/daily-stock-sales/all', searchQuery, startDate, endDate],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (searchQuery.trim()) params.append('q', searchQuery);
+      if (searchQuery.trim()) params.append('query', searchQuery);
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const response = await fetch(`/api/daily-stock-sales/search?${params}`);
+      const response = await fetch(`/api/daily-stock-sales/all?${params}`);
       if (!response.ok) throw new Error('Failed to search forms');
       return response.json();
     }
@@ -43,10 +43,10 @@ export default function DailyStockSalesSearch() {
 
   const formatCurrency = (value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === '') {
-      return '$0.00';
+      return '฿0.00';
     }
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return `$${(isNaN(numValue) ? 0 : numValue).toFixed(2)}`;
+    return `฿${(isNaN(numValue) ? 0 : numValue).toFixed(2)}`;
   };
 
   const FormDetailView = ({ form }: { form: DailyStockSales }) => (
