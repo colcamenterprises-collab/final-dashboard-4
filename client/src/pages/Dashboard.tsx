@@ -135,27 +135,10 @@ export default function Dashboard() {
     deleteQuickNoteMutation.mutate(id);
   };
 
+  // Fetch real KPI data from Loyverse receipts
   const { data: kpis, isLoading: kpisLoading, error: kpisError } = useQuery({
-    queryKey: ["/api/shift-summary/latest"],
-    select: (data: any) => {
-      if (!data || !data.itemsBreakdown) {
-        console.log("No data or itemsBreakdown:", data);
-        return null;
-      }
-      
-      // Calculate total sales from itemsBreakdown
-      const lastShiftSales = Object.values(data.itemsBreakdown).reduce((sum: number, item: any) => sum + item.sales, 0);
-      const lastShiftOrders = Object.values(data.itemsBreakdown).reduce((sum: number, item: any) => sum + item.qty, 0);
-      
-      console.log("KPI Calculation:", { lastShiftSales, lastShiftOrders, shiftDate: data.shiftDate });
-      
-      return {
-        lastShiftSales,
-        lastShiftOrders,
-        shiftDate: data.shiftDate,
-        monthToDateSales: 89566.50 // From authentic July 11th receipts data
-      };
-    }
+    queryKey: ["/api/dashboard/kpis"],
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   // Remove unused data fetching for placeholder components
