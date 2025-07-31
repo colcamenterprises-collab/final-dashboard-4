@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JussiChatBubble } from '@/components/JussiChatBubble';
 
@@ -41,7 +41,15 @@ const DailyShiftForm = () => {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showSuccessPage, setShowSuccessPage] = useState(false);
+  const [showFailurePage, setShowFailurePage] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState<{
+    success: boolean;
+    message: string;
+    formId?: number;
+  } | null>(null);
 
   // Authentic supplier data from CSV - 100% real inventory items
   const inventoryCategories = {
@@ -156,6 +164,54 @@ const DailyShiftForm = () => {
   const totalShopping = formData.shopping.reduce((sum, item) => sum + (item.amount || 0), 0);
   const totalExpenses = totalWages + totalShopping;
 
+  // Save Draft functionality
+  const saveDraft = async () => {
+    setIsDraftSaving(true);
+    setErrorMessage('');
+
+    try {
+      const response = await fetch('/api/daily-shift-forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          totalSales: totalSales,
+          totalExpenses: totalExpenses,
+          isDraft: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save draft: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Draft Saved Successfully",
+        description: `Form saved as draft. You can continue editing later.`,
+        duration: 4000,
+      });
+
+    } catch (error: any) {
+      let errorMessage = 'Failed to save draft. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Draft Save Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDraftSaving(false);
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,20 +222,28 @@ const DailyShiftForm = () => {
       const response = await fetch('/api/daily-shift-forms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          totalSales: totalSales,
+          totalExpenses: totalExpenses,
+          isDraft: false
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to submit form: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to submit form: ${response.statusText}`);
       }
 
       const result = await response.json();
       
-      toast({
-        title: "Thank you, form submitted!",
-        description: `Shift form saved successfully`,
-        duration: 6000,
+      // Show success page with clear confirmation
+      setSubmissionResult({
+        success: true,
+        message: `Form submitted successfully! Form ID: ${result.id || 'Generated'}`,
+        formId: result.id
       });
+      setShowSuccessPage(true);
 
       // Reset form
       setFormData({
@@ -207,16 +271,88 @@ const DailyShiftForm = () => {
         errorMessage = error.message;
       }
       
-      setErrorMessage(errorMessage);
-      toast({
-        title: "Submission Failed",
-        description: errorMessage,
-        variant: "destructive",
+      // Show failure page with clear error message
+      setSubmissionResult({
+        success: false,
+        message: errorMessage
       });
+      setShowFailurePage(true);
+      setErrorMessage(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Auto-dismiss success/failure pages after 10 seconds
+  useEffect(() => {
+    if (showSuccessPage || showFailurePage) {
+      const timer = setTimeout(() => {
+        setShowSuccessPage(false);
+        setShowFailurePage(false);
+        setSubmissionResult(null);
+      }, 10000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessPage, showFailurePage]);
+
+  // Success Page Component
+  if (showSuccessPage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-green-50">
+        <div className="max-w-md w-full mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
+          <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
+          <h1 className="text-2xl font-bold text-green-800 mb-2">SUCCESS!</h1>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Form Submitted Successfully</h2>
+          <p className="text-gray-600 mb-2">{submissionResult?.message}</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Your daily shift form has been saved to the database and is now available for reports and analysis.
+          </p>
+          <div className="text-xs text-gray-400 mb-4">
+            This page will automatically close in 10 seconds...
+          </div>
+          <Button 
+            onClick={() => {
+              setShowSuccessPage(false);
+              setSubmissionResult(null);
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
+          >
+            Continue to New Form
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Failure Page Component
+  if (showFailurePage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50">
+        <div className="max-w-md w-full mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
+          <XCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
+          <h1 className="text-2xl font-bold text-red-800 mb-2">SUBMISSION FAILED</h1>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Form Not Submitted</h2>
+          <p className="text-gray-600 mb-2">{submissionResult?.message}</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Please check your data and try again. If the problem persists, contact support.
+          </p>
+          <div className="text-xs text-gray-400 mb-4">
+            This page will automatically close in 10 seconds...
+          </div>
+          <Button 
+            onClick={() => {
+              setShowFailurePage(false);
+              setSubmissionResult(null);
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2"
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-8">
@@ -664,11 +800,20 @@ const DailyShiftForm = () => {
           </Card>
         ))}
 
-        {/* Submit Button */}
-        <div className="flex justify-center">
+        {/* Submit Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <Button 
+            type="button"
+            onClick={saveDraft}
+            disabled={isDraftSaving || isSubmitting}
+            variant="outline"
+            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-8 py-3 text-lg font-semibold"
+          >
+            {isDraftSaving ? "Saving Draft..." : "Save Draft"}
+          </Button>
           <Button 
             type="submit" 
-            disabled={isSubmitting}
+            disabled={isSubmitting || isDraftSaving}
             className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 text-lg font-semibold"
           >
             {isSubmitting ? "Submitting..." : "Submit Form"}
