@@ -365,7 +365,7 @@ const ReportsAnalysis = () => {
       title: "Financial Summary Reports", 
       description: "Monthly and weekly financial performance with profit analysis",
       icon: PieChart,
-      path: "/loyverse-live",
+      path: "/pos-loyverse",
       status: "Active"
     },
     {

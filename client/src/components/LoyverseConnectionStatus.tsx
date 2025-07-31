@@ -52,7 +52,7 @@ export default function LoyverseConnectionStatus({ compact = false }: LoyverseCo
               >
                 {isLoading ? "Checking..." : status?.connected ? "Connected" : "Disconnected"}
               </Badge>
-              <Link href="/loyverse-live">
+              <Link href="/pos-loyverse">
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
                   Manage
                 </Button>
@@ -107,7 +107,7 @@ export default function LoyverseConnectionStatus({ compact = false }: LoyverseCo
            "Connection failed"}
         </p>
         <div className="mt-3">
-          <Link href="/loyverse-live">
+          <Link href="/pos-loyverse">
             <Button variant="outline" size="sm" className="w-full">
               Manage Integration
             </Button>

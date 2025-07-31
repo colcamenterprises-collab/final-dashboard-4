@@ -18,7 +18,7 @@ import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import ExpensesMerged from "@/pages/ExpensesMerged";
 import POSLoyverse from "@/pages/POSLoyverse";
-import LoyverseLive from "@/pages/LoyverseLive";
+
 import RecipeIngredientManagement from "@/pages/RecipeIngredientManagement";
 import Analysis from "@/pages/Analysis";
 import ReportsAnalysis from "@/pages/ReportsAnalysis";
@@ -57,7 +57,7 @@ function Router() {
         <Route path="/finance" component={Finance} />
         <Route path="/expenses" component={ExpensesMerged} />
         <Route path="/pos-loyverse" component={POSLoyverse} />
-        <Route path="/loyverse-live" component={LoyverseLive} />
+
         <Route path="/recipe-management" component={RecipeIngredientManagement} />
         <Route path="/ingredient-management" component={RecipeIngredientManagement} />
         <Route path="/reports-analysis" component={ReportsAnalysis} />
