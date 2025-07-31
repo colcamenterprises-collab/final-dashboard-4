@@ -11,7 +11,7 @@ import {
   ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle
 } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
-import { JussiChatBubble } from "@/components/JussiChatBubble";
+import JussiChatBubble from "@/components/JussiChatBubble";
 
 // Currency Context
 const CurrencyContext = createContext<{
