@@ -359,6 +359,10 @@ const DailyShiftForm = () => {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
         <p className="text-gray-600">Complete daily shift reporting with authentic inventory tracking</p>
+        {/* Debug info - remove once working */}
+        <div className="text-xs text-blue-500 mt-2">
+          Form Version: v2.0 - Draft Button Enabled | Debug: isDraftSaving={isDraftSaving.toString()}
+        </div>
       </div>
 
       {errorMessage && (
