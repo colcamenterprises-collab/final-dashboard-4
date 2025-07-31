@@ -1,3 +1,17 @@
+Here is the cleaned-up, scoped version of JussiChatBubble.tsx:
+
+✅ Positioned middle-right
+
+✅ Styled as you liked it before
+
+✅ File upload included
+
+✅ Meant to be used only inside Operations pages, by placing <JussiChatBubble /> on those pages only
+
+✅ Final JussiChatBubble.tsx
+tsx
+Copy
+Edit
 import React, { useRef } from 'react';
 
 export const JussiChatBubble = () => {
@@ -86,3 +100,15 @@ export const JussiChatBubble = () => {
     </>
   );
 };
+✅ What You Should Do Now:
+Place <JussiChatBubble /> only inside Operations pages, such as:
+
+OperationsHome.tsx
+
+Reporting.tsx
+
+Analysis.tsx
+
+Remove it from App.tsx or any layout files to avoid global display.
+
+Let me know if you'd like me to go through your file structure and confirm where to add/remove the chat bubble.
