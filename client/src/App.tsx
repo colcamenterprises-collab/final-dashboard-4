@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
+import DashboardSimple from "@/pages/DashboardSimple";
 import DailyShiftForm from "@/pages/DailyShiftForm";
 import DraftFormsLibrary from "@/pages/DraftFormsLibrary";
 import DailySalesStock from "@/pages/DailySalesStock";
@@ -29,7 +30,8 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={DashboardSimple} />
+        <Route path="/dashboard-full" component={Dashboard} />
         <Route path="/daily-sales-stock" component={DailySalesStock} />
         <Route path="/daily-shift-form" component={DailyShiftForm} />
         <Route path="/shopping-list" component={ShoppingList} />
