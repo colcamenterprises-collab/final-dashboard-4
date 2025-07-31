@@ -27,7 +27,7 @@ export const JussiChatBubble = () => {
           top: '50%',
           right: '30px',
           transform: 'translateY(-50%)',
-          backgroundColor: '#fbbf24',
+          backgroundColor: '#f5d016',
           border: '2px solid #000',
           borderRadius: '50%',
           width: '50px',
