@@ -83,6 +83,7 @@ const Recipes = () => {
 
   useEffect(() => {
     loadRecipes();
+    loadIngredients();
   }, []);
 
   const loadRecipes = async () => {
@@ -101,11 +102,24 @@ const Recipes = () => {
     }
   };
 
+  const loadIngredients = async () => {
+    try {
+      const data = await fetch('/api/ingredients').then(r => r.json());
+      setIngredients(data);
+    } catch (error) {
+      toast({
+        title: "Error", 
+        description: "Failed to load ingredients",
+        variant: "destructive",
+      });
+    }
+  };
+
   const addIngredient = () => {
     setNewRecipe({
       ...newRecipe,
       ingredients: [...(newRecipe.ingredients || []), { 
-        ingredientName: '', 
+        ingredientId: 0, 
         quantity: 0, 
         unit: 'grams',
         costPerUnit: 0,
@@ -116,17 +130,38 @@ const Recipes = () => {
 
   const updateIngredient = (index: number, field: keyof RecipeIngredient, value: string | number) => {
     const updated = [...(newRecipe.ingredients || [])];
-    if (field === 'ingredientName' || field === 'unit') {
+    if (field === 'unit') {
       updated[index][field] = value as string;
     } else {
       updated[index][field] = value as number;
     }
     
-    // Auto-calculate total cost when quantity or cost per unit changes
-    if (field === 'quantity' || field === 'costPerUnit') {
-      const quantity = field === 'quantity' ? (value as number) : updated[index].quantity;
-      const costPerUnit = field === 'costPerUnit' ? (value as number) : updated[index].costPerUnit;
-      updated[index].totalCost = quantity * costPerUnit;
+    // Auto-calculate total cost and cost per unit when ingredient or quantity changes
+    if (field === 'ingredientId' || field === 'quantity') {
+      const ingredient = ingredients.find(ing => ing.id === updated[index].ingredientId);
+      if (ingredient && updated[index].quantity > 0) {
+        const costPerKg = parseFloat(ingredient.costPerUnit || '0');
+        let costPerUnit = 0;
+        
+        // Convert quantity to kg for cost calculation
+        const quantity = updated[index].quantity;
+        const unit = updated[index].unit;
+        
+        if (unit === 'kg') {
+          costPerUnit = costPerKg * quantity;
+        } else if (unit === 'grams') {
+          costPerUnit = costPerKg * (quantity / 1000);
+        } else if (unit === 'litres') {
+          costPerUnit = costPerKg * quantity; // Assuming 1L = 1kg for liquids
+        } else if (unit === 'ml') {
+          costPerUnit = costPerKg * (quantity / 1000);
+        } else {
+          costPerUnit = costPerKg * quantity; // Default calculation
+        }
+        
+        updated[index].costPerUnit = costPerKg;
+        updated[index].totalCost = costPerUnit;
+      }
     }
     
     setNewRecipe({ ...newRecipe, ingredients: updated });
@@ -174,8 +209,8 @@ const Recipes = () => {
 
       const recipeData = {
         ...newRecipe,
-        totalIngredientCost: calculateTotalCost(),
-        costPerUnit: calculateCostPerUnit(),
+        totalIngredientCost: calculateTotalCost().toString(),
+        costPerUnit: calculateCostPerUnit().toString(),
       };
 
       const url = editing ? `/api/recipes/${editing}` : '/api/recipes';
@@ -306,26 +341,7 @@ const Recipes = () => {
                 </SelectContent>
               </Select>
               
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="Yield quantity (e.g., 10 for 10 litres of sauce)"
-                value={newRecipe.yieldQuantity || ''}
-                onChange={(e) => setNewRecipe({ ...newRecipe, yieldQuantity: parseFloat(e.target.value) || 0 })}
-              />
-              <Select
-                value={newRecipe.yieldUnit || ''}
-                onValueChange={(value) => setNewRecipe({ ...newRecipe, yieldUnit: value })}
-              >
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="Yield unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map(unit => (
-                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
               
               <Input
                 type="number"
@@ -361,17 +377,27 @@ const Recipes = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Ingredients</h3>
                 <div className="text-sm text-gray-600">
-                  Total Cost: ฿{calculateTotalCost().toFixed(2)} | Cost per {newRecipe.yieldUnit}: ฿{calculateCostPerUnit().toFixed(2)}
+                  Total Cost: ฿{calculateTotalCost().toFixed(2)}
                 </div>
               </div>
               
               {(newRecipe.ingredients || []).map((ingredient, index) => (
                 <div key={index} className="grid grid-cols-5 gap-2 p-2 border rounded">
-                  <Input
-                    placeholder="Ingredient name"
-                    value={ingredient.ingredientName}
-                    onChange={(e) => updateIngredient(index, 'ingredientName', e.target.value)}
-                  />
+                  <Select
+                    value={ingredient.ingredientId?.toString() || ''}
+                    onValueChange={(value) => updateIngredient(index, 'ingredientId', parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select ingredient" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ingredients.map(ing => (
+                        <SelectItem key={ing.id} value={ing.id.toString()}>
+                          {ing.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     step="0.001"
@@ -450,7 +476,6 @@ const Recipes = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Yield</TableHead>
                     <TableHead>Total Cost</TableHead>
                     <TableHead>Cost per Unit</TableHead>
                     <TableHead>Actions</TableHead>
@@ -461,7 +486,6 @@ const Recipes = () => {
                     <TableRow key={recipe.id}>
                       <TableCell className="font-medium">{recipe.name}</TableCell>
                       <TableCell>{recipe.category}</TableCell>
-                      <TableCell>{recipe.yieldQuantity} {recipe.yieldUnit}</TableCell>
                       <TableCell>฿{parseFloat(recipe.totalIngredientCost || '0').toFixed(2)}</TableCell>
                       <TableCell>฿{parseFloat(recipe.costPerUnit || '0').toFixed(2)}</TableCell>
                       <TableCell>
