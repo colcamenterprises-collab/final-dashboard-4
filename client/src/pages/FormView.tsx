@@ -38,6 +38,8 @@ interface FormData {
   kitchenSupplies?: string | Record<string, number>;
   packaging?: string | Record<string, number>;
   drinkStock?: string | Record<string, number>;
+  // Stock requirements/shopping needs
+  number_needed?: string | Record<string, number>;
 }
 
 const FormView = () => {
@@ -96,6 +98,9 @@ const FormView = () => {
   const kitchenSupplies = typeof formData.kitchenSupplies === 'string' ? JSON.parse(formData.kitchenSupplies || '{}') : formData.kitchenSupplies || {};
   const packaging = typeof formData.packaging === 'string' ? JSON.parse(formData.packaging || '{}') : formData.packaging || {};
   const drinkStock = typeof formData.drinkStock === 'string' ? JSON.parse(formData.drinkStock || '{}') : formData.drinkStock || {};
+  
+  // Parse stock requirements/number needed data (this is the actual inventory data)
+  const stockRequirements = typeof formData.number_needed === 'string' ? JSON.parse(formData.number_needed || '{}') : formData.number_needed || {};
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -352,8 +357,23 @@ const FormView = () => {
             </div>
           )}
 
+          {/* Stock Requirements / Shopping Needs */}
+          {Object.keys(stockRequirements).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Stock Requirements / Shopping Needs</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(stockRequirements).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* General Inventory (fallback for older forms) */}
-          {Object.keys(inventory).length > 0 && Object.keys(freshFood).length === 0 && (
+          {Object.keys(inventory).length > 0 && Object.keys(freshFood).length === 0 && Object.keys(stockRequirements).length === 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-4">Food & Stock Items</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
