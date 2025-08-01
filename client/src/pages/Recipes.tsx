@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 interface RecipeIngredient {
-  ingredientName: string;
+  ingredientId: number;
   quantity: number;
   unit: string; // kg, grams, mg, litres, ml, each, cups, tablespoons, etc
   costPerUnit: number;
@@ -53,8 +53,18 @@ const UNIT_OPTIONS = [
   'cups', '1/2 cup', '1/4 cup', 'tablespoons', 'teaspoons'
 ];
 
+interface Ingredient {
+  id: number;
+  name: string;
+  category: string;
+  packageSize: string;
+  costPerUnit: string;
+  unit: string;
+}
+
 const Recipes = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [newRecipe, setNewRecipe] = useState<Partial<Recipe>>({
     name: '',
     description: '',
@@ -258,14 +268,7 @@ const Recipes = () => {
         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Menu Management</h1>
         <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage recipes, ingredients, and menu items</p>
         
-        {/* Navigation to Menu Management sections */}
-        <div className="mt-3 sm:mt-4">
-          <Link href="/ingredients">
-            <Button variant="outline" className="bg-black text-white hover:bg-gray-800 border-0">
-              Ingredients
-            </Button>
-          </Link>
-        </div>
+
       </div>
 
       <div className="space-y-4 sm:space-y-6">
