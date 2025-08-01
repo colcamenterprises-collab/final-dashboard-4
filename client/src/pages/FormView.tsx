@@ -205,7 +205,7 @@ const FormView = () => {
                     </div>
                     <div>
                       <Label>Shop Name</Label>
-                      <Input disabled value={shop.shopName} />
+                      <Input disabled value={shop.shop || shop.shopName} />
                     </div>
                   </div>
                 ))}
