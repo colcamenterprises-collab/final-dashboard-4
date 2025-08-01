@@ -46,7 +46,7 @@ const Recipes = () => {
   const [newRecipe, setNewRecipe] = useState<Partial<Recipe>>({
     name: '',
     description: '',
-    category: 'Main Course',
+    category: 'Burgers',
     servingSize: 1,
     preparationTime: 0,
     ingredients: [],
@@ -128,7 +128,7 @@ const Recipes = () => {
       setNewRecipe({
         name: '',
         description: '',
-        category: 'Main Course',
+        category: 'Burgers',
         servingSize: 1,
         preparationTime: 0,
         ingredients: [],
@@ -279,10 +279,11 @@ const Recipes = () => {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Main Course">Main Course</SelectItem>
-                <SelectItem value="Sides">Sides</SelectItem>
+                <SelectItem value="Burgers">Burgers</SelectItem>
+                <SelectItem value="Side Orders">Side Orders</SelectItem>
+                <SelectItem value="Sauce">Sauce</SelectItem>
                 <SelectItem value="Beverages">Beverages</SelectItem>
-                <SelectItem value="Desserts">Desserts</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
             
