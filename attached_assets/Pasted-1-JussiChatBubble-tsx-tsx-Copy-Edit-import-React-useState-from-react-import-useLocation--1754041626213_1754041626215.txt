@@ -1,0 +1,118 @@
+1. JussiChatBubble.tsx
+tsx
+Copy
+Edit
+import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { ChatAgentProvider } from "../agents/ChatAgentProvider";
+
+const JussiChatBubble = () => {
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+  const allowedPaths = ["/operations", "/operations/receipts", "/operations/reports", "/operations/analysis"];
+
+  if (!allowedPaths.includes(location.pathname)) return null;
+
+  return (
+    <ChatAgentProvider agentName="Jussi" agentRole="Head of Operations" tools={["file-upload", "receipt-parser"]}>
+      <div
+        style={{
+          position: "fixed",
+          right: "20px",
+          bottom: "20px",
+          zIndex: 9999,
+        }}
+      >
+        {!isOpen ? (
+          <button
+            onClick={() => setIsOpen(true)}
+            style={{
+              backgroundColor: "#000",
+              color: "#fff",
+              border: "none",
+              borderRadius: "50%",
+              width: "60px",
+              height: "60px",
+              fontSize: "24px",
+              boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+              cursor: "pointer",
+            }}
+          >
+            💬
+          </button>
+        ) : (
+          <div
+            style={{
+              width: "350px",
+              height: "500px",
+              backgroundColor: "#fff",
+              borderRadius: "10px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#000",
+                color: "#fff",
+                padding: "10px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>💬 Jussi – Ops Chat</span>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: "transparent",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <iframe
+              title="Jussi Chat"
+              src="/chatbox-jussi.html"
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "none",
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </ChatAgentProvider>
+  );
+};
+
+export default JussiChatBubble;
+✅ 2. ChatAgentProvider.tsx
+tsx
+Copy
+Edit
+import React, { useEffect } from "react";
+
+type Props = {
+  children: React.ReactNode;
+  agentName: string;
+  agentRole: string;
+  tools?: string[];
+};
+
+export const ChatAgentProvider = ({ children, agentName, agentRole, tools = [] }: Props) => {
+  useEffect(() => {
+    window.localStorage.setItem("chat-agent-name", agentName);
+    window.localStorage.setItem("chat-agent-role", agentRole);
+    window.localStorage.setItem("chat-agent-tools", JSON.stringify(tools));
+  }, [agentName, agentRole, tools]);
+
+  return <>{children}</>;
+};
