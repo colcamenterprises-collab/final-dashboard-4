@@ -540,14 +540,23 @@ export default function DailyStockSales() {
           <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Daily Stock and Sales</h1>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowItemManager(!showItemManager)}
-          className="flex items-center gap-2"
-        >
-          <Wrench className="h-4 w-4" />
-          Manage Items
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href = '/daily-stock-sales/search'}
+            className="bg-white text-black border-black hover:bg-gray-50"
+          >
+            View Forms
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowItemManager(!showItemManager)}
+            className="flex items-center gap-2"
+          >
+            <Wrench className="h-4 w-4" />
+            Manage Items
+          </Button>
+        </div>
       </div>
 
       {/* Item Management Panel */}
@@ -1740,18 +1749,17 @@ export default function DailyStockSales() {
               type="button"
               onClick={saveDraft}
               disabled={saveDraftMutation.isPending}
-              className="w-full sm:min-w-[150px] bg-black text-white hover:bg-gray-800"
+              className="w-full sm:min-w-[150px] bg-gray-200 text-black hover:bg-gray-300 border-0"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {saveDraftMutation.isPending ? "Saving..." : editingFormId ? "Update Draft" : "Save as Draft"}
+              {saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
             </Button>
             
             <Button 
               type="submit" 
               disabled={createMutation.isPending}
-              className="w-full sm:min-w-[200px] bg-black text-white hover:bg-gray-800"
+              className="w-full sm:min-w-[200px] bg-black text-white hover:bg-gray-800 border-0"
             >
-              {createMutation.isPending ? "Submitting..." : editingFormId ? "Update Form" : "Submit Form"}
+              {createMutation.isPending ? "Submitting..." : "Submit Form"}
             </Button>
           </div>
           </form>
