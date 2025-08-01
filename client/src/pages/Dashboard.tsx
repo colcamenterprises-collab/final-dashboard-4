@@ -244,23 +244,20 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
           <Link href="/expenses" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center">
-              <Receipt className="mr-2 h-4 w-4 shrink-0" />
-              <span className="text-sm">Submit Expense</span>
+            <Button className="w-full sm:w-44 h-10 bg-black text-white font-medium hover:bg-gray-800 flex items-center justify-center">
+              Submit Expense
             </Button>
           </Link>
           <Link href="/daily-stock-sales" className="flex-1 sm:flex-none">
-            <Button className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center">
-              <ClipboardList className="mr-2 h-4 w-4 shrink-0" />
-              <span className="text-sm">Sales & Stock Form</span>
+            <Button className="w-full sm:w-44 h-10 bg-black text-white font-medium hover:bg-gray-800 flex items-center justify-center">
+              Sales & Stock Form
             </Button>
           </Link>
           <Button 
             onClick={() => setIsQuickNoteDialogOpen(true)}
-            className="w-full sm:w-44 h-10 bg-slate-800 text-white font-medium hover:bg-slate-700 justify-center"
+            className="w-full sm:w-44 h-10 bg-black text-white font-medium hover:bg-gray-800 flex items-center justify-center"
           >
-            <StickyNote className="mr-2 h-4 w-4 shrink-0" />
-            <span className="text-sm">Quick Notes</span>
+            Quick Notes
           </Button>
         </div>
       </div>
