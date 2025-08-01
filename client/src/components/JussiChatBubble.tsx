@@ -28,7 +28,7 @@ export const JussiChatBubble = () => {
           right: '30px',
           transform: 'translateY(-50%)',
           backgroundColor: '#f5d016',
-          border: '2px solid #000',
+          border: 'none',
           borderRadius: '50%',
           width: '50px',
           height: '50px',
@@ -41,7 +41,19 @@ export const JussiChatBubble = () => {
         }}
         title="Jussi"
       >
-        💬
+        <svg 
+          width="24" 
+          height="24" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+          style={{ color: '#000' }}
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
       </div>
 
       <div
