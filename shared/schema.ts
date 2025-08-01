@@ -306,27 +306,40 @@ export const ingredients = pgTable("ingredients", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Recipes table
+// Recipes table - Industry standard recipe management
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name").notNull(), // Recipe title (e.g., "Smash Burger", "BBQ Sauce")
   description: text("description"),
-  category: text("category").notNull(),
-  servingSize: integer("serving_size").notNull(),
-  preparationTime: integer("preparation_time"),
-  // Enhanced ingredient portion fields
-  ingredients: jsonb("ingredients").$type<{ ingredientId: number; portion: number }[]>(), // [{ ingredientId: id, portion: number }]
-  costPerServing: decimal("cost_per_serving", { precision: 10, scale: 2 }), // Auto-calculated cost per serving
-  breakDown: jsonb("break_down").$type<{ name: string; portion: number; cost: number }[]>(), // Stored breakdown JSON
-  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
-  profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }),
+  category: text("category").notNull(), // Burgers, Side Orders, Sauce, Beverages, Other
+  
+  // Recipe yield information
+  yieldQuantity: decimal("yield_quantity", { precision: 10, scale: 2 }).notNull(), // How much this recipe makes
+  yieldUnit: text("yield_unit").notNull(), // kg, litres, pieces, portions, each, etc
+  
+  // Recipe ingredients with proper measurements
+  ingredients: jsonb("ingredients").$type<Array<{
+    ingredientName: string;
+    quantity: number;
+    unit: string; // kg, grams, mg, litres, ml, each, cups, tablespoons, etc
+    costPerUnit: number;
+    totalCost: number;
+  }>>().notNull(),
+  
+  // Costing information
+  totalIngredientCost: decimal("total_ingredient_cost", { precision: 10, scale: 2 }),
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }), // Cost per yield unit
+  costPerServing: decimal("cost_per_serving", { precision: 10, scale: 2 }), // If different from unit
+  
+  // Optional fields
+  preparationTime: integer("preparation_time"), // in minutes
+  servingSize: text("serving_size"), // Description of serving size
+  profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // percentage
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  
+  // Recipe management
   isActive: boolean("is_active").default(true),
-  // Marketing content fields
-  deliveryContent: text("delivery_content"), // JSON string for delivery partner content
-  advertisingContent: text("advertising_content"), // JSON string for advertising content
-  socialContent: text("social_content"), // JSON string for social media content
-  marketingNotes: text("marketing_notes"), // Additional notes for marketing content generation
+  notes: text("notes"), // Special instructions
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });

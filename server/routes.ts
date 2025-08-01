@@ -1817,40 +1817,24 @@ export function registerRoutes(app: express.Application): Server {
 
   app.post("/api/recipes", async (req: Request, res: Response) => {
     try {
-      const { recipes, ingredients: ingredientsTable } = await import("../shared/schema");
+      const { recipes } = await import("../shared/schema");
       const data = req.body;
-      
-      // Auto-calculate cost and breakdown
-      let costPerServing = 0;
-      const breakDown = [];
-      
-      for (const ing of data.ingredients || []) {
-        const ingData = await db.select().from(ingredientsTable)
-          .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
-          
-        if (ingData[0]) {
-          const ingCost = ing.portion * parseFloat(ingData[0].costPerPortion || '0');
-          costPerServing += ingCost;
-          breakDown.push({ 
-            name: ingData[0].name, 
-            portion: ing.portion, 
-            cost: ingCost 
-          });
-        }
-      }
       
       const [result] = await db.insert(recipes).values({
         name: data.name,
         description: data.description,
-        category: data.category || 'Main Course',
-        servingSize: data.servingSize || 1,
-        preparationTime: data.preparationTime || 0,
+        category: data.category || 'Burgers',
+        yieldQuantity: data.yieldQuantity || '1',
+        yieldUnit: data.yieldUnit || 'portions',
         ingredients: data.ingredients || [],
-        costPerServing: costPerServing.toString(),
-        breakDown: breakDown,
-        totalCost: data.totalCost || costPerServing.toString(),
-        profitMargin: data.profitMargin || '30',
-        sellingPrice: data.sellingPrice || (costPerServing * 1.3).toString(),
+        totalIngredientCost: data.totalIngredientCost || '0',
+        costPerUnit: data.costPerUnit || '0',
+        costPerServing: data.costPerServing || null,
+        preparationTime: data.preparationTime || 0,
+        servingSize: data.servingSize || null,
+        profitMargin: data.profitMargin || null,
+        sellingPrice: data.sellingPrice || null,
+        notes: data.notes || null,
         isActive: data.isActive ?? true,
       }).returning();
       
@@ -1863,41 +1847,25 @@ export function registerRoutes(app: express.Application): Server {
 
   app.put("/api/recipes/:id", async (req: Request, res: Response) => {
     try {
-      const { recipes, ingredients: ingredientsTable } = await import("../shared/schema");
+      const { recipes } = await import("../shared/schema");
       const id = parseInt(req.params.id);
       const data = req.body;
-      
-      // Auto-calculate cost and breakdown
-      let costPerServing = 0;
-      const breakDown = [];
-      
-      for (const ing of data.ingredients || []) {
-        const ingData = await db.select().from(ingredientsTable)
-          .where(eq(ingredientsTable.id, ing.ingredientId)).limit(1);
-          
-        if (ingData[0]) {
-          const ingCost = ing.portion * parseFloat(ingData[0].costPerPortion || '0');
-          costPerServing += ingCost;
-          breakDown.push({ 
-            name: ingData[0].name, 
-            portion: ing.portion, 
-            cost: ingCost 
-          });
-        }
-      }
       
       const [result] = await db.update(recipes).set({
         name: data.name,
         description: data.description,
         category: data.category,
-        servingSize: data.servingSize,
-        preparationTime: data.preparationTime,
+        yieldQuantity: data.yieldQuantity,
+        yieldUnit: data.yieldUnit,
         ingredients: data.ingredients || [],
-        costPerServing: costPerServing.toString(),
-        breakDown: breakDown,
-        totalCost: data.totalCost || costPerServing.toString(),
+        totalIngredientCost: data.totalIngredientCost,
+        costPerUnit: data.costPerUnit,
+        costPerServing: data.costPerServing,
+        preparationTime: data.preparationTime,
+        servingSize: data.servingSize,
         profitMargin: data.profitMargin,
         sellingPrice: data.sellingPrice,
+        notes: data.notes,
         isActive: data.isActive,
         updatedAt: new Date(),
       }).where(eq(recipes.id, id)).returning();
