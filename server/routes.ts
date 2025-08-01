@@ -380,7 +380,7 @@ export function registerRoutes(app: express.Application): Server {
       console.log("Processed form data:", formData);
       
       // Use Drizzle ORM with proper schema field mapping
-      const [result] = await db.insert(dailyStockSales).values(formData).returning();
+      const [result] = await db.insert(dailyStockSales).values([formData]).returning();
       
       console.log("✅ Comprehensive form saved successfully with ID:", result.id);
       res.json(result);
@@ -569,7 +569,7 @@ export function registerRoutes(app: express.Application): Server {
         
         try {
           await db.transaction(async (tx) => {
-            [result] = await tx.insert(dailyStockSales).values(bulletproofData).returning();
+            [result] = await tx.insert(dailyStockSales).values([bulletproofData]).returning();
           });
           
           console.log(`✅ BULLETPROOF SAVE SUCCESS! ID: ${result.id} (attempt ${dbAttempts})`);
@@ -605,31 +605,36 @@ export function registerRoutes(app: express.Application): Server {
           // Process all food categories for items > 0 - handle object format from simplified form
           if (data.freshFood && typeof data.freshFood === 'object') {
             Object.entries(data.freshFood).forEach(([name, value]) => {
-              if (value > 0) purchaseItems.push({ name, value });
+              const numValue = Number(value);
+              if (numValue > 0) purchaseItems.push({ name, value: numValue });
             });
           }
           
           if (data.frozenFood && typeof data.frozenFood === 'object') {
             Object.entries(data.frozenFood).forEach(([name, value]) => {
-              if (value > 0) purchaseItems.push({ name, value });
+              const numValue = Number(value);
+              if (numValue > 0) purchaseItems.push({ name, value: numValue });
             });
           }
           
           if (data.shelfItems && typeof data.shelfItems === 'object') {
             Object.entries(data.shelfItems).forEach(([name, value]) => {
-              if (value > 0) purchaseItems.push({ name, value });
+              const numValue = Number(value);
+              if (numValue > 0) purchaseItems.push({ name, value: numValue });
             });
           }
           
           if (data.kitchenItems && typeof data.kitchenItems === 'object') {
             Object.entries(data.kitchenItems).forEach(([name, value]) => {
-              if (value > 0) purchaseItems.push({ name, value });
+              const numValue = Number(value);
+              if (numValue > 0) purchaseItems.push({ name, value: numValue });
             });
           }
           
           if (data.packagingItems && typeof data.packagingItems === 'object') {
             Object.entries(data.packagingItems).forEach(([name, value]) => {
-              if (value > 0) purchaseItems.push({ name, value });
+              const numValue = Number(value);
+              if (numValue > 0) purchaseItems.push({ name, value: numValue });
             });
           }
 
@@ -643,7 +648,7 @@ export function registerRoutes(app: express.Application): Server {
               pricePerUnit: '0',
               priority: 'medium',
               formId: result.id,
-              listDate: data.shiftDate,
+              listDate: new Date(data.shiftDate),
               isCompleted: false,
               createdAt: new Date(),
               updatedAt: new Date()
@@ -1189,9 +1194,9 @@ export function registerRoutes(app: express.Application): Server {
         unit: item.unit || 'unit',
         formId: item.formId,
         listDate: item.listDate ? new Date(item.listDate) : new Date(),
-        estimatedCost: parseFloat(item.estimatedCost || '0'),
+        estimatedCost: String(parseFloat(item.estimatedCost || '0')),
         supplier: item.supplier || '',
-        pricePerUnit: parseFloat(item.pricePerUnit || '0'),
+        pricePerUnit: String(parseFloat(item.pricePerUnit || '0')),
         notes: item.notes || '',
         priority: item.priority || 'medium',
         selected: false,
@@ -1439,9 +1444,9 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/receipts/summary/generate/:date", async (req: Request, res: Response) => {
     try {
       const { date } = req.params;
-      const { JussiDailySummaryService } = await import("./services/jussiDailySummaryService");
+      const { generateJussiSummaryForDate } = await import("./services/jussiDailySummaryService");
       
-      const summary = await JussiDailySummaryService.generateJussiSummaryForDate(date);
+      const summary = await generateJussiSummaryForDate(date);
       
       if (!summary) {
         return res.status(404).json({ 
@@ -1464,9 +1469,9 @@ export function registerRoutes(app: express.Application): Server {
   // Get latest shift summary (most recent 5PM-3AM shift)
   app.get("/api/receipts/jussi-summary/latest", async (req: Request, res: Response) => {
     try {
-      const { JussiLatestShiftService } = await import("./services/jussiLatestShiftService");
+      const { getLatestShiftSummary } = await import("./services/jussiLatestShiftService");
       
-      const summary = await JussiLatestShiftService.getLatestShiftSummary();
+      const summary = await getLatestShiftSummary();
       
       if (!summary) {
         return res.status(404).json({ error: "No recent shift data found" });

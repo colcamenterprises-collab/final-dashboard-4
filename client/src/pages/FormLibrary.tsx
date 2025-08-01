@@ -6,8 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Download, FileText } from "lucide-react";
 import { Link } from "wouter";
 
+// Define proper types for the form data
+interface DailyStockSalesForm {
+  id: number;
+  completedBy: string;
+  shiftType: string;
+  shiftDate: Date | string;
+  totalSales: string | null;
+  isDraft: boolean;
+  status?: string;
+  createdAt?: Date | string;
+}
+
 const FormLibrary = () => {
-  const { data: forms = [], isLoading } = useQuery({
+  const { data: forms = [], isLoading } = useQuery<DailyStockSalesForm[]>({
     queryKey: ['/api/daily-stock-sales'],
   });
 
@@ -62,7 +74,7 @@ const FormLibrary = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {forms.map((form: any) => (
+                {forms.map((form) => (
                   <TableRow key={form.id}>
                     <TableCell>{form.id}</TableCell>
                     <TableCell>
