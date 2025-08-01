@@ -30,6 +30,14 @@ interface FormData {
   isDraft: boolean;
   createdAt?: string;
   updatedAt?: string;
+  // Food inventory data
+  inventory?: string | Record<string, number>;
+  freshFood?: string | Record<string, number>;
+  frozenFood?: string | Record<string, number>;
+  shelfItems?: string | Record<string, number>;
+  kitchenSupplies?: string | Record<string, number>;
+  packaging?: string | Record<string, number>;
+  drinkStock?: string | Record<string, number>;
 }
 
 const FormView = () => {
@@ -79,6 +87,15 @@ const FormView = () => {
 
   const wages = typeof formData.wages === 'string' ? JSON.parse(formData.wages) : formData.wages || [];
   const shopping = typeof formData.shopping === 'string' ? JSON.parse(formData.shopping) : formData.shopping || [];
+  
+  // Parse inventory data
+  const inventory = typeof formData.inventory === 'string' ? JSON.parse(formData.inventory || '{}') : formData.inventory || {};
+  const freshFood = typeof formData.freshFood === 'string' ? JSON.parse(formData.freshFood || '{}') : formData.freshFood || {};
+  const frozenFood = typeof formData.frozenFood === 'string' ? JSON.parse(formData.frozenFood || '{}') : formData.frozenFood || {};
+  const shelfItems = typeof formData.shelfItems === 'string' ? JSON.parse(formData.shelfItems || '{}') : formData.shelfItems || {};
+  const kitchenSupplies = typeof formData.kitchenSupplies === 'string' ? JSON.parse(formData.kitchenSupplies || '{}') : formData.kitchenSupplies || {};
+  const packaging = typeof formData.packaging === 'string' ? JSON.parse(formData.packaging || '{}') : formData.packaging || {};
+  const drinkStock = typeof formData.drinkStock === 'string' ? JSON.parse(formData.drinkStock || '{}') : formData.drinkStock || {};
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -244,6 +261,111 @@ const FormView = () => {
               </div>
             </div>
           </div>
+
+          {/* Fresh Food Inventory */}
+          {Object.keys(freshFood).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Fresh Food Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(freshFood).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Frozen Food Inventory */}
+          {Object.keys(frozenFood).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Frozen Food Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(frozenFood).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Shelf Items Inventory */}
+          {Object.keys(shelfItems).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Shelf Items Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(shelfItems).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Kitchen Supplies Inventory */}
+          {Object.keys(kitchenSupplies).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Kitchen Supplies Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(kitchenSupplies).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Packaging Inventory */}
+          {Object.keys(packaging).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Packaging Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(packaging).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Drink Stock Inventory */}
+          {Object.keys(drinkStock).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Drink Stock Inventory</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(drinkStock).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* General Inventory (fallback for older forms) */}
+          {Object.keys(inventory).length > 0 && Object.keys(freshFood).length === 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Food & Stock Items</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {Object.entries(inventory).map(([item, count]) => (
+                  <div key={item} className="p-3 border rounded">
+                    <Label className="text-sm font-medium">{item}</Label>
+                    <Input disabled value={count} className="mt-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Timestamps */}
           <div className="border-t pt-4">
