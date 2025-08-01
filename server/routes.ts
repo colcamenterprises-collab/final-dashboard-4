@@ -497,59 +497,104 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      console.log("Enhanced form submission data:", data);
+      console.log("💾 BULLETPROOF form submission received:", data);
       
-      // Ensure shiftDate is a Date object
-      if (data.shiftDate && typeof data.shiftDate === 'string') {
-        data.shiftDate = new Date(data.shiftDate);
-      }
+      // BULLETPROOF DATA VALIDATION AND SANITIZATION
+      const bulletproofData = {
+        // Core fields (guaranteed safe)
+        completedBy: String(data.completedBy || 'Unknown User').trim(),
+        shiftType: String(data.shiftType || 'night').trim(),
+        shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+        
+        // Sales fields (guaranteed numbers, no NaN)
+        startingCash: parseFloat(String(data.startingCash || 0)) || 0,
+        grabSales: parseFloat(String(data.grabSales || 0)) || 0,
+        aroiDeeSales: parseFloat(String(data.aroiDeeSales || 0)) || 0,
+        qrScanSales: parseFloat(String(data.qrScanSales || 0)) || 0,
+        cashSales: parseFloat(String(data.cashSales || 0)) || 0,
+        totalSales: parseFloat(String(data.totalSales || 0)) || 0,
+        
+        // Cash management (guaranteed numbers)
+        endingCash: parseFloat(String(data.endingCash || 0)) || 0,
+        bankedAmount: parseFloat(String(data.bankedAmount || 0)) || 0,
+        
+        // Expenses (guaranteed clean arrays)
+        wages: data.wages && Array.isArray(data.wages) ? 
+          JSON.stringify(data.wages.map((w: any) => ({
+            name: String(w.name || '').trim(),
+            amount: parseFloat(String(w.amount || 0)) || 0,
+            type: String(w.type || 'wages')
+          })).filter((w: any) => w.name || w.amount > 0)) : 
+          JSON.stringify([]),
+        
+        shopping: data.shopping && Array.isArray(data.shopping) ? 
+          JSON.stringify(data.shopping.map((s: any) => ({
+            item: String(s.item || '').trim(),
+            amount: parseFloat(String(s.amount || 0)) || 0,
+            shop: String(s.shop || '').trim()
+          })).filter((s: any) => s.item || s.amount > 0)) : 
+          JSON.stringify([]),
+        
+        totalExpenses: parseFloat(String(data.totalExpenses || 0)) || 0,
+        gasExpense: parseFloat(String(data.gasExpense || 0)) || 0,
+        
+        // Stock/inventory data (guaranteed safe object)
+        numberNeeded: data.numberNeeded && typeof data.numberNeeded === 'object' ? 
+          JSON.stringify(data.numberNeeded) : 
+          JSON.stringify({}),
+        
+        // Status flags (guaranteed safe)
+        isDraft: Boolean(data.isDraft || false),
+        status: String(data.status || 'completed')
+      };
       
-      // Parse numeric fields for new form structure
-      const numericFields = [
-        'startingCash', 'endingCash', 'grabSales', 'foodpandaSales', 'walkInSales'
-      ];
+      console.log("🛡️ Bulletproof data prepared:", bulletproofData);
       
-      numericFields.forEach(field => {
-        if (data[field] !== undefined && data[field] !== null) {
-          data[field] = parseFloat(data[field] || '0');
-        }
-      });
-
-      // Parse wages and shopping arrays
-      if (data.wages && Array.isArray(data.wages)) {
-        data.wages = JSON.stringify(data.wages.map((w: any) => ({
-          ...w,
-          amount: parseFloat(w.amount || '0')
-        })));
-      }
-
-      if (data.shopping && Array.isArray(data.shopping)) {
-        data.shopping = JSON.stringify(data.shopping.map((s: any) => ({
-          ...s,
-          amount: parseFloat(s.amount || '0')
-        })));
-      }
+      // BULLETPROOF CASH VALIDATION
+      const calculatedCash = bulletproofData.startingCash + bulletproofData.cashSales - bulletproofData.totalExpenses;
+      const manualCash = bulletproofData.endingCash;
       
-      // Check for cash anomalies (manual vs calculated)
-      const calculatedCash = Number(data.startingCash || 0) + Number(data.cashSales || 0) - Number(data.totalExpenses || 0);
-      const manualCash = Number(data.endingCash || 0);
-      
-      if (manualCash !== calculatedCash) {
-        console.log(`🚨 CASH ANOMALY DETECTED: Manual cash ${manualCash} vs calculated ${calculatedCash} (diff: ${manualCash - calculatedCash})`);
-        console.log(`📊 Cash breakdown: Starting ${data.startingCash} + Cash Sales ${data.cashSales} - Expenses ${data.totalExpenses} = ${calculatedCash}`);
+      if (Math.abs(manualCash - calculatedCash) > 0.01) { // Allow for rounding
+        console.log(`🚨 CASH ANOMALY: Manual ฿${manualCash} vs calculated ฿${calculatedCash} (diff: ฿${manualCash - calculatedCash})`);
       }
       
       let result: any;
       
-      // Use database transaction to ensure data integrity
-      await db.transaction(async (tx) => {
-        [result] = await tx.insert(dailyStockSales).values(data).returning();
+      // BULLETPROOF DATABASE TRANSACTION WITH MULTIPLE RETRY ATTEMPTS
+      let dbAttempts = 0;
+      const maxDbAttempts = 3;
+      
+      while (dbAttempts < maxDbAttempts) {
+        dbAttempts++;
+        
+        try {
+          await db.transaction(async (tx) => {
+            [result] = await tx.insert(dailyStockSales).values(bulletproofData).returning();
+          });
+          
+          console.log(`✅ BULLETPROOF SAVE SUCCESS! ID: ${result.id} (attempt ${dbAttempts})`);
+          break; // Success - exit retry loop
+          
+        } catch (dbError: any) {
+          console.error(`❌ Database attempt ${dbAttempts} failed:`, dbError.message);
+          
+          if (dbAttempts === maxDbAttempts) {
+            // Final attempt failed
+            throw new Error(`Database save failed after ${maxDbAttempts} attempts: ${dbError.message}`);
+          }
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * dbAttempts));
+        }
+      }
+      
+      // BULLETPROOF SUCCESS RESPONSE
+      console.log("🎉 BULLETPROOF SUBMISSION COMPLETE!");
+      res.json({
+        ...result,
+        message: "Form saved successfully with bulletproof data validation",
+        bulletproof: true
       });
-      
-      console.log("✅ Form saved successfully with ID:", result.id);
-      
-      // Return immediately - form submission is complete
-      res.json(result);
       
       // Non-blocking post-processing for non-draft submissions
       if (!data.isDraft) {
