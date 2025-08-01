@@ -119,18 +119,12 @@ const Ingredients = () => {
         <p className="text-gray-600 text-sm sm:text-base">Manage recipes, ingredients, and menu items</p>
         
         {/* Navigation to Menu Management sections */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="mt-4">
           <Link href="/recipes">
-            <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-blue-600 text-white hover:bg-blue-700 border-blue-600">
-              <ChefHat className="h-5 w-5" />
-              <span className="text-sm font-medium">Recipes</span>
+            <Button variant="outline" className="bg-black text-white hover:bg-gray-800 border-0">
+              Recipes
             </Button>
           </Link>
-          <Button variant="outline" className="w-full h-auto p-4 flex flex-col items-center space-y-2 bg-gray-200 text-gray-800 border-gray-300 cursor-default">
-            <Package2 className="h-5 w-5" />
-            <span className="text-sm font-medium">Ingredients</span>
-            <span className="text-xs text-gray-600">(Current)</span>
-          </Button>
         </div>
       </div>
 
