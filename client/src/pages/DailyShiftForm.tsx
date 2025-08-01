@@ -928,17 +928,16 @@ const DailyShiftForm = () => {
             type="button"
             onClick={saveDraft}
             disabled={isDraftSaving || isSubmitting}
-            variant="outline"
-            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-8 py-3 text-lg font-semibold"
+            className="bg-gray-200 text-black hover:bg-gray-300 px-8 py-3 text-lg font-semibold border-0"
           >
-{isDraftSaving ? "💾 Saving Draft..." : "📝 Save Draft (Backup)"}
+            {isDraftSaving ? "Saving..." : "Save Draft"}
           </Button>
           <Button 
             type="submit" 
             disabled={isSubmitting || isDraftSaving}
-            className="bg-green-600 text-white hover:bg-green-700 px-8 py-3 text-lg font-semibold shadow-lg"
+            className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold border-0"
           >
-            {isSubmitting ? "💾 SAVING GUARANTEED..." : "✅ BULLETPROOF SAVE - ALWAYS WORKS"}
+            {isSubmitting ? "Submitting..." : "Submit Form"}
           </Button>
         </div>
       </form>
