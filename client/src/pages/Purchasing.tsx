@@ -137,7 +137,7 @@ const Purchasing = () => {
             <Card key={cat} className="mb-6">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-gray-900">{cat}</CardTitle>
-                <Badge variant="secondary">{catItems.length} items</Badge>
+                <Badge className="bg-black text-white rounded-md">{catItems.length} items</Badge>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
