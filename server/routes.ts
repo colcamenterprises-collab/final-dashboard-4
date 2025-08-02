@@ -668,8 +668,8 @@ export function registerRoutes(app: express.Application): Server {
         try {
           console.log("📧 Generating PDF and sending automatic email notification...");
           
-          // Import the working email service
-          const { sendEmailWithAttachment } = await import('./services/workingEmailService');
+          // Import the email service
+          const { emailService } = await import('./services/emailService');
           
           // Generate PDF in memory
           const doc = new PDFDocument({ margin: 40 });
@@ -713,16 +713,12 @@ export function registerRoutes(app: express.Application): Server {
               `;
               
               // Send email with PDF attachment
-              const emailSent = await sendEmailWithAttachment(
-                'colcamenterprises@gmail.com', // Management email
-                `Daily Shift Report - Form ${result.id} - ${shiftDate}`,
-                emailHTML,
-                [{
-                  filename: `form-${result.id}-daily-shift-report.pdf`,
-                  content: base64PDF,
-                  encoding: 'base64'
-                }]
-              );
+              const pdfBuffer = Buffer.concat(pdfBuffers);
+              const emailSent = await emailService.sendDailyShiftReport({
+                ...data,
+                id: result.id,
+                shiftDate: shiftDate
+              }, pdfBuffer);
               
               if (emailSent) {
                 console.log("✅ Automatic email with PDF attachment sent successfully");
