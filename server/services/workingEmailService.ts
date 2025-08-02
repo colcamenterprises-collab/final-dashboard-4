@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
 interface EmailAttachment {
   filename: string;
@@ -6,16 +7,23 @@ interface EmailAttachment {
   encoding: string;
 }
 
-class SimpleEmailService {
-  private transporter: nodemailer.Transporter;
+class WorkingEmailService {
+  private transporter: Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    const gmailUser = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
+    const gmailPassword = (process.env.GMAIL_APP_PASSWORD || 'hqtc tsyn hxxr ocra').replace(/"/g, '');
+    
+    console.log('🔐 Gmail User:', gmailUser);
+    console.log('🔐 Gmail Password length:', gmailPassword.length);
+    
+    this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD
+        user: gmailUser,
+        pass: gmailPassword
       },
+      secure: true,
       tls: {
         rejectUnauthorized: false
       }
@@ -24,20 +32,17 @@ class SimpleEmailService {
 
   async sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<boolean> {
     try {
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions = {
         from: `"Smash Brothers Burgers" <${process.env.GMAIL_USER}>`,
         to,
         subject,
         html,
-      };
-
-      if (attachments && attachments.length > 0) {
-        mailOptions.attachments = attachments.map(att => ({
+        attachments: attachments?.map(att => ({
           filename: att.filename,
           content: att.content,
           encoding: att.encoding as BufferEncoding
-        }));
-      }
+        }))
+      };
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Email sent successfully:', result.messageId);
@@ -60,7 +65,7 @@ class SimpleEmailService {
   }
 }
 
-export const simpleEmailService = new SimpleEmailService();
+export const workingEmailService = new WorkingEmailService();
 
 export const sendEmailWithAttachment = async (
   to: string,
@@ -68,7 +73,7 @@ export const sendEmailWithAttachment = async (
   html: string,
   attachments: EmailAttachment[]
 ): Promise<boolean> => {
-  return await simpleEmailService.sendEmail(to, subject, html, attachments);
+  return await workingEmailService.sendEmail(to, subject, html, attachments);
 };
 
 export const sendSimpleEmail = async (
@@ -76,5 +81,5 @@ export const sendSimpleEmail = async (
   subject: string,
   html: string
 ): Promise<boolean> => {
-  return await simpleEmailService.sendEmail(to, subject, html);
+  return await workingEmailService.sendEmail(to, subject, html);
 };

@@ -668,8 +668,8 @@ export function registerRoutes(app: express.Application): Server {
         try {
           console.log("📧 Generating PDF and sending automatic email notification...");
           
-          // Import the simple email service
-          const { sendEmailWithAttachment } = await import('./services/simpleEmailService');
+          // Import the working email service
+          const { sendEmailWithAttachment } = await import('./services/workingEmailService');
           
           // Generate PDF in memory
           const doc = new PDFDocument({ margin: 40 });
