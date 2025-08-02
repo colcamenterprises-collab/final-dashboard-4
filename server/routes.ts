@@ -959,13 +959,13 @@ export function registerRoutes(app: express.Application): Server {
       const totalSales = parseFloat(formData.totalSales || 0);
       
       doc.fontSize(11).font('Helvetica')
-         .text(`Grab Sales: ฿${grabSales.toFixed(2)}`, 40, y)
-         .text(`QR Scan Sales: ฿${qrScanSales.toFixed(2)}`, 200, y)
-         .text(`Cash Sales: ฿${cashSales.toFixed(2)}`, 350, y);
+         .text(`Grab Sales: THB ${grabSales.toFixed(2)}`, 40, y)
+         .text(`QR Scan Sales: THB ${qrScanSales.toFixed(2)}`, 200, y)
+         .text(`Cash Sales: THB ${cashSales.toFixed(2)}`, 350, y);
       y += 20;
       
-      doc.text(`Aroi Dee Sales: ฿${aroiDeeSales.toFixed(2)}`, 40, y)
-         .text(`TOTAL SALES: ฿${totalSales.toFixed(2)}`, 200, y);
+      doc.text(`Aroi Dee Sales: THB ${aroiDeeSales.toFixed(2)}`, 40, y)
+         .text(`TOTAL SALES: THB ${totalSales.toFixed(2)}`, 200, y);
       y += 40;
 
       // Cash Management
@@ -978,9 +978,9 @@ export function registerRoutes(app: express.Application): Server {
       const bankedAmount = parseFloat(formData.bankedAmount || 0);
       
       doc.fontSize(11).font('Helvetica')
-         .text(`Starting Cash: ฿${startingCash.toFixed(2)}`, 40, y)
-         .text(`Ending Cash: ฿${endingCash.toFixed(2)}`, 200, y)
-         .text(`Banked Amount: ฿${bankedAmount.toFixed(2)}`, 350, y);
+         .text(`Starting Cash: THB ${startingCash.toFixed(2)}`, 40, y)
+         .text(`Ending Cash: THB ${endingCash.toFixed(2)}`, 200, y)
+         .text(`Banked Amount: THB ${bankedAmount.toFixed(2)}`, 350, y);
       y += 40;
 
       // Staff Wages
@@ -992,7 +992,7 @@ export function registerRoutes(app: express.Application): Server {
       if (Array.isArray(wages)) {
         wages.forEach(wage => {
           doc.fontSize(11).font('Helvetica')
-             .text(`${wage.name}: ฿${parseFloat(wage.amount || 0).toFixed(2)}`, 40, y);
+             .text(`${wage.name}: THB ${parseFloat(wage.amount || 0).toFixed(2)}`, 40, y);
           y += 15;
         });
       }
@@ -1007,13 +1007,13 @@ export function registerRoutes(app: express.Application): Server {
       if (Array.isArray(shopping)) {
         shopping.forEach(item => {
           doc.fontSize(11).font('Helvetica')
-             .text(`${item.item}: ฿${parseFloat(item.amount || 0).toFixed(2)}`, 40, y);
+             .text(`${item.item}: THB ${parseFloat(item.amount || 0).toFixed(2)}`, 40, y);
           y += 15;
         });
       }
       
       const totalExpenses = parseFloat(formData.totalExpenses || 0);
-      doc.text(`TOTAL EXPENSES: ฿${totalExpenses.toFixed(2)}`, 40, y);
+      doc.text(`TOTAL EXPENSES: THB ${totalExpenses.toFixed(2)}`, 40, y);
       y += 40;
 
       // Add second page for inventory
