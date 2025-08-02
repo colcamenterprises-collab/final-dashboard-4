@@ -40,6 +40,71 @@ const DailyShiftForm = () => {
     // Food & Stock Items - authentic inventory from CSV
     inventory: {} as Record<string, number>
   });
+
+  // Load existing form data (for editing form 196 and others)
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        const response = await fetch('/api/daily-stock-sales');
+        if (response.ok) {
+          const data = await response.json();
+          // Look for the most recent form or form 196 specifically
+          const mostRecentForm = data.find((form: any) => form.id === 196) || data[0];
+          
+          if (mostRecentForm) {
+            console.log('Loading existing form data:', mostRecentForm);
+            
+            // Parse the stored JSON data
+            let parsedInventory = {};
+            let parsedWages = [];
+            let parsedShopping = [];
+            
+            try {
+              if (mostRecentForm.number_needed) {
+                parsedInventory = typeof mostRecentForm.number_needed === 'string' 
+                  ? JSON.parse(mostRecentForm.number_needed) 
+                  : mostRecentForm.number_needed;
+              }
+              
+              if (mostRecentForm.wages) {
+                parsedWages = typeof mostRecentForm.wages === 'string' 
+                  ? JSON.parse(mostRecentForm.wages) 
+                  : mostRecentForm.wages;
+              }
+              
+              if (mostRecentForm.shopping) {
+                parsedShopping = typeof mostRecentForm.shopping === 'string' 
+                  ? JSON.parse(mostRecentForm.shopping) 
+                  : mostRecentForm.shopping;
+              }
+            } catch (parseError) {
+              console.error('Error parsing stored data:', parseError);
+            }
+            
+            setFormData({
+              completedBy: mostRecentForm.completed_by || '',
+              shiftType: mostRecentForm.shift_type || '',
+              shiftDate: mostRecentForm.shift_date ? mostRecentForm.shift_date.split('T')[0] : new Date().toISOString().split('T')[0],
+              grabSales: mostRecentForm.grab_sales || 0,
+              aroiDeeSales: mostRecentForm.aroi_dee_sales || 0,
+              qrScanSales: mostRecentForm.qr_scan_sales || 0,
+              cashSales: mostRecentForm.cash_sales || 0,
+              wages: parsedWages || [],
+              shopping: parsedShopping || [],
+              startingCash: mostRecentForm.starting_cash || 0,
+              endingCash: mostRecentForm.ending_cash || 0,
+              bankedAmount: mostRecentForm.banked_amount || 0,
+              inventory: parsedInventory || {}
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading existing data:', error);
+      }
+    };
+    
+    loadExistingData();
+  }, []);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
