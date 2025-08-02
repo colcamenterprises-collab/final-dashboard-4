@@ -907,6 +907,148 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Generate and download PDF for specific form (direct download)
+  app.get("/api/daily-stock-sales/:id/download-pdf", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const numericId = parseInt(id);
+      
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid ID parameter" });
+      }
+      
+      const formData = await storage.getDailyStockSalesById(numericId);
+      if (!formData) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({ margin: 40 });
+      
+      // Set headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="form-${numericId}-daily-shift-report.pdf"`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+      
+      // Header
+      doc.fontSize(20).font('Helvetica-Bold')
+         .text('SMASH BROTHERS BURGERS', 40, 40);
+      
+      doc.fontSize(16).font('Helvetica')
+         .text('Daily Shift Report', 40, 70)
+         .fontSize(12)
+         .text(`Form ID: ${formData.id}`, 40, 95)
+         .text(`Date: ${new Date(formData.shiftDate).toLocaleDateString()}`, 40, 110)
+         .text(`Shift: ${formData.shiftType}`, 40, 125)
+         .text(`Completed by: ${formData.completedBy}`, 40, 140);
+
+      let y = 170;
+
+      // Sales Information
+      doc.fontSize(14).font('Helvetica-Bold')
+         .text('SALES BREAKDOWN', 40, y);
+      y += 25;
+      
+      const grabSales = parseFloat(formData.grabSales || 0);
+      const qrScanSales = parseFloat(formData.qrScanSales || 0);
+      const cashSales = parseFloat(formData.cashSales || 0);
+      const aroiDeeSales = parseFloat(formData.aroiDeeSales || 0);
+      const totalSales = parseFloat(formData.totalSales || 0);
+      
+      doc.fontSize(11).font('Helvetica')
+         .text(`Grab Sales: ฿${grabSales.toFixed(2)}`, 40, y)
+         .text(`QR Scan Sales: ฿${qrScanSales.toFixed(2)}`, 200, y)
+         .text(`Cash Sales: ฿${cashSales.toFixed(2)}`, 350, y);
+      y += 20;
+      
+      doc.text(`Aroi Dee Sales: ฿${aroiDeeSales.toFixed(2)}`, 40, y)
+         .text(`TOTAL SALES: ฿${totalSales.toFixed(2)}`, 200, y);
+      y += 40;
+
+      // Cash Management
+      doc.fontSize(14).font('Helvetica-Bold')
+         .text('CASH MANAGEMENT', 40, y);
+      y += 25;
+      
+      const startingCash = parseFloat(formData.startingCash || 0);
+      const endingCash = parseFloat(formData.endingCash || 0);
+      const bankedAmount = parseFloat(formData.bankedAmount || 0);
+      
+      doc.fontSize(11).font('Helvetica')
+         .text(`Starting Cash: ฿${startingCash.toFixed(2)}`, 40, y)
+         .text(`Ending Cash: ฿${endingCash.toFixed(2)}`, 200, y)
+         .text(`Banked Amount: ฿${bankedAmount.toFixed(2)}`, 350, y);
+      y += 40;
+
+      // Staff Wages
+      doc.fontSize(14).font('Helvetica-Bold')
+         .text('STAFF WAGES', 40, y);
+      y += 25;
+      
+      const wages = formData.wages || [];
+      if (Array.isArray(wages)) {
+        wages.forEach(wage => {
+          doc.fontSize(11).font('Helvetica')
+             .text(`${wage.name}: ฿${parseFloat(wage.amount || 0).toFixed(2)}`, 40, y);
+          y += 15;
+        });
+      }
+      y += 15;
+
+      // Shopping Expenses
+      doc.fontSize(14).font('Helvetica-Bold')
+         .text('SHOPPING EXPENSES', 40, y);
+      y += 25;
+      
+      const shopping = formData.shopping || [];
+      if (Array.isArray(shopping)) {
+        shopping.forEach(item => {
+          doc.fontSize(11).font('Helvetica')
+             .text(`${item.item}: ฿${parseFloat(item.amount || 0).toFixed(2)}`, 40, y);
+          y += 15;
+        });
+      }
+      
+      const totalExpenses = parseFloat(formData.totalExpenses || 0);
+      doc.text(`TOTAL EXPENSES: ฿${totalExpenses.toFixed(2)}`, 40, y);
+      y += 40;
+
+      // Add second page for inventory
+      doc.addPage();
+      y = 40;
+
+      // Inventory Section
+      doc.fontSize(16).font('Helvetica-Bold')
+         .text('INVENTORY STOCK LEVELS', 40, y);
+      y += 30;
+
+      const inventory = formData.numberNeeded || {};
+      if (typeof inventory === 'object' && inventory !== null) {
+        Object.entries(inventory).forEach(([item, quantity]) => {
+          doc.fontSize(10).font('Helvetica')
+             .text(`${item}: ${quantity}`, 40, y);
+          y += 12;
+          if (y > 750) {
+            doc.addPage();
+            y = 40;
+          }
+        });
+      }
+
+      // Footer
+      doc.fontSize(8).font('Helvetica')
+         .text(`Generated: ${new Date().toLocaleString()}`, 40, doc.page.height - 50)
+         .text('Smash Brothers Burgers - Daily Operations Report', 40, doc.page.height - 35);
+
+      doc.end();
+    } catch (error: any) {
+      console.error('Error generating PDF:', error);
+      res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+  });
+
   // Serve stored PDF files
   app.get("/objects/form-pdfs/:filename", async (req: Request, res: Response) => {
     try {

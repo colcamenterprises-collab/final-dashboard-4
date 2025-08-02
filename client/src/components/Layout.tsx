@@ -40,6 +40,7 @@ const navigationStructure = [
     path: "/daily-sales-stock", // Main page for collapsed state
     items: [
       { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
+      { path: "/forms-library", label: "Forms Library", icon: FileText },
       { path: "/purchasing", label: "Purchasing", icon: ShoppingCart },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
       { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },

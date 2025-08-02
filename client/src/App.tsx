@@ -36,6 +36,7 @@ import TestMonthlyStock from "@/pages/TestMonthlyStock";
 import DraftForms from "@/pages/DraftForms";
 import ShiftComparison from "@/pages/ShiftComparison";
 import ShiftReportDetail from "@/pages/ShiftReportDetail";
+import FormsLibrary from "@/pages/FormsLibrary";
 
 import NotFound from "@/pages/not-found";
 
@@ -71,7 +72,8 @@ function Router() {
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />
-        <Route path="/form-library" component={DraftFormsLibrary} />
+        <Route path="/form-library" component={DraftFormsLibrary} />  
+        <Route path="/forms-library" component={FormsLibrary} />
         <Route path="/purchasing" component={Purchasing} />
         <Route path="/supplier-management" component={SupplierManagement} />
         <Route path="/test-monthly-stock" component={TestMonthlyStock} />

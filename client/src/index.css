@@ -74,6 +74,152 @@
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
+/* Mobile and Tablet Responsive Styles */
+@media (max-width: 768px) {
+  /* Mobile viewport optimizations */
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  body {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  /* Form containers - full width on mobile */
+  .container {
+    max-width: 100% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Cards - stack vertically and reduce padding */
+  .card {
+    margin-bottom: 1rem !important;
+  }
+  
+  .card-content {
+    padding: 1rem !important;
+  }
+  
+  /* Form grids - single column on mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  
+  /* Input fields - larger touch targets */
+  input, select, textarea, button {
+    min-height: 44px !important;
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    padding: 0.75rem !important;
+  }
+  
+  /* Buttons - full width on mobile */
+  .mobile-full-button {
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  /* Table responsive - horizontal scroll */
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  table {
+    min-width: 600px !important;
+  }
+  
+  /* Hide non-essential columns on mobile */
+  .mobile-hide {
+    display: none !important;
+  }
+  
+  /* Sidebar - overlay on mobile */
+  .sidebar-mobile {
+    position: fixed !important;
+    z-index: 50 !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease !important;
+  }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0) !important;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .container {
+    max-width: 90% !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+  
+  /* Form grids - 2 columns on tablet */
+  .tablet-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem !important;
+  }
+  
+  /* Input fields - comfortable tablet size */
+  input, select, textarea {
+    min-height: 40px !important;
+    padding: 0.625rem !important;
+  }
+  
+  /* Button sizing for tablet */
+  button {
+    min-height: 40px !important;
+    padding: 0.625rem 1rem !important;
+  }
+}
+
+/* Forms Library specific styles */
+.forms-library {
+  padding: 1rem;
+}
+
+.forms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .forms-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .form-card {
+    padding: 1rem;
+  }
+  
+  .form-title {
+    font-size: 1.1rem;
+  }
+  
+  .form-meta {
+    font-size: 0.875rem;
+  }
+}
+
+/* PDF download buttons - mobile friendly */
+.pdf-download-btn {
+  min-width: 120px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .pdf-download-btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+}
+
 .sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
