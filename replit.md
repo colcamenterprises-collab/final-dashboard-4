@@ -11,6 +11,7 @@ Code isolation policy: Once functionality is working and tested, isolate it to p
 Testing requirement: Always test changes in isolation before making additional modifications.
 Documentation requirement: When creating comprehensive project documentation, include all operational details someone would need to rebuild the system from scratch.
 Agent execution policy: Execute only exact commands provided. Do not add, remove, or modify features unless explicitly approved with 'Yes, implement [specific change]'. Log all actions with timestamp and description. If unsure, ask for clarification.
+Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
 
 ## System Architecture
 

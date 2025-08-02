@@ -1,97 +1,80 @@
-import { google } from 'googleapis';
+import nodemailer from 'nodemailer';
 
-const gmail = google.gmail('v1');
-
-interface SimpleFormData {
-  id: number;
-  completedBy: string;
-  shiftType: string;
-  shiftDate: string;
-  startingCash: string;
-  endingCash: string;
-  totalSales: string;
-  notes: string;
-  createdAt: Date;
+interface EmailAttachment {
+  filename: string;
+  content: string;
+  encoding: string;
 }
 
-export async function sendSimpleFormEmail(formData: SimpleFormData) {
-  try {
-    // Gmail API OAuth setup
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      'urn:ietf:wg:oauth:2.0:oob'
-    );
+class SimpleEmailService {
+  private transporter: nodemailer.Transporter;
 
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-    });
-
-    google.options({ auth: oauth2Client });
-
-    const emailContent = `
-      <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
-            <h2 style="color: #333; margin-bottom: 20px;">Simple Stock & Sales Report</h2>
-            
-            <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-              <h3 style="color: #555; margin-bottom: 15px;">Basic Information</h3>
-              <p><strong>Staff:</strong> ${formData.completedBy}</p>
-              <p><strong>Shift:</strong> ${formData.shiftType}</p>
-              <p><strong>Date:</strong> ${formData.shiftDate}</p>
-              <p><strong>Submitted:</strong> ${formData.createdAt.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })}</p>
-            </div>
-
-            <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-              <h3 style="color: #555; margin-bottom: 15px;">Cash Summary</h3>
-              <p><strong>Starting Cash:</strong> ฿${formData.startingCash || '0.00'}</p>
-              <p><strong>Ending Cash:</strong> ฿${formData.endingCash || '0.00'}</p>
-              <p><strong>Total Sales:</strong> ฿${formData.totalSales || '0.00'}</p>
-            </div>
-
-            ${formData.notes ? `
-            <div style="background-color: white; padding: 20px; border-radius: 8px;">
-              <h3 style="color: #555; margin-bottom: 15px;">Notes</h3>
-              <p>${formData.notes}</p>
-            </div>
-            ` : ''}
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
-              <p>This is an automated notification from Smash Brothers Burgers management system.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const message = {
-      to: 'management@smashbrothers.co.th',
-      subject: `Simple Stock Report - ${formData.completedBy} - ${formData.shiftDate}`,
-      html: emailContent
-    };
-
-    const email = [
-      `To: ${message.to}`,
-      `Subject: ${message.subject}`,
-      'Content-Type: text/html; charset=utf-8',
-      '',
-      message.html
-    ].join('\n');
-
-    const encodedMessage = Buffer.from(email).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
-
-    const result = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encodedMessage,
+  constructor() {
+    this.transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD
       },
+      tls: {
+        rejectUnauthorized: false
+      }
     });
+  }
 
-    console.log('Simple form email sent successfully:', result.data.id);
-    return result.data;
-  } catch (error) {
-    console.error('Failed to send simple form email:', error);
-    throw error;
+  async sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<boolean> {
+    try {
+      const mailOptions: nodemailer.SendMailOptions = {
+        from: `"Smash Brothers Burgers" <${process.env.GMAIL_USER}>`,
+        to,
+        subject,
+        html,
+      };
+
+      if (attachments && attachments.length > 0) {
+        mailOptions.attachments = attachments.map(att => ({
+          filename: att.filename,
+          content: att.content,
+          encoding: att.encoding as BufferEncoding
+        }));
+      }
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully:', result.messageId);
+      return true;
+    } catch (error) {
+      console.error('❌ Email sending failed:', error);
+      return false;
+    }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.transporter.verify();
+      console.log('✅ Email service connection verified');
+      return true;
+    } catch (error) {
+      console.error('❌ Email service connection failed:', error);
+      return false;
+    }
   }
 }
+
+export const simpleEmailService = new SimpleEmailService();
+
+export const sendEmailWithAttachment = async (
+  to: string,
+  subject: string,
+  html: string,
+  attachments: EmailAttachment[]
+): Promise<boolean> => {
+  return await simpleEmailService.sendEmail(to, subject, html, attachments);
+};
+
+export const sendSimpleEmail = async (
+  to: string,
+  subject: string,
+  html: string
+): Promise<boolean> => {
+  return await simpleEmailService.sendEmail(to, subject, html);
+};

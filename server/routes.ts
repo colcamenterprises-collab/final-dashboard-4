@@ -19,7 +19,6 @@ import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import PDFDocument from 'pdfkit';
-import { sendEmailWithAttachment } from './services/emailService';
 
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -668,6 +667,9 @@ export function registerRoutes(app: express.Application): Server {
         // Send automatic email notification with PDF attachment after form completion
         try {
           console.log("📧 Generating PDF and sending automatic email notification...");
+          
+          // Import the simple email service
+          const { sendEmailWithAttachment } = await import('./services/simpleEmailService');
           
           // Generate PDF in memory
           const doc = new PDFDocument({ margin: 40 });
