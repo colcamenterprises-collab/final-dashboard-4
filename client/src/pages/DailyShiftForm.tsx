@@ -63,10 +63,12 @@ const DailyShiftForm = () => {
             let parsedShopping = [];
             
             try {
-              if (mostRecentForm.number_needed) {
-                parsedInventory = typeof mostRecentForm.number_needed === 'string' 
-                  ? JSON.parse(mostRecentForm.number_needed) 
-                  : mostRecentForm.number_needed;
+              // Check both possible field names for inventory data
+              const inventoryData = mostRecentForm.numberNeeded || mostRecentForm.number_needed;
+              if (inventoryData) {
+                parsedInventory = typeof inventoryData === 'string' 
+                  ? JSON.parse(inventoryData) 
+                  : inventoryData;
                 console.log('Parsed inventory:', parsedInventory);
               }
               
