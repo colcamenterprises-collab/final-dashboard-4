@@ -664,6 +664,189 @@ export function registerRoutes(app: express.Application): Server {
         } catch (error) {
           console.error("Error generating shopping list:", error);
         }
+
+        // Send automatic email notification with PDF attachment after form completion
+        try {
+          console.log("📧 Generating PDF and sending automatic email notification...");
+          
+          // Generate PDF in memory
+          const doc = new PDFDocument({ margin: 40 });
+          const pdfBuffers: Buffer[] = [];
+          
+          doc.on('data', (chunk) => pdfBuffers.push(chunk));
+          doc.on('end', async () => {
+            try {
+              const pdfBuffer = Buffer.concat(pdfBuffers);
+              const base64PDF = pdfBuffer.toString('base64');
+              
+              // Create comprehensive email content
+              const shiftDate = new Date(data.shiftDate).toLocaleDateString();
+              const emailHTML = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
+                  <h2>New Daily Shift Report Submitted</h2>
+                  <p><strong>Form ID:</strong> ${result.id}</p>
+                  <p><strong>Date:</strong> ${shiftDate}</p>
+                  <p><strong>Shift:</strong> ${data.shiftType}</p>
+                  <p><strong>Completed by:</strong> ${data.completedBy}</p>
+                  
+                  <h3>Sales Summary</h3>
+                  <ul>
+                    <li>Total Sales: THB ${parseFloat(data.totalSales || '0').toFixed(2)}</li>
+                    <li>Cash Sales: THB ${parseFloat(data.cashSales || '0').toFixed(2)}</li>
+                    <li>Grab Sales: THB ${parseFloat(data.grabSales || '0').toFixed(2)}</li>
+                    <li>QR Scan Sales: THB ${parseFloat(data.qrScanSales || '0').toFixed(2)}</li>
+                  </ul>
+                  
+                  <h3>Cash Management</h3>
+                  <ul>
+                    <li>Starting Cash: THB ${parseFloat(data.startingCash || '0').toFixed(2)}</li>
+                    <li>Ending Cash: THB ${parseFloat(data.endingCash || '0').toFixed(2)}</li>
+                    <li>Total Expenses: THB ${parseFloat(data.totalExpenses || '0').toFixed(2)}</li>
+                  </ul>
+                  
+                  <p>The complete daily shift report is attached as a PDF for your records.</p>
+                  
+                  <p style="color: #666; font-size: 12px;">This email was sent automatically when the form was submitted.</p>
+                </div>
+              `;
+              
+              // Send email with PDF attachment
+              const emailSent = await sendEmailWithAttachment(
+                'colcamenterprises@gmail.com', // Management email
+                `Daily Shift Report - Form ${result.id} - ${shiftDate}`,
+                emailHTML,
+                [{
+                  filename: `form-${result.id}-daily-shift-report.pdf`,
+                  content: base64PDF,
+                  encoding: 'base64'
+                }]
+              );
+              
+              if (emailSent) {
+                console.log("✅ Automatic email with PDF attachment sent successfully");
+              } else {
+                console.log("⚠️ Failed to send automatic email notification");
+              }
+            } catch (error) {
+              console.error("❌ Error sending automatic email:", error);
+            }
+          });
+          
+          // Generate the same PDF content as the download endpoint
+          doc.fontSize(20).font('Helvetica-Bold')
+             .text('SMASH BROTHERS BURGERS', 40, 40);
+          
+          doc.fontSize(16).font('Helvetica')
+             .text('Daily Shift Report', 40, 70)
+             .fontSize(12)
+             .text(`Form ID: ${result.id}`, 40, 95)
+             .text(`Date: ${new Date(data.shiftDate).toLocaleDateString()}`, 40, 110)
+             .text(`Shift: ${data.shiftType}`, 40, 125)
+             .text(`Completed by: ${data.completedBy}`, 40, 140);
+
+          let y = 170;
+
+          // Sales Information
+          doc.fontSize(14).font('Helvetica-Bold')
+             .text('SALES BREAKDOWN', 40, y);
+          y += 25;
+          
+          const grabSales = parseFloat(data.grabSales || '0');
+          const qrScanSales = parseFloat(data.qrScanSales || '0');
+          const cashSales = parseFloat(data.cashSales || '0');
+          const aroiDeeSales = parseFloat(data.aroiDeeSales || '0');
+          const totalSales = parseFloat(data.totalSales || '0');
+          
+          doc.fontSize(11).font('Helvetica')
+             .text(`Grab Sales: THB ${grabSales.toFixed(2)}`, 40, y)
+             .text(`QR Scan Sales: THB ${qrScanSales.toFixed(2)}`, 200, y)
+             .text(`Cash Sales: THB ${cashSales.toFixed(2)}`, 350, y);
+          y += 20;
+          
+          doc.text(`Aroi Dee Sales: THB ${aroiDeeSales.toFixed(2)}`, 40, y)
+             .text(`TOTAL SALES: THB ${totalSales.toFixed(2)}`, 200, y);
+          y += 40;
+
+          // Cash Management
+          doc.fontSize(14).font('Helvetica-Bold')
+             .text('CASH MANAGEMENT', 40, y);
+          y += 25;
+          
+          const startingCash = parseFloat(data.startingCash || '0');
+          const endingCash = parseFloat(data.endingCash || '0');
+          const bankedAmount = parseFloat(data.bankedAmount || '0');
+          
+          doc.fontSize(11).font('Helvetica')
+             .text(`Starting Cash: THB ${startingCash.toFixed(2)}`, 40, y)
+             .text(`Ending Cash: THB ${endingCash.toFixed(2)}`, 200, y)
+             .text(`Banked Amount: THB ${bankedAmount.toFixed(2)}`, 350, y);
+          y += 40;
+
+          // Staff Wages
+          doc.fontSize(14).font('Helvetica-Bold')
+             .text('STAFF WAGES', 40, y);
+          y += 25;
+          
+          const wages = data.wages ? JSON.parse(data.wages) : [];
+          if (Array.isArray(wages)) {
+            wages.forEach((wage: any) => {
+              doc.fontSize(11).font('Helvetica')
+                 .text(`${wage.name}: THB ${parseFloat(wage.amount || 0).toFixed(2)}`, 40, y);
+              y += 15;
+            });
+          }
+          y += 15;
+
+          // Shopping Expenses
+          doc.fontSize(14).font('Helvetica-Bold')
+             .text('SHOPPING EXPENSES', 40, y);
+          y += 25;
+          
+          const shopping = data.shopping ? JSON.parse(data.shopping) : [];
+          if (Array.isArray(shopping)) {
+            shopping.forEach((item: any) => {
+              doc.fontSize(11).font('Helvetica')
+                 .text(`${item.item}: THB ${parseFloat(item.amount || 0).toFixed(2)}`, 40, y);
+              y += 15;
+            });
+          }
+          
+          const totalExpenses = parseFloat(data.totalExpenses || '0');
+          doc.text(`TOTAL EXPENSES: THB ${totalExpenses.toFixed(2)}`, 40, y);
+          y += 40;
+
+          // Add second page for inventory
+          doc.addPage();
+          y = 40;
+
+          // Inventory Section
+          doc.fontSize(16).font('Helvetica-Bold')
+             .text('INVENTORY STOCK LEVELS', 40, y);
+          y += 30;
+
+          const inventory = data.numberNeeded ? JSON.parse(data.numberNeeded) : {};
+          if (typeof inventory === 'object' && inventory !== null) {
+            Object.entries(inventory).forEach(([item, quantity]) => {
+              doc.fontSize(10).font('Helvetica')
+                 .text(`${item}: ${quantity}`, 40, y);
+              y += 12;
+              if (y > 750) {
+                doc.addPage();
+                y = 40;
+              }
+            });
+          }
+
+          // Footer
+          doc.fontSize(8).font('Helvetica')
+             .text(`Generated: ${new Date().toLocaleString()}`, 40, doc.page.height - 50)
+             .text('Smash Brothers Burgers - Daily Operations Report', 40, doc.page.height - 35);
+
+          doc.end();
+        } catch (emailError) {
+          console.error("❌ Error generating/sending automatic email notification:", emailError);
+          // Don't fail the form submission if email fails
+        }
       }
       
     } catch (err: any) {
