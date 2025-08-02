@@ -90,8 +90,9 @@ const FormsLibrary = () => {
     });
   };
 
-  const formatCurrency = (amount: number) => {
-    return `฿${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `฿${numAmount.toFixed(2)}`;
   };
 
   if (loading) {
