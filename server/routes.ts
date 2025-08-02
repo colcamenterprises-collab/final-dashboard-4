@@ -18,6 +18,7 @@ import path from 'path';
 import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import PDFDocument from 'pdfkit';
 
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -922,7 +923,7 @@ export function registerRoutes(app: express.Application): Server {
         return res.status(404).json({ error: "Form not found" });
       }
 
-      const PDFDocument = require('pdfkit');
+      // Use imported PDFDocument
       const doc = new PDFDocument({ margin: 40 });
       
       // Set headers for PDF download
