@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -855,6 +856,72 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error fetching daily stock sales:", err);
       res.status(500).json({ error: "Failed to fetch daily stock sales" });
+    }
+  });
+
+  // ─── PDF Generation and Storage endpoints ───────────────────────────────
+  app.post("/api/daily-stock-sales/:id/pdf", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { pdfData } = req.body;
+      
+      if (!pdfData) {
+        return res.status(400).json({ error: "PDF data is required" });
+      }
+      
+      const numericId = parseInt(id);
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid form ID" });
+      }
+      
+      // Get form data to validate it exists
+      const form = await storage.getDailyStockSalesById(numericId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      
+      // Convert base64 PDF data to buffer
+      const pdfBuffer = Buffer.from(pdfData, 'base64');
+      
+      // Generate filename with timestamp and form ID
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `daily-form-${numericId}-${timestamp}.pdf`;
+      
+      // Store PDF in object storage
+      const objectStorageService = new ObjectStorageService();
+      const storedPath = await objectStorageService.storePDF(pdfBuffer, filename);
+      
+      // Update form record with PDF path
+      await db.update(dailyStockSales)
+        .set({ pdfPath: storedPath })
+        .where(eq(dailyStockSales.id, numericId));
+      
+      res.json({ 
+        success: true, 
+        pdfPath: storedPath,
+        filename: filename
+      });
+    } catch (err) {
+      console.error("Error storing PDF:", err);
+      res.status(500).json({ error: "Failed to store PDF" });
+    }
+  });
+
+  // Serve stored PDF files
+  app.get("/objects/form-pdfs/:filename", async (req: Request, res: Response) => {
+    try {
+      const { filename } = req.params;
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = `/objects/form-pdfs/${filename}`;
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving PDF:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "PDF not found" });
+      }
+      return res.status(500).json({ error: "Error serving PDF" });
     }
   });
 

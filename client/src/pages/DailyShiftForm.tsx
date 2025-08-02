@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle, FileDown, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JussiChatBubble } from "@/components/JussiChatBubble";
+import { generateDailyShiftPDF, downloadPDF, generatePDFBlob } from "@/lib/pdfGenerator";
 
 
 const DailyShiftForm = () => {
@@ -420,7 +421,42 @@ const DailyShiftForm = () => {
         if (response.ok) {
           const result = await response.json();
           
-          // SUCCESS - Clear any stored draft
+          // SUCCESS - Generate and store PDF
+          try {
+            const pdfDoc = generateDailyShiftPDF(formData, result.id);
+            const pdfBlob = generatePDFBlob(pdfDoc);
+            
+            // Convert blob to base64 for API
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const pdfBase64 = Buffer.from(arrayBuffer).toString('base64');
+            
+            // Store PDF in object storage
+            const pdfResponse = await fetch(`/api/daily-stock-sales/${result.id}/pdf`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pdfData: pdfBase64 })
+            });
+            
+            if (pdfResponse.ok) {
+              const pdfResult = await pdfResponse.json();
+              console.log('PDF stored successfully:', pdfResult.filename);
+              
+              toast({
+                title: "Success",
+                description: `Form submitted and PDF generated: ${pdfResult.filename}`,
+                variant: "default",
+              });
+            }
+          } catch (pdfError) {
+            console.error('PDF generation failed:', pdfError);
+            toast({
+              title: "Warning",
+              description: "Form saved but PDF generation failed",
+              variant: "destructive",
+            });
+          }
+          
+          // Clear any stored draft
           localStorage.removeItem('dailyShiftDraft');
           
           // Show success page
@@ -485,6 +521,29 @@ const DailyShiftForm = () => {
     }
     
     setIsSubmitting(false);
+  };
+
+  // PDF Generation Functions
+  const handleGenerateAndDownloadPDF = () => {
+    try {
+      const pdfDoc = generateDailyShiftPDF(formData);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `daily-shift-report-${timestamp}.pdf`;
+      downloadPDF(pdfDoc, filename);
+      
+      toast({
+        title: "PDF Downloaded",
+        description: `Report saved as ${filename}`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   // Auto-dismiss success/failure pages after 10 seconds
@@ -1004,6 +1063,14 @@ const DailyShiftForm = () => {
             className="bg-gray-200 text-black hover:bg-gray-300 px-8 py-3 text-lg font-semibold border-0"
           >
             {isDraftSaving ? "Saving..." : "Save Draft"}
+          </Button>
+          <Button 
+            type="button"
+            onClick={handleGenerateAndDownloadPDF}
+            disabled={isSubmitting || isDraftSaving}
+            className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 text-lg font-semibold border-0"
+          >
+            Download PDF
           </Button>
           <Button 
             type="submit" 

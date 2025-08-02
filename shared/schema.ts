@@ -56,6 +56,7 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   discrepancyNotes: text('discrepancy_notes'),
   status: varchar('status', { length: 50 }).default('draft'),
   isDraft: boolean('is_draft').default(true),
+  pdfPath: text('pdf_path'), // Path to stored PDF file
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
