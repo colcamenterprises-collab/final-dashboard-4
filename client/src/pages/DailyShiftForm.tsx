@@ -53,6 +53,9 @@ const DailyShiftForm = () => {
           
           if (mostRecentForm) {
             console.log('Loading existing form data:', mostRecentForm);
+            console.log('Raw number_needed data:', mostRecentForm.number_needed);
+            console.log('Raw wages data:', mostRecentForm.wages);
+            console.log('Raw shopping data:', mostRecentForm.shopping);
             
             // Parse the stored JSON data
             let parsedInventory = {};
@@ -64,18 +67,21 @@ const DailyShiftForm = () => {
                 parsedInventory = typeof mostRecentForm.number_needed === 'string' 
                   ? JSON.parse(mostRecentForm.number_needed) 
                   : mostRecentForm.number_needed;
+                console.log('Parsed inventory:', parsedInventory);
               }
               
               if (mostRecentForm.wages) {
                 parsedWages = typeof mostRecentForm.wages === 'string' 
                   ? JSON.parse(mostRecentForm.wages) 
                   : mostRecentForm.wages;
+                console.log('Parsed wages:', parsedWages);
               }
               
               if (mostRecentForm.shopping) {
                 parsedShopping = typeof mostRecentForm.shopping === 'string' 
                   ? JSON.parse(mostRecentForm.shopping) 
                   : mostRecentForm.shopping;
+                console.log('Parsed shopping:', parsedShopping);
               }
             } catch (parseError) {
               console.error('Error parsing stored data:', parseError);
