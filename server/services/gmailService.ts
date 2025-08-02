@@ -49,18 +49,53 @@ class GmailService {
   }
 
   private createMessage(params: EmailParams): string {
-    const messageParts = [
-      `From: ${params.from}`,
-      `To: ${params.to}`,
-      `Subject: ${params.subject}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=utf-8',
-      '',
-      params.html || params.text || ''
-    ];
+    const boundary = `boundary_${Date.now()}`;
+    
+    if (params.attachments && params.attachments.length > 0) {
+      // Multi-part message with attachments
+      const messageParts = [
+        `From: ${params.from}`,
+        `To: ${params.to}`,
+        `Subject: ${params.subject}`,
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        params.html || params.text || '',
+        ''
+      ];
 
-    const message = messageParts.join('\n');
-    return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      // Add attachments
+      params.attachments.forEach(attachment => {
+        messageParts.push(`--${boundary}`);
+        messageParts.push(`Content-Type: application/pdf; name="${attachment.filename}"`);
+        messageParts.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
+        messageParts.push(`Content-Transfer-Encoding: ${attachment.encoding}`);
+        messageParts.push('');
+        messageParts.push(attachment.content);
+        messageParts.push('');
+      });
+
+      messageParts.push(`--${boundary}--`);
+      const message = messageParts.join('\n');
+      return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } else {
+      // Simple message without attachments
+      const messageParts = [
+        `From: ${params.from}`,
+        `To: ${params.to}`,
+        `Subject: ${params.subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        params.html || params.text || ''
+      ];
+
+      const message = messageParts.join('\n');
+      return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
   }
 
   async sendEmail(params: EmailParams): Promise<boolean> {

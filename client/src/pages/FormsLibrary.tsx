@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Calendar, User, Clock, FileCheck } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileText, Download, Calendar, User, Clock, FileCheck, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FormEntry {
@@ -21,6 +23,8 @@ const FormsLibrary = () => {
   const [forms, setForms] = useState<FormEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingForm, setDownloadingForm] = useState<number | null>(null);
+  const [emailingForm, setEmailingForm] = useState<number | null>(null);
+  const [emailAddress, setEmailAddress] = useState("");
 
   useEffect(() => {
     const fetchForms = async () => {
@@ -79,6 +83,48 @@ const FormsLibrary = () => {
       });
     } finally {
       setDownloadingForm(null);
+    }
+  };
+
+  const handleSendEmail = async (formId: number) => {
+    if (!emailAddress) {
+      toast({
+        title: "Error",
+        description: "Please enter an email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEmailingForm(formId);
+    try {
+      const response = await fetch(`/api/daily-stock-sales/${formId}/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailAddress }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        setEmailAddress(""); // Clear email field
+      } else {
+        throw new Error('Email sending failed');
+      }
+    } catch (error) {
+      console.error('Email sending failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send email",
+        variant: "destructive",
+      });
+    } finally {
+      setEmailingForm(null);
     }
   };
 
@@ -184,7 +230,7 @@ const FormsLibrary = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t">
+                <div className="mt-4 pt-3 border-t space-y-2">
                   <Button
                     onClick={() => handleDownloadPDF(form.id)}
                     disabled={downloadingForm === form.id}
@@ -202,6 +248,67 @@ const FormsLibrary = () => {
                       </>
                     )}
                   </Button>
+
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={emailingForm === form.id}
+                      >
+                        {emailingForm === form.id ? (
+                          <>
+                            <Clock className="h-4 w-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send via Email
+                          </>
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Send Form {form.id} via Email</DialogTitle>
+                        <DialogDescription>
+                          Enter an email address to send this daily shift form as a PDF attachment.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium">Email Address</label>
+                          <Input
+                            type="email"
+                            placeholder="management@smashbrothers.co.th"
+                            value={emailAddress}
+                            onChange={(e) => setEmailAddress(e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          onClick={() => handleSendEmail(form.id)}
+                          disabled={!emailAddress || emailingForm === form.id}
+                          className="bg-black text-white hover:bg-gray-800"
+                        >
+                          {emailingForm === form.id ? (
+                            <>
+                              <Clock className="h-4 w-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Send Email
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
