@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Download, Calendar, User, Clock, FileCheck, Mail } from "lucide-react";
+import { FileText, Download, Calendar, User, Clock, FileCheck, Mail, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FormEntry {
@@ -231,6 +231,15 @@ const FormsLibrary = () => {
                 </div>
 
                 <div className="mt-4 pt-3 border-t space-y-2">
+                  <Button
+                    onClick={() => window.open(`/daily-shift-form?id=${form.id}`, '_blank')}
+                    variant="default"
+                    className="w-full bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Form
+                  </Button>
+                  
                   <Button
                     onClick={() => handleDownloadPDF(form.id)}
                     disabled={downloadingForm === form.id}
