@@ -86,18 +86,18 @@ class EmailService {
         
         <h3>Sales Summary</h3>
         <ul>
-          <li>Total Sales: ${parseFloat(reportData.totalSales || '0').toFixed(2)}</li>
-          <li>Cash Sales: ${parseFloat(reportData.cashSales || '0').toFixed(2)}</li>
-          <li>Grab Sales: ${parseFloat(reportData.grabSales || '0').toFixed(2)}</li>
-          <li>QR Scan Sales: ${parseFloat(reportData.qrScanSales || '0').toFixed(2)}</li>
+          <li>Total Sales: ${Number(reportData.totalSales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>Cash Sales: ${Number(reportData.cashSales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>Grab Sales: ${Number(reportData.grabSales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>QR Scan Sales: ${Number(reportData.qrScanSales || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
         </ul>
         
         <h3>Cash Management</h3>
         <ul>
-          <li>Starting Cash: ${parseFloat(reportData.startingCash || '0').toFixed(2)}</li>
-          <li>Ending Cash: ${parseFloat(reportData.endingCash || '0').toFixed(2)}</li>
-          <li>Total Expenses: ${parseFloat(reportData.totalExpenses || '0').toFixed(2)}</li>
-          <li>Banked Amount: ${parseFloat(reportData.bankedAmount || '0').toFixed(2)}</li>
+          <li>Starting Cash: ${Number(reportData.startingCash || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>Ending Cash: ${Number(reportData.endingCash || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>Total Expenses: ${Number(reportData.totalExpenses || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
+          <li>Banked Amount: ${Number(reportData.bankedAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
         </ul>
 
         <h3>Stock Items Needed for Purchase</h3>
