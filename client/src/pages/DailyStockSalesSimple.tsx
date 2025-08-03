@@ -16,7 +16,7 @@ const DRINK_ITEMS = ['Bottle Water', 'Coke', 'Coke Zero', 'Fanta Strawberry', 'K
 const FRESH_FOOD_ITEMS = ['Iceberg Lettuce', 'Jalapenos', 'Onions', 'Purple Cabbage', 'Test Pickles Enhanced', 'White Cabbage'];
 const FROZEN_FOOD_ITEMS = ['Bacon Long', 'Bacon Short', 'Chicken Nuggets', 'French Fries', 'Onion Rings', 'Sweet Potato Fries'];
 const SHELF_ITEMS = ['Cajun Spice', 'Cheese', 'Chili Sauce', 'Dill Pickles', 'Ketchup', 'Mayonnaise', 'Mustard', 'Oil Fryer', 'Sweet Pickles'];
-const KITCHEN_ITEMS = ['Alcohol Sanitizer', 'Aluminum Foil', 'Dish Washing Liquid', 'Paper Towel Long', 'Paper Towel Short', 'Printer Rolls'];
+const KITCHEN_ITEMS = ['Aluminum Foil', 'Paper Towel Long', 'Paper Towel Short', 'Alcohol Sanitizer', 'Dish Washing Liquid', 'Printer Rolls'];
 const PACKAGING_ITEMS = ['Burger Paper', 'Food Wrap', 'French Fries Box', 'Hand Towel', 'Kitchen Towel', 'Paper Food Bags', 'Plastic Gloves', 'Rubber Gloves Large', 'Rubber Gloves Medium', 'Rubber Gloves Small', 'Takeaway Containers', 'Wooden Skewers'];
 
 // Minimal, bulletproof form schema
