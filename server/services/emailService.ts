@@ -97,7 +97,21 @@ class EmailService {
           <li>Starting Cash: ${parseFloat(reportData.startingCash || '0').toFixed(2)}</li>
           <li>Ending Cash: ${parseFloat(reportData.endingCash || '0').toFixed(2)}</li>
           <li>Total Expenses: ${parseFloat(reportData.totalExpenses || '0').toFixed(2)}</li>
+          <li>Banked Amount: ${parseFloat(reportData.bankedAmount || '0').toFixed(2)}</li>
         </ul>
+
+        <h3>Stock Items Needed for Purchase</h3>
+        ${reportData.numberNeeded ? `
+        <ul>
+          ${Object.entries(reportData.numberNeeded)
+            .filter(([key, value]) => value && parseInt(value as string) > 0)
+            .map(([item, quantity]) => `<li>${item}: ${quantity}</li>`)
+            .join('')}
+        </ul>
+        ` : '<p>No stock items specified.</p>'}
+
+        <h3>Expenses Breakdown</h3>
+        <p>${reportData.expenseDescription || 'No detailed expense breakdown provided.'}</p>
         
         <p>The complete daily shift report is attached as a PDF for your records.</p>
         
