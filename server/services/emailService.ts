@@ -9,9 +9,26 @@ class EmailService {
   async initialize() {
     if (this.initialized) return;
 
-    // Temporarily disable OAuth2 due to expired refresh token
-    // Use app password authentication with correct email address
-    console.log('🔐 Using Gmail app password authentication (OAuth2 token expired)...');
+    // Check if we have all required OAuth2 credentials
+    const hasOAuth2Creds = process.env.GOOGLE_CLIENT_ID && 
+                          process.env.GOOGLE_CLIENT_SECRET && 
+                          process.env.GOOGLE_REFRESH_TOKEN &&
+                          process.env.GMAIL_USER;
+
+    if (hasOAuth2Creds) {
+      try {
+        console.log('🔐 Initializing Gmail OAuth2 authentication...');
+        await this.setupOAuth2();
+        console.log('✅ OAuth2 email service initialized successfully');
+        this.initialized = true;
+        return;
+      } catch (error) {
+        console.error('❌ OAuth2 authentication failed:', error);
+      }
+    }
+
+    // Fallback to app password authentication
+    console.log('🔐 Using Gmail app password authentication...');
     this.setupAppPassword();
     this.initialized = true;
   }
@@ -34,9 +51,8 @@ class EmailService {
         throw new Error('Failed to get access token');
       }
 
-      // For OAuth2, use the actual Gmail email address (not the client ID)
-      // Since GMAIL_USER contains the client ID, we'll use colcamenterprises@gmail.com
-      const userEmail = 'colcamenterprises@gmail.com';
+      // Use the GMAIL_USER environment variable which now contains the actual email address
+      const userEmail = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
       
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -58,12 +74,16 @@ class EmailService {
   }
 
   private setupAppPassword() {
-    // Use the correct Gmail email address (GMAIL_USER contains OAuth client ID, not email)
-    const gmailUser = 'colcamenterprises@gmail.com';
-    const gmailPassword = (process.env.GMAIL_APP_PASSWORD || '').replace(/"/g, '');
+    // Use the GMAIL_USER environment variable which now contains the actual email address
+    const gmailUser = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
+    // Clean up the app password by removing quotes, spaces, and other potential formatting issues
+    const gmailPassword = (process.env.GMAIL_APP_PASSWORD || '')
+      .replace(/["\s-]/g, '')  // Remove quotes, spaces, and dashes
+      .trim();
     
-    console.log('🔐 Gmail User (corrected):', gmailUser);
+    console.log('🔐 Gmail User:', gmailUser);
     console.log('🔐 Gmail Password configured:', gmailPassword.length > 0 ? 'Yes' : 'No');
+    console.log('🔐 Gmail Password length:', gmailPassword.length);
     
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
