@@ -1,11 +1,4 @@
-import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-
-interface GmailConfig {
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
-}
+import nodemailer from 'nodemailer';
 
 interface EmailParams {
   to: string;
@@ -21,123 +14,59 @@ interface EmailParams {
 }
 
 class GmailService {
-  private oauth2Client: OAuth2Client | null = null;
-  private gmail: any = null;
+  private transporter: any = null;
 
-  private initializeGmail() {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  private initializeTransporter() {
+    if (this.transporter) return this.transporter;
 
-    if (!clientId || !clientSecret || !refreshToken) {
-      console.error('Gmail OAuth credentials are missing');
-      return null;
-    }
-
-    this.oauth2Client = new google.auth.OAuth2(
-      clientId,
-      clientSecret,
-      'https://developers.google.com/oauthplayground'
-    );
-
-    this.oauth2Client.setCredentials({
-      refresh_token: refreshToken,
+    console.log('🔐 Initializing Gmail with App Password...');
+    
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER || 'colcamenterprises@gmail.com',
+        pass: process.env.GMAIL_APP_PASSWORD
+      }
     });
 
-    this.gmail = google.gmail({ version: 'v1', auth: this.oauth2Client });
-    return this.gmail;
-  }
-
-  private createMessage(params: EmailParams): string {
-    const boundary = `boundary_${Date.now()}`;
-    
-    if (params.attachments && params.attachments.length > 0) {
-      // Multi-part message with attachments
-      const messageParts = [
-        `From: ${params.from}`,
-        `To: ${params.to}`,
-        `Subject: ${params.subject}`,
-        'MIME-Version: 1.0',
-        `Content-Type: multipart/mixed; boundary="${boundary}"`,
-        '',
-        `--${boundary}`,
-        'Content-Type: text/html; charset=utf-8',
-        '',
-        params.html || params.text || '',
-        ''
-      ];
-
-      // Add attachments
-      params.attachments.forEach(attachment => {
-        messageParts.push(`--${boundary}`);
-        messageParts.push(`Content-Type: application/pdf; name="${attachment.filename}"`);
-        messageParts.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
-        messageParts.push(`Content-Transfer-Encoding: ${attachment.encoding}`);
-        messageParts.push('');
-        messageParts.push(attachment.content);
-        messageParts.push('');
-      });
-
-      messageParts.push(`--${boundary}--`);
-      const message = messageParts.join('\n');
-      return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    } else {
-      // Simple message without attachments
-      const messageParts = [
-        `From: ${params.from}`,
-        `To: ${params.to}`,
-        `Subject: ${params.subject}`,
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=utf-8',
-        '',
-        params.html || params.text || ''
-      ];
-
-      const message = messageParts.join('\n');
-      return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
+    return this.transporter;
   }
 
   async sendEmail(params: EmailParams): Promise<boolean> {
     try {
-      const gmail = this.initializeGmail();
-      if (!gmail) {
-        console.error('Gmail service not initialized');
-        return false;
-      }
+      const transporter = this.initializeTransporter();
+      
+      const mailOptions = {
+        from: params.from,
+        to: params.to,
+        subject: params.subject,
+        html: params.html || params.text,
+        attachments: params.attachments?.map(att => ({
+          filename: att.filename,
+          content: att.content,
+          encoding: att.encoding
+        })) || []
+      };
 
-      const encodedMessage = this.createMessage(params);
-
-      const result = await gmail.users.messages.send({
-        userId: 'me',
-        requestBody: {
-          raw: encodedMessage,
-        },
-      });
-
-      console.log('✅ Gmail API: Email sent successfully', result.data.id);
+      const result = await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully:', result.messageId);
       return true;
     } catch (error) {
-      console.error('❌ Gmail API Error:', error);
+      console.error('❌ Email sending failed:', error);
       return false;
     }
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      const gmail = this.initializeGmail();
-      if (!gmail) {
-        return false;
-      }
-
-      const result = await gmail.users.getProfile({
-        userId: 'me',
-      });
-
-      console.log('✅ Gmail API: Connection successful', result.data.emailAddress);
+      const transporter = this.initializeTransporter();
+      
+      // Test the connection by sending a verification email
+      await transporter.verify();
+      console.log('✅ Gmail App Password: Connection successful');
       return true;
     } catch (error) {
-      console.error('❌ Gmail API: Connection failed', error);
+      console.error('❌ Gmail App Password: Connection failed', error);
       return false;
     }
   }
@@ -203,46 +132,69 @@ function generateEmailHTML(data: any): string {
 
       <hr style="margin: 20px 0;" />
 
-      <h3>💰 Sales Summary</h3>
+      <h3 style="color: #007BFF;">Sales Summary</h3>
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td>Total Sales:</td><td style="text-align: right;"><strong>฿${totalSales}</strong></td></tr>
-        <tr><td>Cash Sales:</td><td style="text-align: right;">฿${cashSales}</td></tr>
-        <tr><td>Card Sales:</td><td style="text-align: right;">฿${cardSales}</td></tr>
-        <tr><td>Orders:</td><td style="text-align: right;">${orderCount} orders</td></tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Total Sales:</strong></td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${totalSales}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Cash Sales:</strong></td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${cashSales}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Card/Digital Sales:</strong></td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${cardSales}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Starting Cash:</strong></td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${startingCash}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Ending Cash:</strong></td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${endingCash}</td>
+        </tr>
       </table>
 
       <hr style="margin: 20px 0;" />
 
-      <h3>🍔 Stock & Usage</h3>
-      <table style="width: 100%; border-collapse: collapse;" border="1">
-        <thead>
-          <tr style="background-color: #f0f0f0;">
-            <th>Item</th><th>Start</th><th>Ordered</th><th>End</th><th>Used</th><th>Variance</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Burger Buns</td><td>${bunsStart}</td><td>${bunsOrdered}</td><td>${bunsEnd}</td><td>${bunsUsed}</td><td>✅ Match</td></tr>
-          <tr><td>Meat (g)</td><td>${meatStart}</td><td>${meatOrdered}</td><td>${meatEnd}</td><td>${meatUsed}</td><td>${meatVariance > 0 ? '+' : ''}${meatVariance}g</td></tr>
-          <tr><td>Drinks</td><td>${drinksStart}</td><td>${drinksOrdered}</td><td>${drinksEnd}</td><td>${drinksUsed}</td><td>✅ Match</td></tr>
-        </tbody>
-      </table>
-
-      <hr style="margin: 20px 0;" />
-
-      <h3>🧾 Cash Management</h3>
+      <h3 style="color: #007BFF;">Stock Analysis</h3>
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td>Starting Cash:</td><td style="text-align: right;">฿${startingCash}</td></tr>
-        <tr><td>Ending Cash:</td><td style="text-align: right;">฿${endingCash}</td></tr>
+        <tr>
+          <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Item</th>
+          <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Used</th>
+          <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Variance</th>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">Burger Buns</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${bunsUsed}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">-</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">Meat (grams)</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${meatUsed}g</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${meatVariance > 0 ? '+' : ''}${meatVariance}g</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">Drinks</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${drinksUsed}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">-</td>
+        </tr>
       </table>
 
       <hr style="margin: 20px 0;" />
 
-      <h3>📌 Discrepancy Notes</h3>
-      <p>${discrepancyNotes}</p>
+      <h3 style="color: #007BFF;">Additional Notes</h3>
+      <p style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0;">
+        ${discrepancyNotes}
+      </p>
 
       <hr style="margin: 20px 0;" />
 
-      <p style="font-size: 12px; color: #666;">This report was automatically generated by your Smash Brothers system.</p>
+      <p style="font-size: 12px; color: #666; text-align: center;">
+        This report was automatically generated by the Smash Brothers Burgers Management System<br>
+        Report generated at: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)
+      </p>
     </div>
   `;
 }

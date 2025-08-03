@@ -9,69 +9,13 @@ class EmailService {
   async initialize() {
     if (this.initialized) return;
 
-    // Check if we have all required OAuth2 credentials
-    const hasOAuth2Creds = process.env.GOOGLE_CLIENT_ID && 
-                          process.env.GOOGLE_CLIENT_SECRET && 
-                          process.env.GOOGLE_REFRESH_TOKEN &&
-                          process.env.GMAIL_USER;
-
-    if (hasOAuth2Creds) {
-      try {
-        console.log('🔐 Initializing Gmail OAuth2 authentication...');
-        await this.setupOAuth2();
-        console.log('✅ OAuth2 email service initialized successfully');
-        this.initialized = true;
-        return;
-      } catch (error) {
-        console.error('❌ OAuth2 authentication failed:', error);
-      }
-    }
-
-    // Fallback to app password authentication
+    // Always use Gmail app password authentication (OAuth2 removed)
     console.log('🔐 Using Gmail app password authentication...');
     this.setupAppPassword();
     this.initialized = true;
   }
 
-  private async setupOAuth2() {
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      'https://developers.google.com/oauthplayground'
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
-    });
-
-    try {
-      const accessToken = await oauth2Client.getAccessToken();
-      
-      if (!accessToken.token) {
-        throw new Error('Failed to get access token');
-      }
-
-      // Use GOOGLE_EMAIL for the actual email address, fallback to hardcoded value
-      const userEmail = process.env.GOOGLE_EMAIL || 'colcamenterprises@gmail.com';
-      
-      this.transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          type: 'OAuth2',
-          user: userEmail,
-          clientId: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-          accessToken: accessToken.token,
-        },
-      });
-
-      console.log('✅ OAuth2 email service initialized successfully');
-    } catch (error) {
-      console.error('❌ OAuth2 setup failed:', error);
-      throw error;
-    }
-  }
+  // OAuth2 method removed - using only Gmail App Password
 
   private setupAppPassword() {
     // Use GOOGLE_EMAIL for the actual email address

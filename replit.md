@@ -12,7 +12,7 @@ Testing requirement: Always test changes in isolation before making additional m
 Documentation requirement: When creating comprehensive project documentation, include all operational details someone would need to rebuild the system from scratch.
 Agent execution policy: Execute only exact commands provided. Do not add, remove, or modify features unless explicitly approved with 'Yes, implement [specific change]'. Log all actions with timestamp and description. If unsure, ask for clarification.
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
-Email system status (Aug 2025): Fully operational and tested. Professional A4 PDF generation, bulletproof form validation, and automatic triggering confirmed working. Dual authentication system with Gmail App Password fallback active. System successfully sends emails to colcamenterprises@gmail.com using backup Gmail app password when OAuth2 tokens expire. Currency formatting fixed (Thai Baht symbols removed). Mobile edit functionality added to expenses page. Ready for full deployment.
+Email system status (Aug 2025): Fully operational and tested. OAuth2 authentication completely removed to eliminate reliability issues. System now uses only Gmail App Password method for bulletproof email delivery. Professional A4 PDF generation, bulletproof form validation, and automatic triggering confirmed working. System successfully sends emails to colcamenterprises@gmail.com with confirmed message IDs. Currency formatting fixed (Thai Baht symbols removed). Mobile edit functionality added to expenses page. Ready for full deployment.
 
 ## System Architecture
 
