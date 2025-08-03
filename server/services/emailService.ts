@@ -9,22 +9,11 @@ class EmailService {
   async initialize() {
     if (this.initialized) return;
 
-    try {
-      // Try OAuth2 first if all credentials are available
-      if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
-        console.log('🔐 Initializing Gmail OAuth2 authentication...');
-        await this.setupOAuth2();
-      } else {
-        console.log('🔐 Using Gmail app password authentication...');
-        this.setupAppPassword();
-      }
-      this.initialized = true;
-    } catch (error) {
-      console.error('❌ Email service initialization failed:', error);
-      // Fallback to app password
-      this.setupAppPassword();
-      this.initialized = true;
-    }
+    // Temporarily disable OAuth2 due to expired refresh token
+    // Use app password authentication with correct email address
+    console.log('🔐 Using Gmail app password authentication (OAuth2 token expired)...');
+    this.setupAppPassword();
+    this.initialized = true;
   }
 
   private async setupOAuth2() {
@@ -45,10 +34,11 @@ class EmailService {
         throw new Error('Failed to get access token');
       }
 
-      // Use actual Gmail email address - this should be set in GOOGLE_USER_EMAIL secret
-      const userEmail = process.env.GOOGLE_USER_EMAIL || 'colcamenterprises@gmail.com';
+      // For OAuth2, use the actual Gmail email address (not the client ID)
+      // Since GMAIL_USER contains the client ID, we'll use colcamenterprises@gmail.com
+      const userEmail = 'colcamenterprises@gmail.com';
       
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
           type: 'OAuth2',
@@ -68,13 +58,14 @@ class EmailService {
   }
 
   private setupAppPassword() {
-    const gmailUser = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
+    // Use the correct Gmail email address (GMAIL_USER contains OAuth client ID, not email)
+    const gmailUser = 'colcamenterprises@gmail.com';
     const gmailPassword = (process.env.GMAIL_APP_PASSWORD || '').replace(/"/g, '');
     
-    console.log('🔐 Gmail User:', gmailUser);
+    console.log('🔐 Gmail User (corrected):', gmailUser);
     console.log('🔐 Gmail Password configured:', gmailPassword.length > 0 ? 'Yes' : 'No');
     
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: gmailUser,
@@ -101,7 +92,7 @@ class EmailService {
       console.log('📧 Subject:', subject);
       
       const mailOptions = {
-        from: process.env.GOOGLE_USER_EMAIL || process.env.GMAIL_USER || 'colcamenterprises@gmail.com',
+        from: 'colcamenterprises@gmail.com',
         to,
         subject,
         html,

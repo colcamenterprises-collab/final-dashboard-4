@@ -713,7 +713,6 @@ export function registerRoutes(app: express.Application): Server {
               `;
               
               // Send email with PDF attachment
-              const pdfBuffer = Buffer.concat(pdfBuffers);
               const emailSent = await emailService.sendDailyShiftReport({
                 ...data,
                 id: result.id,
