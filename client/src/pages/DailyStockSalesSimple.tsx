@@ -233,7 +233,7 @@ const DailyStockSalesSimple = () => {
                 </CardContent>
               </Card>
 
-              {/* Sales Section */}
+              {/* Sales Information */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Sales Information</CardTitle>
