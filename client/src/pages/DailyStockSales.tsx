@@ -60,7 +60,9 @@ const formSchema = z.object({
   shoppingEntries: z.array(z.object({ 
     item: z.string().min(1, "Item name required"), 
     amount: z.coerce.number().min(0).optional().default(0), 
-    shop: z.string().optional().default("")
+    shop: z.string().optional().default(""),
+    customShop: z.string().optional(),
+    customItem: z.string().optional()
   })).optional().default([]),
   gasExpense: z.coerce.number().optional().default(0),
   totalExpenses: z.coerce.number().optional().default(0),
@@ -115,8 +117,15 @@ const SHELF_ITEMS = [
 
 // Drink items with current requirements (matching backend requirements)
 const DRINK_ITEMS = [
-  'Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange',
-  'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'
+  'Coke',
+  'Coke Zero',
+  'Schweppes Manow',
+  'Sprite',
+  'Fanta Orange',
+  'Fanta Strawberry',
+  'Kids Apple',
+  'Kids Orange',
+  'Soda Water'
 ];
 
 // Kitchen supplies
@@ -149,6 +158,27 @@ const SHOP_OPTIONS = [
   '*Other'
 ];
 
+// Combined item categories for shopping dropdown
+const SHOPPING_ITEMS = {
+  'Drinks': DRINK_ITEMS,
+  'Fresh Food': FRESH_FOOD_ITEMS,
+  'Frozen Food': FROZEN_FOOD_ITEMS,
+  'Shelf Items': SHELF_ITEMS,
+  'Kitchen Items': KITCHEN_ITEMS,
+  'Packaging Items': PACKAGING_ITEMS
+};
+
+// Flatten all items for quick search
+const ALL_SHOPPING_ITEMS = [
+  ...DRINK_ITEMS,
+  ...FRESH_FOOD_ITEMS,
+  ...FROZEN_FOOD_ITEMS,
+  ...SHELF_ITEMS,
+  ...KITCHEN_ITEMS,
+  ...PACKAGING_ITEMS,
+  'Other' // Allow custom entries
+];
+
 // Wage categories for dropdown
 const WAGE_CATEGORIES = ['Wages', 'Over Time', 'Cleaning', 'Bonus'];
 
@@ -164,7 +194,8 @@ const shoppingEntrySchema = z.object({
   amount: z.number().min(0),
   notes: z.string().optional(),
   shop: z.string(),
-  customShop: z.string().optional()
+  customShop: z.string().optional(),
+  customItem: z.string().optional()
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -1027,12 +1058,44 @@ export default function DailyStockSales() {
                           name={`shoppingEntries.${index}.item`}
                           render={({ field }) => (
                             <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select item" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {Object.entries(SHOPPING_ITEMS).map(([category, items]) => (
+                                    <div key={category}>
+                                      <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">
+                                        {category}
+                                      </div>
+                                      {items.map((item) => (
+                                        <SelectItem key={item} value={item}>
+                                          {item}
+                                        </SelectItem>
+                                      ))}
+                                    </div>
+                                  ))}
+                                  <SelectItem value="Other">Other (Custom)</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </FormItem>
                           )}
                         />
+                        {form.watch(`shoppingEntries.${index}.item`) === 'Other' && (
+                          <FormField
+                            control={form.control}
+                            name={`shoppingEntries.${index}.customItem`}
+                            render={({ field }) => (
+                              <FormItem className="col-span-3">
+                                <FormControl>
+                                  <Input {...field} placeholder="Enter custom item name" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        )}
                         <FormField
                           control={form.control}
                           name={`shoppingEntries.${index}.amount`}
@@ -1117,7 +1180,7 @@ export default function DailyStockSales() {
                     variant="outline" 
                     onClick={() => {
                       const current = form.getValues('shoppingEntries');
-                      form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '', shop: '', customShop: '' }]);
+                      form.setValue('shoppingEntries', [...current, { item: '', amount: 0, notes: '', shop: '', customShop: '', customItem: '' }]);
                     }}
                   >
                     Add Expense
