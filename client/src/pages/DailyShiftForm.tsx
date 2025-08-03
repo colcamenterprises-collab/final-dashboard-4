@@ -5,116 +5,114 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus, CheckCircle, XCircle, FileDown, FileText } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle, FileDown, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JussiChatBubble } from "@/components/JussiChatBubble";
-import { generateDailyShiftPDF, downloadPDF, generatePDFBlob } from "@/lib/pdfGenerator";
-
 
 const DailyShiftForm = () => {
   const { toast } = useToast();
   
-  // Form state following exact structure: Shift Information → Sales → Expenses → Food & Stock Items
+  // COMPLETE Form State - ALL FIELDS
   const [formData, setFormData] = useState({
     // Shift Information
     completedBy: '',
     shiftType: '',
     shiftDate: new Date().toISOString().split('T')[0],
     
-    // Sales
-    grabSales: 0,
-    aroiDeeSales: 0,
-    qrScanSales: 0,
-    cashSales: 0,
-    
-    // Expenses - Wages & Staff Payments
-    wages: [] as Array<{ name: string; amount: number; type: string }>,
-    
-    // Expenses - Shopping & Expenses  
-    shopping: [] as Array<{ item: string; amount: number; shop: string }>,
-    
     // Cash Management
     startingCash: 0,
     endingCash: 0,
     bankedAmount: 0,
     
-    // Food & Stock Items - authentic inventory from CSV
-    inventory: {} as Record<string, number>
+    // Sales Information
+    grabSales: 0,
+    aroiDeeSales: 0,
+    qrScanSales: 0,
+    cashSales: 0,
+    
+    // Gas Expense
+    gasExpense: 0,
+    
+    // Wages & Staff Payments (Dynamic Array)
+    wages: [] as Array<{ name: string; amount: number; type: string }>,
+    
+    // Shopping & Expenses (Dynamic Array)
+    shopping: [] as Array<{ item: string; amount: number; shop: string }>,
+    
+    // Food & Stock Items - COMPLETE INVENTORY SYSTEM
+    // Fresh Food
+    freshFood: {
+      iceberg_lettuce: 0,
+      tomatoes: 0,
+      white_cabbage: 0,
+      red_onions: 0,
+      cucumber: 0,
+      carrots: 0
+    },
+    
+    // Frozen Food  
+    frozenFood: {
+      chicken_nuggets: 0,
+      bacon: 0,
+      chicken_breast: 0,
+      beef_patties: 0,
+      chicken_patties: 0,
+      french_fries: 0
+    },
+    
+    // Shelf Items
+    shelfItems: {
+      burger_buns: 0,
+      ketchup: 0,
+      mayonnaise: 0,
+      mustard: 0,
+      bbq_sauce: 0,
+      cheese_slices: 0,
+      cooking_oil: 0
+    },
+    
+    // Kitchen Items
+    kitchenItems: {
+      paper_towels: 0,
+      aluminum_foil: 0,
+      plastic_gloves: 0,
+      kitchen_cleaner: 0,
+      sanitizer: 0
+    },
+    
+    // Packaging Items
+    packagingItems: {
+      fries_boxes: 0,
+      small_bags: 0,
+      large_bags: 0,
+      paper_bags: 0,
+      loaded_fries_boxes: 0,
+      labels: 0,
+      cutlery_sets: 0
+    },
+    
+    // Drink Stock
+    drinkStock: {
+      coke: 0,
+      coke_zero: 0,
+      sprite: 0,
+      schweppes_manow: 0,
+      fanta_orange: 0,
+      fanta_strawberry: 0,
+      soda_water: 0,
+      bottled_water: 0,
+      kids_orange: 0,
+      kids_apple: 0
+    },
+    
+    // Notes and Comments
+    notes: '',
+    discrepancyNotes: '',
+    
+    // Status
+    isDraft: false
   });
 
-  // Load existing form data (for editing form 196 and others)
-  useEffect(() => {
-    const loadExistingData = async () => {
-      try {
-        const response = await fetch('/api/daily-stock-sales');
-        if (response.ok) {
-          const data = await response.json();
-          // Look for the most recent form or form 196 specifically
-          const mostRecentForm = data.find((form: any) => form.id === 196) || data[0];
-          
-          if (mostRecentForm) {
-            console.log('Loading existing form data:', mostRecentForm);
-            console.log('Raw number_needed data:', mostRecentForm.number_needed);
-            console.log('Raw wages data:', mostRecentForm.wages);
-            console.log('Raw shopping data:', mostRecentForm.shopping);
-            
-            // Parse the stored JSON data
-            let parsedInventory = {};
-            let parsedWages = [];
-            let parsedShopping = [];
-            
-            try {
-              // Check both possible field names for inventory data
-              const inventoryData = mostRecentForm.numberNeeded || mostRecentForm.number_needed;
-              if (inventoryData) {
-                parsedInventory = typeof inventoryData === 'string' 
-                  ? JSON.parse(inventoryData) 
-                  : inventoryData;
-                console.log('Parsed inventory:', parsedInventory);
-              }
-              
-              if (mostRecentForm.wages) {
-                parsedWages = typeof mostRecentForm.wages === 'string' 
-                  ? JSON.parse(mostRecentForm.wages) 
-                  : mostRecentForm.wages;
-                console.log('Parsed wages:', parsedWages);
-              }
-              
-              if (mostRecentForm.shopping) {
-                parsedShopping = typeof mostRecentForm.shopping === 'string' 
-                  ? JSON.parse(mostRecentForm.shopping) 
-                  : mostRecentForm.shopping;
-                console.log('Parsed shopping:', parsedShopping);
-              }
-            } catch (parseError) {
-              console.error('Error parsing stored data:', parseError);
-            }
-            
-            setFormData({
-              completedBy: mostRecentForm.completed_by || '',
-              shiftType: mostRecentForm.shift_type || '',
-              shiftDate: mostRecentForm.shift_date ? mostRecentForm.shift_date.split('T')[0] : new Date().toISOString().split('T')[0],
-              grabSales: mostRecentForm.grab_sales || 0,
-              aroiDeeSales: mostRecentForm.aroi_dee_sales || 0,
-              qrScanSales: mostRecentForm.qr_scan_sales || 0,
-              cashSales: mostRecentForm.cash_sales || 0,
-              wages: parsedWages || [],
-              shopping: parsedShopping || [],
-              startingCash: mostRecentForm.starting_cash || 0,
-              endingCash: mostRecentForm.ending_cash || 0,
-              bankedAmount: mostRecentForm.banked_amount || 0,
-              inventory: parsedInventory || {}
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error loading existing data:', error);
-      }
-    };
-    
-    loadExistingData();
-  }, []);
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -126,80 +124,49 @@ const DailyShiftForm = () => {
     formId?: number;
   } | null>(null);
 
-  // Authentic supplier data from CSV - 100% real inventory items
-  const inventoryCategories = {
-    "Fresh Food": [
-      { name: "Topside Beef", supplier: "Makro", cost: "฿319.00", unit: "kg" },
-      { name: "Brisket Point End", supplier: "Makro", cost: "฿465.00", unit: "kg" },
-      { name: "Chuck Roll Beef", supplier: "Makro", cost: "฿320.00", unit: "kg" },
-      { name: "Other Beef", supplier: "Makro", cost: "฿299.00", unit: "kg" },
-      { name: "Salad (Iceberg Lettuce)", supplier: "Makro", cost: "฿99.00", unit: "kg" },
-      { name: "Milk", supplier: "Makro", cost: "฿80.00", unit: "litre" },
-      { name: "Burger Bun", supplier: "Bakery", cost: "฿8.00", unit: "each" },
-      { name: "Tomatos", supplier: "Makro", cost: "฿89.00", unit: "kg" },
-      { name: "White Cabbage", supplier: "Makro", cost: "฿45.00", unit: "kg" },
-      { name: "Purple Cabbage", supplier: "Makro", cost: "฿41.25", unit: "kg" },
-      { name: "Onions Bulk 10kg", supplier: "Makro", cost: "฿290.00", unit: "10kg" },
-      { name: "Onions (small bags)", supplier: "Makro", cost: "฿29.00", unit: "kg" },
-      { name: "Cheese", supplier: "Makro", cost: "฿359.00", unit: "kg" },
-      { name: "Bacon Short", supplier: "Makro", cost: "฿305.00", unit: "kg" },
-      { name: "Bacon Long", supplier: "Makro", cost: "฿430.00", unit: "2kg" },
-      { name: "Jalapenos", supplier: "Makro", cost: "฿190.00", unit: "kg" }
-    ],
-    "Frozen Food": [
-      { name: "French Fries 7mm", supplier: "Makro", cost: "฿129.00", unit: "2kg" },
-      { name: "Chicken Nuggets", supplier: "Makro", cost: "฿155.00", unit: "kg" },
-      { name: "Chicken Fillets", supplier: "Makro", cost: "฿199.00", unit: "kg" },
-      { name: "Sweet Potato Fries", supplier: "Makro", cost: "฿145.00", unit: "kg" }
-    ],
-    "Shelf Items": [
-      { name: "Cajun Fries Seasoning", supplier: "Makro", cost: "฿508.00", unit: "510g" },
-      { name: "Crispy Fried Onions", supplier: "Makro", cost: "฿79.00", unit: "500g" },
-      { name: "Pickles (Standard Dill)", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Pickles Sweet", supplier: "Makro", cost: "฿89.00", unit: "480g" },
-      { name: "Mustard", supplier: "Makro", cost: "฿88.00", unit: "kg" },
-      { name: "Mayonnaise", supplier: "Makro", cost: "฿90.00", unit: "litre" },
-      { name: "Tomato Sauce", supplier: "Makro", cost: "฿175.00", unit: "5L" },
-      { name: "BBQ Sauce", supplier: "Makro", cost: "฿110.00", unit: "500g" },
-      { name: "Sriracha Sauce", supplier: "Makro", cost: "฿108.00", unit: "950g" },
-      { name: "Salt (Coarse Sea Salt)", supplier: "Online", cost: "฿121.00", unit: "kg" }
-    ],
-    "Kitchen Supplies": [
-      { name: "Oil (Fryer)", supplier: "Makro", cost: "฿195.00", unit: "5L" },
-      { name: "Plastic Food Wrap", supplier: "Makro", cost: "฿375.00", unit: "500M" },
-      { name: "Paper Towel Long", supplier: "Makro", cost: "฿79.00", unit: "1 bag 6 pieces" },
-      { name: "Paper Towel Short (Serviettes)", supplier: "Makro", cost: "฿116.00", unit: "1 bag 6 pieces" },
-      { name: "Food Gloves (Large)", supplier: "Makro", cost: "฿197.00", unit: "100" },
-      { name: "Food Gloves (Medium)", supplier: "Supercheap", cost: "฿133.00", unit: "100" },
-      { name: "Food Gloves (Small)", supplier: "Makro", cost: "฿133.00", unit: "100" },
-      { name: "Aluminum Foil", supplier: "Makro", cost: "฿385.00", unit: "29.5 CM 90M" },
-      { name: "Plastic Meat Gloves", supplier: "Makro", cost: "฿22.50", unit: "1 bag 24 pieces" },
-      { name: "Kitchen Cleaner", supplier: "Makro", cost: "฿149.00", unit: "3.5 ltre" },
-      { name: "Alcohol Sanitiser", supplier: "Makro", cost: "฿69.00", unit: "450g" }
-    ],
-    "Packaging": [
-      { name: "French Fries Box", supplier: "Makro", cost: "฿105.00", unit: "1 bag 50 piece" },
-      { name: "Plastic Carry Bags (Size- 6×14)", supplier: "Makro", cost: "฿36.00", unit: "500h" },
-      { name: "Plastic Carry Bags (Size - 9×18)", supplier: "Makro", cost: "฿36.00", unit: "500g" },
-      { name: "Brown Paper Food Bags", supplier: "Online", cost: "฿139.00", unit: "50 Bags " },
-      { name: "Loaded Fries Boxes", supplier: "Makro", cost: "฿89.00", unit: "50 Boxes" },
-      { name: "Packaging Labels", supplier: "", cost: "฿50.00", unit: "45 per sheet" },
-      { name: "Knife, Fork, Spoon Set", supplier: "", cost: "฿89.00", unit: "50" }
-    ]
-  };
-
-  const drinkStock = [
-    { name: "Coke", cost: "฿315.00", unit: "24" },
-    { name: "Coke Zero", cost: "฿315.00", unit: "24" },
-    { name: "Sprite", cost: "฿315.00", unit: "24" },
-    { name: "Schweppes Manow", cost: "฿84.00", unit: "6" },
-    { name: "Fanta Orange", cost: "฿81.00", unit: "6" },
-    { name: "Fanta Strawberry", cost: "฿81.00", unit: "6" },
-    { name: "Soda Water", cost: "฿52.00", unit: "6" },
-    { name: "Bottled Water", cost: "฿49.00", unit: "12" },
-    { name: "Kids Juice Orange", cost: "฿99.00", unit: "6" },
-    { name: "Kids Juice Apple", cost: "฿99.00", unit: "6" }
-  ];
+  // Load existing form data on component mount
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        const response = await fetch('/api/daily-stock-sales');
+        if (response.ok) {
+          const data = await response.json();
+          const mostRecentForm = data[0]; // Get the most recent form
+          
+          if (mostRecentForm) {
+            // Parse and load existing data
+            const parsedWages = mostRecentForm.wages ? 
+              (typeof mostRecentForm.wages === 'string' ? JSON.parse(mostRecentForm.wages) : mostRecentForm.wages) : [];
+            const parsedShopping = mostRecentForm.shopping ? 
+              (typeof mostRecentForm.shopping === 'string' ? JSON.parse(mostRecentForm.shopping) : mostRecentForm.shopping) : [];
+            
+            setFormData(prev => ({
+              ...prev,
+              completedBy: mostRecentForm.completed_by || '',
+              shiftType: mostRecentForm.shift_type || '',
+              shiftDate: mostRecentForm.shift_date ? mostRecentForm.shift_date.split('T')[0] : prev.shiftDate,
+              startingCash: parseFloat(mostRecentForm.starting_cash) || 0,
+              endingCash: parseFloat(mostRecentForm.ending_cash) || 0,
+              bankedAmount: parseFloat(mostRecentForm.banked_amount) || 0,
+              grabSales: parseFloat(mostRecentForm.grab_sales) || 0,
+              aroiDeeSales: parseFloat(mostRecentForm.aroi_dee_sales) || 0,
+              qrScanSales: parseFloat(mostRecentForm.qr_scan_sales) || 0,
+              cashSales: parseFloat(mostRecentForm.cash_sales) || 0,
+              gasExpense: parseFloat(mostRecentForm.gas_expense) || 0,
+              wages: parsedWages,
+              shopping: parsedShopping,
+              notes: mostRecentForm.notes || '',
+              discrepancyNotes: mostRecentForm.discrepancy_notes || ''
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading existing data:', error);
+      }
+    };
+    
+    loadExistingData();
+  }, []);
 
   // Add wage entry
   const addWageEntry = () => {
@@ -237,115 +204,92 @@ const DailyShiftForm = () => {
   const totalSales = formData.grabSales + formData.aroiDeeSales + formData.qrScanSales + formData.cashSales;
   const totalWages = formData.wages.reduce((sum, wage) => sum + (wage.amount || 0), 0);
   const totalShopping = formData.shopping.reduce((sum, item) => sum + (item.amount || 0), 0);
-  const totalExpenses = totalWages + totalShopping;
+  const totalExpenses = totalWages + totalShopping + formData.gasExpense;
+  const calculatedEndingCash = formData.startingCash + totalSales - totalExpenses - formData.bankedAmount;
 
-  // BULLETPROOF Save Draft functionality
+  // Save Draft Function
   const saveDraft = async () => {
     setIsDraftSaving(true);
     setErrorMessage('');
 
-    // Prepare bulletproof data
-    const bulletproofData = {
+    const draftData = {
       completedBy: formData.completedBy || 'Draft User',
       shiftType: formData.shiftType || 'night',
-      shiftDate: formData.shiftDate || new Date().toISOString().split('T')[0],
-      
-      // Sales (guaranteed numbers)
-      startingCash: parseFloat(String(formData.startingCash || 0)),
-      grabSales: parseFloat(String(formData.grabSales || 0)),
-      aroiDeeSales: parseFloat(String(formData.aroiDeeSales || 0)),
-      qrScanSales: parseFloat(String(formData.qrScanSales || 0)),
-      cashSales: parseFloat(String(formData.cashSales || 0)),
-      totalSales: parseFloat(String(totalSales || 0)),
-      
-      // Cash management (guaranteed numbers)
-      endingCash: parseFloat(String(formData.endingCash || 0)),
-      bankedAmount: parseFloat(String(formData.bankedAmount || 0)),
-      
-      // Expenses (guaranteed arrays and numbers)
-      wages: Array.isArray(formData.wages) ? formData.wages.map(w => ({
+      shiftDate: formData.shiftDate,
+      startingCash: parseFloat(String(formData.startingCash)) || 0,
+      grabSales: parseFloat(String(formData.grabSales)) || 0,
+      aroiDeeSales: parseFloat(String(formData.aroiDeeSales)) || 0,
+      qrScanSales: parseFloat(String(formData.qrScanSales)) || 0,
+      cashSales: parseFloat(String(formData.cashSales)) || 0,
+      totalSales: parseFloat(String(totalSales)) || 0,
+      endingCash: parseFloat(String(formData.endingCash)) || 0,
+      bankedAmount: parseFloat(String(formData.bankedAmount)) || 0,
+      gasExpense: parseFloat(String(formData.gasExpense)) || 0,
+      wages: formData.wages.map(w => ({
         name: String(w.name || ''),
-        amount: parseFloat(String(w.amount || 0)),
+        amount: parseFloat(String(w.amount)) || 0,
         type: String(w.type || 'wages')
-      })) : [],
-      
-      shopping: Array.isArray(formData.shopping) ? formData.shopping.map(s => ({
+      })),
+      shopping: formData.shopping.map(s => ({
         item: String(s.item || ''),
-        amount: parseFloat(String(s.amount || 0)),
+        amount: parseFloat(String(s.amount)) || 0,
         shop: String(s.shop || '')
-      })) : [],
+      })),
+      totalExpenses: parseFloat(String(totalExpenses)) || 0,
       
-      totalExpenses: parseFloat(String(totalExpenses || 0)),
+      // Stock data combined into numberNeeded object
+      numberNeeded: {
+        ...formData.freshFood,
+        ...formData.frozenFood,
+        ...formData.shelfItems,
+        ...formData.kitchenItems,
+        ...formData.packagingItems,
+        ...formData.drinkStock
+      },
       
-      // Stock data (guaranteed object)
-      numberNeeded: formData.inventory || {},
-      
-      // Draft flag
-      isDraft: true
+      notes: formData.notes || '',
+      discrepancyNotes: formData.discrepancyNotes || '',
+      isDraft: true,
+      status: 'draft'
     };
 
-    // Multiple attempt strategy
-    let attempts = 0;
-    const maxAttempts = 3;
-    
-    while (attempts < maxAttempts) {
-      attempts++;
-      
-      try {
-        const response = await fetch('/api/daily-stock-sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bulletproofData)
+    try {
+      const response = await fetch('/api/daily-stock-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draftData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Draft Saved Successfully",
+          description: `Form saved as draft with ID: ${result.id}`,
+          variant: "default",
         });
-
-        if (response.ok) {
-          const result = await response.json();
-          
-          toast({
-            title: "✅ DRAFT SAVED SUCCESSFULLY",
-            description: `Form saved as draft with ID: ${result.id}. Data is safe.`,
-            duration: 6000,
-            className: "bg-blue-50 border-blue-200 text-blue-800"
-          });
-          
-          // Save to localStorage as backup
-          localStorage.setItem('dailyShiftDraft', JSON.stringify(bulletproofData));
-          return; // Success - exit function
-        } else {
-          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-        }
-
-      } catch (error: any) {
-        console.error(`Draft save attempt ${attempts} failed:`, error);
-        
-        if (attempts === maxAttempts) {
-          // Final attempt failed - save to localStorage
-          localStorage.setItem('dailyShiftDraft', JSON.stringify(bulletproofData));
-          
-          toast({
-            title: "⚠️ Draft Saved Locally",
-            description: "Network issue - draft saved to your browser. Will sync when connection returns.",
-            duration: 8000,
-            className: "bg-yellow-50 border-yellow-200 text-yellow-800"
-          });
-          return;
-        }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        localStorage.setItem('dailyShiftDraft', JSON.stringify(draftData));
+      } else {
+        throw new Error(`Server error: ${response.status}`);
       }
+    } catch (error: any) {
+      localStorage.setItem('dailyShiftDraft', JSON.stringify(draftData));
+      toast({
+        title: "Draft Saved Locally",
+        description: "Network issue - draft saved to your browser",
+        variant: "default",
+      });
     }
     
     setIsDraftSaving(false);
   };
 
-  // BULLETPROOF Form Submission - GUARANTEED TO SAVE
+  // Submit Form Function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
 
-    // Step 1: MANDATORY FIELD VALIDATION
+    // Validation
     if (!formData.completedBy?.trim()) {
       setSubmissionResult({
         success: false,
@@ -356,197 +300,165 @@ const DailyShiftForm = () => {
       return;
     }
 
-    // Step 2: PREPARE BULLETPROOF DATA
-    const bulletproofData = {
+    const submitData = {
       completedBy: String(formData.completedBy).trim(),
       shiftType: formData.shiftType || 'night',
-      shiftDate: formData.shiftDate || new Date().toISOString().split('T')[0],
-      
-      // Sales (guaranteed numbers, no NaN)
-      startingCash: parseFloat(String(formData.startingCash || 0)) || 0,
-      grabSales: parseFloat(String(formData.grabSales || 0)) || 0,
-      aroiDeeSales: parseFloat(String(formData.aroiDeeSales || 0)) || 0,
-      qrScanSales: parseFloat(String(formData.qrScanSales || 0)) || 0,
-      cashSales: parseFloat(String(formData.cashSales || 0)) || 0,
-      totalSales: parseFloat(String(totalSales || 0)) || 0,
-      
-      // Cash management (guaranteed numbers)
-      endingCash: parseFloat(String(formData.endingCash || 0)) || 0,
-      bankedAmount: parseFloat(String(formData.bankedAmount || 0)) || 0,
-      
-      // Expenses (guaranteed arrays and clean data)
-      wages: Array.isArray(formData.wages) ? formData.wages.map(w => ({
+      shiftDate: formData.shiftDate,
+      startingCash: parseFloat(String(formData.startingCash)) || 0,
+      grabSales: parseFloat(String(formData.grabSales)) || 0,
+      aroiDeeSales: parseFloat(String(formData.aroiDeeSales)) || 0,
+      qrScanSales: parseFloat(String(formData.qrScanSales)) || 0,
+      cashSales: parseFloat(String(formData.cashSales)) || 0,
+      totalSales: parseFloat(String(totalSales)) || 0,
+      endingCash: parseFloat(String(formData.endingCash)) || 0,
+      bankedAmount: parseFloat(String(formData.bankedAmount)) || 0,
+      gasExpense: parseFloat(String(formData.gasExpense)) || 0,
+      wages: formData.wages.map(w => ({
         name: String(w.name || '').trim(),
-        amount: parseFloat(String(w.amount || 0)) || 0,
+        amount: parseFloat(String(w.amount)) || 0,
         type: String(w.type || 'wages')
-      })).filter(w => w.name || w.amount > 0) : [],
-      
-      shopping: Array.isArray(formData.shopping) ? formData.shopping.map(s => ({
+      })).filter(w => w.name || w.amount > 0),
+      shopping: formData.shopping.map(s => ({
         item: String(s.item || '').trim(),
-        amount: parseFloat(String(s.amount || 0)) || 0,
+        amount: parseFloat(String(s.amount)) || 0,
         shop: String(s.shop || '').trim()
-      })).filter(s => s.item || s.amount > 0) : [],
+      })).filter(s => s.item || s.amount > 0),
+      totalExpenses: parseFloat(String(totalExpenses)) || 0,
       
-      totalExpenses: parseFloat(String(totalExpenses || 0)) || 0,
-      gasExpense: 0, // Required field
+      // All stock data combined
+      numberNeeded: {
+        ...formData.freshFood,
+        ...formData.frozenFood,
+        ...formData.shelfItems,
+        ...formData.kitchenItems,
+        ...formData.packagingItems,
+        ...formData.drinkStock
+      },
       
-      // Stock data (guaranteed object)
-      numberNeeded: formData.inventory || {},
-      
-      // Status flags
+      notes: formData.notes || '',
+      discrepancyNotes: formData.discrepancyNotes || '',
       isDraft: false,
       status: 'completed'
     };
 
-    // Step 3: MULTIPLE SUBMISSION STRATEGIES
-    let attempts = 0;
-    const maxAttempts = 5;
-    let lastError = '';
-    
-    while (attempts < maxAttempts) {
-      attempts++;
+    try {
+      console.log('Submitting form data:', submitData);
       
-      try {
-        console.log(`Submission attempt ${attempts}:`, bulletproofData);
+      const response = await fetch('/api/daily-stock-sales', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(submitData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
         
-        const response = await fetch('/api/daily-stock-sales', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(bulletproofData)
+        setSubmissionResult({
+          success: true,
+          message: `Form submitted successfully! ID: ${result.id}. Email notification sent to management.`,
+          formId: result.id
         });
-
-        if (response.ok) {
-          const result = await response.json();
-          
-          // SUCCESS - Generate and store PDF
-          try {
-            const pdfDoc = generateDailyShiftPDF(formData, result.id);
-            const pdfBlob = generatePDFBlob(pdfDoc);
-            
-            // Convert blob to base64 for API
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const pdfBase64 = Buffer.from(arrayBuffer).toString('base64');
-            
-            // Store PDF in object storage
-            const pdfResponse = await fetch(`/api/daily-stock-sales/${result.id}/pdf`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pdfData: pdfBase64 })
-            });
-            
-            if (pdfResponse.ok) {
-              const pdfResult = await pdfResponse.json();
-              console.log('PDF stored successfully:', pdfResult.filename);
-              
-              toast({
-                title: "Success",
-                description: `Form submitted and PDF generated: ${pdfResult.filename}`,
-                variant: "default",
-              });
-            }
-          } catch (pdfError) {
-            console.error('PDF generation failed:', pdfError);
-            toast({
-              title: "Warning",
-              description: "Form saved but PDF generation failed",
-              variant: "destructive",
-            });
-          }
-          
-          // Clear any stored draft
-          localStorage.removeItem('dailyShiftDraft');
-          
-          // Show success page
-          setSubmissionResult({
-            success: true,
-            message: `✅ FORM SAVED SUCCESSFULLY! ID: ${result.id}`,
-            formId: result.id
-          });
-          setShowSuccessPage(true);
-
-          // Reset form completely
-          setFormData({
-            completedBy: '',
-            shiftType: '',
-            shiftDate: new Date().toISOString().split('T')[0],
-            grabSales: 0,
-            aroiDeeSales: 0,
-            qrScanSales: 0,
-            cashSales: 0,
-            wages: [],
-            shopping: [],
-            startingCash: 0,
-            endingCash: 0,
-            bankedAmount: 0,
-            inventory: {}
-          });
-          
-          setIsSubmitting(false);
-          return; // SUCCESS - EXIT FUNCTION
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          lastError = errorData.error || `Server error ${response.status}: ${response.statusText}`;
-          throw new Error(lastError);
-        }
-
-      } catch (error: any) {
-        lastError = error.message || 'Network connection failed';
-        console.error(`Submission attempt ${attempts} failed:`, lastError);
+        setShowSuccessPage(true);
         
-        if (attempts === maxAttempts) {
-          // ALL ATTEMPTS FAILED - SAVE TO LOCAL STORAGE AS EMERGENCY BACKUP
-          const emergencyBackup = {
-            ...bulletproofData,
-            timestamp: new Date().toISOString(),
-            attempts: attempts
-          };
-          
-          localStorage.setItem('emergencyFormBackup', JSON.stringify(emergencyBackup));
-          
-          // Show failure page with local save confirmation
-          setSubmissionResult({
-            success: false,
-            message: `❌ Network Error: ${lastError}. IMPORTANT: Your data is saved locally and will be submitted when connection returns.`
-          });
-          setShowFailurePage(true);
-          setErrorMessage(lastError);
-        } else {
-          // Wait before retry (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
-        }
+        // Clear form data
+        setFormData({
+          completedBy: '',
+          shiftType: '',
+          shiftDate: new Date().toISOString().split('T')[0],
+          startingCash: 0,
+          endingCash: 0,
+          bankedAmount: 0,
+          grabSales: 0,
+          aroiDeeSales: 0,
+          qrScanSales: 0,
+          cashSales: 0,
+          gasExpense: 0,
+          wages: [],
+          shopping: [],
+          freshFood: {
+            iceberg_lettuce: 0,
+            tomatoes: 0,
+            white_cabbage: 0,
+            red_onions: 0,
+            cucumber: 0,
+            carrots: 0
+          },
+          frozenFood: {
+            chicken_nuggets: 0,
+            bacon: 0,
+            chicken_breast: 0,
+            beef_patties: 0,
+            chicken_patties: 0,
+            french_fries: 0
+          },
+          shelfItems: {
+            burger_buns: 0,
+            ketchup: 0,
+            mayonnaise: 0,
+            mustard: 0,
+            bbq_sauce: 0,
+            cheese_slices: 0,
+            cooking_oil: 0
+          },
+          kitchenItems: {
+            paper_towels: 0,
+            aluminum_foil: 0,
+            plastic_gloves: 0,
+            kitchen_cleaner: 0,
+            sanitizer: 0
+          },
+          packagingItems: {
+            fries_boxes: 0,
+            small_bags: 0,
+            large_bags: 0,
+            paper_bags: 0,
+            loaded_fries_boxes: 0,
+            labels: 0,
+            cutlery_sets: 0
+          },
+          drinkStock: {
+            coke: 0,
+            coke_zero: 0,
+            sprite: 0,
+            schweppes_manow: 0,
+            fanta_orange: 0,
+            fanta_strawberry: 0,
+            soda_water: 0,
+            bottled_water: 0,
+            kids_orange: 0,
+            kids_apple: 0
+          },
+          notes: '',
+          discrepancyNotes: '',
+          isDraft: false
+        });
+        
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error ${response.status}`);
       }
+
+    } catch (error: any) {
+      console.error('Submission failed:', error);
+      
+      // Save to localStorage as backup
+      localStorage.setItem('emergencyFormBackup', JSON.stringify(submitData));
+      
+      setSubmissionResult({
+        success: false,
+        message: `Submission failed: ${error.message}. Your data is saved locally as backup.`
+      });
+      setShowFailurePage(true);
+      setErrorMessage(error.message);
     }
     
     setIsSubmitting(false);
   };
 
-  // PDF Generation Functions
-  const handleGenerateAndDownloadPDF = () => {
-    try {
-      const pdfDoc = generateDailyShiftPDF(formData);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `daily-shift-report-${timestamp}.pdf`;
-      downloadPDF(pdfDoc, filename);
-      
-      toast({
-        title: "PDF Downloaded",
-        description: `Report saved as ${filename}`,
-        variant: "default",
-      });
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Auto-dismiss success/failure pages after 10 seconds
+  // Auto-dismiss success/failure pages
   useEffect(() => {
     if (showSuccessPage || showFailurePage) {
       const timer = setTimeout(() => {
@@ -569,11 +481,8 @@ const DailyShiftForm = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Form Submitted Successfully</h2>
           <p className="text-gray-600 mb-2">{submissionResult?.message}</p>
           <p className="text-sm text-gray-500 mb-6">
-            Your daily shift form has been saved to the database and is now available for reports and analysis.
+            Your daily shift form has been saved and an email notification sent to management.
           </p>
-          <div className="text-xs text-gray-400 mb-4">
-            This page will automatically close in 10 seconds...
-          </div>
           <Button 
             onClick={() => {
               setShowSuccessPage(false);
@@ -581,7 +490,7 @@ const DailyShiftForm = () => {
             }}
             className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
           >
-            Continue to New Form
+            Create New Form
           </Button>
         </div>
       </div>
@@ -598,11 +507,8 @@ const DailyShiftForm = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Form Not Submitted</h2>
           <p className="text-gray-600 mb-2">{submissionResult?.message}</p>
           <p className="text-sm text-gray-500 mb-6">
-            Please check your data and try again. If the problem persists, contact support.
+            Please check your data and try again. Your data has been saved locally as backup.
           </p>
-          <div className="text-xs text-gray-400 mb-4">
-            This page will automatically close in 10 seconds...
-          </div>
           <Button 
             onClick={() => {
               setShowFailurePage(false);
@@ -618,24 +524,15 @@ const DailyShiftForm = () => {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto p-6 space-y-8">
+    <div className="container max-w-6xl mx-auto p-6 space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
-        <p className="text-gray-600">Complete daily shift reporting with authentic inventory tracking</p>
-        {/* Debug info - remove once working */}
-        <div className="text-xs text-blue-500 mt-2">
-          Form Version: v2.0 - Draft Button Enabled | Debug: isDraftSaving={isDraftSaving.toString()}
-        </div>
+        <p className="text-gray-600">Complete daily shift reporting with full inventory tracking</p>
       </div>
 
       {errorMessage && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           <strong>Error:</strong> {errorMessage}
-          <p className="mt-2 text-sm">
-            <strong>Troubleshooting:</strong> Check if all number fields contain valid numbers (not text). 
-            Empty fields are okay, but text in number fields causes database errors. 
-            If the issue persists, verify all inventory quantities are numbers.
-          </p>
         </div>
       )}
 
@@ -649,19 +546,20 @@ const DailyShiftForm = () => {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="completedBy">Completed By</Label>
+                <Label htmlFor="completedBy">Completed By *</Label>
                 <Input
                   id="completedBy"
                   value={formData.completedBy}
                   onChange={(e) => setFormData(prev => ({ ...prev, completedBy: e.target.value }))}
+                  placeholder="Enter your name"
                   required
                 />
               </div>
               <div>
                 <Label htmlFor="shiftType">Shift Type</Label>
-                <Select onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
+                <Select value={formData.shiftType} onValueChange={(value) => setFormData(prev => ({ ...prev, shiftType: value }))}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select shift type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="day">Day Shift</SelectItem>
@@ -684,10 +582,67 @@ const DailyShiftForm = () => {
           </CardContent>
         </Card>
 
-        {/* 2. Sales */}
+        {/* 2. Cash Management */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Sales</CardTitle>
+            <CardTitle className="text-lg text-gray-900">Cash Management</CardTitle>
+            <CardDescription>Cash flow and banking information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="startingCash">Starting Cash (฿)</Label>
+                <Input
+                  id="startingCash"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.startingCash}
+                  onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endingCash">Ending Cash (฿)</Label>
+                <Input
+                  id="endingCash"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.endingCash}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
+                <Input
+                  id="bankedAmount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.bankedAmount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+            
+            {/* Cash Summary */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">Cash Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>Calculated Ending Cash: <span className="font-bold">฿{calculatedEndingCash.toLocaleString()}</span></div>
+                <div>Actual Ending Cash: <span className="font-bold">฿{formData.endingCash.toLocaleString()}</span></div>
+                <div className={`col-span-2 ${Math.abs(calculatedEndingCash - formData.endingCash) > 100 ? 'text-red-600' : 'text-green-600'}`}>
+                  Difference: <span className="font-bold">฿{Math.abs(calculatedEndingCash - formData.endingCash).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. Sales Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Sales Information</CardTitle>
             <CardDescription>Revenue breakdown by platform</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -739,7 +694,7 @@ const DailyShiftForm = () => {
             </div>
             
             {/* Sales Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-green-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-2">Sales Summary</h3>
               <div className="text-2xl font-bold text-green-600">
                 Total Sales: ฿{totalSales.toLocaleString()}
@@ -748,341 +703,859 @@ const DailyShiftForm = () => {
           </CardContent>
         </Card>
 
-        {/* 3. Expenses */}
+        {/* 4. Gas Expense */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Expenses</CardTitle>
-            <CardDescription>Wages, shopping, and operational expenses</CardDescription>
+            <CardTitle className="text-lg text-gray-900">Gas Expense</CardTitle>
+            <CardDescription>Gas and fuel costs</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Wages & Staff Payments */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Wages & Staff Payments</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Wage Entry
-                </Button>
-              </div>
-              
-              {formData.wages.map((wage, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Staff Name</Label>
-                    <Input
-                      value={wage.name}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].name = e.target.value;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={wage.amount}
-                      onChange={(e) => {
-                        const newWages = [...formData.wages];
-                        newWages[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, wages: newWages }));
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Type</Label>
-                    <Select onValueChange={(value) => {
-                      const newWages = [...formData.wages];
-                      newWages[index].type = value;
-                      setFormData(prev => ({ ...prev, wages: newWages }));
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Wages">Wages</SelectItem>
-                        <SelectItem value="Bonus">Bonus</SelectItem>
-                        <SelectItem value="Overtime">Overtime</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeWageEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Shopping & Expenses */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Shopping & Expenses</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Shopping Entry
-                </Button>
-              </div>
-              
-              {formData.shopping.map((item, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>Item/Expense</Label>
-                    <Input
-                      value={item.item}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].item = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Amount (฿)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.amount}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].amount = parseFloat(e.target.value) || 0;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label>Shop/Source</Label>
-                    <Input
-                      value={item.shop}
-                      onChange={(e) => {
-                        const newShopping = [...formData.shopping];
-                        newShopping[index].shop = e.target.value;
-                        setFormData(prev => ({ ...prev, shopping: newShopping }));
-                      }}
-
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeShoppingEntry(index)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Expense Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Expense Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>Total Wages: ฿{totalWages.toLocaleString()}</div>
-                <div>Total Shopping: ฿{totalShopping.toLocaleString()}</div>
-                <div className="text-lg font-bold text-red-600">Total Expenses: ฿{totalExpenses.toLocaleString()}</div>
-              </div>
+          <CardContent>
+            <div className="max-w-sm">
+              <Label htmlFor="gasExpense">Gas Expense (฿)</Label>
+              <Input
+                id="gasExpense"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.gasExpense}
+                onChange={(e) => setFormData(prev => ({ ...prev, gasExpense: parseFloat(e.target.value) || 0 }))}
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* 4. Cash Management */}
+        {/* 5. Wages & Staff Payments */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Cash Management</CardTitle>
-            <CardDescription>Cash flow tracking and reconciliation</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-lg text-gray-900">Wages & Staff Payments</CardTitle>
+                <CardDescription>Staff wages, bonuses, and payments</CardDescription>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addWageEntry}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Wage Entry
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="startingCash">Starting Cash (฿)</Label>
-                <Input
-                  id="startingCash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.startingCash}
-                  onChange={(e) => setFormData(prev => ({ ...prev, startingCash: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="endingCash">Ending Cash (฿)</Label>
-                <Input
-                  id="endingCash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.endingCash}
-                  onChange={(e) => setFormData(prev => ({ ...prev, endingCash: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bankedAmount">Banked Amount (฿)</Label>
-                <Input
-                  id="bankedAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.bankedAmount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bankedAmount: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 5. Stock Counts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Stock Counts</CardTitle>
-            <CardDescription>Current inventory levels</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Stock Count - Rolls & Meat */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Stock Count</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="burgerRollsStock">Burger Rolls Stock</Label>
+            {formData.wages.map((wage, index) => (
+              <div key={index} className="flex gap-4 items-end p-4 border rounded-lg">
+                <div className="flex-1">
+                  <Label>Staff Name</Label>
                   <Input
-                    id="burgerRollsStock"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.inventory["Burger Rolls Stock"] || ''}
-                    onChange={(e) =>
-                      setFormData(prev => ({
-                        ...prev,
-                        inventory: {
-                          ...prev.inventory,
-                          ["Burger Rolls Stock"]: parseInt(e.target.value) || 0
-                        }
-                      }))
-                    }
+                    value={wage.name}
+                    onChange={(e) => {
+                      const newWages = [...formData.wages];
+                      newWages[index].name = e.target.value;
+                      setFormData(prev => ({ ...prev, wages: newWages }));
+                    }}
+                    placeholder="Enter staff name"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="meatStock">Meat Stock (kg)</Label>
+                <div className="flex-1">
+                  <Label>Amount (฿)</Label>
                   <Input
-                    id="meatStock"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.inventory["Meat Stock"] || ''}
-                    onChange={(e) =>
-                      setFormData(prev => ({
-                        ...prev,
-                        inventory: {
-                          ...prev.inventory,
-                          ["Meat Stock"]: parseFloat(e.target.value) || 0
-                        }
-                      }))
-                    }
+                    value={wage.amount}
+                    onChange={(e) => {
+                      const newWages = [...formData.wages];
+                      newWages[index].amount = parseFloat(e.target.value) || 0;
+                      setFormData(prev => ({ ...prev, wages: newWages }));
+                    }}
                   />
                 </div>
+                <div className="flex-1">
+                  <Label>Type</Label>
+                  <Select value={wage.type} onValueChange={(value) => {
+                    const newWages = [...formData.wages];
+                    newWages[index].type = value;
+                    setFormData(prev => ({ ...prev, wages: newWages }));
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Wages">Wages</SelectItem>
+                      <SelectItem value="Bonus">Bonus</SelectItem>
+                      <SelectItem value="Overtime">Overtime</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeWageEntry(index)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
-            </div>
-
-            {/* Drinks */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Drinks</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {drinkStock.map((drink) => (
-                  <div key={drink.name}>
-                    <Label>{drink.name}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.inventory[drink.name] || ''}
-                      onChange={(e) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          inventory: {
-                            ...prev.inventory,
-                            [drink.name]: parseInt(e.target.value) || 0
-                          }
-                        }));
-                      }}
-                    />
-                  </div>
-                ))}
+            ))}
+            
+            {formData.wages.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No wage entries added yet. Click "Add Wage Entry" to add staff payments.
+              </div>
+            )}
+            
+            {/* Wages Summary */}
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">Wages Summary</h3>
+              <div className="text-xl font-bold text-yellow-600">
+                Total Wages: ฿{totalWages.toLocaleString()}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* 6. Inventory Categories */}
-        {Object.entries(inventoryCategories).map(([category, items]) => (
-          <Card key={category}>
-            <CardHeader>
-              <CardTitle className="text-lg text-gray-900">{category}</CardTitle>
-              <CardDescription>Authentic supplier inventory tracking</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {items.map((item) => (
-                  <div key={item.name}>
-                    <Label className="text-sm">{item.name}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.inventory[item.name] || ''}
-                      onChange={(e) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          inventory: {
-                            ...prev.inventory,
-                            [item.name]: parseInt(e.target.value) || 0
-                          }
-                        }));
-                      }}
-                    />
-                  </div>
-                ))}
+        {/* 6. Shopping & Expenses */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-lg text-gray-900">Shopping & Expenses</CardTitle>
+                <CardDescription>Shopping items and operational expenses</CardDescription>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <Button type="button" variant="outline" size="sm" onClick={addShoppingEntry}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Shopping Entry
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.shopping.map((item, index) => (
+              <div key={index} className="flex gap-4 items-end p-4 border rounded-lg">
+                <div className="flex-1">
+                  <Label>Item</Label>
+                  <Input
+                    value={item.item}
+                    onChange={(e) => {
+                      const newShopping = [...formData.shopping];
+                      newShopping[index].item = e.target.value;
+                      setFormData(prev => ({ ...prev, shopping: newShopping }));
+                    }}
+                    placeholder="Enter item name"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>Amount (฿)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.amount}
+                    onChange={(e) => {
+                      const newShopping = [...formData.shopping];
+                      newShopping[index].amount = parseFloat(e.target.value) || 0;
+                      setFormData(prev => ({ ...prev, shopping: newShopping }));
+                    }}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>Shop</Label>
+                  <Input
+                    value={item.shop}
+                    onChange={(e) => {
+                      const newShopping = [...formData.shopping];
+                      newShopping[index].shop = e.target.value;
+                      setFormData(prev => ({ ...prev, shopping: newShopping }));
+                    }}
+                    placeholder="Enter shop name"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeShoppingEntry(index)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            
+            {formData.shopping.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No shopping entries added yet. Click "Add Shopping Entry" to add expenses.
+              </div>
+            )}
+            
+            {/* Shopping Summary */}
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">Shopping Summary</h3>
+              <div className="text-xl font-bold text-orange-600">
+                Total Shopping: ฿{totalShopping.toLocaleString()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Submit Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Button 
+        {/* 7. Fresh Food Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Fresh Food Stock</CardTitle>
+            <CardDescription>Fresh ingredients and produce inventory</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Iceberg Lettuce (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.iceberg_lettuce}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, iceberg_lettuce: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Tomatoes (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.tomatoes}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, tomatoes: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>White Cabbage (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.white_cabbage}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, white_cabbage: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Red Onions (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.red_onions}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, red_onions: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Cucumber (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.cucumber}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, cucumber: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Carrots (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.freshFood.carrots}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    freshFood: { ...prev.freshFood, carrots: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 8. Frozen Food Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Frozen Food Stock</CardTitle>
+            <CardDescription>Frozen ingredients and protein inventory</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Chicken Nuggets (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.chicken_nuggets}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, chicken_nuggets: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Bacon (500g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.bacon}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, bacon: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Chicken Breast (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.chicken_breast}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, chicken_breast: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Beef Patties (10 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.beef_patties}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, beef_patties: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Chicken Patties (10 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.chicken_patties}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, chicken_patties: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>French Fries (2.5kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.frozenFood.french_fries}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    frozenFood: { ...prev.frozenFood, french_fries: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 9. Shelf Items Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Shelf Items Stock</CardTitle>
+            <CardDescription>Pantry items and condiments inventory</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Burger Buns (8 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.burger_buns}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, burger_buns: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Ketchup (340g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.ketchup}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, ketchup: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Mayonnaise (473ml)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.mayonnaise}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, mayonnaise: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Mustard (226g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.mustard}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, mustard: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>BBQ Sauce (510g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.bbq_sauce}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, bbq_sauce: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Cheese Slices (10 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.cheese_slices}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, cheese_slices: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Cooking Oil (1L)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.shelfItems.cooking_oil}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    shelfItems: { ...prev.shelfItems, cooking_oil: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 10. Kitchen Items Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Kitchen Items Stock</CardTitle>
+            <CardDescription>Kitchen supplies and cleaning materials</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Paper Towels (6 rolls)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.kitchenItems.paper_towels}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    kitchenItems: { ...prev.kitchenItems, paper_towels: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Aluminum Foil (90m)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.kitchenItems.aluminum_foil}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    kitchenItems: { ...prev.kitchenItems, aluminum_foil: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Plastic Gloves (24 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.kitchenItems.plastic_gloves}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    kitchenItems: { ...prev.kitchenItems, plastic_gloves: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Kitchen Cleaner (3.5L)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.kitchenItems.kitchen_cleaner}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    kitchenItems: { ...prev.kitchenItems, kitchen_cleaner: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Sanitizer (450g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.kitchenItems.sanitizer}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    kitchenItems: { ...prev.kitchenItems, sanitizer: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 11. Packaging Items Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Packaging Items Stock</CardTitle>
+            <CardDescription>Packaging materials and supplies</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Fries Boxes (50 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.fries_boxes}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, fries_boxes: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Small Bags (6×14) (500 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.small_bags}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, small_bags: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Large Bags (9×18) (500 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.large_bags}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, large_bags: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Paper Bags (50 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.paper_bags}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, paper_bags: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Loaded Fries Boxes (50 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.loaded_fries_boxes}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, loaded_fries_boxes: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Labels (45 per sheet)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.labels}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, labels: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Cutlery Sets (50 pieces)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.packagingItems.cutlery_sets}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    packagingItems: { ...prev.packagingItems, cutlery_sets: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 12. Drink Stock */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Drink Stock</CardTitle>
+            <CardDescription>Beverage inventory</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label>Coke (24 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.coke}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, coke: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Coke Zero (24 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.coke_zero}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, coke_zero: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Sprite (24 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.sprite}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, sprite: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Schweppes Manow (6 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.schweppes_manow}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, schweppes_manow: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Fanta Orange (6 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.fanta_orange}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, fanta_orange: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Fanta Strawberry (6 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.fanta_strawberry}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, fanta_strawberry: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Soda Water (6 cans)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.soda_water}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, soda_water: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Bottled Water (12 bottles)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.bottled_water}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, bottled_water: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Kids Orange Juice (6 boxes)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.kids_orange}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, kids_orange: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+              <div>
+                <Label>Kids Apple Juice (6 boxes)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.drinkStock.kids_apple}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    drinkStock: { ...prev.drinkStock, kids_apple: parseFloat(e.target.value) || 0 }
+                  }))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 13. Notes and Comments */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Notes and Comments</CardTitle>
+            <CardDescription>Additional notes and observations</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="notes">General Notes</Label>
+              <Textarea
+                id="notes"
+                rows={4}
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter any additional notes or observations about the shift..."
+              />
+            </div>
+            <div>
+              <Label htmlFor="discrepancyNotes">Discrepancy Notes</Label>
+              <Textarea
+                id="discrepancyNotes"
+                rows={3}
+                value={formData.discrepancyNotes}
+                onChange={(e) => setFormData(prev => ({ ...prev, discrepancyNotes: e.target.value }))}
+                placeholder="Enter any discrepancies or issues that need attention..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 14. Total Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-gray-900">Total Summary</CardTitle>
+            <CardDescription>Complete financial overview</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-green-50 p-4 rounded-lg text-center">
+                <h3 className="font-semibold text-green-800 mb-2">Total Sales</h3>
+                <p className="text-2xl font-bold text-green-600">฿{totalSales.toLocaleString()}</p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                <h3 className="font-semibold text-yellow-800 mb-2">Total Wages</h3>
+                <p className="text-2xl font-bold text-yellow-600">฿{totalWages.toLocaleString()}</p>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg text-center">
+                <h3 className="font-semibold text-orange-800 mb-2">Total Shopping</h3>
+                <p className="text-2xl font-bold text-orange-600">฿{totalShopping.toLocaleString()}</p>
+              </div>
+              <div className="bg-red-50 p-4 rounded-lg text-center">
+                <h3 className="font-semibold text-red-800 mb-2">Total Expenses</h3>
+                <p className="text-2xl font-bold text-red-600">฿{totalExpenses.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            <div className="mt-6 bg-blue-50 p-6 rounded-lg">
+              <h3 className="text-xl font-bold text-blue-800 mb-4">Net Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-lg">
+                <div>Net Revenue: <span className="font-bold">฿{(totalSales - totalExpenses).toLocaleString()}</span></div>
+                <div>Cash Difference: <span className={`font-bold ${Math.abs(calculatedEndingCash - formData.endingCash) > 100 ? 'text-red-600' : 'text-green-600'}`}>฿{(formData.endingCash - calculatedEndingCash).toLocaleString()}</span></div>
+                <div>Banked Today: <span className="font-bold">฿{formData.bankedAmount.toLocaleString()}</span></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 15. Form Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-end">
+          <Button
             type="button"
+            variant="outline"
             onClick={saveDraft}
-            disabled={isDraftSaving || isSubmitting}
-            className="bg-gray-200 text-black hover:bg-gray-300 px-8 py-3 text-lg font-semibold border-0"
+            disabled={isDraftSaving}
+            size="lg"
           >
-            {isDraftSaving ? "Saving..." : "Save Draft"}
+            <Save className="w-5 h-5 mr-2" />
+            {isDraftSaving ? 'Saving Draft...' : 'Save Draft'}
           </Button>
-          <Button 
-            type="button"
-            onClick={handleGenerateAndDownloadPDF}
-            disabled={isSubmitting || isDraftSaving}
-            className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 text-lg font-semibold border-0"
+          
+          <Button
+            type="submit"
+            disabled={isSubmitting || !formData.completedBy?.trim()}
+            size="lg"
+            className="bg-green-600 hover:bg-green-700 text-white min-w-[200px]"
           >
-            Download PDF
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={isSubmitting || isDraftSaving}
-            className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold border-0"
-          >
-            {isSubmitting ? "Submitting..." : "Submit Form"}
+            <CheckCircle className="w-5 h-5 mr-2" />
+            {isSubmitting ? 'Submitting Form...' : 'Submit Complete Form'}
           </Button>
         </div>
+        
+        {/* Form validation message */}
+        {!formData.completedBy?.trim() && (
+          <div className="text-center text-red-600 text-sm">
+            Please enter who completed this form before submitting
+          </div>
+        )}
       </form>
 
-      {/* Jussi Chat Bubble for Operations Support */}
       <JussiChatBubble />
     </div>
   );
