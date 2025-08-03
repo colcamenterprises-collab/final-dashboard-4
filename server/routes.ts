@@ -3105,6 +3105,93 @@ ${combinedText.slice(0, 10000)}`; // Limit text to avoid token limits
     }
   });
 
+  // Email Individual Form API
+  app.post('/api/email-individual-form', async (req: Request, res: Response) => {
+    try {
+      const { to, subject, formData } = req.body;
+      
+      // Import email service
+      const { EmailService } = await import('./services/emailService');
+      const emailService = new EmailService();
+      
+      // Create email content
+      const emailContent = `
+DAILY SALES & STOCK FORM
+========================
+
+Shift Information:
+- Completed By: ${formData.completedBy}
+- Shift Type: ${formData.shiftType}
+- Shift Date: ${formData.shiftDate}
+
+Cash Management:
+- Starting Cash: ฿${formData.startingCash?.toLocaleString() || '0'}
+- Ending Cash: ฿${formData.endingCash?.toLocaleString() || '0'}
+- Banked Amount: ฿${formData.bankedAmount?.toLocaleString() || '0'}
+
+Sales Information:
+- Grab Sales: ฿${formData.grabSales?.toLocaleString() || '0'}
+- Aroi Dee Sales: ฿${formData.aroiDeeSales?.toLocaleString() || '0'}
+- QR Scan Sales: ฿${formData.qrScanSales?.toLocaleString() || '0'}
+- Cash Sales: ฿${formData.cashSales?.toLocaleString() || '0'}
+- TOTAL SALES: ฿${formData.totalSales?.toLocaleString() || '0'}
+
+Gas Expense: ฿${formData.gasExpense?.toLocaleString() || '0'}
+
+Wages & Staff Payments:
+${formData.wages?.map((w: any) => `- ${w.name}: ฿${w.amount?.toLocaleString() || '0'} (${w.type})`).join('\n') || 'No wage entries'}
+Total Wages: ฿${formData.totalWages?.toLocaleString() || '0'}
+
+Shopping & Expenses:
+${formData.shopping?.map((s: any) => `- ${s.item}: ฿${s.amount?.toLocaleString() || '0'} (${s.shop})`).join('\n') || 'No shopping entries'}
+Total Shopping: ฿${formData.totalShopping?.toLocaleString() || '0'}
+
+TOTAL EXPENSES: ฿${formData.totalExpenses?.toLocaleString() || '0'}
+NET REVENUE: ฿${formData.netRevenue?.toLocaleString() || '0'}
+
+Fresh Food Stock:
+${Object.entries(formData.freshFood || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Frozen Food Stock:
+${Object.entries(formData.frozenFood || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Shelf Items Stock:
+${Object.entries(formData.shelfItems || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Kitchen Items Stock:
+${Object.entries(formData.kitchenItems || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Packaging Items Stock:
+${Object.entries(formData.packagingItems || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Drink Stock:
+${Object.entries(formData.drinkStock || {}).map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`).join('\n')}
+
+Notes: ${formData.notes || 'No notes'}
+Discrepancy Notes: ${formData.discrepancyNotes || 'No discrepancy notes'}
+
+Generated: ${new Date().toLocaleString()}
+      `;
+
+      // Send email
+      const result = await emailService.sendEmail({
+        to: to || 'colcamenterprises@gmail.com',
+        subject: subject || 'Daily Shift Form',
+        text: emailContent,
+        html: emailContent.replace(/\n/g, '<br>')
+      });
+
+      if (result.success) {
+        res.json({ success: true, message: 'Email sent successfully' });
+      } else {
+        throw new Error(result.error || 'Email sending failed');
+      }
+    } catch (error) {
+      console.error('Error sending individual form email:', error);
+      res.status(500).json({ error: 'Failed to send email', details: (error as Error).message });
+    }
+  });
+
   // Stock Lodge API (Quick Lodge for Burger Buns, Drinks, Meat)
   app.post('/api/lodge-stock', async (req: Request, res: Response) => {
     try {

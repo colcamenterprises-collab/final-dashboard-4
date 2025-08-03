@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus, CheckCircle, XCircle, FileDown, Save } from "lucide-react";
+import { Trash2, Plus, CheckCircle, XCircle, FileDown, Save, Printer, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JussiChatBubble } from "@/components/JussiChatBubble";
 
@@ -206,6 +206,153 @@ const DailyShiftForm = () => {
   const totalShopping = formData.shopping.reduce((sum, item) => sum + (item.amount || 0), 0);
   const totalExpenses = totalWages + totalShopping + formData.gasExpense;
   const calculatedEndingCash = formData.startingCash + totalSales - totalExpenses - formData.bankedAmount;
+
+  // PDF Generation Function
+  const generateAndDownloadPDF = () => {
+    try {
+      // Create PDF content
+      const pdfContent = `
+DAILY SALES & STOCK FORM
+========================
+
+Shift Information:
+- Completed By: ${formData.completedBy}
+- Shift Type: ${formData.shiftType}
+- Shift Date: ${formData.shiftDate}
+
+Cash Management:
+- Starting Cash: ฿${formData.startingCash.toLocaleString()}
+- Ending Cash: ฿${formData.endingCash.toLocaleString()}
+- Banked Amount: ฿${formData.bankedAmount.toLocaleString()}
+
+Sales Information:
+- Grab Sales: ฿${formData.grabSales.toLocaleString()}
+- Aroi Dee Sales: ฿${formData.aroiDeeSales.toLocaleString()}
+- QR Scan Sales: ฿${formData.qrScanSales.toLocaleString()}
+- Cash Sales: ฿${formData.cashSales.toLocaleString()}
+- TOTAL SALES: ฿${totalSales.toLocaleString()}
+
+Gas Expense: ฿${formData.gasExpense.toLocaleString()}
+
+Wages & Staff Payments:
+${formData.wages.map(w => `- ${w.name}: ฿${w.amount.toLocaleString()} (${w.type})`).join('\n')}
+Total Wages: ฿${totalWages.toLocaleString()}
+
+Shopping & Expenses:
+${formData.shopping.map(s => `- ${s.item}: ฿${s.amount.toLocaleString()} (${s.shop})`).join('\n')}
+Total Shopping: ฿${totalShopping.toLocaleString()}
+
+TOTAL EXPENSES: ฿${totalExpenses.toLocaleString()}
+NET REVENUE: ฿${(totalSales - totalExpenses).toLocaleString()}
+
+Fresh Food Stock:
+- Iceberg Lettuce: ${formData.freshFood.iceberg_lettuce}
+- Tomatoes: ${formData.freshFood.tomatoes}
+- White Cabbage: ${formData.freshFood.white_cabbage}
+- Red Onions: ${formData.freshFood.red_onions}
+- Cucumber: ${formData.freshFood.cucumber}
+- Carrots: ${formData.freshFood.carrots}
+
+Frozen Food Stock:
+- Chicken Nuggets: ${formData.frozenFood.chicken_nuggets}
+- Bacon: ${formData.frozenFood.bacon}
+- Chicken Breast: ${formData.frozenFood.chicken_breast}
+- Beef Patties: ${formData.frozenFood.beef_patties}
+- Chicken Patties: ${formData.frozenFood.chicken_patties}
+- French Fries: ${formData.frozenFood.french_fries}
+
+Notes: ${formData.notes}
+Discrepancy Notes: ${formData.discrepancyNotes}
+
+Generated: ${new Date().toLocaleString()}
+      `;
+
+      // Create and download PDF
+      const blob = new Blob([pdfContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daily-shift-form-${formData.shiftDate}-${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "PDF Generated",
+        description: "Daily shift form downloaded successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Email Individual Form Function
+  const emailIndividualForm = async () => {
+    try {
+      const emailData = {
+        to: 'colcamenterprises@gmail.com', // Default email
+        subject: `Daily Shift Form - ${formData.shiftDate} - ${formData.completedBy}`,
+        formData: {
+          completedBy: formData.completedBy,
+          shiftType: formData.shiftType,
+          shiftDate: formData.shiftDate,
+          startingCash: formData.startingCash,
+          endingCash: formData.endingCash,
+          bankedAmount: formData.bankedAmount,
+          grabSales: formData.grabSales,
+          aroiDeeSales: formData.aroiDeeSales,
+          qrScanSales: formData.qrScanSales,
+          cashSales: formData.cashSales,
+          totalSales: totalSales,
+          gasExpense: formData.gasExpense,
+          wages: formData.wages,
+          shopping: formData.shopping,
+          totalWages: totalWages,
+          totalShopping: totalShopping,
+          totalExpenses: totalExpenses,
+          netRevenue: totalSales - totalExpenses,
+          freshFood: formData.freshFood,
+          frozenFood: formData.frozenFood,
+          shelfItems: formData.shelfItems,
+          kitchenItems: formData.kitchenItems,
+          packagingItems: formData.packagingItems,
+          drinkStock: formData.drinkStock,
+          notes: formData.notes,
+          discrepancyNotes: formData.discrepancyNotes
+        }
+      };
+
+      const response = await fetch('/api/email-individual-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailData)
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Email Sent Successfully",
+          description: "Daily shift form emailed to colcamenterprises@gmail.com",
+          variant: "default",
+        });
+      } else {
+        throw new Error(`Server error: ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('Email sending failed:', error);
+      toast({
+        title: "Email Failed",
+        description: `Failed to send email: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
 
   // Save Draft Function
   const saveDraft = async () => {
@@ -1525,27 +1672,55 @@ const DailyShiftForm = () => {
         </Card>
 
         {/* 15. Form Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={saveDraft}
-            disabled={isDraftSaving}
-            size="lg"
-          >
-            <Save className="w-5 h-5 mr-2" />
-            {isDraftSaving ? 'Saving Draft...' : 'Save Draft'}
-          </Button>
-          
-          <Button
-            type="submit"
-            disabled={isSubmitting || !formData.completedBy?.trim()}
-            size="lg"
-            className="bg-green-600 hover:bg-green-700 text-white min-w-[200px]"
-          >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            {isSubmitting ? 'Submitting Form...' : 'Submit Complete Form'}
-          </Button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-between">
+          {/* Left side - PDF and Email buttons */}
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={generateAndDownloadPDF}
+              size="lg"
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              <Printer className="w-5 h-5 mr-2" />
+              Print PDF
+            </Button>
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={emailIndividualForm}
+              size="lg"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <Mail className="w-5 h-5 mr-2" />
+              Email Form
+            </Button>
+          </div>
+
+          {/* Right side - Draft and Submit buttons */}
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={saveDraft}
+              disabled={isDraftSaving}
+              size="lg"
+            >
+              <Save className="w-5 h-5 mr-2" />
+              {isDraftSaving ? 'Saving Draft...' : 'Save Draft'}
+            </Button>
+            
+            <Button
+              type="submit"
+              disabled={isSubmitting || !formData.completedBy?.trim()}
+              size="lg"
+              className="bg-green-600 hover:bg-green-700 text-white min-w-[200px]"
+            >
+              <CheckCircle className="w-5 h-5 mr-2" />
+              {isSubmitting ? 'Submitting Form...' : 'Submit Complete Form'}
+            </Button>
+          </div>
         </div>
         
         {/* Form validation message */}
