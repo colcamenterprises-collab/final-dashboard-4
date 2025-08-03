@@ -71,10 +71,10 @@ export class CronEmailService {
       const analysisData = insight.length > 0 ? insight[0] : null;
 
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate, formData, shopping, analysisData);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, shopping, analysisData);
 
       // Send email using Gmail API
-      await this.sendEmail(htmlContent, lastShiftDate);
+      await this.sendEmail(htmlContent, lastShiftDate || '');
 
       console.log(`✅ Daily management report sent for ${lastShiftDate}`);
     } catch (error) {
