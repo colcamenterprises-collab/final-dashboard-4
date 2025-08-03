@@ -1037,40 +1037,43 @@ export default function DailyStockSales() {
                           name={`shoppingEntries.${index}.item`}
                           render={({ field }) => {
                             const currentValue = field.value || '';
-                            const isDrinkItem = DRINK_ITEMS.includes(currentValue);
                             
-                            // If current value is a drink or empty, show dropdown
-                            if (currentValue === '' || isDrinkItem || currentValue === 'drinks') {
+                            // If user selected "Other", show text input
+                            if (currentValue === 'Other') {
                               return (
                                 <FormItem className="col-span-3">
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select item" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">
-                                        Drinks
-                                      </div>
-                                      {DRINK_ITEMS.map((drink) => (
-                                        <SelectItem key={drink} value={drink}>
-                                          {drink}
-                                        </SelectItem>
-                                      ))}
-                                      <SelectItem value="Other">Other</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      placeholder="Enter item name"
+                                      onChange={(e) => field.onChange(e.target.value)}
+                                    />
+                                  </FormControl>
                                 </FormItem>
                               );
                             }
                             
-                            // For non-drink items, show regular input
+                            // Default: show dropdown with drinks
                             return (
                               <FormItem className="col-span-3">
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select item" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">
+                                      Drinks
+                                    </div>
+                                    {DRINK_ITEMS.map((drink) => (
+                                      <SelectItem key={drink} value={drink}>
+                                        {drink}
+                                      </SelectItem>
+                                    ))}
+                                    <SelectItem value="Other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </FormItem>
                             );
                           }}
