@@ -51,8 +51,8 @@ class EmailService {
         throw new Error('Failed to get access token');
       }
 
-      // Use the GMAIL_USER environment variable which now contains the actual email address
-      const userEmail = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
+      // Use GOOGLE_EMAIL for the actual email address, fallback to hardcoded value
+      const userEmail = process.env.GOOGLE_EMAIL || 'colcamenterprises@gmail.com';
       
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -74,10 +74,10 @@ class EmailService {
   }
 
   private setupAppPassword() {
-    // Use the GMAIL_USER environment variable which now contains the actual email address
-    const gmailUser = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
-    // Clean up the app password by removing quotes, spaces, and other potential formatting issues
-    const gmailPassword = (process.env.GMAIL_APP_PASSWORD || '')
+    // Use GOOGLE_EMAIL for the actual email address
+    const gmailUser = process.env.GOOGLE_EMAIL || 'colcamenterprises@gmail.com';
+    // Use GOOGLE_PASSWORD for the app password, clean up formatting issues
+    const gmailPassword = (process.env.GOOGLE_PASSWORD || process.env.GMAIL_APP_PASSWORD || '')
       .replace(/["\s-]/g, '')  // Remove quotes, spaces, and dashes
       .trim();
     
