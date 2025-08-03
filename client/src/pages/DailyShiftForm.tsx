@@ -39,14 +39,60 @@ const DailyShiftForm = () => {
     // Shopping & Expenses (Dynamic Array)
     shopping: [] as Array<{ item: string; amount: number; shop: string }>,
     
-    // Stock Count - From your actual form
-    stockCount: {
-      burger_rolls_stock: 0,
-      meat_stock_kg: 0
+    // Food & Stock Items - COMPLETE INVENTORY SYSTEM
+    // Fresh Food
+    freshFood: {
+      iceberg_lettuce: 0,
+      tomatoes: 0,
+      white_cabbage: 0,
+      red_onions: 0,
+      cucumber: 0,
+      carrots: 0
     },
     
-    // Drinks - EXACT from your spreadsheet
-    drinks: {
+    // Frozen Food  
+    frozenFood: {
+      chicken_nuggets: 0,
+      bacon: 0,
+      chicken_breast: 0,
+      beef_patties: 0,
+      chicken_patties: 0,
+      french_fries: 0
+    },
+    
+    // Shelf Items
+    shelfItems: {
+      burger_buns: 0,
+      ketchup: 0,
+      mayonnaise: 0,
+      mustard: 0,
+      bbq_sauce: 0,
+      cheese_slices: 0,
+      cooking_oil: 0
+    },
+    
+    // Kitchen Items
+    kitchenItems: {
+      paper_towels: 0,
+      aluminum_foil: 0,
+      plastic_gloves: 0,
+      kitchen_cleaner: 0,
+      sanitizer: 0
+    },
+    
+    // Packaging Items
+    packagingItems: {
+      fries_boxes: 0,
+      small_bags: 0,
+      large_bags: 0,
+      paper_bags: 0,
+      loaded_fries_boxes: 0,
+      labels: 0,
+      cutlery_sets: 0
+    },
+    
+    // Drink Stock
+    drinkStock: {
       coke: 0,
       coke_zero: 0,
       sprite: 0,
@@ -55,76 +101,8 @@ const DailyShiftForm = () => {
       fanta_strawberry: 0,
       soda_water: 0,
       bottled_water: 0,
-      kids_juice_orange: 0,
-      kids_juice_apple: 0
-    },
-    
-    // Fresh Food - EXACT from your spreadsheet  
-    freshFood: {
-      topside_beef: 0,
-      brisket_point_end: 0,
-      chuck_roll_beef: 0,
-      other_beef: 0,
-      salad_iceberg_lettuce: 0,
-      milk: 0,
-      burger_bun: 0,
-      tomatoes: 0,
-      white_cabbage: 0,
-      purple_cabbage: 0,
-      onions_bulk_10kg: 0,
-      onions_small_bags: 0,
-      cheese: 0,
-      bacon_short: 0,
-      bacon_long: 0,
-      jalapenos: 0
-    },
-    
-    // Frozen Food - EXACT from your spreadsheet
-    frozenFood: {
-      french_fries_7mm: 0,
-      chicken_nuggets: 0,
-      chicken_fillets: 0,
-      sweet_potato_fries: 0
-    },
-    
-    // Shelf Items - EXACT from your spreadsheet
-    shelfItems: {
-      cajun_fries_seasoning: 0,
-      crispy_fried_onions: 0,
-      pickles_standard_dill: 0,
-      pickles_sweet: 0,
-      mustard: 0,
-      mayonnaise: 0,
-      tomato_sauce: 0,
-      bbq_sauce: 0,
-      sriracha_sauce: 0,
-      salt_coarse_sea_salt: 0
-    },
-    
-    // Kitchen Supplies - EXACT from your spreadsheet
-    kitchenSupplies: {
-      oil_fryer: 0,
-      plastic_food_wrap: 0,
-      paper_towel_long: 0,
-      paper_towel_short_serviettes: 0,
-      food_gloves_large: 0,
-      food_gloves_medium: 0,
-      food_gloves_small: 0,
-      aluminum_foil: 0,
-      plastic_meat_gloves: 0,
-      kitchen_cleaner: 0,
-      alcohol_sanitiser: 0
-    },
-    
-    // Packaging - EXACT from your spreadsheet
-    packaging: {
-      french_fries_box: 0,
-      plastic_carry_bags_6x14: 0,
-      plastic_carry_bags_9x18: 0,
-      brown_paper_food_bags: 0,
-      loaded_fries_boxes: 0,
-      packaging_labels: 0,
-      knife_fork_spoon_set: 0
+      kids_orange: 0,
+      kids_apple: 0
     },
     
     // Notes and Comments
