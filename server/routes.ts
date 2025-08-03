@@ -1501,10 +1501,68 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // ─── Email Management endpoints ───────────────────────────────
-  app.post("/api/email/send-daily-report", async (_req: Request, res: Response) => {
+  app.post("/api/email/send-daily-report", async (req: Request, res: Response) => {
     try {
-      const { cronEmailService } = await import("./services/cronEmailService");
-      await cronEmailService.sendTestReport();
+      const { formId } = req.body;
+      console.log("📧 Email request received with formId:", formId);
+      
+      // If formId provided, fetch authentic data from database
+      if (formId) {
+        console.log("📊 Fetching authentic Form", formId, "from database...");
+        const [form] = await db.select().from(dailyStockSales).where(eq(dailyStockSales.id, formId)).limit(1);
+        
+        if (!form) {
+          console.log("❌ Form", formId, "not found in database");
+          return res.status(404).json({ error: "Form not found" });
+        }
+
+        console.log("✅ Found authentic Form", formId, "- Total Sales:", form.totalSales);
+
+        // Use authentic form data from database
+        const reportData = {
+          id: form.id,
+          completedBy: form.completedBy,
+          shiftType: form.shiftType,
+          shiftDate: form.shiftDate,
+          totalSales: Number(form.totalSales),
+          cashSales: Number(form.cashSales),
+          grabSales: Number(form.grabSales),
+          qrScanSales: Number(form.qrScanSales),
+          aroiDeeSales: Number(form.aroiDeeSales),
+          startingCash: Number(form.startingCash),
+          endingCash: Number(form.endingCash),
+          bankedAmount: Number(form.bankedAmount),
+          totalExpenses: Number(form.totalExpenses),
+          numberNeeded: typeof form.numberNeeded === 'string' ? JSON.parse(form.numberNeeded) : form.numberNeeded,
+          wages: typeof form.wages === 'string' ? JSON.parse(form.wages) : form.wages,
+          shopping: typeof form.shopping === 'string' ? JSON.parse(form.shopping) : form.shopping
+        };
+
+        // Generate expense description from authentic data
+        let expenseDescription = '';
+        if (reportData.wages && Array.isArray(reportData.wages)) {
+          const wageDetails = reportData.wages.map((w: any) => `${w.name} (${w.amount})`).join(', ');
+          expenseDescription += `Wages: ${wageDetails}. `;
+        }
+        if (reportData.shopping && Array.isArray(reportData.shopping)) {
+          const shoppingDetails = reportData.shopping.map((s: any) => `${s.item} (${s.amount})`).join(', ');
+          expenseDescription += `Shopping: ${shoppingDetails}.`;
+        }
+        reportData.expenseDescription = expenseDescription;
+
+        console.log("📧 Sending email with AUTHENTIC data - Sales:", reportData.totalSales);
+        
+        // Send email with authentic data
+        const { emailService } = await import("./services/emailService");
+        await emailService.sendDailyShiftReport(reportData, Buffer.from('PDF placeholder'));
+        
+      } else {
+        console.log("⚠️ No formId provided - using legacy test report (should be avoided)");
+        // Legacy test report call (should be avoided)
+        const { cronEmailService } = await import("./services/cronEmailService");
+        await cronEmailService.sendTestReport();
+      }
+      
       res.json({ success: true, message: "Daily report sent" });
     } catch (err) {
       console.error("Error sending daily report:", err);
