@@ -207,76 +207,102 @@ const DailyShiftForm = () => {
   const totalExpenses = totalWages + totalShopping + formData.gasExpense;
   const calculatedEndingCash = formData.startingCash + totalSales - totalExpenses - formData.bankedAmount;
 
-  // PDF Generation Function
+  // PDF Generation Function with proper A4 sizing
   const generateAndDownloadPDF = () => {
     try {
-      // Create PDF content
-      const pdfContent = `
-DAILY SALES & STOCK FORM
-========================
+      const { jsPDF } = require('jspdf');
+      require('jspdf-autotable');
+      
+      // Create A4 PDF document
+      const doc = new jsPDF('portrait', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 20;
 
-Shift Information:
-- Completed By: ${formData.completedBy}
-- Shift Type: ${formData.shiftType}
-- Shift Date: ${formData.shiftDate}
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DAILY SALES & STOCK FORM', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
 
-Cash Management:
-- Starting Cash: ฿${formData.startingCash.toLocaleString()}
-- Ending Cash: ฿${formData.endingCash.toLocaleString()}
-- Banked Amount: ฿${formData.bankedAmount.toLocaleString()}
+      // Shift Information
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Shift Information:', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Completed By: ${formData.completedBy}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Shift Type: ${formData.shiftType}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Shift Date: ${formData.shiftDate}`, 25, yPosition);
+      yPosition += 12;
 
-Sales Information:
-- Grab Sales: ฿${formData.grabSales.toLocaleString()}
-- Aroi Dee Sales: ฿${formData.aroiDeeSales.toLocaleString()}
-- QR Scan Sales: ฿${formData.qrScanSales.toLocaleString()}
-- Cash Sales: ฿${formData.cashSales.toLocaleString()}
-- TOTAL SALES: ฿${totalSales.toLocaleString()}
+      // Cash Management
+      doc.setFont('helvetica', 'bold');
+      doc.text('Cash Management:', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Starting Cash: ${formData.startingCash.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Ending Cash: ${formData.endingCash.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Banked Amount: ${formData.bankedAmount.toLocaleString()}`, 25, yPosition);
+      yPosition += 12;
 
-Gas Expense: ฿${formData.gasExpense.toLocaleString()}
+      // Sales Information
+      doc.setFont('helvetica', 'bold');
+      doc.text('Sales Information:', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Grab Sales: ${formData.grabSales.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Aroi Dee Sales: ${formData.aroiDeeSales.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`QR Scan Sales: ${formData.qrScanSales.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Cash Sales: ${formData.cashSales.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(`TOTAL SALES: ${totalSales.toLocaleString()}`, 25, yPosition);
+      yPosition += 12;
 
-Wages & Staff Payments:
-${formData.wages.map(w => `- ${w.name}: ฿${w.amount.toLocaleString()} (${w.type})`).join('\n')}
-Total Wages: ฿${totalWages.toLocaleString()}
+      // Check if we need a new page
+      if (yPosition > pageHeight - 50) {
+        doc.addPage();
+        yPosition = 20;
+      }
 
-Shopping & Expenses:
-${formData.shopping.map(s => `- ${s.item}: ฿${s.amount.toLocaleString()} (${s.shop})`).join('\n')}
-Total Shopping: ฿${totalShopping.toLocaleString()}
+      // Expenses
+      doc.setFont('helvetica', 'bold');
+      doc.text('Expenses:', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Gas Expense: ${formData.gasExpense.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Total Wages: ${totalWages.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`Total Shopping: ${totalShopping.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(`TOTAL EXPENSES: ${totalExpenses.toLocaleString()}`, 25, yPosition);
+      yPosition += 6;
+      doc.text(`NET REVENUE: ${(totalSales - totalExpenses).toLocaleString()}`, 25, yPosition);
+      yPosition += 15;
 
-TOTAL EXPENSES: ฿${totalExpenses.toLocaleString()}
-NET REVENUE: ฿${(totalSales - totalExpenses).toLocaleString()}
+      // Footer
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, pageHeight - 10);
 
-Fresh Food Stock:
-- Iceberg Lettuce: ${formData.freshFood.iceberg_lettuce}
-- Tomatoes: ${formData.freshFood.tomatoes}
-- White Cabbage: ${formData.freshFood.white_cabbage}
-- Red Onions: ${formData.freshFood.red_onions}
-- Cucumber: ${formData.freshFood.cucumber}
-- Carrots: ${formData.freshFood.carrots}
-
-Frozen Food Stock:
-- Chicken Nuggets: ${formData.frozenFood.chicken_nuggets}
-- Bacon: ${formData.frozenFood.bacon}
-- Chicken Breast: ${formData.frozenFood.chicken_breast}
-- Beef Patties: ${formData.frozenFood.beef_patties}
-- Chicken Patties: ${formData.frozenFood.chicken_patties}
-- French Fries: ${formData.frozenFood.french_fries}
-
-Notes: ${formData.notes}
-Discrepancy Notes: ${formData.discrepancyNotes}
-
-Generated: ${new Date().toLocaleString()}
-      `;
-
-      // Create and download PDF
-      const blob = new Blob([pdfContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `daily-shift-form-${formData.shiftDate}-${Date.now()}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Save the PDF
+      doc.save(`daily-shift-form-${formData.shiftDate}-${Date.now()}.pdf`);
 
       toast({
         title: "PDF Generated",
@@ -287,9 +313,22 @@ Generated: ${new Date().toLocaleString()}
       console.error('PDF generation failed:', error);
       toast({
         title: "Error",
-        description: "Failed to generate PDF",
+        description: "Failed to generate PDF. Falling back to text format.",
         variant: "destructive",
       });
+      
+      // Fallback to text format
+      const pdfContent = `DAILY SALES & STOCK FORM\n========================\n\nShift Information:\n- Completed By: ${formData.completedBy}\n- Shift Type: ${formData.shiftType}\n- Shift Date: ${formData.shiftDate}\n\nCash Management:\n- Starting Cash: ${formData.startingCash.toLocaleString()}\n- Ending Cash: ${formData.endingCash.toLocaleString()}\n- Banked Amount: ${formData.bankedAmount.toLocaleString()}\n\nSales Information:\n- Grab Sales: ${formData.grabSales.toLocaleString()}\n- Aroi Dee Sales: ${formData.aroiDeeSales.toLocaleString()}\n- QR Scan Sales: ${formData.qrScanSales.toLocaleString()}\n- Cash Sales: ${formData.cashSales.toLocaleString()}\n- TOTAL SALES: ${totalSales.toLocaleString()}\n\nGas Expense: ${formData.gasExpense.toLocaleString()}\n\nWages & Staff Payments:\n${formData.wages.map(w => `- ${w.name}: ${w.amount.toLocaleString()} (${w.type})`).join('\n')}\nTotal Wages: ${totalWages.toLocaleString()}\n\nShopping & Expenses:\n${formData.shopping.map(s => `- ${s.item}: ${s.amount.toLocaleString()} (${s.shop})`).join('\n')}\nTotal Shopping: ${totalShopping.toLocaleString()}\n\nTOTAL EXPENSES: ${totalExpenses.toLocaleString()}\nNET REVENUE: ${(totalSales - totalExpenses).toLocaleString()}\n\nGenerated: ${new Date().toLocaleString()}`;
+      
+      const blob = new Blob([pdfContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daily-shift-form-${formData.shiftDate}-${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   };
 

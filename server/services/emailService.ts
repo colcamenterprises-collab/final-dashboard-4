@@ -142,17 +142,17 @@ class EmailService {
         
         <h3>Sales Summary</h3>
         <ul>
-          <li>Total Sales: THB ${parseFloat(reportData.totalSales || '0').toFixed(2)}</li>
-          <li>Cash Sales: THB ${parseFloat(reportData.cashSales || '0').toFixed(2)}</li>
-          <li>Grab Sales: THB ${parseFloat(reportData.grabSales || '0').toFixed(2)}</li>
-          <li>QR Scan Sales: THB ${parseFloat(reportData.qrScanSales || '0').toFixed(2)}</li>
+          <li>Total Sales: ${parseFloat(reportData.totalSales || '0').toFixed(2)}</li>
+          <li>Cash Sales: ${parseFloat(reportData.cashSales || '0').toFixed(2)}</li>
+          <li>Grab Sales: ${parseFloat(reportData.grabSales || '0').toFixed(2)}</li>
+          <li>QR Scan Sales: ${parseFloat(reportData.qrScanSales || '0').toFixed(2)}</li>
         </ul>
         
         <h3>Cash Management</h3>
         <ul>
-          <li>Starting Cash: THB ${parseFloat(reportData.startingCash || '0').toFixed(2)}</li>
-          <li>Ending Cash: THB ${parseFloat(reportData.endingCash || '0').toFixed(2)}</li>
-          <li>Total Expenses: THB ${parseFloat(reportData.totalExpenses || '0').toFixed(2)}</li>
+          <li>Starting Cash: ${parseFloat(reportData.startingCash || '0').toFixed(2)}</li>
+          <li>Ending Cash: ${parseFloat(reportData.endingCash || '0').toFixed(2)}</li>
+          <li>Total Expenses: ${parseFloat(reportData.totalExpenses || '0').toFixed(2)}</li>
         </ul>
         
         <p>The complete daily shift report is attached as a PDF for your records.</p>

@@ -169,10 +169,10 @@ export default function Expenses() {
 
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
+    return num.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
   };
 
   const currentMonth = format(new Date(), 'MMMM yyyy');
@@ -537,8 +537,23 @@ export default function Expenses() {
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-2">
                       <p className="font-semibold">{formatCurrency(expense.amount)}</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs px-3 py-1 h-7 min-w-fit touch-manipulation"
+                        onClick={() => {
+                          // Simple edit functionality - could expand this later
+                          toast({
+                            title: "Edit Feature",
+                            description: "Edit functionality coming soon - for now you can add a new expense",
+                            variant: "default",
+                          });
+                        }}
+                      >
+                        Edit
+                      </Button>
                     </div>
                   </div>
                 ))}
