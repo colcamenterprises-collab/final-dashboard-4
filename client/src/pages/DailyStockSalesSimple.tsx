@@ -12,12 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save, FileText } from "lucide-react";
 
 // All inventory items
-const DRINK_ITEMS = ['Coke', 'Schweppes Manow', 'Coke Zero', 'Fanta Strawberry', 'Fanta Orange', 'Kids Apple Juice', 'Kids Orange', 'Soda Water', 'Bottle Water', 'Sprite'];
-const FRESH_FOOD_ITEMS = ['Salad', 'Tomatos', 'White Cabbage', 'Purple Cabbage', 'Onions', 'Milk', 'Butter'];
-const FROZEN_FOOD_ITEMS = ['Sweet Potato Fries', 'Chicken Nuggets', 'Chicken Fillets', 'French Fries'];
-const SHELF_ITEMS = ['Mayonnaise', 'Mustard', 'Cajun Spice', 'Dill Pickles', 'Sweet Pickles', 'Crispy Fried Onions', 'BBQ Sauce (Smokey)', 'Jalapenos', 'Ketchup', 'Chili Sauce (Sriracha)', 'Oil (Fryer)', 'Pepper', 'Salt'];
-const KITCHEN_ITEMS = ['Clear Food Wrap', 'Aluminum Foil', 'Plastic Hand Gloves (Meat)', 'Rubber Gloves (Small)', 'Rubber Gloves (Medium)', 'Rubber Gloves (Large)', 'Alcohol Sanitiser', 'Dish Washing Liquid', 'Paper Towel (Long)', 'Sponge (dish washing)', 'Paper Towel (Short)', 'Rolls Sticky Tape'];
-const PACKAGING_ITEMS = ['French Fries Box', 'French Fries Paper', 'Paper Food Bags', 'Fork & Knife Set', 'Loaded Fries Boxes', 'Burger Paper (12 x 14)', 'Wooden Flag Skewers', 'Printer Rolls', 'Takeaway Sauce Containers', 'Coleslaw Container', 'Plastic Carry Bags', 'Packaging Labels'];
+const DRINK_ITEMS = ['Bottle Water', 'Coke', 'Coke Zero', 'Fanta Strawberry', 'Kids Apple Juice', 'Kids Orange', 'Orange Fanta', 'Schweppes Manow', 'Soda Water', 'Sprite'];
+const FRESH_FOOD_ITEMS = ['Iceberg Lettuce', 'Jalapenos', 'Onions', 'Purple Cabbage', 'Test Pickles Enhanced', 'White Cabbage'];
+const FROZEN_FOOD_ITEMS = ['Bacon Long', 'Bacon Short', 'Chicken Nuggets', 'French Fries', 'Onion Rings', 'Sweet Potato Fries'];
+const SHELF_ITEMS = ['Cajun Spice', 'Cheese', 'Chili Sauce', 'Dill Pickles', 'Ketchup', 'Mayonnaise', 'Mustard', 'Oil Fryer', 'Sweet Pickles'];
+const KITCHEN_ITEMS = ['Alcohol Sanitizer', 'Aluminum Foil', 'Dish Washing Liquid', 'Paper Towel Long', 'Paper Towel Short', 'Printer Rolls'];
+const PACKAGING_ITEMS = ['Burger Paper', 'Food Wrap', 'French Fries Box', 'Hand Towel', 'Kitchen Towel', 'Paper Food Bags', 'Plastic Gloves', 'Rubber Gloves Large', 'Rubber Gloves Medium', 'Rubber Gloves Small', 'Takeaway Containers', 'Wooden Skewers'];
 
 // Minimal, bulletproof form schema
 const formSchema = z.object({
