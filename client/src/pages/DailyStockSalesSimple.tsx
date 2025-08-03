@@ -40,7 +40,6 @@ const formSchema = z.object({
   // Expenses
   salaryWages: z.coerce.number().optional().default(0),
   shopping: z.coerce.number().optional().default(0),
-  gasExpense: z.coerce.number().optional().default(0),
   totalExpenses: z.coerce.number().optional().default(0),
   expenseDescription: z.string().optional(),
   
@@ -83,7 +82,6 @@ const DailyStockSalesSimple = () => {
       endingCash: 0,
       salaryWages: 0,
       shopping: 0,
-      gasExpense: 0,
       totalExpenses: 0,
       expenseDescription: '',
       burgerBunsStock: 0,
@@ -175,58 +173,65 @@ const DailyStockSalesSimple = () => {
         <CardContent>
           <Form {...form}>
             <form className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="completedBy"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Completed By *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter your name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="shiftType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shift Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select shift type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="opening">Opening Shift</SelectItem>
-                          <SelectItem value="closing">Closing Shift</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="shiftDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shift Date *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Shift Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Shift Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="completedBy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Completed By *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter your name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="shiftType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Shift Type</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select shift type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="opening">Opening Shift</SelectItem>
+                              <SelectItem value="closing">Closing Shift</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="shiftDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Shift Date *</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Sales Section */}
               <Card>
@@ -320,32 +325,18 @@ const DailyStockSalesSimple = () => {
                 </CardContent>
               </Card>
 
-              {/* Cash Management */}
+              {/* Wages & Staff Payments */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Cash Management</CardTitle>
+                  <CardTitle className="text-lg">Wages & Staff Payments</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
+                <CardContent>
                   <FormField
                     control={form.control}
-                    name="startingCash"
+                    name="salaryWages"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Starting Cash (฿)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="0" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="endingCash"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ending Cash (฿)</FormLabel>
+                        <FormLabel>Salary/Wages (฿)</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" {...field} />
                         </FormControl>
@@ -356,47 +347,19 @@ const DailyStockSalesSimple = () => {
                 </CardContent>
               </Card>
 
-              {/* Expenses */}
+              {/* Shopping & Expenses */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Expenses</CardTitle>
+                  <CardTitle className="text-lg">Shopping & Expenses</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="salaryWages"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Salary/Wages (฿)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="shopping"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Shopping (฿)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="gasExpense"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Gas Expense (฿)</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0" {...field} />
                           </FormControl>
@@ -436,18 +399,18 @@ const DailyStockSalesSimple = () => {
                 </CardContent>
               </Card>
 
-              {/* Stock Counts */}
+              {/* Cash Management */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Stock Counts</CardTitle>
+                  <CardTitle className="text-lg">Cash Management</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <CardContent className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="burgerBunsStock"
+                    name="startingCash"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Burger Buns</FormLabel>
+                        <FormLabel>Starting Cash (฿)</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" {...field} />
                         </FormControl>
@@ -458,10 +421,10 @@ const DailyStockSalesSimple = () => {
                   
                   <FormField
                     control={form.control}
-                    name="rollsOrderedCount"
+                    name="endingCash"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Rolls Ordered</FormLabel>
+                        <FormLabel>Ending Cash (฿)</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" {...field} />
                         </FormControl>
@@ -469,21 +432,6 @@ const DailyStockSalesSimple = () => {
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="meatWeight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Meat Weight (kg)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.1" placeholder="0" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
                 </CardContent>
               </Card>
 
@@ -521,10 +469,10 @@ const DailyStockSalesSimple = () => {
                 </CardContent>
               </Card>
 
-              {/* Fresh Food */}
+              {/* Fresh Food Stock */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Fresh Food</CardTitle>
+                  <CardTitle className="text-lg">Fresh Food Stock</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -533,40 +481,6 @@ const DailyStockSalesSimple = () => {
                         key={item}
                         control={form.control}
                         name={`freshFood.${item}` as any}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm">{item}</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="number" 
-                                min="0" 
-                                placeholder="0"
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                                value={field.value || 0}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Shelf Items */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Shelf Items</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {SHELF_ITEMS.map((item) => (
-                      <FormField
-                        key={item}
-                        control={form.control}
-                        name={`shelfItems.${item}` as any}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-sm">{item}</FormLabel>
@@ -601,6 +515,40 @@ const DailyStockSalesSimple = () => {
                         key={item}
                         control={form.control}
                         name={`frozenFood.${item}` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">{item}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                value={field.value || 0}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shelf Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Shelf Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {SHELF_ITEMS.map((item) => (
+                      <FormField
+                        key={item}
+                        control={form.control}
+                        name={`shelfItems.${item}` as any}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-sm">{item}</FormLabel>
@@ -688,6 +636,56 @@ const DailyStockSalesSimple = () => {
                       />
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Total Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="burgerBunsStock"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Burger Buns</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="rollsOrderedCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rolls Ordered</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="meatWeight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Meat Weight (kg)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.1" placeholder="0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
 
