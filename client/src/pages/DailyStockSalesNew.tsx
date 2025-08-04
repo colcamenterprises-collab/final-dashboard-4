@@ -28,63 +28,47 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
-// Clean form schema - correct order and fields only
+// Schema aligned with Pydantic specification
 const formSchema = z.object({
   // 1. Shift Information
-  completedBy: z.string().min(1, "Staff name is required"),
-  shiftType: z.enum(['Evening', 'Morning'], { errorMap: () => ({ message: "Please select a shift type" }) }),
-  shiftDate: z.string().min(1, "Shift date is required"),
+  shift_time: z.string().min(1, "Shift time is required"),
+  completed_by: z.string().min(1, "Staff name is required"),
   
   // 2. Sales Information  
-  grabSales: z.coerce.number().optional().default(0),
-  aroiDeeSales: z.coerce.number().optional().default(0),
-  qrScanSales: z.coerce.number().optional().default(0),
-  cashSales: z.coerce.number().optional().default(0),
-  totalSales: z.coerce.number().optional().default(0),
+  total_sales: z.coerce.number().optional().default(0),
+  grab_sales: z.coerce.number().optional().default(0),
+  cash_sales: z.coerce.number().optional().default(0),
+  qr_sales: z.coerce.number().optional().default(0),
   
   // 3. Wages & Staff Payments
-  wageEntries: z.array(z.object({ 
-    staffName: z.string().min(1, "Staff name required"), 
-    amount: z.coerce.number().min(0).optional().default(0), 
-    type: z.enum(['wages', 'overtime', 'other'], { errorMap: () => ({ message: "Select wage type" }) })
-  })).optional().default([]),
+  wages: z.coerce.number().optional().default(0),
   
   // 4. Shopping & Expenses
-  shoppingEntries: z.array(z.object({ 
-    item: z.string().min(1, "Item name required"), 
-    amount: z.coerce.number().min(0).optional().default(0), 
-    shop: z.string().optional().default(""),
-    customShop: z.string().optional()
-  })).optional().default([]),
-  totalExpenses: z.coerce.number().optional().default(0),
+  shopping_expenses: z.string().optional().default(""),
   
   // 5. Cash Management
-  startingCash: z.coerce.number().optional().default(0),
-  endingCash: z.coerce.number().optional().default(0),
-  bankedAmount: z.coerce.number().optional().default(0),
+  starting_cash: z.coerce.number().optional().default(0),
+  ending_cash: z.coerce.number().optional().default(0),
+  amount_banked: z.coerce.number().optional().default(0),
   
-  // 6. Drink Stock
-  drinkStock: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  // 6. Burger Buns & Meat Count
+  burger_buns_stock: z.coerce.number().optional().default(0),
+  buns_ordered: z.coerce.number().optional().default(0),
+  meat_weight: z.coerce.number().optional().default(0),
   
-  // 7. Fresh Food Stock
-  freshFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  // 7. Drink Stock
+  drink_stock: z.array(z.object({
+    brand: z.string(),
+    quantity: z.coerce.number()
+  })).optional().default([]),
   
-  // 8. Frozen Food
-  frozenFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  
-  // 9. Shelf Items
-  shelfItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  
-  // 10. Kitchen Items
-  kitchenItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  
-  // 11. Packaging Items
-  packagingItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  
-  // Key tracking fields
-  burgerBunsStock: z.coerce.number().optional().default(0),
-  meatWeight: z.coerce.number().optional().default(0),
-  rollsOrderedCount: z.coerce.number().optional().default(0),
+  // 8-13. Stock & Summary
+  fresh_food: z.string().optional().default(""),
+  frozen_food: z.string().optional().default(""),
+  shelf_items: z.string().optional().default(""),
+  kitchen_items: z.string().optional().default(""),
+  packaging_items: z.string().optional().default(""),
+  total_summary: z.string().optional().default(""),
   
   isDraft: z.boolean().optional().default(false),
 });
@@ -133,32 +117,30 @@ export default function DailyStockSalesNew() {
   const [activeNavTab, setActiveNavTab] = useState('daily-sales-stock');
   const [activeTab, setActiveTab] = useState('new-form');
 
-  const form = useForm<FormData>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      completedBy: "",
-      shiftType: "Evening",
-      shiftDate: new Date().toISOString().split('T')[0],
-      grabSales: 0,
-      aroiDeeSales: 0,
-      qrScanSales: 0,
-      cashSales: 0,
-      totalSales: 0,
-      wageEntries: [],
-      shoppingEntries: [],
-      totalExpenses: 0,
-      startingCash: 0,
-      endingCash: 0,
-      bankedAmount: 0,
-      burgerBunsStock: 0,
-      meatWeight: 0,
-      rollsOrderedCount: 0,
-      freshFood: {},
-      frozenFood: {},
-      shelfItems: {},
-      drinkStock: {},
-      kitchenItems: {},
-      packagingItems: {},
+      shift_time: "",
+      completed_by: "",
+      total_sales: 0,
+      grab_sales: 0,
+      cash_sales: 0,
+      qr_sales: 0,
+      wages: 0,
+      shopping_expenses: "",
+      starting_cash: 0,
+      ending_cash: 0,
+      amount_banked: 0,
+      burger_buns_stock: 0,
+      buns_ordered: 0,
+      meat_weight: 0,
+      drink_stock: [],
+      fresh_food: "",
+      frozen_food: "",
+      shelf_items: "",
+      kitchen_items: "",
+      packaging_items: "",
+      total_summary: "",
       isDraft: false
     }
   });
@@ -168,18 +150,11 @@ export default function DailyStockSalesNew() {
   
   // Auto-calculate total sales
   useEffect(() => {
-    const total = (watchedValues.grabSales || 0) + 
-                  (watchedValues.aroiDeeSales || 0) + 
-                  (watchedValues.qrScanSales || 0) + 
-                  (watchedValues.cashSales || 0);
-    form.setValue('totalSales', total);
-  }, [watchedValues.grabSales, watchedValues.aroiDeeSales, watchedValues.qrScanSales, watchedValues.cashSales, form]);
-
-  // Auto-calculate total expenses
-  useEffect(() => {
-    const shoppingTotal = (watchedValues.shoppingEntries || []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
-    form.setValue('totalExpenses', shoppingTotal);
-  }, [watchedValues.shoppingEntries, form]);
+    const total = (watchedValues.grab_sales || 0) + 
+                  (watchedValues.cash_sales || 0) + 
+                  (watchedValues.qr_sales || 0);
+    form.setValue('total_sales', total);
+  }, [watchedValues.grab_sales, watchedValues.cash_sales, watchedValues.qr_sales, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
