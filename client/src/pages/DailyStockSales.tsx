@@ -42,55 +42,64 @@ import {
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
 
-// Enhanced form schema with proper validation
+// Clean form schema - correct order and fields only
 const formSchema = z.object({
+  // 1. Shift Information
   completedBy: z.string().min(1, "Staff name is required"),
   shiftType: z.enum(['Evening', 'Morning'], { errorMap: () => ({ message: "Please select a shift type" }) }),
   shiftDate: z.string().min(1, "Shift date is required"),
+  
+  // 2. Sales Information  
   grabSales: z.coerce.number().optional().default(0),
   aroiDeeSales: z.coerce.number().optional().default(0),
   qrScanSales: z.coerce.number().optional().default(0),
   cashSales: z.coerce.number().optional().default(0),
   totalSales: z.coerce.number().optional().default(0),
+  
+  // 3. Wages & Staff Payments
   wageEntries: z.array(z.object({ 
     staffName: z.string().min(1, "Staff name required"), 
     amount: z.coerce.number().min(0).optional().default(0), 
     type: z.enum(['wages', 'overtime', 'other'], { errorMap: () => ({ message: "Select wage type" }) })
   })).optional().default([]),
+  
+  // 4. Shopping & Expenses
   shoppingEntries: z.array(z.object({ 
     item: z.string().min(1, "Item name required"), 
     amount: z.coerce.number().min(0).optional().default(0), 
     shop: z.string().optional().default(""),
     customShop: z.string().optional()
   })).optional().default([]),
-  gasExpense: z.coerce.number().optional().default(0),
   totalExpenses: z.coerce.number().optional().default(0),
+  
+  // 5. Cash Management
   startingCash: z.coerce.number().optional().default(0),
   endingCash: z.coerce.number().optional().default(0),
   bankedAmount: z.coerce.number().optional().default(0),
+  
+  // 6. Drink Stock
+  drinkStock: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // 7. Fresh Food Stock
+  freshFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // 8. Frozen Food
+  frozenFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // 9. Shelf Items
+  shelfItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // 10. Kitchen Items
+  kitchenItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // 11. Packaging Items
+  packagingItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
+  
+  // Key tracking fields
   burgerBunsStock: z.coerce.number().optional().default(0),
   meatWeight: z.coerce.number().optional().default(0),
   rollsOrderedCount: z.coerce.number().optional().default(0),
-  drinkStockCount: z.coerce.number().optional().default(0),
-  // Individual drink items for better tracking
-  coke: z.coerce.number().optional().default(0),
-  cokeZero: z.coerce.number().optional().default(0),
-  sprite: z.coerce.number().optional().default(0),
-  schweppesManow: z.coerce.number().optional().default(0),
-  fantaOrange: z.coerce.number().optional().default(0),
-  fantaStrawberry: z.coerce.number().optional().default(0),
-  sodaWater: z.coerce.number().optional().default(0),
-  water: z.coerce.number().optional().default(0),
-  kidsOrange: z.coerce.number().optional().default(0),
-  kidsApple: z.coerce.number().optional().default(0),
-  // Food inventory sections
-  freshFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  frozenFood: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  shelfItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  drinkStock: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  kitchenItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  packagingItems: z.record(z.coerce.number().optional().default(0)).optional().default({}),
-  expenseDescription: z.string().optional(),
+  
   isDraft: z.boolean().optional().default(false),
 });
 
@@ -213,33 +222,29 @@ export default function DailyStockSales() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       completedBy: "",
-      shiftType: "closing",
-      shiftDate: new Date(),
-      startingCash: 0,
-      endingCash: 0,
+      shiftType: "Evening",
+      shiftDate: new Date().toISOString().split('T')[0],
       grabSales: 0,
-      foodPandaSales: 0,
       aroiDeeSales: 0,
       qrScanSales: 0,
       cashSales: 0,
       totalSales: 0,
-      salaryWages: 0,
-      shopping: 0,
-      gasExpense: 0,
-      totalExpenses: 0,
-      expenseDescription: "",
       wageEntries: [],
       shoppingEntries: [],
+      totalExpenses: 0,
+      startingCash: 0,
+      endingCash: 0,
+      bankedAmount: 0,
       burgerBunsStock: 0,
-      rollsOrderedCount: 0,
       meatWeight: 0,
-      rollsOrderedConfirmed: false,
+      rollsOrderedCount: 0,
       freshFood: {},
       frozenFood: {},
       shelfItems: {},
       drinkStock: {},
       kitchenItems: {},
-      packagingItems: {}
+      packagingItems: {},
+      isDraft: false
     }
   });
 
@@ -798,12 +803,12 @@ export default function DailyStockSales() {
           });
         })} className="space-y-6">
           
-          {/* Who is Completing Form */}
+          {/* 1. Shift Information */}
           <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Who is Completing Form
+                1. Shift Information
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -834,8 +839,8 @@ export default function DailyStockSales() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="opening">Opening Shift</SelectItem>
-                        <SelectItem value="closing">Closing Shift</SelectItem>
+                        <SelectItem value="Evening">Evening Shift</SelectItem>
+                        <SelectItem value="Morning">Morning Shift</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -848,13 +853,13 @@ export default function DailyStockSales() {
                 name="shiftDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Today's Date</FormLabel>
+                    <FormLabel>Shift Date</FormLabel>
                     <FormControl>
                       <Input 
                         type="date" 
                         {...field} 
-                        value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
-                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                        value={typeof field.value === 'string' ? field.value : new Date().toISOString().split('T')[0]}
+                        onChange={(e) => field.onChange(e.target.value)}
                       />
                     </FormControl>
                     <FormMessage />

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import DailyStockSales from "@/pages/DailyStockSales";
+import DailyStockSalesNew from "@/pages/DailyStockSalesNew";
 import DailyStockSalesQuick from "@/pages/DailyStockSalesQuick";
 import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
 import DailyShiftFormSimple from "@/pages/DailyShiftFormSimple";
@@ -47,7 +48,8 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/daily-sales-stock" component={DailySalesStock} />
-        <Route path="/daily-stock-sales" component={DailyShiftForm} />
+        <Route path="/daily-stock-sales" component={DailyStockSalesNew} />
+        <Route path="/daily-stock-sales-old" component={DailyShiftForm} />
         <Route path="/daily-shift-form" component={DailyShiftForm} />
         <Route path="/daily-sales-form" component={DailyShiftForm} />
         <Route path="/daily-stock-sales-quick" component={DailyStockSalesQuick} />

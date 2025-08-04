@@ -34,7 +34,6 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   totalSales: decimal('total_sales', { precision: 10, scale: 2 }).default('0'),
   wages: jsonb('wages'),
   shopping: jsonb('shopping'),
-  gasExpense: decimal('gas_expense', { precision: 10, scale: 2 }).default('0'),
   totalExpenses: decimal('total_expenses', { precision: 10, scale: 2 }).default('0'),
   endingCash: decimal('ending_cash', { precision: 10, scale: 2 }).default('0'),
   bankedAmount: decimal('banked_amount', { precision: 10, scale: 2 }).default('0'),

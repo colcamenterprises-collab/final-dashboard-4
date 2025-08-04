@@ -1704,7 +1704,7 @@ export function registerRoutes(app: express.Application): Server {
                 <p>${formatStockData(data.drinkStock)}</p>
 
                 <h2>Fresh Food Stock</h2>
-                <p>${formatStockData(data.freshFoodStock)}</p>
+                <p>${formatStockData(data.freshFood)}</p>
 
                 <h2>Frozen Food</h2>
                 <p>${formatStockData(data.frozenFood)}</p>
@@ -1793,7 +1793,7 @@ Total Shopping: THB ${formatCurrency(totalShopping)}
 ${formatStockData(data.drinkStock)}
 
 --- FRESH FOOD STOCK ---
-${formatStockData(data.freshFoodStock)}
+${formatStockData(data.freshFood)}
 
 --- FROZEN FOOD ---
 ${formatStockData(data.frozenFood)}
@@ -1860,7 +1860,7 @@ Generated automatically by Smash Brothers Burgers Management System
         "Cash Difference": cashDifference
       });
       if (formData.drinkStock) addSection("Drink Stock", formData.drinkStock);
-      if (formData.freshFoodStock) addSection("Fresh Food Stock", formData.freshFoodStock);
+      if (formData.freshFood) addSection("Fresh Food Stock", formData.freshFood);
       if (formData.frozenFood) addSection("Frozen Food Stock", formData.frozenFood);
       if (formData.shelfItems) addSection("Shelf Items", formData.shelfItems);
       if (formData.kitchenItems) addSection("Kitchen Items", formData.kitchenItems);
