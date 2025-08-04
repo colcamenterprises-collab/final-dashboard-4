@@ -264,7 +264,7 @@ export default function DailyStockSalesSchema() {
                 />
 
                 <div className="col-span-full p-4 bg-gray-50 rounded">
-                  <p className="font-medium text-gray-700">Total Sales: ฿{(watchedValues.total_sales || 0).toFixed(2)}</p>
+                  <p className="font-medium text-gray-700">Total Sales: ฿{Number(watchedValues.total_sales || 0).toFixed(2)}</p>
                 </div>
               </div>
             </section>
