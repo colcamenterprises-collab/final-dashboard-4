@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Clock, 
   TrendingUp, 
@@ -30,17 +29,12 @@ import {
   Package,
   ClipboardList,
   Calculator,
-  Plus,
-  Trash2
+  Save,
+  Send
 } from "lucide-react";
 import { z } from "zod";
 
-// Schema matching Pydantic specification exactly
-const drinkEntrySchema = z.object({
-  brand: z.string().min(1, "Brand is required"),
-  quantity: z.coerce.number().min(0, "Quantity must be positive")
-});
-
+// FORT KNOX LOCKED SCHEMA - DO NOT MODIFY WITHOUT CAM APPROVAL
 const formSchema = z.object({
   // 1. Shift Information
   shift_time: z.string().min(1, "Shift time is required"),
@@ -70,7 +64,7 @@ const formSchema = z.object({
   meat_weight: z.coerce.number().optional().default(0),
   
   // 7. Drink Stock
-  drink_stock: z.array(drinkEntrySchema).optional().default([]),
+  drink_stock: z.string().optional().default(""),
   
   // 8-13. Stock & Summary
   fresh_food: z.string().optional().default(""),
@@ -105,20 +99,20 @@ export default function DailyStockSalesSchema() {
       burger_buns_stock: 0,
       buns_ordered: 0,
       meat_weight: 0,
-      drink_stock: [],
+      drink_stock: "",
       fresh_food: "",
       frozen_food: "",
       shelf_items: "",
       kitchen_items: "",
       packaging_items: "",
       total_summary: "",
-    }
+    },
   });
 
   // Watch form values for calculations
   const watchedValues = form.watch();
   
-  // Auto-calculate total sales
+  // Auto-calculate total sales including Aroi Dee Sales
   useEffect(() => {
     const total = (watchedValues.grab_sales || 0) + 
                   (watchedValues.aroi_dee_sales || 0) + 
@@ -127,62 +121,43 @@ export default function DailyStockSalesSchema() {
     form.setValue('total_sales', total);
   }, [watchedValues.grab_sales, watchedValues.aroi_dee_sales, watchedValues.cash_sales, watchedValues.qr_sales, form]);
 
-  const createMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      return apiRequest('/api/daily-stock-sales', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' }
-      });
-    },
+  // Submit mutation
+  const submitMutation = useMutation({
+    mutationFn: (data: FormData) => apiRequest('/api/daily-stock-sales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Form submitted and email sent successfully"
+        title: "Form submitted successfully",
+        description: "Daily sales and stock data has been saved and email sent.",
       });
-      form.reset();
       queryClient.invalidateQueries({ queryKey: ['/api/daily-stock-sales'] });
+      form.reset();
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
-        title: "Error",
-        description: "Failed to submit form",
-        variant: "destructive"
+        title: "Submission failed",
+        description: error.message || "Please check your data and try again.",
+        variant: "destructive",
       });
-    }
+    },
   });
 
   const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
+    submitMutation.mutate(data);
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      backgroundColor: '#ffffff', 
-      fontFamily: "'Poppins', sans-serif", 
-      padding: '40px',
-      color: '#1a1a1a'
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        
-        {/* Breadcrumb */}
-        <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
-          Home / Operations & Sales / Daily Sales & Stock Form
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
+          <p className="text-gray-600">Version: Fort Knox - Locked Structure</p>
         </div>
 
-        {/* Page Title */}
-        <h1 style={{ 
-          fontSize: '28px', 
-          fontWeight: '800', 
-          margin: '0 0 20px', 
-          color: '#1a1a1a' 
-        }}>
-          Daily Sales & Stock Form
-        </h1>
-
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
             {/* 1. Shift Information */}
             <Card>
@@ -192,7 +167,7 @@ export default function DailyStockSalesSchema() {
                   1. Shift Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="shift_time"
@@ -200,13 +175,12 @@ export default function DailyStockSalesSchema() {
                     <FormItem>
                       <FormLabel>Shift Time</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. 5 PM - 3 AM" />
+                        <Input {...field} placeholder="e.g., 5 PM - 3 AM" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="completed_by"
@@ -214,7 +188,7 @@ export default function DailyStockSalesSchema() {
                     <FormItem>
                       <FormLabel>Completed By</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Staff member name" />
+                        <Input {...field} placeholder="Staff name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -288,7 +262,7 @@ export default function DailyStockSalesSchema() {
                   )}
                 />
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="col-span-full p-4 bg-gray-50 rounded-lg">
                   <p className="font-medium text-gray-700">Total Sales</p>
                   <p className="text-2xl font-bold text-green-600">฿{(watchedValues.total_sales || 0).toFixed(2)}</p>
                 </div>
@@ -336,7 +310,7 @@ export default function DailyStockSalesSchema() {
                     <FormItem>
                       <FormLabel>Expenses Description</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List all shopping and expenses..." rows={3} />
+                        <Textarea {...field} placeholder="Describe shopping and expenses" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -353,7 +327,7 @@ export default function DailyStockSalesSchema() {
                   5. Cash Management
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="starting_cash"
@@ -367,7 +341,6 @@ export default function DailyStockSalesSchema() {
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="ending_cash"
@@ -381,7 +354,6 @@ export default function DailyStockSalesSchema() {
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="amount_banked"
@@ -406,7 +378,7 @@ export default function DailyStockSalesSchema() {
                   6. Burger Buns & Meat Count
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="burger_buns_stock"
@@ -420,7 +392,6 @@ export default function DailyStockSalesSchema() {
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="buns_ordered"
@@ -434,7 +405,6 @@ export default function DailyStockSalesSchema() {
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="meat_weight"
@@ -460,64 +430,19 @@ export default function DailyStockSalesSchema() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {form.watch('drink_stock')?.map((_, index) => (
-                    <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded">
-                      <FormField
-                        control={form.control}
-                        name={`drink_stock.${index}.brand`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Drink Brand</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Brand name" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`drink_stock.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Quantity</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="0" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            const drinks = form.getValues('drink_stock') || [];
-                            drinks.splice(index, 1);
-                            form.setValue('drink_stock', drinks);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const drinks = form.getValues('drink_stock') || [];
-                      drinks.push({ brand: '', quantity: 0 });
-                      form.setValue('drink_stock', drinks);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Drink Entry
-                  </Button>
-                </div>
+                <FormField
+                  control={form.control}
+                  name="drink_stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Drinks Purchased (List Format)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="List drinks purchased" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
 
@@ -535,9 +460,8 @@ export default function DailyStockSalesSchema() {
                   name="fresh_food"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fresh Food Items</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List fresh food stock..." rows={3} />
+                        <Textarea {...field} placeholder="Fresh food stock details" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -560,9 +484,8 @@ export default function DailyStockSalesSchema() {
                   name="frozen_food"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Frozen Food Items</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List frozen food stock..." rows={3} />
+                        <Textarea {...field} placeholder="Frozen food stock details" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -585,9 +508,8 @@ export default function DailyStockSalesSchema() {
                   name="shelf_items"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shelf Items</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List shelf items..." rows={3} />
+                        <Textarea {...field} placeholder="Shelf items stock details" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -600,7 +522,7 @@ export default function DailyStockSalesSchema() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5" />
+                  <ChefHat className="h-5 w-5" />
                   11. Kitchen Items
                 </CardTitle>
               </CardHeader>
@@ -610,9 +532,8 @@ export default function DailyStockSalesSchema() {
                   name="kitchen_items"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Kitchen Items</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List kitchen items..." rows={3} />
+                        <Textarea {...field} placeholder="Kitchen items stock details" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -635,9 +556,8 @@ export default function DailyStockSalesSchema() {
                   name="packaging_items"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Packaging Items</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="List packaging items..." rows={3} />
+                        <Textarea {...field} placeholder="Packaging items stock details" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -650,7 +570,7 @@ export default function DailyStockSalesSchema() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5" />
+                  <ClipboardList className="h-5 w-5" />
                   13. Total Summary
                 </CardTitle>
               </CardHeader>
@@ -660,71 +580,35 @@ export default function DailyStockSalesSchema() {
                   name="total_summary"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Summary Notes</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Add any summary notes or observations..." rows={4} />
+                        <Textarea {...field} placeholder="Overall summary and notes" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg mt-4">
-                  <div>
-                    <p className="font-medium text-gray-700">Total Sales</p>
-                    <p className="text-2xl font-bold text-green-600">฿{(watchedValues.total_sales || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-700">Wages Paid</p>
-                    <p className="text-lg font-semibold text-red-600">฿{(watchedValues.wages || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-700">Cash Difference</p>
-                    <p className="text-lg font-semibold text-blue-600">
-                      ฿{((watchedValues.ending_cash || 0) - (watchedValues.starting_cash || 0)).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Submit Button */}
-            <div className="flex justify-end gap-4">
+            {/* Submit Buttons */}
+            <div className="flex gap-4 justify-end">
               <Button 
                 type="button" 
                 variant="outline"
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/send-last-form-summary', { method: 'POST' });
-                    const result = await response.json();
-                    if (response.ok) {
-                      toast({
-                        title: "Email Sent",
-                        description: "Test email sent to management successfully"
-                      });
-                    } else {
-                      toast({
-                        title: "Email Failed",
-                        description: result.message || "Failed to send email",
-                        variant: "destructive"
-                      });
-                    }
-                  } catch (error) {
-                    toast({
-                      title: "Error",
-                      description: "Failed to send test email",
-                      variant: "destructive"
-                    });
-                  }
-                }}
+                onClick={() => form.reset()}
               >
-                Test Email
+                <Save className="h-4 w-4 mr-2" />
+                Reset Form
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Submitting...' : 'Submit Form & Send Email'}
+              <Button 
+                type="submit" 
+                disabled={submitMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {submitMutation.isPending ? 'Submitting...' : 'Submit & Send Email'}
               </Button>
             </div>
-
           </form>
         </Form>
       </div>
