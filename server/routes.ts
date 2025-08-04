@@ -1567,10 +1567,10 @@ export function registerRoutes(app: express.Application): Server {
           `;
           
           // Import email service
-          const { emailService } = await import('./services/emailService');
+          const { sendEmailWithAttachment } = await import('./services/workingEmailService');
           
           // Send email with PDF attachment
-          const emailSent = await emailService.sendEmailWithAttachment(
+          const emailSent = await sendEmailWithAttachment(
             emailTo,
             `Daily Sales & Stock Report - ${shiftDate}`,
             emailHTML,
@@ -2009,6 +2009,34 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error creating shopping list item:", err);
       res.status(500).json({ error: "Failed to create shopping list item" });
+    }
+  });
+
+  // Update shopping list from latest form submission
+  app.post("/api/shopping-list/update-from-latest", async (req: Request, res: Response) => {
+    try {
+      console.log("📝 Updating shopping list from latest form submission");
+      
+      // Get the most recent daily stock sales form
+      const latestForm = await storage.getLatestDailyStockSales();
+      if (!latestForm) {
+        return res.json({ success: false, message: "No recent form found" });
+      }
+      
+      console.log(`📊 Processing form ID ${latestForm.id} for shopping list updates`);
+      
+      // Generate shopping list items from the latest form data
+      await generateShoppingListFromForm(latestForm);
+      
+      res.json({ 
+        success: true, 
+        message: "Shopping list updated from latest form",
+        formId: latestForm.id,
+        date: latestForm.shiftDate
+      });
+    } catch (err) {
+      console.error("Error updating shopping list from latest:", err);
+      res.status(500).json({ error: "Failed to update shopping list" });
     }
   });
 

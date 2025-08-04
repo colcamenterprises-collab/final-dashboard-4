@@ -1,0 +1,65 @@
+📩 Full Working Endpoint: /api/send-form-summary.ts
+This is a Next.js API route using Gmail SMTP via Nodemailer. It sends an email with your form data to management.
+
+💡 Assumes your Gmail SMTP is already configured and working (you mentioned it is).
+
+🔧 pages/api/send-form-summary.ts
+ts
+Copy
+Edit
+import type { NextApiRequest, NextApiResponse } from 'next';
+import nodemailer from 'nodemailer';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
+
+  const { formData, emailTo = 'management@smashbrothersburgers.com' } = req.body;
+
+  if (!formData || typeof formData !== 'object') {
+    return res.status(400).json({ message: 'Invalid form data' });
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,      // e.g., your.email@gmail.com
+        pass: process.env.GMAIL_PASS,      // App password, NOT your real Gmail password
+      },
+    });
+
+    const emailBody = Object.entries(formData)
+      .map(([key, value]) => `<p><strong>${key}:</strong> ${JSON.stringify(value)}</p>`)
+      .join('');
+
+    const mailOptions = {
+      from: `"SBB Dashboard" <${process.env.GMAIL_USER}>`,
+      to: emailTo,
+      subject: `📋 Daily Form Submitted - ${formData.shiftDate} by ${formData.completedBy}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.5">
+          <h2>📊 Smash Brothers Burgers - Daily Shift Report</h2>
+          ${emailBody}
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({ message: 'Email sent successfully' });
+
+  } catch (error) {
+    console.error('❌ Email sending error:', error);
+    return res.status(500).json({ message: 'Email sending failed', error });
+  }
+}
+🔐 .env.local (if not already set)
+Make sure these two env vars are present:
+
+env
+Copy
+Edit
+GMAIL_USER=your.email@gmail.com
+GMAIL_PASS=your_app_password_here

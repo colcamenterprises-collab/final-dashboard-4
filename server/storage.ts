@@ -104,6 +104,7 @@ export interface IStorage {
   
   // Daily Stock and Sales
   getDailyStockSales(): Promise<DailyStockSales[]>;
+  getLatestDailyStockSales(): Promise<DailyStockSales | null>;
   getAllDailyStockSales(): Promise<DailyStockSales[]>;
   createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales>;
   searchDailyStockSales(query: string, startDate?: Date, endDate?: Date): Promise<DailyStockSales[]>;
@@ -805,6 +806,20 @@ export class MemStorage implements IStorage {
     return await db.select()
       .from(dailyStockSales)
       .orderBy(desc(dailyStockSales.shiftDate));
+  }
+
+  async getLatestDailyStockSales(): Promise<DailyStockSales | null> {
+    // Use database for Latest Daily Stock Sales
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { desc } = await import("drizzle-orm");
+    
+    const results = await db.select()
+      .from(dailyStockSales)
+      .orderBy(desc(dailyStockSales.shiftDate))
+      .limit(1);
+    
+    return results.length > 0 ? results[0] : null;
   }
 
   async getAllDailyStockSales(): Promise<DailyStockSales[]> {
