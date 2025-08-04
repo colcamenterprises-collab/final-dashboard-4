@@ -123,7 +123,7 @@ const DailySalesAndStockForm = () => {
           },
           body: JSON.stringify({
             submissionId: saveResult.id,
-            emailTo: 'management@smashbrothersburgers.com',
+            emailTo: 'smashbrothersburgersth@gmail.com',
             formData: data
           }),
         });
