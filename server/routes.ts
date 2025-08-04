@@ -1582,25 +1582,115 @@ export function registerRoutes(app: express.Application): Server {
 
       const emailTo = 'smashbrothersburgersth@gmail.com';
 
-      // HTML Body
+      // Calculations
+      const totalSales = (formData.grabSales || 0) + (formData.aroiDeeSales || 0) + (formData.qrScanSales || 0) + (formData.cashSales || 0);
+      const totalWages = formData.wages?.reduce((sum: number, w: any) => sum + (w.amount || 0), 0) || 0;
+      const totalShopping = formData.shopping?.reduce((sum: number, s: any) => sum + (s.amount || 0), 0) || 0;
+      const netRevenue = totalSales - (totalWages + totalShopping);
+      const cashDifference = (formData.startingCash + totalSales) - formData.endingCash;
+      const totalExpenses = totalWages + totalShopping;
+
+      // Email Body (HTML)
+      const createHtmlSection = (title: string, data: Record<string, any>) => {
+        const rows = Object.entries(data)
+          .map(([k, v]) => `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`)
+          .join('');
+        return `<h3>${title}</h3><table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-family: Arial; font-size: 14px;">${rows}</table><br/>`;
+      };
+
       const htmlBody = `
-        <h2>📋 Smash Brothers Burgers - Daily Shift Report</h2>
-        <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-family: Arial; font-size: 14px;">
-          ${Object.entries(formData)
-            .map(([key, val]) => `<tr><td><strong>${key}</strong></td><td>${JSON.stringify(val)}</td></tr>`)
-            .join('')}
-        </table>
+        <div style="font-family: Arial; font-size: 14px;">
+          <h2>📋 Smash Brothers Burgers - Daily Shift Report</h2>
+          ${createHtmlSection("Shift Information", {
+            "Completed By": formData.completedBy,
+            "Shift Type": formData.shiftType,
+            "Shift Date": formData.shiftDate,
+          })}
+          ${createHtmlSection("Sales Information", {
+            "Grab Sales": formData.grabSales || 0,
+            "Aroi Dee Sales": formData.aroiDeeSales || 0,
+            "QR Scan Sales": formData.qrScanSales || 0,
+            "Cash Sales": formData.cashSales || 0,
+            "Total Sales": totalSales
+          })}
+          ${formData.wages?.length ? createHtmlSection("Wages & Staff Payments", Object.fromEntries((formData.wages || []).map((w: any) => [w.name, w.amount]))) : ''}
+          ${createHtmlSection("Total Wages", { "Total Wages": totalWages })}
+          ${formData.shopping?.length ? createHtmlSection("Shopping & Expenses", Object.fromEntries((formData.shopping || []).map((s: any) => [s.item, s.amount]))) : ''}
+          ${createHtmlSection("Total Shopping", { "Total Shopping": totalShopping })}
+          ${createHtmlSection("Cash Management", {
+            "Starting Cash": formData.startingCash,
+            "Ending Cash": formData.endingCash,
+            "Banked Amount": formData.bankedAmount,
+            "Cash Difference": cashDifference
+          })}
+          ${formData.drinkStock ? createHtmlSection("Drink Stock", formData.drinkStock) : ''}
+          ${formData.freshFoodStock ? createHtmlSection("Fresh Food Stock", formData.freshFoodStock) : ''}
+          ${formData.frozenFood ? createHtmlSection("Frozen Food Stock", formData.frozenFood) : ''}
+          ${formData.shelfItems ? createHtmlSection("Shelf Items", formData.shelfItems) : ''}
+          ${formData.kitchenItems ? createHtmlSection("Kitchen Items", formData.kitchenItems) : ''}
+          ${formData.packagingItems ? createHtmlSection("Packaging Items", formData.packagingItems) : ''}
+          ${createHtmlSection("Total Summary", {
+            "Total Sales": totalSales,
+            "Total Wages": totalWages,
+            "Total Shopping": totalShopping,
+            "Total Expenses": totalExpenses,
+            "Net Revenue": netRevenue,
+            "Banked Today": formData.bankedAmount,
+          })}
+        </div>
       `;
 
       // PDF generation
       const PDFDocument = (await import('pdfkit')).default;
       
       const doc = new PDFDocument();
-      doc.fontSize(18).text('Smash Brothers Burgers - Daily Shift Report', { underline: true });
-      doc.moveDown();
+      doc.fontSize(18).text('Smash Brothers Burgers - Daily Shift Report', { underline: true }).moveDown();
+      
+      const addSection = (title: string, data: Record<string, any>) => {
+        doc.fontSize(14).text(title, { underline: true });
+        Object.entries(data).forEach(([k, v]) => doc.fontSize(11).text(`${k}: ${v}`));
+        doc.moveDown();
+      };
 
-      Object.entries(formData).forEach(([key, val]) => {
-        doc.fontSize(12).text(`${key}: ${JSON.stringify(val)}`);
+      addSection("Shift Information", {
+        "Completed By": formData.completedBy,
+        "Shift Type": formData.shiftType,
+        "Shift Date": formData.shiftDate,
+      });
+      addSection("Sales Information", {
+        "Grab Sales": formData.grabSales || 0,
+        "Aroi Dee Sales": formData.aroiDeeSales || 0,
+        "QR Scan Sales": formData.qrScanSales || 0,
+        "Cash Sales": formData.cashSales || 0,
+        "Total Sales": totalSales
+      });
+      if (formData.wages?.length) {
+        addSection("Wages & Staff Payments", Object.fromEntries((formData.wages || []).map((w: any) => [w.name, w.amount])));
+      }
+      addSection("Total Wages", { "Total Wages": totalWages });
+      if (formData.shopping?.length) {
+        addSection("Shopping & Expenses", Object.fromEntries((formData.shopping || []).map((s: any) => [s.item, s.amount])));
+      }
+      addSection("Total Shopping", { "Total Shopping": totalShopping });
+      addSection("Cash Management", {
+        "Starting Cash": formData.startingCash,
+        "Ending Cash": formData.endingCash,
+        "Banked Amount": formData.bankedAmount,
+        "Cash Difference": cashDifference
+      });
+      if (formData.drinkStock) addSection("Drink Stock", formData.drinkStock);
+      if (formData.freshFoodStock) addSection("Fresh Food Stock", formData.freshFoodStock);
+      if (formData.frozenFood) addSection("Frozen Food Stock", formData.frozenFood);
+      if (formData.shelfItems) addSection("Shelf Items", formData.shelfItems);
+      if (formData.kitchenItems) addSection("Kitchen Items", formData.kitchenItems);
+      if (formData.packagingItems) addSection("Packaging Items", formData.packagingItems);
+      addSection("Total Summary", {
+        "Total Sales": totalSales,
+        "Total Wages": totalWages,
+        "Total Shopping": totalShopping,
+        "Total Expenses": totalExpenses,
+        "Net Revenue": netRevenue,
+        "Banked Today": formData.bankedAmount
       });
 
       // Create PDF buffer using promise
@@ -1621,15 +1711,15 @@ export function registerRoutes(app: express.Application): Server {
         htmlBody,
         [
           {
-            filename: `SBB-DailyReport-${formData.shiftDate}.pdf`,
+            filename: `SBB-DailyForm-${formData.shiftDate}.pdf`,
             content: pdfBuffer,
           },
         ]
       );
 
-      return res.status(200).json({ message: 'Email and PDF sent successfully' });
+      return res.status(200).json({ message: 'Email sent with PDF' });
     } catch (err) {
-      console.error('❌ Email sending failed:', err);
+      console.error('❌ Failed to send email with form:', err);
       return res.status(500).json({ message: 'Error sending form email', error: err });
     }
   });

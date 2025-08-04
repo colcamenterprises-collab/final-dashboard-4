@@ -1,0 +1,157 @@
+Drop-in Code: /api/send-form-summary.ts
+ts
+Copy
+Edit
+import express from 'express';
+import { sendEmailWithAttachment } from '../services/workingEmailService';
+import PDFDocument from 'pdfkit';
+import getStream from 'get-stream';
+
+const router = express.Router();
+
+router.post('/api/send-form-summary', async (req, res) => {
+  try {
+    const { formData } = req.body;
+
+    if (!formData) return res.status(400).json({ message: 'Missing form data' });
+
+    const emailTo = 'smashbrothersburgersth@gmail.com';
+
+    // Calculations
+    const totalSales = formData.grabSales + formData.aroiDeeSales + formData.qrScanSales + formData.cashSales;
+    const totalWages = formData.wages?.reduce((sum: number, w: any) => sum + (w.amount || 0), 0) || 0;
+    const totalShopping = formData.shopping?.reduce((sum: number, s: any) => sum + (s.amount || 0), 0) || 0;
+    const netRevenue = totalSales - (totalWages + totalShopping);
+    const cashDifference = (formData.startingCash + totalSales) - formData.endingCash;
+    const totalExpenses = totalWages + totalShopping;
+
+    // Email Body (HTML)
+    const createHtmlSection = (title: string, data: Record<string, any>) => {
+      const rows = Object.entries(data)
+        .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+        .join('');
+      return `<h3>${title}</h3><table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">${rows}</table><br/>`;
+    };
+
+    const htmlBody = `
+      <div style="font-family: Arial; font-size: 14px;">
+        ${createHtmlSection("Shift Information", {
+          "Completed By": formData.completedBy,
+          "Shift Type": formData.shiftType,
+          "Shift Date": formData.shiftDate,
+        })}
+        ${createHtmlSection("Sales Information", {
+          "Grab Sales": formData.grabSales,
+          "Aroi Dee Sales": formData.aroiDeeSales,
+          "QR Scan Sales": formData.qrScanSales,
+          "Cash Sales": formData.cashSales,
+          "Total Sales": totalSales
+        })}
+        ${createHtmlSection("Wages & Staff Payments", Object.fromEntries((formData.wages || []).map((w: any) => [w.name, w.amount])))}
+        ${createHtmlSection("Total Wages", { "Total Wages": totalWages })}
+        ${createHtmlSection("Shopping & Expenses", Object.fromEntries((formData.shopping || []).map((s: any) => [s.item, s.amount])))}
+        ${createHtmlSection("Total Shopping", { "Total Shopping": totalShopping })}
+        ${createHtmlSection("Cash Management", {
+          "Starting Cash": formData.startingCash,
+          "Ending Cash": formData.endingCash,
+          "Banked Amount": formData.bankedAmount,
+          "Cash Difference": cashDifference
+        })}
+        ${createHtmlSection("Drink Stock", formData.drinkStock || {})}
+        ${createHtmlSection("Fresh Food Stock", formData.freshFoodStock || {})}
+        ${createHtmlSection("Frozen Food Stock", formData.frozenFood || {})}
+        ${createHtmlSection("Shelf Items", formData.shelfItems || {})}
+        ${createHtmlSection("Kitchen Items", formData.kitchenItems || {})}
+        ${createHtmlSection("Packaging Items", formData.packagingItems || {})}
+        ${createHtmlSection("Total Summary", {
+          "Total Sales": totalSales,
+          "Total Wages": totalWages,
+          "Total Shopping": totalShopping,
+          "Total Expenses": totalExpenses,
+          "Net Revenue": netRevenue,
+          "Banked Today": formData.bankedAmount,
+        })}
+      </div>
+    `;
+
+    // PDF Generation
+    const doc = new PDFDocument();
+    doc.fontSize(18).text('Smash Brothers Burgers - Daily Shift Report', { underline: true }).moveDown();
+    const addSection = (title: string, data: Record<string, any>) => {
+      doc.fontSize(14).text(title, { underline: true });
+      Object.entries(data).forEach(([k, v]) => doc.fontSize(11).text(`${k}: ${v}`));
+      doc.moveDown();
+    };
+
+    addSection("Shift Information", {
+      "Completed By": formData.completedBy,
+      "Shift Type": formData.shiftType,
+      "Shift Date": formData.shiftDate,
+    });
+    addSection("Sales Information", {
+      "Grab Sales": formData.grabSales,
+      "Aroi Dee Sales": formData.aroiDeeSales,
+      "QR Scan Sales": formData.qrScanSales,
+      "Cash Sales": formData.cashSales,
+      "Total Sales": totalSales
+    });
+    addSection("Wages & Staff Payments", Object.fromEntries((formData.wages || []).map((w: any) => [w.name, w.amount])));
+    addSection("Total Wages", { "Total Wages": totalWages });
+    addSection("Shopping & Expenses", Object.fromEntries((formData.shopping || []).map((s: any) => [s.item, s.amount])));
+    addSection("Total Shopping", { "Total Shopping": totalShopping });
+    addSection("Cash Management", {
+      "Starting Cash": formData.startingCash,
+      "Ending Cash": formData.endingCash,
+      "Banked Amount": formData.bankedAmount,
+      "Cash Difference": cashDifference
+    });
+    addSection("Drink Stock", formData.drinkStock || {});
+    addSection("Fresh Food Stock", formData.freshFoodStock || {});
+    addSection("Frozen Food Stock", formData.frozenFood || {});
+    addSection("Shelf Items", formData.shelfItems || {});
+    addSection("Kitchen Items", formData.kitchenItems || {});
+    addSection("Packaging Items", formData.packagingItems || {});
+    addSection("Total Summary", {
+      "Total Sales": totalSales,
+      "Total Wages": totalWages,
+      "Total Shopping": totalShopping,
+      "Total Expenses": totalExpenses,
+      "Net Revenue": netRevenue,
+      "Banked Today": formData.bankedAmount
+    });
+
+    const pdfBuffer = await getStream.buffer(doc);
+
+    await sendEmailWithAttachment({
+      to: emailTo,
+      subject: `Daily Form Submitted - ${formData.shiftDate} by ${formData.completedBy}`,
+      html: htmlBody,
+      attachments: [{
+        filename: `SBB-DailyForm-${formData.shiftDate}.pdf`,
+        content: pdfBuffer
+      }]
+    });
+
+    return res.status(200).json({ message: 'Email sent with PDF' });
+  } catch (err) {
+    console.error('❌ Failed to send email with form:', err);
+    return res.status(500).json({ message: 'Error sending form email', error: err });
+  }
+});
+
+export default router;
+🧩 Dependencies
+Make sure these are installed:
+
+bash
+Copy
+Edit
+npm install pdfkit get-stream
+✅ Result
+When a form is submitted:
+
+The backend sends a clean, formatted email
+
+Attaches a structured PDF
+
+All calculations are accurate and aligned with your layout
