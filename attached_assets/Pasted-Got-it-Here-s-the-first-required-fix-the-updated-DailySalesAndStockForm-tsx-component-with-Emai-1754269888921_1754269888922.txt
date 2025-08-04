@@ -1,0 +1,78 @@
+Got it. Here's the first required fix — the updated DailySalesAndStockForm.tsx component with:
+
+Email PDF sending enabled after submission
+
+Shopping List logic reconnected
+
+Meat, Rolls, and Drinks included
+
+Ready for Jussi comparison logic (though not active yet)
+
+✅ DailySalesAndStockForm.tsx (FULL FILE — REPLACE EXISTING)
+tsx
+Copy
+Edit
+import React, { useState } from 'react';
+import axios from 'axios';
+
+const DailySalesAndStockForm = () => {
+  const [formData, setFormData] = useState({
+    meat: '',
+    rolls: '',
+    drinks: '',
+    shoppingList: {},
+    otherFields: {},
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      // 1. Save the form data
+      const saveRes = await axios.post('/api/daily-sales', formData);
+
+      // 2. Generate PDF + Email
+      await axios.post('/api/send-form-summary', {
+        submissionId: saveRes.data.id,
+        emailTo: 'management@smashbrothersburgers.com'
+      });
+
+      // 3. Update shopping list (fetch + refresh dashboard)
+      await axios.post('/api/shopping-list/update-from-latest');
+
+      alert('Form submitted and emailed successfully!');
+    } catch (err) {
+      console.error('Submission failed', err);
+      alert('Error submitting form. Please try again.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <h2>Daily Sales & Stock Form</h2>
+
+      <label>Meat (grams):</label>
+      <input type="number" name="meat" value={formData.meat} onChange={handleChange} />
+
+      <label>Rolls (units):</label>
+      <input type="number" name="rolls" value={formData.rolls} onChange={handleChange} />
+
+      <label>Drinks (units):</label>
+      <input type="number" name="drinks" value={formData.drinks} onChange={handleChange} />
+
+      {/* Add more fields as needed... */}
+
+      <button type="submit">Submit Form</button>
+    </form>
+  );
+};
+
+export default DailySalesAndStockForm;
