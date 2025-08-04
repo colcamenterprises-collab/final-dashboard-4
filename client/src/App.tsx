@@ -37,6 +37,7 @@ import DraftForms from "@/pages/DraftForms";
 import ShiftComparison from "@/pages/ShiftComparison";
 import ShiftReportDetail from "@/pages/ShiftReportDetail";
 import FormsLibrary from "@/pages/FormsLibrary";
+import TestEmailPage from "@/pages/TestEmailPage";
 
 import NotFound from "@/pages/not-found";
 

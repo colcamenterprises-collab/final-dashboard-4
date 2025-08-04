@@ -1502,6 +1502,76 @@ export function registerRoutes(app: express.Application): Server {
 
   // ─── Email Management endpoints ───────────────────────────────
   
+  // Send latest form summary endpoint (manual trigger)
+  app.post("/api/send-last-form-summary", async (req: Request, res: Response) => {
+    try {
+      console.log("📧 Manual trigger: Sending latest form summary");
+      
+      const latestEntry = await storage.getLatestDailyStockSales();
+      if (!latestEntry) {
+        return res.status(404).json({ message: 'No recent form submission found' });
+      }
+
+      console.log(`📊 Found latest form ID ${latestEntry.id} from ${latestEntry.shiftDate}`);
+      
+      const emailTo = 'smashbrothersburgersth@gmail.com';
+
+      // Construct detailed HTML email body
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
+          <h2>📋 Smash Brothers Burgers - Latest Form Submission</h2>
+          <p><strong>Form ID:</strong> ${latestEntry.id}</p>
+          <p><strong>Date:</strong> ${new Date(latestEntry.shiftDate).toLocaleDateString()}</p>
+          <p><strong>Shift:</strong> ${latestEntry.shiftType}</p>
+          <p><strong>Completed by:</strong> ${latestEntry.completedBy}</p>
+          
+          <h3>Sales Summary</h3>
+          <ul>
+            <li>Total Sales: THB ${parseFloat(latestEntry.totalSales?.toString() || '0').toFixed(2)}</li>
+            <li>Grab Sales: THB ${parseFloat(latestEntry.grabSales?.toString() || '0').toFixed(2)}</li>
+            <li>QR Scan Sales: THB ${parseFloat(latestEntry.qrScanSales?.toString() || '0').toFixed(2)}</li>
+            <li>Cash Sales: THB ${parseFloat(latestEntry.cashSales?.toString() || '0').toFixed(2)}</li>
+          </ul>
+          
+          <h3>Cash Management</h3>
+          <ul>
+            <li>Starting Cash: THB ${parseFloat(latestEntry.startingCash?.toString() || '0').toFixed(2)}</li>
+            <li>Ending Cash: THB ${parseFloat(latestEntry.endingCash?.toString() || '0').toFixed(2)}</li>
+          </ul>
+          
+          <p style="color: #666; font-size: 12px;">Generated automatically by Smash Brothers Burgers Management System</p>
+        </div>
+      `;
+
+      // Import email service
+      const { sendEmailWithAttachment } = await import('./services/workingEmailService');
+
+      // Send email
+      const emailSent = await sendEmailWithAttachment(
+        emailTo,
+        `📋 Latest Form Submission - ${new Date(latestEntry.shiftDate).toLocaleDateString()}`,
+        htmlBody,
+        []
+      );
+
+      if (emailSent) {
+        console.log(`✅ Latest form summary email sent to ${emailTo}`);
+        res.json({ 
+          success: true, 
+          message: 'Email sent successfully',
+          formId: latestEntry.id,
+          sentTo: emailTo
+        });
+      } else {
+        console.log(`❌ Failed to send email to ${emailTo}`);
+        res.status(500).json({ message: 'Failed to send email' });
+      }
+    } catch (error) {
+      console.error('❌ Error sending latest form summary:', error);
+      res.status(500).json({ message: 'Failed to send email', error: error });
+    }
+  });
+
   // Send form summary endpoint for DailySalesAndStockForm
   app.post("/api/send-form-summary", async (req: Request, res: Response) => {
     try {
