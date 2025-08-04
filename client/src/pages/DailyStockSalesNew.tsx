@@ -706,12 +706,65 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 6. Drink Stock */}
+              {/* 6. Burger Buns & Meat Count */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ChefHat className="h-5 w-5" />
+                    6. Burger Buns & Meat Count
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="burgerBunsStock"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Burger Buns in Stock</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" placeholder="0" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="rollsOrderedCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of Buns Ordered</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" placeholder="0" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="meatWeight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Meat Weight (grams)</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" placeholder="0" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* 7. Drink Stock */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Coffee className="h-5 w-5" />
-                    6. Drink Stock
+                    7. Drink Stock
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -734,12 +787,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 7. Fresh Food Stock */}
+              {/* 8. Fresh Food Stock */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <ChefHat className="h-5 w-5" />
-                    7. Fresh Food Stock
+                    <Refrigerator className="h-5 w-5" />
+                    8. Fresh Food Stock
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -762,12 +815,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 8. Frozen Food */}
+              {/* 9. Frozen Food */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Snowflake className="h-5 w-5" />
-                    8. Frozen Food
+                    9. Frozen Food
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -790,12 +843,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 9. Shelf Items */}
+              {/* 10. Shelf Items */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    9. Shelf Items
+                    10. Shelf Items
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -818,12 +871,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 10. Kitchen Items */}
+              {/* 11. Kitchen Items */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <ChefHat className="h-5 w-5" />
-                    10. Kitchen Items
+                    <ClipboardList className="h-5 w-5" />
+                    11. Kitchen Items
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -846,12 +899,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 11. Packaging Items */}
+              {/* 12. Packaging Items */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    11. Packaging Items
+                    12. Packaging Items
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -874,12 +927,12 @@ export default function DailyStockSalesNew() {
                 </CardContent>
               </Card>
 
-              {/* 12. Total Summary */}
+              {/* 13. Total Summary */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Calculator className="h-5 w-5" />
-                    12. Total Summary
+                    13. Total Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -916,8 +969,38 @@ export default function DailyStockSalesNew() {
 
               {/* Submit Button */}
               <div className="flex justify-end gap-4">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/send-last-form-summary', { method: 'POST' });
+                      const result = await response.json();
+                      if (response.ok) {
+                        toast({
+                          title: "Email Sent",
+                          description: "Test email sent to management successfully"
+                        });
+                      } else {
+                        toast({
+                          title: "Email Failed",
+                          description: result.message || "Failed to send email",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to send test email",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  Test Email
+                </Button>
                 <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Submitting...' : 'Submit Form'}
+                  {createMutation.isPending ? 'Submitting...' : 'Submit Form & Send Email'}
                 </Button>
               </div>
 
