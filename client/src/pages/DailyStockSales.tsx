@@ -186,8 +186,7 @@ export default function DailyStockSales() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedForm, setSelectedForm] = useState<DailyStockSales | null>(null);
-  
-  // Receipt photo functionality removed
+  const [activeNavTab, setActiveNavTab] = useState('daily-sales-stock');
   
   // Draft functionality state
   const [isDraft, setIsDraft] = useState(false);
@@ -544,33 +543,150 @@ export default function DailyStockSales() {
   };
 
   return (
-    <div className="container mx-auto p-2 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4 lg:mb-6">
-        <div className="flex items-center gap-2">
-          <Calculator className="h-5 w-5 sm:h-6 sm:w-6" />
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Daily Stock and Sales</h1>
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#ffffff', 
+      fontFamily: "'Poppins', sans-serif", 
+      padding: '40px',
+      color: '#1a1a1a'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        
+        {/* Breadcrumb */}
+        <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
+          Home / Operations & Sales / Daily Sales & Stock
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.href = '/daily-stock-sales/search'}
-            className="bg-white text-black border-black hover:bg-gray-50"
-          >
-            View Forms
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setShowItemManager(!showItemManager)}
-            className="flex items-center gap-2"
-          >
-            <Wrench className="h-4 w-4" />
-            Manage Items
-          </Button>
-        </div>
-      </div>
 
-      {/* Item Management Panel */}
-      {showItemManager && (
+        {/* Page Title */}
+        <h1 style={{ 
+          fontSize: '28px', 
+          fontWeight: '700', 
+          margin: '0 0 20px', 
+          color: '#1a1a1a' 
+        }}>
+          Operations & Sales
+        </h1>
+
+        {/* Navigation Tabs */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '20px', 
+          marginBottom: '30px', 
+          borderBottom: '1px solid #ddd', 
+          paddingBottom: '10px' 
+        }}>
+          <button
+            onClick={() => setActiveNavTab('daily-sales-stock')}
+            style={{
+              fontSize: '16px',
+              padding: '8px 0',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              color: '#1a1a1a',
+              borderBottom: activeNavTab === 'daily-sales-stock' ? '3px solid #000' : '3px solid transparent',
+              fontWeight: activeNavTab === 'daily-sales-stock' ? '600' : '400',
+              background: 'none',
+              border: 'none'
+            }}
+          >
+            Daily Sales & Stock
+          </button>
+          <button
+            onClick={() => window.location.href = '/purchasing'}
+            style={{
+              fontSize: '16px',
+              padding: '8px 0',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              color: '#1a1a1a',
+              borderBottom: '3px solid transparent',
+              fontWeight: '400',
+              background: 'none',
+              border: 'none'
+            }}
+          >
+            Purchasing
+          </button>
+          <button
+            onClick={() => window.location.href = '/expenses'}
+            style={{
+              fontSize: '16px',
+              padding: '8px 0',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              color: '#1a1a1a',
+              borderBottom: '3px solid transparent',
+              fontWeight: '400',
+              background: 'none',
+              border: 'none'
+            }}
+          >
+            Expenses
+          </button>
+          <button
+            onClick={() => window.location.href = '/reports-analysis'}
+            style={{
+              fontSize: '16px',
+              padding: '8px 0',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              color: '#1a1a1a',
+              borderBottom: '3px solid transparent',
+              fontWeight: '400',
+              background: 'none',
+              border: 'none'
+            }}
+          >
+            Reports & Analysis
+          </button>
+        </div>
+
+        {/* Content Section */}
+        <div>
+          <div style={{ 
+            fontSize: '22px', 
+            fontWeight: '600', 
+            margin: '0 0 10px' 
+          }}>
+            Daily Sales & Stock Form
+          </div>
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#444', 
+            marginBottom: '30px' 
+          }}>
+            Complete daily shift reporting with full inventory tracking.
+          </div>
+          
+          <hr style={{ 
+            border: 'none', 
+            borderTop: '1px solid #ddd', 
+            margin: '40px 0' 
+          }} />
+          
+          <div className="space-y-6">
+            <div className="flex gap-2 mb-4">
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.href = '/daily-stock-sales/search'}
+                className="bg-white text-black border-black hover:bg-gray-50"
+              >
+                View Forms
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowItemManager(!showItemManager)}
+                className="flex items-center gap-2"
+              >
+                <Wrench className="h-4 w-4" />
+                Manage Items
+              </Button>
+            </div>
+            </div>
+          </div>
+
+        {/* Item Management Panel */}
+        {showItemManager && (
         <Card className="mb-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -2336,8 +2452,9 @@ export default function DailyStockSales() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
