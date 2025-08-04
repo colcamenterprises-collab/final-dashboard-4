@@ -31,6 +31,7 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   // 2. Sales Information
   totalSales: decimal('total_sales', { precision: 10, scale: 2 }).default('0'),
   grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
+  aroiDeeSales: decimal('aroi_dee_sales', { precision: 10, scale: 2 }).default('0'),
   cashSales: decimal('cash_sales', { precision: 10, scale: 2 }).default('0'),
   qrSales: decimal('qr_sales', { precision: 10, scale: 2 }).default('0'),
   

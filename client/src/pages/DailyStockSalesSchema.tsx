@@ -49,6 +49,7 @@ const formSchema = z.object({
   // 2. Sales Information  
   total_sales: z.coerce.number().optional().default(0),
   grab_sales: z.coerce.number().optional().default(0),
+  aroi_dee_sales: z.coerce.number().optional().default(0),
   cash_sales: z.coerce.number().optional().default(0),
   qr_sales: z.coerce.number().optional().default(0),
   
@@ -93,6 +94,7 @@ export default function DailyStockSalesSchema() {
       completed_by: "",
       total_sales: 0,
       grab_sales: 0,
+      aroi_dee_sales: 0,
       cash_sales: 0,
       qr_sales: 0,
       wages: 0,
@@ -119,10 +121,11 @@ export default function DailyStockSalesSchema() {
   // Auto-calculate total sales
   useEffect(() => {
     const total = (watchedValues.grab_sales || 0) + 
+                  (watchedValues.aroi_dee_sales || 0) + 
                   (watchedValues.cash_sales || 0) + 
                   (watchedValues.qr_sales || 0);
     form.setValue('total_sales', total);
-  }, [watchedValues.grab_sales, watchedValues.cash_sales, watchedValues.qr_sales, form]);
+  }, [watchedValues.grab_sales, watchedValues.aroi_dee_sales, watchedValues.cash_sales, watchedValues.qr_sales, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -235,6 +238,20 @@ export default function DailyStockSalesSchema() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Grab Sales (฿)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="aroi_dee_sales"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aroi Dee Sales (฿)</FormLabel>
                       <FormControl>
                         <Input {...field} type="number" step="0.01" placeholder="0.00" />
                       </FormControl>
