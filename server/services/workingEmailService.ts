@@ -3,8 +3,9 @@ import type { Transporter } from 'nodemailer';
 
 interface EmailAttachment {
   filename: string;
-  content: string;
-  encoding: string;
+  content: string | Buffer;
+  encoding?: string;
+  cid?: string;
 }
 
 class WorkingEmailService {
@@ -30,17 +31,19 @@ class WorkingEmailService {
     });
   }
 
-  async sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<boolean> {
+  async sendEmail(to: string, subject: string, html: string, text?: string, attachments?: EmailAttachment[]): Promise<boolean> {
     try {
       const mailOptions = {
         from: `"Smash Brothers Burgers" <${process.env.GMAIL_USER}>`,
         to,
         subject,
         html,
+        text,
         attachments: attachments?.map(att => ({
           filename: att.filename,
           content: att.content,
-          encoding: att.encoding as BufferEncoding
+          encoding: att.encoding as BufferEncoding,
+          cid: att.cid
         }))
       };
 
@@ -71,9 +74,10 @@ export const sendEmailWithAttachment = async (
   to: string,
   subject: string,
   html: string,
-  attachments: EmailAttachment[]
+  attachments: EmailAttachment[],
+  text?: string
 ): Promise<boolean> => {
-  return await workingEmailService.sendEmail(to, subject, html, attachments);
+  return await workingEmailService.sendEmail(to, subject, html, text, attachments);
 };
 
 export const sendSimpleEmail = async (

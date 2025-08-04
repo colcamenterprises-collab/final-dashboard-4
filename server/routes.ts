@@ -1739,6 +1739,88 @@ export function registerRoutes(app: express.Application): Server {
 
       const htmlBody = generateEmailHtml(formData);
 
+      // Generate plaintext fallback for older email clients
+      const generateEmailPlaintext = (data: any) => {
+        const formatCurrency = (amount: any) => {
+          const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+          return num.toFixed(2);
+        };
+
+        const formatListData = (items: any[], type: 'wages' | 'shopping') => {
+          if (!items || !items.length) return 'None reported';
+          return items.map(item => {
+            if (type === 'wages') return `${item.name}: THB ${formatCurrency(item.amount)}`;
+            if (type === 'shopping') return `${item.item}: THB ${formatCurrency(item.amount)}`;
+            return '';
+          }).join('\n');
+        };
+
+        const formatStockData = (stock: any) => {
+          if (!stock || typeof stock !== 'object') return 'None reported';
+          return Object.entries(stock).map(([item, count]) => `${item}: ${count}`).join('\n');
+        };
+
+        return `
+Smash Brothers Burgers – Daily Shift Report
+
+Form ID: ${data.formId || 'N/A'}
+Date: ${data.shiftDate || 'N/A'}
+Shift: ${data.shiftType || 'N/A'}
+Completed by: ${data.completedBy || 'N/A'}
+
+--- SALES SUMMARY ---
+Total Sales: THB ${formatCurrency(totalSales)}
+Grab Sales: THB ${formatCurrency(data.grabSales)}
+Aroi Dee Sales: THB ${formatCurrency(data.aroiDeeSales)}
+QR Scan Sales: THB ${formatCurrency(data.qrScanSales)}
+Cash Sales: THB ${formatCurrency(data.cashSales)}
+
+--- CASH MANAGEMENT ---
+Starting Cash: THB ${formatCurrency(data.startingCash)}
+Ending Cash: THB ${formatCurrency(data.endingCash)}
+Amount Banked: THB ${formatCurrency(data.bankedAmount)}
+Cash Difference: THB ${formatCurrency(cashDifference)}
+
+--- WAGES & STAFF PAYMENTS ---
+${formatListData(data.wages, 'wages')}
+Total Wages: THB ${formatCurrency(totalWages)}
+
+--- SHOPPING & EXPENSES ---
+${formatListData(data.shopping, 'shopping')}
+Total Shopping: THB ${formatCurrency(totalShopping)}
+
+--- DRINK STOCK ---
+${formatStockData(data.drinkStock)}
+
+--- FRESH FOOD STOCK ---
+${formatStockData(data.freshFoodStock)}
+
+--- FROZEN FOOD ---
+${formatStockData(data.frozenFood)}
+
+--- SHELF ITEMS ---
+${formatStockData(data.shelfItems)}
+
+--- KITCHEN ITEMS ---
+${formatStockData(data.kitchenItems)}
+
+--- PACKAGING ITEMS ---
+${formatStockData(data.packagingItems)}
+
+--- TOTAL SUMMARY ---
+Total Sales: THB ${formatCurrency(totalSales)}
+Total Wages: THB ${formatCurrency(totalWages)}
+Total Shopping: THB ${formatCurrency(totalShopping)}
+Total Expenses: THB ${formatCurrency(totalExpenses)}
+Net Revenue: THB ${formatCurrency(netRevenue)}
+Banked Today: THB ${formatCurrency(data.bankedAmount)}
+
+Generated automatically by Smash Brothers Burgers Management System
+        `;
+      };
+
+      const plainTextBody = generateEmailPlaintext(formData);
+
       // PDF generation
       const PDFDocument = (await import('pdfkit')).default;
       
@@ -1824,7 +1906,8 @@ export function registerRoutes(app: express.Application): Server {
             content: logoBuffer,
             cid: 'logo'
           }
-        ]
+        ],
+        plainTextBody
       );
 
       return res.status(200).json({ message: 'Email sent with PDF' });
