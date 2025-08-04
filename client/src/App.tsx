@@ -110,6 +110,7 @@ function Router() {
         <Route path="/placeholder/ai-descriptions" component={() => <Placeholder title="Food Description Generator (AI)" description="AI-powered food descriptions for marketing and menu creation." />} />
         <Route path="/placeholder/chat" component={() => <Placeholder title="Chat Support" description="AI-powered chat support and assistance system." />} />
         <Route path="/placeholder/employees" component={() => <Placeholder title="Employees" description="Staff management and employee access controls." />} />
+        <Route path="/test-email" component={TestEmailPage} />
 
         <Route component={NotFound} />
       </Switch>
