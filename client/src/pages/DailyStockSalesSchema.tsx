@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import { 
   Form, 
   FormControl, 
@@ -16,22 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Clock, 
-  TrendingUp, 
-  User, 
-  ShoppingCart, 
-  DollarSign,
-  ChefHat,
-  Coffee,
-  Refrigerator,
-  Snowflake,
-  Package,
-  ClipboardList,
-  Calculator,
-  Save,
-  Send
-} from "lucide-react";
 import { z } from "zod";
 
 // FORT KNOX LOCKED SCHEMA - DO NOT MODIFY WITHOUT CAM APPROVAL
@@ -149,33 +134,54 @@ export default function DailyStockSalesSchema() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Sales & Stock Form</h1>
-          <p className="text-gray-600">Version: Fort Knox - Locked Structure</p>
+    <div style={{ fontFamily: 'Poppins, sans-serif' }} className="min-h-screen bg-white text-gray-900 p-10">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Clean Navigation Header */}
+        <div className="mb-8">
+          <nav className="text-sm text-gray-500 mb-4">
+            <Link href="/" className="hover:text-gray-700">Home</Link> / 
+            <span className="mx-1">Operations & Sales</span> / 
+            <span className="mx-1 text-gray-700">Daily Sales & Stock</span>
+          </nav>
+          
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">Operations & Sales</h1>
+          
+          {/* Clean Tabs */}
+          <div className="border-b border-gray-200 mb-8">
+            <nav className="flex space-x-8">
+              <button className="py-4 px-1 border-b-2 border-blue-500 font-medium text-blue-600 text-base">
+                Daily Sales & Stock
+              </button>
+              <Link href="/purchasing" className="py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700 text-base">
+                Purchasing
+              </Link>
+              <Link href="/expenses" className="py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700 text-base">
+                Expenses
+              </Link>
+              <Link href="/reports-analysis" className="py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700 text-base">
+                Reports & Analysis
+              </Link>
+            </nav>
+          </div>
         </div>
 
+        {/* Fort Knox Form Structure */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
 
             {/* 1. Shift Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  1. Shift Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">1. Shift Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="shift_time"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shift Time</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Shift Time</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g., 5 PM - 3 AM" />
+                        <Input {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="e.g., 5 PM - 3 AM" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -186,34 +192,29 @@ export default function DailyStockSalesSchema() {
                   name="completed_by"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Completed By</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Completed By</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Staff name" />
+                        <Input {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Staff name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
             {/* 2. Sales Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  2. Sales Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">2. Sales Information</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <FormField
                   control={form.control}
                   name="grab_sales"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Grab Sales (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Grab Sales</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -225,9 +226,9 @@ export default function DailyStockSalesSchema() {
                   name="aroi_dee_sales"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Aroi Dee Sales (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Aroi Dee Sales</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -239,9 +240,9 @@ export default function DailyStockSalesSchema() {
                   name="cash_sales"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cash Sales (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Cash Sales</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -253,89 +254,69 @@ export default function DailyStockSalesSchema() {
                   name="qr_sales"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>QR Sales (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">QR Sales</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="col-span-full p-4 bg-gray-50 rounded-lg">
-                  <p className="font-medium text-gray-700">Total Sales</p>
-                  <p className="text-2xl font-bold text-green-600">฿{(watchedValues.total_sales || 0).toFixed(2)}</p>
+                <div className="col-span-full p-4 bg-gray-50 rounded">
+                  <p className="font-medium text-gray-700">Total Sales: ฿{(watchedValues.total_sales || 0).toFixed(2)}</p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
             {/* 3. Wages & Staff Payments */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  3. Wages & Staff Payments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="wages"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Wages Paid (฿)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">3. Wages & Staff Payments</h2>
+              <FormField
+                control={form.control}
+                name="wages"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="block mb-2 text-base font-medium">Wages Paid</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 4. Shopping & Expenses */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  4. Shopping & Expenses
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="shopping_expenses"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Expenses Description</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Describe shopping and expenses" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">4. Shopping & Expenses</h2>
+              <FormField
+                control={form.control}
+                name="shopping_expenses"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="block mb-2 text-base font-medium">Expenses Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Describe shopping and expenses" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 5. Cash Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  5. Cash Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">5. Cash Management</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="starting_cash"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Starting Cash (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Starting Cash</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,9 +327,9 @@ export default function DailyStockSalesSchema() {
                   name="ending_cash"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ending Cash (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Ending Cash</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -359,34 +340,29 @@ export default function DailyStockSalesSchema() {
                   name="amount_banked"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount Banked (฿)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Amount Banked</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                        <Input {...field} type="number" step="0.01" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
             {/* 6. Burger Buns & Meat Count */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ChefHat className="h-5 w-5" />
-                  6. Burger Buns & Meat Count
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">6. Burger Buns & Meat Count</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="burger_buns_stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Burger Buns in Stock</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Burger Buns in Stock</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="0" />
+                        <Input {...field} type="number" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -397,9 +373,9 @@ export default function DailyStockSalesSchema() {
                   name="buns_ordered"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Number of Buns Ordered</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Number of Buns Ordered</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="0" />
+                        <Input {...field} type="number" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -410,203 +386,145 @@ export default function DailyStockSalesSchema() {
                   name="meat_weight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Meat Weight (grams)</FormLabel>
+                      <FormLabel className="block mb-2 text-base font-medium">Meat Weight (grams)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="0" />
+                        <Input {...field} type="number" className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="0" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
             {/* 7. Drink Stock */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Coffee className="h-5 w-5" />
-                  7. Drink Stock
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="drink_stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Drinks Purchased (List Format)</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="List drinks purchased" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">7. Drink Stock</h2>
+              <FormField
+                control={form.control}
+                name="drink_stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="block mb-2 text-base font-medium">Drinks Purchased (List Format)</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="List drinks purchased" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 8. Fresh Food Stock */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Refrigerator className="h-5 w-5" />
-                  8. Fresh Food Stock
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="fresh_food"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Fresh food stock details" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">8. Fresh Food Stock</h2>
+              <FormField
+                control={form.control}
+                name="fresh_food"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Fresh food stock details" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 9. Frozen Food */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Snowflake className="h-5 w-5" />
-                  9. Frozen Food
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="frozen_food"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Frozen food stock details" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">9. Frozen Food</h2>
+              <FormField
+                control={form.control}
+                name="frozen_food"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Frozen food stock details" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 10. Shelf Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  10. Shelf Items
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="shelf_items"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Shelf items stock details" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">10. Shelf Items</h2>
+              <FormField
+                control={form.control}
+                name="shelf_items"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Shelf items stock details" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 11. Kitchen Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ChefHat className="h-5 w-5" />
-                  11. Kitchen Items
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="kitchen_items"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Kitchen items stock details" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">11. Kitchen Items</h2>
+              <FormField
+                control={form.control}
+                name="kitchen_items"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Kitchen items stock details" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 12. Packaging Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  12. Packaging Items
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="packaging_items"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Packaging items stock details" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">12. Packaging Items</h2>
+              <FormField
+                control={form.control}
+                name="packaging_items"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Packaging items stock details" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
             {/* 13. Total Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5" />
-                  13. Total Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="total_summary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Overall summary and notes" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+            <section>
+              <h2 className="text-xl font-semibold border-b border-gray-300 pb-2 mb-4">13. Total Summary</h2>
+              <FormField
+                control={form.control}
+                name="total_summary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea {...field} className="w-full p-3 text-sm border border-gray-300 rounded" placeholder="Overall summary and notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
 
-            {/* Submit Buttons */}
-            <div className="flex gap-4 justify-end">
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => form.reset()}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Reset Form
-              </Button>
+            {/* Submit Button */}
+            <div className="pt-8">
               <Button 
                 type="submit" 
                 disabled={submitMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 text-lg font-medium rounded"
               >
-                <Send className="h-4 w-4 mr-2" />
-                {submitMutation.isPending ? 'Submitting...' : 'Submit & Send Email'}
+                {submitMutation.isPending ? 'Submitting...' : 'Submit Form & Send Email'}
               </Button>
             </div>
           </form>
