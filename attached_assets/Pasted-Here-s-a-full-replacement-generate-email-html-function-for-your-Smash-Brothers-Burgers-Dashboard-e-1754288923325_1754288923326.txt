@@ -1,0 +1,148 @@
+Here's a full replacement generate_email_html() function for your Smash Brothers Burgers Dashboard email system:
+
+✅ Includes:
+
+Your official logo (Yellow Circle - Black Logo.png) at the top
+
+All required sections in correct order
+
+No emojis or icons
+
+Clean, professional styling (compatible with most email clients)
+
+🔧 generate_email_html() Full Replacement
+python
+Copy
+Edit
+def generate_email_html(data):
+    return f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                color: #2e003e;
+                background-color: #ffffff;
+                margin: 0;
+                padding: 0;
+            }}
+            .container {{
+                width: 90%;
+                max-width: 700px;
+                margin: 20px auto;
+                padding: 20px;
+                border: 1px solid #ddd;
+            }}
+            .logo {{
+                text-align: center;
+                margin-bottom: 30px;
+            }}
+            .logo img {{
+                max-width: 120px;
+            }}
+            h2 {{
+                border-bottom: 2px solid #ccc;
+                padding-bottom: 5px;
+                margin-top: 30px;
+            }}
+            ul {{
+                padding-left: 20px;
+                margin: 5px 0;
+            }}
+            p, li {{
+                font-size: 14px;
+                line-height: 1.6;
+            }}
+            .footer {{
+                text-align: center;
+                font-size: 12px;
+                color: #999;
+                margin-top: 40px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="logo">
+                <img src="cid:logo" alt="Smash Brothers Logo">
+            </div>
+
+            <h1>Smash Brothers Burgers – Latest Form Submission</h1>
+
+            <p><strong>Form ID:</strong> {data.get('form_id', 'N/A')}<br>
+            <strong>Date:</strong> {data.get('date', 'N/A')}<br>
+            <strong>Shift:</strong> {data.get('shift', 'N/A')}<br>
+            <strong>Completed by:</strong> {data.get('completed_by', 'N/A')}</p>
+
+            <h2>Sales Summary</h2>
+            <ul>
+                <li>Total Sales: THB {data.get('total_sales', '0.00')}</li>
+                <li>Grab Sales: THB {data.get('grab_sales', '0.00')}</li>
+                <li>QR Scan Sales: THB {data.get('qr_sales', '0.00')}</li>
+                <li>Cash Sales: THB {data.get('cash_sales', '0.00')}</li>
+            </ul>
+
+            <h2>Cash Management</h2>
+            <ul>
+                <li>Starting Cash: THB {data.get('starting_cash', '0.00')}</li>
+                <li>Ending Cash: THB {data.get('ending_cash', '0.00')}</li>
+                <li>Amount Banked: THB {data.get('amount_banked', '0.00')}</li>
+            </ul>
+
+            <h2>Wages & Staff Payments</h2>
+            <p>{data.get('wages', 'None')}</p>
+
+            <h2>Shopping & Expenses</h2>
+            <p>{data.get('shopping_expenses', 'None')}</p>
+
+            <h2>Drink Stock</h2>
+            <p>{data.get('drink_stock', 'None')}</p>
+
+            <h2>Fresh Food Stock</h2>
+            <p>{data.get('fresh_food', 'None')}</p>
+
+            <h2>Frozen Food</h2>
+            <p>{data.get('frozen_food', 'None')}</p>
+
+            <h2>Shelf Items</h2>
+            <p>{data.get('shelf_items', 'None')}</p>
+
+            <h2>Kitchen Items</h2>
+            <p>{data.get('kitchen_items', 'None')}</p>
+
+            <h2>Packaging Items</h2>
+            <p>{data.get('packaging_items', 'None')}</p>
+
+            <h2>Total Summary</h2>
+            <p>{data.get('total_summary', 'None')}</p>
+
+            <div class="footer">
+                Generated automatically by Smash Brothers Burgers Management System
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+📎 Notes for Setup
+Logo setup:
+In your email-sending function, make sure to attach the logo image using cid:logo:
+
+python
+Copy
+Edit
+from email.mime.image import MIMEImage
+
+with open('Yellow Circle - Black Logo.png', 'rb') as img_file:
+    logo = MIMEImage(img_file.read())
+    logo.add_header('Content-ID', '<logo>')
+    msg.attach(logo)
+Data Structure:
+Make sure you're passing in a dict data with keys like:
+
+form_id, date, shift, completed_by
+
+total_sales, grab_sales, qr_sales, cash_sales
+
+starting_cash, ending_cash, amount_banked
+
+wages, shopping_expenses, drink_stock, etc.
