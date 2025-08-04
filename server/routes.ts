@@ -1590,55 +1590,154 @@ export function registerRoutes(app: express.Application): Server {
       const cashDifference = (formData.startingCash + totalSales) - formData.endingCash;
       const totalExpenses = totalWages + totalShopping;
 
-      // Email Body (HTML)
-      const createHtmlSection = (title: string, data: Record<string, any>) => {
-        const rows = Object.entries(data)
-          .map(([k, v]) => `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`)
-          .join('');
-        return `<h3>${title}</h3><table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-family: Arial; font-size: 14px;">${rows}</table><br/>`;
+      // Professional Email HTML Template
+      const generateEmailHtml = (data: any) => {
+        const formatCurrency = (amount: any) => {
+          const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+          return num.toFixed(2);
+        };
+
+        const formatListData = (items: any[], type: 'wages' | 'shopping') => {
+          if (!items || !items.length) return 'None reported';
+          return items.map(item => {
+            if (type === 'wages') return `${item.name}: THB ${formatCurrency(item.amount)}`;
+            if (type === 'shopping') return `${item.item}: THB ${formatCurrency(item.amount)}`;
+            return '';
+          }).join('<br>');
+        };
+
+        const formatStockData = (stock: any) => {
+          if (!stock || typeof stock !== 'object') return 'None reported';
+          return Object.entries(stock).map(([item, count]) => `${item}: ${count}`).join('<br>');
+        };
+
+        return `
+        <html>
+        <head>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    color: #2e003e;
+                    background-color: #ffffff;
+                    margin: 0;
+                    padding: 0;
+                }
+                .container {
+                    width: 90%;
+                    max-width: 700px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    border: 1px solid #ddd;
+                }
+                .logo {
+                    text-align: center;
+                    margin-bottom: 30px;
+                }
+                .logo img {
+                    max-width: 120px;
+                }
+                h1 {
+                    color: #2e003e;
+                    text-align: center;
+                }
+                h2 {
+                    border-bottom: 2px solid #ccc;
+                    padding-bottom: 5px;
+                    margin-top: 30px;
+                    color: #2e003e;
+                }
+                ul {
+                    padding-left: 20px;
+                    margin: 5px 0;
+                }
+                p, li {
+                    font-size: 14px;
+                    line-height: 1.6;
+                }
+                .footer {
+                    text-align: center;
+                    font-size: 12px;
+                    color: #999;
+                    margin-top: 40px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="logo">
+                    <img src="cid:logo" alt="Smash Brothers Logo">
+                </div>
+
+                <h1>Smash Brothers Burgers – Daily Shift Report</h1>
+
+                <p><strong>Form ID:</strong> ${data.formId || 'N/A'}<br>
+                <strong>Date:</strong> ${data.shiftDate || 'N/A'}<br>
+                <strong>Shift:</strong> ${data.shiftType || 'N/A'}<br>
+                <strong>Completed by:</strong> ${data.completedBy || 'N/A'}</p>
+
+                <h2>Sales Summary</h2>
+                <ul>
+                    <li>Total Sales: THB ${formatCurrency(totalSales)}</li>
+                    <li>Grab Sales: THB ${formatCurrency(data.grabSales)}</li>
+                    <li>Aroi Dee Sales: THB ${formatCurrency(data.aroiDeeSales)}</li>
+                    <li>QR Scan Sales: THB ${formatCurrency(data.qrScanSales)}</li>
+                    <li>Cash Sales: THB ${formatCurrency(data.cashSales)}</li>
+                </ul>
+
+                <h2>Cash Management</h2>
+                <ul>
+                    <li>Starting Cash: THB ${formatCurrency(data.startingCash)}</li>
+                    <li>Ending Cash: THB ${formatCurrency(data.endingCash)}</li>
+                    <li>Amount Banked: THB ${formatCurrency(data.bankedAmount)}</li>
+                    <li>Cash Difference: THB ${formatCurrency(cashDifference)}</li>
+                </ul>
+
+                <h2>Wages & Staff Payments</h2>
+                <p>${formatListData(data.wages, 'wages')}</p>
+                <p><strong>Total Wages: THB ${formatCurrency(totalWages)}</strong></p>
+
+                <h2>Shopping & Expenses</h2>
+                <p>${formatListData(data.shopping, 'shopping')}</p>
+                <p><strong>Total Shopping: THB ${formatCurrency(totalShopping)}</strong></p>
+
+                <h2>Drink Stock</h2>
+                <p>${formatStockData(data.drinkStock)}</p>
+
+                <h2>Fresh Food Stock</h2>
+                <p>${formatStockData(data.freshFoodStock)}</p>
+
+                <h2>Frozen Food</h2>
+                <p>${formatStockData(data.frozenFood)}</p>
+
+                <h2>Shelf Items</h2>
+                <p>${formatStockData(data.shelfItems)}</p>
+
+                <h2>Kitchen Items</h2>
+                <p>${formatStockData(data.kitchenItems)}</p>
+
+                <h2>Packaging Items</h2>
+                <p>${formatStockData(data.packagingItems)}</p>
+
+                <h2>Total Summary</h2>
+                <ul>
+                    <li>Total Sales: THB ${formatCurrency(totalSales)}</li>
+                    <li>Total Wages: THB ${formatCurrency(totalWages)}</li>
+                    <li>Total Shopping: THB ${formatCurrency(totalShopping)}</li>
+                    <li>Total Expenses: THB ${formatCurrency(totalExpenses)}</li>
+                    <li>Net Revenue: THB ${formatCurrency(netRevenue)}</li>
+                    <li>Banked Today: THB ${formatCurrency(data.bankedAmount)}</li>
+                </ul>
+
+                <div class="footer">
+                    Generated automatically by Smash Brothers Burgers Management System
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
       };
 
-      const htmlBody = `
-        <div style="font-family: Arial; font-size: 14px;">
-          <h2>📋 Smash Brothers Burgers - Daily Shift Report</h2>
-          ${createHtmlSection("Shift Information", {
-            "Completed By": formData.completedBy,
-            "Shift Type": formData.shiftType,
-            "Shift Date": formData.shiftDate,
-          })}
-          ${createHtmlSection("Sales Information", {
-            "Grab Sales": formData.grabSales || 0,
-            "Aroi Dee Sales": formData.aroiDeeSales || 0,
-            "QR Scan Sales": formData.qrScanSales || 0,
-            "Cash Sales": formData.cashSales || 0,
-            "Total Sales": totalSales
-          })}
-          ${formData.wages?.length ? createHtmlSection("Wages & Staff Payments", Object.fromEntries((formData.wages || []).map((w: any) => [w.name, w.amount]))) : ''}
-          ${createHtmlSection("Total Wages", { "Total Wages": totalWages })}
-          ${formData.shopping?.length ? createHtmlSection("Shopping & Expenses", Object.fromEntries((formData.shopping || []).map((s: any) => [s.item, s.amount]))) : ''}
-          ${createHtmlSection("Total Shopping", { "Total Shopping": totalShopping })}
-          ${createHtmlSection("Cash Management", {
-            "Starting Cash": formData.startingCash,
-            "Ending Cash": formData.endingCash,
-            "Banked Amount": formData.bankedAmount,
-            "Cash Difference": cashDifference
-          })}
-          ${formData.drinkStock ? createHtmlSection("Drink Stock", formData.drinkStock) : ''}
-          ${formData.freshFoodStock ? createHtmlSection("Fresh Food Stock", formData.freshFoodStock) : ''}
-          ${formData.frozenFood ? createHtmlSection("Frozen Food Stock", formData.frozenFood) : ''}
-          ${formData.shelfItems ? createHtmlSection("Shelf Items", formData.shelfItems) : ''}
-          ${formData.kitchenItems ? createHtmlSection("Kitchen Items", formData.kitchenItems) : ''}
-          ${formData.packagingItems ? createHtmlSection("Packaging Items", formData.packagingItems) : ''}
-          ${createHtmlSection("Total Summary", {
-            "Total Sales": totalSales,
-            "Total Wages": totalWages,
-            "Total Shopping": totalShopping,
-            "Total Expenses": totalExpenses,
-            "Net Revenue": netRevenue,
-            "Banked Today": formData.bankedAmount,
-          })}
-        </div>
-      `;
+      const htmlBody = generateEmailHtml(formData);
 
       // PDF generation
       const PDFDocument = (await import('pdfkit')).default;
@@ -1702,18 +1801,29 @@ export function registerRoutes(app: express.Application): Server {
         doc.end();
       });
 
-      // Send email
+      // Send email with logo and PDF
       const { sendEmailWithAttachment } = await import('./services/workingEmailService');
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Read logo file
+      const logoPath = path.join(process.cwd(), 'public', 'smash-brothers-logo.png');
+      const logoBuffer = fs.readFileSync(logoPath);
       
       await sendEmailWithAttachment(
         emailTo,
-        `📋 Daily Form Submitted - ${formData.shiftDate} by ${formData.completedBy}`,
+        `Daily Form Submitted - ${formData.shiftDate} by ${formData.completedBy}`,
         htmlBody,
         [
           {
             filename: `SBB-DailyForm-${formData.shiftDate}.pdf`,
             content: pdfBuffer,
           },
+          {
+            filename: 'logo.png',
+            content: logoBuffer,
+            cid: 'logo'
+          }
         ]
       );
 
