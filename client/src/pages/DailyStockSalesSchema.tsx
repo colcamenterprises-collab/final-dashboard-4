@@ -126,7 +126,11 @@ export default function DailyStockSalesSchema() {
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest('/api/daily-stock-sales', 'POST', data);
+      return apiRequest('/api/daily-stock-sales', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' }
+      });
     },
     onSuccess: () => {
       toast({

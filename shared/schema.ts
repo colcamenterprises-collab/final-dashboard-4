@@ -20,42 +20,49 @@ export const dailySales = pgTable("daily_sales", {
   staffMember: text("staff_member").notNull(),
 });
 
-// Enhanced Daily Stock Sales table
+// Daily Stock Sales table - aligned with Pydantic schema
 export const dailyStockSales = pgTable('daily_stock_sales', {
   id: serial('id').primaryKey(),
+  
+  // 1. Shift Information
+  shiftTime: text('shift_time'),
   completedBy: text('completed_by').notNull(),
-  shiftType: text('shift_type').notNull(),
-  shiftDate: timestamp('shift_date').notNull(),
-  startingCash: decimal('starting_cash', { precision: 10, scale: 2 }).default('0'),
-  grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
-  aroiDeeSales: decimal('aroi_dee_sales', { precision: 10, scale: 2 }).default('0'),
-  qrScanSales: decimal('qr_scan_sales', { precision: 10, scale: 2 }).default('0'),
-  cashSales: decimal('cash_sales', { precision: 10, scale: 2 }).default('0'),
+  
+  // 2. Sales Information
   totalSales: decimal('total_sales', { precision: 10, scale: 2 }).default('0'),
-  wages: jsonb('wages'),
-  shopping: jsonb('shopping'),
-  totalExpenses: decimal('total_expenses', { precision: 10, scale: 2 }).default('0'),
+  grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
+  cashSales: decimal('cash_sales', { precision: 10, scale: 2 }).default('0'),
+  qrSales: decimal('qr_sales', { precision: 10, scale: 2 }).default('0'),
+  
+  // 3. Wages & Staff Payments
+  wages: decimal('wages', { precision: 10, scale: 2 }).default('0'),
+  
+  // 4. Shopping & Expenses
+  shoppingExpenses: text('shopping_expenses'),
+  
+  // 5. Cash Management
+  startingCash: decimal('starting_cash', { precision: 10, scale: 2 }).default('0'),
   endingCash: decimal('ending_cash', { precision: 10, scale: 2 }).default('0'),
-  bankedAmount: decimal('banked_amount', { precision: 10, scale: 2 }).default('0'),
+  amountBanked: decimal('amount_banked', { precision: 10, scale: 2 }).default('0'),
+  
+  // 6. Burger Buns & Meat Count
   burgerBunsStock: integer('burger_buns_stock').default(0),
+  bunsOrdered: integer('buns_ordered').default(0),
   meatWeight: decimal('meat_weight', { precision: 10, scale: 2 }).default('0'),
-  rollsOrderedCount: integer('rolls_ordered_count').default(0),
-  // Individual drink stock fields - 10 beverages
+  
+  // 7. Drink Stock (array of DrinkEntry objects)
   drinkStock: jsonb('drink_stock'),
-  // Food category fields - comprehensive inventory
-  freshFood: jsonb('fresh_food'),
-  frozenFood: jsonb('frozen_food'),
-  shelfItems: jsonb('shelf_items'),
-  kitchenItems: jsonb('kitchen_items'),
-  packagingItems: jsonb('packaging_items'),
-  // Number needed field for inventory requirements
-  numberNeeded: jsonb('number_needed').default('{}'),
-  // Additional fields for enhanced functionality  
-  notes: text('notes'),
-  discrepancyNotes: text('discrepancy_notes'),
-  status: varchar('status', { length: 50 }).default('draft'),
-  isDraft: boolean('is_draft').default(true),
-  pdfPath: text('pdf_path'), // Path to stored PDF file
+  
+  // 8-13. Stock & Summary (text fields)
+  freshFood: text('fresh_food'),
+  frozenFood: text('frozen_food'),
+  shelfItems: text('shelf_items'),
+  kitchenItems: text('kitchen_items'),
+  packagingItems: text('packaging_items'),
+  totalSummary: text('total_summary'),
+  
+  // System fields
+  isDraft: boolean('is_draft').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
