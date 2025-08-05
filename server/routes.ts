@@ -459,6 +459,30 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Soft delete endpoint for daily stock sales forms
+  app.delete("/api/daily-stock-sales/:id/soft", async (req: Request, res: Response) => {
+    try {
+      const formId = parseInt(req.params.id);
+      if (isNaN(formId)) {
+        return res.status(400).json({ error: "Invalid form ID" });
+      }
+
+      const success = await storage.softDeleteDailyStockSales(formId);
+      
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: `Form ${formId} has been archived and removed from view` 
+        });
+      } else {
+        res.status(404).json({ error: "Form not found" });
+      }
+    } catch (err) {
+      console.error("Error soft deleting daily stock sales:", err);
+      res.status(500).json({ error: "Failed to archive form" });
+    }
+  });
+
   // POST endpoint for Fort Knox Daily Stock Sales form submission
   app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
@@ -525,6 +549,22 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error("Error searching daily stock sales:", err);
       res.status(500).json({ error: "Failed to search daily stock sales" });
+    }
+  });
+
+  // Soft delete endpoint for daily stock sales forms
+  app.delete("/api/daily-stock-sales/:id/soft", async (req: Request, res: Response) => {
+    try {
+      const formId = parseInt(req.params.id);
+      if (isNaN(formId)) {
+        return res.status(400).json({ error: "Invalid form ID" });
+      }
+
+      await storage.softDeleteDailyStockSales(formId);
+      res.json({ message: "Form removed from library successfully" });
+    } catch (err) {
+      console.error("Error soft deleting form:", err);
+      res.status(500).json({ error: "Failed to remove form from library" });
     }
   });
 

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Download, Calendar, User, Clock, FileCheck, Mail, Eye } from "lucide-react";
+import { FileText, Download, Calendar, User, Clock, FileCheck, Mail, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FormEntry {
@@ -24,6 +24,7 @@ const FormsLibrary = () => {
   const [loading, setLoading] = useState(true);
   const [downloadingForm, setDownloadingForm] = useState<number | null>(null);
   const [emailingForm, setEmailingForm] = useState<number | null>(null);
+  const [deletingForm, setDeletingForm] = useState<number | null>(null);
   const [emailAddress, setEmailAddress] = useState("");
 
   useEffect(() => {
@@ -128,6 +129,41 @@ const FormsLibrary = () => {
     }
   };
 
+  const handleDeleteForm = async (formId: number) => {
+    if (!confirm('Are you sure you want to remove this form from the library? It will be archived and can be recovered later if needed.')) {
+      return;
+    }
+
+    setDeletingForm(formId);
+    try {
+      const response = await fetch(`/api/daily-stock-sales/${formId}/soft`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        
+        // Remove form from local state
+        setForms(forms.filter(form => form.id !== formId));
+      } else {
+        throw new Error('Delete failed');
+      }
+    } catch (error) {
+      console.error('Form deletion failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove form from library",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingForm(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -182,7 +218,7 @@ const FormsLibrary = () => {
                   <div>
                     <CardTitle className="form-title flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      Form {form.id}
+                      {formatDate(form.createdAt)}
                     </CardTitle>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">
@@ -254,6 +290,25 @@ const FormsLibrary = () => {
                       <>
                         <Download className="h-4 w-4 mr-2" />
                         Download PDF
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={() => handleDeleteForm(form.id)}
+                    disabled={deletingForm === form.id}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    {deletingForm === form.id ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2 animate-spin" />
+                        Removing...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove from Library
                       </>
                     )}
                   </Button>

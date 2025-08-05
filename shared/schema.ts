@@ -64,6 +64,7 @@ export const dailyStockSales = pgTable('daily_stock_sales', {
   
   // System fields
   isDraft: boolean('is_draft').default(false),
+  deletedAt: timestamp('deleted_at'), // Soft delete timestamp
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

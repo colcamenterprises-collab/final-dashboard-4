@@ -113,6 +113,7 @@ export interface IStorage {
   getDraftForms(): Promise<DailyStockSales[]>;
   updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales>;
   deleteDailyStockSales(id: number): Promise<boolean>;
+  softDeleteDailyStockSales(id: number): Promise<boolean>;
   
   // Ingredients
   getIngredients(): Promise<Ingredient[]>;
@@ -805,7 +806,7 @@ export class MemStorage implements IStorage {
     
     return await db.select()
       .from(dailyStockSales)
-      .orderBy(desc(dailyStockSales.shiftDate));
+      .orderBy(desc(dailyStockSales.createdAt));
   }
 
   async getLatestDailyStockSales(): Promise<DailyStockSales | null> {
@@ -816,21 +817,33 @@ export class MemStorage implements IStorage {
     
     const results = await db.select()
       .from(dailyStockSales)
-      .orderBy(desc(dailyStockSales.shiftDate))
+      .orderBy(desc(dailyStockSales.createdAt))
       .limit(1);
     
     return results.length > 0 ? results[0] : null;
   }
 
   async getAllDailyStockSales(): Promise<DailyStockSales[]> {
-    // Use database for Daily Stock Sales - same as getDailyStockSales
+    // Use database for Daily Stock Sales - exclude soft-deleted records
     const { db } = await import("./db");
     const { dailyStockSales } = await import("@shared/schema");
-    const { desc } = await import("drizzle-orm");
+    const { desc, isNull } = await import("drizzle-orm");
     
     return await db.select()
       .from(dailyStockSales)
-      .orderBy(desc(dailyStockSales.shiftDate));
+      .where(isNull(dailyStockSales.deletedAt))
+      .orderBy(desc(dailyStockSales.createdAt));
+  }
+
+  async softDeleteDailyStockSales(id: number): Promise<void> {
+    // Soft delete a daily stock sales form by setting deletedAt timestamp
+    const { db } = await import("./db");
+    const { dailyStockSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    await db.update(dailyStockSales)
+      .set({ deletedAt: new Date() })
+      .where(eq(dailyStockSales.id, id));
   }
 
   async createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales> {
@@ -1026,6 +1039,27 @@ export class MemStorage implements IStorage {
       return result.length > 0;
     } catch (error) {
       console.error("Error deleting daily stock sales:", error);
+      return false;
+    }
+  }
+
+  async softDeleteDailyStockSales(id: number): Promise<boolean> {
+    try {
+      const { db } = await import("./db");
+      const { dailyStockSales } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const result = await db.update(dailyStockSales)
+        .set({ 
+          deletedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(dailyStockSales.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error soft deleting daily stock sales:", error);
       return false;
     }
   }
