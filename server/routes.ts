@@ -446,13 +446,12 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Daily Stock Sales endpoints - completed forms only
+  // Daily Stock Sales endpoints - all active forms
   app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {
       const forms = await storage.getAllDailyStockSales();
-      // Filter to only return completed forms (isDraft = false)
-      const completedForms = forms.filter(form => form.isDraft === false);
-      res.json(completedForms);
+      // Return all active forms (deleted_at IS NULL already filtered in storage)
+      res.json(forms);
     } catch (err) {
       console.error("Error fetching daily stock sales:", err);
       res.status(500).json({ error: "Failed to fetch daily stock sales" });

@@ -834,7 +834,7 @@ export class MemStorage implements IStorage {
       SELECT id, completed_by, shift_type, shift_date, starting_cash, ending_cash, 
              grab_sales, food_panda_sales, aroi_dee_sales, qr_scan_sales, cash_sales, 
              total_sales, salary_wages, gas_expense, total_expenses, expense_description,
-             burger_buns_stock, created_at, updated_at, deleted_at
+             burger_buns_stock, created_at, updated_at, deleted_at, is_draft, status
       FROM daily_stock_sales 
       ${whereClause}
       ORDER BY created_at DESC
@@ -860,7 +860,9 @@ export class MemStorage implements IStorage {
       burgerBunsStock: row.burger_buns_stock,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      deletedAt: row.deleted_at
+      deletedAt: row.deleted_at,
+      isDraft: row.is_draft === true || row.is_draft === 't', // Convert PostgreSQL boolean
+      status: row.status
     }));
   }
 
