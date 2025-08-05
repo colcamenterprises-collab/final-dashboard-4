@@ -483,6 +483,35 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Get all archived forms
+  app.get('/api/daily-stock-sales/archived', async (req: Request, res: Response) => {
+    try {
+      const archived = await storage.getAllDailyStockSales({ includeDeleted: true });
+      const filtered = archived.filter((entry: any) => entry.deletedAt !== null);
+      res.json(filtered);
+    } catch (err) {
+      console.error('Error getting archived forms', err);
+      res.status(500).json({ message: 'Failed to fetch archived forms' });
+    }
+  });
+
+  // Restore an archived form
+  app.post('/api/daily-stock-sales/:id/restore', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.updateDailyStockSales(parseInt(id), { deletedAt: null });
+      
+      if (success) {
+        res.json({ message: 'Form restored successfully' });
+      } else {
+        res.status(404).json({ error: 'Form not found' });
+      }
+    } catch (err) {
+      console.error('Error restoring form', err);
+      res.status(500).json({ message: 'Failed to restore form' });
+    }
+  });
+
   // POST endpoint for Fort Knox Daily Stock Sales form submission
   app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
     try {

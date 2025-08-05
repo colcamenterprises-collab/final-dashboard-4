@@ -823,17 +823,20 @@ export class MemStorage implements IStorage {
     return results.length > 0 ? results[0] : null;
   }
 
-  async getAllDailyStockSales(): Promise<DailyStockSales[]> {
+  async getAllDailyStockSales(options?: { includeDeleted?: boolean }): Promise<DailyStockSales[]> {
     // Use raw SQL query to get forms with correct column names from actual database
     const { db } = await import("./db");
+    
+    const includeDeleted = options?.includeDeleted || false;
+    const whereClause = includeDeleted ? '' : 'WHERE deleted_at IS NULL';
     
     const result = await db.execute(`
       SELECT id, completed_by, shift_type, shift_date, starting_cash, ending_cash, 
              grab_sales, food_panda_sales, aroi_dee_sales, qr_scan_sales, cash_sales, 
              total_sales, salary_wages, gas_expense, total_expenses, expense_description,
-             burger_buns_stock, created_at, updated_at
+             burger_buns_stock, created_at, updated_at, deleted_at
       FROM daily_stock_sales 
-      WHERE deleted_at IS NULL 
+      ${whereClause}
       ORDER BY created_at DESC
     `);
     
@@ -856,7 +859,8 @@ export class MemStorage implements IStorage {
       expenseDescription: row.expense_description,
       burgerBunsStock: row.burger_buns_stock,
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      deletedAt: row.deleted_at
     }));
   }
 
@@ -1073,6 +1077,25 @@ export class MemStorage implements IStorage {
       return result.rows.length > 0;
     } catch (error) {
       console.error("Error soft deleting daily stock sales:", error);
+      return false;
+    }
+  }
+
+  async updateDailyStockSales(id: number, updates: { deletedAt?: Date | null }): Promise<boolean> {
+    try {
+      const { db } = await import("./db");
+      
+      // Restore form by setting deleted_at to NULL
+      const result = await db.execute(`
+        UPDATE daily_stock_sales 
+        SET deleted_at = NULL, updated_at = NOW()
+        WHERE id = ${id} 
+        RETURNING id
+      `);
+      
+      return result.rows.length > 0;
+    } catch (error) {
+      console.error("Error updating daily stock sales:", error);
       return false;
     }
   }
