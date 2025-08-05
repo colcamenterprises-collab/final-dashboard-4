@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { 
   Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText,
-  ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle
+  ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle,
+  Clock, GitCompare
 } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
@@ -41,6 +42,19 @@ const navigationStructure = [
       { path: "/daily-stock-sales", label: "Daily Sales Form", icon: ClipboardList },
       { path: "/form-library", label: "Form Library", icon: FileText },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
+    ]
+  },
+  {
+    id: "reports",
+    label: "Reports & Analysis",
+    icon: BarChart3,
+    expandable: true,
+    items: [
+      { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
+      { path: "/analysis", label: "Analysis", icon: TrendingUp },
+      { path: "/shift-analytics", label: "Shift Analytics", icon: Activity },
+      { path: "/shift-comparison", label: "Shift Comparison", icon: BarChart },
+      { path: "/receipts", label: "Receipts", icon: Receipt },
     ]
   },
   {
