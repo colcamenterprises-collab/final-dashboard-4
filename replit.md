@@ -19,6 +19,8 @@ Fort Knox Locked Form System (Aug 4, 2025): Daily Sales & Stock form structure i
 
 Fort Knox File Structure (Aug 5, 2025): Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
 
+Form Library Updates (Aug 5, 2025): Enhanced form library with submission date headers replacing Form IDs, and soft delete functionality that removes forms from frontend view while preserving them in database for future recovery. Added deletedAt timestamp field to database schema and implemented /api/daily-stock-sales/:id/soft DELETE endpoint. Database queries updated to use raw SQL with correct column names matching actual database structure.
+
 ## System Architecture
 
 ### Frontend Architecture
