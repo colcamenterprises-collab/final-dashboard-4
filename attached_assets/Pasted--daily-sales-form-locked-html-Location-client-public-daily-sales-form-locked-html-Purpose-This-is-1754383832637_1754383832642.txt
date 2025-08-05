@@ -1,0 +1,159 @@
+ daily_sales_form_locked.html
+Location: client/public/daily_sales_form_locked.html
+
+Purpose: This is the final frontend form UI. It matches the 13 approved sections, locked order, and item list pulled from the CSV.
+
+html
+Copy
+Edit
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily Sales & Stock Form</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="form-container">
+    <h1>Daily Sales & Stock Form</h1>
+    <form method="POST" action="/submit-form">
+
+      <!-- 1. Shift Information -->
+      <section>
+        <h2>Shift Information</h2>
+        <label>Date:
+          <input type="date" name="date" required>
+        </label>
+        <label>Shift Time:
+          <select name="shift_time" required>
+            <option value="Day">Day</option>
+            <option value="Night">Night</option>
+          </select>
+        </label>
+        <label>Who Completed Form:
+          <input type="text" name="staff_name" required>
+        </label>
+      </section>
+
+      <!-- 2. Sales Information -->
+      <section>
+        <h2>Sales Information</h2>
+        <label>Cash Sales: <input type="number" step="0.01" name="cash_sales" required></label>
+        <label>QR Code Sales: <input type="number" step="0.01" name="qr_sales"></label>
+        <label>Grab Sales: <input type="number" step="0.01" name="grab_sales"></label>
+        <label>Aroi Dee Sales: <input type="number" step="0.01" name="aroi_dee_sales"></label>
+        <label>Total Discounts Given: <input type="number" step="0.01" name="discounts_given"></label>
+        <label>Refunds Issued: <input type="number" step="0.01" name="refunds_issued"></label>
+      </section>
+
+      <!-- 3. Wages & Staff Payments -->
+      <section>
+        <h2>Wages & Staff Payments</h2>
+        <label>Total Wages Paid: <input type="number" step="0.01" name="wages_paid"></label>
+        <label>Staff Meals: <input type="number" step="0.01" name="staff_meals"></label>
+      </section>
+
+      <!-- 4. Shopping & Expenses -->
+      <section>
+        <h2>Shopping & Expenses</h2>
+        <label>Total Spent on Shopping: <input type="number" step="0.01" name="shopping_expense_total"></label>
+        <label>Notes:
+          <textarea name="shopping_notes" rows="3"></textarea>
+        </label>
+      </section>
+
+      <!-- 5. Cash Management -->
+      <section>
+        <h2>Cash Management</h2>
+        <label>Starting Cash: <input type="number" step="0.01" name="starting_cash" required></label>
+        <label>Amount Banked: <input type="number" step="0.01" name="amount_banked" required></label>
+        <label>Ending Cash: <input type="number" step="0.01" name="ending_cash" required></label>
+        <label>Buns in Stock: <input type="number" name="burger_buns_stock"></label>
+        <label>Number of Buns Ordered: <input type="number" name="burger_buns_ordered"></label>
+        <label>Meat Weight Remaining (g): <input type="number" name="meat_weight"></label>
+      </section>
+
+      <!-- 6. Drink Stock -->
+      <section>
+        <h2>Drink Stock</h2>
+        <div id="drink-stock"></div>
+      </section>
+
+      <!-- 7. Fresh Food Stock -->
+      <section>
+        <h2>Fresh Food Stock</h2>
+        <div id="fresh-food"></div>
+      </section>
+
+      <!-- 8. Frozen Food -->
+      <section>
+        <h2>Frozen Food</h2>
+        <div id="frozen-food"></div>
+      </section>
+
+      <!-- 9. Shelf Items -->
+      <section>
+        <h2>Shelf Items</h2>
+        <div id="shelf-items"></div>
+      </section>
+
+      <!-- 10. Kitchen Items -->
+      <section>
+        <h2>Kitchen Items</h2>
+        <div id="kitchen-items"></div>
+      </section>
+
+      <!-- 11. Packaging Items -->
+      <section>
+        <h2>Packaging Items</h2>
+        <div id="packaging-items"></div>
+      </section>
+
+      <!-- 12. Total Summary -->
+      <section>
+        <h2>Total Summary</h2>
+        <label>Comments:
+          <textarea name="comments" rows="4"></textarea>
+        </label>
+      </section>
+
+      <button type="submit">Submit Form</button>
+    </form>
+
+    <button onclick="goBack()">Back</button>
+  </div>
+
+  <script>
+    function goBack() {
+      window.history.back();
+    }
+
+    async function loadStockItems() {
+      const res = await fetch('/api/food-costings');
+      const data = await res.json();
+
+      const categories = {
+        'Drink Stock': 'drink-stock',
+        'Fresh Food': 'fresh-food',
+        'Frozen Food': 'frozen-food',
+        'Shelf': 'shelf-items',
+        'Kitchen': 'kitchen-items',
+        'Packaging': 'packaging-items',
+      };
+
+      Object.keys(categories).forEach(category => {
+        const div = document.getElementById(categories[category]);
+        const filtered = data.filter(i => i.Category === category);
+        filtered.forEach(item => {
+          const label = document.createElement('label');
+          label.innerHTML = `${item.Item}: <input type="number" name="${item.Item}" min="0">`;
+          div.appendChild(label);
+        });
+      });
+    }
+
+    loadStockItems();
+  </script>
+</body>
+</html>
