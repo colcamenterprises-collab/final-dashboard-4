@@ -551,5 +551,44 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Fort Knox Daily Sales Form submission endpoint
+  app.post('/submit-form', async (req: Request, res: Response) => {
+    try {
+      const formData = req.body;
+      
+      // Store in database using existing storage
+      const dailySalesData = {
+        completedBy: formData.staff_name || 'Unknown Staff',
+        shiftType: formData.shift_time || 'Day',
+        shiftDate: new Date(formData.date || new Date()),
+        formData: JSON.stringify(formData),
+        totalSales: String(
+          (parseFloat(formData.cash_sales) || 0) +
+          (parseFloat(formData.qr_sales) || 0) +
+          (parseFloat(formData.grab_sales) || 0) +
+          (parseFloat(formData.aroi_dee_sales) || 0)
+        ),
+        isDraft: false,
+        status: 'completed'
+      };
+
+      // Save to database
+      await storage.createDailyStockSales(dailySalesData);
+      
+      // Send success response
+      res.json({
+        status: 'success',
+        message: 'Form submitted and saved successfully.'
+      });
+
+    } catch (error) {
+      console.error('Error submitting daily sales form:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to submit form. Please try again.'
+      });
+    }
+  });
+
   return server;
 }
