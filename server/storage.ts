@@ -824,26 +824,51 @@ export class MemStorage implements IStorage {
   }
 
   async getAllDailyStockSales(): Promise<DailyStockSales[]> {
-    // Use database for Daily Stock Sales - exclude soft-deleted records
+    // Use raw SQL query to get forms with correct column names from actual database
     const { db } = await import("./db");
-    const { dailyStockSales } = await import("@shared/schema");
-    const { desc, isNull } = await import("drizzle-orm");
     
-    return await db.select()
-      .from(dailyStockSales)
-      .where(isNull(dailyStockSales.deletedAt))
-      .orderBy(desc(dailyStockSales.createdAt));
+    const result = await db.execute(`
+      SELECT id, completed_by, shift_type, shift_date, starting_cash, ending_cash, 
+             grab_sales, food_panda_sales, aroi_dee_sales, qr_scan_sales, cash_sales, 
+             total_sales, salary_wages, gas_expense, total_expenses, expense_description,
+             burger_buns_stock, created_at, updated_at
+      FROM daily_stock_sales 
+      WHERE deleted_at IS NULL 
+      ORDER BY created_at DESC
+    `);
+    
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      completedBy: row.completed_by,
+      shiftType: row.shift_type || 'night',
+      shiftDate: row.shift_date,
+      startingCash: row.starting_cash,
+      endingCash: row.ending_cash,
+      grabSales: row.grab_sales,
+      foodpandaSales: row.food_panda_sales,
+      aroiDeeSales: row.aroi_dee_sales,
+      qrScanSales: row.qr_scan_sales,
+      cashSales: row.cash_sales,
+      totalSales: row.total_sales,
+      salaryWages: row.salary_wages,
+      gasExpense: row.gas_expense,
+      totalExpenses: row.total_expenses,
+      expenseDescription: row.expense_description,
+      burgerBunsStock: row.burger_buns_stock,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
   }
 
   async softDeleteDailyStockSales(id: number): Promise<void> {
     // Soft delete a daily stock sales form by setting deletedAt timestamp
     const { db } = await import("./db");
-    const { dailyStockSales } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
     
-    await db.update(dailyStockSales)
-      .set({ deletedAt: new Date() })
-      .where(eq(dailyStockSales.id, id));
+    await db.execute(`
+      UPDATE daily_stock_sales 
+      SET deleted_at = NOW() 
+      WHERE id = ${id}
+    `);
   }
 
   async createDailyStockSales(data: InsertDailyStockSales): Promise<DailyStockSales> {
