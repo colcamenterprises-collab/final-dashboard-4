@@ -1,0 +1,21 @@
+name,supplier,cost,unit,portions
+Burger Buns,Bakery Supply,2.50,pack,8
+Ground Beef,Meat Supplier,12.00,kg,8
+Lettuce,Fresh Produce,3.00,head,10
+Tomatoes,Fresh Produce,4.00,kg,12
+Cheese Slices,Dairy Supply,8.00,pack,20
+Bacon,Meat Supplier,15.00,kg,16
+Onions,Fresh Produce,2.00,kg,15
+Pickles,Condiment Supply,5.00,jar,30
+Ketchup,Condiment Supply,3.50,bottle,40
+Mustard,Condiment Supply,3.00,bottle,40
+French Fries,Frozen Supply,8.00,bag,25
+Chicken Nuggets,Frozen Supply,12.00,kg,20
+Coca Cola,Beverage Supply,1.20,can,1
+Pepsi,Beverage Supply,1.20,can,1
+Sprite,Beverage Supply,1.20,can,1
+Water Bottles,Beverage Supply,0.50,bottle,1
+Orange Juice,Beverage Supply,2.00,bottle,1
+Cooking Oil,Kitchen Supply,4.50,liter,1
+Salt,Kitchen Supply,1.00,pack,1
+Black Pepper,Kitchen Supply,2.50,pack,1

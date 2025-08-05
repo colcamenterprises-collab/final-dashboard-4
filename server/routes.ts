@@ -471,6 +471,7 @@ export function registerRoutes(app: express.Application): Server {
         shiftType: 'daily-stock-sales',
         shiftDate: new Date(),
         formData: JSON.stringify(data),
+        totalSales: String(data.total_sales || 0),
         isDraft: false,
         status: 'completed'
       };
@@ -530,11 +531,23 @@ export function registerRoutes(app: express.Application): Server {
   // Get all shopping lists endpoint  
   app.get('/api/shopping-lists', async (req: Request, res: Response) => {
     try {
-      const lists = await storage.getAllShoppingLists();
+      const lists = await storage.getShoppingList();
       res.json(lists);
     } catch (error) {
       console.error('Error fetching shopping lists:', error);
       res.status(500).json({ error: 'Failed to fetch shopping lists' });
+    }
+  });
+
+  // Food costings endpoint - loads CSV data
+  app.get('/api/food-costings', async (req: Request, res: Response) => {
+    try {
+      const { loadFoodCostingItems } = await import('./utils/loadFoodCostings');
+      const items = await loadFoodCostingItems();
+      res.json(items);
+    } catch (error) {
+      console.error('Error loading food costings:', error);
+      res.status(500).json({ error: 'Failed to load food costing data' });
     }
   });
 

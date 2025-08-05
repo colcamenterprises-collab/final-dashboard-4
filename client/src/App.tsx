@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import DailyStockSales from "@/pages/DailyStockSales";
 import DailyStockSalesNew from "@/pages/DailyStockSalesNew";
 import DailyStockSalesSchema from "@/pages/DailyStockSalesSchema";
+import DailyStockForm from "@/pages/DailyStockForm";
 import DailyStockSalesQuick from "@/pages/DailyStockSalesQuick";
 import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
 import DailyShiftFormSimple from "@/pages/DailyShiftFormSimple";
@@ -39,6 +40,7 @@ import DraftForms from "@/pages/DraftForms";
 import ShiftComparison from "@/pages/ShiftComparison";
 import ShiftReportDetail from "@/pages/ShiftReportDetail";
 import FormsLibrary from "@/pages/FormsLibrary";
+import FormLibrary from "@/pages/FormLibrary";
 import TestEmailPage from "@/pages/TestEmailPage";
 
 import NotFound from "@/pages/not-found";
@@ -49,7 +51,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/daily-sales-stock" component={DailySalesStock} />
-        <Route path="/daily-stock-sales" component={DailyStockSalesSchema} />
+        <Route path="/daily-stock-sales" component={DailyStockForm} />
         <Route path="/daily-stock-sales-old" component={DailyShiftForm} />
         <Route path="/daily-shift-form" component={DailyShiftForm} />
         <Route path="/daily-sales-form" component={DailyShiftForm} />
@@ -78,6 +80,7 @@ function Router() {
         <Route path="/draft-forms" component={DraftForms} />
         <Route path="/form-library" component={DraftFormsLibrary} />  
         <Route path="/forms-library" component={FormsLibrary} />
+        <Route path="/form-library" component={FormLibrary} />
         <Route path="/purchasing" component={Purchasing} />
         <Route path="/supplier-management" component={SupplierManagement} />
         <Route path="/test-monthly-stock" component={TestMonthlyStock} />

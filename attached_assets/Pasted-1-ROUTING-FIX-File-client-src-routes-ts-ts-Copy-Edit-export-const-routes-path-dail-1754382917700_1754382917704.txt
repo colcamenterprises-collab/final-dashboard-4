@@ -1,0 +1,143 @@
+1. ROUTING FIX
+File: client/src/routes.ts
+
+ts
+Copy
+Edit
+export const routes = [
+  {
+    path: '/daily-stock-sales',
+    element: <DailyStockForm />, // <- Updated route
+  },
+  {
+    path: '/form-library',
+    element: <FormLibrary />,
+  },
+  {
+    path: '/expenses',
+    element: <ExpensesPage />,
+  },
+  // other routes as needed...
+];
+✅ 2. BACK BUTTON ON EVERY SUBPAGE
+Component: client/src/components/BackButton.tsx
+
+tsx
+Copy
+Edit
+import { useNavigate } from 'react-router-dom'
+
+export default function BackButton() {
+  const navigate = useNavigate()
+  return (
+    <button className="back-button" onClick={() => navigate(-1)}>
+      ← Back
+    </button>
+  )
+}
+Add <BackButton /> to the top of every page component (Form, Expenses, Library).
+
+✅ 3. FORM PAGE
+File: client/src/pages/DailyStockForm.tsx
+
+tsx
+Copy
+Edit
+import React from 'react'
+import BackButton from '../components/BackButton'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { DailyStockSchema } from '../schemas/dailySalesSchema'
+import { foodCostingItems } from '../data/foodCostingItems' // <-- Populated from CSV
+
+export default function DailyStockForm() {
+  const form = useForm({
+    resolver: zodResolver(DailyStockSchema),
+  })
+
+  return (
+    <div className="form-container">
+      <BackButton />
+      <h1>Daily Sales & Stock</h1>
+
+      {/* Loop through sections here using fieldsets */}
+      {foodCostingItems.map((item) => (
+        <div key={item.name}>
+          <label>{item.name}</label>
+          <input type="number" {...form.register(item.key)} />
+        </div>
+      ))}
+
+      <button type="submit">Submit</button>
+    </div>
+  )
+}
+✅ 4. MENU NAVIGATION UPDATE
+File: client/src/components/NavSidebar.tsx
+
+tsx
+Copy
+Edit
+<Menu label="Sales & Operations">
+  <MenuItem to="/daily-stock-sales">Daily Sales Form</MenuItem>
+  <MenuItem to="/form-library">Form Library</MenuItem>
+  <MenuItem to="/expenses">Expenses</MenuItem>
+</Menu>
+No parent landing page. Clicking "Sales & Operations" just expands these 3 direct links.
+
+✅ 5. INGREDIENTS + MENU MANAGEMENT
+The following use:
+Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv
+
+Used to populate:
+
+Form item list
+
+Menu Management dropdowns
+
+Ingredients List display
+
+CSV Parser File: server/utils/loadFoodCostings.ts
+
+ts
+Copy
+Edit
+import fs from 'fs'
+import path from 'path'
+import csv from 'csv-parser'
+
+const filePath = path.join(__dirname, '..', 'data', 'Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv')
+
+export async function loadFoodCostingItems() {
+  const results = []
+  return new Promise((resolve) => {
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => resolve(results))
+  })
+}
+✅ 6. README (already deployed)
+Your README is locked and reflects all of the above.
+
+✅ 7. EMAIL + SHOPPING LIST
+workingEmailService.ts is wired for Gmail fallback (App Password OK)
+
+Form output is parsed against food costing list and filtered by entries where value > 0 to generate the shopping list
+
+PDF + email flow wired and will be confirmed on test
+
+✅ NEXT STEPS
+Confirm deployment to /daily-stock-sales now works
+
+Confirm form renders with correct list items
+
+Test submission triggers:
+
+Email summary
+
+Shopping list
+
+Storage
+
+Reconnect Home page if needed with new link

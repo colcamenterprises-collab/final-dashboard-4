@@ -34,16 +34,13 @@ interface LayoutProps {
 const navigationStructure = [
   {
     id: "operations",
-    label: "Operations & Sales",
+    label: "Sales & Operations",
     icon: ShoppingCart,
     expandable: true,
-    path: "/daily-sales-stock", // Main page for collapsed state
     items: [
-      { path: "/daily-sales-stock", label: "Daily Sales & Stock", icon: ClipboardList },
-      { path: "/forms-library", label: "Forms Library", icon: FileText },
-      { path: "/purchasing", label: "Purchasing", icon: ShoppingCart },
+      { path: "/daily-stock-sales", label: "Daily Sales Form", icon: ClipboardList },
+      { path: "/form-library", label: "Form Library", icon: FileText },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
-      { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
     ]
   },
   {
