@@ -345,49 +345,49 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Daily Shift Forms endpoints (comprehensive form data handling)
-  app.post("/api/daily-shift-forms", async (req: Request, res: Response) => {
+  app.post("/api/daily-shift-forms", validateDailySalesForm, async (req: Request, res: Response) => {
     try {
-      const data = req.body;
-      console.log("Comprehensive form submission:", data);
+      const data = req.body; // Now validated and sanitized by middleware
+      console.log("✅ Validated comprehensive form submission:", data);
       
-      // Prepare data for database insertion
+      // Use validated data from middleware
       const formData = {
-        completedBy: data.completedBy || 'Unknown User',
-        shiftType: data.shiftType || 'Standard',
-        shiftDate: data.shiftDate ? new Date(data.shiftDate) : new Date(),
+        completedBy: data.completed_by || data.completedBy || 'Unknown User',
+        shiftType: data.shift_type || data.shiftType || 'Standard',
+        shiftDate: data.shift_date || data.shiftDate || new Date(),
         
-        // Sales data
-        startingCash: parseFloat(data.startingCash || '0'),
-        grabSales: parseFloat(data.grabSales || '0'),
-        aroiDeeSales: parseFloat(data.aroiDeeSales || '0'),
-        qrScanSales: parseFloat(data.qrScanSales || '0'),
-        cashSales: parseFloat(data.cashSales || '0'),
-        totalSales: parseFloat(data.grabSales || '0') + parseFloat(data.aroiDeeSales || '0') + parseFloat(data.qrScanSales || '0') + parseFloat(data.cashSales || '0'),
+        // Sales data (validated by middleware)
+        startingCash: data.starting_cash || data.startingCash || 0,
+        grabSales: data.grab_sales || data.grabSales || 0,
+        aroiDeeSales: data.aroi_dee_sales || data.aroiDeeSales || 0,
+        qrScanSales: data.qr_scan_sales || data.qrScanSales || 0,
+        cashSales: data.cash_sales || data.cashSales || 0,
+        totalSales: data.total_sales || data.totalSales || 0,
         
         // Cash management
-        endingCash: parseFloat(data.endingCash || '0'),
-        bankedAmount: parseFloat(data.bankedAmount || '0'),
+        endingCash: data.ending_cash || data.endingCash || 0,
+        bankedAmount: data.banked_amount || data.bankedAmount || 0,
         
-        // Expenses
+        // Expenses (validated by middleware)
         wages: JSON.stringify(data.wages || []),
         shopping: JSON.stringify(data.shopping || []),
-        totalExpenses: (data.wages || []).reduce((sum: number, wage: any) => sum + parseFloat(wage.amount || '0'), 0) + 
-                       (data.shopping || []).reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0),
+        totalExpenses: data.total_expenses || data.totalExpenses || 0,
         
         // Inventory data
         numberNeeded: JSON.stringify(data.inventory || {}),
         
         // Status
         isDraft: false,
-        status: 'completed'
+        status: data.status || 'completed',
+        validatedAt: data.validated_at
       };
       
-      console.log("Processed form data:", formData);
+      console.log("✅ Processed validated form data:", formData);
       
       // Use Drizzle ORM with proper schema field mapping
       const [result] = await db.insert(dailyStockSales).values([formData]).returning();
       
-      console.log("✅ Comprehensive form saved successfully with ID:", result.id);
+      console.log("✅ Validated comprehensive form saved with ID:", result.id);
       res.json(result);
     } catch (err: any) {
       console.error("Form submission error:", err.message);
@@ -512,33 +512,63 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // POST endpoint for Fort Knox Daily Stock Sales form submission
-  app.post("/api/daily-stock-sales", async (req: Request, res: Response) => {
+  // POST endpoint for Fort Knox Daily Stock Sales form submission with validation
+  app.post("/api/daily-stock-sales", validateDailySalesForm, async (req: Request, res: Response) => {
     try {
-      const data = req.body;
-      console.log("Fort Knox Daily Stock Sales form submission:", data);
+      const data = req.body; // Now validated and sanitized by middleware
+      console.log("✅ Validated Fort Knox Daily Stock Sales form submission:", data);
       
-      // Store form data with proper structure matching Fort Knox schema
+      // Use the validated and sanitized data from middleware
       const formData = {
-        completedBy: data.completed_by || 'Unknown Staff',
-        shiftType: 'daily-stock-sales',
-        shiftDate: new Date(),
+        completedBy: data.completed_by || data.completedBy || 'Unknown Staff',
+        shiftType: data.shift_type || 'daily-stock-sales',
+        shiftDate: data.shift_date || new Date(),
+        
+        // Sales data (validated by middleware)
+        startingCash: data.starting_cash,
+        endingCash: data.ending_cash,
+        grabSales: data.grab_sales,
+        foodPandaSales: data.food_panda_sales,
+        aroiDeeSales: data.aroi_dee_sales,
+        qrScanSales: data.qr_scan_sales,
+        cashSales: data.cash_sales,
+        totalSales: data.total_sales,
+        
+        // Expenses (validated by middleware)
+        salaryWages: data.salary_wages,
+        gasExpense: data.gas_expense,
+        totalExpenses: data.total_expenses,
+        
+        // Stock data (validated by middleware)
+        burgerBunsStock: data.burger_buns_stock,
+        meatWeight: data.meat_weight,
+        
+        // Additional data
         formData: JSON.stringify(data),
-        totalSales: String(data.total_sales || 0),
         isDraft: false,
-        status: 'completed'
+        status: data.status || 'completed',
+        validatedAt: data.validated_at
       };
       
       const [result] = await db.insert(dailyStockSales).values(formData).returning();
-      console.log("✅ Fort Knox form saved with ID:", result.id);
+      console.log("✅ Validated Fort Knox form saved with ID:", result.id);
       
       // Email notification will be added when email service is configured
-      console.log("✅ Form saved successfully - email notification ready for configuration");
+      console.log("✅ Form validation passed - data integrity confirmed");
       
-      res.json(result);
+      res.json({ 
+        success: true, 
+        data: result,
+        message: 'Form submitted successfully with validation',
+        validation_status: 'passed'
+      });
     } catch (err: any) {
       console.error("Fort Knox form submission error:", err);
-      res.status(500).json({ error: 'Failed to save form', details: err.message });
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to save form', 
+        details: err.message 
+      });
     }
   });
 
@@ -621,60 +651,52 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Fort Knox Daily Sales Form submission endpoint
-  app.post('/submit-form', async (req: Request, res: Response) => {
+  app.post('/submit-form', validateDailySalesForm, async (req: Request, res: Response) => {
     try {
-      const { validateDailySalesForm } = await import('./middleware/validateDailySalesForm');
+      const formData = req.body; // Now validated and sanitized by middleware
+      console.log("✅ Validated /submit-form submission:", formData);
       
-      // Validate form data
-      const body = req.body;
-      const requiredFields = [
-        'date', 'starting_cash', 'cash_sales', 'qr_sales', 'grab_sales',
-        'aroi_dee_sales', 'ziptap_sales', 'refunds', 'banked_amount',
-        'burger_buns_stock', 'meat_weight', 'drinks_stock', 'expenses',
-        'wages', 'shopping_items'
-      ];
-
-      const missing = requiredFields.filter(field => !(field in body));
-      if (missing.length > 0) {
-        return res.status(400).json({
-          error: 'Missing required fields',
-          fields: missing
-        });
-      }
-
-      const formData = req.body;
-      
-      // Store in database using existing storage
+      // Use validated data for database storage
       const dailySalesData = {
-        completedBy: formData.staff_name || 'Unknown Staff',
-        shiftType: formData.shift_time || 'Day',
-        shiftDate: new Date(formData.date || new Date()),
+        completedBy: formData.completed_by || formData.staff_name || 'Unknown Staff',
+        shiftType: formData.shift_type || formData.shift_time || 'Day',
+        shiftDate: formData.shift_date || new Date(formData.date || new Date()),
+        
+        // Sales data (validated by middleware)
+        startingCash: formData.starting_cash || 0,
+        endingCash: formData.ending_cash || 0,
+        grabSales: formData.grab_sales || 0,
+        aroiDeeSales: formData.aroi_dee_sales || 0,
+        qrScanSales: formData.qr_scan_sales || formData.qr_sales || 0,
+        cashSales: formData.cash_sales || 0,
+        totalSales: formData.total_sales || 0,
+        
+        // Additional data
         formData: JSON.stringify(formData),
-        totalSales: String(
-          (parseFloat(formData.cash_sales) || 0) +
-          (parseFloat(formData.qr_sales) || 0) +
-          (parseFloat(formData.grab_sales) || 0) +
-          (parseFloat(formData.aroi_dee_sales) || 0) +
-          (parseFloat(formData.ziptap_sales) || 0)
-        ),
         isDraft: false,
-        status: 'completed'
+        status: formData.status || 'completed',
+        validatedAt: formData.validated_at
       };
 
-      // Save to database
-      await storage.createDailyStockSales(dailySalesData);
+      // Save to database using existing storage
+      const result = await storage.createDailyStockSales(dailySalesData);
       
-      // Send success response
+      // Send success response with validation confirmation
       res.json({
+        success: true,
         status: 'success',
-        message: 'Form submitted and saved successfully.'
+        message: 'Form submitted and validated successfully',
+        validation_status: 'passed',
+        data: result
       });
 
     } catch (error) {
-      console.error('Error submitting daily sales form:', error);
+      console.error('Error submitting validated daily sales form:', error);
       res.status(500).json({
+        success: false,
         status: 'error',
-        message: 'Failed to submit form. Please try again.'
+        message: 'Failed to submit form. Please try again.',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
