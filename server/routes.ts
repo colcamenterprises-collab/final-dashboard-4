@@ -554,6 +554,25 @@ export function registerRoutes(app: express.Application): Server {
   // Fort Knox Daily Sales Form submission endpoint
   app.post('/submit-form', async (req: Request, res: Response) => {
     try {
+      const { validateDailySalesForm } = await import('./middleware/validateDailySalesForm');
+      
+      // Validate form data
+      const body = req.body;
+      const requiredFields = [
+        'date', 'starting_cash', 'cash_sales', 'qr_sales', 'grab_sales',
+        'aroi_dee_sales', 'ziptap_sales', 'refunds', 'banked_amount',
+        'burger_buns_stock', 'meat_weight', 'drinks_stock', 'expenses',
+        'wages', 'shopping_items'
+      ];
+
+      const missing = requiredFields.filter(field => !(field in body));
+      if (missing.length > 0) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          fields: missing
+        });
+      }
+
       const formData = req.body;
       
       // Store in database using existing storage
@@ -566,7 +585,8 @@ export function registerRoutes(app: express.Application): Server {
           (parseFloat(formData.cash_sales) || 0) +
           (parseFloat(formData.qr_sales) || 0) +
           (parseFloat(formData.grab_sales) || 0) +
-          (parseFloat(formData.aroi_dee_sales) || 0)
+          (parseFloat(formData.aroi_dee_sales) || 0) +
+          (parseFloat(formData.ziptap_sales) || 0)
         ),
         isDraft: false,
         status: 'completed'
