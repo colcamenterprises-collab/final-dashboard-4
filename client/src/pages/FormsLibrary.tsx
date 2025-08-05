@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Download, Calendar, User, Clock, FileCheck, Mail, Eye, Trash2 } from "lucide-react";
+import { FileText, Download, Calendar, User, Clock, FileCheck, Mail, Eye, Trash2, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FormEntry {
@@ -22,15 +22,19 @@ const FormsLibrary = () => {
   const { toast } = useToast();
   const [forms, setForms] = useState<FormEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewArchived, setViewArchived] = useState(false);
   const [downloadingForm, setDownloadingForm] = useState<number | null>(null);
   const [emailingForm, setEmailingForm] = useState<number | null>(null);
   const [deletingForm, setDeletingForm] = useState<number | null>(null);
+  const [restoringForm, setRestoringForm] = useState<number | null>(null);
   const [emailAddress, setEmailAddress] = useState("");
 
   useEffect(() => {
     const fetchForms = async () => {
+      setLoading(true);
       try {
-        const response = await fetch('/api/daily-stock-sales');
+        const endpoint = viewArchived ? '/api/daily-stock-sales/archived' : '/api/daily-stock-sales';
+        const response = await fetch(endpoint);
         if (response.ok) {
           const data = await response.json();
           setForms(data.sort((a: FormEntry, b: FormEntry) => 
@@ -41,7 +45,7 @@ const FormsLibrary = () => {
         console.error('Failed to fetch forms:', error);
         toast({
           title: "Error",
-          description: "Failed to load forms library",
+          description: `Failed to load ${viewArchived ? 'archived' : 'active'} forms`,
           variant: "destructive",
         });
       } finally {
@@ -50,7 +54,7 @@ const FormsLibrary = () => {
     };
 
     fetchForms();
-  }, [toast]);
+  }, [toast, viewArchived]);
 
   const handleDownloadPDF = async (formId: number) => {
     setDownloadingForm(formId);
@@ -164,6 +168,41 @@ const FormsLibrary = () => {
     }
   };
 
+  const handleRestoreForm = async (formId: number) => {
+    if (!confirm('Are you sure you want to restore this form to the active library?')) {
+      return;
+    }
+
+    setRestoringForm(formId);
+    try {
+      const response = await fetch(`/api/daily-stock-sales/${formId}/restore`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        
+        // Remove form from local state since it's now active
+        setForms(forms.filter(form => form.id !== formId));
+      } else {
+        throw new Error('Restore failed');
+      }
+    } catch (error) {
+      console.error('Form restoration failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to restore form",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoringForm(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -193,19 +232,40 @@ const FormsLibrary = () => {
   return (
     <div className="forms-library container mx-auto p-4">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold mb-2">Forms Library</h1>
-        <p className="text-muted-foreground">
-          Access and download daily shift forms. All forms are available as PDF documents.
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-semibold mb-2">
+              Forms Library {viewArchived ? '- Archived' : '- Active'}
+            </h1>
+            <p className="text-muted-foreground">
+              {viewArchived 
+                ? 'View and restore archived daily shift forms.' 
+                : 'Access and download daily shift forms. All forms are available as PDF documents.'
+              }
+            </p>
+          </div>
+          <Button 
+            onClick={() => setViewArchived(!viewArchived)}
+            variant="outline"
+            className="bg-white dark:bg-gray-800"
+          >
+            {viewArchived ? "View Active Forms" : "View Archived Forms"}
+          </Button>
+        </div>
       </div>
 
       {forms.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No forms available</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {viewArchived ? 'No archived forms' : 'No active forms available'}
+            </h3>
             <p className="text-muted-foreground">
-              Complete your first daily shift form to see it here.
+              {viewArchived 
+                ? 'All archived forms have been restored or no forms have been archived yet.'
+                : 'Complete your first daily shift form to see it here.'
+              }
             </p>
           </CardContent>
         </Card>
@@ -294,24 +354,45 @@ const FormsLibrary = () => {
                     )}
                   </Button>
 
-                  <Button
-                    onClick={() => handleDeleteForm(form.id)}
-                    disabled={deletingForm === form.id}
-                    variant="destructive"
-                    className="w-full"
-                  >
-                    {deletingForm === form.id ? (
-                      <>
-                        <Clock className="h-4 w-4 mr-2 animate-spin" />
-                        Removing...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove from Library
-                      </>
-                    )}
-                  </Button>
+                  {viewArchived ? (
+                    <Button
+                      onClick={() => handleRestoreForm(form.id)}
+                      disabled={restoringForm === form.id}
+                      variant="default"
+                      className="w-full bg-green-600 text-white hover:bg-green-700"
+                    >
+                      {restoringForm === form.id ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Restoring...
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Restore Form
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleDeleteForm(form.id)}
+                      disabled={deletingForm === form.id}
+                      variant="destructive"
+                      className="w-full"
+                    >
+                      {deletingForm === form.id ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Removing...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove from Library
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   <Dialog>
                     <DialogTrigger asChild>

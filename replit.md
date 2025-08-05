@@ -21,6 +21,8 @@ Fort Knox File Structure (Aug 5, 2025): Core locked files include daily_sales_fo
 
 Form Library Updates (Aug 5, 2025): Enhanced form library with submission date headers replacing Form IDs, and soft delete functionality that removes forms from frontend view while preserving them in database for future recovery. Added deletedAt timestamp field to database schema and implemented /api/daily-stock-sales/:id/soft DELETE endpoint. Database queries updated to use raw SQL with correct column names matching actual database structure.
 
+Archived View System (Aug 5, 2025): Implemented complete archived view functionality with toggle between Active and Archived forms. Added /api/daily-stock-sales/archived GET endpoint and /api/daily-stock-sales/:id/restore POST endpoint. Frontend includes toggle button, restore functionality with confirmation dialogs, and context-aware UI messaging. Forms can be archived (soft deleted) and restored seamlessly while maintaining data integrity.
+
 ## System Architecture
 
 ### Frontend Architecture
