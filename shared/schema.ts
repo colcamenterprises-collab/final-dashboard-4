@@ -20,53 +20,65 @@ export const dailySales = pgTable("daily_sales", {
   staffMember: text("staff_member").notNull(),
 });
 
-// Daily Stock Sales table - aligned with Pydantic schema
-export const dailyStockSales = pgTable('daily_stock_sales', {
-  id: serial('id').primaryKey(),
-  
-  // 1. Shift Information
-  shiftTime: text('shift_time'),
-  completedBy: text('completed_by').notNull(),
-  
-  // 2. Sales Information
-  totalSales: decimal('total_sales', { precision: 10, scale: 2 }).default('0'),
-  grabSales: decimal('grab_sales', { precision: 10, scale: 2 }).default('0'),
-  aroiDeeSales: decimal('aroi_dee_sales', { precision: 10, scale: 2 }).default('0'),
-  cashSales: decimal('cash_sales', { precision: 10, scale: 2 }).default('0'),
-  qrSales: decimal('qr_sales', { precision: 10, scale: 2 }).default('0'),
-  
-  // 3. Wages & Staff Payments
-  wages: decimal('wages', { precision: 10, scale: 2 }).default('0'),
-  
-  // 4. Shopping & Expenses
-  shoppingExpenses: text('shopping_expenses'),
-  
-  // 5. Cash Management
-  startingCash: decimal('starting_cash', { precision: 10, scale: 2 }).default('0'),
-  endingCash: decimal('ending_cash', { precision: 10, scale: 2 }).default('0'),
-  amountBanked: decimal('amount_banked', { precision: 10, scale: 2 }).default('0'),
-  
-  // 6. Burger Buns & Meat Count
-  burgerBunsStock: integer('burger_buns_stock').default(0),
-  bunsOrdered: integer('buns_ordered').default(0),
-  meatWeight: decimal('meat_weight', { precision: 10, scale: 2 }).default('0'),
-  
-  // 7. Drink Stock (array of DrinkEntry objects)
-  drinkStock: jsonb('drink_stock'),
-  
-  // 8-13. Stock & Summary (text fields)
-  freshFood: text('fresh_food'),
-  frozenFood: text('frozen_food'),
-  shelfItems: text('shelf_items'),
-  kitchenItems: text('kitchen_items'),
-  packagingItems: text('packaging_items'),
-  totalSummary: text('total_summary'),
-  
+// Daily Stock Sales table - synced with live database
+export const dailyStockSales = pgTable("daily_stock_sales", {
+  id: serial("id").primaryKey(),
+
+  // Core fields
+  completedBy: text("completed_by").notNull(),
+  shiftType: text("shift_type").notNull(),
+  shiftDate: timestamp("shift_date").notNull(),
+
+  // Sales Data
+  startingCash: decimal("starting_cash", { precision: 10, scale: 2 }),
+  endingCash: decimal("ending_cash", { precision: 10, scale: 2 }),
+  grabSales: decimal("grab_sales", { precision: 10, scale: 2 }),
+  foodPandaSales: decimal("food_panda_sales", { precision: 10, scale: 2 }),
+  aroiDeeSales: decimal("aroi_dee_sales", { precision: 10, scale: 2 }),
+  qrScanSales: decimal("qr_scan_sales", { precision: 10, scale: 2 }),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }),
+
+  // Expenses
+  salaryWages: decimal("salary_wages", { precision: 10, scale: 2 }),
+  gasExpense: decimal("gas_expense", { precision: 10, scale: 2 }),
+  totalExpenses: decimal("total_expenses", { precision: 10, scale: 2 }),
+  expenseDescription: text("expense_description"),
+
+  // Stock Tracking
+  burgerBunsStock: integer("burger_buns_stock"),
+  rollsOrderedCount: integer("rolls_ordered_count"),
+  meatWeight: decimal("meat_weight", { precision: 10, scale: 2 }),
+  drinkStockCount: integer("drink_stock_count"),
+
+  // JSON Data Blocks
+  foodItems: jsonb("food_items"),
+  drinkStock: jsonb("drink_stock"),
+  kitchenItems: jsonb("kitchen_items"),
+  packagingItems: jsonb("packaging_items"),
+  freshFood: jsonb("fresh_food"),
+  frozenFood: jsonb("frozen_food"),
+  shelfItems: jsonb("shelf_items"),
+  wageEntries: jsonb("wage_entries"),
+  shoppingEntries: jsonb("shopping_entries"),
+
+  // Additional fields from database
+  rollsOrderedConfirmed: boolean("rolls_ordered_confirmed"),
+  wages: jsonb("wages"),
+  bankedAmount: decimal("banked_amount", { precision: 10, scale: 2 }),
+  purchasedAmounts: jsonb("purchased_amounts"),
+  numberNeeded: jsonb("number_needed"),
+  shopping: jsonb("shopping"),
+  pdfPath: text("pdf_path"),
+
   // System fields
-  isDraft: boolean('is_draft').default(false),
-  deletedAt: timestamp('deleted_at'), // Soft delete timestamp
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  isDraft: boolean("is_draft").default(false),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  status: text("status"),
+  notes: text("notes"),
+  discrepancyNotes: text("discrepancy_notes"),
 });
 
 // Menu Items table
@@ -610,6 +622,8 @@ export const dailyShiftSummary = pgTable("daily_shift_summary", {
 
 export const insertDailyShiftSummarySchema = createInsertSchema(dailyShiftSummary);
 export type InsertDailyShiftSummary = z.infer<typeof insertDailyShiftSummarySchema>;
+
+
 
 // Types
 export type QuickNote = typeof quickNotes.$inferSelect;

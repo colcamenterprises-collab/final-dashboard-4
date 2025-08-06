@@ -1,0 +1,61 @@
+Sync shared/schema.ts with Live Database
+I’ll now generate the exact daily_stock_sales table schema using Drizzle’s format, based on your real columns:
+
+🧩 shared/schema.ts (Drizzle Schema Update)
+Here’s your updated and locked schema for the daily_stock_sales table:
+
+ts
+Copy
+Edit
+// shared/schema.ts
+import { pgTable, serial, text, timestamp, numeric, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+
+export const daily_stock_sales = pgTable("daily_stock_sales", {
+  id: serial("id").primaryKey(),
+
+  // Core fields
+  completed_by: text("completed_by").notNull(),
+  shift_type: text("shift_type").notNull(),
+  shift_date: timestamp("shift_date").notNull(),
+
+  // Sales Data
+  starting_cash: numeric("starting_cash"),
+  ending_cash: numeric("ending_cash"),
+  grab_sales: numeric("grab_sales"),
+  food_panda_sales: numeric("food_panda_sales"),
+  aroi_dee_sales: numeric("aroi_dee_sales"),
+  qr_scan_sales: numeric("qr_scan_sales"),
+  cash_sales: numeric("cash_sales"),
+  total_sales: numeric("total_sales"),
+
+  // Expenses
+  salary_wages: numeric("salary_wages"),
+  gas_expense: numeric("gas_expense"),
+  total_expenses: numeric("total_expenses"),
+  expense_description: text("expense_description"),
+
+  // Stock Tracking
+  burger_buns_stock: integer("burger_buns_stock"),
+  meat_weight: numeric("meat_weight"),
+  drink_stock_count: integer("drink_stock_count"),
+
+  // JSON Data Blocks
+  food_items: jsonb("food_items"),
+  drink_stock: jsonb("drink_stock"),
+  kitchen_items: jsonb("kitchen_items"),
+  packaging_items: jsonb("packaging_items"),
+  fresh_food: jsonb("fresh_food"),
+  frozen_food: jsonb("frozen_food"),
+  shelf_items: jsonb("shelf_items"),
+  wage_entries: jsonb("wage_entries"),
+  shopping_entries: jsonb("shopping_entries"),
+
+  // System
+  is_draft: boolean("is_draft"),
+  deleted_at: timestamp("deleted_at"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+  status: text("status"),
+  notes: text("notes"),
+  discrepancy_notes: text("discrepancy_notes"),
+});
