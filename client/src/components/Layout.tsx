@@ -42,14 +42,6 @@ const navigationStructure = [
       { path: "/daily-stock-sales", label: "Daily Sales Form", icon: ClipboardList },
       { path: "/form-library", label: "Form Library", icon: FileText },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
-    ]
-  },
-  {
-    id: "reports",
-    label: "Reports & Analysis",
-    icon: BarChart3,
-    expandable: true,
-    items: [
       { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
       { path: "/analysis", label: "Analysis", icon: TrendingUp },
       { path: "/shift-analytics", label: "Shift Analytics", icon: Activity },

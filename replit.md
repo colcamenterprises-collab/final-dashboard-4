@@ -27,6 +27,8 @@ Comprehensive Form Validation System (Aug 6, 2025): Implemented robust validatio
 
 Database Schema Synchronization (Aug 6, 2025): Updated shared/schema.ts to match live PostgreSQL database structure for daily_stock_sales table. Resolved type safety issues by aligning Drizzle ORM schema with actual database columns including sales data (grab_sales, food_panda_sales, etc.), expense tracking, stock counts, and JSONB fields. Schema now provides proper TypeScript types and validation schemas for all form operations.
 
+Navigation Structure Update (Aug 6, 2025): Reorganized Reports & Analysis functionality to be nested under Sales & Operations section rather than standalone top-level navigation. This consolidates operational tools including Daily Sales Form, Form Library, Expenses, Reports & Analysis, Analysis, Shift Analytics, Shift Comparison, and Receipts under a unified Sales & Operations menu for improved workflow organization.
+
 ## System Architecture
 
 ### Frontend Architecture
