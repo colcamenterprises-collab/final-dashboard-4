@@ -7,7 +7,7 @@ import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients } from "../shared/schema"; // Adjust path
 import { z } from "zod";
 import { eq, desc, sql, inArray, isNull } from "drizzle-orm";
 import multer from 'multer';
@@ -495,6 +495,78 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error('Performance metrics error:', err);
       res.status(500).json({ error: 'Failed to get performance metrics' });
+    }
+  });
+
+  // CSV Sync endpoint for supplier data
+  app.post('/api/sync-supplier-csv', async (req: Request, res: Response) => {
+    try {
+      const { syncSupplierCSV } = await import('./syncSupplierCSV');
+      console.log('🔄 Starting supplier CSV sync...');
+      
+      const result = await syncSupplierCSV();
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: `CSV sync completed successfully`,
+          imported: result.imported,
+          updated: result.updated,
+          totalProcessed: result.totalProcessed,
+          errors: result.errors
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'CSV sync failed',
+          errors: result.errors
+        });
+      }
+    } catch (err) {
+      console.error('CSV sync error:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to sync CSV',
+        details: err instanceof Error ? err.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get ingredients organized by category for forms
+  app.get('/api/ingredients/by-category', async (req: Request, res: Response) => {
+    try {
+      console.log('🔍 Fetching ingredients by category...');
+      
+      const allIngredients = await db.select().from(ingredients)
+        .orderBy(ingredients.category, ingredients.name);
+
+      console.log(`📦 Found ${allIngredients.length} ingredients`);
+
+      // Group by category
+      const ingredientsByCategory: Record<string, any[]> = {};
+      
+      allIngredients.forEach(ingredient => {
+        if (!ingredientsByCategory[ingredient.category]) {
+          ingredientsByCategory[ingredient.category] = [];
+        }
+        ingredientsByCategory[ingredient.category].push(ingredient);
+      });
+
+      const categories = Object.keys(ingredientsByCategory).sort();
+      console.log(`📂 Categories found: ${categories.join(', ')}`);
+
+      res.json({
+        success: true,
+        categories: categories,
+        ingredients: ingredientsByCategory,
+        total: allIngredients.length
+      });
+    } catch (err) {
+      console.error('❌ Error fetching ingredients by category:', err);
+      res.status(500).json({ 
+        error: 'Failed to fetch ingredients',
+        details: err instanceof Error ? err.message : 'Unknown error'
+      });
     }
   });
 

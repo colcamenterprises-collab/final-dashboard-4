@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import type { DailyStockSales } from "@shared/schema";
+import { DatabaseDrivenIngredients } from "../components/IngredientSection";
 
 // Clean form schema - correct order and fields only
 const formSchema = z.object({
@@ -99,6 +100,9 @@ const formSchema = z.object({
   burgerBunsStock: z.coerce.number().optional().default(0),
   meatWeight: z.coerce.number().optional().default(0),
   rollsOrderedCount: z.coerce.number().optional().default(0),
+  
+  // Dynamic ingredient fields (will be populated from database)
+  ingredients: z.record(z.coerce.number().optional().default(0)).optional().default({}),
   
   isDraft: z.boolean().optional().default(false),
 });
@@ -244,6 +248,7 @@ export default function DailyStockSales() {
       drinkStock: {},
       kitchenItems: {},
       packagingItems: {},
+      ingredients: {},
       isDraft: false
     }
   });
@@ -1568,13 +1573,37 @@ export default function DailyStockSales() {
             </CardContent>
           </Card>
 
-          {/* Food Items Required */}
+          {/* Database-Driven Ingredient System */}
           <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ChefHat className="h-5 w-5" />
-                Food Items Required
+                Inventory Management - Database Driven
               </CardTitle>
+              <p className="text-sm text-gray-600 mt-2">
+                Ingredient list automatically populated from supplier database. Enter quantities needed for each item.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <DatabaseDrivenIngredients
+                formValues={form.getValues()}
+                onFieldChange={(fieldName: string, value: number) => {
+                  form.setValue(fieldName as any, value);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Fallback: Static Food Items (when database unavailable) */}
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border-0 bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ChefHat className="h-5 w-5" />
+                Fallback: Static Food Items
+              </CardTitle>
+              <p className="text-sm text-gray-500 mt-2">
+                Backup inventory system (used when database is unavailable)
+              </p>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Fresh Food */}
