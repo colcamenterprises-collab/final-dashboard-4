@@ -1,0 +1,137 @@
+1. Prisma Schema (schema.prisma)
+Add this to your model:
+
+ts
+Copy
+Edit
+model DailyStock {
+  id             String   @id @default(uuid())
+  salesFormId    String   @unique
+  salesForm      DailySales @relation(fields: [salesFormId], references: [id])
+  burgerBuns     Int
+  meatGrams      Int
+  drinks         Json     // e.g. { "Coke": 12, "Sprite": 7 }
+  ingredients    Json     // e.g. { "Lettuce": 2, "Mayo": 1 }
+  createdAt      DateTime @default(now())
+}
+Then run:
+
+bash
+Copy
+Edit
+npx prisma generate
+npx prisma migrate dev --name add_daily_stock
+⚛️ 2. React Page: /pages/daily-stock.tsx
+tsx
+Copy
+Edit
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/router';
+
+export default function DailyStockForm() {
+  const router = useRouter();
+  const salesId = router.query.salesId as string;
+  const [ingredients, setIngredients] = useState<any[]>([]);
+  const [form, setForm] = useState({
+    burgerBuns: '',
+    meatGrams: '',
+    drinks: {},
+    ingredients: {},
+  });
+
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      const res = await axios.get('/api/ingredients');
+      setIngredients(res.data);
+    };
+    fetchIngredients();
+  }, []);
+
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDrinkChange = (drink: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      drinks: { ...prev.drinks, [drink]: parseInt(value) || 0 },
+    }));
+  };
+
+  const handleIngredientChange = (name: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      ingredients: { ...prev.ingredients, [name]: parseInt(value) || 0 },
+    }));
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    await axios.post('/api/daily-stock', { ...form, salesFormId: salesId });
+    alert('Stock submitted. Done for the day!');
+    router.push('/'); // or wherever you want to redirect
+  };
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Stock Count & Purchasing</h1>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <input type="number" placeholder="Burger Buns Remaining" className="input" value={form.burgerBuns} onChange={(e) => handleChange('burgerBuns', e.target.value)} />
+          <input type="number" placeholder="Meat Weight (grams)" className="input" value={form.meatGrams} onChange={(e) => handleChange('meatGrams', e.target.value)} />
+        </div>
+
+        <div>
+          <label className="font-bold block mb-2">Drink Stock</label>
+          {['Coke', 'Sprite', 'Fanta', 'Water'].map((drink) => (
+            <input key={drink} type="number" placeholder={drink} className="input mb-2" onChange={(e) => handleDrinkChange(drink, e.target.value)} />
+          ))}
+        </div>
+
+        <div>
+          <label className="font-bold block mb-2">Ingredient Purchasing Needs</label>
+          {ingredients.map((item) => (
+            <div key={item.name} className="mb-2">
+              <label className="block text-sm">{item.name}</label>
+              <input type="number" className="input" placeholder="0" onChange={(e) => handleIngredientChange(item.name, e.target.value)} />
+            </div>
+          ))}
+        </div>
+
+        <button type="submit" className="bg-black text-white px-4 py-2 rounded">Submit Stock Report</button>
+      </form>
+    </div>
+  );
+}
+📡 3. API Route: /pages/api/daily-stock.ts
+ts
+Copy
+Edit
+import { prisma } from '@/lib/prisma';
+
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    try {
+      const { salesFormId, burgerBuns, meatGrams, drinks, ingredients } = req.body;
+
+      const result = await prisma.dailyStock.create({
+        data: {
+          salesFormId,
+          burgerBuns: parseInt(burgerBuns),
+          meatGrams: parseInt(meatGrams),
+          drinks,
+          ingredients,
+        },
+      });
+
+      res.status(200).json({ success: true, id: result.id });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to save stock form' });
+    }
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
+  }
+}
+✅ Summary of What’s Now Working

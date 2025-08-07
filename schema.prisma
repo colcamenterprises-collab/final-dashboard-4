@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DailySales {
+  id              String   @id @default(uuid())
+  shiftDate       DateTime
+  cashSales       Float
+  qrSales         Float
+  grabSales       Float
+  aroiDeeSales    Float
+  discounts       Float
+  refunds         Float
+  expenses        Json     // [{ item: string, amount: number }]
+  amountBanked    Float
+  notes           String?
+  createdAt       DateTime @default(now())
+}

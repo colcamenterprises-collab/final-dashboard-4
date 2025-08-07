@@ -389,3 +389,8 @@
   background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
   background-size: 200px 100%;
 }
+
+/* Input utility for Daily Sales form */
+.input {
+  @apply border border-gray-300 rounded px-3 py-2 w-full;
+}

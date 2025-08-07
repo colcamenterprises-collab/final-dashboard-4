@@ -31,6 +31,7 @@ import Marketing from "@/pages/Marketing";
 import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
 import IngredientsTable from "@/pages/IngredientsTable";
+import DailySales from "@/pages/DailySales";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
 import Purchasing from "@/pages/Purchasing";
@@ -77,6 +78,7 @@ function Router() {
         <Route path="/receipts" component={Receipts} />
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/ingredients-table" component={IngredientsTable} />
+        <Route path="/daily-sales" component={DailySales} />
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />
