@@ -99,11 +99,11 @@ const ReportsAnalysis = () => {
     }
 
     // Prepare chart data
-    const salesChannelData = salesSummary ? [
-      { name: 'Grab', value: salesSummary.salesByChannel.grab },
-      { name: 'Aroi Dee', value: salesSummary.salesByChannel.aroiDee },
-      { name: 'Cash', value: salesSummary.salesByChannel.cash },
-      { name: 'QR Scan', value: salesSummary.salesByChannel.qrScan }
+    const salesChannelData = salesSummary?.salesByChannel ? [
+      { name: 'Grab', value: salesSummary.salesByChannel.grab || 0 },
+      { name: 'Aroi Dee', value: salesSummary.salesByChannel.aroiDee || 0 },
+      { name: 'Cash', value: salesSummary.salesByChannel.cash || 0 },
+      { name: 'QR Scan', value: salesSummary.salesByChannel.qrScan || 0 }
     ].filter(item => item.value > 0) : [];
 
     const dailyTrendsData = financialOverview?.recentTrends?.map(trend => ({
