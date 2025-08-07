@@ -1095,6 +1095,34 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Update individual ingredient
+  app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      
+      // Validate and sanitize update data
+      const allowedFields = ['name', 'category', 'supplier', 'price', 'unitPrice', 'packageSize', 'portionSize', 'unit', 'notes'];
+      const sanitizedUpdates: any = {};
+      
+      Object.keys(updates).forEach(key => {
+        if (allowedFields.includes(key) && updates[key] !== undefined) {
+          sanitizedUpdates[key] = updates[key];
+        }
+      });
+      
+      if (Object.keys(sanitizedUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+      
+      const ingredient = await storage.updateIngredient(id, sanitizedUpdates);
+      res.json(ingredient);
+    } catch (error) {
+      console.error("Error updating ingredient:", error);
+      res.status(500).json({ error: "Failed to update ingredient" });
+    }
+  });
+
   // Sync ingredients from CSV
   app.post("/api/ingredients/sync-csv", async (req: Request, res: Response) => {
     try {

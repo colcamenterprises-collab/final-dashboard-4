@@ -30,6 +30,7 @@ import WebhookManagement from "@/pages/WebhookManagement";
 import Marketing from "@/pages/Marketing";
 import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
+import IngredientsTable from "@/pages/IngredientsTable";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
 import Purchasing from "@/pages/Purchasing";
@@ -75,6 +76,7 @@ function Router() {
         <Route path="/marketing" component={Marketing} />
         <Route path="/receipts" component={Receipts} />
         <Route path="/ingredients" component={Ingredients} />
+        <Route path="/ingredients-table" component={IngredientsTable} />
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />
