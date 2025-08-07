@@ -18,11 +18,18 @@ model DailySales {
   qrSales         Float
   grabSales       Float
   aroiDeeSales    Float
+  totalSales      Float
 
   // Expenses
-  shoppingExpenses Json     // [{ item: string, amount: number }]
-  wages            Json     // [{ staff: string, amount: number }]
-  amountBanked     Float
+  shopping        Json     // [{ item: string, cost: string, shop: string }]
+  wages           Json     // [{ name: string, amount: string, type: string }]
+  totalExpenses   Float
+
+  // Banking
+  closingCash     Float
+  cashBanked      Float
+  qrTransferred   Float
+  amountBanked    Float?
 
   // Summary
   notes           String?

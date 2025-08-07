@@ -1,3 +1,7 @@
+✅ /pages/daily-sales.tsx (Updated Form)
+tsx
+Copy
+Edit
 import { useState } from 'react';
 import axios from 'axios';
 
