@@ -45,12 +45,24 @@ model DailySales {
 }
 
 model DailyStock {
-  id             String   @id @default(uuid())
-  salesFormId    String   @unique
-  salesForm      DailySales @relation(fields: [salesFormId], references: [id])
-  burgerBuns     Int
-  meatGrams      Int
-  drinks         Json     // e.g. { "Coke": 12, "Sprite": 7 }
-  ingredients    Json     // e.g. { "Lettuce": 2, "Mayo": 1 }
-  createdAt      DateTime @default(now())
+  id                   String   @id @default(uuid())
+  createdAt            DateTime @default(now())
+  salesFormId          String   @unique
+  salesForm            DailySales @relation(fields: [salesFormId], references: [id])
+
+  // Stock Counts
+  meatWeight           Int      // grams
+  burgerBunsStock      Int
+
+  // Drink Count
+  drinkStock           Json     // { Coke: 12, Sprite: 6, etc. }
+
+  // Ingredient Requests by Category
+  freshFood            Json     // { Lettuce: 2, Tomato: 1, etc. }
+  frozenFood           Json
+  shelfItems           Json
+  kitchenSupplies      Json
+  packaging            Json
+
+  updatedAt            DateTime @updatedAt
 }
