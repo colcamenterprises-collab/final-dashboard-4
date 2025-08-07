@@ -927,5 +927,133 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // ===== EXPENSE MANAGEMENT API ROUTES =====
+  
+  // Get all expenses
+  app.get("/api/expenses", async (req: Request, res: Response) => {
+    try {
+      const expenses = await storage.getExpenses();
+      res.json(expenses);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  // Create new expense
+  app.post("/api/expenses", async (req: Request, res: Response) => {
+    try {
+      const expense = await storage.createExpense(req.body);
+      res.json(expense);
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  // Delete expense
+  app.delete("/api/expenses/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteExpense(id);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Expense not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      res.status(500).json({ error: "Failed to delete expense" });
+    }
+  });
+
+  // Get month-to-date expenses total
+  app.get("/api/expenses/month-to-date", async (req: Request, res: Response) => {
+    try {
+      const total = await storage.getMonthToDateExpenses();
+      res.json({ total });
+    } catch (error) {
+      console.error("Error fetching MTD expenses:", error);
+      res.status(500).json({ error: "Failed to fetch month-to-date expenses" });
+    }
+  });
+
+  // Get expenses by category
+  app.get("/api/expenses/by-category", async (req: Request, res: Response) => {
+    try {
+      const categories = await storage.getExpensesByCategory();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching expenses by category:", error);
+      res.status(500).json({ error: "Failed to fetch expenses by category" });
+    }
+  });
+
+  // Get all expense suppliers
+  app.get("/api/expense-suppliers", async (req: Request, res: Response) => {
+    try {
+      const suppliers = await storage.getExpenseSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error fetching expense suppliers:", error);
+      res.status(500).json({ error: "Failed to fetch expense suppliers" });
+    }
+  });
+
+  // Create new expense supplier
+  app.post("/api/expense-suppliers", async (req: Request, res: Response) => {
+    try {
+      const supplier = await storage.createExpenseSupplier(req.body);
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error creating expense supplier:", error);
+      res.status(500).json({ error: "Failed to create expense supplier" });
+    }
+  });
+
+  // Get all expense categories
+  app.get("/api/expense-categories", async (req: Request, res: Response) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching expense categories:", error);
+      res.status(500).json({ error: "Failed to fetch expense categories" });
+    }
+  });
+
+  // Create new expense category
+  app.post("/api/expense-categories", async (req: Request, res: Response) => {
+    try {
+      const category = await storage.createExpenseCategory(req.body);
+      res.json(category);
+    } catch (error) {
+      console.error("Error creating expense category:", error);
+      res.status(500).json({ error: "Failed to create expense category" });
+    }
+  });
+
+  // Get all bank statements
+  app.get("/api/bank-statements", async (req: Request, res: Response) => {
+    try {
+      const statements = await storage.getBankStatements();
+      res.json(statements);
+    } catch (error) {
+      console.error("Error fetching bank statements:", error);
+      res.status(500).json({ error: "Failed to fetch bank statements" });
+    }
+  });
+
+  // Create/upload bank statement
+  app.post("/api/bank-statements", async (req: Request, res: Response) => {
+    try {
+      const statement = await storage.createBankStatement(req.body);
+      res.json(statement);
+    } catch (error) {
+      console.error("Error creating bank statement:", error);
+      res.status(500).json({ error: "Failed to create bank statement" });
+    }
+  });
+
   return server;
 }
