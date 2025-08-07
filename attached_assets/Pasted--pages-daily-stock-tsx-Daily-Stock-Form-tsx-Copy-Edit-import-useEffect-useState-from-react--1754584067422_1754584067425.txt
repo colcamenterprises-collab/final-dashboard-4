@@ -1,0 +1,117 @@
+/pages/daily-stock.tsx — Daily Stock Form
+tsx
+Copy
+Edit
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/router';
+
+export default function DailyStockForm() {
+  const router = useRouter();
+  const salesFormId = router.query.salesId as string;
+
+  const [ingredients, setIngredients] = useState<any[]>([]);
+  const [form, setForm] = useState({
+    meatWeight: '',
+    burgerBunsStock: '',
+    drinkStock: {},
+    freshFood: {},
+    frozenFood: {},
+    shelfItems: {},
+    kitchenSupplies: {},
+    packaging: {},
+  });
+
+  const categoriesOrder = [
+    'Fresh Food',
+    'Frozen Food',
+    'Shelf Items',
+    'Kitchen Supplies',
+    'Packaging',
+  ];
+
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      const res = await axios.get('/api/ingredients');
+      setIngredients(res.data);
+    };
+    fetchIngredients();
+  }, []);
+
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDrinkChange = (drink: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      drinkStock: { ...prev.drinkStock, [drink]: parseInt(value) || 0 },
+    }));
+  };
+
+  const handleIngredientChange = (category: string, name: string, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [name]: parseInt(value) || 0,
+      },
+    }));
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    await axios.post('/api/daily-stock', { ...form, salesFormId });
+    alert('Stock submitted successfully');
+    router.push('/');
+  };
+
+  // Sort and group ingredients
+  const groupedIngredients = categoriesOrder.reduce((acc, category) => {
+    acc[category] = ingredients.filter((i) => i.category === category);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold mb-4">Daily Stock Form</h1>
+
+      {/* Meat & Rolls */}
+      <div className="grid grid-cols-2 gap-4">
+        <input className="input" type="number" placeholder="Meat Weight (grams)" value={form.meatWeight} onChange={(e) => handleChange('meatWeight', e.target.value)} />
+        <input className="input" type="number" placeholder="Burger Buns Stock" value={form.burgerBunsStock} onChange={(e) => handleChange('burgerBunsStock', e.target.value)} />
+      </div>
+
+      {/* Drinks */}
+      <div>
+        <h2 className="font-bold mb-2">Drink Stock</h2>
+        {['Coke', 'Sprite', 'Fanta', 'Water'].map((drink) => (
+          <input key={drink} type="number" className="input mb-2" placeholder={drink} onChange={(e) => handleDrinkChange(drink, e.target.value)} />
+        ))}
+      </div>
+
+      {/* Ingredient Sections */}
+      {categoriesOrder.map((category) => (
+        <div key={category} className="mt-6">
+          <h2 className="font-bold mb-2">{category}</h2>
+          {groupedIngredients[category]?.map((item) => (
+            <div key={item.name} className="mb-2">
+              <label className="block text-sm font-medium">{item.name}</label>
+              <input
+                type="number"
+                className="input"
+                placeholder="Qty to purchase"
+                onChange={(e) => handleIngredientChange(category.replace(/\s+/g, '').toLowerCase(), item.name, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* Submit */}
+      <button onClick={handleSubmit} className="bg-black text-white px-4 py-2 rounded mt-4">
+        Submit Stock Form
+      </button>
+    </div>
+  );
+}

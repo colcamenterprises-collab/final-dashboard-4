@@ -10,6 +10,9 @@ import { MarloAgent } from './agents/marlo';
 import { BigBossAgent } from './agents/bigboss';
 import { JussiAgent } from './agents/jussi';
 import { db } from './db';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));
@@ -144,6 +147,158 @@ async function checkSchema() {
   const marlo = new MarloAgent();
   const bigboss = new BigBossAgent();
   const jussi = new JussiAgent();
+
+  // Prisma-based Daily Stock API endpoints
+  app.post('/api/daily-stock', async (req: Request, res: Response) => {
+    try {
+      const {
+        salesFormId,
+        meatWeight,
+        burgerBunsStock,
+        drinkStock,
+        freshFood,
+        frozenFood,
+        shelfItems,
+        kitchenSupplies,
+        packaging,
+      } = req.body;
+
+      if (!salesFormId) {
+        return res.status(400).json({ error: 'Sales form ID is required' });
+      }
+
+      const result = await prisma.dailyStock.create({
+        data: {
+          salesFormId,
+          meatWeight: parseInt(meatWeight) || 0,
+          burgerBunsStock: parseInt(burgerBunsStock) || 0,
+          drinkStock: drinkStock || {},
+          freshFood: freshFood || {},
+          frozenFood: frozenFood || {},
+          shelfItems: shelfItems || {},
+          kitchenSupplies: kitchenSupplies || {},
+          packaging: packaging || {},
+        },
+      });
+
+      res.status(200).json({ success: true, id: result.id });
+    } catch (err) {
+      console.error('[daily-stock] Error saving form:', err);
+      res.status(500).json({ error: 'Failed to save stock form' });
+    }
+  });
+
+  app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
+    try {
+      const { salesFormId } = req.params;
+      
+      const stockForm = await prisma.dailyStock.findUnique({
+        where: { salesFormId },
+        include: { salesForm: true },
+      });
+
+      if (!stockForm) {
+        return res.status(404).json({ error: 'Stock form not found' });
+      }
+
+      res.status(200).json(stockForm);
+    } catch (err) {
+      console.error('[daily-stock] Error fetching form:', err);
+      res.status(500).json({ error: 'Failed to fetch stock form' });
+    }
+  });
+
+  // Prisma-based Daily Sales API endpoints
+  app.post('/api/daily-sales', async (req: Request, res: Response) => {
+    try {
+      const {
+        completedBy,
+        startingCash,
+        cashSales,
+        qrSales,
+        grabSales,
+        aroiDeeSales,
+        totalSales,
+        shoppingExpenses,
+        wages,
+        totalExpenses,
+        closingCash,
+        cashBanked,
+        qrTransferred,
+        amountBanked,
+        notes,
+        status = 'draft'
+      } = req.body;
+
+      const result = await prisma.dailySales.create({
+        data: {
+          completedBy,
+          startingCash: parseFloat(startingCash) || 0,
+          cashSales: parseFloat(cashSales) || 0,
+          qrSales: parseFloat(qrSales) || 0,
+          grabSales: parseFloat(grabSales) || 0,
+          aroiDeeSales: parseFloat(aroiDeeSales) || 0,
+          totalSales: parseFloat(totalSales) || 0,
+          shoppingExpenses: shoppingExpenses || [],
+          wages: wages || [],
+          totalExpenses: parseFloat(totalExpenses) || 0,
+          closingCash: parseFloat(closingCash) || 0,
+          cashBanked: parseFloat(cashBanked) || 0,
+          qrTransferred: parseFloat(qrTransferred) || 0,
+          amountBanked: parseFloat(amountBanked) || 0,
+          notes: notes || '',
+          status
+        },
+      });
+
+      res.status(200).json({ success: true, id: result.id });
+    } catch (err) {
+      console.error('[daily-sales] Error saving form:', err);
+      res.status(500).json({ error: 'Failed to save sales form' });
+    }
+  });
+
+  app.get('/api/daily-sales', async (req: Request, res: Response) => {
+    try {
+      const forms = await prisma.dailySales.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 20
+      });
+      res.status(200).json(forms);
+    } catch (err) {
+      console.error('[daily-sales] Error fetching forms:', err);
+      res.status(500).json({ error: 'Failed to fetch sales forms' });
+    }
+  });
+
+  // Basic ingredients API for testing
+  app.get('/api/ingredients', async (req: Request, res: Response) => {
+    try {
+      // Mock ingredients data for now - this would normally come from the database
+      const mockIngredients = [
+        { name: 'Lettuce', category: 'Fresh Food' },
+        { name: 'Tomato', category: 'Fresh Food' },
+        { name: 'Onion', category: 'Fresh Food' },
+        { name: 'Chicken Wings', category: 'Frozen Food' },
+        { name: 'French Fries', category: 'Frozen Food' },
+        { name: 'Chicken Nuggets', category: 'Frozen Food' },
+        { name: 'Salt', category: 'Shelf Items' },
+        { name: 'Pepper', category: 'Shelf Items' },
+        { name: 'Cooking Oil', category: 'Shelf Items' },
+        { name: 'Gloves', category: 'Kitchen Supplies' },
+        { name: 'Paper Towels', category: 'Kitchen Supplies' },
+        { name: 'Cleaning Spray', category: 'Kitchen Supplies' },
+        { name: 'Food Containers', category: 'Packaging' },
+        { name: 'Paper Bags', category: 'Packaging' },
+        { name: 'Napkins', category: 'Packaging' }
+      ];
+      res.json(mockIngredients);
+    } catch (err) {
+      console.error('[ingredients] Error fetching ingredients:', err);
+      res.status(500).json({ error: 'Failed to fetch ingredients' });
+    }
+  });
 
   // Multi-agent chat routes
   app.post('/chat/:agent', async (req: Request, res: Response) => {
