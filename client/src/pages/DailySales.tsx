@@ -9,17 +9,15 @@ function DailySalesForm() {
     qrSales: '',
     grabSales: '',
     aroiDeeSales: '',
-    discounts: '',
-    refunds: '',
     amountBanked: '',
     notes: '',
     shoppingExpenses: [{ item: '', amount: '' }],
-    wageExpenses: [
-      { name: 'Manager', amount: '' },
-      { name: 'Chef', amount: '' },
-      { name: 'Cashier', amount: '' },
-      { name: 'Kitchen Staff', amount: '' },
-      { name: 'Part-time Helper', amount: '' }
+    wages: [
+      { staff: 'Manager', amount: '' },
+      { staff: 'Chef', amount: '' },
+      { staff: 'Cashier', amount: '' },
+      { staff: 'Kitchen Staff', amount: '' },
+      { staff: 'Part-time Helper', amount: '' }
     ],
   });
 
@@ -38,10 +36,10 @@ function DailySalesForm() {
     setForm((prev) => ({ ...prev, shoppingExpenses: updated }));
   };
 
-  const handleWageExpenseChange = (index: number, field: string, value: string) => {
-    const updated = [...form.wageExpenses];
+  const handleWageChange = (index: number, field: string, value: string) => {
+    const updated = [...form.wages];
     (updated[index] as any)[field] = value;
-    setForm((prev) => ({ ...prev, wageExpenses: updated }));
+    setForm((prev) => ({ ...prev, wages: updated }));
   };
 
   const addShoppingExpense = () => {
@@ -57,19 +55,15 @@ function DailySalesForm() {
     const totalSales = salesFields.reduce((sum, field) => sum + (parseFloat(field) || 0), 0);
     
     const shoppingTotal = form.shoppingExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
-    const wageTotal = form.wageExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
+    const wageTotal = form.wages.reduce((sum, wage) => sum + (parseFloat(wage.amount) || 0), 0);
     const totalExpenses = shoppingTotal + wageTotal;
     
     setTotals({ totalSales, totalExpenses });
-  }, [form.cashSales, form.qrSales, form.grabSales, form.aroiDeeSales, form.shoppingExpenses, form.wageExpenses]);
+  }, [form.cashSales, form.qrSales, form.grabSales, form.aroiDeeSales, form.shoppingExpenses, form.wages]);
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    const submissionData = {
-      ...form,
-      shiftDate: new Date().toISOString(),
-    };
-    const res = await axios.post('/api/daily-sales', submissionData);
+    const res = await axios.post('/api/daily-sales', form);
     const salesId = res.data.id;
     window.location.href = `/daily-stock?salesId=${salesId}`;
   };
@@ -109,8 +103,6 @@ function DailySalesForm() {
               { field: 'qrSales', label: 'QR Sales' },
               { field: 'grabSales', label: 'Grab Sales' },
               { field: 'aroiDeeSales', label: 'Aroi Dee Sales' },
-              { field: 'discounts', label: 'Discounts' },
-              { field: 'refunds', label: 'Refunds' },
             ].map(({ field, label }) => (
               <input
                 key={field}
@@ -153,12 +145,12 @@ function DailySalesForm() {
         {/* Wages Section */}
         <div className="border rounded-lg p-4">
           <h3 className="font-bold text-lg mb-3">Staff Wages</h3>
-          {form.wageExpenses.map((wage, i) => (
+          {form.wages.map((wage, i) => (
             <div key={i} className="flex gap-2 mb-2">
               <input 
                 type="text" 
-                value={wage.name} 
-                onChange={(e) => handleWageExpenseChange(i, 'name', e.target.value)} 
+                value={wage.staff} 
+                onChange={(e) => handleWageChange(i, 'staff', e.target.value)} 
                 className="input flex-1" 
                 readOnly
               />
@@ -167,7 +159,7 @@ function DailySalesForm() {
                 step="0.01" 
                 placeholder="Amount" 
                 value={wage.amount} 
-                onChange={(e) => handleWageExpenseChange(i, 'amount', e.target.value)} 
+                onChange={(e) => handleWageChange(i, 'amount', e.target.value)} 
                 className="input w-32" 
               />
             </div>
