@@ -10,6 +10,9 @@ datasource db {
 model DailySales {
   id              String   @id @default(uuid())
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  status          String   @default("draft") // "draft" or "submitted"
+
   completedBy     String
   startingCash    Float
 
@@ -21,8 +24,8 @@ model DailySales {
   totalSales      Float
 
   // Expenses
-  shoppingExpenses Json     // [{ item, cost, shop }]
-  wages            Json     // [{ name, amount, type }]
+  shoppingExpenses Json
+  wages            Json
   totalExpenses    Float
 
   // Banking
@@ -33,6 +36,9 @@ model DailySales {
 
   // Notes
   notes            String?
+
+  // Soft delete
+  deletedAt        DateTime? // null = active, otherwise hidden
   
   // Relation to DailyStock
   stock            DailyStock?
