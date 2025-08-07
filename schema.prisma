@@ -21,21 +21,21 @@ model DailySales {
   totalSales      Float
 
   // Expenses
-  shopping        Json     // [{ item: string, cost: string, shop: string }]
-  wages           Json     // [{ name: string, amount: string, type: string }]
-  totalExpenses   Float
+  shoppingExpenses Json     // [{ item, cost, shop }]
+  wages            Json     // [{ name, amount, type }]
+  totalExpenses    Float
 
   // Banking
-  closingCash     Float
-  cashBanked      Float
-  qrTransferred   Float
-  amountBanked    Float?
+  closingCash      Float
+  cashBanked       Float
+  qrTransferred    Float
+  amountBanked     Float
 
-  // Summary
-  notes           String?
+  // Notes
+  notes            String?
   
   // Relation to DailyStock
-  stock           DailyStock?
+  stock            DailyStock?
 }
 
 model DailyStock {
