@@ -13,12 +13,14 @@ import type { Ingredient } from '@shared/schema';
 interface EditableIngredient extends Ingredient {
   isEditing?: boolean;
   editValues?: Partial<Ingredient>;
+  hasChanges?: boolean;
 }
 
 export default function IngredientsTable() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [ingredients, setIngredients] = useState<EditableIngredient[]>([]);
+  const [stockItems, setStockItems] = useState<EditableIngredient[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Queries
   const { data: fetchedIngredients = [], isLoading } = useQuery<Ingredient[]>({
@@ -29,13 +31,31 @@ export default function IngredientsTable() {
   // Update ingredients state when query data changes
   React.useEffect(() => {
     if (fetchedIngredients.length > 0) {
-      setIngredients(fetchedIngredients.map((ingredient: Ingredient) => ({ 
+      setStockItems(fetchedIngredients.map((ingredient: Ingredient) => ({ 
         ...ingredient, 
         isEditing: false,
-        editValues: {}
+        editValues: {},
+        hasChanges: false
       })));
     }
   }, [fetchedIngredients]);
+
+  // Function to update field for specific item (live in-memory editing)
+  const handleUpdate = (itemName: string, field: string, value: string) => {
+    setStockItems((prevItems) =>
+      prevItems.map((item) =>
+        item.name === itemName
+          ? { 
+              ...item, 
+              [field]: value,
+              hasChanges: true,
+              editValues: { ...item.editValues, [field]: value }
+            }
+          : item
+      )
+    );
+    setHasUnsavedChanges(true);
+  };
 
   // Update mutation
   const updateIngredientMutation = useMutation({
@@ -69,7 +89,7 @@ export default function IngredientsTable() {
   });
 
   const handleEdit = (id: number) => {
-    setIngredients(prev => prev.map(ingredient => 
+    setStockItems(prev => prev.map(ingredient => 
       ingredient.id === id 
         ? { 
             ...ingredient, 
@@ -89,15 +109,19 @@ export default function IngredientsTable() {
   };
 
   const handleCancel = (id: number) => {
-    setIngredients(prev => prev.map(ingredient => 
+    setStockItems(prev => prev.map(ingredient => 
       ingredient.id === id 
-        ? { ...ingredient, isEditing: false, editValues: {} }
+        ? { ...ingredient, isEditing: false, editValues: {}, hasChanges: false }
         : ingredient
     ));
+    
+    // Check if any items still have changes
+    const stillHasChanges = stockItems.some(item => item.id !== id && item.hasChanges);
+    setHasUnsavedChanges(stillHasChanges);
   };
 
   const handleSave = (id: number) => {
-    const ingredient = ingredients.find(i => i.id === id);
+    const ingredient = stockItems.find(i => i.id === id);
     if (!ingredient?.editValues) return;
 
     const updates = { ...ingredient.editValues };
@@ -115,21 +139,59 @@ export default function IngredientsTable() {
 
     updateIngredientMutation.mutate({ id, updates });
     
-    // Reset editing state
-    setIngredients(prev => prev.map(i => 
-      i.id === id ? { ...i, isEditing: false, editValues: {} } : i
+    // Reset editing state and changes flag
+    setStockItems(prev => prev.map(i => 
+      i.id === id ? { ...i, isEditing: false, editValues: {}, hasChanges: false } : i
     ));
+    
+    // Check if any other items still have changes
+    const stillHasChanges = stockItems.some(item => item.id !== id && item.hasChanges);
+    setHasUnsavedChanges(stillHasChanges);
   };
 
   const handleFieldChange = (id: number, field: string, value: string) => {
-    setIngredients(prev => prev.map(ingredient => 
-      ingredient.id === id 
-        ? { 
-            ...ingredient, 
-            editValues: { ...ingredient.editValues, [field]: value }
-          }
-        : ingredient
-    ));
+    const ingredient = stockItems.find(i => i.id === id);
+    if (ingredient) {
+      handleUpdate(ingredient.name, field, value);
+    }
+  };
+
+  // Save all changes at once
+  const handleSaveAllChanges = () => {
+    const itemsWithChanges = stockItems.filter(item => item.hasChanges);
+    
+    itemsWithChanges.forEach(ingredient => {
+      if (ingredient.editValues && Object.keys(ingredient.editValues).length > 0) {
+        const updates = { ...ingredient.editValues };
+        
+        // Convert numeric fields
+        if (updates.price !== undefined) {
+          updates.price = typeof updates.price === 'string' ? parseFloat(updates.price) || 0 : updates.price;
+        }
+        if (updates.packageSize !== undefined) {
+          updates.packageSize = typeof updates.packageSize === 'string' ? parseFloat(updates.packageSize) || 0 : updates.packageSize;
+        }
+        if (updates.portionSize !== undefined) {
+          updates.portionSize = typeof updates.portionSize === 'string' ? parseFloat(updates.portionSize) || 0 : updates.portionSize;
+        }
+
+        updateIngredientMutation.mutate({ id: ingredient.id, updates });
+      }
+    });
+
+    // Clear all changes
+    setStockItems(prev => prev.map(item => ({ 
+      ...item, 
+      hasChanges: false, 
+      editValues: {},
+      isEditing: false 
+    })));
+    setHasUnsavedChanges(false);
+    
+    toast({ 
+      title: "Changes Saved", 
+      description: `Updated ${itemsWithChanges.length} ingredients` 
+    });
   };
 
   const getCategoryColor = (category: string) => {
@@ -167,26 +229,48 @@ export default function IngredientsTable() {
         <div>
           <h1 className="text-3xl font-bold">Ingredient Management</h1>
           <p className="text-gray-600 mt-2">Real-time editable ingredient database - click to edit</p>
-        </div>
-        <Button 
-          onClick={() => syncCsvMutation.mutate()}
-          disabled={syncCsvMutation.isPending}
-          className="flex items-center gap-2"
-        >
-          {syncCsvMutation.isPending ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
+          {hasUnsavedChanges && (
+            <p className="text-orange-600 text-sm mt-1 font-medium">
+              You have unsaved changes
+            </p>
           )}
-          Sync from CSV
-        </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <Button 
+              onClick={handleSaveAllChanges}
+              disabled={updateIngredientMutation.isPending}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+            >
+              <Save className="h-4 w-4" />
+              Save All Changes
+            </Button>
+          )}
+          <Button 
+            onClick={() => syncCsvMutation.mutate()}
+            disabled={syncCsvMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            {syncCsvMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            Sync from CSV
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <span>Ingredients Database</span>
-            <Badge variant="outline">{ingredients.length} items</Badge>
+            <Badge variant="outline">{stockItems.length} items</Badge>
+            {hasUnsavedChanges && (
+              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                {stockItems.filter(item => item.hasChanges).length} changed
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -205,8 +289,11 @@ export default function IngredientsTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ingredients.map((ingredient) => (
-                  <TableRow key={ingredient.id} className={ingredient.isEditing ? 'bg-blue-50' : ''}>
+                {stockItems.map((ingredient) => (
+                  <TableRow 
+                    key={ingredient.id} 
+                    className={`${ingredient.isEditing ? 'bg-blue-50' : ''} ${ingredient.hasChanges ? 'bg-yellow-50 border-l-4 border-l-orange-400' : ''}`}
+                  >
                     <TableCell>
                       {ingredient.isEditing ? (
                         <Input

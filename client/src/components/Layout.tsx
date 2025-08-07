@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { 
   Bell, Search, Menu, X, DollarSign, Home, ClipboardList, ShoppingCart, Calculator, Receipt, BarChart3, ChefHat, Activity, TrendingUp, Package, Megaphone, PieChart, FileText,
   ChevronDown, ChevronRight, MessageCircle, Sun, Moon, UserPlus, Settings, LogOut, FolderOpen, LineChart, DollarSign as Finance, Utensils, FileSpreadsheet, BarChart, AlertTriangle,
-  Clock, GitCompare
+  Clock, GitCompare, Edit
 } from "lucide-react";
 import gradientLogo from "@assets/Gradient - Dark Blue - Just logo_1751392842484.png";
 
@@ -64,6 +64,7 @@ const navigationStructure = [
     items: [
       { path: "/recipes", label: "Recipes", icon: ChefHat },
       { path: "/ingredients", label: "Ingredients", icon: Package },
+      { path: "/ingredients-table", label: "Edit Ingredients", icon: Edit },
     ]
   },
   {
