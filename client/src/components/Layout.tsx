@@ -39,7 +39,7 @@ const navigationStructure = [
     icon: ShoppingCart,
     expandable: true,
     items: [
-      { path: "/daily-stock-sales", label: "Daily Sales Form", icon: ClipboardList },
+      { path: "/daily-sales", label: "Daily Sales Form", icon: ClipboardList },
       { path: "/form-library", label: "Form Library", icon: FileText },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
       { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },

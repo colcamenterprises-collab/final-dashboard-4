@@ -5,18 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
-import DailyStockSales from "@/pages/DailyStockSales";
-import DailyStockSalesNew from "@/pages/DailyStockSalesNew";
-import DailyStockSalesSchema from "@/pages/DailyStockSalesSchema";
 import DailyStockForm from "@/pages/DailyStockForm";
-import DailyStockSalesQuick from "@/pages/DailyStockSalesQuick";
-import DailyStockSalesSimple from "@/pages/DailyStockSalesSimple";
-import DailyShiftFormSimple from "@/pages/DailyShiftFormSimple";
-import DailyShiftForm from "@/pages/DailyShiftForm";
-import DailyStockSalesSearch from "@/pages/DailyStockSalesSearch";
 import PastForms from "@/pages/PastForms";
 import DraftFormsLibrary from "@/pages/DraftFormsLibrary";
-import DailySalesStock from "@/pages/DailySalesStock";
 import ShoppingList from "@/pages/ShoppingList";
 import Finance from "@/pages/Finance";
 import ExpensesMerged from "@/pages/ExpensesMerged";
@@ -53,15 +44,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/daily-sales-stock" component={DailySalesStock} />
         <Route path="/daily-stock-sales" component={DailyStockForm} />
-        <Route path="/daily-stock-sales-old" component={DailyShiftForm} />
-        <Route path="/daily-shift-form" component={DailyShiftForm} />
-        <Route path="/daily-sales-form" component={DailyShiftForm} />
-        <Route path="/daily-stock-sales-quick" component={DailyStockSalesQuick} />
-        <Route path="/daily-stock-sales-complex" component={DailyStockSales} />
-        <Route path="/daily-stock-sales/search" component={DailyStockSalesSearch} />
-        <Route path="/daily-stock-sales-search" component={DailyStockSalesSearch} />
         <Route path="/past-forms" component={PastForms} />
         <Route path="/shopping-list" component={ShoppingList} />
         <Route path="/finance" component={Finance} />
