@@ -9,14 +9,17 @@ datasource db {
 
 model DailySales {
   id              String   @id @default(uuid())
-  shiftDate       DateTime
+  shiftDate       DateTime @default(now())
+  completedBy     String
+  startingCash    Float
   cashSales       Float
   qrSales         Float
   grabSales       Float
   aroiDeeSales    Float
   discounts       Float
   refunds         Float
-  expenses        Json     // [{ item: string, amount: number }]
+  shoppingExpenses Json    // [{ item: string, amount: number }]
+  wageExpenses    Json     // [{ name: string, amount: number }]
   amountBanked    Float
   notes           String?
   createdAt       DateTime @default(now())

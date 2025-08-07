@@ -7,6 +7,8 @@ router.post('/', async (req, res) => {
   try {
     const {
       shiftDate,
+      completedBy,
+      startingCash,
       cashSales,
       qrSales,
       grabSales,
@@ -15,21 +17,25 @@ router.post('/', async (req, res) => {
       refunds,
       amountBanked,
       notes,
-      expenses,
+      shoppingExpenses,
+      wageExpenses,
     } = req.body;
 
     const result = await prisma.dailySales.create({
       data: {
         shiftDate: new Date(shiftDate),
-        cashSales: parseFloat(cashSales),
-        qrSales: parseFloat(qrSales),
-        grabSales: parseFloat(grabSales),
-        aroiDeeSales: parseFloat(aroiDeeSales),
-        discounts: parseFloat(discounts),
-        refunds: parseFloat(refunds),
-        amountBanked: parseFloat(amountBanked),
-        notes,
-        expenses,
+        completedBy,
+        startingCash: parseFloat(startingCash),
+        cashSales: parseFloat(cashSales) || 0,
+        qrSales: parseFloat(qrSales) || 0,
+        grabSales: parseFloat(grabSales) || 0,
+        aroiDeeSales: parseFloat(aroiDeeSales) || 0,
+        discounts: parseFloat(discounts) || 0,
+        refunds: parseFloat(refunds) || 0,
+        amountBanked: parseFloat(amountBanked) || 0,
+        notes: notes || '',
+        shoppingExpenses,
+        wageExpenses,
       },
     });
 
