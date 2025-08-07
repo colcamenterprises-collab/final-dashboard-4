@@ -20,4 +20,18 @@ model DailySales {
   amountBanked    Float
   notes           String?
   createdAt       DateTime @default(now())
+  
+  // Relation to DailyStock
+  stock           DailyStock?
+}
+
+model DailyStock {
+  id             String   @id @default(uuid())
+  salesFormId    String   @unique
+  salesForm      DailySales @relation(fields: [salesFormId], references: [id])
+  burgerBuns     Int
+  meatGrams      Int
+  drinks         Json     // e.g. { "Coke": 12, "Sprite": 7 }
+  ingredients    Json     // e.g. { "Lettuce": 2, "Mayo": 1 }
+  createdAt      DateTime @default(now())
 }

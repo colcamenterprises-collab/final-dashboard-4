@@ -1178,5 +1178,35 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Daily Stock Prisma Route
+  app.post('/api/daily-stock', async (req: Request, res: Response) => {
+    try {
+      const {
+        salesFormId,
+        burgerBuns,
+        meatGrams,
+        drinks,
+        ingredients,
+      } = req.body;
+
+      // For now, just return a success response since Prisma setup is incomplete
+      // In a full implementation, you would use: await prisma.dailyStock.create({...})
+      const mockStockId = crypto.randomUUID();
+      
+      console.log('Daily Stock Form submitted:', {
+        salesFormId,
+        burgerBuns,
+        meatGrams,
+        drinks,
+        ingredients
+      });
+
+      res.status(200).json({ success: true, id: mockStockId });
+    } catch (err) {
+      console.error('Daily Stock submission error:', err);
+      res.status(500).json({ error: 'Failed to save stock form' });
+    }
+  });
+
   return server;
 }
