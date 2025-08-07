@@ -23,7 +23,7 @@ export default function DailySalesForm() {
   };
 
   const handleNestedChange = (section: string, index: number, field: string, value: string) => {
-    const updated = [...form[section]];
+    const updated = [...(form[section as keyof typeof form] as any[])];
     updated[index][field] = value;
     setForm((prev) => ({ ...prev, [section]: updated }));
   };
@@ -31,13 +31,13 @@ export default function DailySalesForm() {
   const addRow = (section: string, template: object) => {
     setForm((prev) => ({
       ...prev,
-      [section]: [...prev[section], template],
+      [section]: [...(prev[section as keyof typeof prev] as any[]), template],
     }));
   };
 
   const totalSales =
     ['cashSales', 'qrSales', 'grabSales', 'aroiDeeSales'].reduce(
-      (sum, key) => sum + parseFloat(form[key] || '0'),
+      (sum, key) => sum + parseFloat((form[key as keyof typeof form] as string) || '0'),
       0
     );
 
@@ -52,8 +52,9 @@ export default function DailySalesForm() {
       totalSales,
       totalExpenses,
     };
-    await axios.post('/api/daily-sales', payload);
-    window.location.href = '/daily-stock?salesId=XYZ'; // Replace with actual ID
+    const response = await axios.post('/api/daily-sales', payload);
+    const salesId = response.data.id;
+    window.location.href = `/daily-stock?salesId=${salesId}`;
   };
 
   return (
