@@ -1055,5 +1055,60 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // ===== INGREDIENT MANAGEMENT API ROUTES =====
+  
+  // Get ingredients by category (for Daily Stock form)
+  app.get("/api/ingredients/by-category", async (req: Request, res: Response) => {
+    try {
+      const ingredients = await storage.getIngredients();
+      
+      // Group by category and sort
+      const grouped = ingredients.reduce((acc: Record<string, any[]>, ingredient) => {
+        const category = ingredient.category || 'Uncategorized';
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(ingredient);
+        return acc;
+      }, {});
+
+      // Sort ingredients within each category by name
+      Object.keys(grouped).forEach(category => {
+        grouped[category].sort((a, b) => a.name.localeCompare(b.name));
+      });
+
+      res.json(grouped);
+    } catch (error) {
+      console.error("Error fetching ingredients by category:", error);
+      res.status(500).json({ error: "Failed to fetch ingredients by category" });
+    }
+  });
+
+  // Get all ingredients
+  app.get("/api/ingredients", async (req: Request, res: Response) => {
+    try {
+      const ingredients = await storage.getIngredients();
+      res.json(ingredients);
+    } catch (error) {
+      console.error("Error fetching ingredients:", error);
+      res.status(500).json({ error: "Failed to fetch ingredients" });
+    }
+  });
+
+  // Sync ingredients from CSV
+  app.post("/api/ingredients/sync-csv", async (req: Request, res: Response) => {
+    try {
+      const { syncSupplierCSV } = await import('./syncSupplierCSV');
+      const result = await syncSupplierCSV();
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing ingredients from CSV:", error);
+      res.status(500).json({ 
+        error: "Failed to sync ingredients from CSV",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   return server;
 }
