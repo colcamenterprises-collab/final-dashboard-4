@@ -1,0 +1,1056 @@
+Non-Negotiables (Read First — Do Not Deviate)
+Do not modify any existing frontend UI styling, routes, components, or files except to add the new API endpoints listed below.
+
+Do not rename files or folders in this spec. Create them exactly as named.
+
+Use Neon Postgres with the provided .env variables. Do not replace with Supabase/Railway.
+
+Use Prisma exactly as configured here. Do not switch ORMs.
+
+Implement Loyverse via an adapter file only (src/ingestion/adapters/loyverse.ts). No other files may call Loyverse directly.
+
+All agents read from Postgres only. They must not call POS APIs directly.
+
+No schema changes beyond the provided schema.prisma.
+
+Pass all acceptance checks at the bottom before marking “done.”
+
+If any step is unclear, stop and ask instead of guessing.
+
+1) Environment & Dependencies
+1.1 Create .env (do not commit secrets)
+ini
+Copy
+Edit
+# --- Neon (Serverless Postgres) ---
+DATABASE_URL="postgresql://USER:PASS@ep-red-credit-ae843q7k.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&pgbouncer=true"
+SHADOW_DATABASE_URL="postgresql://USER:PASS@ep-<shadow-branch>.neon.tech/neondb?sslmode=require&pgbouncer=true"
+
+# --- POS (Loyverse) ---
+LOYVERSE_API_TOKEN="<paste token here>"
+LOYVERSE_BASE_URL="https://api.loyverse.com/v1.0"  # do not change key name
+
+# --- App ---
+APP_PORT="3000"
+TZ="Asia/Bangkok"
+
+# Feature toggles
+USE_MOCK_LOYVERSE="false"   # set "true" to run without a live POS token
+1.2 package.json (replace/add)
+json
+Copy
+Edit
+{
+  "name": "customli-restaurant-os",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "build": "echo \"(JS only)\"",
+    "prisma:gen": "prisma generate",
+    "prisma:dev": "prisma migrate dev --name init_multi_tenant_core",
+    "prisma:deploy": "prisma migrate deploy && prisma generate",
+    "worker:ingest:backfill": "node src/workers/runBackfill.js",
+    "worker:ingest:incremental": "node src/workers/runIncremental.js",
+    "worker:processDaily": "node src/workers/runProcessDaily.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.16.1",
+    "axios": "^1.7.2",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
+    "express": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "prisma": "^5.16.1",
+    "vitest": "^1.6.0"
+  }
+}
+If the project is TypeScript-only, ask before converting. Otherwise, use plain Node (ESM) exactly as above to avoid toolchain churn on Replit.
+
+2) Prisma Schema (single source of truth)
+Create prisma/schema.prisma exactly as below. Do not change names or types.
+
+prisma
+Copy
+Edit
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum POSProvider {
+  LOYVERSE
+  TOAST
+  SQUARE
+  LIGHTSPEED
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  QR
+  WALLET
+  DELIVERY_PARTNER
+  OTHER
+}
+
+enum SalesChannel {
+  IN_STORE
+  GRAB
+  FOODPANDA
+  LINE_MAN
+  ONLINE
+  OTHER
+}
+
+enum JobType {
+  POS_BACKFILL
+  POS_INCREMENTAL_SYNC
+  ANALYTICS_DAILY
+  EMAIL_SUMMARY
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  DEAD_LETTER
+}
+
+model Restaurant {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  email           String?
+  timezone        String           @default("Asia/Bangkok")
+  locale          String           @default("en-TH")
+  logoUrl         String?
+  brandColor      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  posConnections  PosConnection[]
+  menuItems       MenuItem[]
+  receipts        Receipt[]
+  dailySales      DailySales[]
+  dailyStock      DailyStock[]
+  expenses        Expense[]
+  analyticsDaily  AnalyticsDaily[]
+  jobs            Job[]
+  syncLogs        PosSyncLog[]
+  ingestionErrors IngestionError[]
+
+  @@map("restaurants")
+}
+
+model PosConnection {
+  id            String      @id @default(cuid())
+  restaurantId  String
+  provider      POSProvider
+  apiKey        String?
+  refreshToken  String?
+  meta          Json?
+  isActive      Boolean     @default(true)
+  lastSyncAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@index([provider, isActive])
+  @@map("pos_connections")
+}
+
+model Receipt {
+  id            String        @id @default(cuid())
+  restaurantId  String
+  provider      POSProvider
+  externalId    String
+  receiptNumber String?
+  channel       SalesChannel  @default(OTHER)
+  createdAtUTC  DateTime
+  closedAtUTC   DateTime?
+  subtotal      Int
+  tax           Int
+  discount      Int
+  total         Int
+  notes         String?
+  rawPayload    Json?
+  createdAt     DateTime      @default(now())
+
+  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
+  items         ReceiptItem[]
+  payments      ReceiptPayment[]
+
+  @@unique([restaurantId, provider, externalId])
+  @@index([restaurantId, createdAtUTC])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id             String   @id @default(cuid())
+  receiptId      String
+  providerItemId String?
+  sku            String?
+  name           String
+  category       String?
+  qty            Int
+  unitPrice      Int
+  total          Int
+  modifiers      Json?
+
+  receipt        Receipt  @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_items")
+}
+
+model ReceiptPayment {
+  id        String        @id @default(cuid())
+  receiptId String
+  method    PaymentMethod @default(OTHER)
+  amount    Int
+  meta      Json?
+
+  receipt   Receipt       @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_payments")
+}
+
+model MenuItem {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  sku           String
+  name          String
+  category      String
+  portionGrams  Int?
+  isDrink       Boolean    @default(false)
+  isBurger      Boolean    @default(false)
+  active        Boolean    @default(true)
+  meta          Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, sku])
+  @@index([restaurantId, category])
+  @@map("menu_items")
+}
+
+model DailySales {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  shiftDate      DateTime
+  totalSales     Int
+  cash           Int        @default(0)
+  card           Int        @default(0)
+  qr             Int        @default(0)
+  delivery       Int        @default(0)
+  other          Int        @default(0)
+  receiptsCount  Int        @default(0)
+  createdAt      DateTime   @default(now())
+
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, shiftDate])
+  @@index([restaurantId, shiftDate])
+  @@map("daily_sales")
+}
+
+model DailyStock {
+  id               String    @id @default(cuid())
+  restaurantId     String
+  shiftDate        DateTime
+  bunsCount        Int
+  meatWeightGrams  Int
+  drinksCount      Int
+  notes            String?
+  completedBy      String?
+  createdAt        DateTime  @default(now())
+
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, shiftDate])
+  @@index([restaurantId, shiftDate])
+  @@map("daily_stock")
+}
+
+model Expense {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  shiftDate     DateTime
+  item          String
+  costCents     Int
+  supplier      String?
+  expenseType   String?
+  meta          Json?
+  createdAt     DateTime   @default(now())
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, shiftDate])
+  @@map("expenses")
+}
+
+model AnalyticsDaily {
+  id                String    @id @default(cuid())
+  restaurantId      String
+  shiftDate         DateTime
+  top5ByQty         Json?
+  top5ByRevenue     Json?
+  expectedBunsUsed  Int?
+  expectedMeatGrams Int?
+  expectedDrinksUsed Int?
+  variance          Json?
+  shoppingList      Json?
+  flags             Json?
+  createdAt         DateTime  @default(now())
+
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, shiftDate])
+  @@index([restaurantId, shiftDate])
+  @@map("analytics_daily")
+}
+
+model Job {
+  id            String     @id @default(cuid())
+  restaurantId  String?
+  type          JobType
+  payload       Json?
+  status        JobStatus  @default(QUEUED)
+  runAt         DateTime?
+  attempts      Int        @default(0)
+  lastError     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([status, runAt])
+  @@index([restaurantId])
+  @@map("jobs")
+}
+
+model PosSyncLog {
+  id               String      @id @default(cuid())
+  restaurantId     String
+  provider         POSProvider
+  startedAt        DateTime    @default(now())
+  finishedAt       DateTime?
+  mode             String
+  receiptsFetched  Int         @default(0)
+  itemsUpserted    Int         @default(0)
+  paymentsUpserted Int         @default(0)
+  status           String      @default("SUCCESS")
+  message          String?
+  createdAt        DateTime    @default(now())
+
+  restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, startedAt])
+  @@map("pos_sync_logs")
+}
+
+model IngestionError {
+  id            String      @id @default(cuid())
+  restaurantId  String?
+  provider      POSProvider?
+  externalId    String?
+  context       String?
+  errorMessage  String
+  rawPayload    Json?
+  createdAt     DateTime    @default(now())
+
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, createdAt])
+  @@map("ingestion_errors")
+}
+Run:
+
+bash
+Copy
+Edit
+npm i
+npm run prisma:dev
+npm run prisma:gen
+3) Server & Workers (plain Node ESM)
+3.1 src/utils/db.js
+js
+Copy
+Edit
+import { PrismaClient } from '@prisma/client';
+export const prisma = new PrismaClient();
+3.2 src/utils/time.js
+js
+Copy
+Edit
+import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
+import { addMinutes } from 'date-fns';
+
+export const TZ = process.env.TZ || 'Asia/Bangkok';
+
+// Convert POS timestamp (string/Date) to UTC Date
+export function toUTC(d) {
+  if (!d) return null;
+  return zonedTimeToUtc(new Date(d), TZ);
+}
+
+// Compute shiftDate for a UTC timestamp using 18:00–03:00 window in TZ
+export function computeShiftDateUTC(utcDate) {
+  const local = utcToZonedTime(utcDate, TZ);
+  const hour = local.getHours();
+  // If between midnight and 3am local, shiftDate is previous day 18:00
+  const shiftAnchor = new Date(local);
+  if (hour < 3) {
+    shiftAnchor.setDate(shiftAnchor.getDate() - 1);
+  }
+  shiftAnchor.setHours(18, 0, 0, 0);
+  return zonedTimeToUtc(shiftAnchor, TZ);
+}
+3.3 src/ingestion/adapters/loyverse.js
+This is the ONLY file allowed to call Loyverse. If USE_MOCK_LOYVERSE=true, it returns deterministic mock data.
+
+js
+Copy
+Edit
+import axios from 'axios';
+
+const BASE = process.env.LOYVERSE_BASE_URL;
+const TOKEN = process.env.LOYVERSE_API_TOKEN;
+const USE_MOCK = (process.env.USE_MOCK_LOYVERSE || 'false') === 'true';
+
+// Helper: HTTP client with auth
+function client() {
+  if (!BASE) throw new Error('LOYVERSE_BASE_URL missing');
+  if (!TOKEN && !USE_MOCK) throw new Error('LOYVERSE_API_TOKEN missing');
+  return axios.create({
+    baseURL: BASE,
+    headers: { Authorization: `Bearer ${TOKEN}` },
+    timeout: 30000
+  });
+}
+
+/**
+ * Fetch receipts in a time window with pagination.
+ * REQUIRED: Implement according to official Loyverse API (do not guess).
+ * @param {Date} startUTC
+ * @param {Date} endUTC
+ * @param {string|null} cursor
+ * @returns {Promise<{receipts:any[], nextCursor:string|null}>}
+ */
+export async function fetchReceiptsWindow(startUTC, endUTC, cursor = null) {
+  if (USE_MOCK) {
+    return {
+      receipts: [{
+        id: 'mock-receipt-1',
+        number: 'R-1001',
+        created_at: new Date().toISOString(),
+        line_items: [{
+          id: 'mock-item-1',
+          sku: 'BURGER_SINGLE',
+          name: 'Single Burger',
+          category: 'Burgers',
+          quantity: 2,
+          price: 15000,
+          total: 30000,
+          modifiers: [{ name: 'Bacon', price: 3000 }]
+        }],
+        payments: [{ method: 'CASH', amount: 30000 }],
+        total_money: 30000,
+        discount_money: 0,
+        tax_money: 0,
+        channel: 'IN_STORE'
+      }],
+      nextCursor: null
+    };
+  }
+
+  // TODO (Agent): Implement using Loyverse receipts endpoint with official params for:
+  // - created_at_min/max (or equivalent)
+  // - limit/page size
+  // - pagination cursor (if provided by API)
+  // Return { receipts, nextCursor }
+  // Do not change function signature or return shape.
+  throw new Error('Loyverse adapter not implemented. Implement per docs.');
+}
+3.4 src/ingestion/normalize.js
+js
+Copy
+Edit
+import { PaymentMethod, SalesChannel } from '@prisma/client';
+import { toUTC } from '../utils/time.js';
+
+function mapMethod(m) {
+  const x = String(m || '').toUpperCase();
+  if (x.includes('CASH')) return PaymentMethod.CASH;
+  if (x.includes('QR')) return PaymentMethod.QR;
+  if (x.includes('CARD')) return PaymentMethod.CARD;
+  if (x.includes('GRAB')) return PaymentMethod.DELIVERY_PARTNER;
+  return PaymentMethod.OTHER;
+}
+
+function mapChannel(c) {
+  const x = String(c || '').toUpperCase();
+  if (x.includes('GRAB')) return SalesChannel.GRAB;
+  if (x.includes('FOODPANDA')) return SalesChannel.FOODPANDA;
+  if (x.includes('LINE')) return SalesChannel.LINE_MAN;
+  if (x.includes('STORE')) return SalesChannel.IN_STORE;
+  return SalesChannel.OTHER;
+}
+
+export function normalizeReceipt(raw) {
+  return {
+    externalId: String(raw.id),
+    receiptNumber: raw.number ?? null,
+    createdAtUTC: toUTC(raw.created_at),
+    closedAtUTC: toUTC(raw.closed_at ?? raw.created_at),
+    subtotal: Number(raw.subtotal_money ?? raw.total_money ?? 0) - Number(raw.tax_money ?? 0) + Number(raw.discount_money ?? 0),
+    tax: Number(raw.tax_money ?? 0),
+    discount: Number(raw.discount_money ?? 0),
+    total: Number(raw.total_money ?? 0),
+    channel: mapChannel(raw.channel),
+    items: (raw.line_items || []).map(it => ({
+      providerItemId: String(it.id ?? ''),
+      sku: it.sku ?? null,
+      name: it.name ?? 'Unknown',
+      category: it.category ?? null,
+      qty: Number(it.quantity ?? 1),
+      unitPrice: Number(it.price ?? 0),
+      total: Number(it.total ?? (Number(it.price ?? 0) * Number(it.quantity ?? 1))),
+      modifiers: it.modifiers ?? null
+    })),
+    payments: (raw.payments || []).map(p => ({
+      method: mapMethod(p.method),
+      amount: Number(p.amount ?? 0),
+      meta: p
+    })),
+    rawPayload: raw
+  };
+}
+3.5 src/ingestion/upsert.js
+js
+Copy
+Edit
+import { prisma } from '../utils/db.js';
+import { POSProvider } from '@prisma/client';
+
+export async function upsertReceipt(restaurantId, provider, norm) {
+  const providerEnum = POSProvider[provider] ?? POSProvider.LOYVERSE;
+
+  const receipt = await prisma.receipt.upsert({
+    where: {
+      restaurantId_provider_externalId: {
+        restaurantId, provider: providerEnum, externalId: norm.externalId
+      }
+    },
+    create: {
+      restaurantId,
+      provider: providerEnum,
+      externalId: norm.externalId,
+      receiptNumber: norm.receiptNumber,
+      channel: norm.channel,
+      createdAtUTC: norm.createdAtUTC,
+      closedAtUTC: norm.closedAtUTC,
+      subtotal: norm.subtotal,
+      tax: norm.tax,
+      discount: norm.discount,
+      total: norm.total,
+      rawPayload: norm.rawPayload,
+      items: { create: norm.items.map(i => ({ ...i })) },
+      payments: { create: norm.payments.map(p => ({ ...p })) }
+    },
+    update: {
+      receiptNumber: norm.receiptNumber,
+      channel: norm.channel,
+      createdAtUTC: norm.createdAtUTC,
+      closedAtUTC: norm.closedAtUTC,
+      subtotal: norm.subtotal,
+      tax: norm.tax,
+      discount: norm.discount,
+      total: norm.total,
+      rawPayload: norm.rawPayload
+    },
+    include: { items: true, payments: true }
+  });
+
+  // Replace items/payments for idempotent updates
+  await prisma.receiptItem.deleteMany({ where: { receiptId: receipt.id } });
+  if (norm.items.length) {
+    await prisma.receiptItem.createMany({
+      data: norm.items.map(i => ({ ...i, receiptId: receipt.id }))
+    });
+  }
+  await prisma.receiptPayment.deleteMany({ where: { receiptId: receipt.id } });
+  if (norm.payments.length) {
+    await prisma.receiptPayment.createMany({
+      data: norm.payments.map(p => ({ ...p, receiptId: receipt.id }))
+    });
+  }
+}
+3.6 src/workers/runBackfill.js
+js
+Copy
+Edit
+import { prisma } from '../utils/db.js';
+import { fetchReceiptsWindow } from '../ingestion/adapters/loyverse.js';
+import { normalizeReceipt } from '../ingestion/normalize.js';
+
+const DAYS = 90;
+
+async function main() {
+  const restaurants = await prisma.posConnection.findMany({
+    where: { isActive: true, provider: 'LOYVERSE' },
+    include: { restaurant: true }
+  });
+
+  for (const conn of restaurants) {
+    const restaurantId = conn.restaurantId;
+    const startedAt = new Date();
+    let counts = { receipts: 0, items: 0, payments: 0 };
+    let cursor = null;
+
+    try {
+      const end = new Date();
+      const start = new Date(end.getTime() - DAYS * 24 * 3600 * 1000);
+
+      do {
+        const { receipts, nextCursor } = await fetchReceiptsWindow(start, end, cursor);
+        for (const r of receipts) {
+          const norm = normalizeReceipt(r);
+          await prisma.$transaction(async () => {
+            await (await import('../ingestion/upsert.js')).upsertReceipt(restaurantId, 'LOYVERSE', norm);
+          });
+          counts.receipts += 1;
+          counts.items += (norm.items?.length || 0);
+          counts.payments += (norm.payments?.length || 0);
+        }
+        cursor = nextCursor;
+      } while (cursor);
+
+      await prisma.posSyncLog.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          mode: 'backfill',
+          receiptsFetched: counts.receipts,
+          itemsUpserted: counts.items,
+          paymentsUpserted: counts.payments,
+          status: 'SUCCESS',
+          startedAt,
+          finishedAt: new Date()
+        }
+      });
+
+    } catch (e) {
+      await prisma.posSyncLog.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          mode: 'backfill',
+          receiptsFetched: counts.receipts,
+          itemsUpserted: counts.items,
+          paymentsUpserted: counts.payments,
+          status: 'FAILED',
+          message: String(e?.message || e),
+          startedAt,
+          finishedAt: new Date()
+        }
+      });
+      await prisma.ingestionError.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          context: 'backfill',
+          errorMessage: String(e?.message || e)
+        }
+      });
+      throw e;
+    }
+  }
+}
+
+main().then(() => process.exit(0)).catch(() => process.exit(1));
+3.7 src/workers/runIncremental.js
+js
+Copy
+Edit
+import { prisma } from '../utils/db.js';
+import { fetchReceiptsWindow } from '../ingestion/adapters/loyverse.js';
+import { normalizeReceipt } from '../ingestion/normalize.js';
+
+async function main() {
+  const conns = await prisma.posConnection.findMany({
+    where: { isActive: true, provider: 'LOYVERSE' },
+    include: { restaurant: true }
+  });
+
+  for (const conn of conns) {
+    const restaurantId = conn.restaurantId;
+    const startedAt = new Date();
+    let counts = { receipts: 0, items: 0, payments: 0 };
+
+    try {
+      const last = await prisma.receipt.findFirst({
+        where: { restaurantId },
+        orderBy: { createdAtUTC: 'desc' }
+      });
+      const end = new Date();
+      const start = last ? new Date(last.createdAtUTC.getTime() - 5 * 60 * 1000) : new Date(end.getTime() - 24 * 3600 * 1000);
+
+      let cursor = null;
+      do {
+        const { receipts, nextCursor } = await fetchReceiptsWindow(start, end, cursor);
+        for (const r of receipts) {
+          const norm = normalizeReceipt(r);
+          await prisma.$transaction(async () => {
+            await (await import('../ingestion/upsert.js')).upsertReceipt(restaurantId, 'LOYVERSE', norm);
+          });
+          counts.receipts += 1;
+          counts.items += (norm.items?.length || 0);
+          counts.payments += (norm.payments?.length || 0);
+        }
+        cursor = nextCursor;
+      } while (cursor);
+
+      await prisma.posSyncLog.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          mode: 'incremental',
+          receiptsFetched: counts.receipts,
+          itemsUpserted: counts.items,
+          paymentsUpserted: counts.payments,
+          status: 'SUCCESS',
+          startedAt,
+          finishedAt: new Date()
+        }
+      });
+    } catch (e) {
+      await prisma.posSyncLog.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          mode: 'incremental',
+          status: 'FAILED',
+          message: String(e?.message || e),
+          startedAt,
+          finishedAt: new Date()
+        }
+      });
+      await prisma.ingestionError.create({
+        data: {
+          restaurantId,
+          provider: 'LOYVERSE',
+          context: 'incremental',
+          errorMessage: String(e?.message || e)
+        }
+      });
+      throw e;
+    }
+  }
+}
+
+main().then(() => process.exit(0)).catch(() => process.exit(1));
+3.8 src/workers/runProcessDaily.js
+js
+Copy
+Edit
+import { prisma } from '../utils/db.js';
+import { utcToZonedTime } from 'date-fns-tz';
+import { subHours, startOfDay } from 'date-fns';
+
+const MEAT_PER_PATTY_GRAMS = 90;
+const BUNS_VARIANCE = 5;
+const MEAT_VARIANCE = 500;
+const DRINKS_VARIANCE = 5;
+
+function shiftDateKey(d) {
+  // shift window anchor at 18:00 local
+  const local = utcToZonedTime(d, process.env.TZ || 'Asia/Bangkok');
+  const hour = local.getHours();
+  const anchor = new Date(local);
+  if (hour < 3) anchor.setDate(anchor.getDate() - 1);
+  anchor.setHours(18, 0, 0, 0);
+  return new Date(anchor.toISOString());
+}
+
+async function processOrg(restaurantId) {
+  // Find receipts in last 2 days to compute daily analytics per shift
+  const since = subHours(new Date(), 48);
+  const receipts = await prisma.receipt.findMany({
+    where: { restaurantId, createdAtUTC: { gte: since } },
+    include: { items: true, payments: true }
+  });
+
+  // Group by shiftDate
+  const byShift = new Map();
+  for (const r of receipts) {
+    const key = shiftDateKey(r.createdAtUTC).toISOString();
+    if (!byShift.has(key)) byShift.set(key, []);
+    byShift.get(key).push(r);
+  }
+
+  for (const [key, recs] of byShift) {
+    const shiftDate = new Date(key);
+
+    // Totals
+    let total = 0, cash=0, card=0, qr=0, delivery=0, other=0;
+    for (const r of recs) {
+      total += r.total;
+      for (const p of r.payments) {
+        if (p.method === 'CASH') cash += p.amount;
+        else if (p.method === 'CARD') card += p.amount;
+        else if (p.method === 'QR') qr += p.amount;
+        else if (p.method === 'DELIVERY_PARTNER') delivery += p.amount;
+        else other += p.amount;
+      }
+    }
+
+    await prisma.dailySales.upsert({
+      where: { restaurantId_shiftDate: { restaurantId, shiftDate } },
+      create: { restaurantId, shiftDate, totalSales: total, cash, card, qr, delivery, receiptsCount: recs.length },
+      update: { totalSales: total, cash, card, qr, delivery, receiptsCount: recs.length }
+    });
+
+    // Ingredient usage calc (simple rules)
+    let burgersSold = 0;
+    let patties = 0;
+    let drinksSold = 0;
+
+    for (const r of recs) {
+      for (const i of r.items) {
+        const name = (i.name || '').toLowerCase();
+        const sku = (i.sku || '').toUpperCase();
+        const isBurger = sku.includes('BURGER') || name.includes('burger');
+        const isDrink = sku.includes('DRINK') || name.includes('coke') || name.includes('soda') || name.includes('water');
+
+        if (isBurger) {
+          burgersSold += i.qty;
+          // naive: single=1 patty, double=2 if found in name/sku/mods
+          const mods = JSON.stringify(i.modifiers || '').toLowerCase();
+          const pattiesPer = (sku.includes('DOUBLE') || name.includes('double') || mods.includes('double')) ? 2 : 1;
+          patties += i.qty * pattiesPer;
+        }
+        if (isDrink) drinksSold += i.qty;
+      }
+    }
+
+    const expectedBunsUsed = burgersSold;
+    const expectedMeatGrams = patties * MEAT_PER_PATTY_GRAMS;
+    const expectedDrinksUsed = drinksSold;
+
+    const stock = await prisma.dailyStock.findUnique({ where: { restaurantId_shiftDate: { restaurantId, shiftDate } } });
+
+    let variance = null, flags = [];
+    if (stock) {
+      variance = {
+        buns: (expectedBunsUsed - (stock.bunsCount ?? 0)),
+        meatGrams: (expectedMeatGrams - (stock.meatWeightGrams ?? 0)),
+        drinks: (expectedDrinksUsed - (stock.drinksCount ?? 0))
+      };
+      if (Math.abs(variance.buns) > BUNS_VARIANCE) flags.push(`Buns variance ${variance.buns}`);
+      if (Math.abs(variance.meatGrams) > MEAT_VARIANCE) flags.push(`Meat variance ${variance.meatGrams}g`);
+      if (Math.abs(variance.drinks) > DRINKS_VARIANCE) flags.push(`Drinks variance ${variance.drinks}`);
+    }
+
+    // Top 5s
+    const totalsBySku = {};
+    const revenueBySku = {};
+    for (const r of recs) {
+      for (const i of r.items) {
+        const key = i.sku || i.name;
+        totalsBySku[key] = (totalsBySku[key] || 0) + i.qty;
+        revenueBySku[key] = (revenueBySku[key] || 0) + i.total;
+      }
+    }
+    const top5ByQty = Object.entries(totalsBySku).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v]) => ({ skuOrName: k, qty:v }));
+    const top5ByRevenue = Object.entries(revenueBySku).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v]) => ({ skuOrName: k, revenue:v }));
+
+    await prisma.analyticsDaily.upsert({
+      where: { restaurantId_shiftDate: { restaurantId, shiftDate } },
+      create: { restaurantId, shiftDate, expectedBunsUsed, expectedMeatGrams, expectedDrinksUsed, variance, flags, top5ByQty, top5ByRevenue },
+      update: { expectedBunsUsed, expectedMeatGrams, expectedDrinksUsed, variance, flags, top5ByQty, top5ByRevenue }
+    });
+  }
+}
+
+async function main() {
+  const orgs = await prisma.restaurant.findMany({ select: { id: true } });
+  for (const { id } of orgs) {
+    await processOrg(id);
+  }
+}
+
+main().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)});
+3.9 Minimal API for the existing UI
+src/server.js
+js
+Copy
+Edit
+import 'dotenv/config';
+import express from 'express';
+import { prisma } from './utils/db.js';
+
+const app = express();
+app.use(express.json());
+
+// Health
+app.get('/api/health', (_, res) => res.json({ ok: true }));
+
+// Onboard POS connection for a restaurant
+app.post('/api/onboard', async (req, res) => {
+  const { restaurant, pos } = req.body;
+  if (!restaurant?.name || !restaurant?.slug) return res.status(400).json({ error: 'restaurant.name and restaurant.slug required' });
+  const r = await prisma.restaurant.upsert({
+    where: { slug: restaurant.slug },
+    create: { name: restaurant.name, slug: restaurant.slug, email: restaurant.email || null },
+    update: { name: restaurant.name, email: restaurant.email || null }
+  });
+  if (pos?.provider === 'LOYVERSE') {
+    await prisma.posConnection.upsert({
+      where: { id: `${r.id}-LOYVERSE` },
+      create: { id: `${r.id}-LOYVERSE`, restaurantId: r.id, provider: 'LOYVERSE', apiKey: process.env.LOYVERSE_API_TOKEN, isActive: true },
+      update: { isActive: true }
+    });
+  }
+  res.json({ restaurantId: r.id });
+});
+
+// Daily stock submit
+app.post('/api/stock', async (req, res) => {
+  const { restaurantId, shiftDate, bunsCount, meatWeightGrams, drinksCount, completedBy, notes } = req.body;
+  if (!restaurantId || !shiftDate) return res.status(400).json({ error: 'restaurantId and shiftDate required' });
+  const sd = new Date(shiftDate);
+  const row = await prisma.dailyStock.upsert({
+    where: { restaurantId_shiftDate: { restaurantId, shiftDate: sd } },
+    create: { restaurantId, shiftDate: sd, bunsCount, meatWeightGrams, drinksCount, completedBy, notes },
+    update: { bunsCount, meatWeightGrams, drinksCount, completedBy, notes }
+  });
+  res.json(row);
+});
+
+// Expenses submit
+app.post('/api/expenses', async (req, res) => {
+  const { restaurantId, shiftDate, entries } = req.body; // [{item,costCents,supplier,expenseType}]
+  if (!restaurantId || !shiftDate || !Array.isArray(entries)) return res.status(400).json({ error: 'restaurantId, shiftDate, entries required' });
+  const sd = new Date(shiftDate);
+  const data = entries.map(e => ({ restaurantId, shiftDate: sd, ...e }));
+  await prisma.expense.createMany({ data });
+  res.json({ inserted: data.length });
+});
+
+// Dashboard home
+app.get('/api/dashboard/home', async (req, res) => {
+  const { restaurantId } = req.query;
+  if (!restaurantId) return res.status(400).json({ error: 'restaurantId required' });
+  const latest = await prisma.dailySales.findFirst({ where: { restaurantId }, orderBy: { shiftDate: 'desc' } });
+  const analytics = latest ? await prisma.analyticsDaily.findUnique({ where: { restaurantId_shiftDate: { restaurantId, shiftDate: latest.shiftDate } } }) : null;
+  res.json({ latestSales: latest, analytics });
+});
+
+const port = Number(process.env.APP_PORT || 3000);
+app.listen(port, () => console.log(`API running on :${port}`));
+4) Commands to Run (exact order)
+Install & migrate
+
+bash
+Copy
+Edit
+npm i
+npm run prisma:dev
+npm run prisma:gen
+Start API
+
+bash
+Copy
+Edit
+node src/server.js
+Backfill receipts (90 days)
+
+bash
+Copy
+Edit
+npm run worker:ingest:backfill
+Process analytics
+
+bash
+Copy
+Edit
+npm run worker:processDaily
+(Cron idea): set Replit “Always On” or external worker to run:
+
+worker:ingest:incremental every 15 minutes
+
+worker:processDaily daily at 03:05 BKK
+
+5) Minimal Seed (for SBB)
+Run this SQL once (via Prisma Studio or psql):
+
+sql
+Copy
+Edit
+INSERT INTO restaurants (id, name, slug, email, timezone, locale, "createdAt", "updatedAt")
+VALUES ('sbb-rawai', 'Smash Brothers Burgers', 'sbb-rawai', 'smashbrothersburgersth@gmail.com', 'Asia/Bangkok', 'en-TH', now(), now())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO pos_connections (id, "restaurantId", provider, "isActive", "createdAt", "updatedAt")
+VALUES ('sbb-rawai-LOYVERSE', 'sbb-rawai', 'LOYVERSE', true, now(), now())
+ON CONFLICT (id) DO NOTHING;
+6) Acceptance Checklist (must pass before “done”)
+ GET /api/health returns { ok: true }.
+
+ POST /api/onboard with { restaurant:{name,slug,email}, pos:{provider:'LOYVERSE'} } creates/updates the restaurant and pos connection.
+
+ npm run worker:ingest:backfill writes rows to receipts, receipt_items, receipt_payments, and one pos_sync_logs entry per run.
+
+ npm run worker:processDaily upserts daily_sales & analytics_daily for the most recent shifts.
+
+ POST /api/stock stores a row in daily_stock and appears in subsequent analytics_daily variance.
+
+ POST /api/expenses writes entries.
+
+ GET /api/dashboard/home?restaurantId=sbb-rawai returns latest daily_sales + matching analytics_daily.
+
+ No code outside src/ingestion/adapters/loyverse.js calls external POS APIs.
+
+ No frontend files altered except to consume these endpoints if needed.
+
+7) What the Agent MUST do for Loyverse adapter
+In src/ingestion/adapters/loyverse.js, replace the TODO with a real implementation that:
+
+Calls the official Receipts endpoint with:
+
+start & end time filters
+
+pagination (cursor/next page token if required by API)
+
+safe rate-limit handling (retry w/ exponential backoff)
+
+Returns exactly: { receipts: <array>, nextCursor: <string|null> }
+
+Does not change the function signature or return object keys.
+
+Includes unit tests in tests/loyverse.adapter.test.js that:
+
+Mock 2 pages and assert both pages are returned sequentially
+
+Assert it throws a clear error on 401/403
+
+Assert it retries on 429 with backoff (mocked)
+
+If the docs differ slightly on field names, map them inside normalizeReceipt, not in the adapter signature.
