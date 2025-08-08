@@ -1,11 +1,21 @@
 import { PrismaClient } from '@prisma/client';
 import type { Request, Response } from 'express';
 import nodemailer from 'nodemailer';
+import stockData from '../../data/stock_items_by_category.json';
 
 const prisma = new PrismaClient();
 
 function money(n?: number | null) {
   return `฿${(n ?? 0).toFixed(2)}`;
+}
+
+// Helper to preserve display order from JSON
+function orderDrinks(map: Record<string, number>) {
+  const order: string[] = (stockData as any)?.Drinks || Object.keys(map).sort();
+  const index = new Map(order.map((k, i) => [k, i]));
+  return Object.entries(map)
+    .map(([k, v]) => [k, Number(v) || 0] as [string, number])
+    .sort((a, b) => (index.get(a[0]) ?? 999) - (index.get(b[0]) ?? 999));
 }
 
 async function fetchJoined() {
@@ -35,22 +45,14 @@ export async function listForms(req: Request, res: Response) {
       .map(s => {
         const st = stockById.get(s.id)!;
 
-        // Shopping list: qty >= 1
+        // shopping summary
         const shopEntries = Object.entries(st.stockRequests || {}).filter(([, v]) => (Number(v) || 0) >= 1);
-        const shoppingListCount = shopEntries.length;
-        const shoppingPreview = shopEntries.slice(0, 5).map(([k, v]) => `${k} × ${v}`);
 
-        // Drinks (all)
-        const drinksObj: Record<string, number> = Object.fromEntries(
+        // drinks (all)
+        const drinksAll: Record<string, number> = Object.fromEntries(
           Object.entries(st.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0])
         );
-        const drinksList = Object.entries(drinksObj);
-        const drinksCount = drinksList.length;
-        const drinksPreview = drinksList
-          .slice()
-          .sort((a, b) => a[1] - b[1]) // lowest first
-          .slice(0, 3)
-          .map(([k, v]) => `${k}:${v}`);
+        const drinksOrdered = orderDrinks(drinksAll);
 
         return {
           id: s.id,
@@ -58,16 +60,14 @@ export async function listForms(req: Request, res: Response) {
           completedBy: s.completedBy,
           totalSales:
             s.totalSales ??
-            (Number(s.cashSales || 0) +
-             Number(s.qrSales || 0) +
-             Number(s.grabSales || 0) +
-             Number(s.aroiDeeSales || 0)),
+            (Number(s.cashSales || 0) + Number(s.qrSales || 0) + Number(s.grabSales || 0) + Number(s.aroiDeeSales || 0)),
           meatGrams: st.meatGrams,
           burgerBuns: st.burgerBuns,
-          shoppingListCount,
-          shoppingPreview,
-          drinksCount,
-          drinksPreview,
+
+          // NEW
+          drinks: Object.fromEntries(drinksOrdered),
+          shoppingListCount: shopEntries.length,
+          shoppingPreview: shopEntries.slice(0, 5).map(([k, v]) => `${k} × ${v}`),
         };
       });
 
@@ -163,14 +163,21 @@ export async function emailForm(req: Request, res: Response) {
       lines.push(``, `STOCK: Not submitted yet`);
     }
 
+    // Build HTML (keep existing text body as fallback)
+    const html = buildHtmlEmail({ sales, stock, totalSales });
+
     const transporter = buildTransporter();
     await transporter.verify();
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: process.env.SMTP_TO || 'colcamenterprises@gmail.com',
+      to: process.env.SMTP_TO || 'colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com',
       subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
-      text: lines.join('\n'),
+      text: lines.join('\n'),  // keep plaintext fallback
+      html,
       replyTo: 'smashbrothersburgersth@gmail.com',
+      attachments: [
+        { filename: 'logo-email.png', path: './public/logo-email.png', cid: 'logo', contentType: 'image/png' }
+      ]
     });
     res.json({ ok: true });
   } catch (e: any) {
@@ -248,4 +255,77 @@ export async function sendCombinedEmail(salesId: string) {
   } finally {
     await prisma.$disconnect();
   }
+}
+
+function htmlRow(label: string, val: string) {
+  return `<tr><td style="font:400 14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111;">
+    <span style="color:#555">${label}:</span> ${val}
+  </td></tr>`;
+}
+
+function htmlSection(title: string) {
+  return `<tr><td style="font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;padding:16px 0 6px;border-top:1px solid #eee">${title}</td></tr>`;
+}
+
+function buildHtmlEmail({ sales, stock, totalSales }: any) {
+  const fmt = (n?: number) => `฿${(Number(n || 0)).toFixed(2)}`;
+  const drinkLines = stock
+    ? Object.entries(stock.drinkStock || {})
+        .map(([k, v]) => [k, Number(v) || 0] as [string, number])
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(' • ')
+    : '';
+
+  const shopLines = stock
+    ? Object.entries(stock.stockRequests || {})
+        .filter(([, n]) => (Number(n) || 0) > 0)
+        .map(([k, v]) => `• ${k}: ${v}`)
+        .join('<br/>') || '• none'
+    : '• none';
+
+  return `
+  <div style="background:#f9f9f9;padding:24px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:10px;padding:24px">
+      <tr>
+        <td style="display:flex;align-items:center;gap:12px">
+          <img src="cid:logo" width="40" height="40" alt="SBB" style="display:block;border-radius:999px"/>
+          <div style="font:700 18px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">Daily Submission</div>
+        </td>
+      </tr>
+
+      ${htmlSection('Meta')}
+      ${htmlRow('Form ID', sales.id)}
+      ${htmlRow('Date', new Date(sales.createdAt).toLocaleString('en-TH'))}
+      ${htmlRow('Completed By', sales.completedBy || '-')}
+
+      ${htmlSection('Sales')}
+      ${htmlRow('Cash', fmt(sales.cashSales))}
+      ${htmlRow('QR', fmt(sales.qrSales))}
+      ${htmlRow('Grab', fmt(sales.grabSales))}
+      ${htmlRow('Aroi Dee', fmt(sales.aroiDeeSales))}
+      ${htmlRow('<b>Total Sales</b>', `<b>${fmt(totalSales)}</b>`)}
+
+      ${htmlSection('Expenses')}
+      ${htmlRow('Total Expenses', fmt(sales.totalExpenses))}
+
+      ${htmlSection('Banking')}
+      ${htmlRow('Closing Cash', fmt(sales.closingCash))}
+      ${htmlRow('Cash Banked', fmt(sales.cashBanked))}
+      ${htmlRow('QR Transfer', fmt(sales.qrTransferred))}
+
+      ${stock ? `
+      ${htmlSection('End-of-Shift Stock')}
+      ${htmlRow('Meat (g)', String(stock.meatGrams))}
+      ${htmlRow('Burger Buns', String(stock.burgerBuns))}
+
+      ${htmlSection('Drinks (all)')}
+      <tr><td style="font:400 14px/1.8 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">${drinkLines}</td></tr>
+
+      ${htmlSection('Shopping List')}
+      <tr><td style="font:400 14px/1.8 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">${shopLines}</td></tr>
+      ` : ''}
+    </table>
+  </div>`;
 }

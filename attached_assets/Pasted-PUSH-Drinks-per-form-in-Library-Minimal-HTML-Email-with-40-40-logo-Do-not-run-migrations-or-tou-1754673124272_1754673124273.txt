@@ -1,0 +1,192 @@
+PUSH: Drinks-per-form in Library + Minimal HTML Email (with 40×40 logo)
+Do not run migrations or touch expenses.
+No shell/npm. Only edit the files below.
+
+0) Guardrails
+Keep existing sales/stock flow unchanged.
+
+Use the Drinks list order from data/stock_items_by_category.json (section "Drinks"). If missing, fall back to alphabetical.
+
+1) API — return every drink count per form
+File: server/api/forms.ts → update listForms:
+
+ts
+Copy
+Edit
+import stockData from '../../data/stock_items_by_category.json';
+
+// Helper to preserve display order from JSON
+function orderDrinks(map: Record<string, number>) {
+  const order: string[] = (stockData as any)?.Drinks || Object.keys(map).sort();
+  const index = new Map(order.map((k, i) => [k, i]));
+  return Object.entries(map)
+    .map(([k, v]) => [k, Number(v) || 0] as [string, number])
+    .sort((a, b) => (index.get(a[0]) ?? 999) - (index.get(b[0]) ?? 999));
+}
+
+export async function listForms(req, res) {
+  const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
+  const stock = await prisma.dailyStock.findMany({ where: { salesFormId: { in: sales.map(s => s.id) } } });
+  const byId = new Map(stock.map(s => [s.salesFormId!, s]));
+
+  const rows = sales
+    .filter(s => byId.has(s.id))
+    .map(s => {
+      const st = byId.get(s.id)!;
+
+      // shopping summary
+      const shopEntries = Object.entries(st.stockRequests || {}).filter(([, v]) => (Number(v) || 0) >= 1);
+
+      // drinks (all)
+      const drinksAll: Record<string, number> = Object.fromEntries(
+        Object.entries(st.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0])
+      );
+      const drinksOrdered = orderDrinks(drinksAll);
+
+      return {
+        id: s.id,
+        createdAt: s.createdAt,
+        completedBy: s.completedBy,
+        totalSales:
+          s.totalSales ??
+          (Number(s.cashSales || 0) + Number(s.qrSales || 0) + Number(s.grabSales || 0) + Number(s.aroiDeeSales || 0)),
+        meatGrams: st.meatGrams,
+        burgerBuns: st.burgerBuns,
+
+        // NEW
+        drinks: Object.fromEntries(drinksOrdered),
+        shoppingListCount: shopEntries.length,
+        shoppingPreview: shopEntries.slice(0, 5).map(([k, v]) => `${k} × ${v}`),
+      };
+    });
+
+  res.json(rows);
+}
+2) UI — display all 10 drinks inline
+File: client/src/pages/form-library.tsx
+
+Add/replace the Drinks column render:
+
+tsx
+Copy
+Edit
+<th className="p-3 border">Drinks</th>
+...
+<td className="p-3 border text-sm text-gray-700 leading-5">
+  {r.drinks
+    ? Object.entries(r.drinks).map(([k, v], i, arr) => (
+        <span key={k}>
+          {k}: {v}{i < arr.length - 1 ? ' • ' : ''}
+        </span>
+      ))
+    : '—'}
+</td>
+Keep existing columns (Date, Form ID, Completed By, Total Sales, Stock (Meat/Buns), Shopping Items, Actions).
+
+3) Email — minimal HTML with inline logo (40×40)
+Asset: add logo file as public/logo-email.png (use the yellow circle/black logo, resized to 40×40).
+
+File: server/api/forms.ts → in emailForm() replace the send block with:
+
+ts
+Copy
+Edit
+// Build HTML (keep your existing text body as fallback)
+const html = buildHtmlEmail({ sales, stock, totalSales }); // implement using the template below
+
+await transporter.verify();
+await transporter.sendMail({
+  from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  to: process.env.SMTP_TO || 'colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com',
+  subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+  text: lines.join('\n'),  // keep plaintext fallback you already have
+  html,
+  replyTo: 'smashbrothersburgersth@gmail.com',
+  attachments: [
+    { filename: 'logo-email.png', path: './public/logo-email.png', cid: 'logo', contentType: 'image/png' }
+  ]
+});
+Template helper (add in same file):
+
+ts
+Copy
+Edit
+function htmlRow(label: string, val: string) {
+  return `<tr><td style="font:400 14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111;">
+    <span style="color:#555">${label}:</span> ${val}
+  </td></tr>`;
+}
+
+function htmlSection(title: string) {
+  return `<tr><td style="font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;padding:16px 0 6px;border-top:1px solid #eee">${title}</td></tr>`;
+}
+
+function buildHtmlEmail({ sales, stock, totalSales }: any) {
+  const fmt = (n?: number) => `฿${(Number(n || 0)).toFixed(2)}`;
+  const drinkLines = stock
+    ? Object.entries(stock.drinkStock || {})
+        .map(([k, v]) => [k, Number(v) || 0] as [string, number])
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(' • ')
+    : '';
+
+  const shopLines = stock
+    ? Object.entries(stock.stockRequests || {})
+        .filter(([, n]) => (Number(n) || 0) > 0)
+        .map(([k, v]) => `• ${k}: ${v}`)
+        .join('<br/>') || '• none'
+    : '• none';
+
+  return `
+  <div style="background:#f9f9f9;padding:24px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:10px;padding:24px">
+      <tr>
+        <td style="display:flex;align-items:center;gap:12px">
+          <img src="cid:logo" width="40" height="40" alt="SBB" style="display:block;border-radius:999px"/>
+          <div style="font:700 18px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">Daily Submission</div>
+        </td>
+      </tr>
+
+      ${htmlSection('Meta')}
+      ${htmlRow('Form ID', sales.id)}
+      ${htmlRow('Date', new Date(sales.createdAt).toLocaleString('en-TH'))}
+      ${htmlRow('Completed By', sales.completedBy || '-')}
+
+      ${htmlSection('Sales')}
+      ${htmlRow('Cash', fmt(sales.cashSales))}
+      ${htmlRow('QR', fmt(sales.qrSales))}
+      ${htmlRow('Grab', fmt(sales.grabSales))}
+      ${htmlRow('Aroi Dee', fmt(sales.aroiDeeSales))}
+      ${htmlRow('<b>Total Sales</b>', `<b>${fmt(totalSales)}</b>`)}
+
+      ${htmlSection('Expenses')}
+      ${htmlRow('Total Expenses', fmt(sales.totalExpenses))}
+
+      ${htmlSection('Banking')}
+      ${htmlRow('Closing Cash', fmt(sales.closingCash))}
+      ${htmlRow('Cash Banked', fmt(sales.cashBanked))}
+      ${htmlRow('QR Transfer', fmt(sales.qrTransferred))}
+
+      ${stock ? `
+      ${htmlSection('End-of-Shift Stock')}
+      ${htmlRow('Meat (g)', String(stock.meatGrams))}
+      ${htmlRow('Burger Buns', String(stock.burgerBuns))}
+
+      ${htmlSection('Drinks (all)')}
+      <tr><td style="font:400 14px/1.8 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">${drinkLines}</td></tr>
+
+      ${htmlSection('Shopping List')}
+      <tr><td style="font:400 14px/1.8 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#111">${shopLines}</td></tr>
+      ` : ''}
+    </table>
+  </div>`;
+}
+4) Acceptance
+Form Library: Drinks column shows all 10 drinks with counts in your JSON order.
+
+Email: arrives in HTML with the 40×40 logo and sections; plaintext fallback works.
+
+No other behavior changed: Sales → Stock → Email → Library still passes the smoke test.
+

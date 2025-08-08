@@ -9,10 +9,9 @@ type Row = {
   totalSales: number;
   meatGrams: number;
   burgerBuns: number;
+  drinks: Record<string, number>;
   shoppingListCount: number;
   shoppingPreview: string[];
-  drinksCount: number;
-  drinksPreview: string[];
 };
 
 export default function FormLibrary() {
@@ -96,8 +95,14 @@ export default function FormLibrary() {
                     Meat {r.meatGrams}g • Buns {r.burgerBuns}
                   </div>
                 </td>
-                <td className="p-3 border" title={(r.drinksPreview || []).join(', ')}>
-                  {r.drinksCount ?? 0}
+                <td className="p-3 border text-sm text-gray-700 leading-5">
+                  {r.drinks
+                    ? Object.entries(r.drinks).map(([k, v], i, arr) => (
+                        <span key={k}>
+                          {k}: {v}{i < arr.length - 1 ? ' • ' : ''}
+                        </span>
+                      ))
+                    : '—'}
                 </td>
                 <td className="p-3 border" title={(r.shoppingPreview || []).join(', ')}>
                   {r.shoppingListCount ?? 0}
