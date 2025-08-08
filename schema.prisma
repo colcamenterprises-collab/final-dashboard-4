@@ -61,3 +61,259 @@ model DailyStock {
   status            String   @default("submitted") // keep simple for now
   deletedAt         DateTime?
 }
+
+// New models for POS ingestion and analytics
+enum POSProvider {
+  LOYVERSE
+  TOAST
+  SQUARE
+  LIGHTSPEED
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  QR
+  WALLET
+  DELIVERY_PARTNER
+  OTHER
+}
+
+enum SalesChannel {
+  IN_STORE
+  GRAB
+  FOODPANDA
+  LINE_MAN
+  ONLINE
+  OTHER
+}
+
+enum JobType {
+  POS_BACKFILL
+  POS_INCREMENTAL_SYNC
+  ANALYTICS_DAILY
+  EMAIL_SUMMARY
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  DEAD_LETTER
+}
+
+model Restaurant {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  email           String?
+  timezone        String           @default("Asia/Bangkok")
+  locale          String           @default("en-TH")
+  logoUrl         String?
+  brandColor      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  posConnections  PosConnection[]
+  menuItems       MenuItem[]
+  receipts        Receipt[]
+  expenses        Expense[]
+  analyticsDaily  AnalyticsDaily[]
+  jobs            Job[]
+  syncLogs        PosSyncLog[]
+  ingestionErrors IngestionError[]
+
+  @@map("restaurants")
+}
+
+model PosConnection {
+  id            String      @id @default(cuid())
+  restaurantId  String
+  provider      POSProvider
+  apiKey        String?
+  refreshToken  String?
+  meta          Json?
+  isActive      Boolean     @default(true)
+  lastSyncAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@index([provider, isActive])
+  @@map("pos_connections")
+}
+
+model Receipt {
+  id            String        @id @default(cuid())
+  restaurantId  String
+  provider      POSProvider
+  externalId    String
+  receiptNumber String?
+  channel       SalesChannel  @default(OTHER)
+  createdAtUTC  DateTime
+  closedAtUTC   DateTime?
+  subtotal      Int
+  tax           Int
+  discount      Int
+  total         Int
+  notes         String?
+  rawPayload    Json?
+  createdAt     DateTime      @default(now())
+
+  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
+  items         ReceiptItem[]
+  payments      ReceiptPayment[]
+
+  @@unique([restaurantId, provider, externalId])
+  @@index([restaurantId, createdAtUTC])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id             String   @id @default(cuid())
+  receiptId      String
+  providerItemId String?
+  sku            String?
+  name           String
+  category       String?
+  qty            Int
+  unitPrice      Int
+  total          Int
+  modifiers      Json?
+
+  receipt        Receipt  @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_items")
+}
+
+model ReceiptPayment {
+  id        String        @id @default(cuid())
+  receiptId String
+  method    PaymentMethod @default(OTHER)
+  amount    Int
+  meta      Json?
+
+  receipt   Receipt       @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_payments")
+}
+
+model MenuItem {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  sku           String
+  name          String
+  category      String
+  portionGrams  Int?
+  isDrink       Boolean    @default(false)
+  isBurger      Boolean    @default(false)
+  active        Boolean    @default(true)
+  meta          Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, sku])
+  @@index([restaurantId, category])
+  @@map("menu_items")
+}
+
+model Expense {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  shiftDate     DateTime
+  item          String
+  costCents     Int
+  supplier      String?
+  expenseType   String?
+  meta          Json?
+  createdAt     DateTime   @default(now())
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, shiftDate])
+  @@map("expenses")
+}
+
+model AnalyticsDaily {
+  id                String    @id @default(cuid())
+  restaurantId      String
+  shiftDate         DateTime
+  top5ByQty         Json?
+  top5ByRevenue     Json?
+  expectedBunsUsed  Int?
+  expectedMeatGrams Int?
+  expectedDrinksUsed Int?
+  variance          Json?
+  shoppingList      Json?
+  flags             Json?
+  createdAt         DateTime  @default(now())
+
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, shiftDate])
+  @@index([restaurantId, shiftDate])
+  @@map("analytics_daily")
+}
+
+model Job {
+  id            String     @id @default(cuid())
+  restaurantId  String?
+  type          JobType
+  payload       Json?
+  status        JobStatus  @default(QUEUED)
+  runAt         DateTime?
+  attempts      Int        @default(0)
+  lastError     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([status, runAt])
+  @@index([restaurantId])
+  @@map("jobs")
+}
+
+model PosSyncLog {
+  id               String      @id @default(cuid())
+  restaurantId     String
+  provider         POSProvider
+  startedAt        DateTime    @default(now())
+  finishedAt       DateTime?
+  mode             String
+  receiptsFetched  Int         @default(0)
+  itemsUpserted    Int         @default(0)
+  paymentsUpserted Int         @default(0)
+  status           String      @default("SUCCESS")
+  message          String?
+  createdAt        DateTime    @default(now())
+
+  restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, startedAt])
+  @@map("pos_sync_logs")
+}
+
+model IngestionError {
+  id            String      @id @default(cuid())
+  restaurantId  String?
+  provider      POSProvider?
+  externalId    String?
+  context       String?
+  errorMessage  String
+  rawPayload    Json?
+  createdAt     DateTime    @default(now())
+
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, createdAt])
+  @@map("ingestion_errors")
+}

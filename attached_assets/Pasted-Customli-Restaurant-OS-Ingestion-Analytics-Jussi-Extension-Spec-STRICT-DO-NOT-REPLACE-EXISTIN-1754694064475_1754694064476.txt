@@ -1,0 +1,192 @@
+Customli Restaurant OS — Ingestion, Analytics & Jussi Extension Spec
+STRICT — DO NOT REPLACE EXISTING SYSTEM
+
+1. DO NOT
+❌ Do NOT remove or alter any existing frontend/UI code.
+
+❌ Do NOT delete or rename any existing backend files.
+
+❌ Do NOT change or remove any existing database models, tables, or columns.
+
+❌ Do NOT touch the existing Daily Sales & Stock forms — they must continue to function exactly as they do now.
+
+2. Objective
+We are extending the current system by adding new backend modules for:
+
+POS data ingestion (Loyverse → Postgres)
+
+Analytics processing (sales breakdown, variances, top sellers, shopping lists)
+
+Jussi — Head of Operations daily summary generator (email + API endpoint)
+
+All of this must integrate with the current Prisma/Postgres database without breaking existing features.
+
+3. Database
+Keep the current Prisma schema intact.
+
+Add new models from the provided spec:
+
+receipts, receipt_items, receipt_payments
+
+analytics_daily
+
+pos_connections, pos_sync_logs, ingestion_errors
+
+jobs (for agent & email tracking)
+
+Ensure no existing table names or fields change.
+
+Use Prisma migrations to add these models so existing data is preserved.
+
+4. File Structure
+Add these new folders in the backend only:
+
+bash
+Copy
+Edit
+/services/pos-ingestion/        # All POS API fetch + normalization + DB upserts
+/services/analytics/            # All analytics processing jobs
+/services/jussi/                # Jussi summary generator & email sender
+Do not put POS calls anywhere else in the system.
+
+5. Ingestion Module
+pos-ingestion will:
+
+Read POS credentials from the new pos_connections table.
+
+Use a loyverse.js adapter file to call the official API.
+
+Normalize receipts into the receipts, receipt_items, receipt_payments tables.
+
+Write a pos_sync_logs entry each run.
+
+Log any failures to ingestion_errors.
+
+Implement two workers:
+
+runBackfill.js — fetch last 90 days.
+
+runIncremental.js — fetch last 15 minutes.
+
+Workers must be idempotent (safe to re-run without duplicates).
+
+6. Analytics Module
+analytics job reads from receipts + current daily_stock and expenses tables.
+
+Calculates:
+
+Total sales
+
+Payment type breakdown
+
+Expected vs actual stock usage
+
+Variances (±5 buns, ±500g meat, ±5 drinks)
+
+Top 5 sellers by qty and revenue
+
+Shopping list for low-stock items
+
+Writes results to the new analytics_daily table.
+
+Does not overwrite the existing Daily Sales or Stock records — it supplements them.
+
+7. Jussi Module
+Runs after analytics is updated.
+
+Reads:
+
+analytics_daily
+
+daily_stock
+
+expenses
+
+restaurants
+
+Builds a plain-text and HTML management report:
+
+Sales totals
+
+Top sellers
+
+Variances
+
+Shopping list
+
+Notable expenses
+
+Action points
+
+Sends report via SMTP (Nodemailer) to:
+
+DAILY_REPORT_TO env var, or
+
+The restaurant’s email field if DAILY_REPORT_TO is blank.
+
+Logs every send into the jobs table (type='EMAIL_SUMMARY').
+
+Optional GPT summary if USE_GPT_SUMMARY=true.
+
+8. API Endpoints
+Add new backend routes only, do not modify existing ones:
+
+GET /api/analytics/latest?restaurantId=... → returns latest analytics_daily row
+
+GET /api/jussi/latest?restaurantId=... → returns latest EMAIL_SUMMARY job payload
+
+9. Environment Variables
+Append to .env (do not remove existing values):
+
+ini
+Copy
+Edit
+# Neon DB (unchanged)
+DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require&pgbouncer=true"
+SHADOW_DATABASE_URL="postgresql://...shadow-branch...neon.tech/neondb?sslmode=require&pgbouncer=true"
+
+# POS
+LOYVERSE_API_TOKEN="<token>"
+LOYVERSE_BASE_URL="https://api.loyverse.com/v1.0"
+
+# Email (Jussi)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="smashbrothersburgersth@gmail.com"
+SMTP_PASS="<app_password>"
+EMAIL_FROM="Smash Brothers Ops <smashbrothersburgersth@gmail.com>"
+DAILY_REPORT_TO="" # optional
+
+# GPT summary (optional)
+USE_GPT_SUMMARY="false"
+OPENAI_API_KEY=""
+10. Order of Work
+Extend Prisma schema with new models (migrate without deleting existing tables).
+
+Add pos-ingestion module (adapter, normalize, upsert, workers).
+
+Add analytics processing job.
+
+Add jussi summary job.
+
+Add /api/analytics/latest and /api/jussi/latest endpoints.
+
+Test ingestion, analytics, and Jussi output without touching the frontend.
+
+Only after confirming outputs, integrate new data into the existing React UI via the new endpoints.
+
+11. Acceptance Criteria
+Existing forms, frontend, and email workflows are 100% unaffected.
+
+Running runBackfill.js populates receipts, receipt_items, receipt_payments, pos_sync_logs.
+
+Running runIncremental.js updates with latest sales.
+
+Running analytics job creates analytics_daily rows.
+
+Running Jussi job sends email and logs a job row.
+
+/api/analytics/latest and /api/jussi/latest return correct JSON.
+
+No schema changes to existing tables, no deleted data, no UI regressions.
+

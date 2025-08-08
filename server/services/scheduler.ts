@@ -1,10 +1,15 @@
 import { loyverseAPI } from "../loyverseAPI";
 import { buildShiftSummary } from "./receiptSummary";
+import { PrismaClient } from '@prisma/client';
 
 export class SchedulerService {
   private intervals: NodeJS.Timeout[] = [];
+  private prisma = new PrismaClient();
 
   start() {
+    // Initialize restaurant data first
+    this.initializeRestaurant();
+
     // Schedule daily receipt sync at 3am Bangkok time (end of 5pm-3am shift)
     this.scheduleDailyTask(() => {
       this.syncReceiptsAndReports();
@@ -15,7 +20,23 @@ export class SchedulerService {
       this.buildDailySummary();
     }, 3, 5); // 3:05 AM Bangkok time
 
+    // === NEW SERVICES ===
+
+    // Schedule incremental POS sync every 15 minutes
+    this.scheduleIncrementalSync();
+
+    // Schedule analytics processing at 3:30 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.processAnalytics();
+    }, 3, 30); // 3:30 AM Bangkok time
+
+    // Schedule Jussi email summary at 8:00 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.generateJussiSummary();
+    }, 8, 0); // 8:00 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
+    console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
   }
 
   stop() {
@@ -197,9 +218,154 @@ export class SchedulerService {
     }
   }
 
+  // === NEW SERVICE METHODS ===
+
+  /**
+   * Initialize restaurant and POS connection
+   */
+  private async initializeRestaurant() {
+    try {
+      // Ensure Smash Brothers Burgers restaurant exists
+      let restaurant = await this.prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+
+      if (!restaurant) {
+        restaurant = await this.prisma.restaurant.create({
+          data: {
+            name: 'Smash Brothers Burgers',
+            slug: 'smash-brothers-burgers',
+            email: 'smashbrothersburgersth@gmail.com',
+            timezone: 'Asia/Bangkok',
+            locale: 'en-TH'
+          }
+        });
+        console.log('✅ Restaurant created:', restaurant.name);
+      }
+
+      // Ensure POS connection exists
+      let posConnection = await this.prisma.posConnection.findFirst({
+        where: {
+          restaurantId: restaurant.id,
+          provider: 'LOYVERSE',
+          isActive: true
+        }
+      });
+
+      if (!posConnection) {
+        posConnection = await this.prisma.posConnection.create({
+          data: {
+            restaurantId: restaurant.id,
+            provider: 'LOYVERSE',
+            apiKey: process.env.LOYVERSE_API_TOKEN?.substring(0, 8) + '...',
+            isActive: true
+          }
+        });
+        console.log('✅ POS connection created for Loyverse');
+      }
+    } catch (error) {
+      console.error('❌ Restaurant initialization failed:', error);
+    }
+  }
+
+  /**
+   * Schedule incremental POS sync every 15 minutes
+   */
+  private scheduleIncrementalSync() {
+    const interval = setInterval(async () => {
+      try {
+        console.log('🔄 Starting scheduled incremental POS sync...');
+        
+        const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
+        
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMinutes(startDate.getMinutes() - 15);
+        
+        const result = await syncReceiptsWindow(startDate, endDate, 'incremental');
+        console.log('✅ Incremental sync completed:', result);
+      } catch (error) {
+        console.error('❌ Scheduled incremental sync failed:', error);
+      }
+    }, 15 * 60 * 1000); // 15 minutes
+
+    this.intervals.push(interval);
+    console.log('📅 Incremental POS sync scheduled every 15 minutes');
+  }
+
+  /**
+   * Process analytics for the latest shift
+   */
+  private async processAnalytics() {
+    try {
+      console.log('📊 Starting scheduled analytics processing...');
+      
+      const { processAnalytics } = await import('./analytics/processor.js');
+      
+      const restaurant = await this.prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+      
+      if (restaurant) {
+        const analytics = await processAnalytics(restaurant.id);
+        console.log('✅ Analytics processing completed:', {
+          shiftDate: analytics?.shiftDate,
+          flags: analytics?.flags?.length || 0
+        });
+      }
+    } catch (error) {
+      console.error('❌ Scheduled analytics processing failed:', error);
+    }
+  }
+
+  /**
+   * Generate and send Jussi email summary
+   */
+  private async generateJussiSummary() {
+    try {
+      console.log('📧 Starting scheduled Jussi summary generation...');
+      
+      const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
+      const result = await generateDailySummary();
+      
+      console.log('✅ Jussi summary completed:', {
+        jobId: result.jobId,
+        emailSent: !!result.emailResult,
+        recipient: result.emailResult?.recipient
+      });
+    } catch (error) {
+      console.error('❌ Scheduled Jussi summary failed:', error);
+    }
+  }
+
   // Manual trigger for testing
   async triggerManualSync() {
     await this.syncReceiptsAndReports();
+  }
+
+  // Manual trigger for new services
+  async triggerPOSSync() {
+    const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMinutes(startDate.getMinutes() - 60); // Last hour
+    return await syncReceiptsWindow(startDate, endDate, 'manual');
+  }
+
+  async triggerAnalytics() {
+    const { processAnalytics } = await import('./analytics/processor.js');
+    const restaurant = await this.prisma.restaurant.findFirst({
+      where: { slug: 'smash-brothers-burgers' }
+    });
+    if (restaurant) {
+      return await processAnalytics(restaurant.id);
+    }
+    return null;
+  }
+
+  async triggerJussiSummary() {
+    const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
+    return await generateDailySummary();
   }
 }
 

@@ -1317,5 +1317,215 @@ export function registerRoutes(app: express.Application): Server {
     app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
 
+  // === NEW POS INGESTION & ANALYTICS ENDPOINTS ===
+  
+  // POS Sync Status
+  app.get('/api/pos/sync-status', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' },
+        include: {
+          posConnections: { where: { isActive: true } },
+          syncLogs: { orderBy: { startedAt: 'desc' }, take: 5 }
+        }
+      });
+      
+      if (!restaurant) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      
+      res.json({
+        restaurant: { name: restaurant.name, slug: restaurant.slug },
+        connections: restaurant.posConnections,
+        recentSyncs: restaurant.syncLogs
+      });
+    } catch (error) {
+      console.error('POS status error:', error);
+      res.status(500).json({ error: 'Failed to fetch POS status' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Trigger POS Sync
+  app.post('/api/pos/sync', async (req: Request, res: Response) => {
+    try {
+      const { mode = 'incremental' } = req.body;
+      
+      if (mode === 'backfill') {
+        // Trigger backfill sync (last 90 days)
+        const { syncReceiptsWindow } = await import('./services/pos-ingestion/ingester.js');
+        
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 90);
+        
+        const result = await syncReceiptsWindow(startDate, endDate, 'backfill');
+        res.json({ mode: 'backfill', result });
+      } else {
+        // Trigger incremental sync (last 15 minutes)
+        const { syncReceiptsWindow } = await import('./services/pos-ingestion/ingester.js');
+        
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMinutes(startDate.getMinutes() - 15);
+        
+        const result = await syncReceiptsWindow(startDate, endDate, 'incremental');
+        res.json({ mode: 'incremental', result });
+      }
+    } catch (error) {
+      console.error('POS sync error:', error);
+      res.status(500).json({ error: 'Sync failed', details: (error as Error).message });
+    }
+  });
+
+  // Analytics Data
+  app.get('/api/analytics/latest', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+      
+      if (!restaurant) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      
+      const analytics = await prisma.analyticsDaily.findFirst({
+        where: { restaurantId: restaurant.id },
+        orderBy: { shiftDate: 'desc' }
+      });
+      
+      res.json(analytics || { message: 'No analytics data available' });
+    } catch (error) {
+      console.error('Analytics fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch analytics' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Trigger Analytics Processing
+  app.post('/api/analytics/process', async (req: Request, res: Response) => {
+    try {
+      const { processAnalytics } = await import('./services/analytics/processor.js');
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+      
+      if (!restaurant) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      
+      const analytics = await processAnalytics(restaurant.id);
+      
+      if (analytics) {
+        res.json({ success: true, analytics });
+      } else {
+        res.json({ success: false, message: 'No data to process' });
+      }
+    } catch (error) {
+      console.error('Analytics processing error:', error);
+      res.status(500).json({ error: 'Processing failed', details: (error as Error).message });
+    }
+  });
+
+  // Jussi Summary Status
+  app.get('/api/jussi/status', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+      
+      if (!restaurant) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      
+      const recentJobs = await prisma.job.findMany({
+        where: {
+          restaurantId: restaurant.id,
+          type: 'EMAIL_SUMMARY'
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      });
+      
+      res.json({
+        restaurant: { name: restaurant.name },
+        recentSummaries: recentJobs
+      });
+    } catch (error) {
+      console.error('Jussi status error:', error);
+      res.status(500).json({ error: 'Failed to fetch Jussi status' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Trigger Jussi Summary
+  app.post('/api/jussi/generate', async (req: Request, res: Response) => {
+    try {
+      const { generateDailySummary } = await import('./services/jussi/summaryGenerator.js');
+      
+      const result = await generateDailySummary();
+      
+      res.json({
+        success: true,
+        jobId: result.jobId,
+        emailSent: !!result.emailResult,
+        recipient: result.emailResult?.recipient
+      });
+    } catch (error) {
+      console.error('Jussi generation error:', error);
+      res.status(500).json({ error: 'Summary generation failed', details: (error as Error).message });
+    }
+  });
+
+  // Receipt Data from New System
+  app.get('/api/receipts/recent', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: 'smash-brothers-burgers' }
+      });
+      
+      if (!restaurant) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const receipts = await prisma.receipt.findMany({
+        where: { restaurantId: restaurant.id },
+        include: {
+          items: true,
+          payments: true
+        },
+        orderBy: { createdAtUTC: 'desc' },
+        take: limit
+      });
+      
+      res.json(receipts);
+    } catch (error) {
+      console.error('Receipts fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch receipts' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
   return server;
 }

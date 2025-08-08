@@ -14,28 +14,8 @@ Agent execution policy: CRITICAL - Execute ONLY exact commands provided. NEVER a
 Testing requirement: All enhancements must at all times be tested prior to advising a job as completed. Testing includes UI, system files, front end, mobile and tablet responsiveness. All tests must be completed prior to release.
 Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Always use authentic data from the database or authorized sources. Creating fake data for testing or demonstrations is strictly prohibited.
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
-Email system status (Aug 2025): Fully operational and enhanced with professional formatting. Gmail App Password authentication confirmed working with bulletproof delivery. System includes company logo, structured HTML/plaintext multipart emails, THB currency formatting, comprehensive PDF attachments, and professional styling without emojis. Both /api/send-form-summary and /api/send-last-form-summary endpoints operational with confirmed delivery to smashbrothersburgersth@gmail.com. Enhanced with proper calculations (total sales, wages, shopping, net revenue, cash differences) and comprehensive section formatting matching business requirements. Ready for production integration.
-Fort Knox Locked Form System (Aug 4, 2025): Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Aroi Dee Sales field, implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
-
-Fort Knox File Structure (Aug 5, 2025): Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
-
-Form Library Updates (Aug 5, 2025): Enhanced form library with submission date headers replacing Form IDs, and soft delete functionality that removes forms from frontend view while preserving them in database for future recovery. Added deletedAt timestamp field to database schema and implemented /api/daily-stock-sales/:id/soft DELETE endpoint. Database queries updated to use raw SQL with correct column names matching actual database structure.
-
-Archived View System (Aug 5, 2025): Implemented complete archived view functionality with toggle between Active and Archived forms. Added /api/daily-stock-sales/archived GET endpoint and /api/daily-stock-sales/:id/restore POST endpoint. Frontend includes toggle button, restore functionality with confirmation dialogs, and context-aware UI messaging. Forms can be archived (soft deleted) and restored seamlessly while maintaining data integrity.
-
-Comprehensive Form Validation System (Aug 6, 2025): Implemented robust validation middleware (validateDailySalesForm) with business logic checks, data sanitization, and error handling. Features include: required field validation, numeric/integer type checking, date validation, sales reconciliation (total vs individual categories), cash flow validation, and automatic data formatting. Applied to all form submission endpoints (/api/daily-stock-sales, /api/daily-shift-forms, /submit-form) with both Express middleware and utility function patterns. System prevents data entry errors and ensures business logic consistency before database insertion.
-
-Database Schema Synchronization (Aug 6, 2025): Updated shared/schema.ts to match live PostgreSQL database structure for daily_stock_sales table. Resolved type safety issues by aligning Drizzle ORM schema with actual database columns including sales data (grab_sales, food_panda_sales, etc.), expense tracking, stock counts, and JSONB fields. Schema now provides proper TypeScript types and validation schemas for all form operations.
-
-Navigation Structure Update (Aug 6, 2025): Reorganized Reports & Analysis functionality to be nested under Sales & Operations section rather than standalone top-level navigation. This consolidates operational tools including Daily Sales Form, Form Library, Expenses, Reports & Analysis, Analysis, Shift Analytics, Shift Comparison, and Receipts under a unified Sales & Operations menu for improved workflow organization.
-
-Database-Driven Ingredient System (Aug 6, 2025): Implemented comprehensive ingredient management system with CSV sync functionality and dynamic form generation. Features include: CSV sync script that imported 70+ real ingredients across 12 categories (Beverages, Condiments, Drinks, Fresh Food, Frozen Food, Kitchen Supplies, Meat, Packaging, Shelf Stock, Supplies, Vegetables) from supplier database; useIngredients hook for fetching categorized ingredient data via /api/ingredients/by-category endpoint; IngredientSection component providing collapsible category organization with editable quantity fields per ingredient; DatabaseDrivenIngredients component integrated into Daily Stock Sales form replacing static hardcoded lists; ingredients table populated with authentic supplier data including cost, portion size, and supplier information. Daily Stock form now pulls ingredient list from database table, ordered by Category, with editable fields per item as requested. System includes fallback static ingredient lists when database is unavailable for operational continuity.
-
-CSV Sync System Updated (Aug 7, 2025): Successfully executed CSV sync script using Food Costings - Supplier List - Portions - 25.07.2025_1753469470717.csv file. Processed 62 rows of ingredient data with zero errors. Database confirmed to contain 66 ingredients across 12 categories. API endpoints /api/ingredients and /api/ingredients/by-category fully operational. Daily Stock form confirmed pulling ingredient data from database via DatabaseDrivenIngredients component and useIngredients hook, displaying ingredients organized by category with editable quantity fields per Cam's requirements.
-
-Enhanced Ingredient Management System (Aug 7, 2025): Implemented live in-memory editing system with handleUpdate function for real-time stock item modifications. Features include: local state management with immediate visual feedback, batch "Save All Changes" functionality, individual item save/cancel operations, change tracking with visual indicators (yellow highlight and orange badges), unsaved changes notifications, and enhanced CSV parsing utilities. System provides seamless editing experience with clear change state management and professional UI feedback. Located at /ingredients-table with navigation link under Menu Mgmt section.
-
-Complete Prisma-Based Daily Forms System (Aug 7, 2025): Successfully implemented comprehensive dual-form system with separate /daily-sales and /daily-stock routes using Prisma ORM. Features include: draft/submit status tracking with automatic timestamping, soft delete functionality preserving data integrity, enhanced DailyStock model with categorized ingredient management (freshFood, frozenFood, shelfItems, kitchenSupplies, packaging), complete API endpoints in server/index.ts with proper error handling, React forms with dynamic ingredient sections and real-time calculations, mock ingredients API for immediate testing, and full integration with existing navigation structure. Both forms support draft saving, status updates, and structured data entry with proper TypeScript typing throughout. Ready for production deployment.
+Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Aroi Dee Sales field, implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
+Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
 
 ## System Architecture
 
@@ -76,7 +56,11 @@ Complete Prisma-Based Daily Forms System (Aug 7, 2025): Successfully implemented
 - **Recipe Management**: Comprehensive system with ingredient portion selection, automatic cost calculation, and PDF generation.
 - **Inventory Management**: Tracking of supplier items, stock levels, and automated shopping list generation based on inventory needs.
 - **Sales Heatmap**: Visual analytics for hourly sales patterns.
-- **Email Notifications**: Automated daily management reports via Gmail API.
+- **Email Notifications**: Automated daily management reports.
+- **Form Management**: Soft delete functionality for forms, archived view, and robust validation middleware.
+- **Database-Driven Ingredient System**: Dynamic ingredient management based on CSV sync, with categorized display and editable quantities.
+- **Comprehensive Daily Forms System**: Dual-form system (/daily-sales, /daily-stock) with Prisma ORM, draft/submit status, and categorized ingredient management.
+- **POS Ingestion & Analytics System**: Backend modules for automated restaurant operations, including POS data ingestion, data normalization, analytics processing (sales, top sellers, stock variance), Jussi AI summary system, and scheduled tasks for POS sync, analytics, and email reports.
 
 ### Database Schema (Core Tables)
 - **Users**: Authentication and user management.
@@ -89,6 +73,7 @@ Complete Prisma-Based Daily Forms System (Aug 7, 2025): Successfully implemented
 - **Shopping List**: Procurement tracking.
 - **Marketing**: Quick notes and calendar events.
 - **Chat Logs**: Records of AI agent interactions.
+- **Restaurant, PosConnection, Receipt, ReceiptItem, ReceiptPayment, MenuItem, Expense, AnalyticsDaily, Job, PosSyncLog, IngestionError**: For comprehensive POS, analytics, and job management.
 
 ## External Dependencies
 
@@ -100,8 +85,8 @@ Complete Prisma-Based Daily Forms System (Aug 7, 2025): Successfully implemented
 - **Database Services**:
     - **Neon Database**: Serverless PostgreSQL.
     - **Drizzle ORM**: For type-safe database operations and migrations.
+    - **Prisma ORM**: For database interactions in dual-form system.
 - **Email Service**:
     - **Gmail API**: For automated email notifications.
 - **PDF Generation**:
     - **jsPDF**: For client-side PDF recipe generation.
-```

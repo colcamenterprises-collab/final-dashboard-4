@@ -1,0 +1,224 @@
+/**
+ * POS data ingestion service - handles upserts to database
+ */
+import { PrismaClient } from '@prisma/client';
+import { fetchReceiptsWindow, fetchMenuItems } from './loyverse.js';
+import { normalizeReceipt, normalizeMenuItem } from './normalizer.js';
+
+const prisma = new PrismaClient();
+
+/**
+ * Get or create restaurant record
+ */
+async function ensureRestaurant() {
+  let restaurant = await prisma.restaurant.findFirst({
+    where: { slug: 'smash-brothers-burgers' }
+  });
+
+  if (!restaurant) {
+    restaurant = await prisma.restaurant.create({
+      data: {
+        name: 'Smash Brothers Burgers',
+        slug: 'smash-brothers-burgers',
+        email: 'smashbrothersburgersth@gmail.com',
+        timezone: 'Asia/Bangkok'
+      }
+    });
+  }
+
+  return restaurant;
+}
+
+/**
+ * Ensure POS connection record exists
+ */
+async function ensurePosConnection(restaurantId) {
+  let connection = await prisma.posConnection.findFirst({
+    where: { 
+      restaurantId,
+      provider: 'LOYVERSE',
+      isActive: true
+    }
+  });
+
+  if (!connection) {
+    connection = await prisma.posConnection.create({
+      data: {
+        restaurantId,
+        provider: 'LOYVERSE',
+        apiKey: process.env.LOYVERSE_API_TOKEN?.substring(0, 8) + '...',
+        isActive: true
+      }
+    });
+  }
+
+  return connection;
+}
+
+/**
+ * Upsert receipt and related data
+ */
+async function upsertReceipt(normalizedData, restaurantId) {
+  const { receipt, items, payments } = normalizedData;
+
+  // Check if receipt already exists
+  const existing = await prisma.receipt.findUnique({
+    where: {
+      restaurantId_provider_externalId: {
+        restaurantId,
+        provider: 'LOYVERSE',
+        externalId: receipt.externalId
+      }
+    }
+  });
+
+  if (existing) {
+    return { receipt: existing, isNew: false };
+  }
+
+  // Create new receipt with items and payments
+  const created = await prisma.receipt.create({
+    data: {
+      ...receipt,
+      items: {
+        create: items
+      },
+      payments: {
+        create: payments
+      }
+    },
+    include: {
+      items: true,
+      payments: true
+    }
+  });
+
+  return { receipt: created, isNew: true };
+}
+
+/**
+ * Sync receipts for a time window
+ */
+export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental') {
+  const restaurant = await ensureRestaurant();
+  const connection = await ensurePosConnection(restaurant.id);
+
+  const syncLog = await prisma.posSyncLog.create({
+    data: {
+      restaurantId: restaurant.id,
+      provider: 'LOYVERSE',
+      mode,
+      startedAt: new Date()
+    }
+  });
+
+  let receiptsFetched = 0;
+  let itemsUpserted = 0;
+  let paymentsUpserted = 0;
+  let cursor = null;
+  let hasMore = true;
+
+  try {
+    while (hasMore) {
+      const { receipts, nextCursor } = await fetchReceiptsWindow(startUTC, endUTC, cursor);
+      
+      for (const loyverseReceipt of receipts) {
+        try {
+          const normalized = normalizeReceipt(loyverseReceipt, restaurant.id);
+          const { receipt, isNew } = await upsertReceipt(normalized, restaurant.id);
+          
+          receiptsFetched++;
+          if (isNew) {
+            itemsUpserted += receipt.items.length;
+            paymentsUpserted += receipt.payments.length;
+          }
+        } catch (error) {
+          // Log individual receipt errors
+          await prisma.ingestionError.create({
+            data: {
+              restaurantId: restaurant.id,
+              provider: 'LOYVERSE',
+              externalId: loyverseReceipt.id,
+              context: 'receipt_upsert',
+              errorMessage: error.message,
+              rawPayload: loyverseReceipt
+            }
+          });
+        }
+      }
+
+      cursor = nextCursor;
+      hasMore = !!nextCursor && receipts.length > 0;
+    }
+
+    // Update sync log
+    await prisma.posSyncLog.update({
+      where: { id: syncLog.id },
+      data: {
+        finishedAt: new Date(),
+        receiptsFetched,
+        itemsUpserted,
+        paymentsUpserted,
+        status: 'SUCCESS'
+      }
+    });
+
+    // Update connection last sync
+    await prisma.posConnection.update({
+      where: { id: connection.id },
+      data: { lastSyncAt: new Date() }
+    });
+
+    return { receiptsFetched, itemsUpserted, paymentsUpserted };
+  } catch (error) {
+    // Update sync log with error
+    await prisma.posSyncLog.update({
+      where: { id: syncLog.id },
+      data: {
+        finishedAt: new Date(),
+        receiptsFetched,
+        itemsUpserted,
+        paymentsUpserted,
+        status: 'FAILED',
+        message: error.message
+      }
+    });
+
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * Sync menu items
+ */
+export async function syncMenuItems() {
+  const restaurant = await ensureRestaurant();
+  
+  try {
+    const loyverseItems = await fetchMenuItems();
+    let upserted = 0;
+
+    for (const loyverseItem of loyverseItems) {
+      const normalized = normalizeMenuItem(loyverseItem, restaurant.id);
+      
+      await prisma.menuItem.upsert({
+        where: {
+          restaurantId_sku: {
+            restaurantId: restaurant.id,
+            sku: normalized.sku
+          }
+        },
+        update: normalized,
+        create: normalized
+      });
+      
+      upserted++;
+    }
+
+    return { itemsUpserted: upserted };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
