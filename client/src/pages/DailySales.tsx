@@ -48,13 +48,12 @@ export default function DailySalesForm() {
     e.preventDefault();
     const payload = {
       ...form,
-      createdAt: new Date(),
       totalSales,
       totalExpenses,
     };
-    const response = await axios.post('/api/daily-sales', payload);
-    const salesId = response.data.id;
-    window.location.href = `/daily-stock?salesId=${salesId}`;
+    const { data } = await axios.post('/api/daily-sales', payload);
+    const { id } = data; // must exist
+    window.location.href = `/daily-stock?salesId=${id}`;
   };
 
   return (

@@ -1,0 +1,150 @@
+Fixes to get “Sales → Stock → Email → Library” working
+0) Clean up duplicates
+Delete/ignore client/src/pages/DailyStock.tsx (capital D).
+Use only client/src/pages/daily-stock.tsx.
+
+In server/routes.ts, remove any mock/legacy daily-stock handlers. They were shadowing the real API.
+
+1) Wire Express to the real API handlers
+In server/routes.ts:
+
+ts
+Copy
+Edit
+// Stock API (wrap the module default)
+import dailyStockHandler from './api/daily-stock';
+router.post('/api/daily-stock', (req, res) => dailyStockHandler(req as any, res as any));
+router.get('/api/daily-stock', (req, res) => dailyStockHandler(req as any, res as any));
+
+// Combined forms API
+import * as forms from './api/forms';
+router.get('/api/forms', forms.listForms);
+router.get('/api/forms/:id', forms.getForm);
+router.post('/api/forms/:id/email', forms.emailForm);
+(If those lines already exist, make sure there isn’t a second route further down that overrides them.)
+
+2) Sales submit → pass the real ID to stock
+In client/src/pages/DailySales.tsx submit handler:
+
+ts
+Copy
+Edit
+const { data } = await axios.post('/api/daily-sales', payload);
+const { id } = data; // must exist
+window.location.href = `/daily-stock?salesId=${id}`;
+No placeholders.
+
+3) Stock page → include salesId and fix meat conversion
+In client/src/pages/daily-stock.tsx:
+
+ts
+Copy
+Edit
+// 1) Read the id
+const params = new URLSearchParams(window.location.search);
+const salesFormId = params.get('salesId');
+
+// 2) Convert meat to grams (5.5 -> 5500)
+const toGrams = (v: string) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return n <= 50 && String(v).includes('.') ? Math.round(n * 1000) : Math.round(n);
+};
+
+// 3) Build payload
+const payload = {
+  salesFormId,
+  meatGrams: toGrams(form.meatGrams),
+  burgerBuns: Number(form.burgerBuns) || 0,
+  drinks,
+  stockRequests,
+};
+
+await axios.post('/api/daily-stock', payload);
+Update the label to “Meat (kg or grams)”.
+
+4) Stock API → save + trigger combined email
+Use the drop-in we already supplied for server/api/daily-stock.ts. After prisma.dailyStock.create, add:
+
+ts
+Copy
+Edit
+// fire combined email if linked to a sales form
+if (payload.salesFormId) {
+  try {
+    await fetch(`${process.env.PUBLIC_BASE_URL || ''}/api/forms/${payload.salesFormId}/email`, { method: 'POST' });
+  } catch (e) {
+    console.error('post-save email failed', e?.message || e);
+  }
+}
+(If there’s no PUBLIC_BASE_URL, call the emailForm function directly in-process.)
+
+5) Combined Form Library only (hide stock-only list)
+Remove “Stock Library” from sidebar.
+
+Keep “Form Library” (combined list).
+
+/api/forms should list only completed (sales that have stock):
+
+ts
+Copy
+Edit
+// server/api/forms.ts listForms
+const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
+const stock = await prisma.dailyStock.findMany({ where: { salesFormId: { in: sales.map(s => s.id) } } });
+const byId = new Map(stock.map(s => [s.salesFormId!, s]));
+const rows = sales
+  .filter(s => byId.has(s.id))
+  .map(s => {
+    const st = byId.get(s.id)!;
+    return {
+      id: s.id,
+      createdAt: s.createdAt,
+      completedBy: s.completedBy,
+      totalSales: (s.totalSales ?? (s.cashSales + s.qrSales + s.grabSales + s.aroiDeeSales)),
+      meatGrams: st.meatGrams,
+      burgerBuns: st.burgerBuns,
+    };
+  });
+res.json(rows);
+Make sure the library UI uses this endpoint and shows Date | Form ID | Completed By | Total Sales | Stock (Meat/Buns) | Actions (View/Print/Email).
+
+6) SMTP sender
+Set env to your real sender:
+
+ini
+Copy
+Edit
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=colcamenterprises@gmail.com
+SMTP_PASS=<Gmail App Password>
+SMTP_FROM=colcamenterprises@gmail.com
+SMTP_TO=colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com
+Hit /api/test-email (we provided) to verify creds (200 = good).
+
+7) (Optional) Backfill orphans
+If you already have DailyStock rows with salesFormId NULL, link the most recent pairs by timestamp order:
+
+sql
+Copy
+Edit
+WITH ds AS (
+  SELECT id, row_number() OVER (ORDER BY "createdAt") rn FROM "DailySales"
+),
+st AS (
+  SELECT id, row_number() OVER (ORDER BY "createdAt") rn FROM "DailyStock" WHERE "salesFormId" IS NULL
+)
+UPDATE "DailyStock" s
+SET "salesFormId" = ds.id
+FROM st
+JOIN ds USING (rn)
+WHERE s.id = st.id;
+✅ Final smoke test (do exactly this)
+Sales: submit a test entry. Confirm redirect includes ?salesId=<real id>.
+
+Stock: enter 5.5 meat, 5 buns, a few drink and request quantities. Submit.
+
+Email: check colcamenterprises@gmail.com (and SBB inbox). Should be the combined email.
+
+Form Library: only one library visible. New row shows Date, ID, Completed By, Total Sales, Meat 5500g • Buns 5, with View / Print / Email working.

@@ -7,9 +7,8 @@ type Row = {
   createdAt: string;
   completedBy: string;
   totalSales: number;
-  hasStock: boolean;
-  meatGrams: number | null;
-  burgerBuns: number | null;
+  meatGrams: number;
+  burgerBuns: number;
 };
 
 export default function FormLibrary() {
@@ -61,7 +60,7 @@ export default function FormLibrary() {
               <th className="p-3 text-left font-semibold">Form ID</th>
               <th className="p-3 text-left font-semibold">Completed By</th>
               <th className="p-3 text-left font-semibold">Total Sales</th>
-              <th className="p-3 text-left font-semibold">Stock Status</th>
+              <th className="p-3 text-left font-semibold">Stock (Meat/Buns)</th>
               <th className="p-3 text-left font-semibold">Actions</th>
             </tr>
           </thead>
@@ -87,16 +86,9 @@ export default function FormLibrary() {
                   <span className="font-mono">฿{(r.totalSales ?? 0).toFixed(2)}</span>
                 </td>
                 <td className="p-3 border-b">
-                  {r.hasStock ? (
-                    <div className="text-green-600">
-                      <div>✓ Complete</div>
-                      <div className="text-xs text-gray-600">
-                        Meat: {r.meatGrams}g • Buns: {r.burgerBuns}
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-amber-600">⏳ Stock Pending</span>
-                  )}
+                  <div className="text-green-600 font-medium">
+                    Meat {r.meatGrams}g • Buns {r.burgerBuns}
+                  </div>
                 </td>
                 <td className="p-3 border-b">
                   <div className="flex gap-2">

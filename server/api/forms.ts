@@ -10,11 +10,15 @@ function money(n?: number | null) {
 
 async function fetchJoined() {
   const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
-  const stock = await prisma.dailyStock.findMany({
-    where: { salesFormId: { in: sales.map(s => s.id) } }
-  });
-  const stockBySalesId = new Map(stock.map(s => [s.salesFormId!, s]));
-  return sales.map(s => ({ sales: s, stock: stockBySalesId.get(s.id) || null }));
+  const stock = await prisma.dailyStock.findMany({ where: { salesFormId: { in: sales.map(s => s.id) } } });
+  const byId = new Map(stock.map(s => [s.salesFormId!, s]));
+  const rows = sales
+    .filter(s => byId.has(s.id))
+    .map(s => {
+      const st = byId.get(s.id)!;
+      return { sales: s, stock: st };
+    });
+  return rows;
 }
 
 export async function listForms(req: Request, res: Response) {
@@ -25,9 +29,8 @@ export async function listForms(req: Request, res: Response) {
       createdAt: sales.createdAt,
       completedBy: sales.completedBy,
       totalSales: sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales),
-      hasStock: !!stock,
-      meatGrams: stock?.meatGrams ?? null,
-      burgerBuns: stock?.burgerBuns ?? null,
+      meatGrams: stock.meatGrams,
+      burgerBuns: stock.burgerBuns,
     }));
     res.json(data);
   } catch (error) {

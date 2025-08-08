@@ -1140,41 +1140,40 @@ export function registerRoutes(app: express.Application): Server {
 
   // Daily Sales Prisma Route
   app.post('/api/daily-sales', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
     try {
-      const {
-        shiftDate,
-        cashSales,
-        qrSales,
-        grabSales,
-        aroiDeeSales,
-        discounts,
-        refunds,
-        amountBanked,
-        notes,
-        expenses,
-      } = req.body;
-
-      // For now, just return a success response since Prisma setup is incomplete
-      // In a full implementation, you would use: await prisma.dailySales.create({...})
-      const mockId = crypto.randomUUID();
+      const payload = req.body;
       
-      console.log('Daily Sales Form submitted:', {
-        shiftDate,
-        cashSales,
-        qrSales,
-        grabSales,
-        aroiDeeSales,
-        discounts,
-        refunds,
-        amountBanked,
-        notes,
-        expenses
-      });
+      const data = {
+        completedBy: payload.completedBy || 'Unknown',
+        startingCash: Number(payload.startingCash) || 0,
+        cashSales: Number(payload.cashSales) || 0,
+        qrSales: Number(payload.qrSales) || 0,
+        grabSales: Number(payload.grabSales) || 0,
+        aroiDeeSales: Number(payload.aroiDeeSales) || 0,
+        totalSales: payload.totalSales || (Number(payload.cashSales) + Number(payload.qrSales) + Number(payload.grabSales) + Number(payload.aroiDeeSales)),
+        shoppingExpenses: JSON.stringify(payload.shopping || []),
+        wages: JSON.stringify(payload.wages || []),
+        totalExpenses: Number(payload.totalExpenses) || 0,
+        closingCash: Number(payload.closingCash) || 0,
+        cashBanked: Number(payload.cashBanked) || 0,
+        qrTransferred: Number(payload.qrTransferred) || 0,
+        amountBanked: Number(payload.amountBanked) || 0,
+        notes: payload.notes || null,
+        status: 'submitted'
+      };
 
-      res.status(200).json({ success: true, id: mockId });
+      const result = await prisma.dailySales.create({ data });
+      
+      console.log('Daily Sales Form submitted with ID:', result.id);
+      res.status(200).json({ success: true, id: result.id });
     } catch (err) {
       console.error('Daily Sales submission error:', err);
       res.status(500).json({ error: 'Failed to save sales form' });
+    } finally {
+      await prisma.$disconnect();
     }
   });
 
@@ -1241,11 +1240,11 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Form Library API endpoints
-  import('./api/forms.js').then(forms => {
-    app.get('/api/forms', forms.listForms);
-    app.get('/api/forms/:id', forms.getForm);
-    app.post('/api/forms/:id/email', forms.emailForm);
+  // Combined forms API - load async
+  import('./api/forms.js').then(formsModule => {
+    app.get('/api/forms', formsModule.listForms);
+    app.get('/api/forms/:id', formsModule.getForm);
+    app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
 
   return server;

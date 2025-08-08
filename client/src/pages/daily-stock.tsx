@@ -90,7 +90,7 @@ const DailyStockForm = () => {
           <h2 className="text-lg font-semibold mb-3">Meat Count</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Meat Count (kg or grams)</label>
+              <label className="block text-sm font-medium mb-1">Meat (kg or grams)</label>
               <input
                 type="number"
                 step="0.1"
