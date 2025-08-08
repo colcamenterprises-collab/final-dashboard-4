@@ -40,9 +40,10 @@ const navigationStructure = [
     expandable: true,
     items: [
       { path: "/daily-sales", label: "Daily Sales Form", icon: ClipboardList },
+      { path: "/daily-stock", label: "Daily Stock Form", icon: Package },
+      { path: "/stock-library", label: "Stock Library", icon: FileText },
       { path: "/form-library", label: "Form Library", icon: FileText },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
-      { path: "/reports-analysis", label: "Reports & Analysis", icon: BarChart3 },
       { path: "/analysis", label: "Analysis", icon: TrendingUp },
       { path: "/shift-analytics", label: "Shift Analytics", icon: Activity },
       { path: "/shift-comparison", label: "Shift Comparison", icon: BarChart },

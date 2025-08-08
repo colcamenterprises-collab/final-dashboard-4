@@ -24,6 +24,8 @@ import Ingredients from "@/pages/Ingredients";
 import IngredientsTable from "@/pages/IngredientsTable";
 import DailySales from "@/pages/DailySales";
 import DailyStock from "@/pages/DailyStock";
+import DailyStockPage from "@/pages/daily-stock";
+import StockLibrary from "@/pages/stock-library";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
 import Purchasing from "@/pages/Purchasing";
@@ -63,7 +65,8 @@ function Router() {
         <Route path="/ingredients" component={Ingredients} />
         <Route path="/ingredients-table" component={IngredientsTable} />
         <Route path="/daily-sales" component={DailySales} />
-        <Route path="/daily-stock" component={DailyStock} />
+        <Route path="/daily-stock" component={DailyStockPage} />
+        <Route path="/stock-library" component={StockLibrary} />
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />

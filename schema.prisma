@@ -39,9 +39,6 @@ model DailySales {
 
   // Soft delete
   deletedAt        DateTime? // null = active, otherwise hidden
-  
-  // Relation to DailyStock
-  stock            DailyStock?
 }
 
 model DailyStock {

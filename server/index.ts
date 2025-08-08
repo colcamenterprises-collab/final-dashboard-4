@@ -272,6 +272,10 @@ async function checkSchema() {
     }
   });
 
+  // Daily Stock API routes
+  const dailyStockRouter = await import('./api/daily-stock.js');
+  app.use('/api/daily-stock', dailyStockRouter.default);
+
   // Basic ingredients API for testing
   app.get('/api/ingredients', async (req: Request, res: Response) => {
     try {

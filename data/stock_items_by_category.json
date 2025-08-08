@@ -1,57 +1,69 @@
 {
-  "Meat": [
-    "Topside Beef"
-  ],
-  "Fresh Food": [
-    "Iceberg Lettuce 1 kg",
-    "Tomatoes Tor Tomato 1 kg",
-    "White Cabbage Catering",
-    "Yellow onions Catering 1 kg",
-    "Green Bell Pepper 1 kg",
-    "Red Bell Pepper 1 kg",
-    "Gherkins 920g jar",
-    "Avocado"
-  ],
-  "Frozen Food": [
-    "SAVEPAK Frozen French Fries - Shoestring 7 mm 2 kg",
-    "Chicken Wings 1kg Frozen",
-    "Chicken Nuggets Frozen 1kg"
-  ],
-  "Shelf Items": [
-    "Cajun Seasoning 510g, MCCORMICK",
-    "Smoked Paprika Powder BAKING NEEDS 200g",
-    "Black Pepper Powder COOKING 200g",
-    "AMERICAN MUSTARD 450g HEINZ",
-    "TOMATO KETCHUP 910g HEINZ",
-    "Mayonnaise 946ML HELLMANS",
-    "Sea Salt 750g CEREBOS",
-    "Canola Oil 1L GOLDEN CHEF",
-    "Burger Sauce"
-  ],
-  "Kitchen Supplies": [
-    "Baking Paper 450mm x 50m",
-    "Cling Film 300mm x 300m",
-    "Aluminium Foil 450mm x 150m",
-    "Disposable Gloves Large",
-    "Hand Soap 5L",
-    "Sanitiser Gel 5L",
-    "Cleaning Cloth Microfibre",
-    "All Purpose Cleaner 750ml"
-  ],
-  "Packaging": [
-    "Burger Box Black",
-    "French Fry Container Medium",
-    "Napkins Brown",
-    "Paper Bags Large",
-    "Plastic Fork",
-    "Plastic Knife",
-    "Sauce Cup Small"
-  ],
   "Drinks": [
     "Coke",
-    "Coke Zero", 
+    "Coke Zero",
+    "Fanta Orange",
+    "Fanta Strawberry",
+    "Schweppes Manow",
+    "Kids Juice (Orange)",
+    "Kids Juice (Apple)",
     "Sprite",
-    "Fanta",
-    "Water"
+    "Soda Water",
+    "Bottled Water"
+  ],
+  "Fresh Food": [
+    "Salad (Iceberg Lettuce)",
+    "Milk",
+    "Burger Bun",
+    "Tomatos",
+    "White Cabbage",
+    "Purple Cabbage",
+    "Onions Bulk 10kg",
+    "Onions (small bags)",
+    "Cheese",
+    "Bacon Short",
+    "Bacon Long",
+    "Jalapenos"
+  ],
+  "Frozen Food": [
+    "French Fries 7mm",
+    "Chicken Nuggets",
+    "Chicken Fillets",
+    "Sweet Potato Fries"
+  ],
+  "Kitchen Supplies": [
+    "Oil (Fryer)",
+    "Plastic Food Wrap",
+    "Paper Towel Long",
+    "Paper Towel Short (Serviettes)",
+    "Food Gloves (Large)",
+    "Food Gloves (Medium)",
+    "Food Gloves (Small)",
+    "Aluminum Foil",
+    "Plastic Meat Gloves",
+    "Kitchen Cleaner",
+    "Alcohol Sanitiser"
+  ],
+  "Packaging": [
+    "French Fries Box",
+    "Plastic Carry Bags (Size- 6×14)",
+    "Plastic Carry Bags (Size - 9×18)",
+    "Brown Paper Food Bags",
+    "Loaded Fries Boxes",
+    "Packaging Labels",
+    "Knife, Fork, Spoon Set"
+  ],
+  "Shelf Items": [
+    "Cajun Fries Seasoning",
+    "Crispy Fried Onions",
+    "Pickles(standard dill pickles)",
+    "Pickles Sweet (standard)",
+    "Mustard",
+    "Mayonnaise",
+    "Tomato Sauce",
+    "Chili Sauce (Sriracha)",
+    "BBQ Sauce",
+    "Sriracha Sauce",
+    "Salt (Coarse Sea Salt)"
   ]
 }

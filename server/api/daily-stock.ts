@@ -1,68 +1,83 @@
 import express from 'express';
-import { prisma } from '../../lib/prisma';
+import { PrismaClient } from '@prisma/client';
+import nodemailer from 'nodemailer';
 
 const router = express.Router();
+const prisma = new PrismaClient();
+
+// Gmail SMTP configuration
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
 router.post('/', async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
-    const {
-      salesFormId,
-      meatWeight,
-      burgerBunsStock,
-      drinkStock,
-      freshFood,
-      frozenFood,
-      shelfItems,
-      kitchenSupplies,
-      packaging,
-    } = req.body;
+    const { salesFormId, meatGrams, burgerBuns, drinks, stockRequests } = req.body;
 
-    if (!salesFormId) {
-      return res.status(400).json({ error: 'Sales form ID is required' });
-    }
-
-    const result = await prisma.dailyStock.create({
+    // Save to DailyStock
+    const stockForm = await prisma.dailyStock.create({
       data: {
-        salesFormId,
-        meatWeight: parseInt(meatWeight) || 0,
-        burgerBunsStock: parseInt(burgerBunsStock) || 0,
-        drinkStock: drinkStock || {},
-        freshFood: freshFood || {},
-        frozenFood: frozenFood || {},
-        shelfItems: shelfItems || {},
-        kitchenSupplies: kitchenSupplies || {},
-        packaging: packaging || {},
+        salesFormId: salesFormId || null,
+        meatGrams: parseInt(meatGrams) || 0,
+        burgerBuns: parseInt(burgerBuns) || 0,
+        drinkStock: drinks || {},
+        stockRequests: stockRequests || {},
       },
     });
 
-    res.status(200).json({ success: true, id: result.id });
-  } catch (err) {
-    console.error('[daily-stock] Error saving form:', err);
+    // Build email summary
+    let emailBody = 'Daily Stock Form Submission\n\n';
+    emailBody += `Meat: ${meatGrams} grams\n`;
+    emailBody += `Burger Buns: ${burgerBuns}\n\n`;
+
+    // Drinks with quantity > 0
+    emailBody += 'DRINKS:\n';
+    Object.entries(drinks || {}).forEach(([drink, qty]) => {
+      if (qty > 0) {
+        emailBody += `${drink}: ${qty}\n`;
+      }
+    });
+
+    // Stock requests with quantity > 0
+    emailBody += '\nSTOCK REQUESTS:\n';
+    Object.entries(stockRequests || {}).forEach(([item, qty]) => {
+      if (qty > 0) {
+        emailBody += `${item}: ${qty}\n`;
+      }
+    });
+
+    // Send email
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: 'smashbrothersburgersth@gmail.com',
+      subject: `Daily Stock Form - ${new Date().toLocaleDateString()}`,
+      text: emailBody,
+    });
+
+    res.json({ success: true, id: stockForm.id });
+  } catch (error) {
+    console.error('Error saving stock form:', error);
     res.status(500).json({ error: 'Failed to save stock form' });
   }
 });
 
-router.get('/:salesFormId', async (req, res) => {
+// Get stock forms for library
+router.get('/', async (req, res) => {
   try {
-    const { salesFormId } = req.params;
-    
-    const stockForm = await prisma.dailyStock.findUnique({
-      where: { salesFormId },
-      include: { salesForm: true },
+    const stockForms = await prisma.dailyStock.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
     });
 
-    if (!stockForm) {
-      return res.status(404).json({ error: 'Stock form not found' });
-    }
-
-    res.status(200).json(stockForm);
-  } catch (err) {
-    console.error('[daily-stock] Error fetching form:', err);
-    res.status(500).json({ error: 'Failed to fetch stock form' });
+    res.json(stockForms);
+  } catch (error) {
+    console.error('Error fetching stock forms:', error);
+    res.status(500).json({ error: 'Failed to fetch stock forms' });
   }
 });
 
