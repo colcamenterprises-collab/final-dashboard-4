@@ -394,3 +394,13 @@
 .input {
   @apply border border-gray-300 rounded px-3 py-2 w-full;
 }
+
+/* Smaller placeholder text to match label font size */
+.input::placeholder {
+  font-size: 0.875rem; /* text-sm size to match labels */
+  color: #9CA3AF; /* gray-400 */
+}
+
+.dark .input::placeholder {
+  color: #6B7280; /* gray-500 for dark mode */
+}
