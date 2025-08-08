@@ -41,7 +41,6 @@ const navigationStructure = [
     items: [
       { path: "/daily-sales", label: "Daily Sales Form", icon: ClipboardList },
       { path: "/daily-stock", label: "Daily Stock Form", icon: Package },
-      { path: "/stock-library", label: "Stock Library", icon: FileText },
       { path: "/form-library", label: "Form Library", icon: FileText },
     ]
   },
