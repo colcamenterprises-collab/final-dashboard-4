@@ -72,19 +72,19 @@ export default function DailySalesForm() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cash Sales</label>
-            <input className="input" placeholder="Cash Sales" type="number" value={form.cashSales} onChange={(e) => handleChange('cashSales', e.target.value)} />
+            <input className="input" type="number" value={form.cashSales} onChange={(e) => handleChange('cashSales', e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">QR Sales</label>
-            <input className="input" placeholder="QR Sales" type="number" value={form.qrSales} onChange={(e) => handleChange('qrSales', e.target.value)} />
+            <input className="input" type="number" value={form.qrSales} onChange={(e) => handleChange('qrSales', e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Grab Sales</label>
-            <input className="input" placeholder="Grab Sales" type="number" value={form.grabSales} onChange={(e) => handleChange('grabSales', e.target.value)} />
+            <input className="input" type="number" value={form.grabSales} onChange={(e) => handleChange('grabSales', e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Aroi Dee Sales</label>
-            <input className="input" placeholder="Aroi Dee Sales" type="number" value={form.aroiDeeSales} onChange={(e) => handleChange('aroiDeeSales', e.target.value)} />
+            <input className="input" type="number" value={form.aroiDeeSales} onChange={(e) => handleChange('aroiDeeSales', e.target.value)} />
           </div>
         </div>
         <div className="mt-2 font-bold">Total Sales: ฿{totalSales.toFixed(2)}</div>
@@ -127,15 +127,15 @@ export default function DailySalesForm() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Closing Cash</label>
-            <input className="input" placeholder="Closing Cash" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
+            <input className="input" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cash Banked</label>
-            <input className="input" placeholder="Cash Banked" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
+            <input className="input" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">QR Code Transfer Amount</label>
-            <input className="input" placeholder="QR Code Transfer Amount" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
+            <input className="input" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
           </div>
         </div>
       </div>
