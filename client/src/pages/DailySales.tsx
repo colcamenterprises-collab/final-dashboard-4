@@ -125,9 +125,18 @@ export default function DailySalesForm() {
       <div>
         <h2 className="font-bold mb-2">Banking</h2>
         <div className="grid grid-cols-3 gap-4">
-          <input className="input" placeholder="Closing Cash" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
-          <input className="input" placeholder="Cash Banked" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
-          <input className="input" placeholder="QR Code Transfer Amount" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Closing Cash</label>
+            <input className="input" placeholder="Closing Cash" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cash Banked</label>
+            <input className="input" placeholder="Cash Banked" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">QR Code Transfer Amount</label>
+            <input className="input" placeholder="QR Code Transfer Amount" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
+          </div>
         </div>
       </div>
 
