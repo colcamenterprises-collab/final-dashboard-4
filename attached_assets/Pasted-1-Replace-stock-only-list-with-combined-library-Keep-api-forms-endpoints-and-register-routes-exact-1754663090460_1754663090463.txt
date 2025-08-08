@@ -1,0 +1,82 @@
+1) Replace stock-only list with combined library
+Keep /api/forms endpoints and register routes exactly as earlier.
+
+Use the combined UI we provided (form-library.tsx) and add the detail page (form-detail.tsx).
+
+Sidebar: point “Form Library” → /form-library.
+
+Acceptance:
+
+/api/forms returns rows with { id, createdAt, completedBy, totalSales, hasStock, meatGrams, burgerBuns }.
+
+Library shows those columns, newest first.
+
+Buttons:
+
+View → /form-detail?id=<id>
+
+Print → opens ?print=1 and prints
+
+Email → POST /api/forms/:id/email returns { ok: true } and message lands
+
+2) Fire combined email on stock submit
+In server/api/daily-stock.ts: after saving DailyStock, if salesFormId exists, reuse the same logic as /api/forms/:id/email to send the combined (sales+stock) email immediately. (You can call the function directly or inline the build; keep it simple.)
+
+3) Fix meat value parsing (kg → grams)
+Right now it looks like parseInt (and maybe extra math) is mangling the value. Let’s be unambiguous:
+
+Store: grams (integer).
+
+Accept:
+
+If user enters a decimal ≤ 50, treat as kg and convert to grams.
+
+If user enters ≥ 50, treat as grams.
+
+Patch in daily-stock.tsx before POST:
+
+ts
+Copy
+Edit
+const toGrams = (v: string) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  // if looks like kg (e.g., 5.5) and small, convert to grams
+  return n <= 50 && String(v).includes('.') ? Math.round(n * 1000) : Math.round(n);
+};
+
+// ...
+const payload = {
+  salesFormId,
+  meatGrams: toGrams(form.meatGrams),  // handles 5.5 -> 5500
+  burgerBuns: Number(form.burgerBuns) || 0,
+  drinks: mapNumbers(form.drinks),
+  stockRequests: mapNumbers(form.stockRequests),
+};
+(If you prefer kg only: change placeholder to “Meat (kg)” and always convert.)
+
+4) Sales → Stock redirect uses real ID
+In /daily-sales submit handler:
+
+ts
+Copy
+Edit
+const { id } = (await axios.post('/api/daily-sales', payload)).data;
+router.push(`/daily-stock?salesId=${id}`);
+No placeholders.
+
+Quick test you/they should run
+Submit sales: Completed By, some sales, 1 shopping row, 1 wage row.
+→ Redirect to stock with real salesId.
+
+Submit stock: enter 5.5 for meat, 5 buns, two drinks, two stock items.
+→ 200 + library row shows Total Sales and Stock: Meat 5500g, Buns 5.
+→ Email arrives (combined sales+stock).
+
+Library actions:
+
+View shows full merged details
+
+Print opens print view
+
+Email button re-sends

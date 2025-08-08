@@ -66,9 +66,24 @@ function buildTransporter() {
 export async function emailForm(req: Request, res: Response) {
   try {
     const id = String(req.query.id || req.params.id);
-    const sales = await prisma.dailySales.findUnique({ where: { id } });
-    if (!sales) return res.status(404).json({ error: 'Not found' });
-    const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
+    const result = await sendCombinedEmail(id);
+    if (result.success) {
+      res.json({ ok: true });
+    } else {
+      res.status(500).json({ ok: false, error: result.error });
+    }
+  } catch (e: any) {
+    console.error('[emailForm] ', e?.message || e);
+    res.status(500).json({ ok: false, error: e?.message || 'email failed' });
+  }
+}
+
+export async function sendCombinedEmail(salesId: string) {
+  try {
+    const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+    if (!sales) return { success: false, error: 'Sales form not found' };
+    
+    const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
 
     const totalSales = sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales);
     const lines: string[] = [
@@ -122,10 +137,11 @@ export async function emailForm(req: Request, res: Response) {
       text: lines.join('\n'),
       replyTo: 'smashbrothersburgersth@gmail.com',
     });
-    res.json({ ok: true });
+    
+    return { success: true };
   } catch (e: any) {
-    console.error('[emailForm] ', e?.message || e);
-    res.status(500).json({ ok: false, error: e?.message || 'email failed' });
+    console.error('[sendCombinedEmail] ', e?.message || e);
+    return { success: false, error: e?.message || 'email failed' };
   } finally {
     await prisma.$disconnect();
   }

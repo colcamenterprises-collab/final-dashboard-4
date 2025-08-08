@@ -34,6 +34,13 @@ const DailyStockForm = () => {
     }));
   };
 
+  const toGrams = (v: string | number) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    // if looks like kg (e.g., 5.5) and small, convert to grams
+    return n <= 50 && String(v).includes('.') ? Math.round(n * 1000) : Math.round(n);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -41,8 +48,8 @@ const DailyStockForm = () => {
     try {
       const payload = {
         salesFormId,
-        meatGrams: formData.meatGrams,
-        burgerBuns: formData.burgerBuns,
+        meatGrams: toGrams(formData.meatGrams),  // handles 5.5 -> 5500
+        burgerBuns: Number(formData.burgerBuns) || 0,
         drinks: formData.drinks,
         stockRequests: formData.stockRequests,
       };
@@ -54,8 +61,8 @@ const DailyStockForm = () => {
       });
 
       if (response.ok) {
-        alert('Stock form submitted successfully!');
-        setLocation('/stock-library');
+        alert('Stock form submitted successfully! Email sent to management.');
+        setLocation('/form-library');
       } else {
         alert('Failed to submit stock form');
       }
@@ -83,13 +90,14 @@ const DailyStockForm = () => {
           <h2 className="text-lg font-semibold mb-3">Meat Count</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Meat Count (grams)</label>
+              <label className="block text-sm font-medium mb-1">Meat Count (kg or grams)</label>
               <input
                 type="number"
+                step="0.1"
                 value={formData.meatGrams}
                 onChange={(e) => handleInputChange('meatGrams', e.target.value)}
                 className="w-full p-2 border rounded"
-                placeholder="0"
+                placeholder="5.5 (kg) or 5500 (grams)"
               />
             </div>
             <div>
