@@ -1,0 +1,229 @@
+PUSH: Add Shopping List + Meat/Buns/Drinks to Library & Email
+Do not change DB schema or expenses.
+Only edit the files listed below.
+
+1) API – update combined forms endpoints
+File: server/api/forms.ts
+Replace the listForms and emailForm functions with these versions.
+
+ts
+Copy
+Edit
+// --- listForms: only completed forms; include shopping & drinks summaries
+export async function listForms(req, res) {
+  const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
+  const stock = await prisma.dailyStock.findMany({
+    where: { salesFormId: { in: sales.map(s => s.id) } }
+  });
+
+  const stockById = new Map(stock.map(s => [s.salesFormId!, s]));
+
+  const rows = sales
+    .filter(s => stockById.has(s.id)) // completed forms only
+    .map(s => {
+      const st = stockById.get(s.id)!;
+
+      // Shopping list: qty >= 1
+      const shopEntries = Object.entries(st.stockRequests || {}).filter(([, v]) => (Number(v) || 0) >= 1);
+      const shoppingListCount = shopEntries.length;
+      const shoppingPreview = shopEntries.slice(0, 5).map(([k, v]) => `${k} × ${v}`);
+
+      // Drinks (all)
+      const drinksObj: Record<string, number> = Object.fromEntries(
+        Object.entries(st.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0])
+      );
+      const drinksList = Object.entries(drinksObj);
+      const drinksCount = drinksList.length;
+      const drinksPreview = drinksList
+        .slice()
+        .sort((a, b) => a[1] - b[1]) // lowest first
+        .slice(0, 3)
+        .map(([k, v]) => `${k}:${v}`);
+
+      return {
+        id: s.id,
+        createdAt: s.createdAt,
+        completedBy: s.completedBy,
+        totalSales:
+          s.totalSales ??
+          (Number(s.cashSales || 0) +
+           Number(s.qrSales || 0) +
+           Number(s.grabSales || 0) +
+           Number(s.aroiDeeSales || 0)),
+        meatGrams: st.meatGrams,
+        burgerBuns: st.burgerBuns,
+        shoppingListCount,
+        shoppingPreview,
+        drinksCount,
+        drinksPreview,
+      };
+    });
+
+  res.json(rows);
+}
+
+// --- emailForm: include END-OF-SHIFT STOCK, DRINKS (all), SHOPPING LIST (qty>=1)
+export async function emailForm(req: Request, res: Response) {
+  const id = String(req.query.id || req.params.id);
+  const sales = await prisma.dailySales.findUnique({ where: { id } });
+  if (!sales) return res.status(404).json({ error: 'Not found' });
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
+
+  const totalSales =
+    sales.totalSales ??
+    (Number(sales.cashSales || 0) +
+     Number(sales.qrSales || 0) +
+     Number(sales.grabSales || 0) +
+     Number(sales.aroiDeeSales || 0));
+
+  const lines: string[] = [
+    `Daily Submission`,
+    `Form ID: ${sales.id}`,
+    `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
+    `Completed By: ${sales.completedBy || '-'}`,
+    ``,
+    `SALES`,
+    `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
+    `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
+    `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
+    `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+    `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
+    ``,
+    `EXPENSES`,
+    `- Total Expenses: ฿${(sales.totalExpenses || 0).toFixed(2)}`,
+    ``,
+    `BANKING`,
+    `- Closing Cash: ฿${(sales.closingCash || 0).toFixed(2)}`,
+    `- Cash Banked: ฿${(sales.cashBanked || 0).toFixed(2)}`,
+    `- QR Transfer: ฿${(sales.qrTransferred || 0).toFixed(2)}`,
+  ];
+
+  if (stock) {
+    const allDrinks = Object.entries(stock.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0] as [string, number]);
+    allDrinks.sort((a, b) => a[1] - b[1]);
+
+    const shopPos = Object.entries(stock.stockRequests || {}).filter(([, n]) => (Number(n) || 0) > 0);
+
+    lines.push(
+      ``,
+      `END-OF-SHIFT STOCK`,
+      `- Meat (g): ${stock.meatGrams}`,
+      `- Burger Buns: ${stock.burgerBuns}`,
+      ``,
+      `DRINKS (all)`,
+      ...(allDrinks.length ? allDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      ``,
+      `SHOPPING LIST`,
+      ...(shopPos.length ? shopPos.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+    );
+  } else {
+    lines.push(``, `STOCK: Not submitted yet`);
+  }
+
+  try {
+    const transporter = buildTransporter();
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: process.env.SMTP_TO || 'colcamenterprises@gmail.com',
+      subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+      text: lines.join('\n'),
+      replyTo: 'smashbrothersburgersth@gmail.com',
+    });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('[emailForm] ', e?.message || e);
+    res.status(500).json({ ok: false, error: e?.message || 'email failed' });
+  }
+}
+(Leave getForm unchanged.)
+
+2) Library UI – add “Drinks” + “Shopping Items” columns
+File: client/src/pages/form-library.tsx
+Add two headers:
+
+tsx
+Copy
+Edit
+<th className="p-3 border">Drinks</th>
+<th className="p-3 border">Shopping Items</th>
+Render:
+
+tsx
+Copy
+Edit
+<td className="p-3 border" title={(r.drinksPreview || []).join(', ')}>
+  {r.drinksCount ?? 0}
+</td>
+<td className="p-3 border" title={(r.shoppingPreview || []).join(', ')}>
+  {r.shoppingListCount ?? 0}
+</td>
+(Keep your existing Date / Form ID / Completed By / Total Sales / Stock (Meat/Buns) / Actions.)
+
+3) Detail page – show Drinks (all) and Shopping List
+File: client/src/pages/form-detail.tsx
+Change the drinks section to list all drinks with counts:
+
+tsx
+Copy
+Edit
+<h2 className="font-bold">Drinks (all)</h2>
+<ul className="list-disc pl-6">
+  {Object.entries(st.drinkStock || {}).map(([k, v]) => (
+    <li key={k}>{k}: {Number(v) || 0}</li>
+  ))}
+</ul>
+Rename “Purchase Requests (>0)” to “Shopping List” (keep the filter qty > 0):
+
+tsx
+Copy
+Edit
+<h2 className="font-bold">Shopping List</h2>
+<ul className="list-disc pl-6">
+  {Object.entries(st.stockRequests || {})
+    .filter(([, n]) => (Number(n) || 0) > 0)
+    .map(([k, v]) => <li key={k}>{k}: {Number(v)}</li>)}
+</ul>
+4) Ensure stock submit still triggers combined email
+Already in place, but confirm in server/api/daily-stock.ts after save:
+
+ts
+Copy
+Edit
+if (payload.salesFormId) {
+  try {
+    await fetch(`${process.env.PUBLIC_BASE_URL || ''}/api/forms/${payload.salesFormId}/email`, { method: 'POST' });
+  } catch (e) {
+    console.error('post-save email failed', e?.message || e);
+  }
+}
+5) Smoke test (run now)
+Submit Sales → redirected to Stock with ?salesId=<id>.
+
+Submit Stock with:
+
+Meat 5.5 (expect library shows 5500g), Buns 5
+
+Enter counts for all drinks
+
+Add a few shopping items (qty ≥ 1)
+
+Email arrives with:
+
+SALES/EXPENSES/BANKING
+
+END-OF-SHIFT STOCK (Meat/Buns)
+
+DRINKS (all)
+
+SHOPPING LIST (only qty ≥ 1)
+
+Form Library row shows:
+
+Drinks count (+ hover preview)
+
+Shopping Items count (+ hover preview)
+
+Existing View / Print / Email actions still work
+
+If anything in the API returns [], check that DailyStock.salesFormId matches the Sales id (we filter to completed forms only).

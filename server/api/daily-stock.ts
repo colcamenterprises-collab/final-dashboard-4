@@ -46,40 +46,14 @@ router.post('/', async (req, res) => {
 
     const saved = await prisma.dailyStock.create({ data });
 
-    // Email only values > 0
-    const posDrinks = Object.entries(data.drinkStock).filter(([, n]) => (n as number) > 0);
-    const posReqs = Object.entries(data.stockRequests).filter(([, n]) => (n as number) > 0);
-
-    const lines: string[] = [
-      `Daily Stock Submission`,
-      `Submitted: ${new Date(saved.createdAt).toLocaleString()}`,
-      `Linked Sales ID: ${salesFormId || '-'}`,
-      ``,
-      `Counts`,
-      `- Meat (g): ${data.meatGrams}`,
-      `- Burger Buns: ${data.burgerBuns}`,
-      ``,
-      `Drinks (>0):`,
-      ...(posDrinks.length ? posDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
-      ``,
-      `Stock Requests (>0):`,
-      ...(posReqs.length ? posReqs.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
-    ];
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { 
-        user: process.env.GMAIL_USER, 
-        pass: process.env.GMAIL_APP_PASSWORD 
-      },
-    });
-
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: 'smashbrothersburgersth@gmail.com',
-      subject: `Daily Stock Submission ${new Date(saved.createdAt).toLocaleDateString()}`,
-      text: lines.join('\n'),
-    });
+    // Send combined email if linked to sales form
+    if (salesFormId) {
+      try {
+        await fetch(`${process.env.PUBLIC_BASE_URL || 'http://localhost:5000'}/api/forms/${salesFormId}/email`, { method: 'POST' });
+      } catch (e: any) {
+        console.error('post-save email failed', e?.message || e);
+      }
+    }
 
     return res.status(200).json({ success: true, id: saved.id });
   } catch (err) {

@@ -142,39 +142,23 @@ export default function FormDetail() {
                 </div>
               </div>
 
-              {/* Drinks with stock > 0 */}
-              {Object.entries(st.drinkStock || {}).filter(([, n]) => (n as number) > 0).length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Drinks Available</h3>
-                  <ul className="space-y-1 text-sm">
-                    {Object.entries(st.drinkStock || {})
-                      .filter(([, n]) => (n as number) > 0)
-                      .map(([k, v]) => (
-                        <li key={k} className="flex justify-between">
-                          <span>{k}:</span>
-                          <span className="font-mono">{v as number}</span>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
+              <div>
+                <h2 className="font-bold">Drinks (all)</h2>
+                <ul className="list-disc pl-6">
+                  {Object.entries(st.drinkStock || {}).map(([k, v]) => (
+                    <li key={k}>{k}: {Number(v) || 0}</li>
+                  ))}
+                </ul>
+              </div>
 
-              {/* Purchase Requests > 0 */}
-              {Object.entries(st.stockRequests || {}).filter(([, n]) => (n as number) > 0).length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Purchase Requests</h3>
-                  <ul className="space-y-1 text-sm">
-                    {Object.entries(st.stockRequests || {})
-                      .filter(([, n]) => (n as number) > 0)
-                      .map(([k, v]) => (
-                        <li key={k} className="flex justify-between">
-                          <span>{k}:</span>
-                          <span className="font-mono text-red-600">{v as number} needed</span>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
+              <div>
+                <h2 className="font-bold">Shopping List</h2>
+                <ul className="list-disc pl-6">
+                  {Object.entries(st.stockRequests || {})
+                    .filter(([, n]) => (Number(n) || 0) > 0)
+                    .map(([k, v]) => <li key={k}>{k}: {Number(v)}</li>)}
+                </ul>
+              </div>
             </div>
           ) : (
             <div className="text-red-600 font-medium">

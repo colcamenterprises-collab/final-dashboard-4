@@ -9,6 +9,10 @@ type Row = {
   totalSales: number;
   meatGrams: number;
   burgerBuns: number;
+  shoppingListCount: number;
+  shoppingPreview: string[];
+  drinksCount: number;
+  drinksPreview: string[];
 };
 
 export default function FormLibrary() {
@@ -61,6 +65,8 @@ export default function FormLibrary() {
               <th className="p-3 text-left font-semibold">Completed By</th>
               <th className="p-3 text-left font-semibold">Total Sales</th>
               <th className="p-3 text-left font-semibold">Stock (Meat/Buns)</th>
+              <th className="p-3 border">Drinks</th>
+              <th className="p-3 border">Shopping Items</th>
               <th className="p-3 text-left font-semibold">Actions</th>
             </tr>
           </thead>
@@ -89,6 +95,12 @@ export default function FormLibrary() {
                   <div className="text-green-600 font-medium">
                     Meat {r.meatGrams}g • Buns {r.burgerBuns}
                   </div>
+                </td>
+                <td className="p-3 border" title={(r.drinksPreview || []).join(', ')}>
+                  {r.drinksCount ?? 0}
+                </td>
+                <td className="p-3 border" title={(r.shoppingPreview || []).join(', ')}>
+                  {r.shoppingListCount ?? 0}
                 </td>
                 <td className="p-3 border-b">
                   <div className="flex gap-2">

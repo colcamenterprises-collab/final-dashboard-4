@@ -23,16 +23,55 @@ async function fetchJoined() {
 
 export async function listForms(req: Request, res: Response) {
   try {
-    const rows = await fetchJoined();
-    const data = rows.map(({ sales, stock }) => ({
-      id: sales.id,
-      createdAt: sales.createdAt,
-      completedBy: sales.completedBy,
-      totalSales: sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales),
-      meatGrams: stock.meatGrams,
-      burgerBuns: stock.burgerBuns,
-    }));
-    res.json(data);
+    const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
+    const stock = await prisma.dailyStock.findMany({
+      where: { salesFormId: { in: sales.map(s => s.id) } }
+    });
+
+    const stockById = new Map(stock.map(s => [s.salesFormId!, s]));
+
+    const rows = sales
+      .filter(s => stockById.has(s.id)) // completed forms only
+      .map(s => {
+        const st = stockById.get(s.id)!;
+
+        // Shopping list: qty >= 1
+        const shopEntries = Object.entries(st.stockRequests || {}).filter(([, v]) => (Number(v) || 0) >= 1);
+        const shoppingListCount = shopEntries.length;
+        const shoppingPreview = shopEntries.slice(0, 5).map(([k, v]) => `${k} × ${v}`);
+
+        // Drinks (all)
+        const drinksObj: Record<string, number> = Object.fromEntries(
+          Object.entries(st.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0])
+        );
+        const drinksList = Object.entries(drinksObj);
+        const drinksCount = drinksList.length;
+        const drinksPreview = drinksList
+          .slice()
+          .sort((a, b) => a[1] - b[1]) // lowest first
+          .slice(0, 3)
+          .map(([k, v]) => `${k}:${v}`);
+
+        return {
+          id: s.id,
+          createdAt: s.createdAt,
+          completedBy: s.completedBy,
+          totalSales:
+            s.totalSales ??
+            (Number(s.cashSales || 0) +
+             Number(s.qrSales || 0) +
+             Number(s.grabSales || 0) +
+             Number(s.aroiDeeSales || 0)),
+          meatGrams: st.meatGrams,
+          burgerBuns: st.burgerBuns,
+          shoppingListCount,
+          shoppingPreview,
+          drinksCount,
+          drinksPreview,
+        };
+      });
+
+    res.json(rows);
   } catch (error) {
     console.error('Error fetching forms:', error);
     res.status(500).json({ error: 'Failed to fetch forms' });
@@ -67,17 +106,78 @@ function buildTransporter() {
 }
 
 export async function emailForm(req: Request, res: Response) {
+  const id = String(req.query.id || req.params.id);
   try {
-    const id = String(req.query.id || req.params.id);
-    const result = await sendCombinedEmail(id);
-    if (result.success) {
-      res.json({ ok: true });
+    const sales = await prisma.dailySales.findUnique({ where: { id } });
+    if (!sales) return res.status(404).json({ error: 'Not found' });
+    const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
+
+    const totalSales =
+      sales.totalSales ??
+      (Number(sales.cashSales || 0) +
+       Number(sales.qrSales || 0) +
+       Number(sales.grabSales || 0) +
+       Number(sales.aroiDeeSales || 0));
+
+    const lines: string[] = [
+      `Daily Submission`,
+      `Form ID: ${sales.id}`,
+      `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
+      `Completed By: ${sales.completedBy || '-'}`,
+      ``,
+      `SALES`,
+      `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
+      `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
+      `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
+      `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+      `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
+      ``,
+      `EXPENSES`,
+      `- Total Expenses: ฿${(sales.totalExpenses || 0).toFixed(2)}`,
+      ``,
+      `BANKING`,
+      `- Closing Cash: ฿${(sales.closingCash || 0).toFixed(2)}`,
+      `- Cash Banked: ฿${(sales.cashBanked || 0).toFixed(2)}`,
+      `- QR Transfer: ฿${(sales.qrTransferred || 0).toFixed(2)}`,
+    ];
+
+    if (stock) {
+      const allDrinks = Object.entries(stock.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0] as [string, number]);
+      allDrinks.sort((a, b) => a[1] - b[1]);
+
+      const shopPos = Object.entries(stock.stockRequests || {}).filter(([, n]) => (Number(n) || 0) > 0);
+
+      lines.push(
+        ``,
+        `END-OF-SHIFT STOCK`,
+        `- Meat (g): ${stock.meatGrams}`,
+        `- Burger Buns: ${stock.burgerBuns}`,
+        ``,
+        `DRINKS (all)`,
+        ...(allDrinks.length ? allDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+        ``,
+        `SHOPPING LIST`,
+        ...(shopPos.length ? shopPos.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      );
     } else {
-      res.status(500).json({ ok: false, error: result.error });
+      lines.push(``, `STOCK: Not submitted yet`);
     }
+
+    const transporter = buildTransporter();
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: process.env.SMTP_TO || 'colcamenterprises@gmail.com',
+      subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+      text: lines.join('\n'),
+      replyTo: 'smashbrothersburgersth@gmail.com',
+    });
+    res.json({ ok: true });
   } catch (e: any) {
     console.error('[emailForm] ', e?.message || e);
     res.status(500).json({ ok: false, error: e?.message || 'email failed' });
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
