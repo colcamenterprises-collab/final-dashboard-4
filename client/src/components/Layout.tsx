@@ -43,11 +43,6 @@ const navigationStructure = [
       { path: "/daily-stock", label: "Daily Stock Form", icon: Package },
       { path: "/stock-library", label: "Stock Library", icon: FileText },
       { path: "/form-library", label: "Form Library", icon: FileText },
-      { path: "/expenses", label: "Expenses", icon: DollarSign },
-      { path: "/analysis", label: "Analysis", icon: TrendingUp },
-      { path: "/shift-analytics", label: "Shift Analytics", icon: Activity },
-      { path: "/shift-comparison", label: "Shift Comparison", icon: BarChart },
-      { path: "/receipts", label: "Receipts", icon: Receipt },
     ]
   },
   {

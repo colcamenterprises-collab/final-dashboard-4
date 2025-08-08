@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
     // Drinks with quantity > 0
     emailBody += 'DRINKS:\n';
     Object.entries(drinks || {}).forEach(([drink, qty]) => {
-      if (qty > 0) {
+      if (Number(qty) > 0) {
         emailBody += `${drink}: ${qty}\n`;
       }
     });
@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
     // Stock requests with quantity > 0
     emailBody += '\nSTOCK REQUESTS:\n';
     Object.entries(stockRequests || {}).forEach(([item, qty]) => {
-      if (qty > 0) {
+      if (Number(qty) > 0) {
         emailBody += `${item}: ${qty}\n`;
       }
     });
@@ -69,7 +69,6 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const stockForms = await prisma.dailyStock.findMany({
-      where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
