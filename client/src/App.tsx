@@ -37,6 +37,8 @@ import ShiftComparison from "@/pages/ShiftComparison";
 import ShiftReportDetail from "@/pages/ShiftReportDetail";
 import FormsLibrary from "@/pages/FormsLibrary";
 import FormLibrary from "@/pages/FormLibrary";
+import FormLibraryNew from "@/pages/form-library";
+import FormDetail from "@/pages/form-detail";
 import TestEmailPage from "@/pages/TestEmailPage";
 
 import NotFound from "@/pages/not-found";
@@ -70,9 +72,9 @@ function Router() {
         <Route path="/recipes" component={Recipes} />
         <Route path="/form/:id" component={FormView} />
         <Route path="/draft-forms" component={DraftForms} />
-        <Route path="/form-library" component={DraftFormsLibrary} />  
+        <Route path="/form-library" component={FormLibraryNew} />
+        <Route path="/form-detail" component={FormDetail} />
         <Route path="/forms-library" component={FormsLibrary} />
-        <Route path="/form-library" component={FormLibrary} />
         <Route path="/purchasing" component={Purchasing} />
         <Route path="/supplier-management" component={SupplierManagement} />
         <Route path="/test-monthly-stock" component={TestMonthlyStock} />

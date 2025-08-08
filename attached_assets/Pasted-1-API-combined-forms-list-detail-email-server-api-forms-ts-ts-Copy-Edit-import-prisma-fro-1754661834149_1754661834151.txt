@@ -1,0 +1,307 @@
+1) API – combined forms (list, detail, email)
+server/api/forms.ts
+ts
+Copy
+Edit
+import { prisma } from '@/lib/prisma';
+import type { Request, Response } from 'express';
+import nodemailer from 'nodemailer';
+
+function money(n?: number | null) {
+  return `฿${(n ?? 0).toFixed(2)}`;
+}
+
+async function fetchJoined() {
+  const sales = await prisma.dailySales.findMany({ orderBy: { createdAt: 'desc' } });
+  const stock = await prisma.dailyStock.findMany({
+    where: { salesFormId: { in: sales.map(s => s.id) } }
+  });
+  const stockBySalesId = new Map(stock.map(s => [s.salesFormId!, s]));
+  return sales.map(s => ({ sales: s, stock: stockBySalesId.get(s.id) || null }));
+}
+
+export async function listForms(req: Request, res: Response) {
+  const rows = await fetchJoined();
+  const data = rows.map(({ sales, stock }) => ({
+    id: sales.id,
+    createdAt: sales.createdAt,
+    completedBy: sales.completedBy,
+    totalSales: sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales),
+    hasStock: !!stock,
+    meatGrams: stock?.meatGrams ?? null,
+    burgerBuns: stock?.burgerBuns ?? null,
+  }));
+  res.json(data);
+}
+
+export async function getForm(req: Request, res: Response) {
+  const id = String(req.query.id || req.params.id);
+  const sales = await prisma.dailySales.findUnique({ where: { id } });
+  if (!sales) return res.status(404).json({ error: 'Not found' });
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
+  res.json({ sales, stock });
+}
+
+function buildTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_PORT === '465',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
+
+export async function emailForm(req: Request, res: Response) {
+  const id = String(req.query.id || req.params.id);
+  const sales = await prisma.dailySales.findUnique({ where: { id } });
+  if (!sales) return res.status(404).json({ error: 'Not found' });
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
+
+  const totalSales = sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales);
+  const lines: string[] = [
+    `Daily Submission`,
+    `Form ID: ${sales.id}`,
+    `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
+    `Completed By: ${sales.completedBy}`,
+    ``,
+    `SALES`,
+    `- Cash: ${money(sales.cashSales)}`,
+    `- QR: ${money(sales.qrSales)}`,
+    `- Grab: ${money(sales.grabSales)}`,
+    `- Aroi Dee: ${money(sales.aroiDeeSales)}`,
+    `Total Sales: ${money(totalSales)}`,
+    ``,
+    `EXPENSES`,
+    `- Total Expenses: ${money(sales.totalExpenses)}`,
+    ``,
+    `BANKING`,
+    `- Closing Cash: ${money(sales.closingCash)}`,
+    `- Cash Banked: ${money(sales.cashBanked)}`,
+    `- QR Transfer: ${money(sales.qrTransferred)}`,
+  ];
+
+  if (stock) {
+    lines.push(
+      ``,
+      `STOCK`,
+      `- Meat (g): ${stock.meatGrams}`,
+      `- Burger Buns: ${stock.burgerBuns}`,
+      ``,
+      `DRINKS (>0)`,
+      ...Object.entries(stock.drinkStock || {})
+        .filter(([, v]) => (v as number) > 0)
+        .map(([k, v]) => `- ${k}: ${v}`),
+      ``,
+      `PURCHASE REQUESTS (>0)`,
+      ...Object.entries(stock.stockRequests || {})
+        .filter(([, v]) => (v as number) > 0)
+        .map(([k, v]) => `- ${k}: ${v}`)
+    );
+  } else {
+    lines.push(``, `STOCK: Not submitted yet`);
+  }
+
+  try {
+    const transporter = buildTransporter();
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: process.env.SMTP_TO || 'colcamenterprises@gmail.com',
+      subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+      text: lines.join('\n'),
+      replyTo: 'smashbrothersburgersth@gmail.com',
+    });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('[emailForm] ', e?.message || e);
+    res.status(500).json({ ok: false, error: e?.message || 'email failed' });
+  }
+}
+Register routes (Express)
+In server/routes.ts (or wherever routes are wired):
+
+ts
+Copy
+Edit
+import * as forms from './api/forms';
+// ...
+router.get('/api/forms', forms.listForms);
+router.get('/api/forms/:id', forms.getForm);
+router.post('/api/forms/:id/email', forms.emailForm);
+2) Library UI – snippet list with actions
+client/src/pages/form-library.tsx
+tsx
+Copy
+Edit
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom'; // or next/link if Next
+import axios from 'axios';
+
+type Row = {
+  id: string;
+  createdAt: string;
+  completedBy: string;
+  totalSales: number;
+  hasStock: boolean;
+  meatGrams: number | null;
+  burgerBuns: number | null;
+};
+
+export default function FormLibrary() {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get('/api/forms').then(r => { setRows(r.data); setLoading(false); });
+  }, []);
+
+  const emailForm = async (id: string) => {
+    await axios.post(`/api/forms/${id}/email`);
+    alert('Email sent');
+  };
+
+  const printForm = (id: string) => {
+    window.open(`/form-detail?id=${id}&print=1`, '_blank');
+  };
+
+  if (loading) return <div className="p-6">Loading…</div>;
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Form Library</h1>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border">
+          <thead>
+            <tr className="bg-gray-50 text-left">
+              <th className="p-3 border">Date</th>
+              <th className="p-3 border">Form ID</th>
+              <th className="p-3 border">Completed By</th>
+              <th className="p-3 border">Total Sales</th>
+              <th className="p-3 border">Stock</th>
+              <th className="p-3 border">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.id}>
+                <td className="p-3 border">{new Date(r.createdAt).toLocaleString('en-TH')}</td>
+                <td className="p-3 border font-mono text-xs">{r.id.slice(0,8)}…</td>
+                <td className="p-3 border">{r.completedBy}</td>
+                <td className="p-3 border">฿{(r.totalSales ?? 0).toFixed(2)}</td>
+                <td className="p-3 border">{r.hasStock ? `Meat ${r.meatGrams}g • Buns ${r.burgerBuns}` : 'Pending'}</td>
+                <td className="p-3 border space-x-2">
+                  <Link to={`/form-detail?id=${r.id}`} className="underline">View</Link>
+                  <button onClick={() => printForm(r.id)} className="underline">Print</button>
+                  <button onClick={() => emailForm(r.id)} className="underline">Email</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+3) Detail page – full merged view (printable)
+client/src/pages/form-detail.tsx
+tsx
+Copy
+Edit
+import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+
+export default function FormDetail() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id')!;
+  const shouldPrint = params.get('print') === '1';
+
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    axios.get(`/api/forms/${id}`).then(r => setData(r.data));
+  }, [id]);
+
+  useEffect(() => {
+    if (shouldPrint && data) setTimeout(() => window.print(), 300);
+  }, [shouldPrint, data]);
+
+  if (!data) return <div className="p-6">Loading…</div>;
+
+  const s = data.sales, st = data.stock;
+  const totalSales = (s.totalSales ?? (s.cashSales + s.qrSales + s.grabSales + s.aroiDeeSales)) || 0;
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto print:max-w-full">
+      <h1 className="text-2xl font-bold mb-2">Daily Submission</h1>
+      <div className="text-sm text-gray-600 mb-6">
+        <div>Form ID: {s.id}</div>
+        <div>Date: {new Date(s.createdAt).toLocaleString('en-TH')}</div>
+        <div>Completed By: {s.completedBy}</div>
+      </div>
+
+      <section className="mb-4">
+        <h2 className="font-bold">Sales</h2>
+        <div>Cash: ฿{s.cashSales.toFixed(2)}</div>
+        <div>QR: ฿{s.qrSales.toFixed(2)}</div>
+        <div>Grab: ฿{s.grabSales.toFixed(2)}</div>
+        <div>Aroi Dee: ฿{s.aroiDeeSales.toFixed(2)}</div>
+        <div className="font-bold mt-1">Total Sales: ฿{totalSales.toFixed(2)}</div>
+      </section>
+
+      <section className="mb-4">
+        <h2 className="font-bold">Expenses</h2>
+        <div>Total Expenses: ฿{(s.totalExpenses ?? 0).toFixed(2)}</div>
+      </section>
+
+      <section className="mb-4">
+        <h2 className="font-bold">Banking</h2>
+        <div>Closing Cash: ฿{s.closingCash.toFixed(2)}</div>
+        <div>Cash Banked: ฿{s.cashBanked.toFixed(2)}</div>
+        <div>QR Transfer: ฿{s.qrTransferred.toFixed(2)}</div>
+      </section>
+
+      {st ? (
+        <>
+          <section className="mb-4">
+            <h2 className="font-bold">Stock</h2>
+            <div>Meat (g): {st.meatGrams}</div>
+            <div>Burger Buns: {st.burgerBuns}</div>
+          </section>
+
+          <section className="mb-4">
+            <h2 className="font-bold">Drinks (>0)</h2>
+            <ul className="list-disc pl-6">
+              {Object.entries(st.drinkStock || {}).filter(([, n]) => (n as number) > 0).map(([k, v]) => (
+                <li key={k}>{k}: {v as number}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="mb-4">
+            <h2 className="font-bold">Purchase Requests (>0)</h2>
+            <ul className="list-disc pl-6">
+              {Object.entries(st.stockRequests || {}).filter(([, n]) => (n as number) > 0).map(([k, v]) => (
+                <li key={k}>{k}: {v as number}</li>
+              ))}
+            </ul>
+          </section>
+        </>
+      ) : (
+        <div className="text-red-600">Stock form not submitted.</div>
+      )}
+    </div>
+  );
+}
+4) Ensure “submit = save + email + library”
+You already have email on stock submit. Make it combined if a salesFormId exists:
+
+In server/api/daily-stock.ts
+After saving DailyStock, call our email endpoint logic (or inline it): fetch the sales by salesFormId and build the combined email (like emailForm above).
+
+That guarantees: every submission saves, emails, and shows in the library.
+
+5) Navigation (one line)
+Point “Form Library” menu item to /form-library.
+
+Add a hidden route /form-detail?id=... for View/Print.
+

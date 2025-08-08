@@ -1268,26 +1268,12 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // DB Health endpoint
-  app.get('/api/db-health', async (req: Request, res: Response) => {
-    try {
-      const [dbInfo] = await storage.db.execute(sql`
-        SELECT current_database() AS db,
-               inet_server_addr() AS host,
-               inet_server_port() AS port,
-               current_user AS user
-      `);
-
-      const [dsExists] = await storage.db.execute(sql`
-        SELECT to_regclass('public."DailyStock"') AS dailystock_regclass
-      `);
-
-      res.status(200).json({ dbInfo, tables: dsExists });
-    } catch (e) {
-      console.error('db-health error', e);
-      res.status(500).json({ error: 'db-health failed' });
-    }
-  });
+  // Form Library API endpoints
+  import('./api/forms.js').then(forms => {
+    app.get('/api/forms', forms.listForms);
+    app.get('/api/forms/:id', forms.getForm);
+    app.post('/api/forms/:id/email', forms.emailForm);
+  }).catch(err => console.error('Failed to load forms API:', err));
 
   return server;
 }
