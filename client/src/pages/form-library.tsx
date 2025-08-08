@@ -47,83 +47,84 @@ export default function FormLibrary() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Form Library</h1>
-        <div className="text-sm text-gray-600">
+    <div className="space-y-3 md:space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <h1 className="text-2xl md:text-3xl font-bold">Form Library</h1>
+        <div className="text-sm md:text-base text-gray-600">
           {rows.length} form{rows.length !== 1 ? 's' : ''} found
         </div>
       </div>
       
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
-        <table className="min-w-full border-collapse">
+      <div className="overflow-x-auto bg-white border rounded-lg">
+        <table className="min-w-full border-collapse text-sm md:text-base">
           <thead>
             <tr className="bg-gray-50 border-b">
-              <th className="p-3 text-left font-semibold">Date</th>
-              <th className="p-3 text-left font-semibold">Form ID</th>
-              <th className="p-3 text-left font-semibold">Completed By</th>
-              <th className="p-3 text-left font-semibold">Total Sales</th>
-              <th className="p-3 text-left font-semibold">Stock (Meat/Buns)</th>
-              <th className="p-3 border">Drinks</th>
-              <th className="p-3 border">Shopping Items</th>
-              <th className="p-3 text-left font-semibold">Actions</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Date</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm hidden sm:table-cell">Form ID</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Completed By</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Total Sales</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm hidden md:table-cell">Stock (Meat/Buns)</th>
+              <th className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell">Drinks</th>
+              <th className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell">Shopping Items</th>
+              <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, index) => (
               <tr key={r.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                <td className="p-3 border-b">
+                <td className="p-2 md:p-3 border-b text-xs md:text-sm">
+                  <div className="sm:hidden font-medium">{r.completedBy}</div>
                   {new Date(r.createdAt).toLocaleString('en-TH', {
-                    year: 'numeric',
+                    year: '2-digit',
                     month: 'short',
                     day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit'
                   })}
                 </td>
-                <td className="p-3 border-b">
+                <td className="p-2 md:p-3 border-b hidden sm:table-cell">
                   <code className="bg-gray-100 px-2 py-1 rounded text-xs">
                     {r.id.slice(0,8)}...
                   </code>
                 </td>
-                <td className="p-3 border-b font-medium">{r.completedBy}</td>
-                <td className="p-3 border-b">
+                <td className="p-2 md:p-3 border-b font-medium text-xs md:text-sm hidden sm:table-cell">{r.completedBy}</td>
+                <td className="p-2 md:p-3 border-b text-xs md:text-sm">
                   <span className="font-mono">฿{(r.totalSales ?? 0).toFixed(2)}</span>
                 </td>
-                <td className="p-3 border-b">
+                <td className="p-2 md:p-3 border-b text-xs md:text-sm hidden md:table-cell">
                   <div className="text-green-600 font-medium">
-                    Meat {r.meatGrams}g • Buns {r.burgerBuns}
+                    {r.meatGrams}g • {r.burgerBuns}
                   </div>
                 </td>
-                <td className="p-3 border text-sm text-gray-700 leading-5">
+                <td className="p-2 md:p-3 border text-xs text-gray-700 leading-5 hidden lg:table-cell">
                   {r.drinks
-                    ? Object.entries(r.drinks).map(([k, v], i, arr) => (
-                        <span key={k}>
-                          {k}: {v}{i < arr.length - 1 ? ' • ' : ''}
-                        </span>
+                    ? Object.entries(r.drinks).slice(0, 3).map(([k, v], i) => (
+                        <div key={k} className="truncate">
+                          {k}: {v}
+                        </div>
                       ))
                     : '—'}
                 </td>
-                <td className="p-3 border" title={(r.shoppingPreview || []).join(', ')}>
+                <td className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell" title={(r.shoppingPreview || []).join(', ')}>
                   {r.shoppingListCount ?? 0}
                 </td>
-                <td className="p-3 border-b">
-                  <div className="flex gap-2">
+                <td className="p-2 md:p-3 border-b">
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                     <Link 
                       href={`/form-detail?id=${r.id}`} 
-                      className="text-blue-600 hover:text-blue-800 underline text-sm"
+                      className="text-blue-600 hover:text-blue-800 underline text-xs md:text-sm"
                     >
                       View
                     </Link>
                     <button 
                       onClick={() => printForm(r.id)} 
-                      className="text-green-600 hover:text-green-800 underline text-sm"
+                      className="text-green-600 hover:text-green-800 underline text-xs md:text-sm text-left"
                     >
                       Print
                     </button>
                     <button 
                       onClick={() => emailForm(r.id)} 
-                      className="text-purple-600 hover:text-purple-800 underline text-sm"
+                      className="text-purple-600 hover:text-purple-800 underline text-xs md:text-sm text-left"
                     >
                       Email
                     </button>

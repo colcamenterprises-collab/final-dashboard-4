@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +100,11 @@ export default function Layout({ children }: LayoutProps) {
     purchasing: false,
     settings: false
   });
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location]);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true';
@@ -156,8 +161,131 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
       <div className={`min-h-screen font-poppins flex ${darkMode ? 'dark' : ''}`}>
-        {/* Expanded Sidebar with Minimize Option */}
-        <div className={`${isExpanded ? 'w-64' : 'w-16'} sidebar-menu flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-700 transition-all duration-300`}>
+        {/* Mobile Drawer - Hidden on desktop */}
+        <aside className={`fixed inset-y-0 left-0 z-40 w-64 sidebar-menu transform transition-transform duration-200 md:hidden
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+            <div className="font-semibold text-white">Menu</div>
+            <button 
+              className="w-10 h-10 border rounded-lg text-white hover:bg-white/10" 
+              onClick={() => setMobileMenuOpen(false)} 
+              aria-label="Close menu"
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Mobile Navigation Content */}
+          <div className="flex flex-col py-4 px-2 h-full">
+            {/* Logo */}
+            <div className="flex items-center gap-3 mb-6 px-1">
+              <img 
+                src={gradientLogo} 
+                alt="Restaurant Hub Logo" 
+                className="h-8 w-8 object-contain"
+              />
+              <span className="font-semibold text-white">Restaurant Hub</span>
+            </div>
+            
+            {/* Dashboard Link */}
+            <Link href="/">
+              <Button
+                variant="ghost"
+                className={`w-full mb-2 p-2 justify-start ${
+                  location === "/" 
+                    ? "bg-white/20 text-white" 
+                    : "text-white hover:bg-white/10"
+                }`}
+              >
+                <Home className="h-4 w-4" />
+                <span className="ml-3">Dashboard</span>
+              </Button>
+            </Link>
+            
+            {/* Navigation Sections */}
+            <div className="space-y-1 flex-1 overflow-y-auto">
+              {navigationStructure.map((section) => {
+                const SectionIcon = section.icon;
+                
+                if (!section.expandable) {
+                  return (
+                    <Link key={section.id} href={section.path!}>
+                      <Button
+                        variant="ghost"
+                        className={`w-full p-2 justify-start ${
+                          location === section.path
+                            ? "bg-white/20 text-white"
+                            : "text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <SectionIcon className="h-4 w-4" />
+                        <span className="ml-3">{section.label}</span>
+                      </Button>
+                    </Link>
+                  );
+                }
+                
+                const hasActiveChild = section.items?.some(item => location === item.path);
+                
+                return (
+                  <div key={section.id}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleSection(section.id)}
+                      className={`w-full p-2 justify-between ${
+                        hasActiveChild || expandedSections[section.id]
+                          ? "bg-white/20 text-white"
+                          : "text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <SectionIcon className="h-4 w-4" />
+                        <span className="ml-3">{section.label}</span>
+                      </div>
+                      {expandedSections[section.id] ? 
+                        <ChevronDown className="h-4 w-4" /> : 
+                        <ChevronRight className="h-4 w-4" />
+                      }
+                    </Button>
+                    
+                    {expandedSections[section.id] && section.items && (
+                      <div className="ml-6 space-y-1 mt-1">
+                        {section.items.map((item) => {
+                          const ItemIcon = item.icon;
+                          const isPlaceholder = item.path?.startsWith('/placeholder');
+                          
+                          return (
+                            <Link key={item.path} href={item.path || '#'}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`w-full justify-start text-sm p-2 ${
+                                  location === item.path
+                                    ? "bg-white/20 text-white"
+                                    : "text-white/80 hover:bg-white/10"
+                                } ${isPlaceholder ? 'opacity-60' : ''}`}
+                              >
+                                <ItemIcon className="h-3 w-3" />
+                                <span className="ml-2">{item.label}</span>
+                                {isPlaceholder && <span className="ml-auto text-xs">Soon</span>}
+                              </Button>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+        
+        {/* Mobile Overlay */}
+        {mobileMenuOpen && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setMobileMenuOpen(false)} />}
+
+        {/* Desktop Sidebar */}
+        <div className={`${isExpanded ? 'w-64' : 'w-16'} sidebar-menu hidden md:flex flex-col py-4 px-2 fixed left-0 top-0 h-full z-50 border-r border-gray-700 transition-all duration-300`}>
           {/* Minimize/Expand Toggle */}
           <Button
             variant="ghost"
@@ -337,24 +465,19 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Main Content Area */}
-        <div className={`flex-1 ${isExpanded ? 'ml-64' : 'ml-16'} bg-white dark:bg-gray-950 transition-all duration-300`}>
+        <div className="flex-1 md:ml-64 bg-white dark:bg-gray-950 transition-all duration-300">
           {/* Top Navigation Header */}
-          <nav className="restaurant-nav px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
+          <nav className="restaurant-nav px-3 md:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
             <div className="flex items-center justify-between max-w-7xl mx-auto">
               <div className="flex items-center space-x-4 sm:space-x-8">
-                {/* Mobile menu button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                {/* Hamburger menu button for mobile */}
+                <button
+                  className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Open menu"
                 >
-                  {mobileMenuOpen ? (
-                    <X className="h-5 w-5 text-gray-700" />
-                  ) : (
-                    <Menu className="h-5 w-5 text-gray-700" />
-                  )}
-                </Button>
+                  ☰
+                </button>
               </div>
 
               {/* Right side controls */}
@@ -548,8 +671,10 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* Main Content */}
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-            {children}
+          <main className="p-3 md:p-6">
+            <div className="mx-auto w-full max-w-6xl">
+              {children}
+            </div>
           </main>
         </div>
       </div>

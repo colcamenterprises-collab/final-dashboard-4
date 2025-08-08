@@ -57,97 +57,105 @@ export default function DailySalesForm() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold">Daily Sales Form</h1>
+    <div className="space-y-3 md:space-y-4">
+      <h1 className="text-2xl md:text-3xl font-bold">Daily Sales Form</h1>
 
       {/* Shift Info */}
-      <div className="grid grid-cols-2 gap-4">
-        <input className="input" placeholder="Completed By" value={form.completedBy} onChange={(e) => handleChange('completedBy', e.target.value)} />
-        <input className="input" placeholder="Starting Cash" type="number" value={form.startingCash} onChange={(e) => handleChange('startingCash', e.target.value)} />
-      </div>
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Shift Information</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+          <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" placeholder="Completed By" value={form.completedBy} onChange={(e) => handleChange('completedBy', e.target.value)} />
+          <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" placeholder="Starting Cash" type="number" value={form.startingCash} onChange={(e) => handleChange('startingCash', e.target.value)} />
+        </div>
+      </section>
 
       {/* Sales Info */}
-      <div>
-        <h2 className="font-bold mb-2">Sales Information</h2>
-        <div className="grid grid-cols-2 gap-4">
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Sales Information</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cash Sales</label>
-            <input className="input" type="number" value={form.cashSales} onChange={(e) => handleChange('cashSales', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Cash Sales</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.cashSales} onChange={(e) => handleChange('cashSales', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">QR Sales</label>
-            <input className="input" type="number" value={form.qrSales} onChange={(e) => handleChange('qrSales', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">QR Sales</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.qrSales} onChange={(e) => handleChange('qrSales', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Grab Sales</label>
-            <input className="input" type="number" value={form.grabSales} onChange={(e) => handleChange('grabSales', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Grab Sales</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.grabSales} onChange={(e) => handleChange('grabSales', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Aroi Dee Sales</label>
-            <input className="input" type="number" value={form.aroiDeeSales} onChange={(e) => handleChange('aroiDeeSales', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Aroi Dee Sales</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.aroiDeeSales} onChange={(e) => handleChange('aroiDeeSales', e.target.value)} />
           </div>
         </div>
-        <div className="mt-2 font-bold">Total Sales: ฿{totalSales.toFixed(2)}</div>
-      </div>
+        <div className="mt-2 font-bold text-sm md:text-base">Total Sales: ฿{totalSales.toFixed(2)}</div>
+      </section>
 
       {/* Shopping Purchases */}
-      <div>
-        <h2 className="font-bold mb-2">Shopping Purchases</h2>
-        {form.shopping.map((entry, i) => (
-          <div key={i} className="grid grid-cols-3 gap-4 mb-2">
-            <input className="input" placeholder="Item" value={entry.item} onChange={(e) => handleNestedChange('shopping', i, 'item', e.target.value)} />
-            <input className="input" type="number" placeholder="Cost" value={entry.cost} onChange={(e) => handleNestedChange('shopping', i, 'cost', e.target.value)} />
-            <input className="input" placeholder="Shop Name" value={entry.shop} onChange={(e) => handleNestedChange('shopping', i, 'shop', e.target.value)} />
-          </div>
-        ))}
-        <button type="button" onClick={() => addRow('shopping', { item: '', cost: '', shop: '' })} className="text-blue-600 underline">+ Add Shopping Item</button>
-      </div>
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Shopping Purchases</h2>
+        <div className="space-y-3">
+          {form.shopping.map((entry, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+              <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" placeholder="Item" value={entry.item} onChange={(e) => handleNestedChange('shopping', i, 'item', e.target.value)} />
+              <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" placeholder="Cost" value={entry.cost} onChange={(e) => handleNestedChange('shopping', i, 'cost', e.target.value)} />
+              <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" placeholder="Shop Name" value={entry.shop} onChange={(e) => handleNestedChange('shopping', i, 'shop', e.target.value)} />
+            </div>
+          ))}
+          <button type="button" onClick={() => addRow('shopping', { item: '', cost: '', shop: '' })} className="text-blue-600 underline text-sm md:text-base">+ Add Shopping Item</button>
+        </div>
+      </section>
 
       {/* Staff Wages */}
-      <div>
-        <h2 className="font-bold mb-2">Staff Wages</h2>
-        {form.wages.map((entry, i) => (
-          <div key={i} className="grid grid-cols-3 gap-4 mb-2">
-            <input className="input" placeholder="Staff Name" value={entry.name} onChange={(e) => handleNestedChange('wages', i, 'name', e.target.value)} />
-            <input className="input" type="number" placeholder="Amount" value={entry.amount} onChange={(e) => handleNestedChange('wages', i, 'amount', e.target.value)} />
-            <select className="input" value={entry.type} onChange={(e) => handleNestedChange('wages', i, 'type', e.target.value)}>
-              <option>Wages</option>
-              <option>Overtime</option>
-              <option>Bonus</option>
-              <option>Reimbursement</option>
-            </select>
-          </div>
-        ))}
-        <button type="button" onClick={() => addRow('wages', { name: '', amount: '', type: 'Wages' })} className="text-blue-600 underline">+ Add Wage Entry</button>
-      </div>
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Staff Wages</h2>
+        <div className="space-y-3">
+          {form.wages.map((entry, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+              <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" placeholder="Staff Name" value={entry.name} onChange={(e) => handleNestedChange('wages', i, 'name', e.target.value)} />
+              <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" placeholder="Amount" value={entry.amount} onChange={(e) => handleNestedChange('wages', i, 'amount', e.target.value)} />
+              <select className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" value={entry.type} onChange={(e) => handleNestedChange('wages', i, 'type', e.target.value)}>
+                <option>Wages</option>
+                <option>Overtime</option>
+                <option>Bonus</option>
+                <option>Reimbursement</option>
+              </select>
+            </div>
+          ))}
+          <button type="button" onClick={() => addRow('wages', { name: '', amount: '', type: 'Wages' })} className="text-blue-600 underline text-sm md:text-base">+ Add Wage Entry</button>
+        </div>
+      </section>
 
       {/* Banking */}
-      <div>
-        <h2 className="font-bold mb-2">Banking</h2>
-        <div className="grid grid-cols-3 gap-4">
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Banking</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Closing Cash</label>
-            <input className="input" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Closing Cash</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.closingCash} onChange={(e) => handleChange('closingCash', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cash Banked</label>
-            <input className="input" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Cash Banked</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.cashBanked} onChange={(e) => handleChange('cashBanked', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">QR Code Transfer Amount</label>
-            <input className="input" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
+            <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">QR Code Transfer Amount</label>
+            <input className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" type="number" value={form.qrTransferred} onChange={(e) => handleChange('qrTransferred', e.target.value)} />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Notes + Total Expenses */}
-      <div className="mt-6">
-        <textarea className="input w-full h-24" placeholder="Notes..." value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} />
-        <div className="font-bold mt-2">Total Expenses: ฿{totalExpenses.toFixed(2)}</div>
-      </div>
+      <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-2">Notes & Summary</h2>
+        <textarea className="w-full h-24 rounded-md border px-3 py-2 text-sm md:text-base" placeholder="Notes..." value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} />
+        <div className="font-bold mt-2 text-sm md:text-base">Total Expenses: ฿{totalExpenses.toFixed(2)}</div>
+      </section>
 
       {/* Submit */}
-      <button type="submit" onClick={handleSubmit} className="bg-black text-white px-4 py-2 rounded mt-4">Submit & Continue</button>
+      <button type="submit" onClick={handleSubmit} className="w-full sm:w-auto bg-black text-white px-6 py-3 rounded-md text-sm md:text-base font-medium hover:bg-gray-800 transition-colors">Submit & Continue</button>
     </div>
   );
 }

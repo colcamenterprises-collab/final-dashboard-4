@@ -4,6 +4,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global responsive guards */
+html, body { 
+  overflow-x: hidden; 
+}
+* { 
+  box-sizing: border-box; 
+}
+
 :root {
   --primary: #F59E0B;
   --secondary: #EF4444;

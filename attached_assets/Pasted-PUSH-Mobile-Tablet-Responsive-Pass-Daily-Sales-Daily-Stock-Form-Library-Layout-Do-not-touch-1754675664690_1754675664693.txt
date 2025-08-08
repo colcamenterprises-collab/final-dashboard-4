@@ -1,0 +1,151 @@
+PUSH: Mobile & Tablet Responsive Pass (Daily Sales, Daily Stock, Form Library + Layout)
+Do not touch DB/migrations/expenses.
+Only UI files. Tailwind is already in use—stick to it.
+
+0) Global guards
+public/index.html → ensure:
+
+html
+Copy
+Edit
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+src/index.css (or global CSS):
+
+css
+Copy
+Edit
+html, body { overflow-x: hidden; }
+* { box-sizing: border-box; }
+1) Layout: make sidebar a mobile drawer
+File: client/src/components/Layout.tsx (don’t create new shell, patch this one)
+
+Add state + overlay:
+
+tsx
+Copy
+Edit
+const [open, setOpen] = useState(false);
+useEffect(() => { setOpen(false); }, [location.pathname]); // close on route change
+Hamburger in the top bar (visible on mobile):
+
+tsx
+Copy
+Edit
+<button
+  className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border"
+  onClick={() => setOpen(true)}
+  aria-label="Open menu">☰</button>
+Sidebar container class:
+
+tsx
+Copy
+Edit
+<aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r transform transition-transform duration-200 md:static md:translate-x-0
+  ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+  <div className="p-4 border-b flex items-center justify-between md:hidden">
+    <div className="font-semibold">Menu</div>
+    <button className="w-10 h-10 border rounded-lg" onClick={() => setOpen(false)} aria-label="Close menu">×</button>
+  </div>
+  {/* existing nav here */}
+</aside>
+{open && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setOpen(false)} />}
+Main content spacing:
+
+tsx
+Copy
+Edit
+<main className="md:ml-64 p-3 md:p-6"><div className="mx-auto w-full max-w-6xl"><Outlet /></div></main>
+2) Typography scale (apply to all pages)
+Page titles: text-2xl md:text-3xl font-bold
+
+Section headings: text-lg md:text-xl font-semibold
+
+Labels/inputs: text-sm md:text-base
+
+Buttons/inputs height: h-11 md:h-10 px-3
+
+3) Daily Sales – responsive grid + big touch targets
+File: client/src/pages/DailySales.tsx
+
+Wrap each section in:
+
+tsx
+Copy
+Edit
+<section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+  <h2 className="text-lg md:text-xl font-semibold mb-2">Sales Information</h2>
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+    {/* inputs with className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base" */}
+  </div>
+</section>
+Make submit buttons w-full sm:w-auto so they’re full width on phones.
+
+4) Daily Stock – responsive sections
+File: client/src/pages/daily-stock.tsx
+
+For Meat/Buns row: grid grid-cols-1 sm:grid-cols-2 gap-3
+
+For Drinks and Shopping items: grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4
+
+Ensure long labels wrap: add break-words to labels if needed.
+
+Change meat label to “Meat (kg or grams)”.
+
+5) Form Library – table on desktop, cards on mobile
+File: client/src/pages/form-library.tsx
+
+Keep your table inside:
+
+tsx
+Copy
+Edit
+<div className="hidden md:block overflow-x-auto">{/* existing table */}</div>
+Add mobile cards:
+
+tsx
+Copy
+Edit
+<div className="md:hidden space-y-3">
+  {rows.map(r => (
+    <div key={r.id} className="bg-white border rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold">{new Date(r.createdAt).toLocaleString('en-TH')}</div>
+        <div className="text-xs text-gray-500">{r.id.slice(0,8)}…</div>
+      </div>
+      <div className="mt-2 text-sm">
+        <div><span className="text-gray-500">By:</span> {r.completedBy}</div>
+        <div><span className="text-gray-500">Total:</span> ฿{(r.totalSales||0).toFixed(2)}</div>
+        <div><span className="text-gray-500">Stock:</span> Meat {r.meatGrams}g • Buns {r.burgerBuns}</div>
+        <div className="mt-1">
+          <span className="text-gray-500">Drinks:</span>{' '}
+          {r.drinks ? Object.entries(r.drinks).map(([k,v],i,a)=>(
+            <span key={k}>{k}:{v}{i<a.length-1?' • ':''}</span>
+          )) : '—'}
+        </div>
+        <div className="mt-1"><span className="text-gray-500">Shopping Items:</span> {r.shoppingListCount ?? 0}</div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-blue-700 text-sm">
+        <a href={`/form-detail?id=${r.id}`}>View</a>
+        <a href={`/form-detail?id=${r.id}&print=1`} target="_blank" rel="noreferrer">Print</a>
+        <button onClick={() => emailForm(r.id)} className="underline">Email</button>
+      </div>
+    </div>
+  ))}
+</div>
+6) Quick QA (what to verify before handing to you)
+No horizontal scrolling on iPhone/Android/tablets.
+
+Sidebar opens with ☰, closes on overlay tap & on navigation.
+
+Inputs/buttons ≥ 44px tall on phones.
+
+Font sizes scale (titles/labels readable on 5–6" screens).
+
+Daily Stock long lists wrap; no clipped text.
+
+Form Library cards readable and actions tappable.
+
+7) Optional (if quick)
+Add scroll-margin-top for headings (helps anchor links under sticky header).
+
+Print CSS for detail page later; not required now.

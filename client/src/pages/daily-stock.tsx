@@ -75,158 +75,158 @@ const DailyStockForm = () => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Daily Stock Form</h1>
+    <div className="space-y-3 md:space-y-4">
+      <h1 className="text-2xl md:text-3xl font-bold">Daily Stock Form</h1>
       
       {salesFormId && (
-        <div className="mb-4 p-3 bg-blue-50 rounded border">
+        <div className="mb-4 p-3 bg-blue-50 rounded border text-sm md:text-base">
           Linked to Sales Form: {salesFormId}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
         {/* Meat Count */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Meat Count</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Meat Count</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Meat (kg or grams)</label>
+              <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Meat (kg or grams)</label>
               <input
                 type="number"
                 step="0.1"
                 value={formData.meatGrams}
                 onChange={(e) => handleInputChange('meatGrams', e.target.value)}
-                className="w-full p-2 border rounded"
+                className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                 placeholder="5.5 (kg) or 5500 (grams)"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Burger Buns Count</label>
+              <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">Burger Buns Count</label>
               <input
                 type="number"
                 value={formData.burgerBuns}
                 onChange={(e) => handleInputChange('burgerBuns', e.target.value)}
-                className="w-full p-2 border rounded"
+                className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                 placeholder="0"
               />
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Drink Count */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Drink Count</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Drink Count</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {stockItems.Drinks.map((drink) => (
               <div key={drink}>
-                <label className="block text-sm font-medium mb-1">{drink}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{drink}</label>
                 <input
                   type="number"
                   onChange={(e) => handleDrinkChange(drink, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Fresh Food */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Fresh Food</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Fresh Food</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Fresh Food"].map((item) => (
               <div key={item}>
-                <label className="block text-sm font-medium mb-1">{item}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Frozen Food */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Frozen Food</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Frozen Food</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Frozen Food"].map((item) => (
               <div key={item}>
-                <label className="block text-sm font-medium mb-1">{item}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Shelf Items */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Shelf Items</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Shelf Items</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Shelf Items"].map((item) => (
               <div key={item}>
-                <label className="block text-sm font-medium mb-1">{item}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Kitchen Supplies */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Kitchen Supplies</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Kitchen Supplies</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Kitchen Supplies"].map((item) => (
               <div key={item}>
-                <label className="block text-sm font-medium mb-1">{item}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Packaging */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Packaging</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="bg-white border rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-2">Packaging</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems.Packaging.map((item) => (
               <div key={item}>
-                <label className="block text-sm font-medium mb-1">{item}</label>
+                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full h-11 md:h-10 rounded-md border px-3 text-sm md:text-base"
                   placeholder="0"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Submit Button */}
-        <div className="pt-6">
+        <div className="pt-3 md:pt-6">
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-black text-white py-3 px-6 rounded font-medium disabled:opacity-50"
+            className="w-full sm:w-auto bg-black text-white px-6 py-3 rounded-md text-sm md:text-base font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-400"
           >
             {submitting ? 'Submitting...' : 'Submit Stock Form'}
           </button>
