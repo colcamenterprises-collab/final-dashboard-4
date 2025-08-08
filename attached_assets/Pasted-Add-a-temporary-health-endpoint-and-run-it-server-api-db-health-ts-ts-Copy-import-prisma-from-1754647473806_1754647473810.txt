@@ -1,0 +1,149 @@
+Add a temporary health endpoint and run it:
+
+server/api/db-health.ts
+
+ts
+Copy
+import { prisma } from '@/lib/prisma';
+
+export default async function handler(req, res) {
+  try {
+    const [dbInfo] = await prisma.$queryRawUnsafe(`
+      SELECT current_database() AS db,
+             inet_server_addr() AS host,
+             inet_server_port() AS port,
+             current_user AS user
+    `);
+
+    const [dsExists] = await prisma.$queryRawUnsafe(`
+      SELECT to_regclass('public."DailyStock"') AS dailystock_regclass
+    `);
+
+    res.status(200).json({ dbInfo, tables: dsExists });
+  } catch (e) {
+    console.error('db-health error', e);
+    res.status(500).json({ error: 'db-health failed' });
+  }
+}
+Hit it in the browser: /api/db-health
+
+Expected: same db/host/port as your SQL tool reported (neondb on 169.254.254.254:5432), and dailystock_regclass equals "DailyStock".
+
+If dailystock_regclass is null → the table isn’t there in this DB.
+
+B) If DailyStock is missing → sync just this model
+This avoids touching expenses.
+
+pgsql
+Copy
+# DO NOT run generic migrations across the whole DB.
+# Only push the current Prisma schema to create missing tables.
+npx prisma db push
+Using db push will not create _prisma_migrations (expected), and it won’t drop unrelated tables.
+
+After push, re-hit /api/db-health and confirm dailystock_regclass is set.
+
+C) Lock the POST handler (replace with this exact file)
+This eliminates field-name/type issues and ensures we await the write before emailing.
+
+server/api/daily-stock.ts
+
+ts
+Copy
+import { prisma } from '@/lib/prisma';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import nodemailer from 'nodemailer';
+
+function toInt(v: any, def = 0) {
+  const n = parseInt(String(v), 10);
+  return Number.isFinite(n) ? n : def;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    const rows = await prisma.dailyStock.findMany({ orderBy: { createdAt: 'desc' }, take: 20 });
+    return res.status(200).json(rows);
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const {
+      salesFormId = null,
+      meatGrams,
+      burgerBuns,
+      drinks = {},
+      stockRequests = {},
+    } = req.body || {};
+
+    const data = {
+      salesFormId: salesFormId || null,
+      meatGrams: toInt(meatGrams),
+      burgerBuns: toInt(burgerBuns),
+      drinkStock: Object.fromEntries(Object.entries(drinks).map(([k, v]) => [k, toInt(v)])),
+      stockRequests: Object.fromEntries(Object.entries(stockRequests).map(([k, v]) => [k, toInt(v)])),
+      status: 'submitted' as const,
+    };
+
+    const saved = await prisma.dailyStock.create({ data });
+
+    // Email only values > 0
+    const posDrinks = Object.entries(data.drinkStock).filter(([, n]) => (n as number) > 0);
+    const posReqs = Object.entries(data.stockRequests).filter(([, n]) => (n as number) > 0);
+
+    const lines: string[] = [
+      `Daily Stock Submission`,
+      `Submitted: ${new Date(saved.createdAt).toLocaleString()}`,
+      `Linked Sales ID: ${salesFormId || '-'}`,
+      ``,
+      `Counts`,
+      `- Meat (g): ${data.meatGrams}`,
+      `- Burger Buns: ${data.burgerBuns}`,
+      ``,
+      `Drinks (>0):`,
+      ...(posDrinks.length ? posDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      ``,
+      `Stock Requests (>0):`,
+      ...(posReqs.length ? posReqs.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+    ];
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: false,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: 'smashbrothersburgersth@gmail.com',
+      subject: `Daily Stock Submission ${new Date(saved.createdAt).toLocaleDateString()}`,
+      text: lines.join('\n'),
+    });
+
+    return res.status(200).json({ success: true, id: saved.id });
+  } catch (err) {
+    console.error('[daily-stock] save/email error', err);
+    return res.status(500).json({ error: 'Failed to save stock submission' });
+  }
+}
+D) POST a canonical payload again (exactly this)
+bash
+Copy
+curl -X POST http://localhost:5000/api/daily-stock \
+  -H "Content-Type: application/json" \
+  -d '{
+    "salesFormId": "TEST-ID-123",
+    "meatGrams": 2500,
+    "burgerBuns": 48,
+    "drinks": { "Coke": 6, "Sprite": 4, "Fanta": 0, "Water": 2 },
+    "stockRequests": { "Iceberg Lettuce 1 kg": 2, "Tomatoes - Tor Tomato 1 kg": 1 }
+  }'
+Then verify:
+
+sql
+Copy
+SELECT id, "createdAt", "meatGrams", "burgerBuns"
+FROM "DailyStock"
+ORDER BY "createdAt" DESC
+LIMIT 1;
+You should see a row. If not, we still have a DB mismatch.

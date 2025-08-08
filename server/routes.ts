@@ -1180,31 +1180,112 @@ export function registerRoutes(app: express.Application): Server {
 
   // Daily Stock Prisma Route
   app.post('/api/daily-stock', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
     try {
       const {
-        salesFormId,
-        burgerBuns,
+        salesFormId = null,
         meatGrams,
-        drinks,
-        ingredients,
-      } = req.body;
+        burgerBuns,
+        drinks = {},
+        stockRequests = {},
+      } = req.body || {};
 
-      // For now, just return a success response since Prisma setup is incomplete
-      // In a full implementation, you would use: await prisma.dailyStock.create({...})
-      const mockStockId = crypto.randomUUID();
-      
-      console.log('Daily Stock Form submitted:', {
-        salesFormId,
-        burgerBuns,
-        meatGrams,
-        drinks,
-        ingredients
+      const data = {
+        salesFormId: salesFormId || null,
+        meatGrams: parseInt(String(meatGrams), 10) || 0,
+        burgerBuns: parseInt(String(burgerBuns), 10) || 0,
+        drinkStock: Object.fromEntries(Object.entries(drinks).map(([k, v]) => [k, parseInt(String(v), 10) || 0])),
+        stockRequests: Object.fromEntries(Object.entries(stockRequests).map(([k, v]) => [k, parseInt(String(v), 10) || 0])),
+        status: 'submitted' as const,
+      };
+
+      const saved = await prisma.dailyStock.create({ data });
+
+      // Send email notification
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        service: 'gmail',
+        auth: { 
+          user: process.env.GMAIL_USER, 
+          pass: process.env.GMAIL_APP_PASSWORD 
+        },
       });
 
-      res.status(200).json({ success: true, id: mockStockId });
+      // Email only values > 0
+      const posDrinks = Object.entries(data.drinkStock).filter(([, n]) => (n as number) > 0);
+      const posReqs = Object.entries(data.stockRequests).filter(([, n]) => (n as number) > 0);
+
+      const lines: string[] = [
+        `Daily Stock Submission`,
+        `Submitted: ${new Date(saved.createdAt).toLocaleString()}`,
+        `Linked Sales ID: ${salesFormId || '-'}`,
+        ``,
+        `Counts`,
+        `- Meat (g): ${data.meatGrams}`,
+        `- Burger Buns: ${data.burgerBuns}`,
+        ``,
+        `Drinks (>0):`,
+        ...(posDrinks.length ? posDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+        ``,
+        `Stock Requests (>0):`,
+        ...(posReqs.length ? posReqs.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      ];
+
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: 'smashbrothersburgersth@gmail.com',
+        subject: `Daily Stock Submission ${new Date(saved.createdAt).toLocaleDateString()}`,
+        text: lines.join('\n'),
+      });
+
+      res.status(200).json({ success: true, id: saved.id });
     } catch (err) {
       console.error('Daily Stock submission error:', err);
-      res.status(500).json({ error: 'Failed to save stock form' });
+      res.status(500).json({ error: 'Failed to save stock form', details: (err as Error).message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Daily Stock GET Route
+  app.get('/api/daily-stock', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const rows = await prisma.dailyStock.findMany({ 
+        orderBy: { createdAt: 'desc' }, 
+        take: 20 
+      });
+      res.status(200).json(rows);
+    } catch (error) {
+      console.error('Error fetching stock forms:', error);
+      res.status(500).json({ error: 'Failed to fetch stock forms' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // DB Health endpoint
+  app.get('/api/db-health', async (req: Request, res: Response) => {
+    try {
+      const [dbInfo] = await storage.db.execute(sql`
+        SELECT current_database() AS db,
+               inet_server_addr() AS host,
+               inet_server_port() AS port,
+               current_user AS user
+      `);
+
+      const [dsExists] = await storage.db.execute(sql`
+        SELECT to_regclass('public."DailyStock"') AS dailystock_regclass
+      `);
+
+      res.status(200).json({ dbInfo, tables: dsExists });
+    } catch (e) {
+      console.error('db-health error', e);
+      res.status(500).json({ error: 'db-health failed' });
     }
   });
 

@@ -6,10 +6,25 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 function toInt(v: any, def = 0) {
-  const n = parseInt(v as string, 10);
+  const n = parseInt(String(v), 10);
   return Number.isFinite(n) ? n : def;
 }
 
+// GET handler for retrieving stock forms
+router.get('/', async (req, res) => {
+  try {
+    const rows = await prisma.dailyStock.findMany({ 
+      orderBy: { createdAt: 'desc' }, 
+      take: 20 
+    });
+    return res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching stock forms:', error);
+    return res.status(500).json({ error: 'Failed to fetch stock forms' });
+  }
+});
+
+// POST handler for creating stock forms
 router.post('/', async (req, res) => {
   try {
     const {
@@ -20,49 +35,42 @@ router.post('/', async (req, res) => {
       stockRequests = {},
     } = req.body || {};
 
-    const payload = {
+    const data = {
       salesFormId: salesFormId || null,
       meatGrams: toInt(meatGrams),
       burgerBuns: toInt(burgerBuns),
-      drinkStock: Object.fromEntries(
-        Object.entries(drinks).map(([k, v]) => [k, toInt(v)])
-      ),
-      stockRequests: Object.fromEntries(
-        Object.entries(stockRequests).map(([k, v]) => [k, toInt(v)])
-      ),
+      drinkStock: Object.fromEntries(Object.entries(drinks).map(([k, v]) => [k, toInt(v)])),
+      stockRequests: Object.fromEntries(Object.entries(stockRequests).map(([k, v]) => [k, toInt(v)])),
       status: 'submitted' as const,
     };
 
-    console.log('[daily-stock] About to save payload:', payload);
-    const saved = await prisma.dailyStock.create({ data: payload });
-    console.log('[daily-stock] Saved successfully:', saved.id);
+    const saved = await prisma.dailyStock.create({ data });
 
-    // Email summary (only >0 shown)
-    const posDrinks = Object.entries(payload.drinkStock).filter(([, n]) => (n as number) > 0);
-    const posRequests = Object.entries(payload.stockRequests).filter(([, n]) => (n as number) > 0);
+    // Email only values > 0
+    const posDrinks = Object.entries(data.drinkStock).filter(([, n]) => (n as number) > 0);
+    const posReqs = Object.entries(data.stockRequests).filter(([, n]) => (n as number) > 0);
 
     const lines: string[] = [
       `Daily Stock Submission`,
       `Submitted: ${new Date(saved.createdAt).toLocaleString()}`,
-      salesFormId ? `Linked Sales ID: ${salesFormId}` : `Linked Sales ID: -`,
+      `Linked Sales ID: ${salesFormId || '-'}`,
       ``,
       `Counts`,
-      `- Meat (g): ${payload.meatGrams}`,
-      `- Burger Buns: ${payload.burgerBuns}`,
+      `- Meat (g): ${data.meatGrams}`,
+      `- Burger Buns: ${data.burgerBuns}`,
       ``,
       `Drinks (>0):`,
       ...(posDrinks.length ? posDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
       ``,
       `Stock Requests (>0):`,
-      ...(posRequests.length ? posRequests.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      ...(posReqs.length ? posReqs.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
     ];
 
-    // Use Gmail SMTP configuration
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+      auth: { 
+        user: process.env.GMAIL_USER, 
+        pass: process.env.GMAIL_APP_PASSWORD 
       },
     });
 
@@ -77,21 +85,6 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('[daily-stock] save/email error', err);
     return res.status(500).json({ error: 'Failed to save stock submission' });
-  }
-});
-
-// Get stock forms for library
-router.get('/', async (req, res) => {
-  try {
-    const stockForms = await prisma.dailyStock.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-
-    res.json(stockForms);
-  } catch (error) {
-    console.error('Error fetching stock forms:', error);
-    res.status(500).json({ error: 'Failed to fetch stock forms' });
   }
 });
 
