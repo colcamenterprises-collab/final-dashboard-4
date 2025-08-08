@@ -45,24 +45,22 @@ model DailySales {
 }
 
 model DailyStock {
-  id                   String   @id @default(uuid())
-  createdAt            DateTime @default(now())
-  salesFormId          String   @unique
-  salesForm            DailySales @relation(fields: [salesFormId], references: [id])
+  id                String   @id @default(uuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  // Stock Counts
-  meatWeight           Int      // grams
-  burgerBunsStock      Int
+  // Link to the Prisma DailySales form entry (already exists); if not available yet, keep nullable for now
+  salesFormId       String?
+  // @relation(fields: [salesFormId], references: [id])
+  // salesForm         DailySales? 
 
-  // Drink Count
-  drinkStock           Json     // { Coke: 12, Sprite: 6, etc. }
+  meatGrams         Int
+  burgerBuns        Int
 
-  // Ingredient Requests by Category
-  freshFood            Json     // { Lettuce: 2, Tomato: 1, etc. }
-  frozenFood           Json
-  shelfItems           Json
-  kitchenSupplies      Json
-  packaging            Json
+  drinkStock        Json     // full map of drink -> number
+  stockRequests     Json     // full map of item -> number (all items; zeros allowed)
 
-  updatedAt            DateTime @updatedAt
+  // Status
+  status            String   @default("submitted") // keep simple for now
+  deletedAt         DateTime?
 }

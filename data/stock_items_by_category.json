@@ -1,0 +1,57 @@
+{
+  "Meat": [
+    "Topside Beef"
+  ],
+  "Fresh Food": [
+    "Iceberg Lettuce 1 kg",
+    "Tomatoes Tor Tomato 1 kg",
+    "White Cabbage Catering",
+    "Yellow onions Catering 1 kg",
+    "Green Bell Pepper 1 kg",
+    "Red Bell Pepper 1 kg",
+    "Gherkins 920g jar",
+    "Avocado"
+  ],
+  "Frozen Food": [
+    "SAVEPAK Frozen French Fries - Shoestring 7 mm 2 kg",
+    "Chicken Wings 1kg Frozen",
+    "Chicken Nuggets Frozen 1kg"
+  ],
+  "Shelf Items": [
+    "Cajun Seasoning 510g, MCCORMICK",
+    "Smoked Paprika Powder BAKING NEEDS 200g",
+    "Black Pepper Powder COOKING 200g",
+    "AMERICAN MUSTARD 450g HEINZ",
+    "TOMATO KETCHUP 910g HEINZ",
+    "Mayonnaise 946ML HELLMANS",
+    "Sea Salt 750g CEREBOS",
+    "Canola Oil 1L GOLDEN CHEF",
+    "Burger Sauce"
+  ],
+  "Kitchen Supplies": [
+    "Baking Paper 450mm x 50m",
+    "Cling Film 300mm x 300m",
+    "Aluminium Foil 450mm x 150m",
+    "Disposable Gloves Large",
+    "Hand Soap 5L",
+    "Sanitiser Gel 5L",
+    "Cleaning Cloth Microfibre",
+    "All Purpose Cleaner 750ml"
+  ],
+  "Packaging": [
+    "Burger Box Black",
+    "French Fry Container Medium",
+    "Napkins Brown",
+    "Paper Bags Large",
+    "Plastic Fork",
+    "Plastic Knife",
+    "Sauce Cup Small"
+  ],
+  "Drinks": [
+    "Coke",
+    "Coke Zero", 
+    "Sprite",
+    "Fanta",
+    "Water"
+  ]
+}

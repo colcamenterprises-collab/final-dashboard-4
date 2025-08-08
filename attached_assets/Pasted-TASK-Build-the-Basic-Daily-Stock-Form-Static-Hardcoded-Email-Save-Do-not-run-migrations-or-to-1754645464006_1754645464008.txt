@@ -1,0 +1,205 @@
+TASK: Build the Basic Daily Stock Form (Static, Hardcoded, Email + Save)
+Do not run migrations or touch the Drizzle/legacy system.
+Only work in the Prisma track and files listed below.
+
+0) Guardrails (must follow)
+Do not modify or delete any legacy Drizzle files, tables, or routes.
+
+Do not “improve” or refactor beyond this brief.
+
+If anything is unclear, stop and ask.
+
+1) Add static stock item list from Cam’s CSV
+Create data/stock_items_by_category.json in the repo.
+
+Use the JSON Cam provided (the one we generated from his CSV; grouped by section headers).
+
+If you need to regenerate from the CSV, use the rule: Category is a section heading row; “Item” values under it are the inputs.
+
+No extras, no substitutions. Use exact items from the CSV.
+
+Expected JSON shape:
+
+json
+Copy
+Edit
+{
+  "Meat": ["Topside Beef", "..."],
+  "Fresh Food": ["Iceberg Lettuce 1 kg", "..."],
+  "Frozen Food": ["SAVEPAK Frozen French Fries - Shoestring 7 mm 2 kg", "..."],
+  "Shelf Items": ["Cajun Seasoning 510g, MCCORMICK", "..."],
+  "Kitchen Supplies": ["Baking Paper 450mm x 50m", "..."],
+  "Packaging": ["Burger Box Black", "..."],
+  "Drinks": ["Coke", "Coke Zero", "Sprite", "Fanta", "Water", "..."]
+}
+2) Prisma model (DailyStock)
+File: prisma/schema.prisma
+Add this model (don’t touch other models):
+
+prisma
+Copy
+Edit
+model DailyStock {
+  id                String   @id @default(uuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Link to the Prisma DailySales form entry (already exists); if not available yet, keep nullable for now
+  salesFormId       String?
+  // @relation(fields: [salesFormId], references: [id])
+  // salesForm         DailySales? 
+
+  meatGrams         Int
+  burgerBuns        Int
+
+  drinkStock        Json     // full map of drink -> number
+  stockRequests     Json     // full map of item -> number (all items; zeros allowed)
+
+  // Status
+  status            String   @default("submitted") // keep simple for now
+  deletedAt         DateTime?
+}
+Run (Prisma only):
+
+css
+Copy
+Edit
+npx prisma generate
+npx prisma migrate dev --name add_daily_stock_basic
+3) API endpoint to save and email
+File: server/api/daily-stock.ts (create it)
+
+Behavior:
+
+Accept POST with: salesFormId, meatGrams, burgerBuns, drinks (object), stockRequests (object).
+
+Save to DailyStock.
+
+Build an email summary:
+
+Meat grams, burger buns
+
+Drinks with quantity > 0
+
+Stock requests with quantity > 0
+
+Send via existing Gmail SMTP config to smashbrothersburgersth@gmail.com.
+
+Return { success: true, id }.
+
+Implementation notes:
+
+Reuse existing mailer if present (e.g., server/lib/mailer.ts). If not, create a minimal nodemailer call without adding other dependencies.
+
+Do not pull anything from DB except saving the record.
+
+4) Static, hardcoded form page
+File: client/src/pages/daily-stock.tsx (create or replace)
+
+Do not fetch from APIs. Import the JSON from step 1.
+
+Layout (this exact order):
+
+Meat Count (grams) — number input
+
+Burger Buns Count — number input
+
+Drink Count — render inputs from stock_items_by_category.json["Drinks"] in a grid
+
+Fresh Food — number inputs for each item
+
+Frozen Food — number inputs for each item
+
+Shelf Items — number inputs for each item
+
+Kitchen Supplies — number inputs for each item
+
+Packaging — number inputs for each item
+
+Submit behavior:
+
+Build payload:
+
+salesFormId (from querystring if present; otherwise null)
+
+meatGrams, burgerBuns
+
+drinks (object of all drinks with their numeric values)
+
+stockRequests (object of all items with numeric values)
+
+POST to /api/daily-stock.
+
+On success: show confirmation and redirect to the Form Library route currently in use.
+
+UI constraints:
+
+Clean inputs, labels from JSON item names.
+
+No icons/emojis.
+
+No dynamic lookups.
+
+5) Sales → Stock redirect
+File: client/src/pages/daily-sales.tsx (already exists in Prisma track)
+
+On successful POST, redirect to /daily-stock?salesId=<returned id>.
+
+Do not change any fields in the sales form.
+
+6) Form Library visibility
+Ensure the existing Form Library page lists completed stock forms (basic listing is fine).
+
+If a separate library doesn’t exist for Prisma stock forms, create a minimal client/src/pages/stock-library.tsx that lists DailyStock newest-first with:
+
+createdAt, meatGrams, burgerBuns
+
+count of drinks > 0
+
+count of stockRequests > 0
+
+No edits/deletes required right now.
+
+7) Remove legacy reporting page link (not the data)
+Remove the menu link to any legacy ReportsAnalysis.tsx that is wired to Drizzle tables.
+
+Do not delete data or Drizzle code; just hide the menu item to avoid confusion.
+
+8) Acceptance criteria (must pass)
+/daily-stock renders with all sections and items from stock_items_by_category.json.
+
+Submitting saves a DailyStock row with:
+
+full drinkStock map
+
+full stockRequests map
+
+meatGrams, burgerBuns
+
+Email arrives to smashbrothersburgersth@gmail.com showing:
+
+meat grams, buns
+
+drinks with qty > 0
+
+stock requests with qty > 0
+
+Redirects after submit to the library page, which lists the new record.
+
+9) Out of scope (do not do)
+Do not touch Drizzle tables, migrations, or legacy forms.
+
+Do not connect this form to Loyverse or receipts.
+
+Do not add “smart” features or auto-population.
+
+10) Hand-back checklist
+Paths of files added/changed
+
+Prisma migration name and status
+
+Screenshot of /daily-stock page
+
+Screenshot of saved entry in the library
+
+Email sample (subject + first 10 lines of body)

@@ -1,0 +1,75 @@
+{
+  "Drinks": [
+    "Item",
+    "Coke",
+    "Coke Zero",
+    "Fanta Orange",
+    "Fanta Strawberry",
+    "Schweppes Manow",
+    "Kids Juice (Orange)",
+    "Kids Juice (Apple)",
+    "Sprite",
+    "Soda Water",
+    "Bottled Water"
+  ],
+  "Fresh Food": [
+    "Item",
+    "Salad (Iceberg Lettuce)",
+    "Milk",
+    "Burger Bun",
+    "Tomatos",
+    "White Cabbage",
+    "Purple Cabbage",
+    "Onions Bulk 10kg",
+    "Onions (small bags)",
+    "Cheese",
+    "Bacon Short",
+    "Bacon Long",
+    "Jalapenos"
+  ],
+  "Frozen Food": [
+    "Item",
+    "French Fries 7mm",
+    "Chicken Nuggets",
+    "Chicken Fillets",
+    "Sweet Potato Fries"
+  ],
+  "Kitchen Supplies": [
+    "Item",
+    "Oil (Fryer)",
+    "Plastic Food Wrap",
+    "Paper Towel Long",
+    "Paper Towel Short (Serviettes)",
+    "Food Gloves (Large)",
+    "Food Gloves (Medium)",
+    "Food Gloves (Small)",
+    "Aluminum Foil",
+    "Plastic Meat Gloves",
+    "Kitchen Cleaner",
+    "Alcohol Sanitiser"
+  ],
+  "Packaging": [
+    "Item",
+    "French Fries Box",
+    "Plastic Carry Bags (Size- 6\u00d714)",
+    "Plastic Carry Bags (Size - 9\u00d718)",
+    "Brown Paper Food Bags",
+    "Loaded Fries Boxes",
+    "Packaging Labels",
+    "Knife, Fork, Spoon Set"
+  ],
+  "Shelf Items": [
+    "Item",
+    "Cajun Fries Seasoning",
+    "Crispy Fried Onions",
+    "Pickles(standard dill pickles)",
+    "Pickles Sweet (standard)",
+    "Mustard",
+    "Mayonnaise",
+    "Tomato Sauce",
+    "Chili Sauce (Sriracha)",
+    "BBQ Sauce",
+    "Sriracha Sauce",
+    "Salt (Coarse Sea Salt)"
+  ]
+}
