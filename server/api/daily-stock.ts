@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
+import { sendCombinedEmail } from './forms';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -49,7 +50,7 @@ router.post('/', async (req, res) => {
     // Send combined email if linked to sales form
     if (salesFormId) {
       try {
-        await fetch(`${process.env.PUBLIC_BASE_URL || 'http://localhost:5000'}/api/forms/${salesFormId}/email`, { method: 'POST' });
+        await sendCombinedEmail(prisma, salesFormId);
       } catch (e: any) {
         console.error('post-save email failed', e?.message || e);
       }

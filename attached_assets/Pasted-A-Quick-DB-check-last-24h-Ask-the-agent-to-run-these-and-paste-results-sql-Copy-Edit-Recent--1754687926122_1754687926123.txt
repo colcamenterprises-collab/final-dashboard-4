@@ -1,0 +1,115 @@
+A) Quick DB check (last 24h)
+Ask the agent to run these and paste results:
+
+sql
+Copy
+Edit
+-- Recent Sales
+SELECT id, "createdAt", "completedBy", "totalSales"
+FROM "DailySales"
+WHERE "createdAt" > now() - interval '24 hours'
+ORDER BY "createdAt" DESC;
+
+-- Recent Stock
+SELECT id, "createdAt", "salesFormId", "meatGrams", "burgerBuns"
+FROM "DailyStock"
+WHERE "createdAt" > now() - interval '24 hours'
+ORDER BY "createdAt" DESC;
+
+-- Sales with NO Stock (pending)
+SELECT s.id, s."createdAt", s."completedBy"
+FROM "DailySales" s
+LEFT JOIN "DailyStock" st ON st."salesFormId" = s.id
+WHERE s."createdAt" > now() - interval '24 hours'
+  AND st.id IS NULL
+ORDER BY s."createdAt" DESC;
+
+-- Stock with missing/invalid Sales link (should be none)
+SELECT st.id, st."createdAt", st."salesFormId"
+FROM "DailyStock" st
+LEFT JOIN "DailySales" s ON s.id = st."salesFormId"
+WHERE st."createdAt" > now() - interval '24 hours'
+  AND (st."salesFormId" IS NULL OR s.id IS NULL)
+ORDER BY st."createdAt" DESC;
+✔ If the 2am entry shows up as Sales only (no stock), that explains the missing library entry + no email (we send after stock submit).
+✔ If both exist and are linked, jump to email checks below.
+
+B) Fix the email trigger (no external fetch)
+Right now the stock API probably does:
+
+ts
+Copy
+Edit
+fetch(`${process.env.PUBLIC_BASE_URL || ''}/api/forms/${payload.salesFormId}/email`, { method: 'POST' })
+If PUBLIC_BASE_URL isn’t set, Node rejects the relative URL → no email.
+
+Hotfix (copy-paste to agent)
+In server/api/forms.ts, extract the mail logic to a function we can call directly:
+
+ts
+Copy
+Edit
+export async function sendCombinedEmail(prisma, salesId: string) {
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+  if (!sales) throw new Error('Sales not found');
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
+
+  // ...build lines/html exactly like emailForm does...
+
+  const transporter = buildTransporter();
+  await transporter.verify();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: process.env.SMTP_TO || 'colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com',
+    subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+    text: textBody,
+    html: htmlBody,
+    replyTo: 'smashbrothersburgersth@gmail.com',
+    attachments: [{ filename: 'logo-email.png', path: './public/logo-email.png', cid: 'logo', contentType: 'image/png' }]
+  });
+}
+In server/api/daily-stock.ts, after prisma.dailyStock.create(...), replace the fetch with a direct call:
+
+ts
+Copy
+Edit
+import { sendCombinedEmail } from './forms';
+
+try {
+  if (payload.salesFormId) {
+    await sendCombinedEmail(prisma, payload.salesFormId);
+  }
+} catch (e) {
+  console.error('post-save email failed', e?.message || e);
+}
+This removes the PUBLIC_BASE_URL dependency completely.
+
+C) Verify SMTP is still good
+Ask the agent to hit /api/test-email (we added earlier). If it returns 500, fix envs:
+
+ini
+Copy
+Edit
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=colcamenterprises@gmail.com
+SMTP_PASS=<Gmail App Password>
+SMTP_FROM=colcamenterprises@gmail.com
+SMTP_TO=colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com
+D) Immediate resend for the 2am submission
+Once we find the Sales ID for that shift from the SQL above, tell the agent to force-send:
+
+bash
+Copy
+Edit
+POST /api/forms/<SALES_ID>/email
+That will send the combined email using what’s saved.
+
+E) Optional guard so this never hides data again
+Right now the library only shows completed forms (sales+stock). If you want, I can switch it to:
+
+Show both Completed and Pending Stock tabs
+
+Or a single list with a Status column (“Completed” / “Pending Stock”)
+
+No DB change needed.

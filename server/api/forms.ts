@@ -188,73 +188,77 @@ export async function emailForm(req: Request, res: Response) {
   }
 }
 
-export async function sendCombinedEmail(salesId: string) {
-  try {
-    const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
-    if (!sales) return { success: false, error: 'Sales form not found' };
-    
-    const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
+export async function sendCombinedEmail(prisma: PrismaClient, salesId: string) {
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+  if (!sales) throw new Error('Sales not found');
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
 
-    const totalSales = sales.totalSales ?? (sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales);
-    const lines: string[] = [
-      `Daily Submission`,
-      `Form ID: ${sales.id}`,
-      `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
-      `Completed By: ${sales.completedBy}`,
-      ``,
-      `SALES`,
-      `- Cash: ${money(sales.cashSales)}`,
-      `- QR: ${money(sales.qrSales)}`,
-      `- Grab: ${money(sales.grabSales)}`,
-      `- Aroi Dee: ${money(sales.aroiDeeSales)}`,
-      `Total Sales: ${money(totalSales)}`,
-      ``,
-      `EXPENSES`,
-      `- Total Expenses: ${money(sales.totalExpenses)}`,
-      ``,
-      `BANKING`,
-      `- Closing Cash: ${money(sales.closingCash)}`,
-      `- Cash Banked: ${money(sales.cashBanked)}`,
-      `- QR Transfer: ${money(sales.qrTransferred)}`,
-    ];
+  const totalSales =
+    sales.totalSales ??
+    (Number(sales.cashSales || 0) +
+     Number(sales.qrSales || 0) +
+     Number(sales.grabSales || 0) +
+     Number(sales.aroiDeeSales || 0));
 
-    if (stock) {
-      lines.push(
-        ``,
-        `STOCK`,
-        `- Meat (g): ${stock.meatGrams}`,
-        `- Burger Buns: ${stock.burgerBuns}`,
-        ``,
-        `DRINKS (>0)`,
-        ...Object.entries(stock.drinkStock || {})
-          .filter(([, v]) => (v as number) > 0)
-          .map(([k, v]) => `- ${k}: ${v}`),
-        ``,
-        `PURCHASE REQUESTS (>0)`,
-        ...Object.entries(stock.stockRequests || {})
-          .filter(([, v]) => (v as number) > 0)
-          .map(([k, v]) => `- ${k}: ${v}`)
-      );
-    } else {
-      lines.push(``, `STOCK: Not submitted yet`);
-    }
+  const lines: string[] = [
+    `Daily Submission`,
+    `Form ID: ${sales.id}`,
+    `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
+    `Completed By: ${sales.completedBy || '-'}`,
+    ``,
+    `SALES`,
+    `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
+    `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
+    `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
+    `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+    `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
+    ``,
+    `EXPENSES`,
+    `- Total Expenses: ฿${(sales.totalExpenses || 0).toFixed(2)}`,
+    ``,
+    `BANKING`,
+    `- Closing Cash: ฿${(sales.closingCash || 0).toFixed(2)}`,
+    `- Cash Banked: ฿${(sales.cashBanked || 0).toFixed(2)}`,
+    `- QR Transfer: ฿${(sales.qrTransferred || 0).toFixed(2)}`,
+  ];
 
-    const transporter = buildTransporter();
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: 'smashbrothersburgersth@gmail.com',
-      subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
-      text: lines.join('\n'),
-      replyTo: 'smashbrothersburgersth@gmail.com',
-    });
-    
-    return { success: true };
-  } catch (e: any) {
-    console.error('[sendCombinedEmail] ', e?.message || e);
-    return { success: false, error: e?.message || 'email failed' };
-  } finally {
-    await prisma.$disconnect();
+  if (stock) {
+    const allDrinks = Object.entries(stock.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0] as [string, number]);
+    allDrinks.sort((a, b) => a[1] - b[1]);
+
+    const shopPos = Object.entries(stock.stockRequests || {}).filter(([, n]) => (Number(n) || 0) > 0);
+
+    lines.push(
+      ``,
+      `END-OF-SHIFT STOCK`,
+      `- Meat (g): ${stock.meatGrams}`,
+      `- Burger Buns: ${stock.burgerBuns}`,
+      ``,
+      `DRINKS (all)`,
+      ...(allDrinks.length ? allDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      ``,
+      `SHOPPING LIST`,
+      ...(shopPos.length ? shopPos.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+    );
+  } else {
+    lines.push(``, `STOCK: Not submitted yet`);
   }
+
+  // Build HTML using the same function as emailForm
+  const html = buildHtmlEmail({ sales, stock, totalSales });
+  const textBody = lines.join('\n');
+
+  const transporter = buildTransporter();
+  await transporter.verify();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: process.env.SMTP_TO || 'colcamenterprises@gmail.com,smashbrothersburgersth@gmail.com',
+    subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+    text: textBody,
+    html: html,
+    replyTo: 'smashbrothersburgersth@gmail.com',
+    attachments: [{ filename: 'logo-email.png', path: './public/logo-email.png', cid: 'logo', contentType: 'image/png' }]
+  });
 }
 
 function htmlRow(label: string, val: string) {

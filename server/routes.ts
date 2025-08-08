@@ -1177,6 +1177,76 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Email function for direct use
+  async function sendEmailDirectly(prisma: any, salesId: string) {
+    const nodemailer = (await import('nodemailer')).default;
+    
+    const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+    if (!sales) throw new Error('Sales not found');
+    const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
+
+    const totalSales = sales.totalSales ?? 
+      (Number(sales.cashSales || 0) + Number(sales.qrSales || 0) + 
+       Number(sales.grabSales || 0) + Number(sales.aroiDeeSales || 0));
+
+    const lines: string[] = [
+      `Daily Submission`,
+      `Form ID: ${sales.id}`,
+      `Date: ${new Date(sales.createdAt).toLocaleString('en-TH')}`,
+      `Completed By: ${sales.completedBy || '-'}`,
+      ``,
+      `SALES`,
+      `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
+      `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
+      `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
+      `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+      `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
+      ``,
+      `EXPENSES`,
+      `- Total Expenses: ฿${(sales.totalExpenses || 0).toFixed(2)}`,
+      ``,
+      `BANKING`,
+      `- Closing Cash: ฿${(sales.closingCash || 0).toFixed(2)}`,
+      `- Cash Banked: ฿${(sales.cashBanked || 0).toFixed(2)}`,
+      `- QR Transfer: ฿${(sales.qrTransferred || 0).toFixed(2)}`,
+    ];
+
+    if (stock) {
+      const allDrinks = Object.entries(stock.drinkStock || {}).map(([k, v]) => [k, Number(v) || 0]);
+      const shopPos = Object.entries(stock.stockRequests || {}).filter(([, n]) => (Number(n) || 0) > 0);
+      lines.push(
+        ``,
+        `END-OF-SHIFT STOCK`,
+        `- Meat (g): ${stock.meatGrams}`,
+        `- Burger Buns: ${stock.burgerBuns}`,
+        ``,
+        `DRINKS (all)`,
+        ...(allDrinks.length ? allDrinks.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+        ``,
+        `SHOPPING LIST`,
+        ...(shopPos.length ? shopPos.map(([k, v]) => `- ${k}: ${v}`) : ['- none']),
+      );
+    } else {
+      lines.push(``, `STOCK: Not submitted yet`);
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { 
+        user: process.env.GMAIL_USER, 
+        pass: process.env.GMAIL_APP_PASSWORD 
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: 'smashbrothersburgersth@gmail.com',
+      subject: `Daily Submission – ${new Date(sales.createdAt).toLocaleDateString('en-TH')}`,
+      text: lines.join('\n'),
+      replyTo: 'smashbrothersburgersth@gmail.com',
+    });
+  }
+
   // Daily Stock Prisma Route
   app.post('/api/daily-stock', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
@@ -1205,8 +1275,8 @@ export function registerRoutes(app: express.Application): Server {
       // Send combined email if linked to sales form
       if (salesFormId) {
         try {
-          const formsModule = await import('./api/forms.js');
-          await formsModule.sendCombinedEmail(salesFormId);
+          // Direct call to avoid import issues
+          await sendEmailDirectly(prisma, salesFormId);
         } catch (emailErr) {
           console.error('Failed to send combined email:', emailErr);
         }
