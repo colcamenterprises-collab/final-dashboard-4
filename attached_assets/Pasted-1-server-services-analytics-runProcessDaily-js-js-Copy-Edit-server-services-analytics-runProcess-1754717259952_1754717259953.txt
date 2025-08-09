@@ -1,0 +1,346 @@
+1) server/services/analytics/runProcessDaily.js
+js
+Copy
+Edit
+// server/services/analytics/runProcessDaily.js
+import { PrismaClient } from '@prisma/client';
+import { utcToZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+
+const prisma = new PrismaClient();
+
+const TZ = process.env.TZ || 'Asia/Bangkok';
+// Tuning knobs
+const SHIFT_START_HOUR_LOCAL = 18; // 18:00 -> 03:00
+const MEAT_PER_PATTY_GRAMS = 90;
+const BUNS_VARIANCE = 5;
+const MEAT_VARIANCE = 500;
+const DRINKS_VARIANCE = 5;
+
+// Convert a UTC date into the shift anchor (18:00 local)
+function shiftAnchorUTC(utcDate) {
+  const local = utcToZonedTime(utcDate, TZ);
+  const localShift = new Date(local);
+  // if before 03:00 local, use previous day
+  if (localShift.getHours() < 3) localShift.setDate(localShift.getDate() - 1);
+  localShift.setHours(SHIFT_START_HOUR_LOCAL, 0, 0, 0);
+  return zonedTimeToUtc(localShift, TZ);
+}
+
+async function processRestaurant(restaurantId) {
+  // Pull last 48h of receipts and group by shiftDate
+  const since = new Date(Date.now() - 48 * 3600_000);
+  const receipts = await prisma.receipt.findMany({
+    where: { restaurantId, createdAtUTC: { gte: since } },
+    include: { items: true, payments: true }
+  });
+
+  const byShift = new Map(); // key: ISO shiftDateUTC -> array of receipts
+  for (const r of receipts) {
+    const key = shiftAnchorUTC(r.createdAtUTC).toISOString();
+    if (!byShift.has(key)) byShift.set(key, []);
+    byShift.get(key).push(r);
+  }
+
+  for (const [key, recs] of byShift) {
+    const shiftDate = new Date(key);
+
+    // Payments + totals
+    let total = 0, cash = 0, card = 0, qr = 0, delivery = 0, other = 0;
+    for (const r of recs) {
+      total += r.total || 0;
+      for (const p of r.payments) {
+        const m = p.method;
+        if (m === 'CASH') cash += p.amount;
+        else if (m === 'CARD') card += p.amount;
+        else if (m === 'QR') qr += p.amount;
+        else if (m === 'DELIVERY_PARTNER') delivery += p.amount;
+        else other += p.amount;
+      }
+    }
+
+    // Upsert DailySales
+    await prisma.dailySales.upsert({
+      where: { restaurantId_shiftDate: { restaurantId, shiftDate } },
+      create: {
+        restaurantId, shiftDate,
+        totalSales: total, cash, card, qr, delivery, other,
+        receiptsCount: recs.length
+      },
+      update: {
+        totalSales: total, cash, card, qr, delivery, other,
+        receiptsCount: recs.length
+      }
+    });
+
+    // Ingredient expectations
+    let burgersSold = 0;
+    let patties = 0;
+    let drinksSold = 0;
+
+    for (const r of recs) {
+      for (const i of r.items) {
+        const name = (i.name || '').toLowerCase();
+        const sku = (i.sku || '').toUpperCase();
+        const mods = JSON.stringify(i.modifiers || '').toLowerCase();
+
+        const isBurger = sku.includes('BURGER') || name.includes('burger');
+        const isDrink = sku.includes('DRINK') || /coke|sprite|fanta|soda|water|pepsi/i.test(name);
+
+        if (isBurger) {
+          burgersSold += i.qty;
+          const pattiesPer = (sku.includes('DOUBLE') || name.includes('double') || mods.includes('double')) ? 2 : 1;
+          patties += i.qty * pattiesPer;
+        }
+        if (isDrink) drinksSold += i.qty;
+      }
+    }
+
+    const expectedBunsUsed = burgersSold;
+    const expectedMeatGrams = patties * MEAT_PER_PATTY_GRAMS;
+    const expectedDrinksUsed = drinksSold;
+
+    // Variance vs daily_stock (if present)
+    const stock = await prisma.dailyStock.findUnique({
+      where: { restaurantId_shiftDate: { restaurantId, shiftDate } }
+    });
+
+    let variance = null;
+    let flags = [];
+    if (stock) {
+      variance = {
+        buns: (expectedBunsUsed - (stock.bunsCount ?? 0)),
+        meatGrams: (expectedMeatGrams - (stock.meatWeightGrams ?? 0)),
+        drinks: (expectedDrinksUsed - (stock.drinksCount ?? 0))
+      };
+      if (Math.abs(variance.buns) > BUNS_VARIANCE) flags.push(`Buns variance ${variance.buns}`);
+      if (Math.abs(variance.meatGrams) > MEAT_VARIANCE) flags.push(`Meat variance ${variance.meatGrams}g`);
+      if (Math.abs(variance.drinks) > DRINKS_VARIANCE) flags.push(`Drinks variance ${variance.drinks}`);
+    }
+
+    // Top 5s
+    const totalsBySku = {};
+    const revenueBySku = {};
+    for (const r of recs) {
+      for (const i of r.items) {
+        const k = i.sku || i.name;
+        totalsBySku[k] = (totalsBySku[k] || 0) + i.qty;
+        revenueBySku[k] = (revenueBySku[k] || 0) + i.total;
+      }
+    }
+    const top5ByQty = Object.entries(totalsBySku)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([k, v]) => ({ skuOrName: k, qty: v }));
+    const top5ByRevenue = Object.entries(revenueBySku)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([k, v]) => ({ skuOrName: k, revenue: v }));
+
+    await prisma.analyticsDaily.upsert({
+      where: { restaurantId_shiftDate: { restaurantId, shiftDate } },
+      create: {
+        restaurantId, shiftDate,
+        expectedBunsUsed, expectedMeatGrams, expectedDrinksUsed,
+        variance, flags,
+        top5ByQty, top5ByRevenue
+      },
+      update: {
+        expectedBunsUsed, expectedMeatGrams, expectedDrinksUsed,
+        variance, flags,
+        top5ByQty, top5ByRevenue
+      }
+    });
+
+    console.log(
+      `[analytics] ${restaurantId} ${formatInTimeZone(shiftDate, TZ, 'yyyy-MM-dd')} total ฿${(total/100).toFixed(2)} receipts ${recs.length}`
+    );
+  }
+}
+
+async function main() {
+  const restaurants = await prisma.restaurant.findMany({ select: { id: true, name: true } });
+  for (const r of restaurants) {
+    await processRestaurant(r.id);
+  }
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .then(() => process.exit(0))
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+2) server/services/jussi/runJussiDaily.js
+js
+Copy
+Edit
+// server/services/jussi/runJussiDaily.js
+import { PrismaClient } from '@prisma/client';
+import { formatInTimeZone } from 'date-fns-tz';
+import nodemailer from 'nodemailer';
+
+const prisma = new PrismaClient();
+const TZ = process.env.TZ || 'Asia/Bangkok';
+
+// --- email utils (safe no-op if SMTP not set) ---
+function buildTransport() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !port || !user || !pass) return null;
+  return nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+}
+async function maybeSendEmail({ to, subject, text, html }) {
+  const t = buildTransport();
+  if (!t) {
+    console.log('[jussi] SMTP not configured, skipping email send.');
+    return { skipped: true };
+  }
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  await t.sendMail({ from, to, subject, text, html });
+  return { skipped: false };
+}
+
+function fmtMoney(cents) { return `฿${(cents/100).toFixed(2)}`; }
+
+function renderPlain({ restaurant, shiftDate, sales, analytics, expenses }) {
+  const lines = [];
+  lines.push(`Jussi — Daily Ops Report`);
+  lines.push(`${restaurant.name} — ${formatInTimeZone(shiftDate, TZ, 'yyyy-MM-dd')} (18:00–03:00 ${TZ})`);
+  lines.push('');
+
+  if (sales) {
+    lines.push(`Sales: ${fmtMoney(sales.totalSales)} (receipts ${sales.receiptsCount})`);
+    lines.push(`  Cash ${fmtMoney(sales.cash)} | Card ${fmtMoney(sales.card)} | QR ${fmtMoney(sales.qr)} | Delivery ${fmtMoney(sales.delivery)} | Other ${fmtMoney(sales.other)}`);
+  } else {
+    lines.push(`Sales: (no DailySales row)`);
+  }
+  lines.push('');
+
+  const topQty = analytics?.top5ByQty || [];
+  const topRev = analytics?.top5ByRevenue || [];
+  lines.push('Top 5 by Qty:');
+  if (topQty.length) topQty.forEach((x,i)=>lines.push(`  ${i+1}. ${x.skuOrName} — ${x.qty}`));
+  else lines.push('  (none)');
+  lines.push('');
+  lines.push('Top 5 by Revenue:');
+  if (topRev.length) topRev.forEach((x,i)=>lines.push(`  ${i+1}. ${x.skuOrName} — ${fmtMoney(x.revenue)}`));
+  else lines.push('  (none)');
+  lines.push('');
+
+  if (analytics?.variance) {
+    lines.push('Variance (Expected – Count):');
+    lines.push(`  Buns: ${analytics.variance.buns ?? 0}`);
+    lines.push(`  Meat: ${analytics.variance.meatGrams ?? 0} g`);
+    lines.push(`  Drinks: ${analytics.variance.drinks ?? 0}`);
+  } else {
+    lines.push('Variance: (no stock submitted)');
+  }
+  lines.push('');
+
+  const expSum = (expenses || []).reduce((a, e) => a + (e.costCents || 0), 0);
+  lines.push(`Expenses total: ${fmtMoney(expSum)} (${(expenses || []).length} entries)`);
+  if (expenses?.length) {
+    lines.push('  Sample:');
+    expenses.slice(0, 5).forEach(e => lines.push(`   • ${e.item} — ${fmtMoney(e.costCents)}${e.supplier ? ` (${e.supplier})` : ''}`));
+  }
+
+  lines.push('');
+  lines.push('Actions:');
+  const flags = analytics?.flags || [];
+  if (flags.length) flags.forEach(f => lines.push(`  - ${f}`));
+  else lines.push('  - No critical flags. Maintain standard ops.');
+
+  return lines.join('\n');
+}
+
+async function runForRestaurant(restaurantId) {
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
+  if (!restaurant) return;
+
+  // Find latest DailySales row
+  const sales = await prisma.dailySales.findFirst({
+    where: { restaurantId },
+    orderBy: { shiftDate: 'desc' }
+  });
+  if (!sales) {
+    const subject = `[Jussi] ${restaurant.name} — No sales found`;
+    const text = `No DailySales row exists for ${restaurant.name}. Run analytics first.`;
+    await prisma.job.create({ data: { restaurantId, type: 'EMAIL_SUMMARY', status: 'FAILED', payload: { reason: 'NO_SALES' } } });
+    await maybeSendEmail({ to: restaurant.email, subject, text, html: `<pre>${text}</pre>` });
+    return;
+  }
+
+  const shiftDate = sales.shiftDate;
+  const [analytics, expenses] = await Promise.all([
+    prisma.analyticsDaily.findUnique({ where: { restaurantId_shiftDate: { restaurantId, shiftDate } } }),
+    prisma.expense.findMany({ where: { restaurantId, shiftDate }, orderBy: { createdAt: 'desc' } })
+  ]);
+
+  const text = renderPlain({ restaurant, shiftDate, sales, analytics, expenses });
+  const subject = `[Jussi] ${restaurant.name} — ${formatInTimeZone(shiftDate, TZ, 'yyyy-MM-dd')}`;
+  const to = (process.env.DAILY_REPORT_TO || '').trim() || restaurant.email || null;
+
+  if (to) await maybeSendEmail({ to, subject, text, html: `<pre>${text}</pre>` });
+
+  await prisma.job.create({
+    data: {
+      restaurantId,
+      type: 'EMAIL_SUMMARY',
+      status: 'SUCCESS',
+      payload: { restaurantId, shiftDate, totals: sales.totalSales, receipts: sales.receiptsCount, hasAnalytics: !!analytics, expenses: expenses.length }
+    }
+  });
+
+  console.log(`[jussi] sent for ${restaurant.name} ${formatInTimeZone(shiftDate, TZ, 'yyyy-MM-dd')} -> ${to || 'no-recipient'}`);
+}
+
+async function main() {
+  const restaurants = await prisma.restaurant.findMany({ select: { id: true, name: true, email: true } });
+  for (const r of restaurants) {
+    try { await runForRestaurant(r.id); }
+    catch (e) {
+      console.error('[jussi] failed', r.id, e?.message || e);
+      await prisma.job.create({ data: { restaurantId: r.id, type: 'EMAIL_SUMMARY', status: 'FAILED', payload: { error: String(e?.message || e) } } });
+    }
+  }
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .then(() => process.exit(0))
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+3) Run them (right now)
+bash
+Copy
+Edit
+# 1) Process analytics for latest shifts
+node server/services/analytics/runProcessDaily.js
+
+# 2) Send Jussi report (writes a job row; emails if SMTP env set)
+node server/services/jussi/runJussiDaily.js
+Expected:
+
+Console logs like [analytics] … total ฿… receipts …
+
+A new analytics_daily row per shift
+
+A new EMAIL_SUMMARY job row (SUCCESS)
+
+If SMTP is configured, an email to DAILY_REPORT_TO or Restaurant.email
+
+4) (Optional) add npm scripts for convenience
+In your package.json:
+
+json
+Copy
+Edit
+"scripts": {
+  "worker:processDaily": "node server/services/analytics/runProcessDaily.js",
+  "worker:jussi:daily": "node server/services/jussi/runJussiDaily.js"
+}
+Then:
+
+bash
+Copy
+Edit
+npm run worker:processDaily
+npm run worker:jussi:daily
+If any command errors, paste the exact error text and I’ll patch fast. From your earlier counts (count: 47, total_cents: 2239130 and payments: 48), these scripts will produce a proper analytics row and a Jussi summary immediately.
