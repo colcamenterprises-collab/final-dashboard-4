@@ -34,6 +34,7 @@ import restaurantHubLogo from "@assets/Restuarant Hub (2)_1751479657885.png";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import LastShiftSummaryCard from '@/components/LastShiftSummaryCard';
+import LastShiftIngredients from '@/components/LastShiftIngredients';
 
 // Quick Note form schema
 const quickNoteFormSchema = z.object({
@@ -306,6 +307,11 @@ export default function Dashboard() {
       {/* Last Shift Summary Card */}
       <div className="mb-8">
         <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
+      </div>
+
+      {/* Last Shift Ingredients Usage */}
+      <div className="mb-8">
+        <LastShiftIngredients />
       </div>
 
 
