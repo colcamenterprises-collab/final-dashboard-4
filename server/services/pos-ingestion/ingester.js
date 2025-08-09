@@ -120,7 +120,9 @@ export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental')
 
   try {
     while (hasMore) {
+      console.log(`Fetching receipts page...`, {start: startUTC.toISOString(), end: endUTC.toISOString(), cursor});
       const { receipts, nextCursor } = await fetchReceiptsWindow(startUTC, endUTC, cursor);
+      console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
       
       for (const loyverseReceipt of receipts) {
         try {

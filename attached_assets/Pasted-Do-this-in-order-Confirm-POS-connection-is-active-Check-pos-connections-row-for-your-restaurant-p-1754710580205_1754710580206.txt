@@ -1,0 +1,108 @@
+Do this in order
+Confirm POS connection is active
+
+Check pos_connections row for your restaurant:
+
+provider='LOYVERSE', isActive=true, apiKey present.
+
+If needed, re-save the key in .env and restart.
+
+Smoke-test the receipts adapter directly
+Run this tiny script (creates a one-off test without touching workers):
+
+bash
+Copy
+Edit
+node -e "import('axios').then(async ({default:axios})=>{
+  const base=process.env.LOYVERSE_BASE_URL||'https://api.loyverse.com/v1.0';
+  const token=process.env.LOYVERSE_API_TOKEN; 
+  if(!token){console.error('Missing LOYVERSE_API_TOKEN');process.exit(1)}
+  const end=new Date().toISOString();
+  const start=new Date(Date.now()-30*24*3600*1000).toISOString(); // last 30 days
+  try{
+    const r=await axios.get(base+'/receipts',{headers:{Authorization:'Bearer '+token},params:{ created_at_min:start, created_at_max:end, limit:250 }});
+    console.log('HTTP',r.status,'count',Array.isArray(r.data?.receipts)?r.data.receipts.length:0);
+    console.log('Sample IDs:',(r.data?.receipts||[]).slice(0,3).map(x=>x.id));
+  }catch(e){ console.error('ERR',e.response?.status,e.response?.data||e.message) }
+})"
+If you get HTTP 200 count > 0 → the API works, so the worker’s filters/pagination are wrong.
+
+If you get 401/403 → token/permissions issue.
+
+If you get 200 but count=0 → your store may not have receipts in that date window; widen it to 90 days to verify.
+
+Patch the receipts fetch (likely cause)
+In server/services/pos-ingestion/loyverse.ts (or enhancedLoyverseAPI.ts / loyverseReceipts.ts), make sure your call:
+
+Uses created_at_min / created_at_max (ISO8601)
+
+Sets limit=250
+
+Handles pagination with next_page_token (or whatever the API returns)
+
+Pseudo you should have:
+
+ts
+Copy
+Edit
+export async function fetchReceiptsWindow(startISO: string, endISO: string, cursor?: string) {
+  const params: any = { created_at_min: startISO, created_at_max: endISO, limit: 250 };
+  if (cursor) params.page_token = cursor; // or 'cursor' as per API
+  const r = await client.get('/receipts', { params });
+  return {
+    receipts: r.data?.receipts || [],
+    nextCursor: r.data?.next_page_token || null
+  };
+}
+Make the backfill actually pull receipts
+Your log shows:
+
+css
+Copy
+Edit
+Receipt sync result: { receiptsFetched: 0, ... }
+Menu sync result: { itemsUpserted: 50 }
+So receipts loop ran but returned 0. Add verbose page logs in runBackfill.js:
+
+js
+Copy
+Edit
+console.log(`Fetching receipts page...`, {start:startISO, end:endISO, cursor});
+const { receipts, nextCursor } = await fetchReceiptsWindow(startISO,endISO,cursor);
+console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
+Temporarily widen incremental window to 24h to prove it:
+
+js
+Copy
+Edit
+startDate.setMinutes(startDate.getMinutes() - 1440);
+Re-run
+
+bash
+Copy
+Edit
+node server/services/pos-ingestion/runIncremental.js   # after widening window
+# or:
+node server/services/pos-ingestion/runBackfill.js
+Verify counts quickly
+Create once:
+
+bash
+Copy
+Edit
+node -e "import('@prisma/client').then(async ({PrismaClient})=>{const p=new PrismaClient();Promise.all([p.receipt.count(),p.receiptItem.count(),p.receiptPayment.count(),p.posSyncLog.count()]).then(([a,b,c,d])=>{console.log({receipts:a,items:b,payments:c,pos_sync_logs:d});process.exit(0);});});"
+Run it again after each attempt; receipts should increase.
+
+Then run analytics + Jussi
+
+bash
+Copy
+Edit
+node server/services/analytics/runProcessDaily.js
+node server/services/jussi/runJussiDaily.js
+If receipts still show 0
+Paste the last 20 lines of the backfill/incremental logs (with the new page logs).
+
+Paste the output from the adapter smoke test (step 2) — status, count, any error body.
+
+I’ll give you the exact parameter/cursor fix for the Loyverse endpoint you’re hitting.

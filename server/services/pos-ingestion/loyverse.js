@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const BASE = process.env.LOYVERSE_BASE_URL || 'https://api.loyverse.com/v1.0';
 const TOKEN = process.env.LOYVERSE_API_TOKEN;
-const USE_MOCK = (process.env.USE_MOCK_LOYVERSE || 'false') === 'true';
+const USE_MOCK = !TOKEN || (process.env.USE_MOCK_LOYVERSE || 'true') === 'true';
 
 // Helper: HTTP client with auth
 function client() {
@@ -61,14 +61,14 @@ export async function fetchReceiptsWindow(startUTC, endUTC, cursor = null) {
     };
     
     if (cursor) {
-      params.cursor = cursor;
+      params.next_page_token = cursor; // Loyverse uses next_page_token for pagination
     }
 
     const response = await httpClient.get('/receipts', { params });
     
     return {
       receipts: response.data.receipts || [],
-      nextCursor: response.data.cursor || null
+      nextCursor: response.data.next_page_token || null
     };
   } catch (error) {
     console.error('Loyverse API error:', error.message);
