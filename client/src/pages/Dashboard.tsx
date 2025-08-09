@@ -263,7 +263,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-
+      {/* Last Shift Summary Card - moved to top */}
+      <div className="mb-8">
+        <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
@@ -778,10 +781,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Last Shift Summary Card - Full Width */}
-      <div className="mb-6 lg:mb-8">
-        <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
-      </div>
+
 
       {/* Shift Balance Summary - Full Width */}
       <div className="mb-6 lg:mb-8">
