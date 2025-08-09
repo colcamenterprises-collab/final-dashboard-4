@@ -1531,6 +1531,77 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Recipe Management Routes
+  app.get("/api/recipes", async (req: Request, res: Response) => {
+    try {
+      const recipes = await storage.getRecipes();
+      res.json(recipes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recipes", details: (error as Error).message });
+    }
+  });
+
+  app.post("/api/recipes", async (req: Request, res: Response) => {
+    try {
+      const recipe = await storage.createRecipe(req.body);
+      res.json(recipe);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to create recipe", details: (error as Error).message });
+    }
+  });
+
+  app.get("/api/recipes/:id", async (req: Request, res: Response) => {
+    try {
+      const recipe = await storage.getRecipeById(parseInt(req.params.id));
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+      res.json(recipe);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recipe", details: (error as Error).message });
+    }
+  });
+
+  app.put("/api/recipes/:id", async (req: Request, res: Response) => {
+    try {
+      const recipe = await storage.updateRecipe(parseInt(req.params.id), req.body);
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+      res.json(recipe);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update recipe", details: (error as Error).message });
+    }
+  });
+
+  app.delete("/api/recipes/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteRecipe(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete recipe", details: (error as Error).message });
+    }
+  });
+
+  // Ingredients Management Routes
+  app.get("/api/ingredients", async (req: Request, res: Response) => {
+    try {
+      const ingredients = await storage.getIngredients();
+      res.json(ingredients);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch ingredients", details: (error as Error).message });
+    }
+  });
+
+  app.post("/api/ingredients", async (req: Request, res: Response) => {
+    try {
+      const ingredient = await storage.createIngredient(req.body);
+      res.json(ingredient);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to create ingredient", details: (error as Error).message });
+    }
+  });
+
   // Register Loyverse enhanced routes
   app.use('/api/loyverse', loyverseEnhancedRoutes);
   
