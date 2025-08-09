@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import analyticsRoutes from "./routes/analytics";
+import posLive from "./routes/posLive";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -1534,6 +1535,9 @@ export function registerRoutes(app: express.Application): Server {
   // Register analytics routes  
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/receipts', analyticsRoutes);
+  
+  // Register POS Live routes
+  app.use('/api/pos', posLive);
 
   return server;
 }

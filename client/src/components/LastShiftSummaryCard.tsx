@@ -9,7 +9,7 @@ type Summary = {
   grossProfitCents?: number | null;
   payments: Record<string, number>; // method -> cents
   topItems?: Array<{ name: string; qty: number; revenueCents: number }>;
-  source: 'analytics' | 'window';
+  source: 'analytics' | 'pos_live' | 'window';
 };
 
 function cents(c: number | null | undefined) {
@@ -83,25 +83,20 @@ export default function LastShiftSummaryCard({ restaurantId }: { restaurantId: s
           }
         }
 
-        // 2) Fallback: raw window summary
-        const q = new URLSearchParams({
-          restaurantId,
-          from: bounds.startUTC,
-          to: bounds.endUTC,
-        }).toString();
-        const r = await fetch(`/api/receipts/window?${q}`);
-        if (!r.ok) throw new Error(`window endpoint ${r.status}`);
+        // 2) Fallback: live POS data
+        const r = await fetch(`/api/pos/live-shift?restaurantId=${encodeURIComponent(restaurantId)}`);
+        if (!r.ok) throw new Error(`pos live endpoint ${r.status}`);
         const jw = await r.json();
         const summary: Summary = {
-          window: bounds,
+          window: { startUTC: jw.window.startUTC, endUTC: jw.window.endUTC },
           receipts: jw.count ?? 0,
           grossCents: jw.grossCents ?? 0,
           discountsCents: jw.discountsCents ?? 0,
           netCents: jw.netCents ?? jw.grossCents ?? 0,
-          grossProfitCents: jw.grossProfitCents ?? null,
+          grossProfitCents: null,
           payments: jw.payments || {},
           topItems: jw.topItems || [],
-          source: 'window',
+          source: 'pos_live',
         };
         if (!cancelled) setData(summary);
       } catch (e: any) {
