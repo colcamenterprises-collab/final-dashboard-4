@@ -310,7 +310,7 @@ export class MemStorage implements IStorage {
         name: "Single Smash Burger",
         description: "Classic single patty smash burger with cheese and sauce",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
@@ -318,8 +318,8 @@ export class MemStorage implements IStorage {
           {ingredientName: "Cheese Slice", quantity: 20, unit: "grams", costPerUnit: 0.67, totalCost: 13.4},
           {ingredientName: "Special Sauce", quantity: 20, unit: "grams", costPerUnit: 0.15, totalCost: 3}
         ],
-        totalIngredientCost: 57.65,
-        costPerUnit: 57.65,
+        totalIngredientCost: "57.65",
+        costPerUnit: "57.65",
         preparationTime: 5,
         servingSize: "1 burger",
         isActive: true,
@@ -329,7 +329,7 @@ export class MemStorage implements IStorage {
         name: "Super Double Bacon & Cheese",
         description: "Premium double patty burger with bacon and cheese",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
@@ -338,8 +338,8 @@ export class MemStorage implements IStorage {
           {ingredientName: "Bacon", quantity: 30, unit: "grams", costPerUnit: 1.2, totalCost: 36},
           {ingredientName: "Special Sauce", quantity: 25, unit: "grams", costPerUnit: 0.15, totalCost: 3.75}
         ],
-        totalIngredientCost: 141.05,
-        costPerUnit: 141.05,
+        totalIngredientCost: "141.05",
+        costPerUnit: "141.05",
         preparationTime: 7,
         servingSize: "1 burger",
         isActive: true,
@@ -349,15 +349,15 @@ export class MemStorage implements IStorage {
         name: "Crispy Chicken Fillet Burger",
         description: "Crispy fried chicken fillet burger with special sauce",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
           {ingredientName: "Chicken Fillet", quantity: 120, unit: "grams", costPerUnit: 0.45, totalCost: 54},
           {ingredientName: "Special Sauce", quantity: 20, unit: "grams", costPerUnit: 0.15, totalCost: 3}
         ],
-        totalIngredientCost: 65,
-        costPerUnit: 65,
+        totalIngredientCost: "65.00",
+        costPerUnit: "65.00",
         preparationTime: 8,
         servingSize: "1 burger",
         isActive: true,
@@ -367,7 +367,7 @@ export class MemStorage implements IStorage {
         name: "Ultimate Double Burger",
         description: "Double patty burger with extra cheese and sauce",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
@@ -375,8 +375,8 @@ export class MemStorage implements IStorage {
           {ingredientName: "Cheese Slice", quantity: 40, unit: "grams", costPerUnit: 0.67, totalCost: 26.8},
           {ingredientName: "Special Sauce", quantity: 30, unit: "grams", costPerUnit: 0.15, totalCost: 4.5}
         ],
-        totalIngredientCost: 105.8,
-        costPerUnit: 105.8,
+        totalIngredientCost: "105.80",
+        costPerUnit: "105.80",
         preparationTime: 6,
         servingSize: "1 burger",
         isActive: true,
@@ -386,7 +386,7 @@ export class MemStorage implements IStorage {
         name: "Triple Smash Burger",
         description: "Triple patty smash burger with cheese and sauce",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
@@ -394,8 +394,8 @@ export class MemStorage implements IStorage {
           {ingredientName: "Cheese Slice", quantity: 60, unit: "grams", costPerUnit: 0.67, totalCost: 40.2},
           {ingredientName: "Special Sauce", quantity: 30, unit: "grams", costPerUnit: 0.15, totalCost: 4.5}
         ],
-        totalIngredientCost: 152.45,
-        costPerUnit: 152.45,
+        totalIngredientCost: "152.45",
+        costPerUnit: "152.45",
         preparationTime: 8,
         servingSize: "1 burger",
         isActive: true,
@@ -405,7 +405,7 @@ export class MemStorage implements IStorage {
         name: "Double Smash Burger",
         description: "Double patty smash burger with cheese and sauce",
         category: "Burgers",
-        yieldQuantity: 1,
+        yieldQuantity: "1",
         yieldUnit: "portions",
         ingredients: [
           {ingredientName: "Burger Bun", quantity: 1, unit: "each", costPerUnit: 8, totalCost: 8},
@@ -413,8 +413,8 @@ export class MemStorage implements IStorage {
           {ingredientName: "Cheese Slice", quantity: 40, unit: "grams", costPerUnit: 0.67, totalCost: 26.8},
           {ingredientName: "Special Sauce", quantity: 25, unit: "grams", costPerUnit: 0.15, totalCost: 3.75}
         ],
-        totalIngredientCost: 105.05,
-        costPerUnit: 105.05,
+        totalIngredientCost: "105.05",
+        costPerUnit: "105.05",
         preparationTime: 6,
         servingSize: "1 burger",
         isActive: true,
