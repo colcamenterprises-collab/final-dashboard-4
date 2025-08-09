@@ -4,7 +4,7 @@
 import axios from 'axios';
 
 const BASE = process.env.LOYVERSE_BASE_URL || 'https://api.loyverse.com/v1.0';
-const TOKEN = process.env.LOYVERSE_API_TOKEN;
+const TOKEN = process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_ACCESS_TOKEN;
 const USE_MOCK = !TOKEN || (process.env.USE_MOCK_LOYVERSE || 'true') === 'true';
 
 // Helper: HTTP client with auth
