@@ -1,0 +1,83 @@
+Run these quick checks:
+
+bash
+Copy
+Edit
+# A) See ingestion errors (top 20)
+node -e "import('@prisma/client').then(async({PrismaClient})=>{const p=new PrismaClient();const rows=await p.ingestionError.findMany({orderBy:{createdAt:'desc'},take:20});console.log(rows.map(r=>({context:r.context,error:r.errorMessage,created:r.createdAt})));process.exit(0);});"
+
+# B) Confirm unique constraint collisions (upsert blocked)
+node -e "import('@prisma/client').then(async({PrismaClient})=>{const p=new PrismaClient();const dup=await p.receipt.groupBy({by:['externalId'],_count:{_all:true},having:{_count:{_all:{gt:1}}}});console.log(dup);process.exit(0);});"
+
+# C) Dump 3 raw fetched receipts (before normalize) to confirm field names
+node -e "import('./server/services/pos-ingestion/ingester.js').then(async(m)=>{const since=new Date(Date.now()-24*3600e3), now=new Date();const r=await m.debugFetchRaw(since,now);console.log(JSON.stringify(r.slice(0,3),null,2));});"
+If debugFetchRaw doesn’t exist, add a tiny export that just calls the adapter and returns the concatenated receipts array (no DB).
+
+2) Make externalId truly unique (this is usually the blocker)
+Loyverse receipts often include one of:
+
+id or receipt_id or receipt_uuid
+
+receipt_number (not globally unique across stores/days)
+
+Sometimes ticket_id
+
+Your upsert should set:
+
+js
+Copy
+Edit
+const externalId =
+  raw.id ||
+  raw.receipt_id ||
+  raw.receipt_uuid ||
+  `${raw.store_id || 'store'}:${raw.receipt_number}`; // composite fallback
+if (!externalId) throw new Error('Missing externalId');
+Then the Prisma unique stays (restaurantId, provider, externalId) — safe.
+
+3) Fix common field mismatches (why “name” / payments fail)
+Harden normalize:
+
+js
+Copy
+Edit
+// Items
+name: s(it.name) || s(it.item_name) || s(it.title) || 'Unknown',
+sku: s(it.sku) || s(it.item_id) || s(it.handle) || null,
+
+// Payments (map all you see in raw)
+method: mapMethod(p.method || p.type || p.payment_type),
+
+// Totals (ensure cents)
+subtotal: toCents(raw.subtotal_money ?? raw.subtotal ?? 0),
+tax:      toCents(raw.tax_money ?? raw.tax ?? 0),
+discount: toCents(raw.discount_money ?? raw.discount ?? 0),
+total:    toCents(raw.total_money ?? raw.total ?? 0),
+And add a guard: only count as “upserted” after the transaction succeeds — log and write ingestion_errors otherwise (don’t silently skip).
+
+4) Confirm timezone + store filter are actually applied
+You already added these, but let’s prove it with logs:
+
+Log Window UTC before fetch.
+
+Log store_id param you’re sending.
+
+After page 1, log first receipt’s created_at and store_id.
+
+If the sample falls inside the BKK shift and the store matches, good.
+
+5) Re-run a 24h seed and check counts
+bash
+Copy
+Edit
+WINDOW_MINUTES=1440 node server/services/pos-ingestion/runIncremental.js
+node -e "import('@prisma/client').then(async({PrismaClient})=>{const p=new PrismaClient();const [r,ri,rp]=await Promise.all([p.receipt.count(),p.receiptItem.count(),p.receiptPayment.count()]);console.log({receipts:r,items:ri,payments:rp});process.exit(0);});"
+You should see receipts > 3. If it’s still low, the error dump from step 1 will tell us exactly which fields are missing.
+
+6) Reconcile with your CSV (final proof)
+Run your verify script again for Aug 8 18:00 → Aug 9 03:00 (BKK). If totals are still off:
+
+Post the script’s DB totals vs CSV totals line.
+
+Paste the first 2 raw receipts from step 1C.
+I’ll tell you the precise mapping tweak (it’s usually receipt_number uniqueness or tender mapping).

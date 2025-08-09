@@ -44,13 +44,18 @@ function toCents(amount) {
  * Normalize Loyverse receipt to our database format
  */
 export function normalizeReceipt(loyverseReceipt, restaurantId) {
-  // Loyverse uses receipt_number as the unique identifier (not an 'id' field)
+  // Make externalId truly unique across stores and time
+  const externalId = 
+    loyverseReceipt.id ||
+    loyverseReceipt.receipt_id ||
+    loyverseReceipt.receipt_uuid ||
+    `${loyverseReceipt.store_id || 'store'}:${loyverseReceipt.receipt_number}`;
+  
   const receiptNumber = loyverseReceipt.receipt_number;
-  const externalId = receiptNumber; // Use receipt_number as externalId
   
   if (!externalId) {
-    console.error('❌ Missing receipt_number in receipt:', Object.keys(loyverseReceipt));
-    throw new Error(`Missing receipt_number in Loyverse data: ${JSON.stringify(loyverseReceipt).substring(0, 200)}`);
+    console.error('❌ Missing unique identifier in receipt:', Object.keys(loyverseReceipt));
+    throw new Error(`Missing unique ID in Loyverse data: ${JSON.stringify(loyverseReceipt).substring(0, 200)}`);
   }
   
   const receipt = {
@@ -61,19 +66,22 @@ export function normalizeReceipt(loyverseReceipt, restaurantId) {
     channel: mapSalesChannel(loyverseReceipt.channel),
     createdAtUTC: new Date(loyverseReceipt.created_at),
     closedAtUTC: loyverseReceipt.closed_at ? new Date(loyverseReceipt.closed_at) : null,
-    subtotal: toCents(loyverseReceipt.total_money - loyverseReceipt.total_tax),
-    tax: toCents(loyverseReceipt.total_tax),
-    discount: toCents(loyverseReceipt.total_discount),
-    total: toCents(loyverseReceipt.total_money),
+    subtotal: toCents(loyverseReceipt.subtotal_money ?? loyverseReceipt.subtotal ?? (loyverseReceipt.total_money - loyverseReceipt.total_tax)),
+    tax: toCents(loyverseReceipt.tax_money ?? loyverseReceipt.total_tax ?? loyverseReceipt.tax ?? 0),
+    discount: toCents(loyverseReceipt.discount_money ?? loyverseReceipt.total_discount ?? loyverseReceipt.discount ?? 0),
+    total: toCents(loyverseReceipt.total_money ?? loyverseReceipt.total ?? 0),
     notes: loyverseReceipt.note,
     rawPayload: loyverseReceipt
   };
 
+  // Helper to safely get string values
+  const s = (val) => val ? String(val).trim() : null;
+  
   const items = (loyverseReceipt.line_items || []).map(item => ({
     providerItemId: item.id,
-    sku: item.sku,
-    name: item.item_name || item.name || 'Unknown Item',
-    category: item.category || 'GENERAL',
+    sku: s(item.sku) || s(item.item_id) || s(item.handle) || null,
+    name: s(item.item_name) || s(item.name) || s(item.title) || 'Unknown Item',
+    category: s(item.category) || 'GENERAL',
     qty: item.quantity || 1,
     unitPrice: toCents(item.price),
     total: toCents(item.total_money || item.total),
@@ -81,8 +89,8 @@ export function normalizeReceipt(loyverseReceipt, restaurantId) {
   }));
 
   const payments = (loyverseReceipt.payments || []).map(payment => ({
-    method: mapPaymentMethod(payment.type || payment.method),
-    amount: toCents(payment.money_amount || payment.amount),
+    method: mapPaymentMethod(payment.method || payment.type || payment.payment_type),
+    amount: toCents(payment.money_amount || payment.amount || 0),
     meta: payment.payment_details || payment.meta || null
   }));
 

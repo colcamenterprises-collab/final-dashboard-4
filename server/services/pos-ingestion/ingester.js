@@ -100,6 +100,28 @@ async function upsertReceipt(normalizedData, restaurantId) {
 /**
  * Sync receipts for a time window - bulletproof timezone and pagination
  */
+// Debug function to fetch raw receipts without database operations
+export async function debugFetchRaw(startLocal, endLocal) {
+  const BANGKOK_OFFSET = 7;
+  const startUTC = new Date(startLocal.getTime() - (BANGKOK_OFFSET * 60 * 60 * 1000));
+  const endUTC = new Date(endLocal.getTime() - (BANGKOK_OFFSET * 60 * 60 * 1000));
+  
+  let allReceipts = [];
+  let cursor = null;
+  
+  do {
+    const { receipts, nextCursor } = await fetchReceiptsWindow(
+      startUTC.toISOString(), 
+      endUTC.toISOString(), 
+      cursor
+    );
+    allReceipts = allReceipts.concat(receipts);
+    cursor = nextCursor;
+  } while (cursor);
+  
+  return allReceipts;
+}
+
 export async function syncReceiptsWindow(startLocal, endLocal, mode = 'incremental') {
   const restaurant = await ensureRestaurant();
   const connection = await ensurePosConnection(restaurant.id);

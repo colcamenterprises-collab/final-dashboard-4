@@ -34,10 +34,20 @@ async function main() {
     let csvCount = 0;
     
     for (const record of records) {
-      const total = parseFloat(record['Total collected'] || 0);
+      // Try different column name variations
+      const total = parseFloat(
+        record['Total collected'] || 
+        record['total_money'] || 
+        record['Total'] || 
+        record['Amount'] ||
+        record['Net sales'] ||
+        0
+      );
       if (total > 0) {
         csvTotal += total;
         csvCount++;
+        console.log(`CSV Record: ${JSON.stringify(record).substring(0, 100)}...`);
+        break; // Just check first valid record for debugging
       }
     }
     
