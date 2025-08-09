@@ -65,10 +65,14 @@ export async function fetchReceiptsWindow(startUTC, endUTC, cursor = null) {
     }
 
     const response = await httpClient.get('/receipts', { params });
+    const receipts = response.data.receipts || [];
+    const nextCursor = response.data.next_page_token || null;
+    
+    console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
     
     return {
-      receipts: response.data.receipts || [],
-      nextCursor: response.data.next_page_token || null
+      receipts,
+      nextCursor
     };
   } catch (error) {
     console.error('Loyverse API error:', error.message);
