@@ -1,0 +1,82 @@
+Do this (2 edits)
+1) Patch the menu-item upsert (server/services/pos-ingestion/ingester.*)
+Find where it calls prisma.menuItem.upsert(...) and replace that block with this safe version:
+
+js
+Copy
+Edit
+function s(v) { return (v ?? '').toString().trim(); }
+function inferName(raw) {
+  return s(raw.item_name) || s(raw.name) || s(raw.handle) || s(raw.title) || s(raw.reference_id) || s(raw.id) || s(raw.sku);
+}
+
+async function upsertMenuItem(prisma, restaurantId, raw) {
+  // Try SKU; if missing, fall back to external id
+  const sku = s(raw.sku) || s(raw.reference_id) || s(raw.id);
+  if (!sku) {
+    console.warn('SKIP menu item with no sku/id:', raw?.id);
+    return;
+  }
+
+  const finalName = inferName(raw) || `SKU:${sku}`;
+  const category = s(raw.category) || s(raw.category_name) || 'Uncategorized';
+  const active = raw.deleted_at ? false : true;
+
+  const isDrink = /drink|coke|sprite|water|soda|pepsi|fanta/i.test(finalName);
+  const isBurger = /burger|cheese|double/i.test(finalName);
+
+  await prisma.menuItem.upsert({
+    where: { restaurantId_sku: { restaurantId, sku } },
+    create: {
+      restaurantId,
+      sku,
+      name: finalName,
+      category,
+      portionGrams: null,
+      isDrink,
+      isBurger,
+      active,
+      meta: raw
+    },
+    update: {
+      name: finalName,
+      category,
+      active,
+      meta: raw
+    }
+  });
+}
+And wherever you loop menu items, call it like:
+
+js
+Copy
+Edit
+for (const raw of menuItems) {
+  try {
+    await upsertMenuItem(prisma, restaurantId, raw);
+  } catch (e) {
+    console.error('Menu upsert failed:', e?.message);
+    await prisma.ingestionError.create({
+      data: {
+        restaurantId,
+        provider: 'LOYVERSE',
+        context: 'menuItemUpsert',
+        errorMessage: String(e?.message || e),
+        rawPayload: raw
+      }
+    });
+    // continue to next item (don’t crash the whole backfill)
+  }
+}
+2) Ensure Prisma schema matches (no change needed unless you edited it)
+Your MenuItem in Prisma must have:
+
+name String (non-null)
+
+category String (non-null)
+
+@@unique([restaurantId, sku])
+
+(That’s exactly what we defined earlier—leave it.)
+
+Re-run

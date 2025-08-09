@@ -191,6 +191,52 @@ export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental')
 }
 
 /**
+ * Helper functions for safe menu item upsert
+ */
+function s(v) { return (v ?? '').toString().trim(); }
+
+function inferName(raw) {
+  return s(raw.item_name) || s(raw.name) || s(raw.handle) || s(raw.title) || s(raw.reference_id) || s(raw.id) || s(raw.sku);
+}
+
+async function upsertMenuItem(prisma, restaurantId, raw) {
+  // Try SKU; if missing, fall back to external id
+  const sku = s(raw.sku) || s(raw.reference_id) || s(raw.id);
+  if (!sku) {
+    console.warn('SKIP menu item with no sku/id:', raw?.id);
+    return;
+  }
+
+  const finalName = inferName(raw) || `SKU:${sku}`;
+  const category = s(raw.category) || s(raw.category_name) || 'Uncategorized';
+  const active = raw.deleted_at ? false : true;
+
+  const isDrink = /drink|coke|sprite|water|soda|pepsi|fanta/i.test(finalName);
+  const isBurger = /burger|cheese|double/i.test(finalName);
+
+  await prisma.menuItem.upsert({
+    where: { restaurantId_sku: { restaurantId, sku } },
+    create: {
+      restaurantId,
+      sku,
+      name: finalName,
+      category,
+      portionGrams: null,
+      isDrink,
+      isBurger,
+      active,
+      meta: raw
+    },
+    update: {
+      name: finalName,
+      category,
+      active,
+      meta: raw
+    }
+  });
+}
+
+/**
  * Sync menu items
  */
 export async function syncMenuItems() {
@@ -200,21 +246,23 @@ export async function syncMenuItems() {
     const loyverseItems = await fetchMenuItems();
     let upserted = 0;
 
-    for (const loyverseItem of loyverseItems) {
-      const normalized = normalizeMenuItem(loyverseItem, restaurant.id);
-      
-      await prisma.menuItem.upsert({
-        where: {
-          restaurantId_sku: {
+    for (const raw of loyverseItems) {
+      try {
+        await upsertMenuItem(prisma, restaurant.id, raw);
+        upserted++;
+      } catch (e) {
+        console.error('Menu upsert failed:', e?.message);
+        await prisma.ingestionError.create({
+          data: {
             restaurantId: restaurant.id,
-            sku: normalized.sku
+            provider: 'LOYVERSE',
+            context: 'menuItemUpsert',
+            errorMessage: String(e?.message || e),
+            rawPayload: raw
           }
-        },
-        update: normalized,
-        create: normalized
-      });
-      
-      upserted++;
+        });
+        // continue to next item (don't crash the whole backfill)
+      }
     }
 
     return { itemsUpserted: upserted };
