@@ -6,6 +6,8 @@ import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import analyticsRoutes from "./routes/analytics";
 import posLive from "./routes/posLive";
+import posItems from "./routes/posItems";
+import posUsage from "./routes/posUsage";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -1538,6 +1540,8 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register POS Live routes
   app.use('/api/pos', posLive);
+  app.use('/api/pos', posItems);
+  app.use('/api/pos', posUsage);
 
   return server;
 }
