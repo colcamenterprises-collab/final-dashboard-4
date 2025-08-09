@@ -4,6 +4,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
+import analyticsRoutes from "./routes/analytics";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -1526,6 +1527,13 @@ export function registerRoutes(app: express.Application): Server {
       await prisma.$disconnect();
     }
   });
+
+  // Register Loyverse enhanced routes
+  app.use('/api/loyverse', loyverseEnhancedRoutes);
+  
+  // Register analytics routes  
+  app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/receipts', analyticsRoutes);
 
   return server;
 }

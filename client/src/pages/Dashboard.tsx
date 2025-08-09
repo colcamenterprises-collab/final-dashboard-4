@@ -33,6 +33,7 @@ import { apiRequest } from "@/lib/queryClient";
 import restaurantHubLogo from "@assets/Restuarant Hub (2)_1751479657885.png";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import LastShiftSummaryCard from '@/components/LastShiftSummaryCard';
 
 // Quick Note form schema
 const quickNoteFormSchema = z.object({
@@ -781,9 +782,9 @@ export default function Dashboard() {
         {/* Shift Balance Summary */}
         <ShiftBalanceSummary />
         
-        {/* Additional space for future components */}
+        {/* Last Shift Summary Card */}
         <div className="space-y-4">
-          {/* This space can be used for additional dashboard components */}
+          <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
         </div>
       </div>
 
