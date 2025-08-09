@@ -15,7 +15,7 @@ import MonthlyExpensesChart from "@/components/MonthlyExpensesChart";
 import AIInsightsCard from "@/components/AIInsightsCard";
 import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
-import CompactShiftReports from "@/components/CompactShiftReports";
+
 
 import { DiscrepancyCard } from "@/components/DiscrepancyCard";
 import ShiftReportReview from "@/components/ShiftReportReview";
@@ -778,14 +778,14 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        {/* Shift Balance Summary */}
+      {/* Last Shift Summary Card - Full Width */}
+      <div className="mb-6 lg:mb-8">
+        <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
+      </div>
+
+      {/* Shift Balance Summary - Full Width */}
+      <div className="mb-6 lg:mb-8">
         <ShiftBalanceSummary />
-        
-        {/* Last Shift Summary Card */}
-        <div className="space-y-4">
-          <LastShiftSummaryCard restaurantId="cme3ftnz00000ljnjzhhpvi9f" />
-        </div>
       </div>
 
 

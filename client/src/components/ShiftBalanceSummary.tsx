@@ -62,59 +62,32 @@ export default function ShiftBalanceSummary() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-          <Calendar className="h-5 w-5" />
-          Last 5 Shift Reports
+          <DollarSign className="h-5 w-5" />
+          Shift Balance Analysis
         </CardTitle>
       </CardHeader>
       <CardContent>
         {!shiftBalances || shiftBalances.length === 0 ? (
-          <div className="text-sm text-gray-500">No shift data available</div>
+          <div className="text-sm text-gray-500">No shift balance data available</div>
         ) : (
-          <div className="space-y-3">
-            {shiftBalances.map((shift) => (
-              <div 
-                key={shift.id} 
-                className={`p-3 rounded-lg border ${
-                  shift.isBalanced 
-                    ? 'border-green-200 bg-green-50' 
-                    : 'border-red-200 bg-red-50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {shift.isBalanced ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                    )}
-                    <span className="font-medium text-sm">
-                      Closed: {new Date(shift.shiftEnd).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: 'Asia/Bangkok'
-                      })}
-                    </span>
-                  </div>
-                  <Badge 
-                    variant={shift.isBalanced ? "default" : "destructive"}
-                    className={shift.isBalanced ? "text-xs bg-green-100 text-green-800 border-green-300" : "text-xs bg-red-100 text-red-800 border-red-300"}
-                  >
-                    {shift.isBalanced ? "Balanced" : `฿${shift.variance.toFixed(2)} variance`}
-                  </Badge>
-                </div>
-                
-                <div className="text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Sales</span>
-                    <span className="font-semibold">{formatCurrency(shift.totalSales)}</span>
-                  </div>
-                </div>
-
-
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg border border-blue-200 bg-blue-50">
+              <div>
+                <h3 className="text-sm font-medium text-blue-800">Balance Status</h3>
+                <p className="text-xs text-blue-600 mt-1">
+                  {unbalancedCount === 0 
+                    ? "All recent shifts are balanced" 
+                    : `${unbalancedCount} shift${unbalancedCount > 1 ? 's' : ''} need attention`
+                  }
+                </p>
               </div>
-            ))}
+              <Badge 
+                variant={unbalancedCount === 0 ? "default" : "destructive"}
+                className={unbalancedCount === 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+              >
+                {unbalancedCount === 0 ? "All Balanced" : `${unbalancedCount} Unbalanced`}
+              </Badge>
+            </div>
           </div>
         )}
       </CardContent>
