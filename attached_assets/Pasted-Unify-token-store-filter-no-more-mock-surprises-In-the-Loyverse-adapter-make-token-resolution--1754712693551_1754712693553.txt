@@ -1,0 +1,144 @@
+Unify token + store filter (no more mock surprises)
+
+In the Loyverse adapter, make token resolution bulletproof:
+
+js
+Copy
+Edit
+const TOKEN =
+  process.env.LOYVERSE_API_TOKEN ||
+  process.env.LOYVERSE_ACCESS_TOKEN;
+if (!TOKEN) throw new Error('Missing Loyverse access token');
+If you have multiple outlets, pass the store filter:
+
+js
+Copy
+Edit
+const STORE_ID = process.env.LOYVERSE_STORE_ID;
+if (STORE_ID) params.store_id = STORE_ID;
+Use the exact shift window in UTC (BKK → UTC)
+
+Your shift is 18:00–03:00 Asia/Bangkok. Convert that precisely to UTC when calling the API:
+
+js
+Copy
+Edit
+import { zonedTimeToUtc } from 'date-fns-tz';
+
+const TZ = 'Asia/Bangkok';
+const startLocal = new Date('2025-08-08T18:00:00+07:00'); // example
+const endLocal   = new Date('2025-08-09T03:00:00+07:00');
+
+const startUTC = zonedTimeToUtc(startLocal, TZ).toISOString();
+const endUTC   = zonedTimeToUtc(endLocal, TZ).toISOString();
+
+// Use startUTC/endUTC for created_at_min/max
+Make sure your adapter uses created_at_min/created_at_max with those UTC values.
+
+Hard-loop pagination until empty
+Make the receipts fetch impossible to short-circuit:
+
+js
+Copy
+Edit
+export async function fetchReceiptsWindow(startISO, endISO, cursor=null) {
+  const client = axios.create({ baseURL: BASE, headers: { Authorization: `Bearer ${TOKEN}` }, timeout: 30000 });
+  const params = { created_at_min: startISO, created_at_max: endISO, limit: 250 };
+  if (STORE_ID) params.store_id = STORE_ID;
+  if (cursor) params.page_token = cursor; // or whatever Loyverse returns
+
+  const r = await client.get('/receipts', { params });
+  const receipts = Array.isArray(r.data?.receipts) ? r.data.receipts : [];
+  const nextCursor = r.data?.next_page_token || r.data?.nextCursor || null;
+
+  console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
+  return { receipts, nextCursor };
+}
+
+// In the worker:
+let cursor = null, total = 0;
+do {
+  const { receipts, nextCursor } = await fetchReceiptsWindow(startUTC, endUTC, cursor);
+  total += receipts.length;
+  // upsert each receipt…
+  cursor = nextCursor;
+} while (cursor);
+console.log('Window total:', total);
+Bump the window for one-time seeding
+
+Set a temp env to widen incremental quickly:
+
+bash
+Copy
+Edit
+WINDOW_MINUTES=1440 node server/services/pos-ingestion/runIncremental.js
+Or run the backfill again after patching pagination & store filter.
+
+Sanity print the window + sample timestamps
+Inside the worker, right before fetching:
+
+js
+Copy
+Edit
+console.log('Window UTC:', { start: startUTC, end: endUTC });
+After the first page:
+
+js
+Copy
+Edit
+if (receipts[0]) console.log('Sample created_at:', receipts[0].created_at);
+This immediately exposes timezone mistakes.
+
+Reconcile against your CSV (you already uploaded it)
+Run the verify script they added (or drop in mine). You want totals in cents for that shift window to be ~equal:
+
+If DB total << CSV total → your API window or store filter is wrong.
+
+If counts off but totals close → you may be missing split/void/refund mapping; log those fields in normalizeReceipt and include them in totals (or exclude refunds per your policy).
+
+Lock it in going forward (webhooks)
+Since you already have LOYVERSE_WEBHOOK_SECRET, add a tiny webhook handler that:
+
+Verifies the HMAC,
+
+Extracts the receipt ID,
+
+Calls the adapter to fetch just that receipt and upsert.
+This keeps the DB hot without waiting for cron.
+
+Quick commands (copy/paste)
+After patches:
+
+bash
+Copy
+Edit
+# 1) One-shot window seed (last 24h)
+WINDOW_MINUTES=1440 node server/services/pos-ingestion/runIncremental.js
+
+# 2) Check counts
+node -e "import('@prisma/client').then(async({PrismaClient})=>{const p=new PrismaClient();const [r,ri,rp]=await Promise.all([p.receipt.count(),p.receiptItem.count(),p.receiptPayment.count()]);console.log({receipts:r,items:ri,payments:rp});process.exit(0);});"
+
+# 3) Process analytics + send Jussi
+node server/services/analytics/runProcessDaily.js
+node server/services/jussi/runJussiDaily.js
+If you still see 1 receipt for that shift after doing the store filter + pagination + UTC window, ping me with:
+
+The Window UTC log line,
+
+The first page Fetched X receipts line (and nextCursor),
+
+The live API smoke test count (the little axios one-liner),
+
+And the CSV/DB totals from the reconcile script.
+
+I’ll tell you exactly which parameter is off. My bet: you’re missing store_id or your UTC window is a hair off the BKK shift.
+
+
+
+
+
+
+
+
+
+Ask ChatGPT

@@ -2,15 +2,18 @@
  * Loyverse API adapter - ONLY file allowed to call Loyverse directly
  */
 import axios from 'axios';
+// Import not needed in adapter - timezone conversion happens in ingester
 
 const BASE = process.env.LOYVERSE_BASE_URL || 'https://api.loyverse.com/v1.0';
 const TOKEN = process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_ACCESS_TOKEN;
-const USE_MOCK = !TOKEN || (process.env.USE_MOCK_LOYVERSE || 'true') === 'true';
+const STORE_ID = process.env.LOYVERSE_STORE_ID;
+
+// Bulletproof token resolution - no more mock surprises
+if (!TOKEN) throw new Error('Missing Loyverse access token (LOYVERSE_API_TOKEN or LOYVERSE_ACCESS_TOKEN)');
 
 // Helper: HTTP client with auth
 function client() {
   if (!BASE) throw new Error('LOYVERSE_BASE_URL missing');
-  if (!TOKEN && !USE_MOCK) throw new Error('LOYVERSE_API_TOKEN missing');
   return axios.create({
     baseURL: BASE,
     headers: { Authorization: `Bearer ${TOKEN}` },
@@ -20,89 +23,65 @@ function client() {
 
 /**
  * Fetch receipts in a time window with pagination.
- * @param {Date} startUTC
- * @param {Date} endUTC
+ * @param {string} startISO - UTC ISO string
+ * @param {string} endISO - UTC ISO string  
  * @param {string|null} cursor
  * @returns {Promise<{receipts:any[], nextCursor:string|null}>}
  */
-export async function fetchReceiptsWindow(startUTC, endUTC, cursor = null) {
-  if (USE_MOCK) {
-    return {
-      receipts: [{
-        id: 'mock-receipt-1',
-        number: 'R-1001',
-        created_at: new Date().toISOString(),
-        line_items: [{
-          id: 'mock-item-1',
-          sku: 'BURGER_SINGLE',
-          name: 'Single Burger',
-          category: 'Burgers',
-          quantity: 2,
-          price: 15000,
-          total: 30000,
-          modifiers: [{ name: 'Bacon', price: 3000 }]
-        }],
-        payments: [{ method: 'CASH', amount: 30000 }],
-        total_money: 30000,
-        discount_money: 0,
-        tax_money: 0,
-        channel: 'IN_STORE'
-      }],
-      nextCursor: null
-    };
+export async function fetchReceiptsWindow(startISO, endISO, cursor = null) {
+  const httpClient = client();
+  const params = { 
+    created_at_min: startISO, 
+    created_at_max: endISO, 
+    limit: 250 
+  };
+  
+  // Store filter for multi-outlet support
+  if (STORE_ID) {
+    params.store_id = STORE_ID;
+  }
+  
+  // Pagination cursor
+  if (cursor) {
+    params.page_token = cursor; // Use correct Loyverse pagination parameter
   }
 
-  try {
-    const httpClient = client();
-    const params = {
-      created_at_min: startUTC.toISOString(),
-      created_at_max: endUTC.toISOString(),
-      limit: 250
-    };
-    
-    if (cursor) {
-      params.next_page_token = cursor; // Loyverse uses next_page_token for pagination
-    }
+  console.log('Fetching receipts page...', {
+    start: startISO,
+    end: endISO,
+    cursor,
+    store_id: STORE_ID || 'all_stores'
+  });
 
-    const response = await httpClient.get('/receipts', { params });
-    const receipts = response.data.receipts || [];
-    const nextCursor = response.data.next_page_token || null;
-    
-    console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
-    
-    return {
-      receipts,
-      nextCursor
-    };
-  } catch (error) {
-    console.error('Loyverse API error:', error.message);
-    throw new Error(`Loyverse API failed: ${error.message}`);
+  const response = await httpClient.get('/receipts', { params });
+  const receipts = Array.isArray(response.data?.receipts) ? response.data.receipts : [];
+  const nextCursor = response.data?.next_page_token || response.data?.nextCursor || null;
+
+  console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
+  
+  // Sample timestamp logging for timezone debugging
+  if (receipts[0]) {
+    console.log('Sample created_at:', receipts[0].created_at);
   }
+  
+  return {
+    receipts,
+    nextCursor
+  };
 }
 
 /**
  * Fetch menu items from Loyverse
  */
 export async function fetchMenuItems() {
-  if (USE_MOCK) {
-    return [
-      {
-        id: 'mock-item-1',
-        sku: 'BURGER_SINGLE',
-        name: 'Single Burger',
-        category: 'Burgers',
-        price: 15000,
-        active: true
-      }
-    ];
+  const httpClient = client();
+  const params = {};
+  
+  // Store filter for menu items
+  if (STORE_ID) {
+    params.store_id = STORE_ID;
   }
-
-  try {
-    const httpClient = client();
-    const response = await httpClient.get('/items');
-    return response.data.items || [];
-  } catch (error) {
-    console.error('Loyverse menu items error:', error.message);
-    throw new Error(`Loyverse menu items failed: ${error.message}`);
-  }
+  
+  const response = await httpClient.get('/items', { params });
+  return response.data.items || [];
 }

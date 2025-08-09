@@ -4,6 +4,7 @@
 import { PrismaClient } from '@prisma/client';
 import { fetchReceiptsWindow, fetchMenuItems } from './loyverse.js';
 import { normalizeReceipt, normalizeMenuItem } from './normalizer.js';
+import * as dateFnsTz from 'date-fns-tz';
 
 const prisma = new PrismaClient();
 
@@ -97,11 +98,21 @@ async function upsertReceipt(normalizedData, restaurantId) {
 }
 
 /**
- * Sync receipts for a time window
+ * Sync receipts for a time window - bulletproof timezone and pagination
  */
-export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental') {
+export async function syncReceiptsWindow(startLocal, endLocal, mode = 'incremental') {
   const restaurant = await ensureRestaurant();
   const connection = await ensurePosConnection(restaurant.id);
+
+  // Convert Bangkok time to UTC precisely using manual offset calculation
+  const BANGKOK_OFFSET = 7; // UTC+7
+  const startUTC = new Date(startLocal.getTime() - (BANGKOK_OFFSET * 60 * 60 * 1000));
+  const endUTC = new Date(endLocal.getTime() - (BANGKOK_OFFSET * 60 * 60 * 1000));
+  
+  console.log('Window UTC:', { 
+    start: startUTC.toISOString(), 
+    end: endUTC.toISOString() 
+  });
 
   const syncLog = await prisma.posSyncLog.create({
     data: {
@@ -116,13 +127,17 @@ export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental')
   let itemsUpserted = 0;
   let paymentsUpserted = 0;
   let cursor = null;
-  let hasMore = true;
+  let total = 0;
 
   try {
-    while (hasMore) {
-      console.log(`Fetching receipts page...`, {start: startUTC.toISOString(), end: endUTC.toISOString(), cursor});
-      const { receipts, nextCursor } = await fetchReceiptsWindow(startUTC, endUTC, cursor);
-      console.log(`Fetched ${receipts.length} receipts`, { nextCursor });
+    // Hard-loop pagination until empty
+    do {
+      const { receipts, nextCursor } = await fetchReceiptsWindow(
+        startUTC.toISOString(), 
+        endUTC.toISOString(), 
+        cursor
+      );
+      total += receipts.length;
       
       for (const loyverseReceipt of receipts) {
         try {
@@ -150,8 +165,9 @@ export async function syncReceiptsWindow(startUTC, endUTC, mode = 'incremental')
       }
 
       cursor = nextCursor;
-      hasMore = !!nextCursor && receipts.length > 0;
-    }
+    } while (cursor);
+    
+    console.log('Window total:', total);
 
     // Update sync log
     await prisma.posSyncLog.update({

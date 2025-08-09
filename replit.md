@@ -17,6 +17,19 @@ Email automation requirement: Every completed daily shift form must automaticall
 Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Aroi Dee Sales field, implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
 Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
 
+## Recent Changes
+
+**August 9, 2025 - Bulletproof Loyverse API Integration**
+- Unified token resolution with fallback support (LOYVERSE_API_TOKEN || LOYVERSE_ACCESS_TOKEN)
+- Added store filtering for multi-outlet support (LOYVERSE_STORE_ID)
+- Implemented hard-loop pagination to prevent short-circuits and ensure complete data fetch
+- Added precise Bangkok→UTC timezone conversion for API calls
+- Enhanced logging with UTC window display and sample timestamp debugging
+- Eliminated mock data fallbacks - requires real token for production use
+- Created one-shot incremental sync script with configurable time windows
+- All automated operations running: 15-min sync, 3:30 AM analytics, 8:00 AM emails
+- Verification tools ready for ongoing data validation and CSV comparison
+
 ## System Architecture
 
 ### Frontend Architecture
