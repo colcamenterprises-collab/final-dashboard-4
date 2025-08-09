@@ -1,0 +1,65 @@
+import fs from 'fs';
+import { parse } from 'csv-parse/sync';
+import { utcToZonedTime } from 'date-fns-tz';
+import { PrismaClient } from '@prisma/client';
+
+const TZ = 'Asia/Bangkok';
+const prisma = new PrismaClient();
+
+// Adjust these:
+const RESTAURANT_SLUG = 'smash-brothers-burgers';
+const CSV_PATH = process.argv[2]; // pass path as arg
+const SHIFT_START_LOCAL = new Date('2025-08-08T18:00:00+07:00');
+const SHIFT_END_LOCAL   = new Date('2025-08-09T03:00:00+07:00');
+
+function toUTC(d) { return new Date(new Date(d).toISOString()); }
+
+async function dbTotals(restaurantId){
+  const startUTC = toUTC(SHIFT_START_LOCAL);
+  const endUTC   = toUTC(SHIFT_END_LOCAL);
+  const rows = await prisma.receipt.findMany({
+    where: { restaurantId, createdAtUTC: { gte: startUTC, lte: endUTC } },
+    include: { payments:true, items:true }
+  });
+  const total = rows.reduce((a,r)=>a+(r.total||0),0);
+  const byPay = rows.flatMap(r=>r.payments).reduce((m,p)=>((m[p.method]=(m[p.method]||0)+p.amount),m),{});
+  const count = rows.length;
+  return { total, byPay, count };
+}
+
+function csvTotals(csvPath){
+  const input = fs.readFileSync(csvPath);
+  const records = parse(input, { columns:true, skip_empty_lines:true });
+  // Adjust field names to your CSV headers if different:
+  // expected: created_at, total_money, payment_method (one per row)
+  const rows = records.filter(r=>{
+    const d = new Date(r.created_at);
+    return d >= SHIFT_START_LOCAL && d <= SHIFT_END_LOCAL;
+  });
+  const total = rows.reduce((a,r)=>a+Number(r.total_money||0),0);
+  const byPay = rows.reduce((m,r)=>{
+    const k = String(r.payment_method||'OTHER').toUpperCase();
+    m[k]=(m[k]||0)+Number(r.total_money||0);
+    return m;
+  },{});
+  const count = rows.length;
+  return { total, byPay, count };
+}
+
+(async()=>{
+  const restaurant = await prisma.restaurant.findFirst({ where:{ slug: RESTAURANT_SLUG } });
+  if(!restaurant){ console.error('Restaurant not found'); process.exit(1); }
+
+  const db = await dbTotals(restaurant.id);
+  const csv = csvTotals(CSV_PATH);
+
+  const diffTotal = (db.total - csv.total);
+  console.log('DB vs CSV for shift:', { db, csv, diffTotal });
+
+  // Optional: list missing receipt IDs if CSV has ids column
+  // const csvIds = new Set(records.map(r=>r.id));
+  // const missing = dbRows.filter(r=>!csvIds.has(r.externalId)).map(r=>r.externalId);
+
+  await prisma.$disconnect();
+  process.exit(0);
+})();
