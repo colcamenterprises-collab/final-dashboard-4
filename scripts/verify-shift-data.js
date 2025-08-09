@@ -12,8 +12,8 @@ const prisma = new PrismaClient();
 // Configuration
 const RESTAURANT_SLUG = 'smash-brothers-burgers';
 const CSV_PATH = process.argv[2] || './data/receipts_export.csv'; // pass path as arg
-const SHIFT_START_LOCAL = new Date('2025-08-08T18:00:00+07:00');
-const SHIFT_END_LOCAL   = new Date('2025-08-09T03:00:00+07:00');
+const SHIFT_START_LOCAL = new Date('2025-08-08T17:00:00+07:00'); // 5 PM Bangkok
+const SHIFT_END_LOCAL   = new Date('2025-08-09T03:00:00+07:00'); // 3 AM Bangkok
 
 function toUTC(d) { 
   return new Date(new Date(d).toISOString()); 
@@ -62,16 +62,42 @@ function csvTotals(csvPath) {
   console.log(`📊 CSV contains ${records.length} total records`);
   console.log(`📊 CSV columns: ${Object.keys(records[0] || {}).join(', ')}`);
   
-  // Filter for shift window
+  // Filter for shift window - handle MM/DD/YY format from Loyverse
   const rows = records.filter(r => {
-    const d = new Date(r.created_at || r.date || r.timestamp);
-    return d >= SHIFT_START_LOCAL && d <= SHIFT_END_LOCAL;
+    try {
+      let dateStr = r.Date || r.created_at || r.date || r.timestamp;
+      if (!dateStr) return false;
+      
+      // Convert "8/9/25 1:35 AM" format to proper date
+      if (dateStr.includes('/')) {
+        const [datePart, timePart, ampm] = dateStr.split(' ');
+        const [month, day, year] = datePart.split('/');
+        const fullYear = year.length === 2 ? `20${year}` : year;
+        dateStr = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart} ${ampm}`;
+      }
+      
+      const d = new Date(dateStr);
+      const isValid = !isNaN(d.getTime());
+      const inWindow = d >= SHIFT_START_LOCAL && d <= SHIFT_END_LOCAL;
+      
+      return isValid && inWindow;
+    } catch (error) {
+      console.log('Date parsing error for:', r.Date, error.message);
+      return false;
+    }
   });
   
-  const total = rows.reduce((a, r) => a + Number(r.total_money || r.total || r.amount || 0), 0);
+  const total = rows.reduce((a, r) => {
+    // Handle "฿1,226.00" format from Loyverse CSV
+    let amount = r['Total collected'] || r.total_money || r.total || r.amount || '0';
+    amount = String(amount).replace(/[฿,]/g, ''); // Remove currency symbols and commas
+    return a + (Number(amount) * 100); // Convert to cents for consistency with database
+  }, 0);
   const byPay = rows.reduce((m, r) => {
-    const k = String(r.payment_method || r.method || 'OTHER').toUpperCase();
-    m[k] = (m[k] || 0) + Number(r.total_money || r.total || r.amount || 0);
+    const k = String(r['Payment type'] || r.payment_method || r.method || 'OTHER').toUpperCase();
+    let amount = r['Total collected'] || r.total_money || r.total || r.amount || '0';
+    amount = String(amount).replace(/[฿,]/g, '');
+    m[k] = (m[k] || 0) + (Number(amount) * 100);
     return m;
   }, {});
   const count = rows.length;
