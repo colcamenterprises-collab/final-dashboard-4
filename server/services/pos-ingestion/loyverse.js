@@ -6,10 +6,10 @@ import axios from 'axios';
 
 const BASE = process.env.LOYVERSE_BASE_URL || 'https://api.loyverse.com/v1.0';
 const TOKEN = process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_ACCESS_TOKEN;
-const STORE_ID = process.env.LOYVERSE_STORE_ID;
+const STORE_ID = process.env.LOYVERSE_STORE_ID || process.env.LOYVERSE_STORE_ID; // supports both secrets
 
 // Bulletproof token resolution - no more mock surprises
-if (!TOKEN) throw new Error('Missing Loyverse access token (LOYVERSE_API_TOKEN or LOYVERSE_ACCESS_TOKEN)');
+if (!TOKEN) throw new Error('Missing Loyverse access token');
 
 // Helper: HTTP client with auth
 function client() {

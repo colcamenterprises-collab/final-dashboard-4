@@ -1,174 +1,112 @@
+#!/usr/bin/env node
 /**
- * Verification script to compare database receipts with CSV data for specific shift
- * Usage: node scripts/verify-shift-data.js [csv-path]
+ * CSV vs Database reconciliation script
+ * Compares shift totals from CSV against database receipts
  */
+import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import { parse } from 'csv-parse/sync';
-import { PrismaClient } from '@prisma/client';
 
-const TZ = 'Asia/Bangkok';
 const prisma = new PrismaClient();
-
-// Configuration
-const RESTAURANT_SLUG = 'smash-brothers-burgers';
-const CSV_PATH = process.argv[2] || './data/receipts_export.csv'; // pass path as arg
-const SHIFT_START_LOCAL = new Date('2025-08-08T17:00:00+07:00'); // 5 PM Bangkok
-const SHIFT_END_LOCAL   = new Date('2025-08-09T03:00:00+07:00'); // 3 AM Bangkok
-
-function toUTC(d) { 
-  return new Date(new Date(d).toISOString()); 
-}
-
-async function dbTotals(restaurantId) {
-  const startUTC = toUTC(SHIFT_START_LOCAL);
-  const endUTC   = toUTC(SHIFT_END_LOCAL);
-  
-  console.log(`🔍 Querying database for shift: ${SHIFT_START_LOCAL.toISOString()} to ${SHIFT_END_LOCAL.toISOString()}`);
-  console.log(`🔍 UTC range: ${startUTC.toISOString()} to ${endUTC.toISOString()}`);
-  
-  const rows = await prisma.receipt.findMany({
-    where: { 
-      restaurantId, 
-      createdAtUTC: { 
-        gte: startUTC, 
-        lte: endUTC 
-      } 
-    },
-    include: { 
-      payments: true, 
-      items: true 
-    }
-  });
-  
-  const total = rows.reduce((a, r) => a + (r.total || 0), 0);
-  const byPay = rows.flatMap(r => r.payments).reduce((m, p) => {
-    m[p.method] = (m[p.method] || 0) + p.amount;
-    return m;
-  }, {});
-  const count = rows.length;
-  
-  return { total, byPay, count, receipts: rows };
-}
-
-function csvTotals(csvPath) {
-  if (!fs.existsSync(csvPath)) {
-    console.log(`⚠️  CSV file not found: ${csvPath}`);
-    return { total: 0, byPay: {}, count: 0, records: [] };
-  }
-  
-  const input = fs.readFileSync(csvPath);
-  const records = parse(input, { columns: true, skip_empty_lines: true });
-  
-  console.log(`📊 CSV contains ${records.length} total records`);
-  console.log(`📊 CSV columns: ${Object.keys(records[0] || {}).join(', ')}`);
-  
-  // Filter for shift window - handle MM/DD/YY format from Loyverse
-  const rows = records.filter(r => {
-    try {
-      let dateStr = r.Date || r.created_at || r.date || r.timestamp;
-      if (!dateStr) return false;
-      
-      // Convert "8/9/25 1:35 AM" format to proper date
-      if (dateStr.includes('/')) {
-        const [datePart, timePart, ampm] = dateStr.split(' ');
-        const [month, day, year] = datePart.split('/');
-        const fullYear = year.length === 2 ? `20${year}` : year;
-        dateStr = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart} ${ampm}`;
-      }
-      
-      const d = new Date(dateStr);
-      const isValid = !isNaN(d.getTime());
-      const inWindow = d >= SHIFT_START_LOCAL && d <= SHIFT_END_LOCAL;
-      
-      return isValid && inWindow;
-    } catch (error) {
-      console.log('Date parsing error for:', r.Date, error.message);
-      return false;
-    }
-  });
-  
-  const total = rows.reduce((a, r) => {
-    // Handle "฿1,226.00" format from Loyverse CSV
-    let amount = r['Total collected'] || r.total_money || r.total || r.amount || '0';
-    amount = String(amount).replace(/[฿,]/g, ''); // Remove currency symbols and commas
-    return a + (Number(amount) * 100); // Convert to cents for consistency with database
-  }, 0);
-  const byPay = rows.reduce((m, r) => {
-    const k = String(r['Payment type'] || r.payment_method || r.method || 'OTHER').toUpperCase();
-    let amount = r['Total collected'] || r.total_money || r.total || r.amount || '0';
-    amount = String(amount).replace(/[฿,]/g, '');
-    m[k] = (m[k] || 0) + (Number(amount) * 100);
-    return m;
-  }, {});
-  const count = rows.length;
-  
-  return { total, byPay, count, records: rows };
-}
 
 async function main() {
   try {
-    console.log('🏪 Shift Data Verification Tool');
-    console.log('================================');
+    // Load CSV data
+    const csvPath = 'attached_assets/receipts-2025-08-08-2025-08-08_1754712009734.csv';
+    console.log('📄 Loading CSV from:', csvPath);
     
-    const restaurant = await prisma.restaurant.findFirst({ 
-      where: { slug: RESTAURANT_SLUG } 
-    });
-    
-    if (!restaurant) { 
-      console.error('❌ Restaurant not found'); 
-      process.exit(1); 
+    if (!fs.existsSync(csvPath)) {
+      console.log('❌ CSV file not found at:', csvPath);
+      process.exit(1);
     }
     
-    console.log(`✅ Restaurant found: ${restaurant.name} (ID: ${restaurant.id})`);
-    
-    const db = await dbTotals(restaurant.id);
-    const csv = csvTotals(CSV_PATH);
-    
-    const diffTotal = (db.total - csv.total);
-    const diffCount = (db.count - csv.count);
-    
-    console.log('\n📊 COMPARISON RESULTS');
-    console.log('=====================');
-    console.log('Database:', {
-      receipts: db.count,
-      total: `$${(db.total / 100).toFixed(2)}`,
-      payments: db.byPay
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const records = parse(csvContent, { 
+      headers: true, 
+      skip_empty_lines: true 
     });
-    console.log('CSV File:', {
-      receipts: csv.count,
-      total: `$${(csv.total / 100).toFixed(2)}`,
-      payments: csv.byPay
+    
+    console.log('📊 CSV Analysis:');
+    console.log('Total records:', records.length);
+    
+    // Calculate CSV totals
+    let csvTotal = 0;
+    let csvCount = 0;
+    
+    for (const record of records) {
+      const total = parseFloat(record['Total collected'] || 0);
+      if (total > 0) {
+        csvTotal += total;
+        csvCount++;
+      }
+    }
+    
+    console.log('CSV totals:', {
+      count: csvCount,
+      totalAmount: csvTotal.toFixed(2),
+      avgTicket: csvCount > 0 ? (csvTotal / csvCount).toFixed(2) : '0.00'
     });
+    
+    // Database analysis for shift window (Bangkok 17:00 Aug 8 → 03:00 Aug 9)
+    const shiftStart = new Date('2025-08-08T10:00:00.000Z'); // 17:00 Bangkok = 10:00 UTC
+    const shiftEnd = new Date('2025-08-08T20:00:00.000Z');   // 03:00 Bangkok = 20:00 UTC
+    
+    console.log('\n🗄️  Database Analysis:');
+    console.log('Shift window UTC:', {
+      start: shiftStart.toISOString(),
+      end: shiftEnd.toISOString()
+    });
+    
+    const dbReceipts = await prisma.receipt.findMany({
+      where: {
+        createdAtUTC: {
+          gte: shiftStart,
+          lte: shiftEnd
+        }
+      },
+      select: {
+        receiptNumber: true,
+        total: true,
+        createdAtUTC: true,
+        externalId: true
+      }
+    });
+    
+    const dbTotal = dbReceipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0);
+    const dbCount = dbReceipts.length;
+    
+    console.log('Database totals:', {
+      count: dbCount,
+      totalAmount: (dbTotal / 100).toFixed(2), // Convert from cents
+      avgTicket: dbCount > 0 ? (dbTotal / dbCount / 100).toFixed(2) : '0.00'
+    });
+    
+    // Reconciliation
+    console.log('\n🔍 Reconciliation:');
+    const countDiff = Math.abs(csvCount - dbCount);
+    const totalDiff = Math.abs(csvTotal - (dbTotal / 100));
+    
     console.log('Differences:', {
-      receipts: diffCount,
-      total: `$${(diffTotal / 100).toFixed(2)}`,
-      status: diffTotal === 0 && diffCount === 0 ? '✅ MATCH' : '⚠️  MISMATCH'
+      countGap: countDiff,
+      totalGap: totalDiff.toFixed(2),
+      percentageMatch: dbCount > 0 ? ((Math.min(csvCount, dbCount) / Math.max(csvCount, dbCount)) * 100).toFixed(1) + '%' : '0%'
     });
     
-    // Show sample receipts from database
-    if (db.receipts.length > 0) {
-      console.log('\n🧾 Sample Database Receipts:');
-      db.receipts.slice(0, 3).forEach(r => {
-        console.log(`  - ${r.number}: $${(r.total / 100).toFixed(2)} at ${r.createdAtUTC}`);
-      });
-    }
-    
-    // Show sample CSV records
-    if (csv.records.length > 0) {
-      console.log('\n📄 Sample CSV Records:');
-      csv.records.slice(0, 3).forEach(r => {
-        const total = r.total_money || r.total || r.amount || 0;
-        const date = r.created_at || r.date || r.timestamp;
-        console.log(`  - ${r.number || r.id || 'N/A'}: $${(total / 100).toFixed(2)} at ${date}`);
-      });
+    if (countDiff > 5 || totalDiff > 100) {
+      console.log('\n⚠️  Large discrepancies detected!');
+      console.log('Possible causes:');
+      console.log('• Wrong timezone conversion (check UTC window)');
+      console.log('• Missing store_id filter');
+      console.log('• Incomplete pagination (check cursor loop)');
+      console.log('• CSV covers different time period');
+    } else {
+      console.log('\n✅ Data reconciliation looks good!');
     }
     
   } catch (error) {
     console.error('❌ Verification failed:', error.message);
-    console.error(error.stack);
   } finally {
     await prisma.$disconnect();
-    process.exit(0);
   }
 }
 

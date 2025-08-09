@@ -146,10 +146,14 @@ export async function syncReceiptsWindow(startLocal, endLocal, mode = 'increment
           
           receiptsFetched++;
           if (isNew) {
-            itemsUpserted += receipt.items.length;
-            paymentsUpserted += receipt.payments.length;
+            itemsUpserted += normalized.items.length;
+            paymentsUpserted += normalized.payments.length;
           }
+          
+          console.log(`✅ Upserted receipt ${loyverseReceipt.number || loyverseReceipt.id}`, { isNew });
         } catch (error) {
+          console.error(`❌ Failed to upsert receipt ${loyverseReceipt.id}:`, error.message);
+          
           // Log individual receipt errors
           await prisma.ingestionError.create({
             data: {

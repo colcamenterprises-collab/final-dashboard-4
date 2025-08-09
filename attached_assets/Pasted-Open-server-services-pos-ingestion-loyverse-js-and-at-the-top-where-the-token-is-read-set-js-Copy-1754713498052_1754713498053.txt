@@ -1,0 +1,54 @@
+Open server/services/pos-ingestion/loyverse.js and at the top where the token is read, set:
+
+js
+Copy
+Edit
+// inside loyverse.js
+const TOKEN =
+  process.env.LOYVERSE_API_TOKEN ||
+  process.env.LOYVERSE_ACCESS_TOKEN;   // supports both secrets
+
+if (!TOKEN) throw new Error('Missing Loyverse access token');
+
+const STORE_ID = process.env.LOYVERSE_STORE_ID || process.env.LOYVERSE_STORE_ID; // whichever you used
+When building the request params, add:
+
+js
+Copy
+Edit
+const params = { created_at_min: startISO, created_at_max: endISO, limit: 250 };
+if (STORE_ID) params.store_id = STORE_ID;
+Make sure your pagination loop uses next_page_token (or the exact field your response returns) and keeps looping until null.
+
+2) Restart the app so envs load
+In Replit: Stop → Run (or restart the process).
+
+3) Quick live smoke test (verifies real API)
+Paste this whole line in the shell (it’s bash safe):
+
+bash
+Copy
+Edit
+node -e "import('axios').then(async({default:axios})=>{const base=process.env.LOYVERSE_BASE_URL||'https://api.loyverse.com/v1.0';const token=process.env.LOYVERSE_API_TOKEN||process.env.LOYVERSE_ACCESS_TOKEN;if(!token){console.error('Missing token');process.exit(1)}const end=new Date().toISOString();const start=new Date(Date.now()-90*24*3600*1000).toISOString();try{const r=await axios.get(base+'/receipts',{headers:{Authorization:'Bearer '+token},params:{created_at_min:start,created_at_max:end,limit:250,store_id:process.env.LOYVERSE_STORE_ID}});console.log('HTTP',r.status,'count',Array.isArray(r.data?.receipts)?r.data.receipts.length:0,'next',r.data?.next_page_token||null);}catch(e){console.error('ERR',e.response?.status,e.response?.data||e.message)}})"
+Expect HTTP 200 count > 0, maybe a next token.
+
+4) Seed a bigger window (one-time) and check counts
+bash
+Copy
+Edit
+WINDOW_MINUTES=1440 node server/services/pos-ingestion/runIncremental.js
+node -e "import('@prisma/client').then(async({PrismaClient})=>{const p=new PrismaClient();const [r,ri,rp]=await Promise.all([p.receipt.count(),p.receiptItem.count(),p.receiptPayment.count()]);console.log({receipts:r,items:ri,payments:rp});process.exit(0);});"
+If receipts still barely moves, your UTC window or store_id is off. In the worker, log the exact window:
+
+js
+Copy
+Edit
+console.log('Window UTC:', { start: startUTC, end: endUTC });
+…and after page 1:
+
+js
+Copy
+Edit
+if (receipts[0]) console.log('Sample created_at:', receipts[0].created_at);
+5) Reconcile vs your CSV (prove parity)
+If the agent already added scripts/verify-shift-data.js, run it. If not, tell me the CSV path and I’ll give you a paste-in script. The goal is to compare 6pm Aug 8 → 3am Aug 9 (BKK) totals and counts. If DB totals are much lower, it’s 99%: wrong store_id, window, or pagination.
