@@ -1634,7 +1634,21 @@ export function registerRoutes(app: express.Application): Server {
         take: limit
       });
       
-      res.json(snapshots);
+      // Convert BigInt to string for JSON serialization
+      const serializedSnapshots = snapshots.map(snapshot => ({
+        ...snapshot,
+        totalSalesSatang: snapshot.totalSalesSatang.toString(),
+        payments: snapshot.payments?.map(p => ({
+          ...p,
+          totalSatang: p.totalSatang.toString()
+        })),
+        items: snapshot.items?.map(i => ({
+          ...i,
+          revenueSatang: i.revenueSatang.toString()
+        }))
+      }));
+      
+      res.json(serializedSnapshots);
     } catch (error) {
       console.error('Snapshots fetch error:', error);
       res.status(500).json({ error: 'Failed to fetch snapshots' });
@@ -1757,6 +1771,144 @@ export function registerRoutes(app: express.Application): Server {
     } catch (error) {
       console.error('Snapshot creation error:', error);
       res.status(500).json({ error: 'Failed to create snapshot', details: (error as Error).message });
+    }
+  });
+
+  // Get purchases-aware comparison for specific snapshot
+  app.get('/api/snapshots/:id/comparison', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const snapshotId = req.params.id;
+      
+      const comparison = await prisma.jussiComparison.findFirst({
+        where: { snapshotId },
+        select: {
+          openingBuns: true,
+          openingMeatGram: true,
+          openingDrinks: true,
+          purchasedBuns: true,
+          purchasedMeatGram: true,
+          purchasedDrinks: true,
+          expectedBuns: true,
+          expectedMeatGram: true,
+          expectedDrinks: true,
+          expectedCloseBuns: true,
+          expectedCloseMeatGram: true,
+          expectedCloseDrinks: true,
+          staffBuns: true,
+          staffMeatGram: true,
+          staffDrinks: true,
+          varBuns: true,
+          varMeatGram: true,
+          varDrinks: true,
+          state: true
+        }
+      });
+      
+      if (!comparison) {
+        return res.status(404).json({ error: 'No comparison data available for this snapshot' });
+      }
+      
+      res.json({
+        opening: { 
+          buns: comparison.openingBuns ?? 0, 
+          meatGram: comparison.openingMeatGram ?? 0, 
+          drinks: comparison.openingDrinks ?? 0 
+        },
+        purchases: { 
+          buns: comparison.purchasedBuns ?? 0, 
+          meatGram: comparison.purchasedMeatGram ?? 0, 
+          drinks: comparison.purchasedDrinks ?? 0 
+        },
+        usagePOS: { 
+          buns: comparison.expectedBuns ?? 0, 
+          meatGram: comparison.expectedMeatGram ?? 0, 
+          drinks: comparison.expectedDrinks ?? 0 
+        },
+        expectedClose: { 
+          buns: comparison.expectedCloseBuns ?? 0, 
+          meatGram: comparison.expectedCloseMeatGram ?? 0, 
+          drinks: comparison.expectedCloseDrinks ?? 0 
+        },
+        staffClose: { 
+          buns: comparison.staffBuns ?? 0, 
+          meatGram: comparison.staffMeatGram ?? 0, 
+          drinks: comparison.staffDrinks ?? 0 
+        },
+        variance: { 
+          buns: comparison.varBuns ?? 0, 
+          meatGram: comparison.varMeatGram ?? 0, 
+          drinks: comparison.varDrinks ?? 0 
+        },
+        state: comparison.state
+      });
+    } catch (error) {
+      console.error('Comparison fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch comparison' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Recompute purchases-aware variance for specific snapshot
+  app.post('/api/snapshots/:id/recompute', async (req: Request, res: Response) => {
+    try {
+      const snapshotId = req.params.id;
+      
+      // Find the snapshot date
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const snapshot = await prisma.shiftSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: { windowStartUTC: true }
+      });
+      
+      if (!snapshot) {
+        return res.status(404).json({ error: 'Snapshot not found' });
+      }
+      
+      // Format date for worker
+      const date = snapshot.windowStartUTC.toISOString().split('T')[0];
+      
+      // Execute the snapshot worker
+      const { spawn } = require('child_process');
+      const worker = spawn('node', ['workers/snapshotWorker.mjs', date], { cwd: process.cwd() });
+      
+      let output = '';
+      let error = '';
+      
+      worker.stdout.on('data', (data: Buffer) => {
+        output += data.toString();
+      });
+      
+      worker.stderr.on('data', (data: Buffer) => {
+        error += data.toString();
+      });
+      
+      worker.on('close', (code: number) => {
+        if (code === 0) {
+          res.json({ 
+            success: true, 
+            message: 'Purchases-aware comparison recomputed successfully',
+            output: output.trim()
+          });
+        } else {
+          res.status(500).json({ 
+            success: false, 
+            error: 'Recomputation failed',
+            details: error || output
+          });
+        }
+      });
+      
+      await prisma.$disconnect();
+      
+    } catch (error) {
+      console.error('Recompute error:', error);
+      res.status(500).json({ error: 'Failed to recompute comparison', details: (error as Error).message });
     }
   });
 

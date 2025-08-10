@@ -186,14 +186,14 @@ async function runForDate(dateStr, opts = {}) {
   const isMeat = (cat) => (cat||'').toLowerCase().includes('meat') || (cat||'').toLowerCase().includes('beef');
   const isDrink= (cat) => (cat||'').toLowerCase().includes('drink') || (cat||'').toLowerCase().includes('beverage');
 
-  // 1) Opening stock (previous shift's closing stock)
+  // === Opening (prev staff form before window) ===
   const prevSales = await prisma.dailySales.findFirst({
     where: { createdAt: { lt: startUTC } },
     orderBy: { createdAt: 'desc' },
     select: { id: true }
   });
   
-  let openingBuns = null, openingMeat = null, openingDrnk = null;
+  let openingBuns = null, openingMeatG = null, openingDrinks = null;
   if (prevSales) {
     const prevStock = await prisma.dailyStock.findFirst({
       where: { salesFormId: prevSales.id },
@@ -206,41 +206,64 @@ async function runForDate(dateStr, opts = {}) {
     
     if (prevStock) {
       openingBuns = prevStock.burgerBuns ?? null;
-      openingMeat = prevStock.meatGrams ?? null;
+      openingMeatG = prevStock.meatGrams ?? null;
       // Calculate drinks count from drinkStock JSON
-      openingDrnk = prevStock.drinkStock ? 
-        Object.values(prevStock.drinkStock).reduce((sum, count) => sum + (Number(count) || 0), 0) : null;
+      if (prevStock.drinkStock) {
+        openingDrinks = Object.values(prevStock.drinkStock).reduce((sum, count) => sum + (Number(count) || 0), 0);
+      }
     }
   }
 
-  // 2) Purchases in window (placeholder for expense system)
-  // TODO: Implement when Expense/ExpenseLine tables are available
-  let purchasedBuns = 0, purchasedMeat = 0, purchasedDrnk = 0;
+  // === Purchases in window (Expense -> ExpenseLine, only PURCHASE) ===
+  const purLines = await prisma.expenseLine.findMany({
+    where: {
+      type: 'PURCHASE',
+      createdAt: { gte: startUTC, lte: endUTC }
+    },
+    select: { 
+      qty: true, 
+      uom: true, 
+      ingredientId: true,
+      name: true
+    }
+  });
 
-  // 3) Usage from POS (already computed): expectedBuns, expectedMeatGram, drinksSold
+  let purchasedBuns = 0, purchasedMeatG = 0, purchasedDrinks = 0;
+  for (const l of purLines) {
+    const name = (l.name || '').toLowerCase();
+    const q = Number(l.qty || 0);
+    
+    // Simple categorization based on item name
+    if (name.includes('bun') || name.includes('roll')) purchasedBuns += q;
+    if (name.includes('meat') || name.includes('beef')) purchasedMeatG += q;
+    if (name.includes('drink') || name.includes('beverage')) purchasedDrinks += q;
+  }
 
-  // 4) Expected closing = opening + purchases - usage
+  // === Usage from POS === (already computed): expectedBuns, expectedMeatGram, drinksSold
+
+  // === Expected closing ===
   const expectedCloseBuns = (openingBuns ?? 0) + purchasedBuns - (expectedBuns ?? 0);
-  const expectedCloseMeat = (openingMeat ?? 0) + purchasedMeat - (expectedMeatGram ?? 0);
-  const expectedCloseDrnk = (openingDrnk ?? 0) + purchasedDrnk - (drinksSold ?? 0);
+  const expectedCloseMeatG = (openingMeatG ?? 0) + purchasedMeatG - (expectedMeatGram ?? 0);
+  const expectedCloseDrinks = (openingDrinks ?? 0) + purchasedDrinks - (drinksSold ?? 0);
 
-  // 5) Variance = staff closing - expected closing
-  const varBuns = staffBuns != null ? staffBuns - expectedCloseBuns : null;
-  const varMeat = staffMeatGram != null ? staffMeatGram - expectedCloseMeat : null;
-  const varDrinks = staffDrinks != null ? staffDrinks - expectedCloseDrnk : null;
+  // Staff closing (already fetched earlier as staffBuns/staffMeatGram/staffDrinks)
+  const varBuns2 = staffBuns != null ? staffBuns - expectedCloseBuns : null;
+  const varMeat2 = staffMeatGram != null ? staffMeatGram - expectedCloseMeatG : null;
+  const varDrink2 = staffDrinks != null ? staffDrinks - expectedCloseDrinks : null;
 
   let state = 'OK';
+  if (varBuns2 != null && Math.abs(varBuns2) > 5) state = 'MISMATCH';
+  if (varMeat2 != null && Math.abs(varMeat2) > 500) state = 'MISMATCH';
+
   const notes = [];
-  if (varBuns != null && Math.abs(varBuns) > 5) state = 'MISMATCH';
-  if (varMeat != null && Math.abs(varMeat) > 500) state = 'MISMATCH';
   if (staffBuns == null || staffMeatGram == null) {
     state = 'MISSING_DATA';
     notes.push('Missing staff stock counts.');
   }
   
   // Add purchase information to notes
-  if (purchasedBuns > 0 || purchasedMeat > 0 || purchasedDrnk > 0) {
-    notes.push(`Purchases: ${purchasedBuns} buns, ${purchasedMeat}g meat, ${purchasedDrnk} drinks.`);
+  if (purchasedBuns > 0 || purchasedMeatG > 0 || purchasedDrinks > 0) {
+    notes.push(`Purchases: ${purchasedBuns} buns, ${purchasedMeatG}g meat, ${purchasedDrinks} drinks.`);
   }
 
   await prisma.jussiComparison.create({
@@ -250,13 +273,13 @@ async function runForDate(dateStr, opts = {}) {
       
       // Opening stock
       openingBuns,
-      openingMeatGram: openingMeat,
-      openingDrinks: openingDrnk,
+      openingMeatGram: openingMeatG,
+      openingDrinks,
       
       // Purchases
       purchasedBuns,
-      purchasedMeatGram: purchasedMeat,
-      purchasedDrinks: purchasedDrnk,
+      purchasedMeatGram: purchasedMeatG,
+      purchasedDrinks,
       
       // Usage (POS expected)
       expectedBuns,
@@ -265,8 +288,8 @@ async function runForDate(dateStr, opts = {}) {
       
       // Expected closing
       expectedCloseBuns,
-      expectedCloseMeatGram: expectedCloseMeat,
-      expectedCloseDrinks: expectedCloseDrnk,
+      expectedCloseMeatGram: expectedCloseMeatG,
+      expectedCloseDrinks,
       
       // Staff actual
       staffBuns,
@@ -274,12 +297,12 @@ async function runForDate(dateStr, opts = {}) {
       staffDrinks,
       
       // Final variance
-      varBuns,
-      varMeatGram: varMeat,
-      varDrinks,
+      varBuns: Math.round(varBuns2 ?? 0),
+      varMeatGram: Math.round(varMeat2 ?? 0),
+      varDrinks: Math.round(varDrink2 ?? 0),
       
       state,
-      notes: notes.length ? notes.join(' ') : null
+      notes: 'Purchases-aware variance calculation.'
     }
   });
 
@@ -297,12 +320,12 @@ async function runForDate(dateStr, opts = {}) {
   console.log(`Sales THB: ${toTHB(totalSalesSatang)}`);
   console.log(`Payments THB -> CASH: ${toTHB(cash?.totalSatang ?? 0)} | QR: ${toTHB(qr?.totalSatang ?? 0)} | GRAB: ${toTHB(grab?.totalSatang ?? 0)}`);
   console.log(`\nPHASE 2+ ENHANCED STOCK TRACKING:`);
-  console.log(`Opening -> Buns: ${openingBuns}, Meat(g): ${openingMeat}, Drinks: ${openingDrnk}`);
-  console.log(`Purchases -> Buns: ${purchasedBuns}, Meat(g): ${purchasedMeat}, Drinks: ${purchasedDrnk}`);
+  console.log(`Opening -> Buns: ${openingBuns}, Meat(g): ${openingMeatG}, Drinks: ${openingDrinks}`);
+  console.log(`Purchases -> Buns: ${purchasedBuns}, Meat(g): ${purchasedMeatG}, Drinks: ${purchasedDrinks}`);
   console.log(`Usage -> Buns: ${expectedBuns}, Meat(g): ${expectedMeatGram}, Drinks: ${drinksSold}`);
-  console.log(`Expected Close -> Buns: ${expectedCloseBuns}, Meat(g): ${expectedCloseMeat}, Drinks: ${expectedCloseDrnk}`);
+  console.log(`Expected Close -> Buns: ${expectedCloseBuns}, Meat(g): ${expectedCloseMeatG}, Drinks: ${expectedCloseDrinks}`);
   console.log(`Staff Close -> Buns: ${staffBuns}, Meat(g): ${staffMeatGram}, Drinks: ${staffDrinks}`);
-  console.log(`Variance -> Buns: ${varBuns}, Meat(g): ${varMeat}, Drinks: ${varDrinks}`);
+  console.log(`Variance -> Buns: ${Math.round(varBuns2 ?? 0)}, Meat(g): ${Math.round(varMeat2 ?? 0)}, Drinks: ${Math.round(varDrink2 ?? 0)}`);
   console.log(`State: ${state}`);
 }
 

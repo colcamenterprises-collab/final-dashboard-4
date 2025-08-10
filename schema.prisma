@@ -75,6 +75,12 @@ enum POSProvider {
   OTHER
 }
 
+enum ExpenseType { 
+  GENERAL 
+  PURCHASE 
+  WAGE 
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -244,6 +250,21 @@ model Expense {
 
   @@index([restaurantId, shiftDate])
   @@map("expenses")
+}
+
+model ExpenseLine {
+  id           String      @id @default(uuid())
+  expenseId    String
+  ingredientId String?
+  name         String
+  qty          Float?
+  uom          String?
+  unitPriceTHB Decimal?    @db.Decimal(12,4)
+  lineTotalTHB Decimal?    @db.Decimal(12,2)
+  type         ExpenseType @default(GENERAL)
+  createdAt    DateTime    @default(now())
+  
+  @@index([ingredientId])
 }
 
 model AnalyticsDaily {
@@ -485,3 +506,4 @@ model JussiComparison {
   @@index([snapshotId])
   @@index([salesFormId])
 }
+

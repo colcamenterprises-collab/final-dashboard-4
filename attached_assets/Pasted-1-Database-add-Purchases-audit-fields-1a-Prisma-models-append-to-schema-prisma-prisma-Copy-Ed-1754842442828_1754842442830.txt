@@ -1,0 +1,233 @@
+1) Database: add Purchases + audit fields
+1a) Prisma models (append to schema.prisma)
+prisma
+Copy
+Edit
+enum ExpenseType { GENERAL PURCHASE WAGE }
+
+model Expense {
+  id           String   @id @default(uuid())
+  salesFormId  String?
+  expenseDate  DateTime @default(now())
+  type         ExpenseType @default(GENERAL)
+  supplier     String?
+  notes        String?
+  totalTHB     Decimal  @db.Decimal(12,2)
+  lines        ExpenseLine[]
+  createdAt    DateTime @default(now())
+}
+
+model ExpenseLine {
+  id           String   @id @default(uuid())
+  expenseId    String
+  ingredientId String?
+  name         String
+  qty          Float?
+  uom          String?
+  unitPriceTHB Decimal? @db.Decimal(12,4)
+  lineTotalTHB Decimal? @db.Decimal(12,2)
+  Expense      Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  @@index([ingredientId])
+}
+1b) Jussi audit fields (persist the full math)
+prisma
+Copy
+Edit
+model JussiComparison {
+  // …existing fields…
+  // Purchases-aware audit trail (nullable)
+  openingBuns       Int?
+  purchasedBuns     Int?
+  expectedCloseBuns Int?
+
+  openingMeatGram       Int?
+  purchasedMeatGram     Int?
+  expectedCloseMeatGram Int?
+
+  openingDrinks       Int?
+  purchasedDrinks     Int?
+  expectedCloseDrinks Int?
+}
+Then: npx prisma migrate dev --name add_purchases_and_audit → npx prisma generate.
+
+(If you prefer raw SQL instead of Prisma, say the word—I'll drop it in one block.)
+
+2) Worker upgrades (drop-in)
+2a) Update workers/snapshotWorker.mjs
+Add the purchases/opening/expected logic and write the audit fields. Replace the “Variance” section with this block:
+
+js
+Copy
+Edit
+// === Opening (prev staff form before window) ===
+const prev = await prisma.dailySales.findFirst({
+  where: { createdAt: { lt: startUTC } },
+  orderBy: { createdAt: 'desc' },
+  select: { DailyStock: { select: { burgerBuns: true, meatWeight: true, drinksCount: true } } }
+});
+const openingBuns   = prev?.DailyStock?.burgerBuns ?? null;
+const openingMeatG  = prev?.DailyStock?.meatWeight ?? null;
+const openingDrinks = prev?.DailyStock?.drinksCount ?? null;
+
+// === Purchases in window (Expense -> ExpenseLine, only PURCHASE) ===
+const purLines = await prisma.expenseLine.findMany({
+  where: {
+    Expense: { type: 'PURCHASE', expenseDate: { gte: startUTC, lte: endUTC } },
+    ingredientId: { not: null }
+  },
+  select: { qty: true, uom: true, Ingredient: { select: { category: true, uom: true } } }
+});
+const isBun   = c => (c||'').toLowerCase().includes('bun') || (c||'').toLowerCase().includes('roll');
+const isMeat  = c => (c||'').toLowerCase().includes('meat') || (c||'').toLowerCase().includes('beef');
+const isDrink = c => (c||'').toLowerCase().includes('drink') || (c||'').toLowerCase().includes('beverage');
+
+let purchasedBuns = 0, purchasedMeatG = 0, purchasedDrinks = 0;
+for (const l of purLines) {
+  const cat = l.Ingredient?.category || '';
+  const q = Number(l.qty || 0);
+  if (isBun(cat))   purchasedBuns   += q; // assume units
+  if (isMeat(cat))  purchasedMeatG  += q; // assume grams
+  if (isDrink(cat)) purchasedDrinks += q; // assume units
+}
+
+// === Usage from POS === (already computed): expectedBuns, expectedMeatGram, expectedDrinks
+
+// === Expected closing ===
+const expectedCloseBuns   = (openingBuns  ?? 0) + purchasedBuns   - (expectedBuns      ?? 0);
+const expectedCloseMeatG  = (openingMeatG ?? 0) + purchasedMeatG  - (expectedMeatGram  ?? 0);
+const expectedCloseDrinks = (openingDrinks?? 0) + purchasedDrinks - (expectedDrinks    ?? 0);
+
+// Staff closing (already fetched earlier as staffBuns/staffMeatGram/staffDrinks)
+const varBuns2  = staffBuns      != null ? staffBuns      - expectedCloseBuns   : null;
+const varMeat2  = staffMeatGram  != null ? staffMeatGram  - expectedCloseMeatG  : null;
+const varDrink2 = staffDrinks    != null ? staffDrinks    - expectedCloseDrinks : null;
+
+let state = 'OK';
+if (varBuns2 != null && Math.abs(varBuns2) > 5)   state = 'MISMATCH';
+if (varMeat2 != null && Math.abs(varMeat2) > 500) state = 'MISMATCH';
+
+// Update the comparison we created earlier:
+await prisma.jussiComparison.update({
+  where: { snapshotId: snapshot.id }, // if multiple, findFirst orderBy createdAt desc
+  data: {
+    varBuns: Math.round(varBuns2 ?? 0),
+    varMeatGram: Math.round(varMeat2 ?? 0),
+    varDrinks: Math.round(varDrink2 ?? 0),
+    openingBuns, purchasedBuns, expectedCloseBuns,
+    openingMeatGram: openingMeatG, purchasedMeatGram: purchasedMeatG, expectedCloseMeatGram: expectedCloseMeatG,
+    openingDrinks, purchasedDrinks, expectedCloseDrinks,
+    state,
+    notes: 'Purchases-aware variance calculation.'
+  }
+});
+await prisma.shiftSnapshot.update({ where: { id: snapshot.id }, data: { reconcileState: state } });
+2b) Parity audit (DB vs CSV totals)
+File: workers/parityAudit.mjs
+
+js
+Copy
+Edit
+import { PrismaClient } from '@prisma/client';
+import fs from 'node:fs';
+const prisma = new PrismaClient();
+
+// usage: node workers/parityAudit.mjs 2025-08-09 /path/to/sales-summary.csv /path/to/payment-type-sales.csv
+const [dateArg, salesSummaryCsv, paymentsCsv] = process.argv.slice(2);
+if (!dateArg || !salesSummaryCsv || !paymentsCsv) {
+  console.error('Usage: node workers/parityAudit.mjs YYYY-MM-DD sales-summary.csv payment-type-sales.csv');
+  process.exit(1);
+}
+const csv = p => fs.readFileSync(p,'utf8').trim().split('\n').map(r=>r.split(','));
+const toNum = s => Number((s||'').replace(/[^\d.-]/g,''));
+
+const salesRows = csv(salesSummaryCsv);
+const payRows   = csv(paymentsCsv);
+
+// payment total from CSV
+let csvTotal = 0;
+for (let i=1;i<payRows.length;i++) csvTotal += toNum(payRows[i][payRows[0].indexOf('Net amount')]);
+const startUTC = new Date(Date.UTC(...dateArg.split('-').map((n,i)=>i===1?Number(n)-1:Number(n)), 11,0,0));
+const endUTC   = new Date(Date.UTC(...dateArg.split('-').map((n,i)=>i===1?Number(n)-1:Number(n)), 20,0,0));
+
+const [dbAgg] = await prisma.$queryRaw`
+  SELECT COUNT(*)::int AS count, COALESCE(SUM("total"),0)::bigint AS total
+  FROM receipts
+  WHERE provider='LOYVERSE' AND "createdAtUTC" BETWEEN ${startUTC} AND ${endUTC};
+`;
+
+const dbReceipts = dbAgg?.count ?? 0;
+const dbTotalTHB = Number(dbAgg?.total ?? 0)/100;
+
+const diffTotal = +(dbTotalTHB - csvTotal).toFixed(2);
+
+console.log({
+  date: dateArg,
+  dbReceipts,
+  csvReceipts: salesRows[1]?.[salesRows[0].indexOf('Receipts')] || null,
+  dbTotalTHB,
+  csvTotalTHB: csvTotal,
+  diffTotal
+});
+
+if (diffTotal !== 0) {
+  await prisma.shiftSnapshot.updateMany({
+    where: { windowStartUTC: startUTC, windowEndUTC: endUTC },
+    data: { reconcileState: 'MISMATCH', reconcileNotes: 'DB vs CSV totals differ' }
+  });
+}
+await prisma.$disconnect();
+3) API endpoints (quick)
+POST /api/snapshots/:id/recompute → re-runs the purchases-aware section only.
+
+GET /api/snapshots/:id/comparison → returns:
+
+json
+Copy
+Edit
+{
+  "opening": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "purchases": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "usagePOS": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "expectedClose": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "staffClose": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "variance": { "buns": 0, "meatGram": 0, "drinks": 0 },
+  "state": "OK"
+}
+4) UI to-dos (quick wins)
+Expenses menu (restore):
+
+List, “+ Purchase” button.
+
+Expense form: vendor/date/notes + lines grid (ingredient, qty, uom, unit price).
+
+Lines with ingredientId + type=PURCHASE are counted in Jussi.
+
+Analytics → Sales vs Staff (purchases-aware):
+
+Show the six rows per bucket: Opening / +Purchases / −Usage / =Expected / Staff / Variance.
+
+Badge colors: OK (green), ± tolerance (amber), beyond tolerance (red).
+
+Form Library + Email:
+
+Itemize expenses in the form view and the email body.
+
+Attach merged PDF.
+
+5) Test steps (15 min)
+Add a test purchase (buns=24 units, meat=5000g, drinks=12) inside the Aug 9 window.
+
+Re-run snapshot:
+
+bash
+Copy
+Edit
+node workers/snapshotWorker.mjs 2025-08-09 9c303a5e-6b0f-4a12-b116-cfb6a0089ef7
+Hit GET /api/snapshots/:id/comparison → expect variances to move toward zero.
+
+Run parity audit with your CSVs to confirm alerting:
+
+bash
+Copy
+Edit
+node workers/parityAudit.mjs 2025-08-09 /mnt/data/sales-summary-2025-08-09-2025-08-09.csv /mnt/data/
