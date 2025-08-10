@@ -1,0 +1,134 @@
+Worker changes (Phase 2+)
+Update the snapshot/Jussi comparison to pull opening, purchases, and usage:
+
+Opening stock (previous completed staff form before the window):
+
+Find the latest DailySales with a linked DailyStock before windowStartUTC.
+
+Read burgerBuns, meatWeight, drinksCount.
+
+Purchases in window (from ExpenseLine):
+
+Sum qty for lines where type=PURCHASE, ingredientId is mapped, and expenseDate between windowStartUTC and windowEndUTC.
+
+Map ingredients to the 3 tracked buckets via Ingredient.category:
+
+“Buns/Rolls” → buns units
+
+“Meat” → grams
+
+“Drinks” → units
+
+Usage from POS:
+
+Already in the snapshot. Replace heuristics once recipes land; for now keep current calc.
+
+Closing (staff):
+
+Use the DailyStock tied to the current Sales Form (same shift).
+
+burgerBuns, meatWeight, drinksCount.
+
+Variance:
+
+Compute as above, store on JussiComparison (varBuns, varMeatGram, varDrinks) and include the components used:
+
+opening_*, purchased_*, usage_*, expected_closing_*, staff_closing_* (add columns if you want them persisted).
+
+Drop-in patch (core logic snippet to add into snapshotWorker.mjs)
+js
+Copy
+Edit
+// helpers to bucket ingredients
+const isBun  = (cat) => (cat||'').toLowerCase().includes('bun') || (cat||'').toLowerCase().includes('roll');
+const isMeat = (cat) => (cat||'').toLowerCase().includes('meat') || (cat||'').toLowerCase().includes('beef');
+const isDrink= (cat) => (cat||'').toLowerCase().includes('drink') || (cat||'').toLowerCase().includes('beverage');
+
+// 1) Opening stock (prev shift)
+const prev = await prisma.dailySales.findFirst({
+  where: { createdAt: { lt: startUTC } },
+  orderBy: { createdAt: 'desc' },
+  select: { DailyStock: { select: { burgerBuns: true, meatWeight: true, drinksCount: true } }, id: true }
+});
+const openingBuns = prev?.DailyStock?.burgerBuns ?? null;
+const openingMeat = prev?.DailyStock?.meatWeight ?? null;   // grams
+const openingDrnk = prev?.DailyStock?.drinksCount ?? null;
+
+// 2) Purchases in window (by ingredient category)
+const purLines = await prisma.expenseLine.findMany({
+  where: {
+    Expense: { type: 'PURCHASE', expenseDate: { gte: startUTC, lte: endUTC } },
+    ingredientId: { not: null }
+  },
+  select: { qty: true, uom: true, Ingredient: { select: { category: true, uom: true } } }
+});
+let purchasedBuns=0, purchasedMeat=0, purchasedDrnk=0;
+for (const l of purLines) {
+  const cat = l.Ingredient?.category || '';
+  const q = Number(l.qty||0);
+  if (isBun(cat))   purchasedBuns += q;           // assume buns in units
+  if (isMeat(cat))  purchasedMeat += q;           // assume grams
+  if (isDrink(cat)) purchasedDrnk += q;           // assume units
+}
+
+// 3) Usage from POS (already computed): expectedBuns, expectedMeatGram, expectedDrinks
+
+// 4) Staff closing from current form (we already fetched earlier)
+const staffBuns = staffBuns /* existing */;
+const staffMeat = staffMeatGram;
+const staffDrnk = staffDrinks;
+
+// 5) Expected closing
+const expectedCloseBuns = (openingBuns ?? 0) + purchasedBuns - (expectedBuns ?? 0);
+const expectedCloseMeat = (openingMeat ?? 0) + purchasedMeat - (expectedMeatGram ?? 0);
+const expectedCloseDrnk = (openingDrnk ?? 0) + purchasedDrnk - (expectedDrinks ?? 0);
+
+// 6) Variance vs staff
+const varBuns2 = staffBuns != null ? staffBuns - expectedCloseBuns : null;
+const varMeat2 = staffMeat != null ? staffMeat - expectedCloseMeat : null;
+const varDrnk2 = staffDrnk != null ? staffDrnk - expectedCloseDrnk : null;
+
+// save to JussiComparison (extend model if you want to persist the opening/purchase/expectedClose fields)
+await prisma.jussiComparison.update({
+  where: { id: comparisonId }, // use the id you created earlier
+  data: {
+    // overwrite prior heuristic-only variances
+    varBuns: Math.round(varBuns2 ?? 0),
+    varMeatGram: Math.round(varMeat2 ?? 0),
+    varDrinks: Math.round(varDrnk2 ?? 0),
+    notes: 'Variance includes purchases for the window.'
+  }
+});
+You can add optional fields to JussiComparison to store opening*, purchased*, expectedClose* if you want full audit trails in one table.
+
+UI fixes (quick wins)
+Restore “Expenses” menu (and add “+ Purchase” button).
+
+Expense form = vendor, lines grid (ingredient lookup, qty, uom, unit price).
+
+If an expense has no ingredient lines, it still saves (GENERAL), but purchases only count lines with an ingredientId.
+
+Analytics sections visible (toggle flags off).
+
+Show “Shift Snapshot”, “Sales vs Staff”, and “Ingredient Usage” tabs.
+
+In “Sales vs Staff”, display:
+
+Opening, Purchases, Usage, Expected Close, Staff Close, Variance — for buns/meat/drinks with red/yellow thresholds.
+
+Form Library & Email (previous note):
+
+Itemize expenses in the library view + email body.
+
+Attach merged PDF.
+
+Testing (fast)
+Add a test purchase of: buns 24 units, meat 5000 g, drinks 12 units within the Aug 9 window.
+
+Re-run snapshotWorker for 2025-08-09 → verify:
+
+Purchases are included in expected closing.
+
+Variances move toward zero.
+
+Toggle an ingredient to a different category and confirm it moves buckets (buns/meat/drinks) correctly.

@@ -179,9 +179,55 @@ async function runForDate(dateStr, opts = {}) {
     }
   }
 
-  const varBuns = staffBuns != null ? (expectedBuns - staffBuns) : null;
-  const varMeat = staffMeatGram != null ? (expectedMeatGram - staffMeatGram) : null;
-  const varDrinks = staffDrinks != null ? (drinksSold - staffDrinks) : null;
+  // === PHASE 2+ ENHANCED VARIANCE CALCULATION ===
+  
+  // Helper functions to categorize ingredients
+  const isBun  = (cat) => (cat||'').toLowerCase().includes('bun') || (cat||'').toLowerCase().includes('roll');
+  const isMeat = (cat) => (cat||'').toLowerCase().includes('meat') || (cat||'').toLowerCase().includes('beef');
+  const isDrink= (cat) => (cat||'').toLowerCase().includes('drink') || (cat||'').toLowerCase().includes('beverage');
+
+  // 1) Opening stock (previous shift's closing stock)
+  const prevSales = await prisma.dailySales.findFirst({
+    where: { createdAt: { lt: startUTC } },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true }
+  });
+  
+  let openingBuns = null, openingMeat = null, openingDrnk = null;
+  if (prevSales) {
+    const prevStock = await prisma.dailyStock.findFirst({
+      where: { salesFormId: prevSales.id },
+      select: { 
+        burgerBuns: true, 
+        meatGrams: true, 
+        drinkStock: true 
+      }
+    });
+    
+    if (prevStock) {
+      openingBuns = prevStock.burgerBuns ?? null;
+      openingMeat = prevStock.meatGrams ?? null;
+      // Calculate drinks count from drinkStock JSON
+      openingDrnk = prevStock.drinkStock ? 
+        Object.values(prevStock.drinkStock).reduce((sum, count) => sum + (Number(count) || 0), 0) : null;
+    }
+  }
+
+  // 2) Purchases in window (placeholder for expense system)
+  // TODO: Implement when Expense/ExpenseLine tables are available
+  let purchasedBuns = 0, purchasedMeat = 0, purchasedDrnk = 0;
+
+  // 3) Usage from POS (already computed): expectedBuns, expectedMeatGram, drinksSold
+
+  // 4) Expected closing = opening + purchases - usage
+  const expectedCloseBuns = (openingBuns ?? 0) + purchasedBuns - (expectedBuns ?? 0);
+  const expectedCloseMeat = (openingMeat ?? 0) + purchasedMeat - (expectedMeatGram ?? 0);
+  const expectedCloseDrnk = (openingDrnk ?? 0) + purchasedDrnk - (drinksSold ?? 0);
+
+  // 5) Variance = staff closing - expected closing
+  const varBuns = staffBuns != null ? staffBuns - expectedCloseBuns : null;
+  const varMeat = staffMeatGram != null ? staffMeatGram - expectedCloseMeat : null;
+  const varDrinks = staffDrinks != null ? staffDrinks - expectedCloseDrnk : null;
 
   let state = 'OK';
   const notes = [];
@@ -191,20 +237,47 @@ async function runForDate(dateStr, opts = {}) {
     state = 'MISSING_DATA';
     notes.push('Missing staff stock counts.');
   }
+  
+  // Add purchase information to notes
+  if (purchasedBuns > 0 || purchasedMeat > 0 || purchasedDrnk > 0) {
+    notes.push(`Purchases: ${purchasedBuns} buns, ${purchasedMeat}g meat, ${purchasedDrnk} drinks.`);
+  }
 
   await prisma.jussiComparison.create({
     data: {
       snapshotId: snapshot.id,
       salesFormId,
+      
+      // Opening stock
+      openingBuns,
+      openingMeatGram: openingMeat,
+      openingDrinks: openingDrnk,
+      
+      // Purchases
+      purchasedBuns,
+      purchasedMeatGram: purchasedMeat,
+      purchasedDrinks: purchasedDrnk,
+      
+      // Usage (POS expected)
       expectedBuns,
       expectedMeatGram,
       expectedDrinks: drinksSold,
+      
+      // Expected closing
+      expectedCloseBuns,
+      expectedCloseMeatGram: expectedCloseMeat,
+      expectedCloseDrinks: expectedCloseDrnk,
+      
+      // Staff actual
       staffBuns,
       staffMeatGram,
       staffDrinks,
+      
+      // Final variance
       varBuns,
       varMeatGram: varMeat,
       varDrinks,
+      
       state,
       notes: notes.length ? notes.join(' ') : null
     }
@@ -223,7 +296,13 @@ async function runForDate(dateStr, opts = {}) {
   console.log(`Receipts: ${receipts.length}`);
   console.log(`Sales THB: ${toTHB(totalSalesSatang)}`);
   console.log(`Payments THB -> CASH: ${toTHB(cash?.totalSatang ?? 0)} | QR: ${toTHB(qr?.totalSatang ?? 0)} | GRAB: ${toTHB(grab?.totalSatang ?? 0)}`);
-  console.log(`Expected -> Buns: ${expectedBuns}, Meat(g): ${expectedMeatGram}, Drinks: ${drinksSold}`);
+  console.log(`\nPHASE 2+ ENHANCED STOCK TRACKING:`);
+  console.log(`Opening -> Buns: ${openingBuns}, Meat(g): ${openingMeat}, Drinks: ${openingDrnk}`);
+  console.log(`Purchases -> Buns: ${purchasedBuns}, Meat(g): ${purchasedMeat}, Drinks: ${purchasedDrnk}`);
+  console.log(`Usage -> Buns: ${expectedBuns}, Meat(g): ${expectedMeatGram}, Drinks: ${drinksSold}`);
+  console.log(`Expected Close -> Buns: ${expectedCloseBuns}, Meat(g): ${expectedCloseMeat}, Drinks: ${expectedCloseDrnk}`);
+  console.log(`Staff Close -> Buns: ${staffBuns}, Meat(g): ${staffMeatGram}, Drinks: ${staffDrinks}`);
+  console.log(`Variance -> Buns: ${varBuns}, Meat(g): ${varMeat}, Drinks: ${varDrinks}`);
   console.log(`State: ${state}`);
 }
 

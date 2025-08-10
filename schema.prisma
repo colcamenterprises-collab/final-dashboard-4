@@ -446,14 +446,32 @@ model JussiComparison {
   salesFormId      String?
   createdAt        DateTime       @default(now())
 
+  // Opening stock (from previous shift)
+  openingBuns      Int?
+  openingMeatGram  Int?
+  openingDrinks    Int?
+
+  // Purchases during the window
+  purchasedBuns    Int?
+  purchasedMeatGram Int?
+  purchasedDrinks  Int?
+
+  // Usage from POS
   expectedBuns     Int?
   expectedMeatGram Int?
   expectedDrinks   Int?
 
+  // Expected closing (opening + purchases - usage)
+  expectedCloseBuns    Int?
+  expectedCloseMeatGram Int?
+  expectedCloseDrinks  Int?
+
+  // Staff closing (actual counts)
   staffBuns        Int?
   staffMeatGram    Int?
   staffDrinks      Int?
 
+  // Variance (staff - expected closing)
   varBuns          Int?
   varMeatGram      Int?
   varDrinks        Int?

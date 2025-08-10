@@ -19,17 +19,18 @@ Fort Knox File Structure: Core locked files include daily_sales_form_locked.html
 
 ## Recent Changes
 
-**August 10, 2025 - Phase 2 Snapshot System Implementation - COMPLETE ✅**
+**August 10, 2025 - Phase 2+ Enhanced Stock Tracking System - COMPLETE ✅**
+- **Enhanced JussiComparison Schema**: Added 9 new fields for comprehensive stock flow tracking (opening*, purchased*, expectedClose*)
+- **Advanced Snapshot Worker**: Enhanced snapshotWorker.mjs with opening stock, purchases, and variance calculation
+- **Comprehensive Stock Flow**: Opening Stock (48 buns, 5g meat, 50 drinks) → Purchases (0) → Usage (40 buns, 3600g meat, 11 drinks) → Expected vs Staff Closing
+- **Enhanced Variance Analysis**: Buns: 165 variance, Meat: 7645g variance (staff vs expected closing), state: MISMATCH  
 - **Database Schema**: Added 8 new Phase 2 models (ShiftSnapshot, PaymentBreakdown, SnapshotItem, SnapshotModifier, PaymentMethodMap, RecipeItem, RecipeComponent, JussiComparison)
-- **Snapshot Worker**: Created snapshotWorker.mjs with automated BKK timezone shift processing (18:00→03:00)
-- **Payment Method Mapping**: Seeded payment channel resolution (CASH, QR, GRAB, CARD, OTHER)
 - **API Endpoints**: Added /api/snapshots, /api/snapshots/:id, /api/jussi/latest-comparison, /api/snapshots/create
 - **Live Testing**: Successfully processed 22 receipts for 2025-08-09, ฿7,667.10 total sales
-- **Jussi Comparison**: POS expects 40 buns vs staff counted 173 buns (variance: -133), state: MISMATCH
 - **Payment Analysis**: ฿3,457 cash (10 transactions), ฿4,210.10 digital (12 transactions)
 - **Top Performers**: Ultimate Double (9 sold), Cheesy Bacon Fries (7 sold), Single Smash Burger (5 sold)
-- **Ingredient Usage Component**: LastShiftIngredients.tsx showing live POS ingredient calculations
-- **STATUS: Phase 2 automated shift snapshots with Jussi AI comparison framework operational**
+- **Ready for Expense Integration**: Framework prepared for purchase tracking when expense system is implemented
+- **STATUS: Phase 2+ comprehensive stock tracking with opening/purchases/usage/closing analysis operational**
 
 **August 9, 2025 - Complete Restaurant Analytics & AI Summary System - OPERATIONAL ✅**
 - **Bulletproof Loyverse POS Integration**: 48 receipts, 113 items, 48 payments, ฿52,479.00 total revenue
