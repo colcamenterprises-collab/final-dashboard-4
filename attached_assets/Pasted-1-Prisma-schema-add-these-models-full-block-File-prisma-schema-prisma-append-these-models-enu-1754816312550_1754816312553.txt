@@ -1,0 +1,604 @@
+1) Prisma schema — add these models (full block)
+File: prisma/schema.prisma
+(append these models+enums to your existing schema; do not remove current models)
+
+prisma
+Copy
+Edit
+// ========= Enums =========
+enum Provider {
+  LOYVERSE
+}
+
+enum PaymentChannel {
+  CASH
+  QR
+  CARD
+  GRAB
+  OTHER
+}
+
+enum ReconcileState {
+  OK
+  MISMATCH
+  MISSING_DATA
+}
+
+// ========= Core Snapshot =========
+model ShiftSnapshot {
+  id                  String            @id @default(uuid())
+  provider            Provider          @default(LOYVERSE)
+  windowStartUTC      DateTime
+  windowEndUTC        DateTime
+  loyverseShiftNumber Int?
+  salesFormId         String?
+  createdAt           DateTime          @default(now())
+  totalReceipts       Int               @default(0)
+  totalSalesSatang    BigInt            @default(0)
+  reconcileState      ReconcileState    @default(MISSING_DATA)
+  reconcileNotes      String?
+
+  payments   PaymentBreakdown[]
+  items      SnapshotItem[]
+  modifiers  SnapshotModifier[]
+  comparisons JussiComparison[]
+
+  salesForm  DailySales? @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
+
+  @@index([windowStartUTC, windowEndUTC])
+}
+
+model PaymentBreakdown {
+  id           String         @id @default(uuid())
+  snapshotId   String
+  channel      PaymentChannel
+  count        Int            @default(0)
+  totalSatang  BigInt         @default(0)
+
+  snapshot     ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@unique([snapshotId, channel])
+}
+
+model SnapshotItem {
+  id            String         @id @default(uuid())
+  snapshotId    String
+  itemName      String
+  sku           String?
+  category      String?
+  qty           Int            @default(0)
+  revenueSatang BigInt         @default(0)
+
+  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+model SnapshotModifier {
+  id            String         @id @default(uuid())
+  snapshotId    String
+  modifierName  String
+  lines         Int            @default(0)
+  revenueSatang BigInt         @default(0)
+
+  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+// Map LV payment labels to canonical channels
+model PaymentMethodMap {
+  id         String         @id @default(uuid())
+  provider   Provider       @default(LOYVERSE)
+  sourceName String
+  channel    PaymentChannel @default(OTHER)
+  createdAt  DateTime       @default(now())
+
+  @@unique([provider, sourceName])
+}
+
+// ========= Recipes (for precise Jussi) =========
+model RecipeItem {
+  id         String   @id @default(uuid())
+  sku        String?  @unique
+  name       String
+  category   String?
+  isMealDeal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  components RecipeComponent[]
+}
+
+model RecipeComponent {
+  id           String     @id @default(uuid())
+  recipeItemId String
+  ingredientId String
+  baseQty      Float
+  uom          String
+
+  recipeItem   RecipeItem @relation(fields: [recipeItemId], references: [id], onDelete: Cascade)
+
+  @@index([recipeItemId])
+}
+
+// ========= Jussi Comparison Record =========
+model JussiComparison {
+  id               String         @id @default(uuid())
+  snapshotId       String
+  salesFormId      String?
+  createdAt        DateTime       @default(now())
+
+  expectedBuns     Int?
+  expectedMeatGram Int?
+  expectedDrinks   Int?
+
+  staffBuns        Int?
+  staffMeatGram    Int?
+  staffDrinks      Int?
+
+  varBuns          Int?
+  varMeatGram      Int?
+  varDrinks        Int?
+
+  state            ReconcileState @default(MISSING_DATA)
+  notes            String?
+
+  snapshot         ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  salesForm        DailySales?    @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([salesFormId])
+}
+After editing schema:
+
+css
+Copy
+Edit
+npx prisma migrate dev --name add_snapshot_phase2
+npx prisma generate
+2) Raw SQL migration (use this if you want it live immediately)
+File: prisma/migrations/20250810_add_snapshot_phase2.sql
+
+sql
+Copy
+Edit
+-- Enums
+DO $$ BEGIN CREATE TYPE "Provider" AS ENUM ('LOYVERSE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "PaymentChannel" AS ENUM ('CASH','QR','CARD','GRAB','OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "ReconcileState" AS ENUM ('OK','MISMATCH','MISSING_DATA'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ShiftSnapshot
+CREATE TABLE IF NOT EXISTS "ShiftSnapshot" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "provider" "Provider" NOT NULL DEFAULT 'LOYVERSE',
+  "windowStartUTC" timestamptz NOT NULL,
+  "windowEndUTC" timestamptz NOT NULL,
+  "loyverseShiftNumber" integer,
+  "salesFormId" uuid,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "totalReceipts" integer NOT NULL DEFAULT 0,
+  "totalSalesSatang" bigint NOT NULL DEFAULT 0,
+  "reconcileState" "ReconcileState" NOT NULL DEFAULT 'MISSING_DATA',
+  "reconcileNotes" text
+);
+CREATE INDEX IF NOT EXISTS "ShiftSnapshot_window_idx" ON "ShiftSnapshot" ("windowStartUTC","windowEndUTC");
+
+-- PaymentBreakdown
+CREATE TABLE IF NOT EXISTS "PaymentBreakdown" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "snapshotId" uuid NOT NULL REFERENCES "ShiftSnapshot"("id") ON DELETE CASCADE,
+  "channel" "PaymentChannel" NOT NULL,
+  "count" integer NOT NULL DEFAULT 0,
+  "totalSatang" bigint NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "PaymentBreakdown_snapshot_channel" ON "PaymentBreakdown" ("snapshotId","channel");
+
+-- SnapshotItem
+CREATE TABLE IF NOT EXISTS "SnapshotItem" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "snapshotId" uuid NOT NULL REFERENCES "ShiftSnapshot"("id") ON DELETE CASCADE,
+  "itemName" text NOT NULL,
+  "sku" text,
+  "category" text,
+  "qty" integer NOT NULL DEFAULT 0,
+  "revenueSatang" bigint NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS "SnapshotItem_snapshot_idx" ON "SnapshotItem" ("snapshotId");
+
+-- SnapshotModifier
+CREATE TABLE IF NOT EXISTS "SnapshotModifier" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "snapshotId" uuid NOT NULL REFERENCES "ShiftSnapshot"("id") ON DELETE CASCADE,
+  "modifierName" text NOT NULL,
+  "lines" integer NOT NULL DEFAULT 0,
+  "revenueSatang" bigint NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS "SnapshotModifier_snapshot_idx" ON "SnapshotModifier" ("snapshotId");
+
+-- PaymentMethodMap
+CREATE TABLE IF NOT EXISTS "PaymentMethodMap" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "provider" "Provider" NOT NULL DEFAULT 'LOYVERSE',
+  "sourceName" text NOT NULL,
+  "channel" "PaymentChannel" NOT NULL DEFAULT 'OTHER',
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  UNIQUE ("provider","sourceName")
+);
+
+-- RecipeItem
+CREATE TABLE IF NOT EXISTS "RecipeItem" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "sku" text UNIQUE,
+  "name" text NOT NULL,
+  "category" text,
+  "isMealDeal" boolean NOT NULL DEFAULT false,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+
+-- RecipeComponent
+CREATE TABLE IF NOT EXISTS "RecipeComponent" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "recipeItemId" uuid NOT NULL REFERENCES "RecipeItem"("id") ON DELETE CASCADE,
+  "ingredientId" text NOT NULL,
+  "baseQty" double precision NOT NULL,
+  "uom" text NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "RecipeComponent_recipe_idx" ON "RecipeComponent" ("recipeItemId");
+
+-- JussiComparison
+CREATE TABLE IF NOT EXISTS "JussiComparison" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "snapshotId" uuid NOT NULL REFERENCES "ShiftSnapshot"("id") ON DELETE CASCADE,
+  "salesFormId" uuid,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "expectedBuns" integer,
+  "expectedMeatGram" integer,
+  "expectedDrinks" integer,
+  "staffBuns" integer,
+  "staffMeatGram" integer,
+  "staffDrinks" integer,
+  "varBuns" integer,
+  "varMeatGram" integer,
+  "varDrinks" integer,
+  "state" "ReconcileState" NOT NULL DEFAULT 'MISSING_DATA',
+  "notes" text
+);
+CREATE INDEX IF NOT EXISTS "JussiComparison_snapshot_idx" ON "JussiComparison" ("snapshotId");
+CREATE INDEX IF NOT EXISTS "JussiComparison_salesForm_idx" ON "JussiComparison" ("salesFormId");
+After applying raw SQL, run:
+
+nginx
+Copy
+Edit
+npx prisma db pull
+npx prisma generate
+3) Seed payment mapping
+File: prisma/seed-payment-map.mjs
+
+js
+Copy
+Edit
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+
+const rows = [
+  { sourceName: 'Cash', channel: 'CASH' },
+  { sourceName: 'CASH', channel: 'CASH' },
+  { sourceName: 'Scan (QR Code)', channel: 'QR' },
+  { sourceName: 'QR', channel: 'QR' },
+  { sourceName: 'Grab', channel: 'GRAB' },
+  { sourceName: 'GRAB', channel: 'GRAB' },
+  { sourceName: 'Card', channel: 'CARD' },
+  { sourceName: 'VISA', channel: 'CARD' },
+  { sourceName: 'MASTERCARD', channel: 'CARD' },
+];
+
+(async () => {
+  for (const r of rows) {
+    await prisma.paymentMethodMap.upsert({
+      where: { provider_sourceName: { provider: 'LOYVERSE', sourceName: r.sourceName } },
+      create: { provider: 'LOYVERSE', sourceName: r.sourceName, channel: r.channel },
+      update: { channel: r.channel },
+    });
+  }
+  console.log('Seeded payment method map');
+  await prisma.$disconnect();
+})();
+Run:
+
+arduino
+Copy
+Edit
+node prisma/seed-payment-map.mjs
+4) Snapshot worker (pure JS, ready to run)
+File: workers/snapshotWorker.mjs
+
+js
+Copy
+Edit
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+
+const MEAT_PER_PATTY_GRAM = 90;
+const BUNS_PER_BURGER = 1;
+
+function bkkWindowToUTC(dateStrYYYYMMDD) {
+  const [y, m, d] = dateStrYYYYMMDD.split('-').map(Number);
+  const startUTC = new Date(Date.UTC(y, m - 1, d, 11, 0, 0)); // 18:00 BKK
+  const endUTC   = new Date(Date.UTC(y, m - 1, d, 20, 0, 0)); // 03:00 BKK
+  return { startUTC, endUTC };
+}
+function toTHB(satang) {
+  const n = typeof satang === 'bigint' ? Number(satang) : Number(satang || 0);
+  return (n / 100).toFixed(2);
+}
+function isBurgerLike(name) {
+  const s = (name || '').toLowerCase();
+  return s.includes('burger') || s.includes('smash') || s.includes('double');
+}
+async function mapPaymentChannel(name) {
+  try {
+    const row = await prisma.paymentMethodMap.findUnique({
+      where: { provider_sourceName: { provider: 'LOYVERSE', sourceName: name } }
+    });
+    if (row) return row.channel;
+  } catch {}
+  const n = (name || '').toLowerCase();
+  if (n.includes('cash')) return 'CASH';
+  if (n.includes('qr')) return 'QR';
+  if (n.includes('grab')) return 'GRAB';
+  if (n.includes('card') || n.includes('visa') || n.includes('master')) return 'CARD';
+  return 'OTHER';
+}
+
+async function runForDate(dateStr, opts = {}) {
+  const { startUTC, endUTC } = bkkWindowToUTC(dateStr);
+
+  const snapshot = await prisma.shiftSnapshot.create({
+    data: {
+      windowStartUTC: startUTC,
+      windowEndUTC: endUTC,
+      salesFormId: opts.salesFormId ?? null,
+      loyverseShiftNumber: opts.loyverseShiftNumber ?? null,
+      reconcileState: 'MISSING_DATA'
+    }
+  });
+
+  const receipts = await prisma.$queryRaw`
+    SELECT id, "receiptNumber", "createdAtUTC", "total"
+    FROM receipts
+    WHERE provider='LOYVERSE'
+      AND "createdAtUTC" BETWEEN ${startUTC} AND ${endUTC}
+    ORDER BY "createdAtUTC" ASC
+  `;
+  const totalSalesSatang = receipts.reduce((a, r) => a + Number(r.total), 0);
+  await prisma.shiftSnapshot.update({
+    where: { id: snapshot.id },
+    data: {
+      totalReceipts: receipts.length,
+      totalSalesSatang: BigInt(totalSalesSatang)
+    }
+  });
+
+  const payments = await prisma.$queryRaw`
+    SELECT rp.method::text as method,
+           COUNT(*)::int as count,
+           COALESCE(SUM(rp.amount),0)::bigint as total_satang
+    FROM receipt_payments rp
+    JOIN receipts r ON r.id = rp."receiptId"
+    WHERE r.provider='LOYVERSE'
+      AND r."createdAtUTC" BETWEEN ${startUTC} AND ${endUTC}
+    GROUP BY rp.method
+    ORDER BY rp.method
+  `;
+  for (const p of payments) {
+    const channel = await mapPaymentChannel(p.method);
+    await prisma.paymentBreakdown.upsert({
+      where: { snapshotId_channel: { snapshotId: snapshot.id, channel } },
+      create: { snapshotId: snapshot.id, channel, count: p.count, totalSatang: BigInt(p.total_satang) },
+      update: { count: p.count, totalSatang: BigInt(p.total_satang) }
+    });
+  }
+
+  const items = await prisma.$queryRaw`
+    SELECT ri.name, ri.sku, ri.category,
+           SUM(ri.qty)::int as qty,
+           COALESCE(SUM(ri.total),0)::bigint as revenue_satang
+    FROM receipt_items ri
+    JOIN receipts r ON r.id = ri."receiptId"
+    WHERE r.provider='LOYVERSE'
+      AND r."createdAtUTC" BETWEEN ${startUTC} AND ${endUTC}
+    GROUP BY ri.name, ri.sku, ri.category
+    ORDER BY qty DESC NULLS LAST
+  `;
+  for (const it of items) {
+    await prisma.snapshotItem.create({
+      data: {
+        snapshotId: snapshot.id,
+        itemName: it.name,
+        sku: it.sku,
+        category: it.category ?? undefined,
+        qty: it.qty,
+        revenueSatang: BigInt(it.revenue_satang)
+      }
+    });
+  }
+
+  const mods = await prisma.$queryRaw`
+    WITH src AS (
+      SELECT ri.modifiers
+      FROM receipt_items ri
+      JOIN receipts r ON r.id = ri."receiptId"
+      WHERE r.provider='LOYVERSE'
+        AND r."createdAtUTC" BETWEEN ${startUTC} AND ${endUTC}
+    ), flat AS (
+      SELECT jsonb_array_elements(COALESCE(src.modifiers, '[]'::jsonb)) AS mod FROM src
+    )
+    SELECT
+      mod->>'name' AS modifier_name,
+      COUNT(*)::int AS lines,
+      COALESCE(SUM( (mod->>'price')::bigint ),0)::bigint AS revenue_satang
+    FROM flat
+    GROUP BY modifier_name
+    ORDER BY lines DESC NULLS LAST
+  `;
+  for (const m of mods) {
+    await prisma.snapshotModifier.create({
+      data: {
+        snapshotId: snapshot.id,
+        modifierName: m.modifier_name ?? '(none)',
+        lines: m.lines,
+        revenueSatang: BigInt(m.revenue_satang)
+      }
+    });
+  }
+
+  // Jussi quick comparison (heuristic for now)
+  const itemsForCalc = await prisma.snapshotItem.findMany({ where: { snapshotId: snapshot.id } });
+  let burgersSold = 0;
+  let drinksSold = 0;
+  for (const it of itemsForCalc) {
+    const nm = (it.itemName || '').toLowerCase();
+    if (isBurgerLike(nm)) {
+      const isDouble = /double|คู่/.test(nm);
+      const pattiesPer = isDouble ? 2 : 1;
+      burgersSold += it.qty * pattiesPer;
+    }
+    if (nm.includes('cola') || nm.includes('fanta') || nm.includes('schweppes') || nm.includes('water') || nm.includes('soda')) {
+      drinksSold += it.qty;
+    }
+    if (nm.includes('set') || nm.includes('meal')) {
+      drinksSold += it.qty; // default 1 drink per set
+    }
+  }
+  const expectedBuns = burgersSold * BUNS_PER_BURGER;
+  const expectedMeatGram = burgersSold * MEAT_PER_PATTY_GRAM;
+
+  let staffBuns = null, staffMeatGram = null, staffDrinks = null;
+  let salesFormId = opts.salesFormId || null;
+  if (!salesFormId) {
+    const ds = await prisma.dailySales.findFirst({
+      where: { createdAt: { gte: startUTC, lte: endUTC } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, DailyStock: { select: { burgerBuns: true, meatWeight: true, drinksCount: true } } }
+    });
+    if (ds) salesFormId = ds.id;
+    if (ds?.DailyStock) {
+      staffBuns = ds.DailyStock.burgerBuns ?? null;
+      staffMeatGram = ds.DailyStock.meatWeight ?? null;
+      staffDrinks = ds.DailyStock.drinksCount ?? null;
+    }
+  } else {
+    const ds = await prisma.dailySales.findUnique({
+      where: { id: salesFormId },
+      select: { DailyStock: { select: { burgerBuns: true, meatWeight: true, drinksCount: true } } }
+    });
+    if (ds?.DailyStock) {
+      staffBuns = ds.DailyStock.burgerBuns ?? null;
+      staffMeatGram = ds.DailyStock.meatWeight ?? null;
+      staffDrinks = ds.DailyStock.drinksCount ?? null;
+    }
+  }
+
+  const varBuns = staffBuns != null ? (expectedBuns - staffBuns) : null;
+  const varMeat = staffMeatGram != null ? (expectedMeatGram - staffMeatGram) : null;
+  const varDrinks = staffDrinks != null ? (drinksSold - staffDrinks) : null;
+
+  let state = 'OK';
+  const notes = [];
+  if (varBuns != null && Math.abs(varBuns) > 5) state = 'MISMATCH';
+  if (varMeat != null && Math.abs(varMeat) > 500) state = 'MISMATCH';
+  if (staffBuns == null || staffMeatGram == null || staffDrinks == null) {
+    state = 'MISSING_DATA';
+    notes.push('Missing staff stock counts.');
+  }
+
+  await prisma.jussiComparison.create({
+    data: {
+      snapshotId: snapshot.id,
+      salesFormId,
+      expectedBuns,
+      expectedMeatGram,
+      expectedDrinks: drinksSold,
+      staffBuns,
+      staffMeatGram,
+      staffDrinks,
+      varBuns,
+      varMeatGram: varMeat,
+      varDrinks,
+      state,
+      notes: notes.length ? notes.join(' ') : null
+    }
+  });
+
+  await prisma.shiftSnapshot.update({
+    where: { id: snapshot.id },
+    data: { reconcileState: state, reconcileNotes: notes.length ? notes.join(' ') : null }
+  });
+
+  const cash = await prisma.paymentBreakdown.findUnique({ where: { snapshotId_channel: { snapshotId: snapshot.id, channel: 'CASH' } } });
+  const qr   = await prisma.paymentBreakdown.findUnique({ where: { snapshotId_channel: { snapshotId: snapshot.id, channel: 'QR' } } });
+  const grab = await prisma.paymentBreakdown.findUnique({ where: { snapshotId_channel: { snapshotId: snapshot.id, channel: 'GRAB' } } });
+
+  console.log(`\nSnapshot ${snapshot.id}`);
+  console.log(`Receipts: ${receipts.length}`);
+  console.log(`Sales THB: ${toTHB(totalSalesSatang)}`);
+  console.log(`Payments THB -> CASH: ${toTHB(cash?.totalSatang ?? 0)} | QR: ${toTHB(qr?.totalSatang ?? 0)} | GRAB: ${toTHB(grab?.totalSatang ?? 0)}`);
+  console.log(`Expected -> Buns: ${expectedBuns}, Meat(g): ${expectedMeatGram}, Drinks: ${drinksSold}`);
+  console.log(`State: ${state}`);
+}
+
+const dateArg = process.argv[2];
+if (!dateArg) {
+  console.error('Usage: node workers/snapshotWorker.mjs YYYY-MM-DD [salesFormId]');
+  process.exit(1);
+}
+const salesFormIdArg = process.argv[3];
+
+runForDate(dateArg, { salesFormId: salesFormIdArg })
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
+Run:
+
+bash
+Copy
+Edit
+node workers/snapshotWorker.mjs 2025-08-09 9c303a5e-6b0f-4a12-b116-cfb6a0089ef7
+5) Package.json scripts (optional but handy)
+File: package.json (add under "scripts")
+
+json
+Copy
+Edit
+{
+  "scripts": {
+    "migrate:phase2": "prisma migrate dev --name add_snapshot_phase2",
+    "prisma:gen": "prisma generate",
+    "seed:payments": "node prisma/seed-payment-map.mjs",
+    "snapshot": "node workers/snapshotWorker.mjs"
+  }
+}
+6) Minimal QA steps (agent can run)
+Apply schema (or SQL), then:
+
+arduino
+Copy
+Edit
+npx prisma generate
+node prisma/seed-payment-map.mjs
+Build snapshot:
+
+bash
+Copy
+Edit
+node workers/snapshotWorker.mjs 2025-08-09 9c303a5e-6b0f-4a12-b116-cfb6a0089ef7
+Verify tables:
+
+ShiftSnapshot has a row for that date window.
+
+PaymentBreakdown has CASH/QR/GRAB totals (not all in OTHER).
+
+SnapshotItem, SnapshotModifier populated.
+
+JussiComparison created with expected vs staff counts and variance.
