@@ -39,6 +39,10 @@ model DailySales {
 
   // Soft delete
   deletedAt        DateTime? // null = active, otherwise hidden
+  
+  // Phase 2 Relations
+  snapshots        ShiftSnapshot[]
+  comparisons      JussiComparison[]
 }
 
 model DailyStock {
@@ -316,4 +320,150 @@ model IngestionError {
 
   @@index([restaurantId, provider, createdAt])
   @@map("ingestion_errors")
+}
+
+// ========= Phase 2: Snapshot System Enums =========
+enum Provider {
+  LOYVERSE
+}
+
+enum PaymentChannel {
+  CASH
+  QR
+  CARD
+  GRAB
+  OTHER
+}
+
+enum ReconcileState {
+  OK
+  MISMATCH
+  MISSING_DATA
+}
+
+// ========= Core Snapshot =========
+model ShiftSnapshot {
+  id                  String            @id @default(uuid())
+  provider            Provider          @default(LOYVERSE)
+  windowStartUTC      DateTime
+  windowEndUTC        DateTime
+  loyverseShiftNumber Int?
+  salesFormId         String?
+  createdAt           DateTime          @default(now())
+  totalReceipts       Int               @default(0)
+  totalSalesSatang    BigInt            @default(0)
+  reconcileState      ReconcileState    @default(MISSING_DATA)
+  reconcileNotes      String?
+
+  payments   PaymentBreakdown[]
+  items      SnapshotItem[]
+  modifiers  SnapshotModifier[]
+  comparisons JussiComparison[]
+
+  salesForm  DailySales? @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
+
+  @@index([windowStartUTC, windowEndUTC])
+}
+
+model PaymentBreakdown {
+  id           String         @id @default(uuid())
+  snapshotId   String
+  channel      PaymentChannel
+  count        Int            @default(0)
+  totalSatang  BigInt         @default(0)
+
+  snapshot     ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@unique([snapshotId, channel])
+}
+
+model SnapshotItem {
+  id            String         @id @default(uuid())
+  snapshotId    String
+  itemName      String
+  sku           String?
+  category      String?
+  qty           Int            @default(0)
+  revenueSatang BigInt         @default(0)
+
+  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+model SnapshotModifier {
+  id            String         @id @default(uuid())
+  snapshotId    String
+  modifierName  String
+  lines         Int            @default(0)
+  revenueSatang BigInt         @default(0)
+
+  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+// Map LV payment labels to canonical channels
+model PaymentMethodMap {
+  id         String         @id @default(uuid())
+  provider   Provider       @default(LOYVERSE)
+  sourceName String
+  channel    PaymentChannel @default(OTHER)
+  createdAt  DateTime       @default(now())
+
+  @@unique([provider, sourceName])
+}
+
+// ========= Recipes (for precise Jussi) =========
+model RecipeItem {
+  id         String   @id @default(uuid())
+  sku        String?  @unique
+  name       String
+  category   String?
+  isMealDeal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  components RecipeComponent[]
+}
+
+model RecipeComponent {
+  id           String     @id @default(uuid())
+  recipeItemId String
+  ingredientId String
+  baseQty      Float
+  uom          String
+
+  recipeItem   RecipeItem @relation(fields: [recipeItemId], references: [id], onDelete: Cascade)
+
+  @@index([recipeItemId])
+}
+
+// ========= Jussi Comparison Record =========
+model JussiComparison {
+  id               String         @id @default(uuid())
+  snapshotId       String
+  salesFormId      String?
+  createdAt        DateTime       @default(now())
+
+  expectedBuns     Int?
+  expectedMeatGram Int?
+  expectedDrinks   Int?
+
+  staffBuns        Int?
+  staffMeatGram    Int?
+  staffDrinks      Int?
+
+  varBuns          Int?
+  varMeatGram      Int?
+  varDrinks        Int?
+
+  state            ReconcileState @default(MISSING_DATA)
+  notes            String?
+
+  snapshot         ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  salesForm        DailySales?    @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([salesFormId])
 }

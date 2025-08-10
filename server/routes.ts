@@ -1614,5 +1614,151 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/pos', posItems);
   app.use('/api/pos', posUsage);
 
+  // === PHASE 2: SNAPSHOT SYSTEM ENDPOINTS ===
+  
+  // Get shift snapshots
+  app.get('/api/snapshots', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const snapshots = await prisma.shiftSnapshot.findMany({
+        include: {
+          payments: true,
+          items: { orderBy: { qty: 'desc' }, take: 5 },
+          comparisons: true
+        },
+        orderBy: { windowStartUTC: 'desc' },
+        take: limit
+      });
+      
+      res.json(snapshots);
+    } catch (error) {
+      console.error('Snapshots fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch snapshots' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Get specific snapshot with details
+  app.get('/api/snapshots/:id', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const snapshot = await prisma.shiftSnapshot.findUnique({
+        where: { id: req.params.id },
+        include: {
+          payments: true,
+          items: { orderBy: { qty: 'desc' } },
+          modifiers: { orderBy: { lines: 'desc' } },
+          comparisons: { include: { salesForm: true } }
+        }
+      });
+      
+      if (!snapshot) {
+        return res.status(404).json({ error: 'Snapshot not found' });
+      }
+      
+      res.json(snapshot);
+    } catch (error) {
+      console.error('Snapshot fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch snapshot' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Get latest Jussi comparison
+  app.get('/api/jussi/latest-comparison', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const comparison = await prisma.jussiComparison.findFirst({
+        include: {
+          snapshot: {
+            select: {
+              windowStartUTC: true,
+              windowEndUTC: true,
+              totalReceipts: true,
+              totalSalesSatang: true
+            }
+          },
+          salesForm: {
+            select: {
+              completedBy: true,
+              createdAt: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      if (!comparison) {
+        return res.status(404).json({ error: 'No comparison data available' });
+      }
+      
+      res.json(comparison);
+    } catch (error) {
+      console.error('Comparison fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch comparison' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  // Run snapshot for specific date
+  app.post('/api/snapshots/create', async (req: Request, res: Response) => {
+    try {
+      const { date, salesFormId } = req.body;
+      
+      if (!date) {
+        return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      }
+      
+      // Execute the snapshot worker
+      const { spawn } = require('child_process');
+      const args = ['workers/snapshotWorker.mjs', date];
+      if (salesFormId) args.push(salesFormId);
+      
+      const worker = spawn('node', args, { cwd: process.cwd() });
+      
+      let output = '';
+      let error = '';
+      
+      worker.stdout.on('data', (data: Buffer) => {
+        output += data.toString();
+      });
+      
+      worker.stderr.on('data', (data: Buffer) => {
+        error += data.toString();
+      });
+      
+      worker.on('close', (code: number) => {
+        if (code === 0) {
+          res.json({ 
+            success: true, 
+            message: 'Snapshot created successfully',
+            output: output.trim()
+          });
+        } else {
+          res.status(500).json({ 
+            success: false, 
+            error: 'Snapshot creation failed',
+            details: error || output
+          });
+        }
+      });
+      
+    } catch (error) {
+      console.error('Snapshot creation error:', error);
+      res.status(500).json({ error: 'Failed to create snapshot', details: (error as Error).message });
+    }
+  });
+
   return server;
 }
