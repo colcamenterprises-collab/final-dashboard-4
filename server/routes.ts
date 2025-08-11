@@ -550,6 +550,145 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // ===== Purchasing (Expenses) API =====
+
+  // Create/Update Expense with lines
+  app.post('/api/expenses', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    try {
+      const { id, shiftDate, supplier, notes, lines } = req.body ?? {};
+      if (!lines || !Array.isArray(lines) || !lines.length) {
+        return res.status(400).json({ error: 'At least one line required' });
+      }
+
+      // total fallback in cents
+      const totalCents = lines.reduce((sum: number, l: any) => {
+        const val = l.lineTotalTHB ?? (Number(l.qty || 0) * Number(l.unitPriceTHB || 0));
+        return sum + (isFinite(val) ? Math.round(Number(val) * 100) : 0);
+      }, 0);
+
+      // Use simplified expense creation for existing schema
+      const head = await prisma.expense.create({
+        data: {
+          restaurantId: 'restaurant-1', // hardcoded for now
+          shiftDate: shiftDate ? new Date(shiftDate) : new Date(),
+          item: lines[0]?.name || 'Purchase',
+          costCents: totalCents,
+          supplier: supplier,
+          expenseType: 'PURCHASE'
+        },
+      });
+
+      // Create expense lines
+      await prisma.$transaction(
+        lines.map((l: any) =>
+          prisma.expenseLine.create({
+            data: {
+              expenseId: head.id,
+              ingredientId: l.ingredientId ?? null,
+              name: l.name,
+              qty: l.qty != null ? Number(l.qty) : null,
+              uom: l.uom ?? null,
+              unitPriceTHB: l.unitPriceTHB != null ? Number(l.unitPriceTHB) : null,
+              lineTotalTHB: l.lineTotalTHB != null ? Number(l.lineTotalTHB) : null,
+              type: 'PURCHASE'
+            },
+          }),
+        ),
+      );
+
+      // Optional: recompute latest snapshot purchases-aware
+      const latest = await prisma.shiftSnapshot.findFirst({ orderBy: { windowStartUTC: 'desc' }, select: { id: true } });
+      if (latest) {
+        try {
+          // If you exposed a recompute endpoint:
+          // await fetch(`http://localhost:5000/api/snapshots/${latest.id}/recompute`, { method:'POST' });
+          // or call your recompute logic here directly if it's in-process
+        } catch (e) { /* non-blocking */ }
+      }
+
+      return safeJson(res, { ok: true, id: head.id });
+    } catch (e: any) {
+      console.error(e);
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  app.get('/api/expenses', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    try {
+      // Get expenses with their lines
+      const expenses = await prisma.expense.findMany({
+        orderBy: { shiftDate: 'desc' },
+        take: 100,
+      });
+      
+      // Get lines separately and merge
+      const expenseIds = expenses.map(e => e.id);
+      const lines = await prisma.expenseLine.findMany({
+        where: { expenseId: { in: expenseIds } }
+      });
+      
+      const result = expenses.map(expense => ({
+        id: expense.id,
+        expenseDate: expense.shiftDate,
+        type: expense.expenseType || 'PURCHASE',
+        supplier: expense.supplier,
+        notes: null,
+        totalTHB: expense.costCents / 100,
+        lines: lines.filter(l => l.expenseId === expense.id).map(l => ({
+          id: l.id,
+          name: l.name,
+          qty: l.qty,
+          uom: l.uom,
+          lineTotalTHB: l.lineTotalTHB ? Number(l.lineTotalTHB) : null
+        }))
+      }));
+      
+      return safeJson(res, result);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  app.get('/api/ingredients/search', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const q = String(req.query.q ?? '').trim();
+    try {
+      if (!q) return safeJson(res, []);
+      
+      // Search in existing recipe items as a proxy for ingredients
+      const rows = await prisma.recipeItem.findMany({
+        where: { 
+          name: { contains: q, mode: 'insensitive' }
+        },
+        take: 20,
+        select: { id: true, name: true, category: true },
+      });
+      
+      // Map to expected format
+      const mapped = rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        uom: 'unit',
+        category: r.category || 'Recipe Item'
+      }));
+      
+      return safeJson(res, mapped);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
   // Comprehensive Reporting API Endpoints
   app.get('/api/reports/sales-summary', async (req: Request, res: Response) => {
     try {

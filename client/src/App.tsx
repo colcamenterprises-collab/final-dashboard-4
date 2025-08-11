@@ -42,6 +42,8 @@ import FormLibrary from "@/pages/FormLibrary";
 import FormLibraryNew from "@/pages/form-library";
 import FormDetail from "@/pages/form-detail";
 import TestEmailPage from "@/pages/TestEmailPage";
+import ExpensesList from "@/pages/expenses/ExpensesList";
+import ExpenseEditor from "@/pages/expenses/ExpenseEditor";
 
 import NotFound from "@/pages/not-found";
 
@@ -63,6 +65,9 @@ function Router() {
         <Route path="/analysis" component={AnalysisList} />
         <Route path="/analysis/:id" component={AnalysisDetail} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
+        <Route path="/finance/expenses" component={ExpensesList} />
+        <Route path="/finance/expenses/new" component={ExpenseEditor} />
+        <Route path="/finance/expenses/:id" component={ExpenseEditor} />
         <Route path="/shift-comparison" component={ShiftComparison} />
         <Route path="/analysis/shift-report/:date" component={ShiftReportDetail} />
         <Route path="/marketing" component={Marketing} />

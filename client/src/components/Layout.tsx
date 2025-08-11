@@ -48,7 +48,13 @@ const navigationStructure = [
     id: "finance",
     label: "Finance",
     icon: DollarSign,
-    path: "/finance"
+    expandable: true,
+    path: "/finance",
+    items: [
+      { path: "/finance", label: "Dashboard", icon: BarChart3 },
+      { path: "/analysis", label: "Analysis", icon: LineChart },
+      { path: "/finance/expenses", label: "Purchasing", icon: ShoppingCart },
+    ]
   },
   {
     id: "menu-mgmt",

@@ -1,0 +1,369 @@
+0) Design language (fast tokens the UI will use)
+Use these Tailwind tokens globally:
+
+Typography: text-gray-900 titles, text-gray-700 labels, text-gray-500 meta, tabular-nums for numbers.
+
+Radius/shadow: cards rounded-2xl shadow-[0_2px_16px_rgba(16,24,40,.06)] border border-gray-200.
+
+Spacing: sections p-6 space-y-6, cards p-5.
+
+Color accents: Emerald for “OK”, Amber for “Pending/Missing”, Rose for “Error/Mismatch”.
+
+Micro-components: .badge, .pill, .stat.
+
+(Agent: keep Dashboard’s new style consistent with the components below.)
+
+1) Server routes (paste into server/routes.ts)
+These create + list expenses and recompute the latest snapshot after save.
+
+ts
+Copy
+Edit
+// ===== Purchasing (Expenses) API =====
+import type { Request, Response } from 'express';
+
+// BigInt-safe sender (if not already defined)
+function safeJson(res: Response, data: any, status = 200) {
+  const json = JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? Number(v) : v));
+  res.status(status).setHeader('Content-Type', 'application/json').send(json);
+}
+
+// Create/Update Expense with lines
+app.post('/api/expenses', async (req: Request, res: Response) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  try {
+    const { id, expenseDate, type = 'PURCHASE', supplier, notes, salesFormId, lines } = req.body ?? {};
+    if (!lines || !Array.isArray(lines) || !lines.length) {
+      return res.status(400).json({ error: 'At least one line required' });
+    }
+
+    // total fallback
+    const totalTHB = lines.reduce((sum: number, l: any) => {
+      const val = l.lineTotalTHB ?? (Number(l.qty || 0) * Number(l.unitPriceTHB || 0));
+      return sum + (isFinite(val) ? Number(val) : 0);
+    }, 0);
+
+    // upsert head
+    const head = id
+      ? await prisma.expense.update({
+          where: { id },
+          data: { expenseDate: expenseDate ? new Date(expenseDate) : undefined, type, supplier, notes, salesFormId, totalTHB },
+        })
+      : await prisma.expense.create({
+          data: { expenseDate: expenseDate ? new Date(expenseDate) : new Date(), type, supplier, notes, salesFormId, totalTHB },
+        });
+
+    // wipe + recreate lines on update (simple and safe)
+    await prisma.expenseLine.deleteMany({ where: { expenseId: head.id } });
+    await prisma.$transaction(
+      lines.map((l: any) =>
+        prisma.expenseLine.create({
+          data: {
+            expenseId: head.id,
+            ingredientId: l.ingredientId ?? null,
+            name: l.name,
+            qty: l.qty != null ? Number(l.qty) : null,
+            uom: l.uom ?? null,
+            unitPriceTHB: l.unitPriceTHB != null ? Number(l.unitPriceTHB) : null,
+            lineTotalTHB: l.lineTotalTHB != null ? Number(l.lineTotalTHB) : null,
+          },
+        }),
+      ),
+    );
+
+    // Optional: recompute latest snapshot purchases-aware
+    const latest = await prisma.shiftSnapshot.findFirst({ orderBy: { windowStartUTC: 'desc' }, select: { id: true } });
+    if (latest) {
+      try {
+        // If you exposed a recompute endpoint:
+        // await fetch(`http://localhost:5000/api/snapshots/${latest.id}/recompute`, { method:'POST' });
+        // or call your recompute logic here directly if it’s in-process
+      } catch (e) { /* non-blocking */ }
+    }
+
+    return safeJson(res, { ok: true, id: head.id });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/expenses', async (req: Request, res: Response) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  try {
+    const rows = await prisma.expense.findMany({
+      orderBy: { expenseDate: 'desc' },
+      include: { lines: true },
+      take: 100,
+    });
+    return safeJson(res, rows);
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/ingredients/search', async (req: Request, res: Response) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  const q = String(req.query.q ?? '').trim();
+  try {
+    if (!q) return safeJson(res, []);
+    const rows = await prisma.ingredient.findMany({
+      where: { name: { contains: q, mode: 'insensitive' } },
+      take: 20,
+      select: { id: true, name: true, uom: true, category: true },
+    });
+    return safeJson(res, rows);
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+2) Frontend — Purchasing UI (market-leading feel)
+Add two pages and a shared component. Minimal, modern, fast.
+
+2.1 Purchasing list
+File: client/src/pages/expenses/ExpensesList.tsx
+
+tsx
+Copy
+Edit
+import React, { useEffect, useState } from 'react';
+
+type Expense = {
+  id: string; expenseDate: string; type: 'PURCHASE'|'GENERAL'|'WAGE';
+  supplier?: string | null; notes?: string | null; totalTHB: number;
+  lines: { id:string; name:string; qty?:number; uom?:string; lineTotalTHB?:number }[];
+};
+
+const currency = (n:number)=> new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB'}).format(n);
+
+export default function ExpensesList() {
+  const [rows, setRows] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string|null>(null);
+
+  useEffect(()=>{(async()=>{
+    try{
+      setErr(null); setLoading(true);
+      const res = await fetch('/api/expenses', { headers: {Accept:'application/json'} });
+      if(!res.ok) throw new Error('Failed to load expenses');
+      setRows(await res.json());
+    }catch(e:any){setErr(e.message)}finally{setLoading(false)}
+  })()},[]);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Purchasing</h1>
+        <a href="/finance/expenses/new" className="rounded-lg bg-gray-900 text-white text-sm px-4 py-2">+ New Purchase</a>
+      </div>
+      {err ? <div className="rounded border bg-rose-50 p-4 text-rose-700">{err}</div> : null}
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-[0_2px_16px_rgba(16,24,40,.06)]">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-gray-500">
+              <th className="py-3 px-4">Date</th>
+              <th className="py-3 px-4">Supplier</th>
+              <th className="py-3 px-4">Type</th>
+              <th className="py-3 px-4">Lines</th>
+              <th className="py-3 px-4">Total</th>
+              <th className="py-3 px-4"></th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {rows.map(r=>(
+              <tr key={r.id} className="border-t">
+                <td className="py-3 px-4">{new Date(r.expenseDate).toLocaleString('en-GB',{timeZone:'Asia/Bangkok'})}</td>
+                <td className="py-3 px-4">{r.supplier ?? '—'}</td>
+                <td className="py-3 px-4">{r.type}</td>
+                <td className="py-3 px-4">{r.lines?.length ?? 0}</td>
+                <td className="py-3 px-4 font-medium">{currency(r.totalTHB ?? 0)}</td>
+                <td className="py-3 px-4"><a className="text-xs underline" href={`/finance/expenses/${r.id}`}>Open</a></td>
+              </tr>
+            ))}
+            {!rows.length && !loading && (<tr><td className="py-6 px-4 text-gray-500" colSpan={6}>No purchases yet.</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+2.2 New/Edit expense (with modern line editor)
+File: client/src/pages/expenses/ExpenseEditor.tsx
+
+tsx
+Copy
+Edit
+import React, { useEffect, useMemo, useState } from 'react';
+import { IngredientSearch } from './IngredientSearch';
+
+type Line = { id?:string; ingredientId?:string|null; name:string; qty?:number|null; uom?:string|null; unitPriceTHB?:number|null; lineTotalTHB?:number|null };
+const currency = (n:number)=> new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB'}).format(n);
+
+export default function ExpenseEditor() {
+  const [id, setId] = useState<string|undefined>(undefined); // if /:id, parse from router
+  const [expenseDate, setExpenseDate] = useState<string>(()=>new Date().toISOString());
+  const [supplier, setSupplier] = useState('');
+  const [notes, setNotes] = useState('');
+  const [lines, setLines] = useState<Line[]>([{ name:'', qty:null, uom:null, unitPriceTHB:null, lineTotalTHB:null }]);
+  const [showFinderIdx, setShowFinderIdx] = useState<number|null>(null);
+  const total = useMemo(()=>lines.reduce((s,l)=> s + (l.lineTotalTHB ?? ((l.qty||0)*(l.unitPriceTHB||0))),0),[lines]);
+
+  function updateLine(i:number, patch:Partial<Line>) {
+    setLines(prev => prev.map((l,idx)=> idx===i ? {...l, ...patch} : l));
+  }
+  function addLine() { setLines(prev => [...prev, { name:'', qty:null, uom:null, unitPriceTHB:null, lineTotalTHB:null }]); }
+  function removeLine(i:number) { setLines(prev => prev.filter((_,idx)=> idx!==i)); }
+
+  async function save() {
+    const body = {
+      id, expenseDate, supplier, notes, type:'PURCHASE',
+      lines: lines.filter(l => l.name.trim()).map(l => ({
+        ingredientId: l.ingredientId ?? null,
+        name: l.name.trim(),
+        qty: l.qty!=null? Number(l.qty): null,
+        uom: l.uom ?? null,
+        unitPriceTHB: l.unitPriceTHB!=null? Number(l.unitPriceTHB): null,
+        lineTotalTHB: l.lineTotalTHB!=null? Number(l.lineTotalTHB): null,
+      })),
+    };
+    const res = await fetch('/api/expenses', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok) { alert('Save failed'); return; }
+    const out = await res.json();
+    window.location.href = '/finance/expenses';
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{id ? 'Edit Purchase' : 'New Purchase'}</h1>
+        <div className="text-sm text-gray-500">Total: <span className="tabular-nums font-semibold">{currency(total)}</span></div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_2px_16px_rgba(16,24,40,.06)] md:col-span-1">
+          <div className="space-y-3 text-sm">
+            <div>
+              <div className="text-gray-600 mb-1">Date</div>
+              <input type="datetime-local" value={expenseDate.slice(0,16)} onChange={e=>setExpenseDate(new Date(e.target.value).toISOString())} className="w-full rounded-lg border px-3 py-2" />
+            </div>
+            <div>
+              <div className="text-gray-600 mb-1">Supplier</div>
+              <input value={supplier} onChange={e=>setSupplier(e.target.value)} className="w-full rounded-lg border px-3 py-2" placeholder="e.g. Makro Rawai" />
+            </div>
+            <div>
+              <div className="text-gray-600 mb-1">Notes</div>
+              <textarea value={notes} onChange={e=>setNotes(e.target.value)} className="w-full rounded-lg border px-3 py-2" rows={3} placeholder="Optional notes" />
+            </div>
+            <button onClick={save} className="mt-2 w-full rounded-lg bg-gray-900 text-white text-sm px-4 py-2">Save & Recompute</button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_2px_16px_rgba(16,24,40,.06)] md:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700">Lines</h3>
+            <button onClick={addLine} className="text-sm rounded-lg border px-3 py-1.5">+ Add line</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="py-2">Ingredient / Name</th>
+                  <th className="py-2">Qty</th>
+                  <th className="py-2">UOM</th>
+                  <th className="py-2">Unit Price</th>
+                  <th className="py-2">Line Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="py-2 pr-2">
+                      <div className="flex gap-2">
+                        <button onClick={()=>setShowFinderIdx(i)} className="rounded border px-2">🔍</button>
+                        <input className="w-full rounded border px-2 py-1" placeholder="Buns Pack / Ground Beef / Water…" value={l.name} onChange={e=>updateLine(i,{name:e.target.value})} />
+                      </div>
+                      {l.ingredientId ? <div className="text-xs text-emerald-600 mt-1">Linked to ingredient</div> : <div className="text-xs text-gray-400 mt-1">Free text (not linked)</div>}
+                    </td>
+                    <td className="py-2 pr-2"><input type="number" className="w-24 rounded border px-2 py-1" value={l.qty ?? ''} onChange={e=>updateLine(i,{qty: e.target.value === '' ? null : Number(e.target.value)})} /></td>
+                    <td className="py-2 pr-2"><input className="w-24 rounded border px-2 py-1" value={l.uom ?? ''} onChange={e=>updateLine(i,{uom:e.target.value})} placeholder="unit/g/ml" /></td>
+                    <td className="py-2 pr-2"><input type="number" className="w-28 rounded border px-2 py-1" value={l.unitPriceTHB ?? ''} onChange={e=>updateLine(i,{unitPriceTHB: e.target.value === '' ? null : Number(e.target.value)})} /></td>
+                    <td className="py-2 pr-2 font-medium">{currency(l.lineTotalTHB ?? ((l.qty||0)*(l.unitPriceTHB||0)))}</td>
+                    <td className="py-2"><button onClick={()=>removeLine(i)} className="text-rose-600">Remove</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {showFinderIdx!=null && (
+        <IngredientSearch
+          onClose={()=>setShowFinderIdx(null)}
+          onPick={(ing)=>{ updateLine(showFinderIdx, { ingredientId: ing.id, name: ing.name, uom: ing.uom ?? null }); setShowFinderIdx(null); }}
+        />
+      )}
+    </div>
+  );
+}
+2.3 Ingredient finder (modal)
+File: client/src/pages/expenses/IngredientSearch.tsx
+
+tsx
+Copy
+Edit
+import React, { useEffect, useState } from 'react';
+
+export function IngredientSearch({ onClose, onPick }: { onClose:()=>void; onPick:(ing:any)=>void }) {
+  const [q, setQ] = useState('');
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(()=>{ (async()=>{
+    if(!q.trim()) { setRows([]); return; }
+    const r = await fetch('/api/ingredients/search?q='+encodeURIComponent(q));
+    if(r.ok) setRows(await r.json());
+  })() },[q]);
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-700">Find Ingredient</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+        <input autoFocus placeholder="Search ingredient…" className="w-full rounded-lg border px-3 py-2 mb-3" value={q} onChange={e=>setQ(e.target.value)} />
+        <div className="max-h-80 overflow-auto divide-y">
+          {rows.map((r:any)=>(
+            <button key={r.id} onClick={()=>onPick(r)} className="w-full text-left px-2 py-3 hover:bg-gray-50">
+              <div className="font-medium">{r.name}</div>
+              <div className="text-xs text-gray-500">{r.category || '—'} · {r.uom || 'unit'}</div>
+            </button>
+          ))}
+          {!rows.length && <div className="text-sm text-gray-500 p-3">Start typing to search…</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+3) Routing + navigation
+Add to sidebar under Finance:
+
+“Purchasing” → /finance/expenses (list)
+
+Routes (React Router):
+
+/finance/expenses → ExpensesList
+
+/finance/expenses/new → ExpenseEditor
+
+/finance/expenses/:id (optional; for now ExpenseEditor can do new only)
+
+4) QA checklist (what “done” looks like)
+Create a purchase with lines, link a couple to ingredients.
+
+After save, the Dashboard → Expenses total increases and Sales vs Staff expected close adjusts (after recompute).
+
+The list shows the new purchase; editing works.
+
+The UI looks consistent with the dashboard: rounded cards, balanced white space, modern inputs, clear CTAs.
+
