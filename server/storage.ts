@@ -24,6 +24,9 @@ import {
   stockPurchaseRolls, stockPurchaseDrinks, stockPurchaseMeat
 } from "@shared/schema";
 
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
@@ -715,12 +718,56 @@ export class MemStorage implements IStorage {
     await db.delete(shoppingList).where(eq(shoppingList.id, id));
   }
 
-  async getExpenses(): Promise<Expense[]> {
-    // Use database for expenses
+  async getExpenses(): Promise<any[]> {
+    // Get historical expenses from DailySales JSON data
+    const dailySalesExpenses = await prisma.dailySales.findMany({
+      select: {
+        id: true,
+        createdAt: true,
+        shoppingExpenses: true,
+        totalExpenses: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Parse and flatten the JSON expenses
+    const parsedExpenses = dailySalesExpenses.flatMap(record => {
+      if (!record.shoppingExpenses) return [];
+      
+      try {
+        const expenses = JSON.parse(record.shoppingExpenses as string);
+        return expenses.map((expense: any, index: number) => ({
+          id: `${record.id}-${index}`,
+          date: record.createdAt,
+          item: expense.item,
+          amount: parseFloat(expense.cost),
+          supplier: expense.shop,
+          category: 'Shopping',
+          source: 'daily_sales'
+        }));
+      } catch (e) {
+        return [];
+      }
+    });
+
+    // Also get new expenses from Drizzle schema
     const { db } = await import("./db");
     const { expenses } = await import("@shared/schema");
-    const result = await db.select().from(expenses).orderBy(expenses.date);
-    return result;
+    const newExpenses = await db.select().from(expenses).orderBy(expenses.date);
+
+    const formattedNewExpenses = newExpenses.map(expense => ({
+      id: expense.id,
+      date: expense.date,
+      item: expense.item,
+      amount: expense.amount,
+      supplier: expense.supplier,
+      category: expense.category,
+      source: 'expenses_table'
+    }));
+
+    // Combine and sort by date
+    return [...parsedExpenses, ...formattedNewExpenses]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
   async createExpense(expense: InsertExpense): Promise<Expense> {

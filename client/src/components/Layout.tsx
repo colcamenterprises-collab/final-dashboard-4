@@ -53,7 +53,7 @@ const navigationStructure = [
     items: [
       { path: "/finance", label: "Dashboard", icon: BarChart3 },
       { path: "/analysis", label: "Analysis", icon: LineChart },
-      { path: "/finance/expenses", label: "Purchasing", icon: ShoppingCart },
+      { path: "/expenses", label: "Expenses", icon: Receipt },
     ]
   },
   {
