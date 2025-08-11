@@ -1,0 +1,150 @@
+1) Freeze & snapshot (now)
+Stop any new writes to Expenses.
+
+Dump current DB so we don’t lose Phase-2 tables:
+
+pg_dump -Fc $DATABASE_URL > backup_now.dump (or your host’s snapshot button).
+
+2) Forensics (what happened)
+Logs show: rm -rf prisma/migrations && npx prisma db push --accept-data-loss → drops/recreates tables to match the current schema. Any table/column that wasn’t in the active Prisma schema is gone.
+
+Old “Expenses” page (legacy) stored data separately; new “Purchasing” UI points at different tables. The drop wiped the legacy rows.
+
+3) Recovery options (choose A first, else B)
+A — Restore from DB backup/snapshot (preferred)
+
+If your DB provider has point-in-time or daily backups: restore to a new database instance from a date before the push (e.g., Aug 8).
+
+Then we copy only the expenses tables from the restored instance into prod (avoids clobbering Phase-2 data).
+
+B — Rebuild from Daily Sales forms (fallback)
+
+Many Daily Sales forms stored expenses as JSON (e.g., shoppingExpenses). We can reconstruct Expenses + ExpenseLine per form.
+
+Paste-ready SQL (rebuild from forms)
+This extracts itemized lines from the JSON in DailySales.shoppingExpenses between July 1 and Aug 10 and builds Expense heads and ExpenseLine rows. Adjust column names if yours differ.
+
+sql
+Copy
+Edit
+-- 0) Safety: run inside a transaction
+BEGIN;
+
+-- 1) Identify forms with embedded expenses in the date range
+WITH ds AS (
+  SELECT id AS salesFormId, "createdAt", "shoppingExpenses"
+  FROM "DailySales"
+  WHERE "createdAt" >= '2025-07-01'::timestamptz
+    AND "createdAt" <  '2025-08-11'::timestamptz
+    AND "shoppingExpenses" IS NOT NULL
+),
+
+-- 2) Generate a head Expense id per form
+heads AS (
+  SELECT salesFormId,
+         gen_random_uuid() AS expense_id,
+         MIN("createdAt")   AS expenseDate
+  FROM ds
+  GROUP BY salesFormId
+),
+
+-- 3) Insert Expense heads (type = PURCHASE)
+ins_heads AS (
+  INSERT INTO "Expense" (id, "salesFormId", "expenseDate", type, supplier, notes, "totalTHB", "createdAt")
+  SELECT h.expense_id,
+         h.salesFormId,
+         h.expenseDate,
+         'PURCHASE',
+         NULL,                        -- no global supplier at head level
+         'Recovered from DailySales.shoppingExpenses',
+         0,                           -- will backfill totals after lines
+         now()
+  FROM heads h
+  ON CONFLICT (id) DO NOTHING
+  RETURNING id, "salesFormId"
+),
+
+-- 4) Flatten JSON lines and attach to head ids
+lines AS (
+  SELECT h.expense_id,
+         d.salesFormId,
+         x->>'name'                  AS name,
+         NULLIF(x->>'supplier','')   AS supplier,
+         NULLIF(x->>'uom','')        AS uom,
+         (x->>'qty')::numeric        AS qty,
+         (x->>'unitPriceTHB')::numeric AS unitPriceTHB,
+         (x->>'lineTotalTHB')::numeric AS lineTotalTHB,
+         NULLIF(x->>'note','')       AS note
+  FROM ds d
+  JOIN heads h ON h.salesFormId = d.salesFormId
+  CROSS JOIN LATERAL jsonb_array_elements(d."shoppingExpenses") AS x
+),
+
+-- 5) Insert ExpenseLine rows
+ins_lines AS (
+  INSERT INTO "ExpenseLine" ("expenseId","ingredientId","name","qty","uom","unitPriceTHB","lineTotalTHB")
+  SELECT expense_id,
+         NULL,                         -- we didn't have ingredient links in legacy
+         name,
+         qty,
+         uom,
+         unitPriceTHB,
+         COALESCE(lineTotalTHB, qty*unitPriceTHB)
+  FROM lines
+  WHERE name IS NOT NULL
+  RETURNING "expenseId","lineTotalTHB"
+)
+
+-- 6) Backfill totals on heads
+UPDATE "Expense" e
+SET "totalTHB" = COALESCE(s.sum_thb, 0)
+FROM (
+  SELECT "expenseId", SUM(COALESCE("lineTotalTHB",0)) AS sum_thb
+  FROM "ExpenseLine"
+  GROUP BY "expenseId"
+) s
+WHERE e.id = s."expenseId";
+
+COMMIT;
+Verification queries
+sql
+Copy
+Edit
+-- How many recovered expenses?
+SELECT COUNT(*) AS heads, SUM("totalTHB") AS total_thb FROM "Expense"
+WHERE notes = 'Recovered from DailySales.shoppingExpenses';
+
+-- Sample recovered lines:
+SELECT e."expenseDate", e."salesFormId", l.name, l.qty, l.uom, l."lineTotalTHB"
+FROM "Expense" e
+JOIN "ExpenseLine" l ON l."expenseId" = e.id
+WHERE e.notes = 'Recovered from DailySales.shoppingExpenses'
+ORDER BY e."expenseDate" DESC
+LIMIT 50;
+If your forms only stored totals (no itemization), we can at least restore one head with a single line "name"='Unitemized expenses (legacy)' per form using the total field.
+
+Safer (and clearer) Prisma/Node script
+If you prefer TypeScript instead of raw SQL, I’ll drop a small scripts/recoverExpensesFromForms.mjs that:
+
+reads DailySales.shoppingExpenses json per form
+
+creates Expense head
+
+creates ExpenseLines
+
+recomputes head totals
+(Ask and I’ll paste it.)
+
+4) Put the UI back where you expect it
+Restore “Expenses” (legacy) menu for quick access to historical rows.
+
+Keep “Finance → Purchasing” for the new line-item flow.
+
+Add an “Import/Recover” admin button visible to you only (to run the rebuild script again if needed).
+
+5) Guardrails so this never happens again
+Disallow db push --accept-data-loss in prod (CI check or npm script guard).
+
+Nightly logical export of critical tables to object storage (Expense, ExpenseLine, DailySales, receipts, snapshots).
+
+Pre-migration row counts + checksum test; abort on delta > threshold.

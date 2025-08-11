@@ -677,9 +677,9 @@ function ExpensesMerged() {
 
   // Filter expenses based on search and filters
   const filteredExpenses = expenses.filter((expense: any) => {
-    const matchesSearch = expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         expense.supplier?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         expense.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (expense.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (expense.supplier || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (expense.category || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesMonth = !selectedMonth || selectedMonth === "all-months" || 
                         `${expense.year}-${expense.month.toString().padStart(2, '0')}` === selectedMonth;

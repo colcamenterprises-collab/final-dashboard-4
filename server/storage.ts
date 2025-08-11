@@ -719,55 +719,36 @@ export class MemStorage implements IStorage {
   }
 
   async getExpenses(): Promise<any[]> {
-    // Get historical expenses from DailySales JSON data
-    const dailySalesExpenses = await prisma.dailySales.findMany({
-      select: {
-        id: true,
-        createdAt: true,
-        shoppingExpenses: true,
-        totalExpenses: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    // Direct SQL query to get the recovered expense data
+    const expenses = await prisma.$queryRaw<Array<{
+      id: string,
+      item: string,
+      costCents: number,
+      supplier: string,
+      shiftDate: Date,
+      expenseType: string,
+      createdAt: Date,
+      meta: any
+    }>>`
+      SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", meta
+      FROM expenses 
+      ORDER BY "createdAt" DESC
+    `;
 
-    // Parse and flatten the JSON expenses
-    const parsedExpenses = dailySalesExpenses.flatMap(record => {
-      if (!record.shoppingExpenses) return [];
-      
-      try {
-        const expenses = JSON.parse(record.shoppingExpenses as string);
-        return expenses.map((expense: any, index: number) => ({
-          id: `${record.id}-${index}`,
-          date: record.createdAt,
-          item: expense.item,
-          amount: parseFloat(expense.cost),
-          supplier: expense.shop,
-          category: 'Shopping',
-          source: 'daily_sales'
-        }));
-      } catch (e) {
-        return [];
-      }
-    });
-
-    // Also get new expenses from Drizzle schema
-    const { db } = await import("./db");
-    const { expenses } = await import("@shared/schema");
-    const newExpenses = await db.select().from(expenses).orderBy(expenses.date);
-
-    const formattedNewExpenses = newExpenses.map(expense => ({
+    // Format to match the expected UI structure
+    return expenses.map(expense => ({
       id: expense.id,
-      date: expense.date,
-      item: expense.item,
-      amount: expense.amount,
-      supplier: expense.supplier,
-      category: expense.category,
-      source: 'expenses_table'
+      date: expense.shiftDate || expense.createdAt,
+      description: expense.item || 'Unknown Item',
+      amount: (expense.costCents || 0) / 100, // Convert cents to THB
+      category: expense.expenseType || 'Shopping',
+      supplier: expense.supplier || 'Unknown Supplier',
+      paymentMethod: 'Cash',
+      items: expense.item || 'Unknown Item',
+      notes: expense.meta ? JSON.stringify(expense.meta) : null,
+      month: expense.shiftDate ? expense.shiftDate.getMonth() + 1 : new Date().getMonth() + 1,
+      year: expense.shiftDate ? expense.shiftDate.getFullYear() : new Date().getFullYear()
     }));
-
-    // Combine and sort by date
-    return [...parsedExpenses, ...formattedNewExpenses]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
   async createExpense(expense: InsertExpense): Promise<Expense> {
@@ -799,18 +780,16 @@ export class MemStorage implements IStorage {
   }
 
   async getExpensesByCategory(): Promise<Record<string, number>> {
-    const { db } = await import("./db");
-    const { expenses } = await import("@shared/schema");
-    const { sql } = await import("drizzle-orm");
-    
-    const result = await db.select({
-      category: expenses.category,
-      total: sql<number>`SUM(${expenses.amount}::numeric)`
-    }).from(expenses).groupBy(expenses.category);
+    // Use the recovered Prisma data
+    const result = await prisma.$queryRaw<Array<{category: string, total: number}>>`
+      SELECT "expenseType" as category, SUM("costCents"::numeric)/100 as total 
+      FROM expenses 
+      GROUP BY "expenseType"
+    `;
     
     const categories: Record<string, number> = {};
     result.forEach(row => {
-      categories[row.category] = row.total;
+      categories[row.category || 'Other'] = Number(row.total) || 0;
     });
     
     return categories;
