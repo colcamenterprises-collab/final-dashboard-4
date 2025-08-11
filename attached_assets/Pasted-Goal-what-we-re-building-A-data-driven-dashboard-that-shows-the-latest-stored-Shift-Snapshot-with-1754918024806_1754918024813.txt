@@ -1,3 +1,287 @@
+Goal (what we’re building)
+
+A data-driven dashboard that shows the latest stored Shift Snapshot with:
+
+Expenses (purchases in the shift window)
+
+Variance (Opening + Purchases − Usage = Expected → Staff → Variance)
+
+Shift Report Balance (staff banking vs POS payments)
+
+Payments + Top Items …and an Analysis section to browse snapshots.
+
+
+
+---
+
+Work order (do in this order)
+
+1. Backend routes: add 3 read-only endpoints
+
+GET /api/dashboard/latest
+
+GET /api/analysis/list
+
+GET /api/analysis/:id
+(Optional: GET /api/snapshots/:id/items if missing)
+
+
+
+2. Wire routes in server/routes.ts and restart server.
+
+
+3. Frontend: replace Dashboard with the new, styled, data-driven version that reads /api/dashboard/latest.
+
+
+4. Add Analysis menu (list + detail pages) using the new endpoints.
+
+
+5. Accept: verify all three headline metrics render (Expenses, Variance, Balance) from stored data.
+
+
+
+
+---
+
+1) Backend — paste into server/routes.ts
+
+> This composes data from: ShiftSnapshot, PaymentBreakdown, SnapshotItem, JussiComparison, Expense, ExpenseLine, and DailySales.
+It handles BigInt → number safely.
+
+
+
+1.1 BigInt JSON helper (top of file, once)
+
+// Safe JSON for BigInt values
+function safeJson(res: any, data: any, status = 200) {
+  const json = JSON.stringify(
+    data,
+    (_k, v) => (typeof v === 'bigint' ? Number(v) : v)
+  );
+  res.status(status).setHeader('Content-Type', 'application/json').send(json);
+}
+
+1.2 Utilities (top or near the new routes)
+
+const THB = (satang?: number | bigint | null) => Number(satang ?? 0) / 100;
+
+function toBKK(iso: Date) {
+  return new Date(iso); // client formats to BKK; we just pass ISO
+}
+
+// Try to infer staff banking fields safely
+function extractStaffBanking(ds: any) {
+  // Adjust these if your column names differ
+  return {
+    closingCashTHB: Number(ds?.closingCashTHB ?? ds?.closingCash ?? 0),
+    cashBankedTHB: Number(ds?.cashBankedTHB ?? ds?.cashBanked ?? 0),
+    qrTransferTHB: Number(ds?.qrTransferTHB ?? ds?.qrTransfer ?? 0),
+  };
+}
+
+1.3 Core builder to compose a dashboard snapshot
+
+async function buildSnapshotDTO(prisma: any, snapshotId: string) {
+  const snapshot = await prisma.shiftSnapshot.findUnique({
+    where: { id: snapshotId },
+    include: {
+      payments: true,
+      items: { select: { itemName: true, qty: true, revenueSatang: true }, orderBy: { qty: 'desc' }, take: 50 },
+      comparisons: { orderBy: { createdAt: 'desc' }, take: 1 },
+    }
+  });
+  if (!snapshot) return null;
+
+  const comp = snapshot.comparisons?.[0] ?? null;
+  const start = snapshot.windowStartUTC;
+  const end = snapshot.windowEndUTC;
+
+  // Expenses (PURCHASE) in window
+  const lines = await prisma.expenseLine.findMany({
+    where: {
+      Expense: { type: 'PURCHASE', expenseDate: { gte: start, lte: end } }
+    },
+    select: { qty: true, unitPriceTHB: true, lineTotalTHB: true, name: true }
+  });
+  let expensesTotal = 0;
+  for (const l of lines) {
+    const v = (l.lineTotalTHB != null)
+      ? Number(l.lineTotalTHB)
+      : (Number(l.qty ?? 0) * Number(l.unitPriceTHB ?? 0));
+    expensesTotal += (isFinite(v) ? v : 0);
+  }
+
+  // Staff form within window (for banking)
+  const ds = await prisma.dailySales.findFirst({
+    where: { createdAt: { gte: start, lte: end } },
+    orderBy: { createdAt: 'desc' }
+  });
+  const staffBank = extractStaffBanking(ds);
+
+  // POS payments from snapshot
+  const byChannel = Object.fromEntries((snapshot.payments || []).map((p: any) => [p.channel, p]));
+  const posCashTHB = THB(byChannel['CASH']?.totalSatang);
+  const posQrTHB   = THB(byChannel['QR']?.totalSatang);
+  const posGrabTHB = THB(byChannel['GRAB']?.totalSatang);
+
+  const balance = {
+    staff: staffBank,
+    pos: { cashTHB: posCashTHB, qrTHB: posQrTHB, grabTHB: posGrabTHB },
+    diffs: {
+      cashTHB: Number((staffBank.cashBankedTHB - posCashTHB).toFixed(2)),
+      qrTHB:   Number((staffBank.qrTransferTHB - posQrTHB).toFixed(2)),
+    }
+  };
+
+  // Format comparison response (purchases-aware)
+  const comparison = comp ? {
+    opening: {
+      buns: comp.openingBuns ?? null,
+      meatGram: comp.openingMeatGram ?? null,
+      drinks: comp.openingDrinks ?? null,
+    },
+    purchases: {
+      buns: comp.purchasedBuns ?? 0,
+      meatGram: comp.purchasedMeatGram ?? 0,
+      drinks: comp.purchasedDrinks ?? 0,
+    },
+    usagePOS: {
+      buns: comp.expectedBuns ?? 0,
+      meatGram: comp.expectedMeatGram ?? 0,
+      drinks: comp.expectedDrinks ?? 0,
+    },
+    expectedClose: {
+      buns: comp.expectedCloseBuns ?? 0,
+      meatGram: comp.expectedCloseMeatGram ?? 0,
+      drinks: comp.expectedCloseDrinks ?? 0,
+    },
+    staffClose: {
+      buns: comp.staffBuns ?? null,
+      meatGram: comp.staffMeatGram ?? null,
+      drinks: comp.staffDrinks ?? null,
+    },
+    variance: {
+      buns: comp.varBuns ?? null,
+      meatGram: comp.varMeatGram ?? null,
+      drinks: comp.varDrinks ?? null,
+    },
+    state: comp.state
+  } : null;
+
+  return {
+    snapshot: {
+      id: snapshot.id,
+      windowStartUTC: toBKK(snapshot.windowStartUTC),
+      windowEndUTC: toBKK(snapshot.windowEndUTC),
+      totalReceipts: snapshot.totalReceipts,
+      totalSalesTHB: Number((THB(snapshot.totalSalesSatang)).toFixed(2)),
+      reconcileState: snapshot.reconcileState,
+      reconcileNotes: snapshot.reconcileNotes ?? null,
+      payments: (snapshot.payments || []).map((p: any) => ({
+        channel: p.channel,
+        count: p.count,
+        totalTHB: Number((THB(p.totalSatang)).toFixed(2))
+      })),
+    },
+    expenses: {
+      totalTHB: Number(expensesTotal.toFixed(2)),
+      linesCount: lines.length
+    },
+    comparison,
+    balance,
+    topItems: (snapshot.items || []).map((it: any) => ({
+      itemName: it.itemName,
+      qty: it.qty,
+      revenueTHB: Number((THB(it.revenueSatang)).toFixed(2))
+    }))
+  };
+}
+
+1.4 Endpoints (paste into server/routes.ts)
+
+// GET latest dashboard snapshot
+app.get('/api/dashboard/latest', async (req, res) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  try {
+    const latest = await prisma.shiftSnapshot.findFirst({
+      orderBy: { windowStartUTC: 'desc' },
+      select: { id: true }
+    });
+    if (!latest) return safeJson(res, { snapshot: null });
+    const dto = await buildSnapshotDTO(prisma, latest.id);
+    return safeJson(res, dto);
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET analysis list (last 14)
+app.get('/api/analysis/list', async (req, res) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  try {
+    const rows = await prisma.shiftSnapshot.findMany({
+      orderBy: { windowStartUTC: 'desc' },
+      take: 14,
+      select: {
+        id: true, windowStartUTC: true, windowEndUTC: true,
+        totalReceipts: true, totalSalesSatang: true, reconcileState: true
+      }
+    });
+    const mapped = rows.map((r: any) => ({
+      id: r.id,
+      windowStartUTC: r.windowStartUTC,
+      windowEndUTC: r.windowEndUTC,
+      totalReceipts: r.totalReceipts,
+      totalSalesTHB: Number((THB(r.totalSalesSatang)).toFixed(2)),
+      reconcileState: r.reconcileState
+    }));
+    return safeJson(res, mapped);
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET analysis detail by snapshot id
+app.get('/api/analysis/:id', async (req, res) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  const { id } = req.params;
+  try {
+    const dto = await buildSnapshotDTO(prisma, id);
+    if (!dto) return res.status(404).json({ error: 'Snapshot not found' });
+    return safeJson(res, dto);
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// OPTIONAL: Top items if not present yet
+app.get('/api/snapshots/:id/items', async (req, res) => {
+  const prisma = req.prisma || req.app.get('prisma');
+  try {
+    const rows = await prisma.snapshotItem.findMany({
+      where: { snapshotId: req.params.id },
+      orderBy: { qty: 'desc' },
+      take: 50,
+      select: { itemName: true, qty: true, revenueSatang: true }
+    });
+    return safeJson(res, rows.map((r:any)=>({
+      itemName: r.itemName, qty: r.qty, revenueTHB: Number((THB(r.revenueSatang)).toFixed(2))
+    })));
+  } catch (e:any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+
+---
+
+2) Frontend — replace the Dashboard with real data
+
+> Paste this over client/src/pages/Dashboard.tsx. It calls /api/dashboard/latest only. It includes Expenses, Variance, Shift Balance, Payments, and Top Items with clean styling.
+
+
+
 import React, { useEffect, useMemo, useState } from 'react';
 
 type DashboardDTO = {
@@ -146,7 +430,7 @@ export default function Dashboard() {
           )}
           <div className="mt-3 flex gap-3">
             <a className="text-xs underline text-gray-600" href="/form-library">Open Form Library</a>
-            <a className="text-xs underline text-gray-600" href="/purchasing">Purchasing</a>
+            <a className="text-xs underline text-gray-600" href="/finance/expenses">Purchasing</a>
             <a className="text-xs underline text-gray-600" href="/analysis">Open Analysis</a>
           </div>
         </Card>
@@ -218,7 +502,7 @@ export default function Dashboard() {
             <div className="text-lg font-semibold tabular-nums">{currency(data.expenses?.totalTHB ?? 0)}</div>
           </div>
           <div className="mt-1 text-xs text-gray-500">{int(data.expenses?.linesCount)} lines</div>
-          <div className="mt-3"><a className="text-xs underline text-gray-600" href="/purchasing">Open Purchasing</a></div>
+          <div className="mt-3"><a className="text-xs underline text-gray-600" href="/finance/expenses">Open Purchasing</a></div>
         </Card>
       </div>
 
@@ -238,25 +522,106 @@ export default function Dashboard() {
           </div>
         </Card>
       ) : null}
+    </div>
+  );
+}
 
-      {/* Restaurant Hub Logo and Copyright */}
-      <div className="flex flex-col items-end mt-8 mb-4">
-        <a 
-          href="https://www.customli.io" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="block"
-        >
-          <img 
-            src="/assets/restaurant-hub-logo.png" 
-            alt="Restaurant Hub" 
-            className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity mb-2 cursor-pointer"
-          />
-        </a>
-        <p className="text-xs text-gray-500 text-right">
-          Copyright 2025 - www.customli.io - Restaurant Marketing & Management
-        </p>
+
+---
+
+3) Analysis menu (minimal)
+
+Add a sidebar entry “Analysis” → routes:
+
+/analysis → list
+
+/analysis/:id → detail (reuse dashboard cards with /api/analysis/:id)
+
+
+
+client/src/pages/AnalysisList.tsx
+
+import React, { useEffect, useState } from 'react';
+
+export default function AnalysisList() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [err, setErr] = useState<string|null>(null);
+
+  useEffect(()=>{(async()=>{
+    try {
+      const r = await fetch('/api/analysis/list', { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('Failed to load');
+      setRows(await r.json());
+    } catch(e:any){ setErr(e.message); }
+  })()},[]);
+
+  if (err) return <div className="p-6 text-rose-700">{err}</div>;
+  return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Analysis</h1>
+      <div className="rounded-xl border bg-white">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-gray-500">
+            <th className="py-2 px-3">Window (BKK)</th><th className="py-2 px-3">Sales</th><th className="py-2 px-3">Receipts</th><th className="py-2 px-3">State</th><th></th>
+          </tr></thead>
+          <tbody>
+            {rows.map(r=>(
+              <tr key={r.id} className="border-t">
+                <td className="py-2 px-3">{new Date(r.windowStartUTC).toLocaleString('en-GB',{timeZone:'Asia/Bangkok'})} → {new Date(r.windowEndUTC).toLocaleTimeString('en-GB',{timeZone:'Asia/Bangkok'})}</td>
+                <td className="py-2 px-3">฿{r.totalSalesTHB.toLocaleString()}</td>
+                <td className="py-2 px-3">{r.totalReceipts}</td>
+                <td className="py-2 px-3">{r.reconcileState}</td>
+                <td className="py-2 px-3"><a className="text-xs underline" href={`/analysis/${r.id}`}>Open</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
+
+client/src/pages/AnalysisDetail.tsx
+
+Re-use the Dashboard page layout but fetch from /api/analysis/:id instead of /api/dashboard/latest. (Agent can copy Dashboard.tsx and swap the fetch URL using useParams().)
+
+
+---
+
+4) Acceptance checklist (what “done” looks like)
+
+Dashboard shows latest stored snapshot (not live).
+
+Expenses card total matches purchase lines inside the window.
+
+Variance table shows Opening / Purchases / Usage / Expected / Staff / Variance with color thresholds.
+
+Shift Report Balance shows staff vs POS and clear diffs.
+
+Payments and Top Items render from snapshot.
+
+Analysis menu is visible, list of last 14 snapshots works, detail page mirrors dashboard layout for that snapshot.
+
+
+
+---
+
+5) Runbook
+
+# 1) Backend changes
+# paste routes into server/routes.ts, save, restart server
+
+# 2) Frontend
+# replace client/src/pages/Dashboard.tsx with the new file
+# add client/src/pages/AnalysisList.tsx (and AnalysisDetail.tsx)
+# add router entries + sidebar link "Analysis"
+
+# 3) Verify
+curl -s http://localhost:5000/api/dashboard/latest | head
+curl -s http://localhost:5000/api/analysis/list | head
+
+
+---
+
+If you want me to also ship the Expenses entry form (ingredient search + line grid) next, say “go” — I’ll drop the React component and the minimal POST route so purchases can be added and the dashboard will update after a recompute.
+

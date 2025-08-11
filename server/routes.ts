@@ -29,6 +29,148 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 const upload = multer({ storage: multer.memoryStorage() });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Safe JSON for BigInt values
+function safeJson(res: any, data: any, status = 200) {
+  const json = JSON.stringify(
+    data,
+    (_k, v) => (typeof v === 'bigint' ? Number(v) : v)
+  );
+  res.status(status).setHeader('Content-Type', 'application/json').send(json);
+}
+
+const THB = (satang?: number | bigint | null) => Number(satang ?? 0) / 100;
+
+function toBKK(iso: Date) {
+  return new Date(iso); // client formats to BKK; we just pass ISO
+}
+
+// Try to infer staff banking fields safely
+function extractStaffBanking(ds: any) {
+  // Adjust these if your column names differ
+  return {
+    closingCashTHB: Number(ds?.closingCashTHB ?? ds?.closingCash ?? 0),
+    cashBankedTHB: Number(ds?.cashBankedTHB ?? ds?.cashBanked ?? 0),
+    qrTransferTHB: Number(ds?.qrTransferTHB ?? ds?.qrTransfer ?? 0),
+  };
+}
+
+async function buildSnapshotDTO(prisma: any, snapshotId: string) {
+  const snapshot = await prisma.shiftSnapshot.findUnique({
+    where: { id: snapshotId },
+    include: {
+      payments: true,
+      items: { select: { itemName: true, qty: true, revenueSatang: true }, orderBy: { qty: 'desc' }, take: 50 },
+      comparisons: { orderBy: { createdAt: 'desc' }, take: 1 },
+    }
+  });
+  if (!snapshot) return null;
+
+  const comp = snapshot.comparisons?.[0] ?? null;
+  const start = snapshot.windowStartUTC;
+  const end = snapshot.windowEndUTC;
+
+  // Expenses (PURCHASE) in window
+  const lines = await prisma.expenseLine.findMany({
+    where: {
+      type: 'PURCHASE',
+      createdAt: { gte: start, lte: end }
+    },
+    select: { qty: true, unitPriceTHB: true, lineTotalTHB: true, name: true }
+  });
+  let expensesTotal = 0;
+  for (const l of lines) {
+    const v = (l.lineTotalTHB != null)
+      ? Number(l.lineTotalTHB)
+      : (Number(l.qty ?? 0) * Number(l.unitPriceTHB ?? 0));
+    expensesTotal += (isFinite(v) ? v : 0);
+  }
+
+  // Staff form within window (for banking)
+  const ds = await prisma.dailySales.findFirst({
+    where: { createdAt: { gte: start, lte: end } },
+    orderBy: { createdAt: 'desc' }
+  });
+  const staffBank = extractStaffBanking(ds);
+
+  // POS payments from snapshot
+  const byChannel = Object.fromEntries((snapshot.payments || []).map((p: any) => [p.channel, p]));
+  const posCashTHB = THB(byChannel['CASH']?.totalSatang);
+  const posQrTHB   = THB(byChannel['QR']?.totalSatang);
+  const posGrabTHB = THB(byChannel['GRAB']?.totalSatang);
+
+  const balance = {
+    staff: staffBank,
+    pos: { cashTHB: posCashTHB, qrTHB: posQrTHB, grabTHB: posGrabTHB },
+    diffs: {
+      cashTHB: Number((staffBank.cashBankedTHB - posCashTHB).toFixed(2)),
+      qrTHB:   Number((staffBank.qrTransferTHB - posQrTHB).toFixed(2)),
+    }
+  };
+
+  // Format comparison response (purchases-aware)
+  const comparison = comp ? {
+    opening: {
+      buns: comp.openingBuns ?? null,
+      meatGram: comp.openingMeatGram ?? null,
+      drinks: comp.openingDrinks ?? null,
+    },
+    purchases: {
+      buns: comp.purchasedBuns ?? 0,
+      meatGram: comp.purchasedMeatGram ?? 0,
+      drinks: comp.purchasedDrinks ?? 0,
+    },
+    usagePOS: {
+      buns: comp.expectedBuns ?? 0,
+      meatGram: comp.expectedMeatGram ?? 0,
+      drinks: comp.expectedDrinks ?? 0,
+    },
+    expectedClose: {
+      buns: comp.expectedCloseBuns ?? 0,
+      meatGram: comp.expectedCloseMeatGram ?? 0,
+      drinks: comp.expectedCloseDrinks ?? 0,
+    },
+    staffClose: {
+      buns: comp.staffBuns ?? null,
+      meatGram: comp.staffMeatGram ?? null,
+      drinks: comp.staffDrinks ?? null,
+    },
+    variance: {
+      buns: comp.varBuns ?? null,
+      meatGram: comp.varMeatGram ?? null,
+      drinks: comp.varDrinks ?? null,
+    },
+    state: comp.state
+  } : null;
+
+  return {
+    snapshot: {
+      id: snapshot.id,
+      windowStartUTC: toBKK(snapshot.windowStartUTC),
+      windowEndUTC: toBKK(snapshot.windowEndUTC),
+      totalReceipts: snapshot.totalReceipts,
+      totalSalesTHB: Number((THB(snapshot.totalSalesSatang)).toFixed(2)),
+      reconcileState: snapshot.reconcileState,
+      reconcileNotes: snapshot.reconcileNotes ?? null,
+      payments: (snapshot.payments || []).map((p: any) => ({
+        channel: p.channel,
+        count: p.count,
+        totalTHB: Number((THB(p.totalSatang)).toFixed(2))
+      })),
+    },
+    expenses: {
+      totalTHB: Number(expensesTotal.toFixed(2)),
+      linesCount: lines.length
+    },
+    comparison,
+    balance,
+    topItems: (snapshot.items || []).map((it: any) => ({
+      itemName: it.itemName,
+      qty: it.qty,
+      revenueTHB: Number((THB(it.revenueSatang)).toFixed(2))
+    }))
+  };
+}
+
 export function registerRoutes(app: express.Application): Server {
   const server = createServer(app);
   // Stock discrepancy endpoint for dashboard
@@ -269,28 +411,48 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  app.get('/api/analysis/:id', async (req: Request, res: Response) => {
+  app.get('/api/analysis/list', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
     try {
-      const reportId = parseInt(req.params.id);
-      if (isNaN(reportId)) {
-        return res.status(400).json({ error: 'Invalid report ID' });
-      }
-      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
-      
-      if (!report) {
-        return res.status(404).json({ error: 'Report not found' });
-      }
-
-      res.json({
-        id: report.id,
-        filename: report.filename,
-        shiftDate: report.shiftDate,
-        isAnalyzed: report.isAnalyzed,
-        analysisSummary: report.analysisSummary
+      const rows = await prisma.shiftSnapshot.findMany({
+        orderBy: { windowStartUTC: 'desc' },
+        take: 14,
+        select: {
+          id: true, windowStartUTC: true, windowEndUTC: true,
+          totalReceipts: true, totalSalesSatang: true, reconcileState: true
+        }
       });
-    } catch (err) {
-      console.error('Get analysis error:', err);
-      res.status(500).json({ error: 'Failed to get analysis' });
+      const mapped = rows.map((r: any) => ({
+        id: r.id,
+        windowStartUTC: r.windowStartUTC,
+        windowEndUTC: r.windowEndUTC,
+        totalReceipts: r.totalReceipts,
+        totalSalesTHB: Number((THB(r.totalSalesSatang)).toFixed(2)),
+        reconcileState: r.reconcileState
+      }));
+      return safeJson(res, mapped);
+    } catch (e: any) {
+      console.error('Analysis list error:', e);
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+  app.get('/api/analysis/snapshot/:id', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const { id } = req.params;
+    try {
+      const dto = await buildSnapshotDTO(prisma, id);
+      if (!dto) return res.status(404).json({ error: 'Snapshot not found' });
+      return safeJson(res, dto);
+    } catch (e: any) {
+      console.error('Analysis detail error:', e);
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
     }
   });
 
@@ -359,6 +521,32 @@ export function registerRoutes(app: express.Application): Server {
     } catch (err) {
       console.error('Latest analysis error:', err);
       res.status(500).json({ error: 'Failed to get latest analysis' });
+    }
+  });
+
+  // Generic analysis route (for uploaded reports) - must come after specific routes
+  app.get('/api/analysis/:id', async (req: Request, res: Response) => {
+    try {
+      const reportId = parseInt(req.params.id);
+      if (isNaN(reportId)) {
+        return res.status(400).json({ error: 'Invalid report ID' });
+      }
+      const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
+      
+      if (!report) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+
+      res.json({
+        id: report.id,
+        filename: report.filename,
+        shiftDate: report.shiftDate,
+        isAnalyzed: report.isAnalyzed,
+        analysisSummary: report.analysisSummary
+      });
+    } catch (err) {
+      console.error('Get analysis error:', err);
+      res.status(500).json({ error: 'Failed to get analysis' });
     }
   });
 
@@ -1759,6 +1947,28 @@ export function registerRoutes(app: express.Application): Server {
       await prisma.$disconnect();
     }
   });
+
+  // GET latest dashboard snapshot
+  app.get('/api/dashboard/latest', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    try {
+      const latest = await prisma.shiftSnapshot.findFirst({
+        orderBy: { windowStartUTC: 'desc' },
+        select: { id: true }
+      });
+      if (!latest) return safeJson(res, { snapshot: null });
+      const dto = await buildSnapshotDTO(prisma, latest.id);
+      return safeJson(res, dto);
+    } catch (e: any) {
+      console.error('Dashboard latest error:', e);
+      return res.status(500).json({ error: e.message });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
+
 
   // Run snapshot for specific date
   app.post('/api/snapshots/create', async (req: Request, res: Response) => {

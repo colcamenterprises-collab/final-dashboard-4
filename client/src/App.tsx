@@ -15,6 +15,8 @@ import POSLoyverse from "@/pages/POSLoyverse";
 
 import RecipeIngredientManagement from "@/pages/RecipeIngredientManagement";
 import Analysis from "@/pages/Analysis";
+import AnalysisList from "@/pages/AnalysisList";
+import AnalysisDetail from "@/pages/AnalysisDetail";
 import ReportsAnalysis from "@/pages/ReportsAnalysis";
 import ShiftAnalytics from "@/pages/ShiftAnalytics";
 import WebhookManagement from "@/pages/WebhookManagement";
@@ -58,7 +60,8 @@ function Router() {
         <Route path="/recipe-management" component={RecipeIngredientManagement} />
         <Route path="/ingredient-management" component={RecipeIngredientManagement} />
         <Route path="/reports-analysis" component={ReportsAnalysis} />
-        <Route path="/analysis" component={Analysis} />
+        <Route path="/analysis" component={AnalysisList} />
+        <Route path="/analysis/:id" component={AnalysisDetail} />
         <Route path="/shift-analytics" component={ShiftAnalytics} />
         <Route path="/shift-comparison" component={ShiftComparison} />
         <Route path="/analysis/shift-report/:date" component={ShiftReportDetail} />
