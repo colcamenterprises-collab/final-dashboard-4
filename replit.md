@@ -19,6 +19,19 @@ Fort Knox File Structure: Core locked files include daily_sales_form_locked.html
 
 ## Recent Changes
 
+**August 12, 2025 - Data-Driven Dashboard + Phase 2++ API Integration - COMPLETE ✅**
+- **New Data-Driven Dashboard**: Replaced placeholder home page with authentic Phase 2++ API-powered dashboard
+- **Real-Time Analytics Display**: Shows actual snapshot data including reconcile state badges (OK/MISMATCH/MISSING_DATA)
+- **Purchases-Aware Variance Table**: Visual breakdown of Opening + Purchases - Usage = Expected vs Staff with color-coded thresholds
+- **Authentic Payment Data**: Real payment breakdowns (CASH/QR/GRAB/CARD/OTHER) from actual POS transactions
+- **Top Items Integration**: Live top-selling items with quantities and revenue from SnapshotItem data
+- **Clean Error States**: Proper loading states, error handling, and empty state messaging without fake data
+- **API Endpoints Enhanced**: Added GET /api/snapshots/:id/items with BigInt serialization for top items display
+- **Bangkok Timezone Display**: Shift windows properly formatted for Asia/Bangkok timezone with readable date/time
+- **No Placeholder Content**: Completely removed all fake/mock data from dashboard, only showing authentic restaurant data
+- **Responsive Design**: Clean grid layout working across mobile, tablet, and desktop with proper spacing
+- **STATUS: Restaurant Operations Hub dashboard fully operational with authentic Phase 2++ purchases-aware data**
+
 **August 10, 2025 - Phase 2++ Purchases + Audit Fields System - COMPLETE ✅**
 - **Complete Purchases-Aware System**: Full implementation with ExpenseType enum and ExpenseLine model for purchase tracking
 - **Enhanced Snapshot Worker**: Purchases-aware logic queries ExpenseLine with type='PURCHASE' within shift windows

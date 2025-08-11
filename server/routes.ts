@@ -1725,6 +1725,41 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Get top items for specific snapshot
+  app.get('/api/snapshots/:id/items', async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+      const snapshotId = req.params.id;
+      
+      const items = await prisma.snapshotItem.findMany({
+        where: { snapshotId },
+        orderBy: { qty: 'desc' },
+        take: 50,
+        select: { 
+          itemName: true, 
+          qty: true, 
+          revenueSatang: true 
+        }
+      });
+      
+      // Convert BigInt to string for JSON serialization
+      const serializedItems = items.map(item => ({
+        itemName: item.itemName,
+        qty: item.qty,
+        revenueSatang: item.revenueSatang.toString()
+      }));
+      
+      res.json(serializedItems);
+    } catch (error) {
+      console.error('Items fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch items' });
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+
   // Run snapshot for specific date
   app.post('/api/snapshots/create', async (req: Request, res: Response) => {
     try {
