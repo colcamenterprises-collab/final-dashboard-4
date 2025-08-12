@@ -19,6 +19,17 @@ Fort Knox File Structure: Core locked files include daily_sales_form_locked.html
 
 ## Recent Changes
 
+**August 12, 2025 - Enhanced Source-Based Expense Management System - COMPLETE ✅**
+- **Source-Based Expense Architecture**: Implemented ExpenseSource enum system with DIRECT/SHIFT_FORM categorization
+- **Database Schema Enhancement**: Added source column with proper constraints and data migration of existing ฿3,923 expenses
+- **Tabbed Interface System**: Clean separation between Business Expenses (out-of-shift costs) and Shift Purchasing (variance-affecting purchases)
+- **API Route Architecture**: Source-filtered endpoints supporting ?source=DIRECT/SHIFT_FORM with proper Prisma integration
+- **Component Separation**: Dedicated BusinessExpenses.tsx and ShiftPurchasing.tsx with distinct functionality and styling
+- **Variance Integration**: Shift purchases automatically trigger snapshot recompute for accurate inventory tracking
+- **Data Classification**: All recovered expenses properly classified as DIRECT business expenses maintaining data integrity
+- **Error Resolution**: Fixed SelectItem value prop issues and established proper filter defaults
+- **STATUS: Complete expense management system with proper source separation and variance integration operational**
+
 **August 12, 2025 - Data-Driven Dashboard + Phase 2++ API Integration - COMPLETE ✅**
 - **New Data-Driven Dashboard**: Replaced placeholder home page with authentic Phase 2++ API-powered dashboard
 - **Real-Time Analytics Display**: Shows actual snapshot data including reconcile state badges (OK/MISMATCH/MISSING_DATA)

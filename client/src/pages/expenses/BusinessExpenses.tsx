@@ -39,8 +39,8 @@ export function BusinessExpenses() {
   const { toast } = useToast();
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   // Fetch business expenses only (DIRECT source)
   const { data: expenses = [], isLoading } = useQuery({
@@ -100,8 +100,8 @@ export function BusinessExpenses() {
   const filteredExpenses = expenses.filter((expense: any) => {
     const matchesSearch = expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          expense.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMonth = !selectedMonth || expense.month === parseInt(selectedMonth);
-    const matchesCategory = !selectedCategory || expense.category === selectedCategory;
+    const matchesMonth = selectedMonth === "all" || !selectedMonth || expense.month === parseInt(selectedMonth);
+    const matchesCategory = selectedCategory === "all" || !selectedCategory || expense.category === selectedCategory;
     
     return matchesSearch && matchesMonth && matchesCategory;
   });
@@ -303,7 +303,7 @@ export function BusinessExpenses() {
                   <SelectValue placeholder="All months" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All months</SelectItem>
+                  <SelectItem value="all">All months</SelectItem>
                   <SelectItem value="8">August 2025</SelectItem>
                   <SelectItem value="7">July 2025</SelectItem>
                   <SelectItem value="6">June 2025</SelectItem>
@@ -318,7 +318,7 @@ export function BusinessExpenses() {
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All categories</SelectItem>
+                  <SelectItem value="all">All categories</SelectItem>
                   <SelectItem value="UTILITY">Utilities</SelectItem>
                   <SelectItem value="SUPPLIES">Supplies</SelectItem>
                   <SelectItem value="SHOPPING">Shopping</SelectItem>
