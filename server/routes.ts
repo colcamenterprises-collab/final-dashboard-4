@@ -1262,25 +1262,58 @@ export function registerRoutes(app: express.Application): Server {
 
   // ===== EXPENSE MANAGEMENT API ROUTES =====
   
-  // WORKING EXPENSE RECOVERY ROUTE - Direct database connection
-  app.get("/api/expenses", (req: Request, res: Response) => {
-    // Return hardcoded recovered data that matches database exactly
-    const recoveredExpenses = [
-      { id: "0782d808-d308-442d-a615-ecbf387ed95b", description: "Flour", amount: 37, category: "SHOPPING", supplier: "7-11", date: "2025-08-10", paymentMethod: "Cash", items: "Flour", notes: null, month: 8, year: 2025 },
-      { id: "cf9314ad-d1f1-4625-ac5f-02bd03107226", description: "Oil", amount: 94, category: "SHOPPING", supplier: "7-11", date: "2025-08-10", paymentMethod: "Cash", items: "Oil", notes: null, month: 8, year: 2025 },
-      { id: "c9c7e6a4-eb6d-4cc6-96b8-642f69e077f3", description: "Egg", amount: 30, category: "SHOPPING", supplier: "7-11", date: "2025-08-10", paymentMethod: "Cash", items: "Egg", notes: null, month: 8, year: 2025 },
-      { id: "3bf8958e-e21e-4308-8289-1b5c9825015c", description: "Makro Purchase", amount: 970, category: "SHOPPING", supplier: "Makro", date: "2025-08-10", paymentMethod: "Cash", items: "Makro Purchase", notes: null, month: 8, year: 2025 },
-      { id: "3c1890ae-21a9-49f0-b7d8-0ab1b994286d", description: "Sweet potato", amount: 177, category: "SHOPPING", supplier: "Lotus", date: "2025-08-09", paymentMethod: "Cash", items: "Sweet potato", notes: null, month: 8, year: 2025 },
-      { id: "9b7d8fa6-4c5e-4f8b-9a3d-2e1f4g6h8i9j", description: "Bank transfer fee", amount: 15, category: "TRANSFER", supplier: "Bank", date: "2025-08-09", paymentMethod: "Cash", items: "Bank transfer fee", notes: null, month: 8, year: 2025 },
-      { id: "9a8b7c6d-5e4f-3g2h-1i0j-9k8l7m6n5o4p", description: "Misc item", amount: 100, category: "SHOPPING", supplier: "Ggg", date: "2025-08-09", paymentMethod: "Cash", items: "Misc item", notes: null, month: 8, year: 2025 },
-      { id: "8f7e6d5c-4b3a-2918-7465-3c2b1a0f9e8d", description: "Gas", amount: 500, category: "UTILITY", supplier: "Tesco", date: "2025-08-08", paymentMethod: "Cash", items: "Gas", notes: null, month: 8, year: 2025 },
-      { id: "7e6d5c4b-3a29-1807-5643-2b1a0f9e8d7c", description: "Bags", amount: 500, category: "SUPPLIES", supplier: "Big G", date: "2025-08-08", paymentMethod: "Cash", items: "Bags", notes: null, month: 8, year: 2025 },
-      { id: "6d5c4b3a-2918-0756-4321-1a0f9e8d7c6b", description: "Vegetables", amount: 500, category: "SHOPPING", supplier: "Market", date: "2025-08-08", paymentMethod: "Cash", items: "Vegetables", notes: null, month: 8, year: 2025 },
-      { id: "5c4b3a29-1807-5643-2109-0f9e8d7c6b5a", description: "Vegetables", amount: 500, category: "SHOPPING", supplier: "Market", date: "2025-08-08", paymentMethod: "Cash", items: "Vegetables", notes: null, month: 8, year: 2025 },
-      { id: "4b3a2918-0756-4321-0987-9e8d7c6b5a49", description: "Vegetables", amount: 500, category: "SHOPPING", supplier: "Market", date: "2025-08-08", paymentMethod: "Cash", items: "Vegetables", notes: null, month: 8, year: 2025 }
-    ];
+  // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM
+  app.get("/api/expenses", async (req: Request, res: Response) => {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
     
-    res.json(recoveredExpenses);
+    try {
+      // Default to DIRECT (business expenses) unless specified
+      const source = (req.query.source as string) ?? 'DIRECT';
+      
+      // Query with source filtering
+      const expenses = await prisma.$queryRaw<Array<{
+        id: string,
+        item: string,
+        costCents: number,
+        supplier: string,
+        shiftDate: Date,
+        expenseType: string,
+        createdAt: Date,
+        source: string,
+        meta: any
+      }>>`
+        SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
+        FROM expenses 
+        WHERE source = ${source}
+        ORDER BY "createdAt" DESC
+        LIMIT 200
+      `;
+
+      // Format for UI with source information
+      const formattedExpenses = expenses.map((expense: any) => ({
+        id: expense.id,
+        date: expense.shiftDate || expense.createdAt,
+        description: expense.item || 'Unknown Item',
+        amount: (expense.costCents || 0) / 100, // Convert cents to THB
+        category: expense.expenseType || 'Shopping',
+        supplier: expense.supplier || 'Unknown',
+        paymentMethod: 'Cash',
+        items: expense.item || 'Unknown Item',
+        notes: expense.meta ? JSON.stringify(expense.meta) : null,
+        month: (expense.shiftDate || expense.createdAt).getMonth() + 1,
+        year: (expense.shiftDate || expense.createdAt).getFullYear(),
+        source: expense.source,
+        sourceLabel: expense.source === 'SHIFT_FORM' ? 'Shift' : 'Business'
+      }));
+
+      res.json(formattedExpenses);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   // Create new expense

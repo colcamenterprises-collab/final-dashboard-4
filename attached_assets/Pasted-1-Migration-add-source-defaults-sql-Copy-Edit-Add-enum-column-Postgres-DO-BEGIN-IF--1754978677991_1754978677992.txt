@@ -1,0 +1,128 @@
+1) Migration (add source + defaults)
+sql
+Copy
+Edit
+-- Add enum + column (Postgres)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ExpenseSource') THEN
+    CREATE TYPE "ExpenseSource" AS ENUM ('DIRECT', 'SHIFT_FORM');
+  END IF;
+END $$;
+
+ALTER TABLE "Expense"
+  ADD COLUMN IF NOT EXISTS "source" "ExpenseSource";
+
+-- Backfill: anything tied to a DailySales form or “Recovered …” → SHIFT_FORM; otherwise DIRECT
+UPDATE "Expense" SET "source"='SHIFT_FORM'
+WHERE "salesFormId" IS NOT NULL
+   OR (notes IS NOT NULL AND notes ILIKE '%Recovered from DailySales.shoppingExpenses%');
+
+UPDATE "Expense" SET "source"='DIRECT'
+WHERE "source" IS NULL;
+If you’re using Prisma, add to schema.prisma:
+
+prisma
+Copy
+Edit
+enum ExpenseSource { DIRECT SHIFT_FORM }
+
+model Expense {
+  id           String        @id @default(uuid())
+  expenseDate  DateTime
+  type         ExpenseType   @default(PURCHASE)
+  supplier     String?
+  notes        String?
+  totalTHB     Float          @default(0)
+  salesFormId  String?
+  source       ExpenseSource  @default(DIRECT)  // <-- NEW
+  lines        ExpenseLine[]
+  createdAt    DateTime       @default(now())
+}
+Then run: npx prisma migrate dev --name add_expense_source (NOT db push).
+
+2) API filters (small, surgical)
+Dashboard purchases for variance (SHIFT only, in-window)
+ts
+Copy
+Edit
+// in buildSnapshotDTO()
+const lines = await prisma.expenseLine.findMany({
+  where: {
+    Expense: {
+      source: 'SHIFT_FORM',         // <— only shift purchases
+      type: 'PURCHASE',
+      expenseDate: { gte: start, lte: end }
+    }
+  },
+  select: { qty: true, unitPriceTHB: true, lineTotalTHB: true, name: true }
+});
+Expenses page (Business only)
+ts
+Copy
+Edit
+// GET /api/expenses  (add optional ?source=)
+app.get('/api/expenses', async (req,res)=>{
+  const source = (req.query.source as string) ?? 'DIRECT';
+  const rows = await prisma.expense.findMany({
+    where: { source: source as any },     // <— DEFAULT DIRECT
+    orderBy: { expenseDate: 'desc' },
+    include: { lines: true },
+    take: 200,
+  });
+  return safeJson(res, rows);
+});
+Your new Purchasing UI should POST with source='SHIFT_FORM' only when the purchase is added inside a shift context. The normal Expenses form should always POST source='DIRECT'.
+
+3) Re-tag any mistaken rows (one-time cleanup)
+If the agent imported form expenses into the business list:
+
+sql
+Copy
+Edit
+-- Anything created by the recovery script or linked to a form → SHIFT_FORM
+UPDATE "Expense"
+SET "source"='SHIFT_FORM'
+WHERE notes ILIKE '%Recovered from DailySales.shoppingExpenses%'
+   OR "salesFormId" IS NOT NULL;
+4) UI changes (clear & modern)
+Tabs
+
+Daily Sales & Stock (forms)
+
+Purchasing (Shift) — tagline: “Purchases made during a shift (affects shift variance & inventory).”
+
+Expenses (Business) — tagline: “Out-of-shift business expenses (Makro, fuel, director).”
+
+Reports & Analysis
+
+Expenses (Business) List uses /api/expenses?source=DIRECT.
+
+Purchasing uses /api/expenses?source=SHIFT_FORM (or a dedicated route) and after save triggers Recompute for the latest snapshot.
+
+Dashboard cards
+
+Expenses (Purchases in window) → clearly labeled “Shift purchases only”.
+
+Optional second card: Business Expenses (MTD) pulling DIRECT totals this month (does not affect shift balance).
+
+5) Recovery of missing July/Aug business expenses
+If a DB snapshot exists from before the destructive push, restore to a temp DB and copy the old expenses table into prod (safer & exact).
+
+If no snapshot: do you have the bank CSV or Google Sheet that fed the old Expenses page? I can give you a one-click importer to rebuild DIRECT expenses from those files.
+
+6) Quick acceptance tests
+Open Expenses (Business) → should show only your out-of-shift entries.
+
+Purchasing (Shift) → create a small test line; Dashboard “Expenses (Shift)” increases, Variance adjusts; Business list stays unchanged.
+
+Reports & Analysis → totals match filters:
+
+MTD Business (DIRECT)
+
+Per-shift Purchases (SHIFT_FORM)
+
+7) Optional: add a “source chip” to each list row
+SHIFT_FORM → purple pill “Shift”
+
+DIRECT → blue pill “Business”
+
