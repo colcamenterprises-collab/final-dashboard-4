@@ -48,9 +48,9 @@ function toBKK(iso: Date) {
 function extractStaffBanking(ds: any) {
   // Adjust these if your column names differ
   return {
-    closingCashTHB: Number(ds?.closingCashTHB ?? ds?.closingCash ?? 0),
-    cashBankedTHB: Number(ds?.cashBankedTHB ?? ds?.cashBanked ?? 0),
-    qrTransferTHB: Number(ds?.qrTransferTHB ?? ds?.qrTransfer ?? 0),
+    closingCashTHB: Number(ds?.amountBanked ?? 0),
+    cashBankedTHB: Number(ds?.amountBanked ?? 0),
+    qrTransferTHB: Number(ds?.qrTransferred ?? 0),
   };
 }
 
@@ -103,12 +103,8 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
     where: { createdAt: { gte: snapshot.windowStartUTC, lte: snapshot.windowEndUTC } },
     orderBy: { createdAt: 'desc' },
     select: {
-      closingCashTHB: true,
-      cashBankedTHB: true,
-      qrTransferTHB: true,
-      closingCash: true,
-      cashBanked: true,
-      qrTransfer: true
+      amountBanked: true,
+      qrTransferred: true
     }
   });
   const staffBank = extractStaffBanking(ds);
@@ -180,7 +176,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
     },
     expenses: {
       totalTHB: Number(expensesTotal.toFixed(2)),
-      linesCount: lines.length
+      linesCount: expensesCount
     },
     comparison,
     balance,

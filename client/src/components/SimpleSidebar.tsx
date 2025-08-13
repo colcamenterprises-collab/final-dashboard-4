@@ -40,9 +40,9 @@ export default function SimpleSidebar({ children }: SimpleSidebarProps) {
           {/* Navigation */}
           <nav className="space-y-2">
             <Link
-              href="/dashboard"
+              href="/"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                location === '/dashboard' ? 'bg-teal-100 text-teal-700' : 'text-gray-700 hover:bg-gray-100'
+                location === '/' ? 'bg-teal-100 text-teal-700' : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               <div className="w-5 h-5 bg-teal-600 rounded"></div>
@@ -55,7 +55,16 @@ export default function SimpleSidebar({ children }: SimpleSidebarProps) {
               }`}
             >
               <div className="w-5 h-5 bg-orange-500 rounded"></div>
-              {sidebarOpen && <span>Daily Sales</span>}
+              {sidebarOpen && <span>Daily Sales Form</span>}
+            </Link>
+            <Link
+              href="/daily-stock-sales"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                location === '/daily-stock-sales' ? 'bg-purple-100 text-purple-700' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <div className="w-5 h-5 bg-purple-500 rounded"></div>
+              {sidebarOpen && <span>Daily Stock Form</span>}
             </Link>
             <Link
               href="/receipts"
