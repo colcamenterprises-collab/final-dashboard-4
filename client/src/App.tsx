@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
-import SimpleSidebar from "@/components/SimpleSidebar";
+import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
 import DashboardModern from "@/pages/DashboardModern";
 import DailyStockForm from "@/pages/DailyStockForm";
@@ -55,8 +55,10 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <SimpleSidebar>
-      <Switch>
+    <div className="min-h-screen bg-[#f5f7f8] flex">
+      <Sidebar />
+      <main className="flex-1 min-w-0">
+        <Switch>
         <Route path="/" component={DashboardModern} />
         <Route path="/dashboard-old" component={Dashboard} />
         <Route path="/daily-stock-sales" component={DailyStockForm} />
@@ -131,8 +133,9 @@ function Router() {
         <Route path="/test-email" component={TestEmailPage} />
 
         <Route component={NotFound} />
-      </Switch>
-    </SimpleSidebar>
+        </Switch>
+      </main>
+    </div>
   );
 }
 
