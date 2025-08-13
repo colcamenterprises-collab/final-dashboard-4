@@ -1,24 +1,58 @@
 import { useLocation } from "wouter";
 import { useState } from "react";
 
-type Item = { label: string; path: string };
+type Item = { label: string; path: string; icon: JSX.Element };
 
-const NAV_SALES_OPS: Item[] = [
-  { label: "Dashboard", path: "/dashboard" },
-  { label: "Daily Sales Form", path: "/daily-sales" },
-  { label: "Daily Stock Form", path: "/daily-stock" },
-  { label: "Receipts", path: "/receipts" },
-  { label: "Expenses (Business)", path: "/expenses" },
-  { label: "System Status", path: "/system-status" },
+const Icon = {
+  dash: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 7h7v6H4zM13 7h7v10h-7zM4 15h7v2H4z" />
+    </svg>
+  ),
+  sales: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 19h16M5 17l2-9h10l2 9M9 10v3M12 10v3M15 10v3" />
+    </svg>
+  ),
+  stock: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" />
+    </svg>
+  ),
+  receipts: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M8 3h10v18l-3-2-3 2-3-2-3 2V3z" /><path d="M10 7h6M10 11h6M10 15h6" />
+    </svg>
+  ),
+  expenses: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="8" /><path d="M9 9h3a3 3 0 110 6H9m3-6V7m0 10v-2" />
+    </svg>
+  ),
+  status: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5 5l2.1 2.1M16.9 16.9L19 19M5 19l2.1-2.1M16.9 7.1L19 5" />
+    </svg>
+  ),
+};
+
+const NAV: Item[] = [
+  { label: "Dashboard",            path: "/dashboard",     icon: Icon.dash },
+  { label: "Daily Sales Form",     path: "/daily-sales",   icon: Icon.sales },
+  { label: "Daily Stock Form",     path: "/daily-stock",   icon: Icon.stock },
+  { label: "Receipts",             path: "/receipts",      icon: Icon.receipts },
+  { label: "Expenses (Business)",  path: "/expenses",      icon: Icon.expenses },
+  { label: "System Status",        path: "/system-status", icon: Icon.status },
 ];
 
 export default function Sidebar() {
   const [location, navigate] = useLocation();
   const [open, setOpen] = useState(true);
 
-  // widths: 256px open → 78px collapsed
   const width = open ? "w-64" : "w-[78px]";
-  const showLabel = open ? "" : "opacity-0 pointer-events-none";
+  const label = open ? "" : "opacity-0 pointer-events-none";
+  const iconOnly = open ? "" : "mx-auto";
+  const padX = open ? "px-3" : "px-2";
 
   return (
     <aside
@@ -29,9 +63,7 @@ export default function Sidebar() {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
-        <div className={`font-semibold tracking-tight text-gray-900 ${open ? "" : "sr-only"}`}>
-          Smash Brothers
-        </div>
+        <div className={`font-semibold tracking-tight text-gray-900 ${open ? "" : "sr-only"}`}>Smash Brothers</div>
         <button
           aria-label="Toggle sidebar"
           onClick={() => setOpen(v => !v)}
@@ -41,39 +73,27 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Section label */}
-      <div className={`text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-3 ${open ? "mb-2" : "sr-only"}`}>
+      {/* Section divider */}
+      <div className={`text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-4 ${open ? "mb-2" : "sr-only"}`}>
         Sales & Operations
       </div>
 
-      {/* Nav: text-only, slim active bar; NO DOTS */}
+      {/* Nav (no dots; green active pill) */}
       <nav className="px-2 pb-6 overflow-y-auto">
         <ul className="space-y-2">
-          {NAV_SALES_OPS.map(item => {
+          {NAV.map(item => {
             const active = location.startsWith(item.path);
             return (
               <li key={item.path}>
                 <button
                   onClick={() => navigate(item.path)}
                   title={!open ? item.label : undefined}
-                  className={`relative w-full flex items-center rounded-xl px-3 py-2
-                              hover:bg-gray-50 border border-transparent
-                              ${active ? "bg-emerald-50 border-emerald-200" : ""}`}
+                  className={`relative w-full flex items-center ${padX} py-2 rounded-full
+                              border border-transparent hover:bg-gray-50
+                              ${active ? "bg-emerald-600 text-white shadow-sm" : "text-gray-800"}`}
                 >
-                  {/* Slim left accent when active */}
-                  {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-emerald-500" />
-                  )}
-
-                  {/* Collapsed: very small text hint (2 letters), no badge bg */}
-                  <span className={`text-[11px] font-semibold text-gray-700 w-6 text-center ${open ? "hidden" : ""}`}>
-                    {item.label.slice(0,2).toUpperCase()}
-                  </span>
-
-                  {/* Full label (hidden when collapsed) */}
-                  <span className={`ml-2 text-sm text-gray-800 transition-opacity ${showLabel}`}>
-                    {item.label}
-                  </span>
+                  <span className={`text-current ${iconOnly}`}>{item.icon}</span>
+                  <span className={`ml-3 text-sm transition-opacity ${label}`}>{item.label}</span>
                 </button>
               </li>
             );
