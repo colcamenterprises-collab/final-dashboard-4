@@ -298,19 +298,16 @@ const Recipes = () => {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-4 lg:p-6 max-w-7xl">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Menu Management</h1>
-        <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Manage recipes, ingredients, and menu items</p>
-        
-
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">Menu Management</h1>
       </div>
 
-      <div className="space-y-4 sm:space-y-6">
+      <div className="mt-6 space-y-6">
         <Card>
           <CardHeader className="pb-3 sm:pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Recipe Management</h2>
+              <h2 className="text-[18px] font-semibold text-[var(--heading)]">Recipe Management</h2>
               <div className="text-xs sm:text-sm text-gray-600">
                 Create industry-standard recipes with proper measurements and costing
               </div>

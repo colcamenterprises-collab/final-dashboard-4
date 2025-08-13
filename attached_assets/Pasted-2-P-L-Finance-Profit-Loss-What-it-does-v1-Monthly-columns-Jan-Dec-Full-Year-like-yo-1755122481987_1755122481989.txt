@@ -1,0 +1,280 @@
+2) P&L (Finance → “Profit & Loss”)
+What it does (v1)
+Monthly columns (Jan → Dec + Full Year) like your sheet.
+
+Live calculation from Sales and Expenses tables.
+
+Category → line mapping (so new imports auto-flow in).
+
+Toggle to include/exclude shift purchases (default: off).
+
+Data it needs
+Sales (already in your system):
+
+Food gross, Food discounts/refunds
+
+Drink gross, Drink discounts/refunds
+
+Payment fees (acquirers)
+
+Expenses (DIRECT_UPLOAD + MANUAL by default):
+
+Mapped categories (Wage, Rent, Utilities, etc.)
+
+SHIFT_FORM excluded unless toggled
+
+If some sales metrics aren’t separated yet, we’ll accept gross & discounts at the POS layer and compute Net.
+
+Minimal schema additions
+sql
+Copy
+Edit
+-- P&L mapping from expense categories to P&L rows
+CREATE TABLE IF NOT EXISTS PLRow (
+  id SERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,   -- e.g., 'WAGES','RENT','UTILITIES','FUEL','MARKETING_OTHER'
+  label TEXT NOT NULL,         -- display label
+  sort_order INT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS PLCategoryMap (
+  category_id INT NOT NULL,    -- your Expense.Category id
+  plrow_code TEXT NOT NULL REFERENCES PLRow(code),
+  PRIMARY KEY (category_id)
+);
+
+-- Optional: monthly cache (for speed). Recomputed on change.
+CREATE TABLE IF NOT EXISTS PLMonthCache (
+  year INT NOT NULL,
+  month INT NOT NULL,          -- 1..12
+  plrow_code TEXT NOT NULL REFERENCES PLRow(code),
+  amount_minor BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (year, month, plrow_code)
+);
+Seed PLRow to match your sheet order (top→bottom):
+
+nginx
+Copy
+Edit
+TOTAL_GROSS_REVENUE
+FOOD_GROSS
+FOOD_DISCOUNT
+FOOD_NET
+DRINK_GROSS
+DRINK_DISCOUNT
+DRINK_NET
+DISCOUNTS_TOTAL
+NET_REV_EX_FEES
+PAYMENT_FEES
+NET_REV_INC_FEES
+COGS_FOOD
+COGS_BEVERAGE
+COGS_TOTAL
+GROSS_PROFIT
+GROSS_MARGIN
+
+WAGES
+TIPS_QR
+BONUS_PAY
+STAFF_FROM_ACCOUNT
+RENT
+ADMIN
+ADVERTISING_GRAB
+ADVERTISING_OTHER
+DELIVERY_FEE_DISCOUNT
+DIRECTOR_PAYMENT
+DISCOUNT_MERCHANT_FUNDED
+FITTINGS
+KITCHEN_SUPPLIES
+MARKETING
+MARKETING_SUCCESS_FEE
+MISC
+PRINTERS
+RENOVATIONS
+SUBSCRIPTIONS
+STATIONARY
+TRAVEL
+UTILITIES
+MISC_CASH_PURCHASES
+TOTAL_EXPENSES
+
+EBIT
+INTEREST_EXPENSE
+EBT
+INCOME_TAX
+NET_EARNINGS
+(Some rows are composites and won’t be directly mapped; that’s fine — they’re computed.)
+
+Mapping examples (so auto-flows)
+Category (Expense)	Map to PL row
+“Staff Expenses - Wage”	WAGES
+“Staff Expenses (from Account)”	STAFF_FROM_ACCOUNT
+“Rent”	RENT
+“Advertising - Grab”	ADVERTISING_GRAB
+“Delivery Fee Discount (Merchant-Funded)”	DELIVERY_FEE_DISCOUNT
+“Discount (Merchant-Funded)”	DISCOUNT_MERCHANT_FUNDED
+“Kitchen Supplies or Packaging”	KITCHEN_SUPPLIES
+“Renovations”	RENOVATIONS
+“Subscriptions”	SUBSCRIPTIONS
+“Utilities”	UTILITIES
+“Misc Cash Purchases”	MISC_CASH_PURCHASES
+“Beverage COGS”	COGS_BEVERAGE
+“Food COGS”	COGS_FOOD
+
+Add/adjust maps in PLCategoryMap. When you categorize new vendors, they inherit the category → PLRow.
+
+Calculation logic (server)
+ts
+Copy
+Edit
+// getPL(year): returns a matrix [rowCode -> [1..12, fullYear]]
+// amounts in THB (not satang); keep minor in math, format at the edge
+type MonthVec = { m: number[]; total: number }; // m[0..11], total
+
+async function getPL(year: number, includeShift=false): Promise<Record<string, MonthVec>> {
+  const r: Record<string, MonthVec> = {};
+  const acc = (code:string, m:number, val:number) => {
+    if (!r[code]) r[code] = { m: Array(12).fill(0), total: 0 };
+    r[code].m[m-1] += val; r[code].total += val;
+  };
+
+  // 1) Sales (you already store by receipt/shift; aggregate by month)
+  const sales = await aggregateSalesByMonth(year); // return {month, foodGross, foodDisc, drinkGross, drinkDisc, paymentFees}
+  for (const s of sales) {
+    acc('FOOD_GROSS', s.month,  s.foodGross);
+    acc('FOOD_DISCOUNT', s.month,  s.foodDisc);
+    acc('DRINK_GROSS', s.month, s.drinkGross);
+    acc('DRINK_DISCOUNT', s.month, s.drinkDisc);
+    acc('PAYMENT_FEES', s.month, s.paymentFees);
+  }
+
+  // derived
+  for (let m=1;m<=12;m++){
+    const fg = r.FOOD_GROSS?.m[m-1]||0, fd = r.FOOD_DISCOUNT?.m[m-1]||0;
+    const dg = r.DRINK_GROSS?.m[m-1]||0, dd = r.DRINK_DISCOUNT?.m[m-1]||0;
+    const discTotal = (fd+dd);
+    const foodNet = fg - fd, drinkNet = dg - dd;
+
+    acc('FOOD_NET', m, foodNet);
+    acc('DRINK_NET', m, drinkNet);
+    acc('TOTAL_GROSS_REVENUE', m, fg+dg);
+    acc('DISCOUNTS_TOTAL', m, discTotal);
+    const netExFees = fg+dg - discTotal;
+    acc('NET_REV_EX_FEES', m, netExFees);
+    const fees = r.PAYMENT_FEES?.m[m-1]||0;
+    acc('NET_REV_INC_FEES', m, netExFees - fees);
+  }
+
+  // 2) Expenses (DIRECT_UPLOAD + MANUAL by default)
+  const sources = includeShift ? ['DIRECT_UPLOAD','MANUAL','SHIFT_FORM'] : ['DIRECT_UPLOAD','MANUAL'];
+  const exp = await aggregateExpensesByMonthAndPLRow(year, sources); // {month, plrowCode, amount}
+  for (const e of exp) acc(e.plrowCode, e.month, e.amount);
+
+  // 3) COGS totals & composites
+  for (let m=1;m<=12;m++){
+    const cFood = r.COGS_FOOD?.m[m-1]||0, cBev = r.COGS_BEVERAGE?.m[m-1]||0;
+    acc('COGS_TOTAL', m, cFood + cBev);
+    const netIncFees = r.NET_REV_INC_FEES?.m[m-1]||0;
+    const cogs = cFood + cBev;
+    const gp = netIncFees - cogs;
+    acc('GROSS_PROFIT', m, gp);
+
+    // margins as %; store as number 0..1 (UI will format)
+    const margin = netIncFees ? gp / netIncFees : 0;
+    acc('GROSS_MARGIN', m, margin);
+  }
+
+  // 4) Total Expenses (sum of all expense rows mapped as “expense set”)
+  const expenseRows = [
+    'WAGES','TIPS_QR','BONUS_PAY','STAFF_FROM_ACCOUNT','RENT','ADMIN','ADVERTISING_GRAB','ADVERTISING_OTHER',
+    'DELIVERY_FEE_DISCOUNT','DIRECTOR_PAYMENT','DISCOUNT_MERCHANT_FUNDED','FITTINGS','KITCHEN_SUPPLIES','MARKETING',
+    'MARKETING_SUCCESS_FEE','MISC','PRINTERS','RENOVATIONS','SUBSCRIPTIONS','STATIONARY','TRAVEL','UTILITIES','MISC_CASH_PURCHASES'
+  ];
+  for (let m=1;m<=12;m++){
+    const sum = expenseRows.reduce((a,code)=>a+(r[code]?.m[m-1]||0),0);
+    acc('TOTAL_EXPENSES', m, sum);
+
+    const ebit = (r.GROSS_PROFIT?.m[m-1]||0) - sum;
+    acc('EBIT', m, ebit);
+    // assuming 0 for interest & tax v1
+    acc('EBT', m, ebit);
+    acc('NET_EARNINGS', m, ebit);
+  }
+
+  return r;
+}
+API & UI
+API
+
+GET /api/finance/pl?year=2025&includeShift=false → the matrix above.
+
+GET /api/finance/pl/export?year=2025 → CSV/Excel (optional).
+
+UI (Finance → Profit & Loss)
+
+Same container spacing as dashboard.
+
+Controls row (right): Year selector, toggle “Include shift purchases”.
+
+A sticky horizontal scroll table:
+
+Left column = P&L line (grouped with soft dividers).
+
+Months as columns + “Full Year”.
+
+Money: formatted THB; Gross Margin as % with one decimal.
+
+Cards above table (optional, same style):
+
+Total Net Revenue (inc fees), COGS, Gross Profit, Total Expenses, EBIT.
+
+Mappings for your current sheet (quick start)
+Food → COGS_FOOD
+
+Beverage → COGS_BEVERAGE
+
+Staff Expenses - Wage → WAGES
+
+Staff Expenses (from Account) → STAFF_FROM_ACCOUNT
+
+Rent → RENT
+
+Advertising - Grab → ADVERTISING_GRAB
+
+Delivery Fee Discount (Merchant-Funded) → DELIVERY_FEE_DISCOUNT
+
+Discount (Merchant-Funded) → DISCOUNT_MERCHANT_FUNDED
+
+Kitchen Supplies or Packaging → KITCHEN_SUPPLIES
+
+Renovations → RENOVATIONS
+
+Subscriptions → SUBSCRIPTIONS
+
+Utilities → UTILITIES
+
+Misc Cash Purchases → MISC_CASH_PURCHASES
+
+Add others as you need; the UI for mapping can be a small admin panel later.
+
+Guardrails
+Finance totals exclude SHIFT_FORM by default, everywhere.
+
+Unit tests:
+
+If any query “finance summary” lacks source IN (...), fail CI.
+
+On every import commit or expense edit:
+
+Recompute PLMonthCache for that (year, month) only (fast), or invalidate cache and lazy rebuild on first read.
+
+Acceptance (v1)
+ P&L page appears under Finance; spacing/heading match home page.
+
+ Data matches your Excel for months where data exists (within rounding).
+
+ Adding a DIRECT_UPLOAD expense in a mapped category updates P&L on refresh.
+
+ Toggling Include shift purchases changes totals appropriately.
+
+ Gross margin shows % and equals (Net inc fees - COGS) / Net inc fees.

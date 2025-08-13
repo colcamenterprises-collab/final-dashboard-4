@@ -179,17 +179,12 @@ export default function Expenses() {
   const mtdTotal = mtdData?.total || 0;
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: 'Poppins, sans-serif' }}>
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-            Expenses
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Track and manage business expenses
-          </p>
-        </div>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">
+          Expenses
+        </h1>
         <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">
@@ -350,7 +345,7 @@ export default function Expenses() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Month to Date</CardTitle>
@@ -386,7 +381,7 @@ export default function Expenses() {
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 mt-6">
         <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">

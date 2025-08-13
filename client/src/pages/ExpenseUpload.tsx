@@ -577,27 +577,24 @@ export default function ExpenseUpload() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Expense Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Direct upload bank statements for AI-powered expense categorization
-          </p>
-        </div>
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">
+          Expense Management
+        </h1>
       </div>
 
-      <Tabs defaultValue="upload" className="space-y-4">
+      <Tabs defaultValue="upload" className="mt-6 space-y-4">
         <TabsList>
           <TabsTrigger value="upload">Upload Statements</TabsTrigger>
           <TabsTrigger value="history">Import History</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="upload" className="space-y-4">
+        <TabsContent value="upload" className="gap-4">
           {renderUploadStep()}
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
+        <TabsContent value="history" className="gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Import History</CardTitle>

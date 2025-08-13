@@ -97,14 +97,16 @@ export default function Dashboard() {
   const snap = data.snapshot;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-semibold">Restaurant Operations Hub</h1>
-        <div className="text-sm text-gray-500">{windowStr}</div>
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">
+          Restaurant Operations Hub
+        </h1>
+        <div className="text-xs text-[var(--muted)]">{windowStr}</div>
       </div>
 
       {/* Top row */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 mt-6">
         <Card title="Last Shift Snapshot" right={<Badge state={snap.reconcileState} />}>
           <div className="space-y-3">
             <div className="flex items-baseline justify-between">
