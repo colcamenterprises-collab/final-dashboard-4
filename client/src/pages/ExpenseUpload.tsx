@@ -184,7 +184,7 @@ export default function ExpenseUpload() {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const content = e.target?.result as string;
-      const contentBase64 = btoa(content);
+      const contentBase64 = window.btoa(unescape(encodeURIComponent(content)));
 
       // For CSV files, parse headers for mapping
       if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
@@ -225,7 +225,7 @@ export default function ExpenseUpload() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
-      const contentBase64 = btoa(content);
+      const contentBase64 = window.btoa(unescape(encodeURIComponent(content)));
 
       parseContentMutation.mutate({
         batchId: currentBatchId,
