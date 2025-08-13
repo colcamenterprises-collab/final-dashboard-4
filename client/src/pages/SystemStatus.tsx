@@ -109,10 +109,10 @@ export default function SystemStatus() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold mb-2">
-              {process.env.AGENT_READONLY === "1" ? "ENABLED" : "DISABLED"}
+              {status?.readonlyMode ? "ENABLED" : "DISABLED"}
             </div>
             {getStatusBadge(
-              process.env.AGENT_READONLY === "1",
+              status?.readonlyMode === true,
               "Protected",
               "Unprotected"
             )}
