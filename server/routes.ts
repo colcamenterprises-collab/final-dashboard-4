@@ -1745,6 +1745,11 @@ export function registerRoutes(app: express.Application): Server {
     app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
 
+  // Expense Import Routes
+  import('./api/expenseImports').then(expenseModule => {
+    app.use('/api/expenses/imports', expenseModule.default);
+  }).catch(err => console.error('Failed to load expense imports API:', err));
+
   // === NEW POS INGESTION & ANALYTICS ENDPOINTS ===
   
   // POS Sync Status

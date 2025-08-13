@@ -49,6 +49,7 @@ import ExpenseEditor from "@/pages/expenses/ExpenseEditor";
 import { BusinessExpenses } from "@/pages/expenses/BusinessExpenses";
 import { ShiftPurchasing } from "@/pages/expenses/ShiftPurchasing";
 import BusinessExpensesSheet from "@/pages/BusinessExpenses";
+import ExpenseUpload from "@/pages/ExpenseUpload";
 import SystemStatus from "@/pages/SystemStatus";
 
 import NotFound from "@/pages/not-found";
@@ -67,6 +68,7 @@ function App() {
           <Route path="/daily-stock-sales" component={DailyStockForm} />
           <Route path="/receipts" component={Receipts} />
           <Route path="/expenses" component={ExpensesMerged} />
+          <Route path="/expense-upload" component={ExpenseUpload} />
           <Route path="/system-status" component={SystemStatus} />
           
           {/* Operations extras */}

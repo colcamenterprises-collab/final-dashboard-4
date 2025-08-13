@@ -1,0 +1,254 @@
+1) What “Expenses” must do (rules)
+Sources
+
+DIRECT_UPLOAD → bank/credit statements you upload (CSV/PDF/XLSX).
+
+MANUAL → the “Add Business Expense” popup (already in place).
+
+SHIFT_FORM → purchases inside the Daily Sales & Stock form.
+Policy: SHIFT_FORM rows are stored and viewable, but excluded from Finance totals by default.
+
+Always
+
+Normalize to a unified table.
+
+Collate by posting date (keep original date fields too).
+
+Auto-categorize using a Vendor Alias → Category map (handles Thai).
+
+Flag uncertainty for human review before committing.
+
+Outputs
+
+Finance totals use DIRECT_UPLOAD + MANUAL only (unless you toggle “Include shift purchases”).
+
+Per-vendor & per-category breakdowns; time filters.
+
+2) Minimal data model (add/confirm)
+Tables
+Expense
+id, date, description_raw, amount_minor, currency, source(enum), vendor_id?, category_id?, import_batch_id?, notes, createdAt
+
+ExpenseImportBatch
+id, type(enum: BANK_STATEMENT|CREDIT_CARD|GENERIC), filename, original_mime, row_count, status(enum: DRAFT|REVIEW|COMMITTED|FAILED), createdBy, createdAt
+
+ExpenseImportLine (staging)
+id, batch_id, row_index, date_raw, description_raw, amount_raw, currency_raw, parsed_ok(bool), parse_errors(jsonb), vendor_guess, category_guess_id?, confidence(0–1), duplicate_of_expense_id?
+
+Vendor
+id, display_name, default_category_id?
+
+VendorAlias
+id, vendor_id, alias_text ← store Thai spellings, Makro variants, etc.
+
+Category
+id, name, code (e.g., FNB, UTIL, RENT, FUEL, BANK_FEES)
+
+If you’re on Prisma: these map 1:many cleanly; otherwise, the schema works in SQL too.
+
+3) Categorization engine (simple, fast, Thai-ready)
+Order of operations for each ImportLine:
+
+Normalize text
+
+Lowercase, trim, collapse spaces, strip punctuation except Thai characters and digits.
+
+Exact/substring alias match (Thai+English)
+
+VendorAlias.alias_text → vendor_id → default_category_id.
+
+Examples to seed:
+
+แม็คโคร, makro, ห้างแม็คโคร → Vendor: Makro → Category: Food & Beverage
+
+โลตัส, tesco, lotus → Vendor: Lotus → Food & Beverage
+
+ปตท, PTT, บางจาก → Fuel
+
+ทรู, True, AIS, ดีแทค → Utilities/Phone
+
+กสิกร, KBANK, SCB, ธนาคาร + “ค่าธรรมเนียม” → Bank Fees
+
+Heuristics fallback (if no alias matched)
+
+Keyword bags (Thai & EN):
+
+“ค่าน้ำ”, “ค่าไฟ”, “ไฟฟ้า”, “pwa”, “mea” → Utilities
+
+“เช่า”, “rent” → Rent
+
+“ค่าธรรมเนียม”, “fee” → Bank Fees
+
+Fuzzy match (Levenshtein on alias strings; threshold 0.85) → lower confidence (e.g., 0.6).
+
+Uncertain (<0.8) → mark confidence < 0.8 and require human choice in Review UI.
+
+Duplicates
+
+If (abs(amount) within ±1 THB) && (date ± 2d) && similar description) already committed, mark duplicate_of_expense_id.
+
+Remembered learning: When you fix a row in review (choose vendor/category), we immediately add Vendor/VendorAlias so the next imports auto-map.
+
+4) Front-end flow (drop-in)
+A. “Upload” action (Expenses page)
+Button “Upload & Categorize” → Import Wizard modal.
+
+Step 1: Upload type (dropdown)
+
+Bank statement (CSV/XLSX/PDF)
+
+Credit card
+
+Generic CSV
+
+Step 2: File picker (drag & drop; multiple allowed but process as batches).
+
+Step 3 (if CSV): Column mapping preview (date, description, amount, currency).
+We ship sensible defaults (KBank, SCB, Krungsri presets).
+
+Step 4: Send to Jussi (see prompts below) → populates ExpenseImportLine.
+
+Step 5: Review & Commit screen.
+
+B. “Review & Commit” screen (for a batch)
+Table view of staged rows:
+
+Date | Description (raw) | Amount | Vendor (dropdown) | Category (dropdown) | Conf | Status
+
+Toolbar:
+
+Bulk select → “Set Vendor”, “Set Category”, “Mark as personal/ignore”.
+
+Toggle “Show uncertain only”.
+
+Toggle “Hide duplicates”.
+
+Commit button:
+
+Creates Expense rows from staged lines with final vendor/category.
+
+Option: “Also add vendor alias from description” (checked by default).
+
+C. Filters & Totals (already close)
+“Source” pill filter: DIRECT_UPLOAD / MANUAL / SHIFT_FORM (default: SHIFT_FORM off).
+
+Date range, Category, Vendor filters.
+
+Cards (left to right): Total Business Expenses, Total Entries, Average Expense — scope obeys filters.
+
+5) API (Express examples)
+ts
+Copy
+Edit
+// POST /api/expenses/imports
+// body: { type, filename, mime, contentBase64 }
+returns { batchId }
+
+// POST /api/expenses/imports/:batchId/parse
+// body: { mapping?: { date, description, amount, currency }, locale?: "th-TH" }
+returns: { rows: ImportLinePreview[] } // fills ExpenseImportLine
+
+// GET /api/expenses/imports/:batchId/lines?uncertain=1
+// GET /api/expenses/vendors?q=แม็ค
+// GET /api/expenses/categories
+
+// PATCH /api/expenses/imports/:batchId/lines/:lineId
+// body: { vendorId?, categoryId?, ignore?, note? }
+
+// POST /api/expenses/imports/:batchId/commit
+// Moves reviewed lines -> Expense, creates Vendor/VendorAlias as needed.
+
+// GET /api/expenses?from=...&to=...&source=DEFAULT
+PDF handling
+
+For Thai PDFs: try text extraction first; if not selectable, run OCR (Tesseract with Thai language pack). Persist the raw row even if parse errors → user can fix in the Review screen.
+
+6) Jussi instructions (built-in prompts)
+System Prompt (static):
+
+You are a financial import parser for a restaurant. Input is CSV/XLSX/PDF text rows from Thai bank/credit statements. Output JSON rows with fields: date, description, amount, currency, side (“debit” or “credit”). Preserve Thai strings. Do not convert currencies. Do not infer categories here. Return a list of rows; one row per transaction. Ignore running balances. Keep signs as in the source.
+
+Per-upload “Task Prompt” (examples):
+
+Bank Statement (Thailand)
+
+Format quirks: Dates may be d/M/yyyy or dd/MM/yyyy. Delimiters may be commas or tabs. Descriptions often include Thai vendor names. Amount should be numeric with . decimal. If the row has ค่าธรรมเนียม/fee, it is an expense (debit). Return only debit rows by default.
+Output JSON array; each element: {date, description, amount, currency, side}.
+
+Credit Card
+
+Include only posted transactions (no authorizations). If there’s a negative sign, that’s a credit (exclude unless it’s a fee reversal). Return expenses as debit rows.
+
+Generic CSV
+
+Use provided column mapping. If some cells are empty, set null. Do not drop the row.
+
+Post-parse (our server)
+
+Run the alias & category engine described above.
+
+Save into ExpenseImportLine with confidence.
+
+7) UI copy (so staff know what to do)
+Upload Modal:
+
+“Upload type: Select the kind of file. We’ll auto-detect common Thai bank formats.”
+
+“What’s included: Only business expenses. Shift purchases from the daily form are already tracked and excluded from Finance totals.”
+
+Review page badges:
+
+Low confidence (≤0.8) — “Please select a vendor or category to teach the system.”
+
+Duplicate — “Looks like this already exists (same date/amount).”
+
+8) Seed data (start smart)
+Categories: Food & Beverage, Utilities, Rent, Fuel, Bank Fees, Marketing, Repairs & Maintenance, Office, Other.
+Vendors & Aliases (examples)
+
+Vendor	Default Category	Aliases (Thai/EN)
+Makro	Food & Beverage	แม็คโคร, makro, ห้างแม็คโคร
+Lotus	Food & Beverage	โลตัส, lotus, tesco
+PTT	Fuel	ปตท, PTT
+Bangchak	Fuel	บางจาก
+MEA	Utilities	การไฟฟ้านครหลวง, MEA
+PWA	Utilities	การประปา, PWA
+True	Utilities	ทรู, True
+AIS	Utilities	เอไอเอส, AIS
+KBANK	Bank Fees	กสิกร, KBANK
+SCB	Bank Fees	ไทยพาณิชย์, SCB
+
+9) What to change in the current UI (small)
+Expenses page header bar: add tabs “Business Expenses” (current) | “Imports” (new)
+In “Imports”:
+
+“Upload & Categorize” button → Import Wizard
+
+Table of past batches with status (DRAFT, REVIEW, COMMITTED), counts, created date.
+
+Filters card: add Source filter (default: DIRECT_UPLOAD + MANUAL).
+Checkbox “Include shift purchases (affects variance only)” → off by default.
+
+10) Guardrails (to prevent regressions)
+Finance totals endpoint defaults to source IN ('DIRECT_UPLOAD','MANUAL').
+
+CI test: failing if any code counts SHIFT_FORM by default.
+
+When committing a batch, require:
+
+uncertain_count=0 AND duplicate_hidden=false acknowledged.
+
+Nightly export of Expense & Vendor tables to S3/Drive (CSV).
+
+11) Acceptance checklist (sign-off)
+ Can upload CSV/PDF; batch appears with parsed rows.
+
+ Alias learning: choosing vendor/category during review creates Vendor/VendorAlias and re-applies instantly to the batch.
+
+ Finance totals change only with DIRECT_UPLOAD + MANUAL (SHIFT_FORM off).
+
+ Thai vendor names recognized (Makro/แม็คโคร → Food & Beverage).
+
+ Duplicates are detected and not committed twice.
+
+ Simple chart/metrics on Expenses reflect filter scope.

@@ -161,20 +161,86 @@ export const stockEntries = pgTable("stock_entries", {
 
 
 
-// Expenses table
+// Enhanced Expenses table with source tracking
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
-  description: text("description").notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  category: text("category").notNull(),
-  date: timestamp("date").notNull().defaultNow(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).default('0'), // For rolls/drinks quantity tracking
-  paymentMethod: text("payment_method").notNull(),
+  date: timestamp("date").notNull(),
+  descriptionRaw: text("description_raw").notNull(),
+  amountMinor: integer("amount_minor").notNull(), // Amount in minor currency units (satang for THB)
+  currency: text("currency").notNull().default('THB'),
+  source: text("source").notNull(), // DIRECT_UPLOAD, MANUAL, SHIFT_FORM
+  vendorId: integer("vendor_id").references(() => vendors.id),
+  categoryId: integer("category_id").references(() => categories.id),
+  importBatchId: integer("import_batch_id").references(() => expenseImportBatch.id),
+  notes: text("notes"),
+  
+  // Legacy fields for backwards compatibility
+  description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  category: text("category"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).default('0'),
+  paymentMethod: text("payment_method"),
   supplier: text("supplier"),
   items: text("items"),
-  notes: text("notes"),
-  month: integer("month").notNull(), // For month-by-month analysis
-  year: integer("year").notNull(),
+  month: integer("month"),
+  year: integer("year"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Expense Import Batch table
+export const expenseImportBatch = pgTable("expense_import_batch", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // BANK_STATEMENT, CREDIT_CARD, GENERIC
+  filename: text("filename").notNull(),
+  originalMime: text("original_mime").notNull(),
+  rowCount: integer("row_count").notNull(),
+  status: text("status").notNull().default('DRAFT'), // DRAFT, REVIEW, COMMITTED, FAILED
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Expense Import Line (staging) table
+export const expenseImportLine = pgTable("expense_import_line", {
+  id: serial("id").primaryKey(),
+  batchId: integer("batch_id").notNull().references(() => expenseImportBatch.id),
+  rowIndex: integer("row_index").notNull(),
+  dateRaw: text("date_raw"),
+  descriptionRaw: text("description_raw").notNull(),
+  amountRaw: text("amount_raw").notNull(),
+  currencyRaw: text("currency_raw"),
+  parsedOk: boolean("parsed_ok").default(false),
+  parseErrors: jsonb("parse_errors"),
+  vendorGuess: text("vendor_guess"),
+  categoryGuessId: integer("category_guess_id").references(() => categories.id),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.0 to 1.0
+  duplicateOfExpenseId: integer("duplicate_of_expense_id").references(() => expenses.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Vendors table
+export const vendors = pgTable("vendors", {
+  id: serial("id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  defaultCategoryId: integer("default_category_id").references(() => categories.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Vendor Aliases table (for Thai & English variants)
+export const vendorAliases = pgTable("vendor_aliases", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  aliasText: text("alias_text").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Categories table
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(), // FNB, UTIL, RENT, FUEL, BANK_FEES
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -419,13 +485,20 @@ export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true }).extend({
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true }).extend({
   supplier: z.string().nullable().optional(),
   items: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 export const insertExpenseSupplierSchema = createInsertSchema(expenseSuppliers).omit({ id: true, createdAt: true });
 export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({ id: true, createdAt: true });
+
+// New expense import schemas
+export const insertExpenseImportBatchSchema = createInsertSchema(expenseImportBatch).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertExpenseImportLineSchema = createInsertSchema(expenseImportLine).omit({ id: true, createdAt: true });
+export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true, createdAt: true });
+export const insertVendorAliasSchema = createInsertSchema(vendorAliases).omit({ id: true, createdAt: true });
+export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
 export const insertBankStatementSchema = createInsertSchema(bankStatements).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true });
 export const insertAiInsightSchema = createInsertSchema(aiInsights).omit({ id: true, createdAt: true });
@@ -468,6 +541,19 @@ export type ExpenseSupplier = typeof expenseSuppliers.$inferSelect;
 export type InsertExpenseSupplier = z.infer<typeof insertExpenseSupplierSchema>;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
 export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+
+// New expense import types
+export type ExpenseImportBatch = typeof expenseImportBatch.$inferSelect;
+export type InsertExpenseImportBatch = z.infer<typeof insertExpenseImportBatchSchema>;
+export type ExpenseImportLine = typeof expenseImportLine.$inferSelect;
+export type InsertExpenseImportLine = z.infer<typeof insertExpenseImportLineSchema>;
+export type Vendor = typeof vendors.$inferSelect;
+export type InsertVendor = z.infer<typeof insertVendorSchema>;
+export type VendorAlias = typeof vendorAliases.$inferSelect;
+export type InsertVendorAlias = z.infer<typeof insertVendorAliasSchema>;
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
 export type BankStatement = typeof bankStatements.$inferSelect;
 export type InsertBankStatement = z.infer<typeof insertBankStatementSchema>;
 export type Transaction = typeof transactions.$inferSelect;

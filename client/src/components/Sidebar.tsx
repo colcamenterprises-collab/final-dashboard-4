@@ -36,6 +36,7 @@ const NAV = [
   {
     title: "Finance",
     items: [
+      { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
       { label: "Profit & Loss",       path: "/finance/pnl",       icon: Icon.money },
       { label: "Analysis",            path: "/finance/analysis",  icon: Icon.chart },
       { label: "Forecast & Budget",   path: "/finance/forecast",  icon: Icon.list },
