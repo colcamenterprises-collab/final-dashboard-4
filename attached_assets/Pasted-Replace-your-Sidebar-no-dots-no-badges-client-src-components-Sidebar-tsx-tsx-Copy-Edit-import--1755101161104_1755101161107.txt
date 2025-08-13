@@ -1,3 +1,9 @@
+Replace your Sidebar (no dots, no badges)
+client/src/components/Sidebar.tsx
+
+tsx
+Copy
+Edit
 import { useLocation } from "wouter";
 import { useState } from "react";
 
@@ -82,4 +88,32 @@ export default function Sidebar() {
       </nav>
     </aside>
   );
+}
+What this does
+Removes the colored dots entirely.
+
+Uses a thin emerald bar on the active item (clean, professional).
+
+Collapsed state shows a tiny 2-letter text hint (no badge background).
+
+Keeps your shell (flex-1/min-w-0), so no white gutter.
+
+Fix the agent’s prebuild script (their glob was broken)
+If they added the “deny layout hacks” script, correct the glob line or it won’t scan anything.
+
+scripts/deny-layout-hacks.js
+
+js
+Copy
+Edit
+import fs from "fs";
+import glob from "glob";
+
+const files = glob.sync("client/src/**/*.{tsx,ts,jsx,js}", { nodir: true }); // <-- fixed
+const bad = /(ml-|pl-|margin-left:|padding-left:).*(64|256|280|sidebar)/i;
+
+const offenders = files.filter(f => bad.test(fs.readFileSync(f, "utf8")));
+if (offenders.length) {
+  console.error("Blocked build: hard-coded left margins found:\n" + offenders.join("\n"));
+  process.exit(1);
 }
