@@ -1,3 +1,11 @@
+Here’s a clean, collapsible, grouped sidebar (accordion-style) that matches the Lessa look—no dots, green active pill, smooth collapse (256 → 78px), and submenu items for Finance + Marketing (placeholders only). It won’t touch backend; it just gives us the structure to grow into.
+
+1) Drop-in Sidebar (grouped + collapsible + icons-only when collapsed)
+client/src/components/Sidebar.tsx
+
+tsx
+Copy
+Edit
 import { useLocation } from "wouter";
 import { useEffect, useState, Fragment } from "react";
 
@@ -31,12 +39,12 @@ const NAV: Group[] = [
     key: "ops",
     title: "Operations",
     items: [
-      { label: "Sales Form",   path: "/daily-sales",    icon: I.form },
-      { label: "Stock Form",   path: "/daily-stock",    icon: I.stock },
-      { label: "Expenses",     path: "/expenses", icon: I.file },
-      { label: "Receipts",     path: "/receipts", icon: I.file },
+      { label: "Sales Form",   path: "/operations/sales",    icon: I.form },
+      { label: "Stock Form",   path: "/operations/stock",    icon: I.stock },
+      { label: "Expenses",     path: "/operations/expenses", icon: I.file },
+      { label: "Receipts",     path: "/operations/receipts", icon: I.file },
       { label: "Analysis",     path: "/operations/analysis", icon: I.chart },
-      { label: "Delivery Partners", path: "/operations/delivery", icon: I.list },
+      { label: "Delivery Partners", path: "/operations/delivery", icon: I.list }, // (Grab/Foodpanda integration later)
       { label: "Shift Reports", path: "/operations/reports", icon: I.file },
     ],
   },
@@ -57,8 +65,8 @@ const NAV: Group[] = [
     title: "Menu Mgmt",
     items: [
       { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: I.calc },
-      { label: "Ingredient Mgmt",  path: "/ingredients",     icon: I.list },
-      { label: "Recipe Cards",     path: "/recipes",         icon: I.recipe },
+      { label: "Ingredient Mgmt",  path: "/menu/ingredients",     icon: I.list },
+      { label: "Recipe Cards",     path: "/menu/recipes",         icon: I.recipe },
       { label: "Menu Performance", path: "/menu/performance",     icon: I.chart },
       { label: "Seasonal Planner", path: "/menu/seasonal",        icon: I.calendar },
     ],
@@ -155,3 +163,60 @@ export default function Sidebar() {
     </aside>
   );
 }
+Behavior
+
+Lessa look (flat white, thin group headers).
+
+Accordion groups with chevrons (expand/collapse).
+
+Collapsed sidebar shows icons only (still fully navigable).
+
+Active item = emerald rounded pill.
+
+No dots, no color blobs.
+
+2) Route stubs (so links open clean placeholders now)
+Add these to client/src/App.tsx (keep your existing ones; these are new placeholders only):
+
+tsx
+Copy
+Edit
+// Operations extras
+<Route path="/operations/delivery" component={() => <div className="p-6">Delivery Partners (Grab/Foodpanda) — coming soon</div>} />
+<Route path="/operations/reports"  component={() => <div className="p-6">Shift Reports — coming soon</div>} />
+
+// Finance
+<Route path="/finance/pnl"        component={() => <div className="p-6">Profit & Loss — coming soon</div>} />
+<Route path="/finance/analysis"   component={() => <div className="p-6">Finance Analysis — coming soon</div>} />
+<Route path="/finance/forecast"   component={() => <div className="p-6">Forecasting & Budget — coming soon</div>} />
+<Route path="/finance/suppliers"  component={() => <div className="p-6">Supplier Payments — coming soon</div>} />
+<Route path="/finance/cashflow"   component={() => <div className="p-6">Cash Flow — coming soon</div>} />
+<Route path="/finance/tax"        component={() => <div className="p-6">Tax & Compliance — coming soon</div>} />
+
+// Menu Mgmt
+<Route path="/menu/cost-calculator" component={() => <div className="p-6">Cost Calculator — coming soon</div>} />
+<Route path="/menu/ingredients"     component={() => <div className="p-6">Ingredient Mgmt — coming soon</div>} />
+<Route path="/menu/recipes"         component={() => <div className="p-6">Recipe Cards — coming soon</div>} />
+<Route path="/menu/performance"     component={() => <div className="p-6">Menu Performance — coming soon</div>} />
+<Route path="/menu/seasonal"        component={() => <div className="p-6">Seasonal Planner — coming soon</div>} />
+
+// Marketing
+<Route path="/marketing/reviews"     component={() => <div className="p-6">Add Reviews — coming soon</div>} />
+<Route path="/marketing/social"      component={() => <div className="p-6">Social Posting — coming soon</div>} />
+<Route path="/marketing/analytics"   component={() => <div className="p-6">Campaign Analytics — coming soon</div>} />
+<Route path="/marketing/loyalty"     component={() => <div className="p-6">Loyalty & Rewards — coming soon</div>} />
+<Route path="/marketing/automation"  component={() => <div className="p-6">Email/SMS Automation — coming soon</div>} />
+<Route path="/marketing/promotions"  component={() => <div className="p-6">Promotions Manager — coming soon</div>} />
+3) Lockdown notes (so it stays tidy)
+Keep flex shell in App.tsx (<Sidebar /> + <main className="flex-1 min-w-0">) — no page-level margins.
+
+If the agent added the prebuild guard, ensure the glob is correct:
+
+js
+Copy
+Edit
+// scripts/deny-layout-hacks.js
+import fs from "fs"; import glob from "glob";
+const files = glob.sync("client/src/**/*.{tsx,ts,jsx,js}", { nodir: true });
+const bad = /(ml-|pl-|margin-left:|padding-left:).*(64|256|280|sidebar)/i;
+// ... (same as before)

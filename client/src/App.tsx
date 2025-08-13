@@ -69,11 +69,31 @@ function App() {
           <Route path="/expenses" component={ExpensesMerged} />
           <Route path="/system-status" component={SystemStatus} />
           
-          {/* New grouped navigation routes */}
+          {/* Operations extras */}
           <Route path="/operations/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Operations Analysis</h1><p>Comprehensive operational analysis and insights.</p></div>} />
-          <Route path="/finance/pnl" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Profit & Loss</h1><p>Financial performance analysis.</p></div>} />
-          <Route path="/finance/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Finance Analysis</h1><p>Financial analytics and reporting.</p></div>} />
-          <Route path="/menu/cost-calculator" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Cost Calculator</h1><p>Calculate ingredient costs and menu pricing.</p></div>} />
+          <Route path="/operations/delivery" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Delivery Partners</h1><p>Grab/Foodpanda integration — coming soon</p></div>} />
+          <Route path="/operations/reports" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Shift Reports</h1><p>Detailed shift reporting — coming soon</p></div>} />
+
+          {/* Finance */}
+          <Route path="/finance/pnl" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Profit & Loss</h1><p>Financial performance analysis — coming soon</p></div>} />
+          <Route path="/finance/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Finance Analysis</h1><p>Financial analytics and reporting — coming soon</p></div>} />
+          <Route path="/finance/forecast" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Forecasting & Budget</h1><p>Financial planning and budgeting — coming soon</p></div>} />
+          <Route path="/finance/suppliers" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Supplier Payments</h1><p>Manage supplier payments — coming soon</p></div>} />
+          <Route path="/finance/cashflow" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Cash Flow</h1><p>Cash flow management — coming soon</p></div>} />
+          <Route path="/finance/tax" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Tax & Compliance</h1><p>Tax management and compliance — coming soon</p></div>} />
+
+          {/* Menu Mgmt */}
+          <Route path="/menu/cost-calculator" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Cost Calculator</h1><p>Calculate ingredient costs and menu pricing — coming soon</p></div>} />
+          <Route path="/menu/performance" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Menu Performance</h1><p>Menu performance analytics — coming soon</p></div>} />
+          <Route path="/menu/seasonal" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Seasonal Planner</h1><p>Seasonal menu planning — coming soon</p></div>} />
+
+          {/* Marketing */}
+          <Route path="/marketing/reviews" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Add Reviews</h1><p>Review management system — coming soon</p></div>} />
+          <Route path="/marketing/social" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Social Posting</h1><p>Social media management — coming soon</p></div>} />
+          <Route path="/marketing/analytics" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Campaign Analytics</h1><p>Marketing campaign analytics — coming soon</p></div>} />
+          <Route path="/marketing/loyalty" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Loyalty & Rewards</h1><p>Customer loyalty program — coming soon</p></div>} />
+          <Route path="/marketing/automation" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Email/SMS Automation</h1><p>Marketing automation system — coming soon</p></div>} />
+          <Route path="/marketing/promotions" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Promotions Manager</h1><p>Promotional campaign management — coming soon</p></div>} />
           
           {/* Keep all your existing routes */}
           <Route path="/dashboard-old" component={Dashboard} />
