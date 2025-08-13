@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
+import SimpleSidebar from "@/components/SimpleSidebar";
 import Dashboard from "@/pages/Dashboard";
 import DashboardModern from "@/pages/DashboardModern";
 import DailyStockForm from "@/pages/DailyStockForm";
@@ -54,7 +55,7 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <Layout>
+    <SimpleSidebar>
       <Switch>
         <Route path="/" component={DashboardModern} />
         <Route path="/dashboard-old" component={Dashboard} />
@@ -131,7 +132,7 @@ function Router() {
 
         <Route component={NotFound} />
       </Switch>
-    </Layout>
+    </SimpleSidebar>
   );
 }
 

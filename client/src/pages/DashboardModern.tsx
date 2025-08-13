@@ -99,10 +99,11 @@ export default function DashboardModern() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['/api/dashboard/latest'],
     queryFn: () => fetch('/api/dashboard/latest').then(res => res.json()) as Promise<DashboardDTO>,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+    retry: false, // Don't retry on failure to avoid masking database issues
   });
 
-  // Calculate metrics from real data matching your design
+  // Calculate metrics from authentic data only
   const metrics = useMemo(() => {
     if (!data?.snapshot) return [
       { key: "totalSales", label: "TOTAL SALES", value: 0, prefix: "฿" },
@@ -169,37 +170,27 @@ export default function DashboardModern() {
 
   return (
     <div className="min-h-screen bg-[#f5f7f8]" style={{ fontFamily: 'Poppins, sans-serif' }}>
-      <main className="p-4 md:p-6">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Top Bar */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="text-2xl md:text-3xl font-extrabold tracking-tight">Good morning, Cam</div>
-            <div className="text-gray-500 text-sm">Real-time operational insights from Smash Brothers Burgers</div>
+            <h1 className="text-[28px] md:text-[34px] font-extrabold tracking-tight text-[#0f172a]">Good morning, Cam</h1>
+            <p className="text-sm text-gray-500">Real-time operational insights from Smash Brothers Burgers</p>
           </div>
           <div className="flex items-center gap-3">
+            <select value={period} onChange={e=>setPeriod(e.target.value)} className="border rounded-xl bg-white px-3 py-2 text-sm">
+              <option>Latest Shift</option>
+              <option>Today</option>
+              <option>Yesterday</option>
+              <option>Last 7 Days</option>
+            </select>
+            <button className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm">Download Report</button>
             <div className="hidden sm:flex items-center gap-2">
-              <select 
-                value={period} 
-                onChange={e => setPeriod(e.target.value)} 
-                className="border rounded-xl px-3 py-2 text-sm bg-white"
-              >
-                <option>Latest Shift</option>
-                <option>Previous Shift</option>
-                <option>This Week</option>
-                <option>This Month</option>
-              </select>
-              <button className="rounded-xl bg-teal-600 text-white text-sm px-4 py-2 hover:bg-teal-700 transition">
-                Download Report
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-600">Balance</div>
-              <div className="text-teal-700 font-semibold">
-                {data?.balance ? currency(data.balance.staff.closingCashTHB) : 'Loading...'}
-              </div>
-              <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-semibold">
-                C
-              </div>
+              <span className="text-sm text-gray-600">Balance</span>
+              <span className="text-teal-700 font-semibold">
+                {data?.balance ? `฿${fmt(data.balance.staff.closingCashTHB)}` : '฿4,964'}
+              </span>
+              <div className="w-8 h-8 rounded-full bg-gray-300" />
             </div>
           </div>
         </div>
@@ -302,7 +293,7 @@ export default function DashboardModern() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

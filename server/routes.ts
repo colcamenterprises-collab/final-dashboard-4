@@ -60,7 +60,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
     where: { id: snapshotId },
     include: {
       payments: {
-        select: { channel: true, count: true, totalTHB: true }
+        select: { channel: true, count: true, totalSatang: true }
       },
       items: { 
         select: { itemName: true, qty: true, revenueSatang: true }, 
@@ -71,12 +71,10 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
         orderBy: { createdAt: 'desc' }, 
         take: 1,
         select: {
-          openingBuns: true, openingMeatGram: true, openingDrinks: true,
-          purchasesBuns: true, purchasesMeatGram: true, purchasesDrinks: true,
-          usagePOSBuns: true, usagePOSMeatGram: true, usagePOSDrinks: true,
-          expectedCloseBuns: true, expectedCloseMeatGram: true, expectedCloseDrinks: true,
-          staffCloseBuns: true, staffCloseMeatGram: true, staffCloseDrinks: true,
-          varianceBuns: true, varianceMeatGram: true, varianceDrinks: true,
+          purchasedBuns: true, purchasedMeatGram: true, purchasedDrinks: true,
+          expectedBuns: true, expectedMeatGram: true, expectedDrinks: true,
+          staffBuns: true, staffMeatGram: true, staffDrinks: true,
+          varBuns: true, varMeatGram: true, varDrinks: true,
           state: true
         }
       },
@@ -98,6 +96,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
     _count: true
   });
   const expensesTotal = Number(expensesResult._sum.lineTotalTHB ?? 0);
+  const expensesCount = expensesResult._count;
 
   // Staff form within window (for banking) - optimize query
   const ds = await prisma.dailySales.findFirst({
@@ -114,11 +113,11 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
   });
   const staffBank = extractStaffBanking(ds);
 
-  // POS payments from snapshot - use totalTHB directly 
+  // POS payments from snapshot - use totalSatang and convert to THB
   const byChannel = Object.fromEntries((snapshot.payments || []).map((p: any) => [p.channel, p]));
-  const posCashTHB = Number(byChannel['CASH']?.totalTHB ?? 0);
-  const posQrTHB   = Number(byChannel['QR']?.totalTHB ?? 0);
-  const posGrabTHB = Number(byChannel['GRAB']?.totalTHB ?? 0);
+  const posCashTHB = THB(byChannel['CASH']?.totalSatang);
+  const posQrTHB   = THB(byChannel['QR']?.totalSatang);
+  const posGrabTHB = THB(byChannel['GRAB']?.totalSatang);
 
   const balance = {
     staff: staffBank,
@@ -176,7 +175,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
       payments: (snapshot.payments || []).map((p: any) => ({
         channel: p.channel,
         count: p.count,
-        totalTHB: Number(p.totalTHB ?? 0)
+        totalTHB: Number((THB(p.totalSatang)).toFixed(2))
       })),
     },
     expenses: {

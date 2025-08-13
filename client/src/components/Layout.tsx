@@ -62,7 +62,7 @@ export default function Layout({ children }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currency, setCurrency] = useState("THB");
-  const [isExpanded, setIsExpanded] = useState(true); // Expanded by default - full sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(true); // 256px open → 72px collapsed
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     operations: false,
     finance: false,
