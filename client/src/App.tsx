@@ -69,6 +69,12 @@ function App() {
           <Route path="/expenses" component={ExpensesMerged} />
           <Route path="/system-status" component={SystemStatus} />
           
+          {/* New grouped navigation routes */}
+          <Route path="/operations/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Operations Analysis</h1><p>Comprehensive operational analysis and insights.</p></div>} />
+          <Route path="/finance/pnl" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Profit & Loss</h1><p>Financial performance analysis.</p></div>} />
+          <Route path="/finance/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Finance Analysis</h1><p>Financial analytics and reporting.</p></div>} />
+          <Route path="/menu/cost-calculator" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Cost Calculator</h1><p>Calculate ingredient costs and menu pricing.</p></div>} />
+          
           {/* Keep all your existing routes */}
           <Route path="/dashboard-old" component={Dashboard} />
           <Route path="/past-forms" component={PastForms} />

@@ -1,3 +1,9 @@
+Drop-in Sidebar (grouped)
+Replace client/src/components/Sidebar.tsx with this:
+
+tsx
+Copy
+Edit
 import { useLocation } from "wouter";
 import { useState, Fragment } from "react";
 
@@ -21,18 +27,12 @@ type Group = { title: string; items: Item[] };
 
 const NAV: Group[] = [
   {
-    title: "Dashboard",
-    items: [
-      { label: "Overview", path: "/dashboard", icon: I.dash },
-    ],
-  },
-  {
     title: "Operations",
     items: [
-      { label: "Sales Form",   path: "/daily-sales",    icon: I.form },
-      { label: "Stock Form",   path: "/daily-stock",    icon: I.stock },
-      { label: "Expenses",     path: "/expenses", icon: I.file },
-      { label: "Receipts",     path: "/receipts", icon: I.file },
+      { label: "Sales Form",   path: "/operations/sales",    icon: I.form },
+      { label: "Stock Form",   path: "/operations/stock",    icon: I.stock },
+      { label: "Expenses",     path: "/operations/expenses", icon: I.file },
+      { label: "Receipts",     path: "/operations/receipts", icon: I.file },
       { label: "Analysis",     path: "/operations/analysis", icon: I.chart },
     ],
   },
@@ -47,8 +47,8 @@ const NAV: Group[] = [
     title: "Menu Mgmt",
     items: [
       { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: I.calc },
-      { label: "Ingredient Mgmt",  path: "/ingredients",     icon: I.list },
-      { label: "Recipe Cards",     path: "/recipes",         icon: I.recipe },
+      { label: "Ingredient Mgmt",  path: "/menu/ingredients",     icon: I.list },
+      { label: "Recipe Cards",     path: "/menu/recipes",         icon: I.recipe },
     ],
   },
   {
@@ -120,3 +120,36 @@ export default function Sidebar() {
     </aside>
   );
 }
+Notes
+No dots, no colored badges. Monochrome SVG icons only.
+
+Active item uses a green rounded pill (exact vibe in the reference).
+
+Collapsed = icons centered; tooltips via title.
+
+Group headings match your list: Operations, Finance, Menu Mgmt, Marketing.
+
+Route wiring (quick)
+Add these routes in your client/src/App.tsx so the links work (placeholder components are fine until we wire real pages):
+
+tsx
+Copy
+Edit
+// ...
+<Route path="/operations/sales" component={DailySales} />
+<Route path="/operations/stock" component={DailyStock} />
+<Route path="/operations/expenses" component={Expenses} />
+<Route path="/operations/receipts" component={Receipts} />
+<Route path="/operations/analysis" component={() => <div className="p-6">Ops Analysis</div>} />
+
+<Route path="/finance/pnl" component={() => <div className="p-6">P&L</div>} />
+<Route path="/finance/analysis" component={() => <div className="p-6">Finance Analysis</div>} />
+
+<Route path="/menu/cost-calculator" component={() => <div className="p-6">Cost Calculator</div>} />
+<Route path="/menu/ingredients" component={() => <div className="p-6">Ingredient Management</div>} />
+<Route path="/menu/recipes" component={() => <div className="p-6">Recipe Cards</div>} />
+
+<Route path="/marketing" component={() => <div className="p-6">Marketing</div>} />
+// ...
+(If you need to keep the old paths alive, add small redirect stubs so /daily-sales → /operations/sales, etc.)
+
