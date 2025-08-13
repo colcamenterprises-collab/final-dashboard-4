@@ -55,48 +55,70 @@ function extractStaffBanking(ds: any) {
 }
 
 async function buildSnapshotDTO(prisma: any, snapshotId: string) {
+  // Optimize with a single query using joins
   const snapshot = await prisma.shiftSnapshot.findUnique({
     where: { id: snapshotId },
     include: {
-      payments: true,
-      items: { select: { itemName: true, qty: true, revenueSatang: true }, orderBy: { qty: 'desc' }, take: 50 },
-      comparisons: { orderBy: { createdAt: 'desc' }, take: 1 },
+      payments: {
+        select: { channel: true, count: true, totalTHB: true }
+      },
+      items: { 
+        select: { itemName: true, qty: true, revenueSatang: true }, 
+        orderBy: { qty: 'desc' }, 
+        take: 10 // Reduce from 50 to 10 for better performance
+      },
+      comparisons: { 
+        orderBy: { createdAt: 'desc' }, 
+        take: 1,
+        select: {
+          openingBuns: true, openingMeatGram: true, openingDrinks: true,
+          purchasesBuns: true, purchasesMeatGram: true, purchasesDrinks: true,
+          usagePOSBuns: true, usagePOSMeatGram: true, usagePOSDrinks: true,
+          expectedCloseBuns: true, expectedCloseMeatGram: true, expectedCloseDrinks: true,
+          staffCloseBuns: true, staffCloseMeatGram: true, staffCloseDrinks: true,
+          varianceBuns: true, varianceMeatGram: true, varianceDrinks: true,
+          state: true
+        }
+      },
     }
   });
   if (!snapshot) return null;
 
   const comp = snapshot.comparisons?.[0] ?? null;
-  const start = snapshot.windowStartUTC;
-  const end = snapshot.windowEndUTC;
 
-  // Expenses (PURCHASE) in window
-  const lines = await prisma.expenseLine.findMany({
+  // Optimize expenses query - use aggregate instead of findMany
+  const expensesResult = await prisma.expenseLine.aggregate({
     where: {
       type: 'PURCHASE',
-      createdAt: { gte: start, lte: end }
+      createdAt: { gte: snapshot.windowStartUTC, lte: snapshot.windowEndUTC }
     },
-    select: { qty: true, unitPriceTHB: true, lineTotalTHB: true, name: true }
+    _sum: {
+      lineTotalTHB: true
+    },
+    _count: true
   });
-  let expensesTotal = 0;
-  for (const l of lines) {
-    const v = (l.lineTotalTHB != null)
-      ? Number(l.lineTotalTHB)
-      : (Number(l.qty ?? 0) * Number(l.unitPriceTHB ?? 0));
-    expensesTotal += (isFinite(v) ? v : 0);
-  }
+  const expensesTotal = Number(expensesResult._sum.lineTotalTHB ?? 0);
 
-  // Staff form within window (for banking)
+  // Staff form within window (for banking) - optimize query
   const ds = await prisma.dailySales.findFirst({
-    where: { createdAt: { gte: start, lte: end } },
-    orderBy: { createdAt: 'desc' }
+    where: { createdAt: { gte: snapshot.windowStartUTC, lte: snapshot.windowEndUTC } },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      closingCashTHB: true,
+      cashBankedTHB: true,
+      qrTransferTHB: true,
+      closingCash: true,
+      cashBanked: true,
+      qrTransfer: true
+    }
   });
   const staffBank = extractStaffBanking(ds);
 
-  // POS payments from snapshot
+  // POS payments from snapshot - use totalTHB directly 
   const byChannel = Object.fromEntries((snapshot.payments || []).map((p: any) => [p.channel, p]));
-  const posCashTHB = THB(byChannel['CASH']?.totalSatang);
-  const posQrTHB   = THB(byChannel['QR']?.totalSatang);
-  const posGrabTHB = THB(byChannel['GRAB']?.totalSatang);
+  const posCashTHB = Number(byChannel['CASH']?.totalTHB ?? 0);
+  const posQrTHB   = Number(byChannel['QR']?.totalTHB ?? 0);
+  const posGrabTHB = Number(byChannel['GRAB']?.totalTHB ?? 0);
 
   const balance = {
     staff: staffBank,
@@ -154,7 +176,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
       payments: (snapshot.payments || []).map((p: any) => ({
         channel: p.channel,
         count: p.count,
-        totalTHB: Number((THB(p.totalSatang)).toFixed(2))
+        totalTHB: Number(p.totalTHB ?? 0)
       })),
     },
     expenses: {

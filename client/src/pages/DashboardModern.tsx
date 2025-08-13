@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -102,32 +102,58 @@ export default function DashboardModern() {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Calculate metrics from real data
+  // Calculate metrics from real data matching your design
   const metrics = useMemo(() => {
-    if (!data?.snapshot) return [];
+    if (!data?.snapshot) return [
+      { key: "totalSales", label: "TOTAL SALES", value: 0, prefix: "฿" },
+      { key: "orders", label: "ORDERS", value: 0 },
+      { key: "avgOrder", label: "AVG ORDER", value: 0, prefix: "฿" },
+      { key: "status", label: "STATUS", value: "NO DATA" },
+    ];
     
     const snapshot = data.snapshot;
-    const totalPayments = snapshot.payments?.reduce((sum, p) => sum + p.totalTHB, 0) || 0;
+    const totalSales = snapshot.payments?.reduce((sum, p) => sum + p.totalTHB, 0) || 0;
     const totalOrders = snapshot.totalReceipts || 0;
-    const avgOrderValue = totalOrders > 0 ? totalPayments / totalOrders : 0;
+    const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
     
     return [
-      { label: "Total Sales", value: totalPayments, unit: "฿" },
-      { label: "Orders", value: totalOrders },
-      { label: "Avg Order", value: avgOrderValue, format: (n: number) => currency(n).replace('THB', '฿') },
-      { label: "Status", value: 0, format: () => snapshot.reconcileState },
+      { key: "totalSales", label: "TOTAL SALES", value: Math.round(totalSales), prefix: "฿" },
+      { key: "orders", label: "ORDERS", value: totalOrders },
+      { key: "avgOrder", label: "AVG ORDER", value: Math.round(avgOrderValue), prefix: "฿" },
+      { key: "status", label: "STATUS", value: snapshot.reconcileState },
     ];
   }, [data]);
 
-  // Process top items for display
-  const bestSellers = useMemo(() => {
-    if (!data?.topItems) return [];
+  // Process top items for display matching your design format
+  const sellers = useMemo(() => {
+    if (!data?.topItems) return [
+      { qty: 0, name: "No data", price: 0 },
+      { qty: 0, name: "No data", price: 0 },
+      { qty: 0, name: "No data", price: 0 },
+      { qty: 0, name: "No data", price: 0 },
+    ];
     return data.topItems.slice(0, 4).map(item => ({
+      qty: item.qty,
       name: item.itemName,
-      quantity: item.qty,
-      revenue: item.revenueTHB,
-      price: item.qty > 0 ? item.revenueTHB / item.qty : 0
+      price: item.revenueTHB
     }));
+  }, [data]);
+
+  // Process payment data for your design
+  const payments = useMemo(() => {
+    if (!data?.snapshot?.payments) return [
+      { method: "CASH", amount: 0 },
+      { method: "OTHER", amount: 0 },
+    ];
+    
+    const cashPayment = data.snapshot.payments.find(p => p.channel === 'CASH');
+    const otherPayments = data.snapshot.payments.filter(p => p.channel !== 'CASH');
+    const otherTotal = otherPayments.reduce((sum, p) => sum + p.totalTHB, 0);
+    
+    return [
+      { method: "CASH", amount: cashPayment?.totalTHB || 0 },
+      { method: "OTHER", amount: otherTotal },
+    ];
   }, [data]);
 
   if (error) {
@@ -187,97 +213,95 @@ export default function DashboardModern() {
           </div>
         )}
 
-        {/* Metrics row */}
-        {!isLoading && metrics.length > 0 && (
-          <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {metrics.map(m => (
-              <StatCard 
-                key={m.label} 
-                label={m.label} 
-                value={m.value} 
-                unit={m.unit} 
-                format={m.format} 
-              />
-            ))}
-          </section>
-        )}
-
-        {/* Revenue + Promo + Best Seller */}
-        {!isLoading && (
-          <section className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <MiniCard title="Payment Breakdown">
-              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                <div>Current shift data</div>
-                {data?.snapshot && (
-                  <StatusBadge state={data.snapshot.reconcileState} />
+        {/* Metric Pills - Your Design */}
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {metrics.map(m => (
+            <div key={m.key} className="rounded-2xl bg-teal-600 text-white px-6 py-5 shadow-md flex items-center justify-between">
+              <div>
+                <div className="text-teal-100 text-xs tracking-wide">{m.label}</div>
+                {m.key !== "status" ? (
+                  <div className="text-3xl font-semibold tabular-nums mt-1">{m.prefix || ""}{fmt(m.value)}</div>
+                ) : (
+                  <div className="text-3xl font-extrabold mt-1">{m.value}</div>
                 )}
               </div>
-              <div className="rounded-2xl border bg-white p-3">
-                <RevenueChart payments={data?.snapshot?.payments} />
-              </div>
-            </MiniCard>
-
-            <div className="xl:col-span-1">
-              <div className="rounded-2xl p-5 h-full bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow">
-                <div className="text-lg font-semibold">Live POS Integration</div>
-                <div className="text-sm text-orange-50 mt-1">
-                  Real-time data from Loyverse POS system with automated reconciliation
-                </div>
-                <button className="mt-4 bg-white/10 hover:bg-white/20 transition rounded-xl px-4 py-2 text-sm border border-white/30">
-                  View Details
-                </button>
-              </div>
             </div>
+          ))}
+        </div>
 
-            <MiniCard title="Top Sellers">
-              {bestSellers.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {bestSellers.map((item) => (
-                    <div key={item.name} className="rounded-xl border p-3 bg-white">
-                      <div className="rounded-md bg-gradient-to-br from-teal-100 to-teal-200 h-16 mb-2 flex items-center justify-center">
-                        <div className="text-teal-700 text-xs font-medium">
-                          {item.quantity}x
-                        </div>
-                      </div>
-                      <div className="text-sm font-medium truncate">{item.name}</div>
-                      <div className="text-xs text-gray-500">Qty: {fmt(item.quantity)}</div>
-                      <div className="text-teal-700 font-semibold mt-1">{currency(item.revenue)}</div>
+        {/* Main Grid: Payments | Orange Promo | Top Sellers - Your Exact Design */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Payment Breakdown */}
+          <div className="rounded-2xl bg-white border p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Payment Breakdown</h3>
+              <StatusBadge state={data?.snapshot?.reconcileState || 'MISSING_DATA'} />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Current shift data</p>
+            <div className="mt-4 space-y-4">
+              {payments.map(p => {
+                const total = payments.reduce((a,b) => a + b.amount, 0);
+                const pct = total > 0 ? (p.amount / total) * 100 : 0;
+                return (
+                  <div key={p.method} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700 font-medium">{p.method}</span>
+                      <span className="text-gray-900 font-semibold">฿{fmt(p.amount)}</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-sm">No sales data available</div>
-                  <div className="text-xs text-gray-400 mt-1">Data will appear when orders are processed</div>
-                </div>
-              )}
-            </MiniCard>
-          </section>
-        )}
-
-        {/* System Status */}
-        {data?.snapshot && (
-          <section className="mt-6">
-            <MiniCard title="System Status">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-teal-600">{data.snapshot.totalReceipts}</div>
-                  <div className="text-sm text-gray-600">Total Receipts</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-teal-600">
-                    {currency(data.snapshot.totalSalesTHB)}
+                    <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                      <div className="h-full bg-teal-600" style={{ width: `${Math.max(0, Math.min(100, pct))}%`}} />
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600">Revenue (POS)</div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Orange Promo */}
+          <div className="rounded-2xl p-6 bg-gradient-to-r from-orange-400 to-orange-500 text-white">
+            <div className="text-xl font-semibold">Live POS Integration</div>
+            <p className="text-sm text-orange-50 mt-1">Real-time data from Loyverse POS system with automated reconciliation</p>
+            <button className="mt-5 rounded-xl border border-white/30 bg-white/10 hover:bg-white/20 px-4 py-2 text-sm">View Details</button>
+          </div>
+
+          {/* Top Sellers */}
+          <div className="rounded-2xl bg-white border p-5">
+            <h3 className="font-semibold text-gray-900">Top Sellers</h3>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              {sellers.map((s, idx) => (
+                <div key={idx} className="rounded-2xl border bg-white p-3">
+                  <div className="relative rounded-xl bg-[#ccfbf1] h-28 mb-3 overflow-hidden">
+                    <div className="w-full h-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center">
+                      <div className="text-teal-700 text-sm font-medium">SBB</div>
+                    </div>
+                    <span className="absolute top-2 left-2 bg-white/90 text-teal-700 text-xs font-semibold rounded-md px-2 py-1">{s.qty}x</span>
+                  </div>
+                  <div className="text-sm font-medium truncate" title={s.name}>{s.name}</div>
+                  <div className="text-xs text-gray-500">Qty: {s.qty}</div>
+                  <div className="text-teal-700 font-semibold mt-1">฿{fmt(s.price)}</div>
                 </div>
-                <div className="text-center">
-                  <StatusBadge state={data.snapshot.reconcileState} />
-                  <div className="text-sm text-gray-600 mt-1">Reconciliation</div>
-                </div>
-              </div>
-            </MiniCard>
-          </section>
-        )}
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Status Row - Your Exact Design */}
+        <div className="mt-6 rounded-2xl bg-white border p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+            <div>
+              <div className="text-teal-700 text-2xl font-semibold tabular-nums">{fmt(metrics[1].value)}</div>
+              <div className="text-sm text-gray-500">Total Receipts</div>
+            </div>
+            <div>
+              <div className="text-teal-700 text-2xl font-semibold tabular-nums">฿{fmt(metrics[0].value)}</div>
+              <div className="text-sm text-gray-500">Revenue (POS)</div>
+            </div>
+            <div>
+              <StatusBadge state={data?.snapshot?.reconcileState || 'MISSING_DATA'} />
+              <div className="text-sm text-gray-500 mt-1">Reconciliation</div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
