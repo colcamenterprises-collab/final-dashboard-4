@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
+import DashboardModern from "@/pages/DashboardModern";
 import DailyStockForm from "@/pages/DailyStockForm";
 import PastForms from "@/pages/PastForms";
 import DraftFormsLibrary from "@/pages/DraftFormsLibrary";
@@ -25,7 +26,7 @@ import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
 import IngredientsTable from "@/pages/IngredientsTable";
 import DailySales from "@/pages/DailySales";
-import DailyStock from "@/pages/DailyStock";
+// import DailyStock from "@/pages/DailyStock"; // Removed - file doesn't exist
 import DailyStockPage from "@/pages/daily-stock";
 import StockLibrary from "@/pages/stock-library";
 import Recipes from "@/pages/Recipes";
@@ -55,7 +56,8 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={DashboardModern} />
+        <Route path="/dashboard-old" component={Dashboard} />
         <Route path="/daily-stock-sales" component={DailyStockForm} />
         <Route path="/past-forms" component={PastForms} />
         <Route path="/shopping-list" component={ShoppingList} />
