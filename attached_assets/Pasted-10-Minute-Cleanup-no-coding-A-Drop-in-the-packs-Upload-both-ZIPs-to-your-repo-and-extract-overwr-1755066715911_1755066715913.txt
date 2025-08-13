@@ -1,0 +1,98 @@
+10-Minute Cleanup (no coding)
+A) Drop in the packs
+Upload both ZIPs to your repo and extract (overwrite OK).
+
+B) Wire 3 middlewares (copy/paste)
+In your server entry (src/server/index.ts or similar), add near the top:
+
+ts
+Copy
+Edit
+import { reqId } from "./middleware/reqId";
+import { timing } from "./middleware/timing";
+import { errorGuard } from "./middleware/errorGuard";
+import { readonlyGuard } from "./middleware/readonly";
+import { PrismaClient } from "@prisma/client";
+import { installPrismaWriteBlock } from "./middleware/prismaWriteBlock";
+
+app.use(reqId);
+app.use(timing);
+app.use(readonlyGuard);
+
+const prisma = new PrismaClient();
+installPrismaWriteBlock(prisma);
+
+// ... your routes
+
+app.use(errorGuard); // keep this LAST
+C) Turn on read-only
+Replit → Secrets:
+
+AGENT_READONLY = 1 (keeps your data safe while we clean)
+
+Optional: SLOW_API_MS = 300 (threshold for slow warnings)
+
+D) Restore the menu (already included)
+The pack’s src/config/nav.ts restores:
+
+Sales & Operations → Dashboard, Daily Sales & Stock, Purchasing (Shift), Expenses (Business), Analysis
+
+Finance → Reports, Exports
+
+E) Run the audits (1 command)
+Add to package.json:
+
+json
+Copy
+Edit
+{
+  "scripts": {
+    "audit:routes": "node scripts/audit/list-routes.ts",
+    "audit:unsafe": "node scripts/audit/find-unsafe.ts",
+    "audit:large": "node scripts/audit/find-large-files.ts",
+    "audit:all": "bash scripts/audit/report.sh"
+  }
+}
+Then run:
+
+arduino
+Copy
+Edit
+npm run audit:all
+It will:
+
+Print all App Router pages/routes (quick map of what exists).
+
+Flag unsafe prisma commands, raw SQL mutations, and mutating HTTP calls.
+
+Flag large source files (>300KB) that bloat builds and slow Replit.
+
+F) Business Expenses visible now (no DB)
+Put your ledger in a Google Sheet and Publish as CSV.
+
+Replit → Secrets:
+NEXT_PUBLIC_EXPENSES_SHEET_CSV_URL = <CSV link>
+
+Open /expenses — you’ll see totals + table immediately (read-only).
+
+Clean Sweep Gameplan (short, surgical)
+Freeze writes (done via AGENT_READONLY=1).
+
+Run npm run audit:all and paste me the output. I’ll tell you which files to delete or fix.
+
+Delete dead code we identify (old form versions, orphaned components, duplicate routes).
+
+Stabilize Analysis: ensure /api/analysis/:shiftId returns real snapshot data; fix worker if mismatched.
+
+Performance: the timing middleware will print any endpoint slower than SLOW_API_MS. We’ll address the top 5 offenders (usually N+1 queries, missing indexes, or heavy JSON).
+
+Style pass on Dashboard (use the known layout you wanted; zero placeholders).
+
+Optional strictness: if you want, switch to tsconfig.strict.json later for tighter type safety (I’ll guide it).
+
+What I need from you (2 quick items)
+Flip AGENT_READONLY=1 (if not already on).
+
+Run npm run audit:all and paste the output here.
+
+From that output, I’ll give you a bullet list of exact deletes/fixes and handle the rest with ready-to-paste files. No SQL. No guesswork.
