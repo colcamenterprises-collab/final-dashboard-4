@@ -31,64 +31,31 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Updated consolidated navigation structure as per user requirements
-const navigationStructure = [
-  {
-    id: "operations",
-    label: "Sales & Operations",
-    icon: ShoppingCart,
-    expandable: true,
-    items: [
-      { path: "/daily-sales", label: "Daily Sales Form", icon: ClipboardList },
-      { path: "/daily-stock", label: "Daily Stock Form", icon: Package },
-      { path: "/form-library", label: "Form Library", icon: FileText },
-    ]
-  },
-  {
-    id: "finance",
-    label: "Finance",
-    icon: DollarSign,
-    expandable: true,
-    path: "/finance",
-    items: [
-      { path: "/finance", label: "Dashboard", icon: BarChart3 },
-      { path: "/analysis", label: "Analysis", icon: LineChart },
-      { path: "/expenses", label: "Expenses", icon: Receipt },
-    ]
-  },
-  {
-    id: "menu-mgmt",
-    label: "Menu Mgmt",
-    icon: Utensils,
-    expandable: true,
-    path: "/recipes", // Main page for collapsed state
-    items: [
-      { path: "/recipes", label: "Recipes", icon: ChefHat },
-      { path: "/ingredients", label: "Ingredients", icon: Package },
-      { path: "/ingredients-table", label: "Edit Ingredients", icon: Edit },
-    ]
-  },
-  {
-    id: "marketing",
-    label: "Marketing",
-    icon: Megaphone,
-    path: "/marketing"
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: Settings,
-    expandable: true,
-    path: "/placeholder/business-info", // Main page for collapsed state
-    items: [
-      { path: "/placeholder/business-info", label: "Business Info", icon: FileText },
-      { path: "/placeholder/logo", label: "Logo", icon: Settings },
-      { path: "/placeholder/api-keys", label: "API Keys", icon: Settings },
-      { path: "/placeholder/theme", label: "Theme", icon: Settings },
-      { path: "/placeholder/employees", label: "Employee", icon: UserPlus },
-    ]
-  }
-];
+import { NAV } from "@/config/nav";
+
+// Convert NAV config to navigationStructure format
+const navigationStructure = NAV.map(group => ({
+  id: group.group.toLowerCase().replace(/\s+/g, '-'),
+  label: group.group,
+  icon: group.group === "Sales & Operations" ? ShoppingCart : 
+        group.group === "Finance" ? DollarSign :
+        group.group === "System" ? Settings : Activity,
+  expandable: true,
+  items: group.items.map(item => ({
+    path: item.path,
+    label: item.label,
+    icon: item.label.includes("Dashboard") ? Home :
+          item.label.includes("Daily Sales") ? ClipboardList :
+          item.label.includes("Purchasing") ? ShoppingCart :
+          item.label.includes("Expenses") ? Receipt :
+          item.label.includes("Analysis") ? LineChart :
+          item.label.includes("Reports") ? BarChart3 :
+          item.label.includes("Exports") ? FileSpreadsheet :
+          item.label.includes("Security") ? AlertTriangle :
+          item.label.includes("POS") ? Activity :
+          Activity
+  }))
+}));
 
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();

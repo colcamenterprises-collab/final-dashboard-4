@@ -1316,6 +1316,41 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // System status endpoint for lockdown monitoring
+  app.get("/api/system/status", async (req: Request, res: Response) => {
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      // Get current database user
+      const userResult = await prisma.$queryRaw<Array<{current_user: string}>>`SELECT current_user`;
+      const currentUser = userResult[0]?.current_user || 'unknown';
+      
+      // Check for unsafe scripts in package.json
+      const fs = await import('fs');
+      const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+      const unsafeScripts = [];
+      
+      if (packageJson.scripts?.['db:push']?.includes('drizzle-kit push')) {
+        unsafeScripts.push('db:push contains drizzle-kit push');
+      }
+      
+      const status = {
+        readonlyMode: process.env.AGENT_READONLY === "1",
+        databaseUser: currentUser,
+        writeProtection: true, // Middleware is always installed
+        unsafeScripts,
+        lastChecked: new Date().toISOString()
+      };
+      
+      res.json(status);
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error("Error checking system status:", error);
+      res.status(500).json({ error: "Failed to check system status" });
+    }
+  });
+
   // Create new expense
   app.post("/api/expenses", async (req: Request, res: Response) => {
     try {
