@@ -25,7 +25,12 @@ import {
 } from "@shared/schema";
 
 import { PrismaClient } from "@prisma/client";
+import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
+
 const prisma = new PrismaClient();
+
+// Install Prisma write blocking middleware for AGENT_READONLY mode
+installPrismaWriteBlock(prisma);
 
 export interface IStorage {
   // Users

@@ -1,0 +1,104 @@
+Files added:
+
+src/server/middleware/readonly.ts
+
+src/server/middleware/prismaWriteBlock.ts
+
+src/config/nav.ts (restores menu)
+
+src/app/analysis/page.tsx + src/app/api/analysis/[shiftId]/route.ts
+
+src/app/expenses/page.tsx (sheet-backed)
+
+scripts/deny-unsafe.sh
+
+2) Add two lines in your server entry (1 minute)
+Open your server entry file (src/server/index.ts or app.ts) and add exactly these two imports/uses near the top:
+
+ts
+Copy
+Edit
+import { readonlyGuard } from "./middleware/readonly";
+app.use(readonlyGuard);
+If you initialize Prisma once, also install the write blocker where you create the PrismaClient:
+
+ts
+Copy
+Edit
+import { PrismaClient } from "@prisma/client";
+import { installPrismaWriteBlock } from "./middleware/prismaWriteBlock";
+const prisma = new PrismaClient();
+installPrismaWriteBlock(prisma);
+This locks writes when the flag is on (see step 4). No SQL. No DB user edits.
+
+3) Protect builds from destructive commands (1 minute)
+Add this to your package.json scripts:
+
+json
+Copy
+Edit
+{
+  "scripts": {
+    "prestart": "bash scripts/deny-unsafe.sh",
+    "prebuild": "bash scripts/deny-unsafe.sh"
+  }
+}
+4) Flip the Read-Only kill switch (30 seconds)
+In Replit → Secrets:
+
+Add AGENT_READONLY = 1
+Restart the app. Now:
+
+All POST/PUT/PATCH/DELETE HTTP requests are blocked.
+
+Any Prisma writes throw READ_ONLY_MODE.
+
+The agent can click around, but cannot mutate prod data.
+
+(When you want to make legit changes, temporarily set it to 0, do your thing, then set back to 1.)
+
+5) Set up Business Expenses (no DB needed)
+We’ll read your ledger from a Google Sheet CSV while we recover DB later.
+
+Make a Google Sheet with headers:
+Date, Supplier, Category, Item, Quantity, UnitCost, Total, Note
+
+File → Share → Anyone with link Viewer.
+
+File → Publish to the web → as CSV. Copy the CSV link.
+
+In Replit → Secrets add:
+NEXT_PUBLIC_EXPENSES_SHEET_CSV_URL = <your published CSV link>
+
+Visit /expenses in your app. You’ll see totals and a table immediately.
+
+This is read-only display and separate from shift purchases. It gives you management visibility now without migrations.
+
+6) Analysis page (real numbers only)
+Go to /analysis?shiftId=<your-shift-id>
+
+It pulls snapshot totals, payments breakdown, and banking variance.
+
+If you see NO_SNAPSHOT, that means the worker didn’t write a snapshot for that shift. We’ll fix the worker after lock-down.
+
+7) Restore the menu layout (already included)
+src/config/nav.ts is included. Your sidebar will show:
+
+Sales & Operations
+
+Dashboard
+
+Daily Sales & Stock
+
+Purchasing (Shift)
+
+Expenses (Business) ✅
+
+Analysis ✅
+
+Finance
+
+Reports
+
+Exports
+

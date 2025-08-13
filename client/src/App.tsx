@@ -46,6 +46,7 @@ import ExpensesList from "@/pages/expenses/ExpensesList";
 import ExpenseEditor from "@/pages/expenses/ExpenseEditor";
 import { BusinessExpenses } from "@/pages/expenses/BusinessExpenses";
 import { ShiftPurchasing } from "@/pages/expenses/ShiftPurchasing";
+import SystemStatus from "@/pages/SystemStatus";
 
 import NotFound from "@/pages/not-found";
 
@@ -72,6 +73,7 @@ function Router() {
         <Route path="/finance/expenses/:id" component={ExpenseEditor} />
         <Route path="/expenses/business" component={BusinessExpenses} />
         <Route path="/expenses/purchasing" component={ShiftPurchasing} />
+        <Route path="/system/status" component={SystemStatus} />
         <Route path="/shift-comparison" component={ShiftComparison} />
         <Route path="/analysis/shift-report/:date" component={ShiftReportDetail} />
         <Route path="/marketing" component={Marketing} />

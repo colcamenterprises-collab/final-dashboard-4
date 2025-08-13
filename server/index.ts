@@ -11,12 +11,20 @@ import { BigBossAgent } from './agents/bigboss';
 import { JussiAgent } from './agents/jussi';
 import { db } from './db';
 import { PrismaClient } from '@prisma/client';
+import { readonlyGuard } from './middleware/readonly';
+import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
 
 const prisma = new PrismaClient();
+
+// Install Prisma write blocking middleware for AGENT_READONLY mode
+installPrismaWriteBlock(prisma);
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
+
+// Install readonly guard middleware - blocks all mutating operations when AGENT_READONLY=1
+app.use(readonlyGuard);
 
 // NUCLEAR cache control headers - most aggressive possible
 app.use((req, res, next) => {
