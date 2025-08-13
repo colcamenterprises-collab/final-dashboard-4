@@ -11,6 +11,9 @@ import { BigBossAgent } from './agents/bigboss';
 import { JussiAgent } from './agents/jussi';
 import { db } from './db';
 import { PrismaClient } from '@prisma/client';
+import { reqId } from './middleware/reqId';
+import { timing } from './middleware/timing';
+import { errorGuard } from './middleware/errorGuard';
 import { readonlyGuard } from './middleware/readonly';
 import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
 
@@ -20,10 +23,11 @@ const prisma = new PrismaClient();
 installPrismaWriteBlock(prisma);
 
 const app = express();
+// Middleware stack - order matters
+app.use(reqId);
+app.use(timing);
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
-
-// Install readonly guard middleware - blocks all mutating operations when AGENT_READONLY=1
 app.use(readonlyGuard);
 
 // NUCLEAR cache control headers - most aggressive possible
@@ -383,13 +387,8 @@ async function checkSchema() {
   const { cronEmailService } = await import('./services/cronEmailService');
   cronEmailService.startEmailCron();
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  // Error guard middleware - must be LAST
+  app.use(errorGuard);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
