@@ -26,7 +26,8 @@ const NAV = [
     items: [
       { label: "Sales Form",   path: "/daily-sales",    icon: Icon.form },
       { label: "Stock Form",   path: "/daily-stock",    icon: Icon.stock },
-      { label: "Expenses",     path: "/expenses", icon: Icon.file },
+      { label: "Expenses",     path: "/expenses", icon: Icon.money },
+      { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
       { label: "Receipts",     path: "/receipts", icon: Icon.file },
       { label: "Analysis",     path: "/operations/analysis", icon: Icon.chart },
       { label: "Delivery Partners", path: "/operations/delivery", icon: Icon.list },
@@ -36,7 +37,6 @@ const NAV = [
   {
     title: "Finance",
     items: [
-      { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
       { label: "Profit & Loss",       path: "/finance/pnl",       icon: Icon.money },
       { label: "Analysis",            path: "/finance/analysis",  icon: Icon.chart },
       { label: "Forecast & Budget",   path: "/finance/forecast",  icon: Icon.list },

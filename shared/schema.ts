@@ -820,4 +820,38 @@ export const insertDailyReceiptSummarySchema = createInsertSchema(dailyReceiptSu
 export type DailyReceiptSummary = typeof dailyReceiptSummaries.$inferSelect;
 export type InsertDailyReceiptSummary = z.infer<typeof insertDailyReceiptSummarySchema>;
 
+// P&L Finance Tables
+export const plRow = pgTable("pl_row", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+});
+
+export const plCategoryMap = pgTable("pl_category_map", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => expenseCategories.id),
+  plrowCode: text("plrow_code").notNull().references(() => plRow.code),
+});
+
+export const plMonthCache = pgTable("pl_month_cache", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  plrowCode: text("plrow_code").notNull().references(() => plRow.code),
+  amountMinor: integer("amount_minor").notNull().default(0),
+});
+
+// P&L Schema definitions  
+export const insertPLRowSchema = createInsertSchema(plRow);
+export const insertPLCategoryMapSchema = createInsertSchema(plCategoryMap);
+export const insertPLMonthCacheSchema = createInsertSchema(plMonthCache);
+
+export type PLRow = typeof plRow.$inferSelect;
+export type InsertPLRow = z.infer<typeof insertPLRowSchema>;
+export type PLCategoryMap = typeof plCategoryMap.$inferSelect;
+export type InsertPLCategoryMap = z.infer<typeof insertPLCategoryMapSchema>;
+export type PLMonthCache = typeof plMonthCache.$inferSelect;
+export type InsertPLMonthCache = z.infer<typeof insertPLMonthCacheSchema>;
+
 

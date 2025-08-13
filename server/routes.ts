@@ -1746,8 +1746,12 @@ export function registerRoutes(app: express.Application): Server {
   }).catch(err => console.error('Failed to load forms API:', err));
 
   // Expense Import Routes
-  import('./api/expenseImports').then(expenseModule => {
+  import('./api/expenseImports').then(async expenseModule => {
     app.use('/api/expenses/imports', expenseModule.default);
+    
+    // Import and register finance router
+    const { financeRouter } = await import('./api/finance');
+    app.use('/api/finance', financeRouter);
   }).catch(err => console.error('Failed to load expense imports API:', err));
 
   // === NEW POS INGESTION & ANALYTICS ENDPOINTS ===

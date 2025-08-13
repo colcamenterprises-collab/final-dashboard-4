@@ -32,6 +32,7 @@ import DailyStockPage from "@/pages/daily-stock";
 import StockLibrary from "@/pages/stock-library";
 import Recipes from "@/pages/Recipes";
 import Placeholder from "@/pages/Placeholder";
+import ProfitLoss from "@/pages/ProfitLoss";
 import Purchasing from "@/pages/Purchasing";
 import FormView from "@/pages/FormView";
 import SupplierManagement from "@/pages/SupplierManagement";
@@ -77,7 +78,7 @@ function App() {
           <Route path="/operations/reports" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Shift Reports</h1><p>Detailed shift reporting — coming soon</p></div>} />
 
           {/* Finance */}
-          <Route path="/finance/pnl" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Profit & Loss</h1><p>Financial performance analysis — coming soon</p></div>} />
+          <Route path="/finance/pnl" component={ProfitLoss} />
           <Route path="/finance/analysis" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Finance Analysis</h1><p>Financial analytics and reporting — coming soon</p></div>} />
           <Route path="/finance/forecast" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Forecasting & Budget</h1><p>Financial planning and budgeting — coming soon</p></div>} />
           <Route path="/finance/suppliers" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Supplier Payments</h1><p>Manage supplier payments — coming soon</p></div>} />
