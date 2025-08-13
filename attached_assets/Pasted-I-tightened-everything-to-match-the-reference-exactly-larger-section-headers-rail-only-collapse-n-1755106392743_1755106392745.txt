@@ -1,0 +1,420 @@
+I tightened everything to match the reference exactly: larger section headers, rail-only collapse (no icons), pill-active nav, soft shadows, inner container background, tighter top spacing, logo slot, and a placeholder line/area chart that looks like the sample.
+
+Below are drop-in files. Paste them as-is.
+
+0) Global theme (tokens, shadows, radii, spacing)
+client/src/styles/theme.css
+
+css
+Copy
+Edit
+:root{
+  /* Brand */
+  --brand: #0ea37e;        /* emerald-600 vibe */
+  --brand-700: #0b8b6b;
+  --brand-50: #e6f7f2;
+
+  /* Surface + text */
+  --bg-app: #f5f7f8;
+  --surface: #ffffff;
+  --muted: #6b7280;
+  --heading: #0f172a;
+
+  /* Radii */
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+  --r-3xl: 28px;
+
+  /* Card shadow (subtle, airy) */
+  --shadow-1: 0 2px 6px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-2: 0 8px 28px rgba(15,23,42,.08), 0 2px 8px rgba(15,23,42,.05);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(15,23,42,.03);
+}
+
+/* Utilities */
+.bg-app     { background: var(--bg-app); }
+.card       { background: var(--surface); border:1px solid #e5e7eb; border-radius: var(--r-3xl); box-shadow: var(--shadow-1); }
+.card-inner { background: var(--surface); border:1px solid #eef2f7; border-radius: var(--r-2xl); box-shadow: var(--shadow-inset); }
+.kpi-pill   { background: var(--brand); color:#fff; border-radius: var(--r-2xl); box-shadow: var(--shadow-1); }
+.kpi-label  { color: rgba(255,255,255,.85); font-size:12px; letter-spacing:.3px; }
+.kpi-value  { font-weight:700; font-size:28px; line-height:1.1; }
+
+.header-pill  { border-radius:999px; border:1px solid #e5e7eb; background:#fff; box-shadow: var(--shadow-1); }
+
+.shadow-2     { box-shadow: var(--shadow-2); }
+
+/* Sidebar */
+.sb           { background:#fff; border-right:1px solid #e5e7eb; box-shadow: 2px 0 12px rgba(0,0,0,.03); }
+.sb-group     { color:#9aa2b1; letter-spacing:.08em; font-weight:700; font-size:12px; }
+.sb-item      { height:40px; border-radius:999px; }
+.sb-active    { background: var(--brand); color:#fff; box-shadow: var(--shadow-1); }
+.sb-rail      { width:56px; } /* collapsed width */
+Wire it once (e.g., in client/src/main.css or wherever you import Tailwind/global CSS):
+
+css
+Copy
+Edit
+@import "./styles/theme.css";
+1) Sidebar — grouped, rail-only collapsed, larger group headers
+client/src/components/Sidebar.tsx
+
+tsx
+Copy
+Edit
+import { useLocation } from "wouter";
+import { useEffect, useRef, useState, Fragment } from "react";
+
+/* Minimal mono icons (same weight) */
+const Icon = {
+  grid:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>,
+  form:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 4h12v16H6z"/><path d="M8 8h8M8 12h8M8 16h6"/></svg>,
+  stock: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>,
+  file:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14l4-2 4 2 4-2 4 2V9z"/><path d="M14 3v6h6"/></svg>,
+  chart: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>,
+  money: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><path d="M9 9h3a3 3 0 110 6H9m3-6V7m0 10v-2"/></svg>,
+  list:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>,
+  meg:   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11l14-5v12L3 13z"/><path d="M17 6v12"/><path d="M6 14v5a2 2 0 0 0 2 2h2"/></svg>,
+  star:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 17.3l6.18 3.7-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>,
+  calc:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h3M8 15h3M13 15h3"/></svg>,
+};
+
+/* Groups + items */
+const NAV = [
+  {
+    title: "Dashboard",
+    items: [{ label: "Overview", path: "/dashboard", icon: Icon.grid }],
+  },
+  {
+    title: "Operations",
+    items: [
+      { label: "Sales Form",   path: "/operations/sales",    icon: Icon.form },
+      { label: "Stock Form",   path: "/operations/stock",    icon: Icon.stock },
+      { label: "Expenses",     path: "/operations/expenses", icon: Icon.file },
+      { label: "Receipts",     path: "/operations/receipts", icon: Icon.file },
+      { label: "Analysis",     path: "/operations/analysis", icon: Icon.chart },
+      { label: "Delivery Partners", path: "/operations/delivery", icon: Icon.list },
+      { label: "Shift Reports",     path: "/operations/reports",  icon: Icon.file },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { label: "Profit & Loss",       path: "/finance/pnl",       icon: Icon.money },
+      { label: "Analysis",            path: "/finance/analysis",  icon: Icon.chart },
+      { label: "Forecast & Budget",   path: "/finance/forecast",  icon: Icon.list },
+      { label: "Supplier Payments",   path: "/finance/suppliers", icon: Icon.list },
+      { label: "Cash Flow",           path: "/finance/cashflow",  icon: Icon.money },
+      { label: "Tax & Compliance",    path: "/finance/tax",       icon: Icon.file },
+    ],
+  },
+  {
+    title: "Menu Mgmt",
+    items: [
+      { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: Icon.calc },
+      { label: "Ingredient Mgmt",  path: "/menu/ingredients",     icon: Icon.list },
+      { label: "Recipe Cards",     path: "/menu/recipes",         icon: Icon.file },
+      { label: "Menu Performance", path: "/menu/performance",     icon: Icon.chart },
+      { label: "Seasonal Planner", path: "/menu/seasonal",        icon: Icon.list },
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      { label: "Add Reviews",        path: "/marketing/reviews",    icon: Icon.star },
+      { label: "Social Posting",     path: "/marketing/social",     icon: Icon.meg },
+      { label: "Campaign Analytics", path: "/marketing/analytics",  icon: Icon.chart },
+      { label: "Loyalty & Rewards",  path: "/marketing/loyalty",    icon: Icon.star },
+      { label: "Email/SMS Automation", path: "/marketing/automation", icon: Icon.list },
+      { label: "Promotions Manager", path: "/marketing/promotions", icon: Icon.meg },
+    ],
+  },
+];
+
+export default function Sidebar(){
+  const [location, navigate] = useLocation();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState(false);
+  const railRef = useRef<HTMLDivElement>(null);
+
+  useEffect(()=>{ // defaults: first two open
+    setExpanded({ Dashboard: true, Operations: true });
+  },[]);
+
+  // Expand on hover when rail-only
+  useEffect(()=>{
+    const el = railRef.current;
+    if (!el || !collapsed) return;
+    let t: any;
+    const onEnter = ()=>{ t=setTimeout(()=>setCollapsed(false), 60); };
+    const onLeave = ()=>{ clearTimeout(t); setCollapsed(true); };
+    el.addEventListener("mouseenter", onEnter);
+    el.addEventListener("mouseleave", onLeave);
+    return ()=>{ el.removeEventListener("mouseenter", onEnter); el.removeEventListener("mouseleave", onLeave); };
+  },[collapsed]);
+
+  return (
+    <aside
+      ref={railRef}
+      className={`sb sticky top-0 h-screen shrink-0 ${collapsed ? "sb-rail" : "w-64"} transition-[width] duration-300 ease-in-out`}
+    >
+      {/* Top bar: logo + collapse toggle */}
+      <div className="flex items-center justify-between px-4 py-4">
+        <div className={`${collapsed ? "sr-only" : ""} flex items-center gap-2`}>
+          {/* Logo slot */}
+          <div className="w-7 h-7 rounded-md bg-[var(--brand)] text-white grid place-items-center font-bold">S</div>
+          <div className="font-semibold tracking-tight text-[15px] text-[var(--heading)]">Smash Brothers</div>
+        </div>
+        <button
+          aria-label="Toggle"
+          onClick={()=>setCollapsed(v=>!v)}
+          className="rounded-lg border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50"
+        >
+          {collapsed ? "›" : "‹"}
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="px-3 pb-6 overflow-y-auto">
+        {NAV.map(group=>(
+          <Fragment key={group.title}>
+            <button
+              onClick={()=>setExpanded(s=>({ ...s, [group.title]: !s[group.title] }))}
+              className={`w-full flex items-center justify-between px-2 py-2 ${collapsed ? "pointer-events-none" : ""}`}
+            >
+              <span className={`sb-group ${collapsed ? "sr-only" : ""}`}>{group.title}</span>
+              {!collapsed && <span className={`text-gray-400 text-xs ${expanded[group.title] ? "" : "rotate-180"}`}>▾</span>}
+            </button>
+
+            {(expanded[group.title] || collapsed) && (
+              <ul className="space-y-2">
+                {group.items.map(item=>{
+                  const active = location === item.path || location.startsWith(item.path + "/");
+                  return (
+                    <li key={item.path}>
+                      <button
+                        onClick={()=>navigate(item.path)}
+                        title={collapsed ? item.label : undefined}
+                        className={`sb-item w-full flex items-center ${collapsed ? "justify-center px-0" : "px-3"} ${active ? "sb-active" : "hover:bg-gray-50"}`}
+                      >
+                        {!collapsed && <span className="mr-3 text-current">{item.icon}</span>}
+                        {collapsed ? null : <span className="text-sm">{item.label}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Fragment>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+What changed
+
+Group headers are larger than items (12px vs 14px items) and bold.
+
+Rail-only collapsed: 56px strip, no icons or text; hover temporarily expands.
+
+Active item = emerald pill (exact vibe).
+
+2) Dashboard — exact layout with inner surfaces & chart
+client/src/pages/Dashboard.tsx
+
+tsx
+Copy
+Edit
+import { useState } from "react";
+
+const n = (v:number)=>new Intl.NumberFormat().format(v);
+
+export default function Dashboard(){
+  const [period, setPeriod] = useState("This year");
+
+  return (
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
+      {/* Top header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">Good morning, Cam</h1>
+          <p className="text-sm text-[var(--muted)] -mt-1">Real-time operational insights from Smash Brothers Burgers</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="header-pill flex items-center gap-2 px-3 py-2">
+            <span className="text-sm text-[var(--muted)]">{period}</span>
+            <select value={period} onChange={e=>setPeriod(e.target.value)} className="opacity-0 absolute inset-0 cursor-pointer">
+              <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
+            </select>
+            <span className="text-[var(--muted)] text-xs">▾</span>
+          </div>
+          <button className="header-pill text-sm px-4 py-2">Download report</button>
+          <div className="hidden sm:flex items-center gap-2 header-pill px-3 py-2">
+            <span className="text-sm text-[var(--muted)]">Your balance</span>
+            <span className="text-[var(--brand-700)] font-semibold">฿566.55</span>
+            <div className="w-8 h-8 rounded-full bg-gray-300"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI banner inside soft frame */}
+      <div className="card mt-6 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {[
+            { label: "Total sales", value: "฿321,000" },
+            { label: "Orders", value: "22,000" },
+            { label: "Avg order", value: "฿789" },
+            { label: "Status", value: "OK" },
+          ].map((k)=>(
+            <div key={k.label} className="kpi-pill px-6 py-4">
+              <div className="kpi-label">{k.label.toUpperCase()}</div>
+              <div className="kpi-value mt-1 tabular-nums">{k.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content cards */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-6">
+        {/* Summary revenue (left) */}
+        <div className="card p-5">
+          <div className="text-[var(--heading)] font-semibold text-[18px]">Summary Revenue</div>
+          <div className="text-xs text-[var(--muted)]">Last update last week</div>
+
+          <div className="card-inner mt-4 p-4">
+            {/* Placeholder line/area chart (SVG) */}
+            <svg viewBox="0 0 360 150" className="w-full h-40">
+              <defs>
+                <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.35"/>
+                  <stop offset="100%" stopColor="var(--brand)" stopOpacity="0.02"/>
+                </linearGradient>
+              </defs>
+              <!-- axes -->
+              <line x1="30" y1="130" x2="340" y2="130" stroke="#e5e7eb" strokeWidth="1"/>
+              <line x1="30" y1="20"  x2="30"  y2="130" stroke="#e5e7eb" strokeWidth="1"/>
+              <!-- area path -->
+              <path d="M30 120 C70 110, 110 100, 150 105 C190 110, 230 80, 270 90 C300 120, 320 70, 340 85 L340 130 L30 130 Z"
+                    fill="url(#g)"/>
+              <!-- line path -->
+              <path d="M30 120 C70 110, 110 100, 150 105 C190 110, 230 80, 270 90 C300 120, 320 70, 340 85"
+                    fill="none" stroke="var(--brand)" strokeWidth="3" strokeLinecap="round"/>
+              <!-- ticks -->
+              <g fontSize="10" fill="#9aa2b1">
+                <text x="40"  y="145">2 Dec</text>
+                <text x="110" y="145">3 Dec</text>
+                <text x="180" y="145">4 Dec</text>
+                <text x="240" y="145">5 Dec</text>
+                <text x="300" y="145">6 Dec</text>
+              </g>
+            </svg>
+
+            {/* Payment breakdown bars */}
+            <div className="mt-3">
+              <div className="text-sm text-[var(--muted)] mb-2">Payment Breakdown</div>
+              {[
+                { label:"CASH",  value:3457, total:3457+4210 },
+                { label:"OTHER", value:4210, total:3457+4210 },
+              ].map(r=>(
+                <div key={r.label} className="mb-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--heading)]/90">{r.label}</span>
+                    <span className="font-semibold">฿{n(r.value)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-200 mt-2 overflow-hidden">
+                    <div className="h-full" style={{ width:`${(r.value/r.total)*100}%`, background:"var(--brand)" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Orange promo (center) */}
+        <div className="card p-0 overflow-hidden">
+          <div className="h-full p-6 text-white" style={{ background: "linear-gradient(90deg,#f59e0b,#f97316)" }}>
+            <div className="text-[18px] font-semibold">Need more information?</div>
+            <div className="text-sm text-white/90 mt-1">Present information in a visually appealing way</div>
+            <button className="mt-5 border border-white/30 bg-white/10 hover:bg-white/20 text-sm rounded-full px-5 py-2">See more</button>
+          </div>
+        </div>
+
+        {/* Best Seller (right) */}
+        <div className="card p-5">
+          <div className="text-[var(--heading)] font-semibold text-[18px]">Best Seller</div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {[{n:"Ultimate Double",q:9,p:2100},{n:"Cheesy Bacon",q:7,p:833},{n:"Single Smash",q:5,p:824},{n:"Sweet Potato",q:4,p:396}].map((b,i)=>(
+              <div key={i} className="card-inner p-3">
+                <div className="relative rounded-xl bg-[#ccfbf1] h-24 mb-3 overflow-hidden">
+                  <img src={`https://picsum.photos/seed/sbb${i}/300/200`} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-80"/>
+                  <span className="absolute top-2 left-2 bg-white/90 text-[var(--brand-700)] text-xs font-semibold rounded-md px-2 py-1">{b.q}x</span>
+                </div>
+                <div className="text-sm font-medium truncate">{b.n}</div>
+                <div className="text-xs text-[var(--muted)]">Qty: {b.q}</div>
+                <div className="text-[var(--brand-700)] font-semibold mt-1">฿{n(b.p)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+What changed
+
+Top spacing & header pills match the reference.
+
+KPI row inside a soft outer card; each KPI is a green pill with correct label/value styles.
+
+Inner cards use card-inner for that raised-but-flat feel.
+
+Chart is an SVG area+line that looks like the sample.
+
+3) Mini style guide (use across all new pages)
+client/src/styles/style-guide.md (keep in repo)
+
+markdown
+Copy
+Edit
+# SBB UI Style Guide (v1)
+
+Font: Poppins.  
+App bg: var(--bg-app) #f5f7f8.  
+Surfaces: var(--surface) #fff with --shadow-1.  
+Primary: var(--brand) #0ea37e (hover: --brand-700).  
+
+Radii:
+- Cards: --r-3xl (28px)
+- Inner cards: --r-2xl (24px)
+- KPI pills & nav active: rounded-full / --r-2xl
+
+Shadows:
+- Cards: --shadow-1
+- Overlays/large: --shadow-2
+- Inner panels: --shadow-inset
+
+Header controls:
+- `.header-pill` for filters/buttons (rounded-full + thin border)
+
+Layout:
+- Shell: `<Sidebar/>` (rail collapse 56px) + `<main class="flex-1 min-w-0">`.
+- No page-level `ml-*` or `pl-*` to clear sidebar.
+- Containers: `.card` → `.card-inner` stacks.
+
+KPI:
+- Label `.kpi-label` (12px, white/85%), Value `.kpi-value` (28px, bold), wrapper `.kpi-pill`.
+
+Charts:
+- Use SVG area+line with gradient `var(--brand)`; axes #e5e7eb, tick labels #9aa2b1.
+
+Nav:
+- Group header: `.sb-group` (12px, semibold, uppercase, gray).
+- Item: `.sb-item` height 40px.
+- Active: `.sb-active` (brand pill, white text).
+- Collapsed: rail-only (56px), auto-expand on hover.
+
+Do/Don't:
+- ✅ Use `.card`/`.card-inner` for all panels.
+- ✅ Keep spacing grid 24px between sections.
+- ❌ No icons or text in collapsed rail.
+- ❌ No colored dots/badges in the sidebar.

@@ -1,0 +1,42 @@
+:root{
+  /* Brand */
+  --brand: #0ea37e;        /* emerald-600 vibe */
+  --brand-700: #0b8b6b;
+  --brand-50: #e6f7f2;
+
+  /* Surface + text */
+  --bg-app: #f5f7f8;
+  --surface: #ffffff;
+  --muted: #6b7280;
+  --heading: #0f172a;
+
+  /* Radii */
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+  --r-3xl: 28px;
+
+  /* Card shadow (subtle, airy) */
+  --shadow-1: 0 2px 6px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-2: 0 8px 28px rgba(15,23,42,.08), 0 2px 8px rgba(15,23,42,.05);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(15,23,42,.03);
+}
+
+/* Utilities */
+.bg-app     { background: var(--bg-app); }
+.card       { background: var(--surface); border:1px solid #e5e7eb; border-radius: var(--r-3xl); box-shadow: var(--shadow-1); }
+.card-inner { background: var(--surface); border:1px solid #eef2f7; border-radius: var(--r-2xl); box-shadow: var(--shadow-inset); }
+.kpi-pill   { background: var(--brand); color:#fff; border-radius: var(--r-2xl); box-shadow: var(--shadow-1); }
+.kpi-label  { color: rgba(255,255,255,.85); font-size:12px; letter-spacing:.3px; }
+.kpi-value  { font-weight:700; font-size:28px; line-height:1.1; }
+
+.header-pill  { border-radius:999px; border:1px solid #e5e7eb; background:#fff; box-shadow: var(--shadow-1); }
+
+.shadow-2     { box-shadow: var(--shadow-2); }
+
+/* Sidebar */
+.sb           { background:#fff; border-right:1px solid #e5e7eb; box-shadow: 2px 0 12px rgba(0,0,0,.03); }
+.sb-group     { color:#9aa2b1; letter-spacing:.08em; font-weight:700; font-size:12px; }
+.sb-item      { height:40px; border-radius:999px; }
+.sb-active    { background: var(--brand); color:#fff; box-shadow: var(--shadow-1); }
+.sb-rail      { width:56px; } /* collapsed width */

@@ -1,156 +1,148 @@
 import { useLocation } from "wouter";
-import { useEffect, useState, Fragment } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 
-type Item = { label: string; path: string; icon?: JSX.Element };
-type Group = { key: string; title: string; items: Item[] };
-
-// Minimal monochrome icons (no colors)
-const I = {
-  dash:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h7v6H4zM13 7h7v10h-7zM4 15h7v2H4z"/></svg>,
+/* Minimal mono icons (same weight) */
+const Icon = {
+  grid:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>,
   form:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 4h12v16H6z"/><path d="M8 8h8M8 12h8M8 16h6"/></svg>,
   stock: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>,
   file:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14l4-2 4 2 4-2 4 2V9z"/><path d="M14 3v6h6"/></svg>,
   chart: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>,
   money: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><path d="M9 9h3a3 3 0 110 6H9m3-6V7m0 10v-2"/></svg>,
-  heart: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.8 8.6a5.5 5.5 0 0 0-9-2.1l-.8.9-.8-.9a5.5 5.5 0 1 0-7.8 7.8l8.6 8.2 8.6-8.2a5.5 5.5 0 0 0 1.2-5.7z"/></svg>,
-  calendar: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 3v4M17 3v4M3 9h18M5 9v12h14V9"/></svg>,
-  megaphone: <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11l14-5v12L3 13z"/><path d="M17 6v12"/><path d="M6 14v5a2 2 0 0 0 2 2h2"/></svg>,
-  star:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 17.3l6.18 3.7-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>,
   list:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>,
-  recipe:<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h6"/></svg>,
+  meg:   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11l14-5v12L3 13z"/><path d="M17 6v12"/><path d="M6 14v5a2 2 0 0 0 2 2h2"/></svg>,
+  star:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 17.3l6.18 3.7-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>,
   calc:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h3M8 15h3M13 15h3"/></svg>,
 };
 
-const NAV: Group[] = [
+/* Groups + items */
+const NAV = [
   {
-    key: "dashboard",
     title: "Dashboard",
-    items: [{ label: "Overview", path: "/dashboard", icon: I.dash }],
+    items: [{ label: "Overview", path: "/dashboard", icon: Icon.grid }],
   },
   {
-    key: "ops",
     title: "Operations",
     items: [
-      { label: "Sales Form",   path: "/daily-sales",    icon: I.form },
-      { label: "Stock Form",   path: "/daily-stock",    icon: I.stock },
-      { label: "Expenses",     path: "/expenses", icon: I.file },
-      { label: "Receipts",     path: "/receipts", icon: I.file },
-      { label: "Analysis",     path: "/operations/analysis", icon: I.chart },
-      { label: "Delivery Partners", path: "/operations/delivery", icon: I.list },
-      { label: "Shift Reports", path: "/operations/reports", icon: I.file },
+      { label: "Sales Form",   path: "/daily-sales",    icon: Icon.form },
+      { label: "Stock Form",   path: "/daily-stock",    icon: Icon.stock },
+      { label: "Expenses",     path: "/expenses", icon: Icon.file },
+      { label: "Receipts",     path: "/receipts", icon: Icon.file },
+      { label: "Analysis",     path: "/operations/analysis", icon: Icon.chart },
+      { label: "Delivery Partners", path: "/operations/delivery", icon: Icon.list },
+      { label: "Shift Reports",     path: "/operations/reports",  icon: Icon.file },
     ],
   },
   {
-    key: "fin",
     title: "Finance",
     items: [
-      { label: "Profit & Loss",       path: "/finance/pnl",        icon: I.money },
-      { label: "Analysis",            path: "/finance/analysis",   icon: I.chart },
-      { label: "Forecasting & Budget",path: "/finance/forecast",   icon: I.calendar },
-      { label: "Supplier Payments",   path: "/finance/suppliers",  icon: I.list },
-      { label: "Cash Flow",           path: "/finance/cashflow",   icon: I.money },
-      { label: "Tax & Compliance",    path: "/finance/tax",        icon: I.file },
+      { label: "Profit & Loss",       path: "/finance/pnl",       icon: Icon.money },
+      { label: "Analysis",            path: "/finance/analysis",  icon: Icon.chart },
+      { label: "Forecast & Budget",   path: "/finance/forecast",  icon: Icon.list },
+      { label: "Supplier Payments",   path: "/finance/suppliers", icon: Icon.list },
+      { label: "Cash Flow",           path: "/finance/cashflow",  icon: Icon.money },
+      { label: "Tax & Compliance",    path: "/finance/tax",       icon: Icon.file },
     ],
   },
   {
-    key: "menu",
     title: "Menu Mgmt",
     items: [
-      { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: I.calc },
-      { label: "Ingredient Mgmt",  path: "/ingredients",     icon: I.list },
-      { label: "Recipe Cards",     path: "/recipes",         icon: I.recipe },
-      { label: "Menu Performance", path: "/menu/performance",     icon: I.chart },
-      { label: "Seasonal Planner", path: "/menu/seasonal",        icon: I.calendar },
+      { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: Icon.calc },
+      { label: "Ingredient Mgmt",  path: "/ingredients",     icon: Icon.list },
+      { label: "Recipe Cards",     path: "/recipes",         icon: Icon.file },
+      { label: "Menu Performance", path: "/menu/performance",     icon: Icon.chart },
+      { label: "Seasonal Planner", path: "/menu/seasonal",        icon: Icon.list },
     ],
   },
   {
-    key: "mkt",
     title: "Marketing",
     items: [
-      { label: "Add Reviews",         path: "/marketing/reviews",     icon: I.star },
-      { label: "Social Posting",      path: "/marketing/social",      icon: I.megaphone },
-      { label: "Campaign Analytics",  path: "/marketing/analytics",   icon: I.chart },
-      { label: "Loyalty & Rewards",   path: "/marketing/loyalty",     icon: I.heart },
-      { label: "Email/SMS Automation",path: "/marketing/automation",  icon: I.calendar },
-      { label: "Promotions Manager",  path: "/marketing/promotions",  icon: I.megaphone },
+      { label: "Add Reviews",        path: "/marketing/reviews",    icon: Icon.star },
+      { label: "Social Posting",     path: "/marketing/social",     icon: Icon.meg },
+      { label: "Campaign Analytics", path: "/marketing/analytics",  icon: Icon.chart },
+      { label: "Loyalty & Rewards",  path: "/marketing/loyalty",    icon: Icon.star },
+      { label: "Email/SMS Automation", path: "/marketing/automation", icon: Icon.list },
+      { label: "Promotions Manager", path: "/marketing/promotions", icon: Icon.meg },
     ],
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar(){
   const [location, navigate] = useLocation();
-  const [open, setOpen] = useState(true);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState(false);
+  const railRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Default: Dashboard open, Operations open, others collapsed
-    setOpenGroups({ dashboard: true, ops: true, fin: false, menu: false, mkt: false });
-  }, []);
+  useEffect(()=>{ // defaults: first two open
+    setExpanded({ Dashboard: true, Operations: true });
+  },[]);
 
-  const width = open ? "w-64" : "w-[78px]";
-  const showText = open ? "" : "opacity-0 pointer-events-none";
-  const iconOnly  = open ? "" : "mx-auto";
-  const padX      = open ? "px-3" : "px-2";
+  // Expand on hover when rail-only
+  useEffect(()=>{
+    const el = railRef.current;
+    if (!el || !collapsed) return;
+    let t: any;
+    const onEnter = ()=>{ t=setTimeout(()=>setCollapsed(false), 60); };
+    const onLeave = ()=>{ clearTimeout(t); setCollapsed(true); };
+    el.addEventListener("mouseenter", onEnter);
+    el.addEventListener("mouseleave", onLeave);
+    return ()=>{ el.removeEventListener("mouseenter", onEnter); el.removeEventListener("mouseleave", onLeave); };
+  },[collapsed]);
 
   return (
     <aside
-      className={`sticky top-0 h-screen shrink-0 ${width}
-                  transition-[width] duration-300 ease-in-out
-                  bg-white border-r border-gray-200 flex flex-col`}
-      style={{ boxShadow: "2px 0 12px rgba(0,0,0,0.03)" }}
+      ref={railRef}
+      className={`sb sticky top-0 h-screen shrink-0 ${collapsed ? "sb-rail" : "w-64"} transition-[width] duration-300 ease-in-out`}
     >
-      {/* Header */}
+      {/* Top bar: logo + collapse toggle */}
       <div className="flex items-center justify-between px-4 py-4">
-        <div className={`font-semibold tracking-tight text-gray-900 ${open ? "" : "sr-only"}`}>Smash Brothers</div>
+        <div className={`${collapsed ? "sr-only" : ""} flex items-center gap-2`}>
+          {/* Logo slot */}
+          <div className="w-7 h-7 rounded-md bg-[var(--brand)] text-white grid place-items-center font-bold">S</div>
+          <div className="font-semibold tracking-tight text-[15px] text-[var(--heading)]">Smash Brothers</div>
+        </div>
         <button
-          aria-label="Toggle sidebar"
-          onClick={() => setOpen(v => !v)}
+          aria-label="Toggle"
+          onClick={()=>setCollapsed(v=>!v)}
           className="rounded-lg border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50"
         >
-          {open ? "‹" : "›"}
+          {collapsed ? "›" : "‹"}
         </button>
       </div>
 
-      {/* Groups (accordion) */}
-      <nav className="px-2 pb-6 overflow-y-auto">
-        {NAV.map(group => {
-          const expanded = open ? openGroups[group.key] : true; // when collapsed, show icons for all
-          return (
-            <Fragment key={group.key}>
-              <button
-                onClick={() => setOpenGroups(s => ({ ...s, [group.key]: !s[group.key] }))}
-                className={`w-full flex items-center justify-between ${padX} py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400
-                            ${open ? "" : "cursor-default pointer-events-none"}`}
-              >
-                <span className={`${showText.replace("pointer-events-none","")}`}>{group.title}</span>
-                {open && <span className={`text-gray-400 text-xs ${expanded ? "" : "rotate-180"}`}>▾</span>}
-              </button>
+      {/* Nav */}
+      <nav className="px-3 pb-6 overflow-y-auto">
+        {NAV.map(group=>(
+          <Fragment key={group.title}>
+            <button
+              onClick={()=>setExpanded(s=>({ ...s, [group.title]: !s[group.title] }))}
+              className={`w-full flex items-center justify-between px-2 py-2 ${collapsed ? "pointer-events-none" : ""}`}
+            >
+              <span className={`sb-group ${collapsed ? "sr-only" : ""}`}>{group.title}</span>
+              {!collapsed && <span className={`text-gray-400 text-xs ${expanded[group.title] ? "" : "rotate-180"}`}>▾</span>}
+            </button>
 
-              {/* Items */}
-              {expanded && (
-                <ul className="space-y-2">
-                  {group.items.map(item => {
-                    const active = location === item.path || location.startsWith(item.path + "/");
-                    return (
-                      <li key={item.path}>
-                        <button
-                          onClick={() => navigate(item.path)}
-                          title={!open ? item.label : undefined}
-                          className={`relative w-full flex items-center ${padX} py-2 rounded-full
-                                      border border-transparent hover:bg-gray-50
-                                      ${active ? "bg-emerald-600 text-white shadow-sm" : "text-gray-800"}`}
-                        >
-                          <span className={`text-current ${iconOnly}`}>{item.icon ?? I.list}</span>
-                          <span className={`ml-3 text-sm transition-opacity ${showText}`}>{item.label}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Fragment>
-          );
-        })}
+            {(expanded[group.title] || collapsed) && (
+              <ul className="space-y-2">
+                {group.items.map(item=>{
+                  const active = location === item.path || location.startsWith(item.path + "/");
+                  return (
+                    <li key={item.path}>
+                      <button
+                        onClick={()=>navigate(item.path)}
+                        title={collapsed ? item.label : undefined}
+                        className={`sb-item w-full flex items-center ${collapsed ? "justify-center px-0" : "px-3"} ${active ? "sb-active" : "hover:bg-gray-50"}`}
+                      >
+                        <span className={`text-current ${collapsed ? "" : "mr-3"}`}>{item.icon}</span>
+                        {collapsed ? null : <span className="text-sm">{item.label}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Fragment>
+        ))}
       </nav>
     </aside>
   );
