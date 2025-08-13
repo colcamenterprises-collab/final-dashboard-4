@@ -14,6 +14,7 @@ Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Alw
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
 Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Aroi Dee Sales field, implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
 Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
+Layout Protection: Clean app shell architecture (App.tsx + Sidebar.tsx) with automated prebuild validation preventing margin-left hacks. Layout uses proper flex-1 min-w-0 structure with 256px → 78px collapsible sidebar.
 
 ## System Architecture
 ### Frontend Architecture
@@ -46,6 +47,7 @@ Fort Knox File Structure: Core locked files include daily_sales_form_locked.html
 - **Comprehensive Daily Forms System**: Dual-form system (/daily-sales, /daily-stock) with draft/submit status.
 - **POS Ingestion & Analytics System**: Backend modules for POS data ingestion, normalization, analytics (sales, top sellers, stock variance), AI summaries, and scheduled tasks.
 - **Production-Grade Security**: Multi-layer security with HTTP method blocking, ORM write protection, database-level constraints, read-only database user, security middleware, and safety script detection.
+- **Layout Integrity Protection**: Automated prebuild check (`scripts/deny-layout-hacks.js`) that prevents margin-left hacks from being reintroduced, ensuring clean flex-based layout architecture.
 - **Source-Based Expense Management**: System for categorizing expenses as direct or shift-related, with tabbed interfaces for separation.
 - **Data-Driven Dashboard**: Real-time analytics display showing snapshot data, purchases-aware variance, authentic payment data, and top-selling items.
 - **Purchases + Audit Fields System**: Full implementation with expense types and line items for comprehensive stock accountability and variance analysis.
