@@ -28,7 +28,7 @@ const NAV = [
       { label: "Expenses",     path: "/expenses", icon: Icon.money },
       { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
       { label: "Receipts",     path: "/receipts", icon: Icon.file },
-      { label: "Analysis",     path: "/operations/analysis", icon: Icon.chart },
+      { label: "Shift Summary", path: "/operations/analysis/shift-summary", icon: Icon.chart },
       { label: "Delivery Partners", path: "/operations/delivery", icon: Icon.list },
       { label: "Shift Reports",     path: "/operations/reports",  icon: Icon.file },
     ],
