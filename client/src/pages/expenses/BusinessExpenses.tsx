@@ -19,13 +19,40 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
 
+// Standard expense type options (exact order and wording)
+const EXPENSE_TYPES = [
+  "Food",
+  "F&B", 
+  "Beverage",
+  "Staff Expenses (Bonus Pay)",
+  "Staff Expenses (from Account)",
+  "Rent",
+  "Administration",
+  "Advertising - Grab",
+  "Advertising - Other",
+  "Delivery Fee Discount (Merchant-Funded)",
+  "Director Payment",
+  "Discount (Merchant-Funded)",
+  "Fittings",
+  "Kitchen Supplies or Packaging",
+  "Marketing",
+  "Marketing success fee",
+  "Misc",
+  "Printers",
+  "Renovations",
+  "Subscriptions",
+  "Stationary",
+  "Travel",
+  "Utilities"
+] as const;
+
 const expenseFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
   amount: z.string().min(1, "Amount is required").refine((val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  category: z.string().min(1, "Category is required"),
+  typeOfExpense: z.enum(EXPENSE_TYPES, { required_error: "Expense type is required" }),
   date: z.string().min(1, "Date is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
   supplier: z.string().optional(),
@@ -63,7 +90,7 @@ export function BusinessExpenses() {
     defaultValues: {
       description: "",
       amount: "",
-      category: "",
+      typeOfExpense: undefined,
       date: format(new Date(), "yyyy-MM-dd"),
       paymentMethod: "Cash",
       supplier: "",
@@ -79,7 +106,8 @@ export function BusinessExpenses() {
         body: JSON.stringify({
           ...data,
           amount: parseFloat(data.amount),
-          source: 'DIRECT' // Always set as business expense
+          source: 'DIRECT', // Always set as business expense
+          category: data.typeOfExpense // Map typeOfExpense to category for backward compatibility
         }),
       }),
     onSuccess: () => {
@@ -111,10 +139,10 @@ export function BusinessExpenses() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Business Expenses</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-[18px] font-semibold text-[var(--heading)]">Business Expenses</h2>
+          <p className="text-xs text-[var(--muted)] mt-1">
             Out-of-shift business expenses (Makro, fuel, director costs)
           </p>
         </div>
@@ -162,23 +190,20 @@ export function BusinessExpenses() {
                   
                   <FormField
                     control={form.control}
-                    name="category"
+                    name="typeOfExpense"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
+                        <FormLabel>Type of Expense</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
+                              <SelectValue placeholder="Select expense type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="UTILITY">Utilities</SelectItem>
-                            <SelectItem value="SUPPLIES">Supplies</SelectItem>
-                            <SelectItem value="SHOPPING">Shopping</SelectItem>
-                            <SelectItem value="TRANSFER">Transfer</SelectItem>
-                            <SelectItem value="FUEL">Fuel</SelectItem>
-                            <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                            {EXPENSE_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -241,46 +266,44 @@ export function BusinessExpenses() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Business Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="card">
+          <div className="card-inner">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Total Business Expenses</h3>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </div>
             <div className="text-2xl font-bold">฿{totalAmount.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+        <div className="card">
+          <div className="card-inner">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Total Entries</h3>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </div>
             <div className="text-2xl font-bold">{filteredExpenses.length}</div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Expense</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+        <div className="card">
+          <div className="card-inner">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Average Expense</h3>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
             <div className="text-2xl font-bold">
               ฿{filteredExpenses.length > 0 ? (totalAmount / filteredExpenses.length).toLocaleString() : '0'}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="card mt-6">
+        <div className="card-inner">
+          <h3 className="text-[18px] font-semibold text-[var(--heading)] mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
@@ -312,40 +335,36 @@ export function BusinessExpenses() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category">Expense Type</Label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
+                  <SelectValue placeholder="All expense types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  <SelectItem value="UTILITY">Utilities</SelectItem>
-                  <SelectItem value="SUPPLIES">Supplies</SelectItem>
-                  <SelectItem value="SHOPPING">Shopping</SelectItem>
-                  <SelectItem value="TRANSFER">Transfer</SelectItem>
-                  <SelectItem value="FUEL">Fuel</SelectItem>
+                  <SelectItem value="all">All expense types</SelectItem>
+                  {EXPENSE_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Expenses List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Expenses List</CardTitle>
-          <CardDescription>
+      <div className="card mt-6">
+        <div className="card-inner">
+          <h3 className="text-[18px] font-semibold text-[var(--heading)] mb-2">Business Expenses List</h3>
+          <p className="text-xs text-[var(--muted)] mb-4">
             Showing {filteredExpenses.length} business expenses
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Source</TableHead>
@@ -367,7 +386,7 @@ export function BusinessExpenses() {
                       {format(new Date(expense.date), "MMM dd, yyyy")}
                     </TableCell>
                     <TableCell className="font-medium">{expense.description}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
+                    <TableCell>{expense.typeOfExpense || expense.category}</TableCell>
                     <TableCell>{expense.supplier || '-'}</TableCell>
                     <TableCell>฿{expense.amount.toLocaleString()}</TableCell>
                     <TableCell>
@@ -380,8 +399,8 @@ export function BusinessExpenses() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

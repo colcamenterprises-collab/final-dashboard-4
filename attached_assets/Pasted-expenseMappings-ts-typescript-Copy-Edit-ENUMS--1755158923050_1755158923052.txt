@@ -1,0 +1,117 @@
+expenseMappings.ts
+typescript
+Copy
+Edit
+// ==============================
+// ENUMS
+// ==============================
+
+export enum ExpenseType {
+  FOOD = "Food",
+  FB = "F&B",
+  BEVERAGE = "Beverage",
+  STAFF_BONUS = "Staff Expenses (Bonus Pay)",
+  STAFF_ACCOUNT = "Staff Expenses (from Account)",
+  RENT = "Rent",
+  ADMINISTRATION = "Administration",
+  ADVERTISING_GRAB = "Advertising - Grab",
+  ADVERTISING_OTHER = "Advertising - Other",
+  DELIVERY_FEE_DISCOUNT = "Delivery Fee Discount (Merchant-Funded)",
+  DIRECTOR_PAYMENT = "Director Payment",
+  DISCOUNT_MERCHANT_FUNDED = "Discount (Merchant-Funded)",
+  FITTINGS = "Fittings",
+  KITCHEN_SUPPLIES = "Kitchen Supplies or Packaging",
+  MARKETING = "Marketing",
+  MARKETING_SUCCESS_FEE = "Marketing success fee",
+  MISC = "Misc",
+  PRINTERS = "Printers",
+  RENOVATIONS = "Renovations",
+  SUBSCRIPTIONS = "Subscriptions",
+  STATIONARY = "Stationary",
+  TRAVEL = "Travel",
+  UTILITIES = "Utilities",
+  UNKNOWN = "Unknown"
+}
+
+export enum PnLCategory {
+  COGS = "Cost of Goods Sold",
+  OFFICE_EXPENSE = "Office Expense",
+  UTILITIES = "Utilities",
+  MARKETING = "Marketing & Advertising",
+  STAFF_EXPENSE = "Staff Expense",
+  RENT = "Rent",
+  ADMINISTRATION = "Administration",
+  MISC = "Miscellaneous",
+  UNKNOWN = "Unknown"
+}
+
+// ==============================
+// SHOP NAME DEFAULT MAPPING
+// ==============================
+
+export const shopNameToExpenseType: Record<string, ExpenseType> = {
+  "Makro": ExpenseType.FOOD,
+  "Mr DIY": ExpenseType.KITCHEN_SUPPLIES,
+  "Bakery": ExpenseType.FOOD,
+  "Big C": ExpenseType.FOOD,
+  "Printers": ExpenseType.PRINTERS,
+  "Supercheap": ExpenseType.FOOD,
+  "Burger Boxes": ExpenseType.KITCHEN_SUPPLIES,
+  "Cameron": ExpenseType.DIRECTOR_PAYMENT,
+  "Colin": ExpenseType.DIRECTOR_PAYMENT,
+  "DTAC": ExpenseType.UTILITIES,
+  "Company Expense": ExpenseType.MISC,
+  "Gas": ExpenseType.UTILITIES,
+  "GO Wholesale": ExpenseType.FOOD,
+  "Grab Merchant": ExpenseType.ADVERTISING_GRAB,
+  "HomePro": ExpenseType.KITCHEN_SUPPLIES,
+  "Landlord": ExpenseType.RENT,
+  "Lawyer": ExpenseType.ADMINISTRATION,
+  "Lazada": ExpenseType.KITCHEN_SUPPLIES,
+  "Lotus": ExpenseType.FOOD,
+  "Loyverse": ExpenseType.SUBSCRIPTIONS,
+  "MEA": ExpenseType.UTILITIES,
+  "AIS": ExpenseType.UTILITIES,
+  "Other": ExpenseType.MISC
+};
+
+// ==============================
+// EXPENSE TYPE → P&L CATEGORY
+// ==============================
+
+export const expenseTypeToPnLCategory: Record<ExpenseType, PnLCategory> = {
+  [ExpenseType.FOOD]: PnLCategory.COGS,
+  [ExpenseType.FB]: PnLCategory.COGS,
+  [ExpenseType.BEVERAGE]: PnLCategory.COGS,
+  [ExpenseType.STAFF_BONUS]: PnLCategory.STAFF_EXPENSE,
+  [ExpenseType.STAFF_ACCOUNT]: PnLCategory.STAFF_EXPENSE,
+  [ExpenseType.RENT]: PnLCategory.RENT,
+  [ExpenseType.ADMINISTRATION]: PnLCategory.ADMINISTRATION,
+  [ExpenseType.ADVERTISING_GRAB]: PnLCategory.MARKETING,
+  [ExpenseType.ADVERTISING_OTHER]: PnLCategory.MARKETING,
+  [ExpenseType.DELIVERY_FEE_DISCOUNT]: PnLCategory.MARKETING,
+  [ExpenseType.DIRECTOR_PAYMENT]: PnLCategory.MISC,
+  [ExpenseType.DISCOUNT_MERCHANT_FUNDED]: PnLCategory.MARKETING,
+  [ExpenseType.FITTINGS]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.KITCHEN_SUPPLIES]: PnLCategory.COGS,
+  [ExpenseType.MARKETING]: PnLCategory.MARKETING,
+  [ExpenseType.MARKETING_SUCCESS_FEE]: PnLCategory.MARKETING,
+  [ExpenseType.MISC]: PnLCategory.MISC,
+  [ExpenseType.PRINTERS]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.RENOVATIONS]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.SUBSCRIPTIONS]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.STATIONARY]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.TRAVEL]: PnLCategory.OFFICE_EXPENSE,
+  [ExpenseType.UTILITIES]: PnLCategory.UTILITIES,
+  [ExpenseType.UNKNOWN]: PnLCategory.UNKNOWN
+};
+
+// ==============================
+// HELPER FUNCTION
+// ==============================
+
+export function getExpenseMapping(shopName: string) {
+  const expenseType = shopNameToExpenseType[shopName] || ExpenseType.UNKNOWN;
+  const pnlCategory = expenseTypeToPnLCategory[expenseType] || PnLCategory.UNKNOWN;
+  return { expenseType, pnlCategory };
+}
