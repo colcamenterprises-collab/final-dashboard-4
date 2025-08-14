@@ -39,18 +39,9 @@ export default function ShiftSummary(){
 
   return (
     <div className="bg-gray-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
-      <div className="flex items-baseline justify-between mb-6">
-        <div>
-          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
-          <p className="text-gray-600 mt-1">Upload Loyverse CSV exports to analyze shift performance and cross-check with daily forms</p>
-        </div>
-        <div className="flex gap-3">
-          <input type="date" className="bg-white border border-gray-200 rounded-xl shadow-sm px-3 py-2 text-sm" value={date} onChange={e=>setDate(e.target.value)} />
-          <input type="file" multiple accept=".csv" onChange={e=>setFiles(e.target.files)} className="bg-white border border-gray-200 rounded-xl shadow-sm px-3 py-2 text-sm" />
-          <button onClick={onUpload} disabled={loading || !files?.length} className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-            {loading ? "Processing…" : "Upload & Analyze"}
-          </button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
+        <p className="text-gray-600 mt-1">Upload Loyverse CSV exports to analyze shift performance and cross-check with daily forms</p>
       </div>
 
       {/* Instructions Card */}
@@ -71,6 +62,58 @@ export default function ShiftSummary(){
                 <p>4. <strong>Review Analysis:</strong> Get KPIs, payment breakdown, top items, and cross-checking results</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Section - moved here for better layout */}
+      {!data && (
+        <div className="bg-white rounded-2xl border p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Loyverse CSV Files</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Date (Optional)</label>
+                <input 
+                  type="date" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" 
+                  value={date} 
+                  onChange={e=>setDate(e.target.value)} 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose CSV Files</label>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept=".csv" 
+                  onChange={e=>setFiles(e.target.files)} 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" 
+                />
+              </div>
+              <div className="flex items-end">
+                <button 
+                  onClick={onUpload} 
+                  disabled={loading || !files?.length} 
+                  className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white rounded-lg px-4 py-2 font-medium transition-colors"
+                >
+                  {loading ? "Processing..." : "Upload & Analyze"}
+                </button>
+              </div>
+            </div>
+            {files && files.length > 0 && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-700 font-medium">Selected files: {files.length} CSV file{files.length !== 1 ? 's' : ''}</p>
+                <div className="text-xs text-gray-500 mt-1 space-y-1">
+                  {Array.from(files).map((f, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                      <span>{f.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
