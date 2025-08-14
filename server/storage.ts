@@ -2,7 +2,7 @@ import {
   users, menuItems, inventory, shoppingList, expenses, transactions, 
   aiInsights, suppliers, staffShifts, dailySales, dailyStockSales,
   expenseSuppliers, expenseCategories, bankStatements, ingredients, recipes, recipeIngredients,
-  quickNotes, marketingCalendar, shiftReports,
+  quickNotes, marketingCalendar, shiftReports, shiftSales, shiftPurchases,
   type User, type InsertUser, type MenuItem, type InsertMenuItem,
   type Inventory, type InsertInventory, type ShoppingList, type InsertShoppingList,
   type Expense, type InsertExpense, type Transaction, type InsertTransaction,
@@ -18,6 +18,8 @@ import {
   type QuickNote, type InsertQuickNote,
   type MarketingCalendar, type InsertMarketingCalendar,
   type ShiftReport, type InsertShiftReport,
+  type ShiftSales, type InsertShiftSales,
+  type ShiftPurchase, type InsertShiftPurchase,
   type StockPurchaseRolls, type InsertStockPurchaseRolls,
   type StockPurchaseDrinks, type InsertStockPurchaseDrinks,
   type StockPurchaseMeat, type InsertStockPurchaseMeat,
@@ -170,6 +172,12 @@ export interface IStorage {
     drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
     meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
   }>;
+
+  // Shift Sales (Sales Form)
+  createShiftSales(data: InsertShiftSales & { shiftPurchases?: InsertShiftPurchase[] }): Promise<ShiftSales>;
+  getShiftSales(id: number): Promise<ShiftSales | undefined>;
+  getShiftSalesByDate(date: string): Promise<ShiftSales[]>;
+  updateShiftSalesStatus(id: number, status: 'DRAFT' | 'SUBMITTED' | 'LOCKED'): Promise<ShiftSales>;
   
   // Shift Reports
   getShiftReports(): Promise<ShiftReport[]>;
@@ -1931,6 +1939,66 @@ export class MemStorage implements IStorage {
   async searchShiftReports(query?: string, status?: string): Promise<ShiftReport[]> {
     const { shiftReportsService } = await import('./services/shiftReportsService');
     return shiftReportsService.searchShiftReports(query, status);
+  }
+
+  // Shift Sales (Sales Form) methods
+  async createShiftSales(data: InsertShiftSales & { shiftPurchases?: InsertShiftPurchase[] }): Promise<ShiftSales> {
+    const { db } = await import("./db");
+    const { shiftSales, shiftPurchases } = await import("@shared/schema");
+    
+    const { shiftPurchases: purchasesData, ...shiftSalesData } = data;
+    
+    // Insert shift sales record
+    const [result] = await db.insert(shiftSales).values(shiftSalesData).returning();
+    
+    // Insert shift purchases if provided
+    if (purchasesData && purchasesData.length > 0) {
+      const purchasesToInsert = purchasesData.map(purchase => ({
+        ...purchase,
+        shiftSalesId: result.id,
+      }));
+      
+      await db.insert(shiftPurchases).values(purchasesToInsert);
+    }
+    
+    return result;
+  }
+
+  async getShiftSales(id: number): Promise<ShiftSales | undefined> {
+    const { db } = await import("./db");
+    const { shiftSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db.select().from(shiftSales).where(eq(shiftSales.id, id));
+    return result;
+  }
+
+  async getShiftSalesByDate(date: string): Promise<ShiftSales[]> {
+    const { db } = await import("./db");
+    const { shiftSales } = await import("@shared/schema");
+    const { eq, desc } = await import("drizzle-orm");
+    
+    const results = await db
+      .select()
+      .from(shiftSales)
+      .where(eq(shiftSales.shiftDate, date))
+      .orderBy(desc(shiftSales.createdAt));
+    
+    return results;
+  }
+
+  async updateShiftSalesStatus(id: number, status: 'DRAFT' | 'SUBMITTED' | 'LOCKED'): Promise<ShiftSales> {
+    const { db } = await import("./db");
+    const { shiftSales } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [result] = await db
+      .update(shiftSales)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(shiftSales.id, id))
+      .returning();
+    
+    return result;
   }
 }
 

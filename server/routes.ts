@@ -2418,5 +2418,58 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Shift Sales (Sales Form) routes
+  app.post("/api/shift-sales", async (req, res) => {
+    try {
+      const result = await storage.createShiftSales(req.body);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating shift sales:", error);
+      res.status(500).json({ error: "Failed to create shift sales" });
+    }
+  });
+
+  app.get("/api/shift-sales/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await storage.getShiftSales(id);
+      if (!result) {
+        return res.status(404).json({ error: "Shift sales not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting shift sales:", error);
+      res.status(500).json({ error: "Failed to get shift sales" });
+    }
+  });
+
+  app.get("/api/shift-sales/date/:date", async (req, res) => {
+    try {
+      const date = req.params.date;
+      const result = await storage.getShiftSalesByDate(date);
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting shift sales by date:", error);
+      res.status(500).json({ error: "Failed to get shift sales by date" });
+    }
+  });
+
+  app.patch("/api/shift-sales/:id/status", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      if (!['DRAFT', 'SUBMITTED', 'LOCKED'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const result = await storage.updateShiftSalesStatus(id, status);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating shift sales status:", error);
+      res.status(500).json({ error: "Failed to update shift sales status" });
+    }
+  });
+
   return server;
 }

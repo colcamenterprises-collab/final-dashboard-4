@@ -27,6 +27,7 @@ import Receipts from "@/pages/Receipts";
 import Ingredients from "@/pages/Ingredients";
 import IngredientsTable from "@/pages/IngredientsTable";
 import DailySales from "@/pages/DailySales";
+import SalesForm from "@/pages/SalesForm";
 // import DailyStock from "@/pages/DailyStock"; // Removed - file doesn't exist
 import DailyStockPage from "@/pages/daily-stock";
 import StockLibrary from "@/pages/stock-library";
@@ -65,6 +66,7 @@ function App() {
           <Route path="/" component={DashboardModern} />
           <Route path="/dashboard" component={DashboardModern} />
           <Route path="/daily-sales" component={DailySales} />
+          <Route path="/sales-form" component={SalesForm} />
           <Route path="/daily-stock" component={DailyStockPage} />
           <Route path="/daily-stock-sales" component={DailyStockForm} />
           <Route path="/receipts" component={Receipts} />

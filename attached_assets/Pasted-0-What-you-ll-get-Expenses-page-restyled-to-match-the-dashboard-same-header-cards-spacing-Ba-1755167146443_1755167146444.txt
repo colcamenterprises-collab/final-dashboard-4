@@ -1,0 +1,218 @@
+0) What you’ll get
+
+Expenses page restyled to match the dashboard (same header, cards, spacing).
+
+Bank Statement Importer with a Review → Approve gate.
+
+Consolidate to P&L button (only visible when a batch is fully approved).
+
+Stored mappings (Shop Name → Expense Type; Expense Type → P&L Category) editable in-app.
+
+“Jane from Accounting” role placeholder with permissions and audit trail.
+
+1) Data model (minimal, explicit)
+-- Batches (bank statements, etc.)
+CREATE TABLE IF NOT EXISTS ExpenseImportBatch (
+  id BIGSERIAL PRIMARY KEY,
+  type TEXT NOT NULL,                         -- 'BANK_STATEMENT' | 'CREDIT_CARD' | 'GENERIC_CSV'
+  filename TEXT NOT NULL,
+  original_mime TEXT NOT NULL,
+  row_count INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'REVIEW',      -- 'REVIEW' | 'APPROVED' | 'COMMITTED'
+  approved_by TEXT,                           -- user name/id (e.g., "Jane from Accounting")
+  approved_at TIMESTAMPTZ,
+  committed_at TIMESTAMPTZ,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Staged lines (awaiting review)
+CREATE TABLE IF NOT EXISTS ExpenseImportLine (
+  id BIGSERIAL PRIMARY KEY,
+  batch_id BIGINT NOT NULL REFERENCES ExpenseImportBatch(id) ON DELETE CASCADE,
+  row_index INT NOT NULL,
+  date_raw TEXT,
+  description_raw TEXT,
+  amount_raw TEXT,
+  currency_raw TEXT,
+  date DATE,
+  description_norm TEXT,
+  amount_minor BIGINT,
+  currency TEXT,
+  shop_name TEXT,                              -- from your list
+  expense_type TEXT,                            -- from your list (mapped or user override)
+  pnl_category TEXT,                            -- auto from expense_type (mapped or override)
+  confidence NUMERIC,                           -- 0..1 (for auto mapping certainty)
+  is_duplicate BOOLEAN DEFAULT FALSE,
+  is_ignored  BOOLEAN DEFAULT FALSE,
+  reviewer_note TEXT,
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ
+);
+
+-- Mapping tables (editable in-app)
+CREATE TABLE IF NOT EXISTS VendorAlias (
+  id BIGSERIAL PRIMARY KEY,
+  alias_text TEXT UNIQUE NOT NULL,              -- Thai/EN substrings, e.g., 'แม็คโคร', 'Makro'
+  shop_name TEXT NOT NULL                       -- one of your Shop Name enums
+);
+
+CREATE TABLE IF NOT EXISTS ExpenseMappingConfig (
+  key TEXT PRIMARY KEY,                         -- 'shopNameToExpenseType' | 'expenseTypeToPnLCategory'
+  json_value JSONB NOT NULL
+);
+
+
+We’ll seed ExpenseMappingConfig with the lists/mappings we finalized. Edits are versioned via audit log below.
+
+2) Permissions & “Jane from Accounting”
+
+Add role flags in your user table or a tiny ACL:
+
+CAN_REVIEW_IMPORTS (Jane)
+
+CAN_APPROVE_IMPORTS (Jane)
+
+CAN_COMMIT_IMPORTS (you and Jane if desired)
+
+“Jane from Accounting” is just a user record with those flags.
+
+Audit log (simple & effective):
+
+CREATE TABLE IF NOT EXISTS AuditLog (
+  id BIGSERIAL PRIMARY KEY,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,            -- 'IMPORT_CREATED','LINE_EDITED','BATCH_APPROVED','BATCH_COMMITTED','MAPPING_UPDATED'
+  entity TEXT NOT NULL,            -- 'ExpenseImportBatch:123','ExpenseImportLine:456','Mapping:shopNameToExpenseType'
+  diff JSONB,                      -- { before:..., after:... }
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+3) Frontend (Expenses page) — same style as dashboard
+
+Header + tabs
+
+Title: “Business Expenses”
+
+Tabs: Overview | Imports | Mappings
+
+Same container: bg-app min-h-screen px-6 sm:px-8 py-5
+
+Cards: use .card / .card-inner, headings text-[18px] font-semibold, captions text-xs text-[var(--muted)], gaps mt-6.
+
+Imports tab flow
+
+Button: Upload & Categorize
+
+Batch table (status chips: REVIEW / APPROVED / COMMITTED)
+
+Open a batch → Review screen:
+
+Table columns: Date | Description | Amount | Shop Name (dropdown) | Type of Expense (dropdown) | P&L Category (read-only derived or editable) | Confidence | Flags (Dup/Ignore)
+
+Bulk actions (Set Shop, Set Type, Ignore)
+
+Approve Batch (enables when all rows are reviewed or confidence≥0.8 and no dup conflicts)
+
+Consolidate to P&L (only after Approved)
+
+Mappings tab
+
+Shop Names (list with “Default Type of Expense” dropdown)
+
+Expense Types → P&L Category (dropdown)
+
+Vendor Aliases table (Add alias → maps to Shop Name)
+
+All controls use the same button/input pills as the dashboard for visual consistency.
+
+4) Backend endpoints (clean & explicit)
+POST   /api/expenses/imports                   # create batch (upload file)
+POST   /api/expenses/imports/:id/parse         # parse -> create ExpenseImportLine rows + auto-map (no commit)
+GET    /api/expenses/imports                   # list batches
+GET    /api/expenses/imports/:id               # batch detail + lines
+PATCH  /api/expenses/imports/:id/lines/:lineId # set shop_name / expense_type / pnl_category / ignore / notes
+POST   /api/expenses/imports/:id/approve       # set status=APPROVED, approved_by/at
+POST   /api/expenses/imports/:id/commit        # create Expense rows; status=COMMITTED; write AuditLog
+
+GET    /api/expenses/mappings                  # read both mapping trees + vendor aliases
+POST   /api/expenses/mappings                  # update mapping(s); writes AuditLog
+POST   /api/expenses/aliases                   # add vendor alias → shop name; writes AuditLog
+DELETE /api/expenses/aliases/:aliasId          # remove alias
+
+
+Commit path (what happens on /commit):
+
+Creates final Expense rows from ExpenseImportLine where !is_ignored.
+
+Uses chosen shop_name, expense_type, pnl_category.
+
+Marks batch COMMITTED and timestamps.
+
+Triggers P&L cache refresh for the touched months only.
+
+5) Styling patch for current Expenses pages
+
+Wrap each page root with the same container (as on P&L).
+
+Replace ad-hoc panels with .card and .card-inner.
+
+Standardize headings and spacing tokens.
+
+Remove any ml-*/pl-* sidebar hacks (your guard script already enforces this).
+
+6) Mapping logic (server-side auto fill)
+
+On parse:
+
+Normalize description → match VendorAlias.alias_text (Thai & EN substrings).
+
+If match → set shop_name.
+
+Map shop_name → Expense Type (from config).
+
+Map Expense Type → P&L Category (from config).
+
+Set confidence:
+
+exact alias hit: 0.95
+
+fuzzy alias: 0.75
+
+no alias: 0.4 (forces review)
+
+Reviewer overrides write back to mapping tables (option toggle: “Remember this mapping”), so the system learns.
+
+7) “Consolidate to P&L” (manual button)
+
+Visible only when status='APPROVED'.
+
+On click → server commits the batch and rebuilds P&L cache for the affected months/year.
+
+P&L page reflects changes immediately on refresh.
+
+8) Guardrails
+
+Import batches can’t be committed unless:
+
+All rows either (a) have shop/type/category or (b) are marked ignored.
+
+No open duplicates flagged (or explicitly overridden).
+
+Finance queries default: source IN ('DIRECT_UPLOAD','MANUAL') (SHIFT_FORM excluded).
+
+AuditLog written on every mapping change and batch state change.
+
+9) Tiny UX copy (keeps staff aligned)
+
+Approve Batch: “Lock this batch for posting. You can still unapprove before consolidating.”
+
+Consolidate to P&L: “Create expenses and update monthly P&L. This cannot be undone.”
+
+10) Next small steps (I’ll do them now if you want)
+
+Patch the Expenses page to the new style (header, cards, spacing).
+
+Add Imports + Mappings tabs and skeleton UI.
+
+Stub the endpoints so the flow works end-to-end with fake data, then wire real parsing.

@@ -1,6 +1,10 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enums for Shift Sales
+export const shiftTimeEnum = pgEnum('shift_time', ['MORNING', 'EVENING', 'LATE']);
+export const salesFormStatusEnum = pgEnum('sales_form_status', ['DRAFT', 'SUBMITTED', 'LOCKED']);
 
 // Users table
 export const users = pgTable("users", {
@@ -791,6 +795,86 @@ export const insertChatLogSchema = createInsertSchema(chatLogs).omit({
 
 export type ChatLog = typeof chatLogs.$inferSelect;
 export type InsertChatLog = z.infer<typeof insertChatLogSchema>;
+
+// Shift Sales table (Step 1 of 2-step form process)
+export const shiftSales = pgTable("shift_sales", {
+  id: serial("id").primaryKey(),
+  
+  // Shift Information
+  shiftDate: date("shift_date").notNull(),
+  shiftStartUTC: timestamp("shift_start_utc").notNull(),
+  shiftEndUTC: timestamp("shift_end_utc").notNull(),
+  shiftTime: shiftTimeEnum("shift_time").notNull(),
+  completedBy: varchar("completed_by", { length: 64 }).notNull(),
+  
+  // Money fields in satang (minor units)
+  startingCashSatang: integer("starting_cash_satang").notNull(),
+  endingCashSatang: integer("ending_cash_satang").notNull(),
+  cashBankedSatang: integer("cash_banked_satang").notNull(),
+  
+  // Sales channels in satang
+  cashSatang: integer("cash_satang").notNull().default(0),
+  qrSatang: integer("qr_satang").notNull().default(0),
+  grabSatang: integer("grab_satang").notNull().default(0),
+  aroiDeeSatang: integer("aroi_dee_satang").notNull().default(0),
+  cardSatang: integer("card_satang").default(0),
+  otherSatang: integer("other_satang").default(0),
+  
+  // Deductions
+  discountsSatang: integer("discounts_satang").default(0),
+  refundsSatang: integer("refunds_satang").default(0),
+  
+  // Other fields
+  totalOrders: integer("total_orders"),
+  
+  // Delivery partner fees (for reconciliation, not P&L)
+  grabCommissionSatang: integer("grab_commission_satang").default(0),
+  merchantFundedDiscountSatang: integer("merchant_funded_discount_satang").default(0),
+  
+  // Calculated fields (stored for performance)
+  totalShiftPurchasesSatang: integer("total_shift_purchases_satang").default(0),
+  
+  // Text fields
+  notes: text("notes"),
+  attachments: jsonb("attachments"),
+  
+  // Status and admin controls
+  status: salesFormStatusEnum("status").default("DRAFT"),
+  
+  // Audit fields
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by", { length: 64 }),
+  dataSource: varchar("data_source", { length: 20 }).default("STAFF_FORM"),
+});
+
+// Shift Purchase table (children of shift_sales)
+export const shiftPurchases = pgTable("shift_purchases", {
+  id: serial("id").primaryKey(),
+  shiftSalesId: integer("shift_sales_id").notNull().references(() => shiftSales.id),
+  description: text("description").notNull(),
+  supplier: text("supplier"),
+  amountSatang: integer("amount_satang").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for new tables
+export const insertShiftSalesSchema = createInsertSchema(shiftSales).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export const insertShiftPurchaseSchema = createInsertSchema(shiftPurchases).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+// Types for new tables
+export type ShiftSales = typeof shiftSales.$inferSelect;
+export type InsertShiftSales = z.infer<typeof insertShiftSalesSchema>;
+export type ShiftPurchase = typeof shiftPurchases.$inferSelect;
+export type InsertShiftPurchase = z.infer<typeof insertShiftPurchaseSchema>;
 
 // Daily receipt summaries processed by Jussi
 export const dailyReceiptSummaries = pgTable('daily_receipt_summaries', {

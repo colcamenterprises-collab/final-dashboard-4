@@ -1,0 +1,117 @@
+the Sales Form is missing a bunch of fields. Let’s lock the Final v2 Sales Form so the agent can’t freestyle. Below is the exact spec (fields, rules, calcs, and layout). If they build this verbatim, Step 1 (Sales) will hand off cleanly to Step 2 (Stock).
+
+Sales Form (Step 1 of 2) — Final Spec
+A) Shift Information
+Field	Type	Required	Rules / Notes
+Shift Time	select	✅	Morning (10–17), Evening (17–03), Late (23–07) — store start/end UTC.
+Shift Date	date	✅	Local TZ (Thailand); normalize to shift start UTC.
+Completed By	text	✅	Staff name; 64 chars max.
+Starting Cash (฿)	money	✅	Integer satang (store minor units).
+Ending Cash Counted (฿)	money	✅	Physically counted at close.
+Notes	textarea		500 chars max.
+B) Sales Information (channels)
+Field	Type	Required	Rules / Notes
+Cash Sales (฿)	money	✅	THB, minor units.
+QR Scan Sales (฿)	money	✅	Bank QR / PromptPay.
+Grab Sales (฿)	money	✅	Gross order value before Grab fees/discounts.
+Aroi Dee Sales (฿)	money	✅	If unused, default 0.
+Card Sales (฿)	money		For card terminals (optional; keep).
+Other Sales (฿)	money		For anything not mapped.
+Total Orders	integer		If available from POS snapshot; else optional.
+Discounts / Refunds (฿)	money		Store separately to match P&L “Total Discounts”.
+
+Auto-calc: Total Sales (POS) = sum(all channels) − discounts/refunds.
+
+C) Delivery Partner Fees (non-cash costs for the shift)
+Field	Type	Required	Rules / Notes
+Grab Commission (฿)	money		Pure fee portion (for reconciliation now; P&L from bank later).
+Delivery Fee Discount (Merchant-Funded) (฿)	money		Optional; belongs to Marketing in P&L (from bank later).
+
+Captured for recon and variance explanations; do not post to P&L from this form.
+
+D) Banked / Reconciliation
+Field	Type	Required	Rules / Notes
+Cash Banked (฿)	money	✅	What staff deposited / transferred.
+Expected Cash Close (auto)	calc	—	Starting Cash + Cash Sales − Cash Payouts (if any)
+Cash Variance (auto)	calc	—	Ending Cash Counted − Expected Cash Close (badge red/green).
+E) Shift Purchases (for variance only, not P&L)
+Field	Type	Required	Rules / Notes
+Items (repeatable)	list		{ description, amount(฿), supplier (free text) }
+Total Shift Purchases (auto)	calc	—	Sum of above.
+
+These reduce expected cash for reconciliation and feed stock/usage analysis.
+They do not hit P&L; only Business Expenses and Bank Statement imports feed P&L/COGS.
+
+F) Attachments
+Field	Type	Required	Notes
+Photos/Receipts	files		jpg/png/pdf; max 5 files; 5MB each.
+Validations & Guardrails
+
+All money values stored as integer satang (minor units).
+
+No negative inputs (except refunds/discounts which are positive fields applied as deductions).
+
+Fort Knox: form is locked after submit; editable only by Admin.
+
+Save/Continue → Stock Form (Step 2) requires:
+
+Required fields filled
+
+Cash variance acknowledged if abs(variance) > ƒ(THB 20) (confirm modal with reason).
+
+Data source stamps: every saved shift stamped with data_source = 'STAFF_FORM' and UTC timestamps.
+
+Calculations (shown in UI)
+
+Total Sales (POS) = sum(Cash + QR + Grab + AroiDee + Card + Other) − Discounts/Refunds.
+
+Expected Cash Close = Starting Cash + Cash Sales − Total Shift Purchases.
+
+Cash Variance = Ending Cash Counted − Expected Cash Close.
+
+Banking Status = Cash Banked vs (Cash Sales − purchases if you bank daily).
+
+Storage (table fields)
+
+ShiftSales (Step 1)
+
+id, shiftDate, shiftStartUTC, shiftEndUTC, shiftLabel
+
+completedBy, startingCashSatang, endingCashSatang, cashBankedSatang
+
+cashSatang, qrSatang, grabSatang, aroiDeeSatang, cardSatang, otherSatang
+
+discountsSatang, refundsSatang (if you want to store separately), totalOrders
+
+grabCommissionSatang, merchantFundedDiscountSatang
+
+totalShiftPurchasesSatang (denorm), notes, attachments[]
+
+status: DRAFT | SUBMITTED | LOCKED
+
+createdAt / updatedAt / createdBy
+
+ShiftPurchase (children)
+
+id, shiftSalesId, description, supplier, amountSatang, createdAt
+
+UI Layout (matches your new design)
+
+Page Title: “Daily Sales” (Step indicator under title)
+
+Card 1: Shift Information (grid 2 cols on desktop)
+
+Card 2: Sales Information (grid 3–4 cols responsive)
+
+Card 3: Delivery Partner Fees (two inputs)
+
+Card 4: Banked / Reconciliation (shows computed badges)
+
+Card 5: Shift Purchases (repeatable rows + running total)
+
+Card 6: Attachments + Notes
+
+Primary CTA: Save & Continue to Stock (disabled until valid)
+Secondary: Save Draft
+
+All cards use the same .card / .card-inner token styles from the P&L page.
