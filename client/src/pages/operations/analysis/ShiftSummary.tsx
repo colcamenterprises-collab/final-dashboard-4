@@ -38,16 +38,41 @@ export default function ShiftSummary(){
 
   return (
     <div className="bg-gray-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
-      <div className="flex items-baseline justify-between mb-4">
-        <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
+      <div className="flex items-baseline justify-between mb-6">
+        <div>
+          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
+          <p className="text-gray-600 mt-1">Upload Loyverse CSV exports to analyze shift performance and cross-check with daily forms</p>
+        </div>
         <div className="flex gap-3">
           <input type="date" className="bg-white border border-gray-200 rounded-xl shadow-sm px-3 py-2 text-sm" value={date} onChange={e=>setDate(e.target.value)} />
           <input type="file" multiple accept=".csv" onChange={e=>setFiles(e.target.files)} className="bg-white border border-gray-200 rounded-xl shadow-sm px-3 py-2 text-sm" />
-          <button onClick={onUpload} disabled={loading || !files?.length} className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm">
+          <button onClick={onUpload} disabled={loading || !files?.length} className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
             {loading ? "Processing…" : "Upload & Analyze"}
           </button>
         </div>
       </div>
+
+      {/* Instructions Card */}
+      {!data && (
+        <div className="bg-white border border-blue-200 rounded-2xl p-6 mb-6 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">How to Use Shift Summary</h3>
+              <div className="text-gray-700 space-y-2">
+                <p>1. <strong>Export from Loyverse:</strong> Go to Reports → Sales → Export as CSV</p>
+                <p>2. <strong>Select Date:</strong> Choose the shift date you want to analyze</p>
+                <p>3. <strong>Upload Files:</strong> Select one or more CSV files from Loyverse</p>
+                <p>4. <strong>Review Analysis:</strong> Get KPIs, payment breakdown, top items, and cross-checking results</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       {k && (
