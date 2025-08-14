@@ -1582,9 +1582,10 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Daily Sales Prisma Route
+  // Daily Sales Prisma Route with Email
   app.post('/api/daily-sales', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
+    const { sendDailySalesEmail } = await import('./services/salesEmail');
     const prisma = new PrismaClient();
     
     try {
@@ -1592,24 +1593,35 @@ export function registerRoutes(app: express.Application): Server {
       
       const data = {
         completedBy: payload.completedBy || 'Unknown',
-        startingCash: Number(payload.startingCash) || 0,
+        startingCash: Number(payload.cashStart) || 0, // Updated field name
         cashSales: Number(payload.cashSales) || 0,
         qrSales: Number(payload.qrSales) || 0,
         grabSales: Number(payload.grabSales) || 0,
         aroiDeeSales: Number(payload.aroiDeeSales) || 0,
-        totalSales: payload.totalSales || (Number(payload.cashSales) + Number(payload.qrSales) + Number(payload.grabSales) + Number(payload.aroiDeeSales)),
+        directSales: Number(payload.directSales) || 0, // Added directSales
+        totalSales: payload.totalSales || (Number(payload.cashSales) + Number(payload.qrSales) + Number(payload.grabSales) + Number(payload.aroiDeeSales) + Number(payload.directSales)),
         shoppingExpenses: JSON.stringify(payload.shopping || []),
         wages: JSON.stringify(payload.wages || []),
+        otherMoneyOut: JSON.stringify(payload.otherMoneyOut || []), // Added other money out
         totalExpenses: Number(payload.totalExpenses) || 0,
-        closingCash: Number(payload.closingCash) || 0,
+        closingCash: Number(payload.endingCash) || 0, // Updated field name
         cashBanked: Number(payload.cashBanked) || 0,
         qrTransferred: Number(payload.qrTransferred) || 0,
-        amountBanked: Number(payload.amountBanked) || 0,
+        amountBanked: Number(payload.cashBanked) || 0,
         notes: payload.notes || null,
         status: 'submitted'
       };
 
       const result = await prisma.dailySales.create({ data });
+      
+      // Send email with shopping list included
+      try {
+        await sendDailySalesEmail(payload);
+        console.log('Daily Sales email sent successfully for ID:', result.id);
+      } catch (emailError) {
+        console.error('Failed to send sales email:', emailError);
+        // Don't fail the entire request for email issues
+      }
       
       console.log('Daily Sales Form submitted with ID:', result.id);
       res.status(200).json({ success: true, id: result.id });

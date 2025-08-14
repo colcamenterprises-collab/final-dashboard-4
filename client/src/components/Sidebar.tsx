@@ -24,8 +24,7 @@ const NAV = [
   {
     title: "Operations",
     items: [
-      { label: "Sales Form",   path: "/daily-sales",    icon: Icon.form },
-      { label: "Stock Form",   path: "/daily-stock",    icon: Icon.stock },
+      { label: "Daily Sales & Stock", path: "/operations/daily", icon: Icon.form },
       { label: "Expenses",     path: "/expenses", icon: Icon.money },
       { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
       { label: "Receipts",     path: "/receipts", icon: Icon.file },

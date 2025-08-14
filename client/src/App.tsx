@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Layout from "@/components/Layout";
+
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
 import DashboardModern from "@/pages/DashboardModern";
@@ -65,6 +65,7 @@ function App() {
         <Switch>
           <Route path="/" component={DashboardModern} />
           <Route path="/dashboard" component={DashboardModern} />
+          <Route path="/operations/daily" component={SalesForm} />
           <Route path="/daily-sales" component={DailySales} />
           <Route path="/sales-form" component={SalesForm} />
           <Route path="/daily-stock" component={DailyStockPage} />
@@ -127,9 +128,7 @@ function App() {
           <Route path="/recipes" component={Recipes} />
           <Route path="/form/:id" component={FormView} />
           <Route path="/draft-forms" component={DraftForms} />
-          <Route path="/form-library" component={FormLibraryNew} />
-          <Route path="/form-detail" component={FormDetail} />
-          <Route path="/forms-library" component={FormsLibrary} />
+
           <Route path="/purchasing" component={Purchasing} />
           <Route path="/supplier-management" component={SupplierManagement} />
           <Route path="/test-monthly-stock" component={TestMonthlyStock} />
@@ -145,7 +144,7 @@ function App() {
           
           {/* Operations & Sales sub-routes */}
           <Route path="/ops-sales/draft-forms" component={DraftFormsLibrary} />
-          <Route path="/ops-sales/form-library" component={DraftFormsLibrary} />
+
           <Route path="/ops-sales/purchasing" component={() => <Placeholder title="Purchasing" description="Manage procurement and supplier relationships." />} />
           <Route path="/ops-sales/shopping-requirements" component={() => <Placeholder title="Shopping Requirements" description="Track shopping requirements and generate purchase orders." />} />
           <Route path="/ops-sales/quick-lodge" component={() => <Placeholder title="Burger Bun, Drinks, Meat - Quick Lodge" description="Quick inventory management for key items." />} />
