@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { JussiChatBubble } from "@/components/JussiChatBubble";
 
 type Summary = {
   dateLocal: string;
@@ -256,6 +257,49 @@ export default function ShiftSummary(){
           </div>
         </div>
       )}
+
+      {/* Jussi AI Analysis Section */}
+      {data && (
+        <div className="mt-6 space-y-6">
+          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-2xl border border-yellow-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
+                <span className="text-sm font-bold text-black">J</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Jussi AI Analysis</h3>
+            </div>
+            
+            <div className="bg-white/60 rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Shift Performance Insights</h4>
+              <div className="space-y-2 text-sm text-gray-700">
+                <p>• <strong>Revenue Performance:</strong> {data?.summary?.kpis?.grossSales > 12000 ? "Strong performance - above average daily target" : "Below average - consider promotional strategies"}</p>
+                <p>• <strong>Payment Mix:</strong> {((pay.Grab || 0) / (data?.summary?.kpis?.grossSales || 1) * 100).toFixed(0)}% delivery orders indicate {(pay.Grab || 0) / (data?.summary?.kpis?.grossSales || 1) > 0.6 ? "healthy online presence" : "opportunity to boost delivery sales"}</p>
+                <p>• <strong>Transaction Analysis:</strong> Average order value of {THB((data?.summary?.kpis?.grossSales || 0) / Math.max(1, data?.summary?.kpis?.totalReceipts || 1))} {((data?.summary?.kpis?.grossSales || 0) / Math.max(1, data?.summary?.kpis?.totalReceipts || 1)) > 400 ? "suggests premium positioning" : "indicates value pricing strategy"}</p>
+                <p>• <strong>Operational Efficiency:</strong> {data?.summary?.topItems?.[0]?.qty > 10 ? "High volume on top items shows good menu focus" : "Consider promoting best-selling items more"}</p>
+              </div>
+            </div>
+
+            <div className="bg-white/60 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Recommended Actions</h4>
+              <div className="space-y-1 text-sm text-gray-700">
+                {((pay.Cash || 0) / (data?.summary?.kpis?.grossSales || 1)) > 0.3 && (
+                  <p>• Consider promoting digital payments to reduce cash handling</p>
+                )}
+                {data?.summary?.kpis?.burgersSold < 20 && (
+                  <p>• Focus marketing on signature burger items to increase core sales</p>
+                )}
+                {data?.discrepancies?.some(d => d.level === "warn") && (
+                  <p>• Review cash handling procedures - discrepancies detected with Daily Sales form</p>
+                )}
+                <p>• Chat with me below for detailed analysis and specific recommendations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jussi Chat Component */}
+      <JussiChatBubble />
     </div>
   );
 }
