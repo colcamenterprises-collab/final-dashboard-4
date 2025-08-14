@@ -147,6 +147,27 @@ export default function DailySalesLibrary() {
                         <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/daily-sales/view?id=${r.id}`}>View</a>
                         <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/analysis/shift-summary?date=${r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : ''}`}>Shift Summary</a>
                         <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/stock?shiftId=${r.id}`}>Stock</a>
+                        <button 
+                          className="text-sm text-red-600 hover:text-red-900 font-medium" 
+                          onClick={async () => {
+                            if (confirm(`Are you sure you want to delete this daily sales record from ${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Unknown Date'}?`)) {
+                              try {
+                                const response = await fetch(`/api/daily-sales/${r.id}`, {method: "DELETE"});
+                                if (response.ok) {
+                                  alert("Record deleted successfully");
+                                  fetchRows(); // Refresh the list
+                                } else {
+                                  alert("Failed to delete record");
+                                }
+                              } catch (error) {
+                                console.error('Delete error:', error);
+                                alert("Error deleting record");
+                              }
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>

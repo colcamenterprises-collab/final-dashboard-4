@@ -44,11 +44,27 @@ r.get("/:id", async (req, res) => {
   const { id } = req.params;
   const row = (await pool.query(`SELECT * FROM "DailySales" WHERE id=$1`, [id])).rows[0];
   if (!row) return res.status(404).json({ error: "Not found" });
+  
   // add computed variance
   const sumShopping = Number(row.shoppingExpenses||0);
   const expectedClose = Number(row.startingCash||0) + Number(row.cashSales||0) - sumShopping;
   const variance = Number(row.closingCash||0) - expectedClose;
-  res.json({ ok: true, row: { ...row, variance }});
+  
+  res.json({ ok: true, ...row, variance });
+});
+
+r.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(`DELETE FROM "DailySales" WHERE id = $1`, [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Daily sales record not found" });
+    }
+    res.json({ ok: true, message: "Daily sales record deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting daily sales record:", error);
+    res.status(500).json({ error: "Failed to delete daily sales record" });
+  }
 });
 
 r.post("/:id/resend-email", async (req, res) => {
