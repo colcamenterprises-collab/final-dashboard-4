@@ -9,6 +9,7 @@ import analysisShift from "./routes/analysisShift";
 import posLive from "./routes/posLive";
 import posItems from "./routes/posItems";
 import posUsage from "./routes/posUsage";
+import dailySalesLibrary from "./routes/dailySalesLibrary";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -2073,6 +2074,9 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
+  
+  // Register Daily Sales Library routes
+  app.use('/api/daily-sales', dailySalesLibrary);
   
   // Register POS Live routes
   app.use('/api/pos', posLive);

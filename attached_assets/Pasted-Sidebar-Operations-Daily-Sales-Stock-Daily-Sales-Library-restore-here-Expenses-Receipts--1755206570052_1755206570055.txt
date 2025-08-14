@@ -1,0 +1,284 @@
+Sidebar
+
+Operations
+
+Daily Sales & Stock
+
+Daily Sales Library ← (restore here)
+
+Expenses
+
+Receipts
+
+Analysis
+…(rest unchanged)
+
+DB (indexes only; reuse existing table)
+
+Assuming your submissions live in daily_sales with arrays for shopping, wages, otherMoneyOut:
+
+CREATE INDEX IF NOT EXISTS idx_daily_sales_date ON daily_sales (shift_date);
+CREATE INDEX IF NOT EXISTS idx_daily_sales_completed_by ON daily_sales (completed_by);
+CREATE INDEX IF NOT EXISTS idx_daily_sales_locked ON daily_sales (status);
+
+
+If you stored money in satang, keep that; formatting happens in UI.
+
+API (clean, read-only + small actions)
+GET   /api/daily-sales?from=YYYY-MM-DD&to=YYYY-MM-DD&staff=Mint&variance=only&hasAttach=1&page=1&pageSize=50
+GET   /api/daily-sales/:id              # full detail (incl. Shopping/Wages/Other arrays)
+POST  /api/daily-sales/:id/resend-email # uses the same email you approved earlier (includes Shopping)
+POST  /api/daily-sales/:id/lock         # admin only
+POST  /api/daily-sales/:id/unlock       # admin only
+GET   /api/daily-sales/export.csv?from=...&to=...   # flat export for Excel
+
+
+Variance flag logic (server):
+variance = abs(endingCash - (cashStart + cashSales - sum(shopping.amount) - sum(otherMoneyOut.amount)))
+Mark as mismatch if variance > 20 THB.
+
+Frontend pages (styled like your dashboard)
+List page: client/src/pages/operations/daily-sales/Library.tsx
+
+Header: Daily Sales Library
+
+Filters row: date range, staff (autocomplete from recent), toggles (Variance only, With attachments)
+
+Table columns:
+
+Date
+
+Completed By
+
+Cash Start
+
+Total Sales (auto calc)
+
+Total Expenses
+
+Ending Cash
+
+Cash Banked
+
+QR Transferred
+
+Variance (badge green/red)
+
+Email (sent/failed; button to Resend)
+
+Actions (View • Print • Open Stock • Open Shift Summary)
+
+Pagination (50 per page), sticky header, CSV export button.
+
+Detail drawer/page: client/src/pages/operations/daily-sales/View.tsx
+
+Mirrors yesterday’s form:
+
+A) Shift Info
+
+B) Sales (+ Total Sales)
+
+C) Expenses (Shopping/Wages/Other + Shopping table preserved)
+
+D) Summary
+
+Buttons: Print, Resend email, Open Stock, Open Shift Summary
+
+Drop-in server handlers (skeleton)
+// server/routes/dailySalesLibrary.ts
+import { Router } from "express";
+import { pool } from "../db";
+import { sendDailySalesEmail } from "../services/salesEmail"; // already built earlier
+
+const r = Router();
+
+r.get("/", async (req, res) => {
+  const { from, to, staff, variance, hasAttach, page="1", pageSize="50" } = req.query as Record<string,string>;
+  const q:any[] = [];
+  const where:string[] = [];
+
+  if (from) { q.push(from); where.push(`shift_date >= $${q.length}`); }
+  if (to)   { q.push(to);   where.push(`shift_date <= $${q.length}`); }
+  if (staff){ q.push(staff);where.push(`completed_by ILIKE '%'||$${q.length}||'%'`); }
+  if (hasAttach==="1") where.push(`jsonb_array_length(coalesce(attachments,'[]'::jsonb)) > 0`);
+
+  const baseWhere = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const pageN = Math.max(1, parseInt(page)), ps = Math.min(200, Math.max(10, parseInt(pageSize)));
+  const off = (pageN-1)*ps;
+
+  const sql = `
+    SELECT id, shift_date, completed_by, cash_start, cash_sales, qr_sales, grab_sales, aroi_dee_sales,
+           direct_sales, total_sales, shopping, wages, other_money_out,
+           total_expenses, ending_cash, cash_banked, qr_transferred, status, attachments
+    FROM daily_sales
+    ${baseWhere}
+    ORDER BY shift_date DESC, id DESC
+    LIMIT ${ps} OFFSET ${off};
+  `;
+  const rows = (await pool.query(sql, q)).rows;
+
+  // compute variance & optionally filter variance-only
+  const out = rows.map((r:any)=>{
+    const sumShopping = (r.shopping||[]).reduce((a:any,x:any)=> a + Number(x.amount||0), 0);
+    const sumOther    = (r.other_money_out||[]).reduce((a:any,x:any)=> a + Number(x.amount||0), 0);
+    const expectedClose = Number(r.cash_start||0) + Number(r.cash_sales||0) - (sumShopping + sumOther);
+    const variance = Number(r.ending_cash||0) - expectedClose;
+    return { ...r, variance };
+  });
+  const filtered = variance==="only" ? out.filter(x => Math.abs(x.variance) > 20) : out;
+
+  res.json({ ok:true, rows: filtered, page: pageN, pageSize: ps });
+});
+
+r.get("/:id", async (req,res)=>{
+  const { id } = req.params;
+  const row = (await pool.query(`SELECT * FROM daily_sales WHERE id=$1`, [id])).rows[0];
+  if (!row) return res.status(404).json({ error: "Not found" });
+  // add computed variance
+  const sumShopping = (row.shopping||[]).reduce((a:any,x:any)=> a + Number(x.amount||0), 0);
+  const sumOther    = (row.other_money_out||[]).reduce((a:any,x:any)=> a + Number(x.amount||0), 0);
+  const expectedClose = Number(row.cash_start||0) + Number(row.cash_sales||0) - (sumShopping + sumOther);
+  const variance = Number(row.ending_cash||0) - expectedClose;
+  res.json({ ok:true, row: { ...row, variance }});
+});
+
+r.post("/:id/resend-email", async (req,res)=>{
+  const { id } = req.params;
+  const row = (await pool.query(`SELECT * FROM daily_sales WHERE id=$1`, [id])).rows[0];
+  if (!row) return res.status(404).json({ error: "Not found" });
+  await sendDailySalesEmail(row);
+  res.json({ ok:true });
+});
+
+r.post("/:id/lock", async (req,res)=>{
+  const { id } = req.params;
+  await pool.query(`UPDATE daily_sales SET status='LOCKED' WHERE id=$1`, [id]);
+  res.json({ ok:true });
+});
+
+r.post("/:id/unlock", async (req,res)=>{
+  const { id } = req.params;
+  await pool.query(`UPDATE daily_sales SET status='SUBMITTED' WHERE id=$1`, [id]);
+  res.json({ ok:true });
+});
+
+export default r;
+
+
+Register it
+
+// server/routes.ts
+import dailySalesLibrary from "./routes/dailySalesLibrary";
+app.use("/api/daily-sales", dailySalesLibrary);
+
+Drop-in list page (React)
+// client/src/pages/operations/daily-sales/Library.tsx
+import React, { useEffect, useState } from "react";
+
+const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(n||0);
+
+export default function DailySalesLibrary(){
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+  const [staff, setStaff] = useState<string>("");
+  const [varianceOnly, setVarianceOnly] = useState(false);
+  const [hasAttach, setHasAttach] = useState(false);
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRows = async ()=>{
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (from) params.append("from", from);
+    if (to) params.append("to", to);
+    if (staff) params.append("staff", staff);
+    if (varianceOnly) params.append("variance","only");
+    if (hasAttach) params.append("hasAttach","1");
+    const r = await fetch(`/api/daily-sales?${params.toString()}`);
+    const j = await r.json();
+    setRows(j.rows || []);
+    setLoading(false);
+  };
+
+  useEffect(()=>{ fetchRows(); },[]);
+
+  return (
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">Daily Sales Library</h1>
+        <div className="flex gap-2">
+          <input type="date" className="header-pill px-3 py-2 text-sm" value={from} onChange={e=>setFrom(e.target.value)} />
+          <span className="text-sm self-center">to</span>
+          <input type="date" className="header-pill px-3 py-2 text-sm" value={to} onChange={e=>setTo(e.target.value)} />
+          <input type="text" placeholder="Staff…" className="header-pill px-3 py-2 text-sm" value={staff} onChange={e=>setStaff(e.target.value)} />
+          <label className="header-pill px-3 py-2 text-sm flex items-center gap-2"><input type="checkbox" checked={varianceOnly} onChange={e=>setVarianceOnly(e.target.checked)}/> Variance only</label>
+          <label className="header-pill px-3 py-2 text-sm flex items-center gap-2"><input type="checkbox" checked={hasAttach} onChange={e=>setHasAttach(e.target.checked)}/> With attachments</label>
+          <button className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm" onClick={fetchRows}>{loading?"Loading…":"Apply"}</button>
+          <a className="header-pill px-3 py-2 text-sm border" href={`/api/daily-sales/export.csv?from=${from}&to=${to}`}>Export CSV</a>
+        </div>
+      </div>
+
+      <div className="card p-0 overflow-auto">
+        <table className="min-w-[1100px] w-full">
+          <thead className="sticky top-0 bg-white">
+            <tr>
+              {["Date","Completed By","Cash Start","Total Sales","Total Expenses","Ending Cash","Cash Banked","QR Transferred","Variance","Email","Actions"].map(h=>(
+                <th key={h} className="p-3 text-left text-xs text-[var(--muted)]">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r:any)=>(
+              <tr key={r.id} className="border-t">
+                <td className="p-3">{r.shift_date}</td>
+                <td className="p-3">{r.completed_by}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.cash_start)}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.total_sales)}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.total_expenses)}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.ending_cash)}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.cash_banked)}</td>
+                <td className="p-3 text-right tabular-nums">{THB(r.qr_transferred)}</td>
+                <td className="p-3">
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-md ${Math.abs(r.variance)>20?"bg-amber-100 text-amber-800":"bg-green-100 text-green-800"}`}>
+                    {THB(r.variance)}
+                  </span>
+                </td>
+                <td className="p-3">
+                  <button className="text-sm underline" onClick={async()=>{
+                    await fetch(`/api/daily-sales/${r.id}/resend-email`, {method:"POST"});
+                    alert("Email sent");
+                  }}>Resend</button>
+                </td>
+                <td className="p-3">
+                  <a className="text-sm underline mr-2" href={`/operations/daily-sales/view?id=${r.id}`}>View</a>
+                  <a className="text-sm underline mr-2" href={`/operations/analysis/shift-summary?date=${r.shift_date}`}>Shift Summary</a>
+                  <a className="text-sm underline" href={`/operations/stock?shiftId=${r.id}`}>Stock</a>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr><td className="p-6 text-center text-sm text-[var(--muted)]" colSpan={11}>No records</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+(You can create a simple View.tsx detail page by reusing your existing form component in read-only mode.)
+
+Accept / Verify
+
+ Sidebar shows Daily Sales Library under Operations.
+
+ List loads with recent submissions; filters work.
+
+ Variance badge reflects the same math as yesterday.
+
+ “Resend” sends the same email (with Shopping table).
+
+ Links open View, Shift Summary (for same date), and Stock.
+
+ CSV export downloads a flat file for Excel.

@@ -54,6 +54,7 @@ import BusinessExpensesSheet from "@/pages/BusinessExpenses";
 import ExpenseUpload from "@/pages/ExpenseUpload";
 import SystemStatus from "@/pages/SystemStatus";
 import ShiftSummary from "@/pages/operations/analysis/ShiftSummary";
+import DailySalesLibrary from "@/pages/operations/daily-sales/Library";
 
 import NotFound from "@/pages/not-found";
 
@@ -77,6 +78,7 @@ function App() {
           <Route path="/system-status" component={SystemStatus} />
           
           {/* Operations extras */}
+          <Route path="/operations/daily-sales/library" component={DailySalesLibrary} />
           <Route path="/operations/analysis/shift-summary" component={ShiftSummary} />
           <Route path="/operations/delivery" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Delivery Partners</h1><p>Grab/Foodpanda integration — coming soon</p></div>} />
           <Route path="/operations/reports" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Shift Reports</h1><p>Detailed shift reporting — coming soon</p></div>} />
