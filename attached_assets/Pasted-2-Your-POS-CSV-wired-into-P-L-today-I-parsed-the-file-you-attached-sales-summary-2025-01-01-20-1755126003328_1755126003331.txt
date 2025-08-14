@@ -1,0 +1,99 @@
+2) Your POS CSV — wired into P&L (today)
+I parsed the file you attached: sales-summary-2025-01-01-2025-08-13.csv.
+Columns detected:
+
+pgsql
+Copy
+Edit
+Date, Gross sales, Refunds, Discounts, Net sales, Cost of goods, Gross profit, Margin, Taxes
+Monthly totals I computed (THB)
+sql
+Copy
+Edit
+Month  Gross Sales   Refunds   Discounts   Net Sales   Cost of Goods   Gross Profit
+Jan    750,755       13,741    1,792       735,210     136,312         598,871
+Feb    742,093       14,197    1,305       726,584     134,021         592,536
+Mar    838,263       11,872      977       825,406     172,460         652,915
+Apr    684,947        8,441    2,188       674,303     160,106         514,170
+May    635,004        7,840    1,870       625,283     207,484         417,770
+Jun    451,737        1,573    1,541       448,609     152,881         295,702
+Jul    421,186        4,565    2,614       413,995     141,546         272,421
+Aug    208,145        1,317      426       206,398      70,265         136,120
+TOTAL  4,732,130      63,546   12,713     4,655,788   1,175,075       3,480,505
+These are exactly the measures your P&L needs for the top half (gross, discounts, net) and COGS.
+
+How we ingest this (v1 — “Sales Summary (POS)” import)
+Because your P&L currently expects Food vs Drink splits (which the CSV doesn’t provide), we’ll treat it as combined sales for now. That keeps totals right; we can split later when we ingest per-item receipts.
+
+Add one tiny override table:
+
+sql
+Copy
+Edit
+CREATE TABLE IF NOT EXISTS sales_monthly_override (
+  year INT NOT NULL,
+  month INT NOT NULL,           -- 1..12
+  gross_sales_thb NUMERIC NOT NULL DEFAULT 0,       -- combined food+drink
+  discounts_thb   NUMERIC NOT NULL DEFAULT 0,       -- refunds + discounts
+  cogs_thb        NUMERIC NOT NULL DEFAULT 0,       -- combined COGS
+  UNIQUE (year, month)
+);
+Import behavior for this CSV type
+
+Parse dates, bucket by month.
+
+For each month:
+
+gross_sales_thb ← Gross sales
+
+discounts_thb ← Refunds + Discounts
+
+cogs_thb ← Cost of goods
+
+Upsert into sales_monthly_override.
+
+API tweak in /api/finance/pl
+
+When assembling sales for the P&L:
+
+Load your normal ShiftSnapshot rollup (if present).
+
+Left-join overrides and, where present, replace:
+
+TOTAL_GROSS_REVENUE with gross_sales_thb
+
+DISCOUNTS_TOTAL with discounts_thb
+
+COGS_TOTAL (or COGS_FOOD) with cogs_thb
+
+Recompute derived lines: Net (ex fees), Net (inc fees), Gross Profit, margins.
+
+Payment fees aren’t in this CSV. Those will come from bank/card statement imports; until then they’ll be 0, which is fine — the rows will update as soon as statements are imported.
+
+Labeling in the UI
+
+Add a small “Data source” footnote row in the P&L table (optional):
+
+“Sales: POS summary override” for months with overrides
+
+“Sales: Shift snapshots” otherwise
+(This clears up where numbers came from.)
+
+3) What I’ll ship right now (clear for the agent)
+Import type: Sales Summary (POS) into Upload Statements
+
+Column mapping is fixed (as above).
+
+On import, upsert monthly totals into sales_monthly_override.
+
+Show a review table (month → amounts) before commit.
+
+P&L API:
+
+Read overrides and replace sales/discounts/COGS for months that have them.
+
+Expenses page restyle:
+
+Replace page wrapper + headings with the exact same classes used on P&L.
+
+Ensure cards use .card/.card-inner, standard gaps, and remove legacy margins.
