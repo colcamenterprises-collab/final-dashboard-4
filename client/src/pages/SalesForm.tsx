@@ -9,169 +9,162 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Plus, X, Upload, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, X, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
 import BackButton from '@/components/BackButton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
-// Final v2 Sales Form Schema - exact specification from user
+// LOCKED Sales Form Schema - exact specification
 const salesFormSchema = z.object({
-  // A) Shift Information
-  shiftTime: z.enum(['MORNING', 'EVENING', 'LATE']),
+  // A) Shift Info
   shiftDate: z.string().min(1, 'Shift date is required'),
   completedBy: z.string().min(1, 'Staff name is required').max(64, 'Maximum 64 characters'),
-  startingCash: z.number().min(0, 'Cannot be negative'),
-  endingCashCounted: z.number().min(0, 'Cannot be negative'),
-  notes: z.string().max(500, 'Maximum 500 characters').optional(),
+  cashStart: z.number().min(0, 'Cannot be negative'),
   
-  // B) Sales Information (channels)
+  // B) Sales
   cashSales: z.number().min(0, 'Cannot be negative'),
-  qrScanSales: z.number().min(0, 'Cannot be negative'),
+  qrSales: z.number().min(0, 'Cannot be negative'),
   grabSales: z.number().min(0, 'Cannot be negative'),
   aroiDeeSales: z.number().min(0, 'Cannot be negative'),
-  cardSales: z.number().min(0, 'Cannot be negative').optional(),
-  otherSales: z.number().min(0, 'Cannot be negative').optional(),
-  totalOrders: z.number().min(0, 'Cannot be negative').optional(),
-  discountsRefunds: z.number().min(0, 'Cannot be negative').optional(),
+  directSales: z.number().min(0, 'Cannot be negative'),
   
-  // C) Delivery Partner Fees
-  grabCommission: z.number().min(0, 'Cannot be negative').optional(),
-  merchantFundedDiscount: z.number().min(0, 'Cannot be negative').optional(),
-  
-  // D) Banked / Reconciliation
+  // D) Summary
+  endingCash: z.number().min(0, 'Cannot be negative'),
   cashBanked: z.number().min(0, 'Cannot be negative'),
+  qrTransferred: z.number().min(0, 'Cannot be negative'),
 });
 
 type SalesFormData = z.infer<typeof salesFormSchema>;
 
-interface ShiftPurchase {
+interface ShoppingItem {
   id?: number;
-  description: string;
+  item: string;
+  shopName: string;
   amount: number;
-  supplier: string;
+}
+
+interface WageItem {
+  id?: number;
+  staffName: string;
+  amount: number;
+  type: 'Wages' | 'Overtime' | 'Bonus';
+}
+
+interface OtherMoneyOutItem {
+  id?: number;
+  type: string;
+  amount: number;
+  notes?: string;
 }
 
 export default function SalesForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [shiftPurchases, setShiftPurchases] = useState<ShiftPurchase[]>([]);
-  const [newPurchase, setNewPurchase] = useState<ShiftPurchase>({
-    description: '',
+  
+  // Expense arrays
+  const [shopping, setShopping] = useState<ShoppingItem[]>([]);
+  const [wages, setWages] = useState<WageItem[]>([]);
+  const [otherMoneyOut, setOtherMoneyOut] = useState<OtherMoneyOutItem[]>([]);
+  
+  // New item states
+  const [newShopping, setNewShopping] = useState<ShoppingItem>({
+    item: '',
+    shopName: '',
     amount: 0,
-    supplier: '',
   });
-  const [status, setStatus] = useState<'DRAFT' | 'SUBMITTED' | 'LOCKED'>('DRAFT');
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [showVarianceConfirm, setShowVarianceConfirm] = useState(false);
-  const [varianceReason, setVarianceReason] = useState('');
+  const [newWage, setNewWage] = useState<WageItem>({
+    staffName: '',
+    amount: 0,
+    type: 'Wages',
+  });
+  const [newOtherMoney, setNewOtherMoney] = useState<OtherMoneyOutItem>({
+    type: '',
+    amount: 0,
+    notes: '',
+  });
 
   const form = useForm<SalesFormData>({
     resolver: zodResolver(salesFormSchema),
     defaultValues: {
-      shiftTime: 'EVENING',
       shiftDate: new Date().toISOString().split('T')[0],
       completedBy: '',
-      startingCash: 0,
-      endingCashCounted: 0,
+      cashStart: 0,
       cashSales: 0,
-      qrScanSales: 0,
+      qrSales: 0,
       grabSales: 0,
       aroiDeeSales: 0,
-      cardSales: 0,
-      otherSales: 0,
-      totalOrders: 0,
-      discountsRefunds: 0,
-      grabCommission: 0,
-      merchantFundedDiscount: 0,
+      directSales: 0,
+      endingCash: 0,
       cashBanked: 0,
-      notes: '',
+      qrTransferred: 0,
     },
   });
 
   // Watch form values for calculations
   const formValues = form.watch();
   
-  // Calculations per specification
-  const totalSalesPOS = (formValues.cashSales || 0) + 
-                       (formValues.qrScanSales || 0) + 
-                       (formValues.grabSales || 0) + 
-                       (formValues.aroiDeeSales || 0) + 
-                       (formValues.cardSales || 0) + 
-                       (formValues.otherSales || 0) - 
-                       (formValues.discountsRefunds || 0);
+  // Auto calculations
+  const totalSales = (formValues.cashSales || 0) + 
+                    (formValues.qrSales || 0) + 
+                    (formValues.grabSales || 0) + 
+                    (formValues.aroiDeeSales || 0) + 
+                    (formValues.directSales || 0);
 
-  const totalShiftPurchases = shiftPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-  
-  const expectedCashClose = (formValues.startingCash || 0) + 
-                           (formValues.cashSales || 0) - 
-                           totalShiftPurchases;
-  
-  const cashVariance = (formValues.endingCashCounted || 0) - expectedCashClose;
+  const totalExpenses = shopping.reduce((sum, item) => sum + item.amount, 0) +
+                       wages.reduce((sum, item) => sum + item.amount, 0) +
+                       otherMoneyOut.reduce((sum, item) => sum + item.amount, 0);
 
-  // Shift time options per specification
-  const shiftTimeOptions = [
-    { value: 'MORNING', label: 'Morning (10–17)', start: '10:00', end: '17:00' },
-    { value: 'EVENING', label: 'Evening (17–03)', start: '17:00', end: '03:00' },
-    { value: 'LATE', label: 'Late (23–07)', start: '23:00', end: '07:00' },
-  ];
-
-  // Convert THB to satang (minor units) for storage
-  const convertToSatang = (thb: number) => Math.round(thb * 100);
-
-  // Add shift purchase
-  const addShiftPurchase = useCallback(() => {
-    if (newPurchase.description && newPurchase.amount > 0) {
-      setShiftPurchases(prev => [...prev, { ...newPurchase, id: Date.now() }]);
-      setNewPurchase({ description: '', amount: 0, supplier: '' });
+  // Add shopping item
+  const addShopping = useCallback(() => {
+    if (newShopping.item && newShopping.shopName && newShopping.amount > 0) {
+      setShopping(prev => [...prev, { ...newShopping, id: Date.now() }]);
+      setNewShopping({ item: '', shopName: '', amount: 0 });
     }
-  }, [newPurchase]);
+  }, [newShopping]);
 
-  // Remove shift purchase
-  const removeShiftPurchase = useCallback((id: number) => {
-    setShiftPurchases(prev => prev.filter(p => p.id !== id));
+  // Add wage item
+  const addWage = useCallback(() => {
+    if (newWage.staffName && newWage.amount > 0) {
+      setWages(prev => [...prev, { ...newWage, id: Date.now() }]);
+      setNewWage({ staffName: '', amount: 0, type: 'Wages' });
+    }
+  }, [newWage]);
+
+  // Add other money out item
+  const addOtherMoney = useCallback(() => {
+    if (newOtherMoney.type && newOtherMoney.amount > 0) {
+      setOtherMoneyOut(prev => [...prev, { ...newOtherMoney, id: Date.now() }]);
+      setNewOtherMoney({ type: '', amount: 0, notes: '' });
+    }
+  }, [newOtherMoney]);
+
+  // Remove functions
+  const removeShopping = useCallback((id: number) => {
+    setShopping(prev => prev.filter(item => item.id !== id));
   }, []);
 
-  // Handle file upload
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    const validFiles = files.filter(file => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      return validTypes.includes(file.type) && file.size <= maxSize;
-    });
-    
-    if (attachments.length + validFiles.length > 5) {
-      toast({
-        title: "Too many files",
-        description: "Maximum 5 files allowed",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setAttachments(prev => [...prev, ...validFiles]);
-  }, [attachments.length, toast]);
+  const removeWage = useCallback((id: number) => {
+    setWages(prev => prev.filter(item => item.id !== id));
+  }, []);
 
-  // Remove attachment
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+  const removeOtherMoney = useCallback((id: number) => {
+    setOtherMoneyOut(prev => prev.filter(item => item.id !== id));
   }, []);
 
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('/api/shift-sales', 'POST', data);
+      return apiRequest('/api/daily-sales', 'POST', data);
     },
     onSuccess: (result) => {
       toast({
         title: "Sales form submitted",
         description: "Redirecting to Stock Form...",
       });
-      // Redirect to Stock Form with shift ID
-      setLocation(`/stock-form?shiftId=${result.id}`);
+      // Redirect to Stock Form
+      setLocation('/daily-stock');
     },
     onError: (error) => {
       toast({
@@ -182,101 +175,45 @@ export default function SalesForm() {
     },
   });
 
-  // Save draft mutation
-  const saveDraftMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return apiRequest('/api/shift-sales', 'POST', { ...data, status: 'DRAFT' });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Draft saved",
-        description: "Your progress has been saved",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Save failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   // Handle form submission
   const onSubmit = useCallback((data: SalesFormData) => {
-    // Check for significant cash variance (> 20 THB)
-    if (Math.abs(cashVariance) > 20 && !showVarianceConfirm) {
-      setShowVarianceConfirm(true);
-      return;
-    }
-
-    // Convert all money values to satang
-    const salesData = {
-      // Convert time and date
-      shiftTime: data.shiftTime,
+    // Create payload matching exact API spec
+    const payload = {
       shiftDate: data.shiftDate,
       completedBy: data.completedBy,
+      cashStart: data.cashStart,
       
-      // Convert cash amounts to satang
-      startingCashSatang: convertToSatang(data.startingCash),
-      endingCashSatang: convertToSatang(data.endingCashCounted),
-      cashBankedSatang: convertToSatang(data.cashBanked),
+      cashSales: data.cashSales,
+      qrSales: data.qrSales,
+      grabSales: data.grabSales,
+      aroiDeeSales: data.aroiDeeSales,
+      directSales: data.directSales,
+      totalSales: totalSales,
       
-      // Convert sales amounts to satang
-      cashSatang: convertToSatang(data.cashSales),
-      qrSatang: convertToSatang(data.qrScanSales),
-      grabSatang: convertToSatang(data.grabSales),
-      aroiDeeSatang: convertToSatang(data.aroiDeeSales),
-      cardSatang: convertToSatang(data.cardSales || 0),
-      otherSatang: convertToSatang(data.otherSales || 0),
-      
-      // Other fields
-      totalOrders: data.totalOrders || 0,
-      discountsSatang: convertToSatang(data.discountsRefunds || 0),
-      
-      // Delivery fees
-      grabCommissionSatang: convertToSatang(data.grabCommission || 0),
-      merchantFundedDiscountSatang: convertToSatang(data.merchantFundedDiscount || 0),
-      
-      // Shift purchases
-      totalShiftPurchasesSatang: convertToSatang(totalShiftPurchases),
-      shiftPurchases: shiftPurchases.map(p => ({
-        description: p.description,
-        supplier: p.supplier,
-        amountSatang: convertToSatang(p.amount),
+      shopping: shopping.map(item => ({
+        item: item.item,
+        shopName: item.shopName,
+        amount: item.amount,
+      })),
+      wages: wages.map(item => ({
+        staffName: item.staffName,
+        amount: item.amount,
+        type: item.type,
+      })),
+      otherMoneyOut: otherMoneyOut.map(item => ({
+        type: item.type,
+        amount: item.amount,
+        notes: item.notes || '',
       })),
       
-      // Meta
-      notes: data.notes || '',
-      status: 'SUBMITTED',
-      attachments: attachments.map(f => f.name),
-      varianceReason: showVarianceConfirm ? varianceReason : null,
+      totalExpenses: totalExpenses,
+      endingCash: data.endingCash,
+      cashBanked: data.cashBanked,
+      qrTransferred: data.qrTransferred,
     };
 
-    submitMutation.mutate(salesData);
-  }, [cashVariance, showVarianceConfirm, convertToSatang, totalShiftPurchases, shiftPurchases, attachments, varianceReason, submitMutation]);
-
-  // Save draft
-  const saveDraft = useCallback(() => {
-    const draftData = {
-      ...form.getValues(),
-      status: 'DRAFT',
-      shiftPurchases,
-      attachments: attachments.map(f => f.name),
-    };
-    saveDraftMutation.mutate(draftData);
-  }, [form, shiftPurchases, attachments, saveDraftMutation]);
-
-  // Check if form is complete
-  const isFormComplete = form.formState.isValid && 
-    formValues.completedBy && 
-    formValues.startingCash >= 0 && 
-    formValues.endingCashCounted >= 0 &&
-    formValues.cashSales >= 0 &&
-    formValues.qrScanSales >= 0 &&
-    formValues.grabSales >= 0 &&
-    formValues.aroiDeeSales >= 0 &&
-    formValues.cashBanked >= 0;
+    submitMutation.mutate(payload);
+  }, [totalSales, totalExpenses, shopping, wages, otherMoneyOut, submitMutation]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
@@ -289,59 +226,29 @@ export default function SalesForm() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Daily Sales</h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Step 1 of 2 • Sales Information & Cash Management
+                  Complete daily sales and expense tracking
                 </p>
               </div>
             </div>
           </div>
-          
-          {/* Status Badge */}
-          <Badge variant={status === 'LOCKED' ? 'destructive' : status === 'SUBMITTED' ? 'default' : 'secondary'}>
-            {status === 'LOCKED' ? 'Locked' : status === 'SUBMITTED' ? 'Submitted' : 'Draft'}
-          </Badge>
         </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* Card 1: Shift Information */}
+            {/* A) Shift Info */}
             <Card className="card">
               <CardHeader className="card-header">
                 <CardTitle className="card-title">Shift Information</CardTitle>
               </CardHeader>
               <CardContent className="card-inner">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="shiftTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shift Time *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select shift time" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {shiftTimeOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
                     name="shiftDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shift Date *</FormLabel>
+                        <FormLabel>Shift Date (TH local) *</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -364,77 +271,36 @@ export default function SalesForm() {
                     )}
                   />
 
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="startingCash"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Starting Cash (฿) *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              placeholder="0.00"
-                              {...field} 
-                              onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="endingCashCounted"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Ending Cash Counted (฿) *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              placeholder="0.00"
-                              {...field} 
-                              onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="cashStart"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cash Start (฿) *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Shift notes (max 500 chars)" 
-                          {...field} 
-                          maxLength={500}
-                          rows={3}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </CardContent>
             </Card>
 
-            {/* Card 2: Sales Information */}
+            {/* B) Sales */}
             <Card className="card">
               <CardHeader className="card-header">
-                <CardTitle className="card-title">Sales Information</CardTitle>
+                <CardTitle className="card-title">Sales</CardTitle>
               </CardHeader>
               <CardContent className="card-inner">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                   <FormField
                     control={form.control}
                     name="cashSales"
@@ -457,10 +323,10 @@ export default function SalesForm() {
 
                   <FormField
                     control={form.control}
-                    name="qrScanSales"
+                    name="qrSales"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>QR Scan Sales (฿) *</FormLabel>
+                        <FormLabel>QR Sales (฿) *</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -517,69 +383,10 @@ export default function SalesForm() {
 
                   <FormField
                     control={form.control}
-                    name="cardSales"
+                    name="directSales"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Card Sales (฿)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00"
-                            {...field} 
-                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="otherSales"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Other Sales (฿)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00"
-                            {...field} 
-                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="totalOrders"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Orders</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            placeholder="0"
-                            {...field} 
-                            onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="discountsRefunds"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Discounts / Refunds (฿)</FormLabel>
+                        <FormLabel>Direct Sales (฿) *</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -600,73 +407,246 @@ export default function SalesForm() {
                   <div className="flex items-center space-x-2">
                     <TrendingUp className="w-5 h-5 text-blue-600" />
                     <span className="font-semibold text-blue-800 dark:text-blue-200">
-                      Total Sales (POS): ฿{totalSalesPOS.toFixed(2)}
+                      Total Sales: ฿{totalSales.toFixed(2)}
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Card 3: Delivery Partner Fees */}
+            {/* C) Expenses - Shopping */}
             <Card className="card">
               <CardHeader className="card-header">
-                <CardTitle className="card-title">Delivery Partner Fees</CardTitle>
+                <CardTitle className="card-title">Shopping</CardTitle>
               </CardHeader>
               <CardContent className="card-inner">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="grabCommission"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Grab Commission (฿)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00"
-                            {...field} 
-                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                {/* Add Shopping Item */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <Input
+                    placeholder="Item (max 120 chars)"
+                    value={newShopping.item}
+                    maxLength={120}
+                    onChange={(e) => setNewShopping(prev => ({ ...prev, item: e.target.value }))}
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="merchantFundedDiscount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Delivery Fee Discount (Merchant-Funded) (฿)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00"
-                            {...field} 
-                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <Input
+                    placeholder="Shop Name (max 80 chars)"
+                    value={newShopping.shopName}
+                    maxLength={80}
+                    onChange={(e) => setNewShopping(prev => ({ ...prev, shopName: e.target.value }))}
                   />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount (฿)"
+                    value={newShopping.amount || ''}
+                    onChange={(e) => setNewShopping(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={addShopping}
+                    disabled={!newShopping.item || !newShopping.shopName || newShopping.amount <= 0}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add More
+                  </Button>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Captured for reconciliation and variance explanations; do not post to P&L from this form.
-                </p>
+
+                {/* Shopping List */}
+                {shopping.length > 0 && (
+                  <div className="space-y-2">
+                    {shopping.map((item, index) => (
+                      <div key={item.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                          <span className="font-medium">{item.item}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                            at {item.shopName} - ฿{item.amount.toFixed(2)}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeShopping(item.id || index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Card 4: Banked / Reconciliation */}
+            {/* C) Expenses - Wages */}
             <Card className="card">
               <CardHeader className="card-header">
-                <CardTitle className="card-title">Banked / Reconciliation</CardTitle>
+                <CardTitle className="card-title">Wages</CardTitle>
               </CardHeader>
               <CardContent className="card-inner">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Add Wage Item */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <Input
+                    placeholder="Staff Name (max 80 chars)"
+                    value={newWage.staffName}
+                    maxLength={80}
+                    onChange={(e) => setNewWage(prev => ({ ...prev, staffName: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount (฿)"
+                    value={newWage.amount || ''}
+                    onChange={(e) => setNewWage(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  />
+                  <Select 
+                    value={newWage.type} 
+                    onValueChange={(value) => setNewWage(prev => ({ ...prev, type: value as 'Wages' | 'Overtime' | 'Bonus' }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Wages">Wages</SelectItem>
+                      <SelectItem value="Overtime">Overtime</SelectItem>
+                      <SelectItem value="Bonus">Bonus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    type="button" 
+                    onClick={addWage}
+                    disabled={!newWage.staffName || newWage.amount <= 0}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add More
+                  </Button>
+                </div>
+
+                {/* Wages List */}
+                {wages.length > 0 && (
+                  <div className="space-y-2">
+                    {wages.map((item, index) => (
+                      <div key={item.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                          <span className="font-medium">{item.staffName}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                            {item.type} - ฿{item.amount.toFixed(2)}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeWage(item.id || index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* C) Expenses - Other Money Out */}
+            <Card className="card">
+              <CardHeader className="card-header">
+                <CardTitle className="card-title">Other Money Out</CardTitle>
+              </CardHeader>
+              <CardContent className="card-inner">
+                {/* Add Other Money Out Item */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <Input
+                    placeholder="Type (max 80 chars)"
+                    value={newOtherMoney.type}
+                    maxLength={80}
+                    onChange={(e) => setNewOtherMoney(prev => ({ ...prev, type: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount (฿)"
+                    value={newOtherMoney.amount || ''}
+                    onChange={(e) => setNewOtherMoney(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  />
+                  <Input
+                    placeholder="Notes (max 200 chars)"
+                    value={newOtherMoney.notes}
+                    maxLength={200}
+                    onChange={(e) => setNewOtherMoney(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={addOtherMoney}
+                    disabled={!newOtherMoney.type || newOtherMoney.amount <= 0}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add More
+                  </Button>
+                </div>
+
+                {/* Other Money Out List */}
+                {otherMoneyOut.length > 0 && (
+                  <div className="space-y-2">
+                    {otherMoneyOut.map((item, index) => (
+                      <div key={item.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                          <span className="font-medium">{item.type}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                            ฿{item.amount.toFixed(2)}
+                            {item.notes && ` - ${item.notes}`}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeOtherMoney(item.id || index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Total Expenses Display */}
+                <div className="mt-6 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                      Total Expenses: ฿{totalExpenses.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* D) Summary */}
+            <Card className="card">
+              <CardHeader className="card-header">
+                <CardTitle className="card-title">Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="card-inner">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="endingCash"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ending Cash (฿) *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="cashBanked"
@@ -687,206 +667,37 @@ export default function SalesForm() {
                     )}
                   />
 
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Expected Cash Close:</span>
-                        <span className="font-semibold">฿{expectedCashClose.toFixed(2)}</span>
-                      </div>
-                      <div className={`flex justify-between items-center ${Math.abs(cashVariance) > 20 ? 'text-red-600' : 'text-green-600'}`}>
-                        <span className="text-sm font-medium">Cash Variance:</span>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-semibold">฿{cashVariance.toFixed(2)}</span>
-                          {Math.abs(cashVariance) > 20 && <AlertTriangle className="w-4 h-4" />}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {Math.abs(cashVariance) > 20 && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          Cash variance exceeds ฿20. Please acknowledge and provide reason before submission.
-                        </AlertDescription>
-                      </Alert>
+                  <FormField
+                    control={form.control}
+                    name="qrTransferred"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>QR Sales Transferred (฿) *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </div>
+                  />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Card 5: Shift Purchases */}
-            <Card className="card">
-              <CardHeader className="card-header">
-                <CardTitle className="card-title">Shift Purchases</CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  For variance only, not P&L
-                </p>
-              </CardHeader>
-              <CardContent className="card-inner">
-                {/* Add New Purchase */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <Input
-                    placeholder="Description"
-                    value={newPurchase.description}
-                    onChange={(e) => setNewPurchase(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Amount (฿)"
-                    value={newPurchase.amount || ''}
-                    onChange={(e) => setNewPurchase(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  />
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Supplier"
-                      value={newPurchase.supplier}
-                      onChange={(e) => setNewPurchase(prev => ({ ...prev, supplier: e.target.value }))}
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={addShiftPurchase}
-                      disabled={!newPurchase.description || newPurchase.amount <= 0}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Purchases List */}
-                {shiftPurchases.length > 0 && (
-                  <div className="space-y-2">
-                    {shiftPurchases.map((purchase, index) => (
-                      <div key={purchase.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div>
-                          <span className="font-medium">{purchase.description}</span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
-                            {purchase.supplier} - ฿{purchase.amount.toFixed(2)}
-                          </span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeShiftPurchase(purchase.id || index)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <span className="font-semibold text-blue-800 dark:text-blue-200">
-                        Total Shift Purchases: ฿{totalShiftPurchases.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Card 6: Attachments & Notes */}
-            <Card className="card">
-              <CardHeader className="card-header">
-                <CardTitle className="card-title">Attachments</CardTitle>
-              </CardHeader>
-              <CardContent className="card-inner">
-                <div className="space-y-4">
-                  <div>
-                    <input
-                      type="file"
-                      multiple
-                      accept=".jpg,.jpeg,.png,.pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <label htmlFor="file-upload">
-                      <Button type="button" variant="outline" className="cursor-pointer">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Photos/Receipts (max 5 files, 5MB each)
-                      </Button>
-                    </label>
-                  </div>
-                  
-                  {attachments.length > 0 && (
-                    <div className="space-y-2">
-                      {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                          <span className="text-sm">{file.name}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeAttachment(index)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Variance Confirmation Modal */}
-            {showVarianceConfirm && (
-              <Card className="card border-red-200 bg-red-50 dark:bg-red-900/20">
-                <CardHeader className="card-header">
-                  <CardTitle className="card-title text-red-800 dark:text-red-200">
-                    Cash Variance Confirmation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="card-inner">
-                  <p className="text-red-700 dark:text-red-300 mb-4">
-                    Cash variance of ฿{cashVariance.toFixed(2)} exceeds the ฿20 threshold. 
-                    Please provide a reason for this variance.
-                  </p>
-                  <Textarea
-                    placeholder="Explain the reason for cash variance..."
-                    value={varianceReason}
-                    onChange={(e) => setVarianceReason(e.target.value)}
-                    className="mb-4"
-                  />
-                  <div className="flex space-x-2">
-                    <Button 
-                      type="button" 
-                      onClick={() => setShowVarianceConfirm(false)}
-                      variant="outline"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="button" 
-                      onClick={() => form.handleSubmit(onSubmit)()}
-                      disabled={!varianceReason.trim()}
-                    >
-                      Acknowledge & Continue
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Form Actions */}
-            <div className="flex justify-between space-x-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={saveDraft}
-                disabled={saveDraftMutation.isPending}
-              >
-                Save Draft
-              </Button>
-              
+            {/* Submit Button */}
+            <div className="flex justify-end">
               <Button 
                 type="submit" 
-                disabled={!isFormComplete || submitMutation.isPending || status === 'LOCKED'}
+                disabled={submitMutation.isPending}
                 className="min-w-[200px]"
               >
-                {submitMutation.isPending ? 'Submitting...' : 'Save & Continue to Stock'}
+                {submitMutation.isPending ? 'Submitting...' : 'Submit & Continue to Stock'}
               </Button>
             </div>
           </form>

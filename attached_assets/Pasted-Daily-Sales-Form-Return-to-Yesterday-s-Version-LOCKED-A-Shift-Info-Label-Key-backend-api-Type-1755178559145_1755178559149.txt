@@ -1,0 +1,210 @@
+Daily Sales Form — Return to Yesterday’s Version (LOCKED)
+A) Shift Info
+Label	Key (backend/api)	Type	Required
+Shift Date (TH local)	shiftDate	date	✅
+Completed By	completedBy	text (max 64)	✅
+Cash Start (฿)	cashStart	money/number ≥ 0	✅
+B) Sales
+Label	Key	Type	Required
+Cash Sales (฿)	cashSales	money/number ≥ 0	✅
+QR Sales (฿)	qrSales	money/number ≥ 0	✅
+Grab Sales (฿)	grabSales	money/number ≥ 0	✅
+Aroi Dee Sales (฿)	aroiDeeSales	money/number ≥ 0	✅
+Direct Sales (฿)	directSales	money/number ≥ 0	✅
+Total Sales (auto)	totalSales	read-only calc	—
+
+Calculation
+
+totalSales = cashSales + qrSales + grabSales + aroiDeeSales + directSales
+
+C) Expenses
+Shopping (repeatable)
+
+Array key: shopping
+
+Row shape: { item, shopName, amount }
+
+Label	Key	Type	Required
+Item	item	text (max 120)	✅
+Shop Name	shopName	text (max 80)	✅
+Amount (฿)	amount	money/number ≥ 0	✅
+
+UI: “Add More” button to append rows.
+
+Wages (repeatable)
+
+Array key: wages
+
+Row shape: { staffName, amount, type }
+
+Label	Key	Type	Required
+Staff Name	staffName	text (max 80)	✅
+Amount (฿)	amount	money/number ≥ 0	✅
+Type	type	dropdown: Wages, Overtime, Bonus	✅
+Other Money Out (repeatable)
+
+Array key: otherMoneyOut
+
+Row shape: { type, amount, notes }
+
+Label	Key	Type	Required
+Type	type	text (max 80)	✅
+Amount (฿)	amount	money/number ≥ 0	✅
+Notes	notes	text (max 200)	
+Total Expenses (auto)
+
+Key: totalExpenses
+
+Calculation
+
+totalExpenses =
+  sum(shopping[].amount) +
+  sum(wages[].amount) +
+  sum(otherMoneyOut[].amount)
+
+D) Summary
+Label	Key	Type	Required
+Ending Cash (฿)	endingCash	money/number ≥ 0	✅
+Cash Banked (฿)	cashBanked	money/number ≥ 0	✅
+QR Sales Transferred (฿)	qrTransferred	money/number ≥ 0	✅
+
+No other derived fields here. Keep it exactly as before.
+
+API Payload (submit)
+{
+  "shiftDate": "2025-08-14",
+  "completedBy": "John",
+  "cashStart": 2000,
+  "cashSales": 7667,
+  "qrSales": 0,
+  "grabSales": 0,
+  "aroiDeeSales": 0,
+  "directSales": 0,
+  "totalSales": 7667,
+  "shopping": [
+    { "item": "Burger buns", "shopName": "Makro", "amount": 450 }
+  ],
+  "wages": [
+    { "staffName": "Mint", "amount": 500, "type": "Wages" }
+  ],
+  "otherMoneyOut": [
+    { "type": "Gas", "amount": 120, "notes": "Top up" }
+  ],
+  "totalExpenses": 1070,
+  "endingCash": 3500,
+  "cashBanked": 3000,
+  "qrTransferred": 0
+}
+
+
+Keep keys exactly. If your backend stores minor units (satang), convert at the API boundary as it did yesterday; do not change storage format.
+
+JSON Schema (server validation)
+
+Drop-in to enforce the exact shape (no extra fields):
+
+{
+  "type":"object",
+  "required":[
+    "shiftDate","completedBy","cashStart",
+    "cashSales","qrSales","grabSales","aroiDeeSales","directSales","totalSales",
+    "shopping","wages","otherMoneyOut",
+    "totalExpenses","endingCash","cashBanked","qrTransferred"
+  ],
+  "additionalProperties": false,
+  "properties":{
+    "shiftDate":{"type":"string","format":"date"},
+    "completedBy":{"type":"string","minLength":1,"maxLength":64},
+    "cashStart":{"type":"number","minimum":0},
+
+    "cashSales":{"type":"number","minimum":0},
+    "qrSales":{"type":"number","minimum":0},
+    "grabSales":{"type":"number","minimum":0},
+    "aroiDeeSales":{"type":"number","minimum":0},
+    "directSales":{"type":"number","minimum":0},
+    "totalSales":{"type":"number","minimum":0},
+
+    "shopping":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["item","shopName","amount"],
+        "additionalProperties": false,
+        "properties":{
+          "item":{"type":"string","minLength":1,"maxLength":120},
+          "shopName":{"type":"string","minLength":1,"maxLength":80},
+          "amount":{"type":"number","minimum":0}
+        }
+      }
+    },
+    "wages":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["staffName","amount","type"],
+        "additionalProperties": false,
+        "properties":{
+          "staffName":{"type":"string","minLength":1,"maxLength":80},
+          "amount":{"type":"number","minimum":0},
+          "type":{"type":"string","enum":["Wages","Overtime","Bonus"]}
+        }
+      }
+    },
+    "otherMoneyOut":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["type","amount"],
+        "additionalProperties": false,
+        "properties":{
+          "type":{"type":"string","minLength":1,"maxLength":80},
+          "amount":{"type":"number","minimum":0},
+          "notes":{"type":"string","maxLength":200}
+        }
+      }
+    },
+
+    "totalExpenses":{"type":"number","minimum":0},
+    "endingCash":{"type":"number","minimum":0},
+    "cashBanked":{"type":"number","minimum":0},
+    "qrTransferred":{"type":"number","minimum":0}
+  }
+}
+
+Frontend behavior (unchanged UX)
+
+“Add More” buttons on Shopping, Wages, Other Money Out.
+
+Auto-calc totalSales and totalExpenses as user types; send both in payload.
+
+On successful submit → redirect to Stock Form (exactly as yesterday).
+
+Keep the existing route (/daily-stock-sales or /daily-sales, whichever you were using yesterday). Do not create a v2 route.
+
+Guardrails for the agent
+
+Do not rename keys or fields.
+
+Do not add/remove fields.
+
+Do not touch unrelated schema/routes.
+
+Do not introduce partner/fee/discount logic elsewhere.
+
+If DB columns already exist, reuse them; if not, add only the columns above with the same names.
+
+Keep conversion to minor units exactly as yesterday if that’s what the API did.
+
+Acceptance checklist (you can verify quickly)
+
+ Form shows exactly the fields above, in the same sections.
+
+ “Add More” works for the three expense repeaters.
+
+ totalSales and totalExpenses auto-sum correctly.
+
+ Submit succeeds and redirects to Stock.
+
+ No extra fields appeared; no removed fields.
+
+ Existing shifts/data still load without error.
