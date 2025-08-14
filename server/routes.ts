@@ -23,6 +23,7 @@ import path from 'path';
 import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { expenseTypeToPnLCategory, getExpenseMapping, ExpenseType, ShopName } from "../shared/expenseMappings";
 // Email functionality will be added when needed
 
 
@@ -1368,10 +1369,25 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Create new expense
+  // Create new expense with enum validation and P&L mapping
   app.post("/api/expenses", async (req: Request, res: Response) => {
     try {
-      const expense = await storage.createExpense(req.body);
+      const expenseData = req.body;
+      
+      // Auto-populate P&L category based on expense type
+      if (expenseData.typeOfExpense) {
+        const pnlCategory = expenseTypeToPnLCategory[expenseData.typeOfExpense as ExpenseType];
+        expenseData.pnlCategory = pnlCategory;
+      }
+      
+      // If shopName is provided but no typeOfExpense, auto-suggest from mapping
+      if (expenseData.shopName && !expenseData.typeOfExpense) {
+        const mapping = getExpenseMapping(expenseData.shopName);
+        expenseData.typeOfExpense = mapping.expenseType;
+        expenseData.pnlCategory = mapping.pnlCategory;
+      }
+      
+      const expense = await storage.createExpense(expenseData);
       res.json(expense);
     } catch (error) {
       console.error("Error creating expense:", error);

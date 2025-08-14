@@ -19,32 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
 
-// Standard expense type options (exact order and wording)
-const EXPENSE_TYPES = [
-  "Food",
-  "F&B", 
-  "Beverage",
-  "Staff Expenses (Bonus Pay)",
-  "Staff Expenses (from Account)",
-  "Rent",
-  "Administration",
-  "Advertising - Grab",
-  "Advertising - Other",
-  "Delivery Fee Discount (Merchant-Funded)",
-  "Director Payment",
-  "Discount (Merchant-Funded)",
-  "Fittings",
-  "Kitchen Supplies or Packaging",
-  "Marketing",
-  "Marketing success fee",
-  "Misc",
-  "Printers",
-  "Renovations",
-  "Subscriptions",
-  "Stationary",
-  "Travel",
-  "Utilities"
-] as const;
+import { EXPENSE_TYPE_OPTIONS, SHOP_NAME_OPTIONS, ExpenseType, ShopName } from "@shared/expenseMappings";
 
 const expenseFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
@@ -52,7 +27,8 @@ const expenseFormSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  typeOfExpense: z.enum(EXPENSE_TYPES, { required_error: "Expense type is required" }),
+  typeOfExpense: z.nativeEnum(ExpenseType, { required_error: "Expense type is required" }),
+  shopName: z.nativeEnum(ShopName).optional(),
   date: z.string().min(1, "Date is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
   supplier: z.string().optional(),
@@ -91,6 +67,7 @@ export function BusinessExpenses() {
       description: "",
       amount: "",
       typeOfExpense: undefined,
+      shopName: undefined,
       date: format(new Date(), "yyyy-MM-dd"),
       paymentMethod: "Cash",
       supplier: "",
@@ -107,7 +84,8 @@ export function BusinessExpenses() {
           ...data,
           amount: parseFloat(data.amount),
           source: 'DIRECT', // Always set as business expense
-          category: data.typeOfExpense // Map typeOfExpense to category for backward compatibility
+          category: data.typeOfExpense, // Map typeOfExpense to category for backward compatibility
+          supplier: data.shopName || data.supplier // Use shopName as primary, fallback to manual supplier
         }),
       }),
     onSuccess: () => {
@@ -201,7 +179,7 @@ export function BusinessExpenses() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {EXPENSE_TYPES.map((type) => (
+                            {EXPENSE_TYPE_OPTIONS.map((type) => (
                               <SelectItem key={type} value={type}>{type}</SelectItem>
                             ))}
                           </SelectContent>
@@ -229,18 +207,41 @@ export function BusinessExpenses() {
                   
                   <FormField
                     control={form.control}
-                    name="supplier"
+                    name="shopName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Supplier</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter supplier" {...field} />
-                        </FormControl>
+                        <FormLabel>Shop Name</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select shop" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {SHOP_NAME_OPTIONS.map((shop) => (
+                              <SelectItem key={shop} value={shop}>{shop}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="supplier"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supplier (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter supplier name if different from shop" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -342,7 +343,7 @@ export function BusinessExpenses() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All expense types</SelectItem>
-                  {EXPENSE_TYPES.map((type) => (
+                  {EXPENSE_TYPE_OPTIONS.map((type) => (
                     <SelectItem key={type} value={type}>{type}</SelectItem>
                   ))}
                 </SelectContent>

@@ -185,6 +185,13 @@ export const expenses = pgTable("expenses", {
   month: integer("month"),
   year: integer("year"),
   
+  // Expense type and shop name fields (enum-locked)
+  typeOfExpense: text("type_of_expense"),
+  shopName: text("shop_name"),
+  
+  // P&L category mapping (auto-populated from typeOfExpense)
+  pnlCategory: text("pnl_category"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
