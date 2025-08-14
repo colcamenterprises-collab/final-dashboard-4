@@ -41,7 +41,7 @@ export default function ShiftSummary(){
     <div className="bg-gray-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
       <div className="mb-6">
         <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
-        <p className="text-gray-600 mt-1">Upload Loyverse CSV exports to analyze shift performance and cross-check with daily forms</p>
+        <p className="text-gray-600 mt-1">Upload POS CSV exports to analyze shift performance and cross-check with daily forms</p>
       </div>
 
       {/* Instructions Card */}
@@ -56,9 +56,9 @@ export default function ShiftSummary(){
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">How to Use Shift Summary</h3>
               <div className="text-gray-700 space-y-2">
-                <p>1. <strong>Export from Loyverse:</strong> Go to Reports → Sales → Export as CSV</p>
+                <p>1. <strong>Export from POS:</strong> Export your sales data as CSV files</p>
                 <p>2. <strong>Select Date:</strong> Choose the shift date you want to analyze</p>
-                <p>3. <strong>Upload Files:</strong> Select one or more CSV files from Loyverse</p>
+                <p>3. <strong>Upload Files:</strong> Select your CSV data files</p>
                 <p>4. <strong>Review Analysis:</strong> Get KPIs, payment breakdown, top items, and cross-checking results</p>
               </div>
             </div>
@@ -69,7 +69,7 @@ export default function ShiftSummary(){
       {/* Upload Section - moved here for better layout */}
       {!data && (
         <div className="bg-white rounded-2xl border p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Loyverse CSV Files</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload POS CSV Files</h3>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -224,82 +224,6 @@ export default function ShiftSummary(){
           </div>
         </div>
       ) : null}
-
-      {/* Sample data showcase when no files uploaded */}
-      {!data && (
-        <div className="mt-6 space-y-6">
-          <div className="bg-white rounded-2xl border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sample Analysis Results</h3>
-            <p className="text-gray-600 mb-4">Here's what you'll see after uploading your Loyverse CSV files:</p>
-            
-            {/* Sample KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-              {[
-                ["Gross Sales", "₿15,007"],
-                ["Net Sales", "₿14,767"],
-                ["Total Receipts", "41"],
-                ["Refunds", "₿240"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-gray-50 border p-4">
-                  <div className="text-xs text-gray-500">{label}</div>
-                  <div className="text-xl font-semibold mt-1 text-gray-800">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Sample top items */}
-            <div className="mt-6">
-              <h4 className="font-semibold text-gray-900 mb-3">Top Selling Items</h4>
-              <div className="space-y-2">
-                {[
-                  ["Super Double Bacon and Cheese", "14 sold", "₿3,120"],
-                  ["Single Smash Burger", "9 sold", "₿1,640"],
-                  ["Single Meal Set", "9 sold", "₿2,191"],
-                  ["Super Double Bacon & Cheese Set", "7 sold", "₿2,273"],
-                  ["Sweet Potato Fries", "6 sold", "₿594"],
-                ].map(([name, qty, sales]) => (
-                  <div key={name} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                    <span className="font-medium text-gray-700 text-sm">{name}</span>
-                    <div className="text-right">
-                      <div className="font-semibold text-sm">{qty}</div>
-                      <div className="text-xs text-gray-500">{sales}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sample payment breakdown */}
-            <div className="mt-6">
-              <h4 className="font-semibold text-gray-900 mb-3">Payment Methods</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {[
-                  ["GRAB", "₿10,310", 70],
-                  ["Cash", "₿4,118", 28],
-                  ["QR Code", "₿579", 2],
-                ].map(([method, amount, percentage]) => (
-                  <div key={method} className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700 font-medium">{method}</span>
-                      <span className="text-gray-900 font-semibold">{amount}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-200 overflow-hidden mt-2">
-                      <div className="h-full bg-teal-500" style={{ width: `${percentage}%` }}/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Upload your Loyverse CSV exports (item sales, payment types, receipts, shifts) 
-                to see real analysis with cross-checking against Daily Sales forms.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Jussi AI Analysis Section */}
       {data && (
