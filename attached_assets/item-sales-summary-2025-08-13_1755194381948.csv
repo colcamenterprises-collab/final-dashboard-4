@@ -1,0 +1,21 @@
+Item name,SKU,Category,Items sold,Gross sales,Items refunded,Refunds,Discounts,Net sales,Cost of goods,Gross profit,Margin,Taxes
+Bottle Water,10031,Drinks,1.000,40,0.000,0,0,40,4,35,89%,0
+Cajun Fries,10018,Side Orders,3.000,297,0.000,0,0,297,48,248,83%,0
+Cheesy Bacon Fries,10010,Side Orders,4.000,476,0.000,0,0,476,82,393,82%,0
+Coke Can,10012,Drinks,3.000,120,0.000,0,0,120,39,80,67%,0
+Coke Zero,10013,Drinks,2.000,80,0.000,0,0,80,26,53,67%,0
+Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น),10066,Smash Burgers,5.000,845,0.000,0,0,845,416,428,50%,0
+Double Set (Meal Deal),10032,Smash Burger Sets (Meal Deals),2.000,598,0.000,0,0,598,232,366,61%,0
+Fanta Orange,10027,Drinks,1.000,40,0.000,0,0,40,13,26,67%,0
+French Fries,10030,Side Orders,4.000,356,0.000,0,0,356,36,319,89%,0
+Loaded Fries (Original),10035,Side Orders,2.000,340,0.000,0,0,340,82,257,75%,0
+Onion Rings,10020,Side Orders,2.000,198,0.000,0,0,198,20,177,89%,0
+Single Meal Set (Meal Deal),10033,Smash Burger Sets (Meal Deals),9.000,2191,0.000,0,0,2191,735,1455,66%,0
+Single Smash Burger (ซิงเกิ้ล),10004,Smash Burgers,9.000,1640,0.000,0,0,1640,535,1104,67%,0
+Soda Water,10029,Drinks,1.000,40,0.000,0,0,40,7,32,80%,0
+Super Double Bacon & Cheese Set (Meal Deal),10036,Smash Burger Sets (Meal Deals),7.000,2273,0.000,0,0,2273,882,1390,61%,0
+Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน),10019,Smash Burgers,14.000,3360,1.000,240,0,3120,1349,1770,56%,0
+Sweet Potato Fries,10022,Side Orders,6.000,594,0.000,0,0,594,217,376,63%,0
+Triple Smash Burger (สาม),10009,Smash Burgers,1.000,290,0.000,0,0,290,128,161,55%,0
+Ultimate Double (คู่),10006,Smash Burgers,5.000,1100,0.000,0,0,1100,468,631,57%,0
+🐔 Big Rooster Sriracha Chicken ไก่ศรีราชาตัวใหญ่,10068,Smash Burgers,1.000,369,0.000,0,0,369,89,279,75%,0

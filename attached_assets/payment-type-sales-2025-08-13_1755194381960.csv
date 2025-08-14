@@ -1,0 +1,4 @@
+Payment type,Payment transactions,Payments amount,Refund transactions,Refunds amount,Net amount
+GRAB,20,10310,0,0,10310
+Cash,18,4358,1,240,4118
+SCAN (QR Code),3,579,0,0,579
