@@ -1,13 +1,14 @@
 import { useState } from "react";
 import ManagerChecklistStatusCard from "@/components/ManagerChecklistStatusCard";
+import { TrendingUp, Users, ShoppingCart, FileText } from "lucide-react";
 
 const fmt = (n:number, d=0)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:d}).format(n);
 
 const KPIS = [
-  { label: "Total sales", value: 321000, prefix: "฿" },
-  { label: "Orders", value: 22000 },
-  { label: "Avg order", value: 789, prefix: "฿" },
-  { label: "Status", value: "OK" },
+  { label: "Total sales", value: 321, suffix: "k", icon: TrendingUp },
+  { label: "Visitor", value: 678, suffix: "k", icon: Users },
+  { label: "CVR", value: 7.89, icon: ShoppingCart },
+  { label: "Total orders", value: 211, suffix: "k", icon: FileText },
 ];
 
 const payments = [
@@ -50,12 +51,17 @@ export default function DashboardModern() {
 
       {/* Main KPI Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
-        <div className="grid grid-cols-4 gap-8">
+        <div className="grid grid-cols-4 divide-x divide-white/20">
           {KPIS.map((k,i)=>(
-            <div key={i} className="text-center">
-              <div className="text-sm opacity-90 mb-1">{k.label}</div>
-              <div className="text-2xl font-bold">
-                {typeof k.value === "number" ? `${k.prefix ?? ""}${fmt(k.value)}` : k.value}
+            <div key={i} className="flex items-center justify-center gap-4 px-6">
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <k.icon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide opacity-80 mb-1">{k.label}</div>
+                <div className="text-2xl font-bold">
+                  {fmt(k.value)}{k.suffix || ""}
+                </div>
               </div>
             </div>
           ))}
