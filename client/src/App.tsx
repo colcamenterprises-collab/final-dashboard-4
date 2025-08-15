@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 import Dashboard from "@/pages/Dashboard";
 import DashboardModern from "@/pages/DashboardModern";
 import DailyStockForm from "@/pages/DailyStockForm";
@@ -65,12 +65,9 @@ import AdminQuestions from "@/pages/managers/AdminQuestions";
 import NotFound from "@/pages/not-found";
 
 function App() {
-  // App shell: fixed sidebar + flexible content, no margin hacks
   return (
-    <div className="min-h-screen bg-[#f5f7f8] flex">
-      <Sidebar />
-      <main className="flex-1 min-w-0">
-        <Switch>
+    <AppShell>
+      <Switch>
           <Route path="/" component={DashboardModern} />
           <Route path="/dashboard" component={DashboardModern} />
           <Route path="/operations/daily" component={SalesForm} />
@@ -113,6 +110,7 @@ function App() {
           <Route path="/marketing/promotions" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Promotions Manager</h1><p>Promotional campaign management — coming soon</p></div>} />
 
           {/* Managers */}
+          <Route path="/managers/nightly-checklist" component={NightlyChecklist} />
           <Route path="/managers/checklist" component={NightlyChecklist} />
           <Route path="/managers/history" component={ChecklistHistory} />
           <Route path="/managers/admin" component={AdminQuestions} />
@@ -184,8 +182,7 @@ function App() {
 
           <Route component={NotFound} />
         </Switch>
-      </main>
-    </div>
+    </AppShell>
   );
 }
 
