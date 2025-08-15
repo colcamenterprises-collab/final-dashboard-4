@@ -58,6 +58,8 @@ import DailySalesLibrary from "@/pages/operations/daily-sales/Library";
 import ViewDailySales from "@/pages/operations/daily-sales/View";
 import CostCalculator from "@/pages/menu/CostCalculator";
 import MenuImportWizard from "@/pages/menu/MenuImportWizard";
+import NightlyChecklist from "@/pages/managers/NightlyChecklist";
+import ChecklistHistory from "@/pages/managers/ChecklistHistory";
 
 import NotFound from "@/pages/not-found";
 
@@ -108,6 +110,10 @@ function App() {
           <Route path="/marketing/loyalty" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Loyalty & Rewards</h1><p>Customer loyalty program — coming soon</p></div>} />
           <Route path="/marketing/automation" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Email/SMS Automation</h1><p>Marketing automation system — coming soon</p></div>} />
           <Route path="/marketing/promotions" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Promotions Manager</h1><p>Promotional campaign management — coming soon</p></div>} />
+
+          {/* Managers */}
+          <Route path="/managers/checklist" component={NightlyChecklist} />
+          <Route path="/managers/history" component={ChecklistHistory} />
           
           {/* Keep all your existing routes */}
           <Route path="/dashboard-old" component={Dashboard} />

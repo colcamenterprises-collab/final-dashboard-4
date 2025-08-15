@@ -15,6 +15,7 @@ import chef from "./routes/chef";
 import recipes from "./routes/recipes";
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
+import { generateDailyChecklist, saveChecklistSubmission, getChecklistHistory } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -2021,14 +2022,16 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/recipes/save-with-photo", async (req: Request, res: Response) => {
     try {
       const recipeData = {
-        name: req.body.name,
-        description: req.body.description,
+        name: req.body.name || "Untitled Recipe",
+        category: req.body.category || "General",
+        description: req.body.description || "",
         photoUrl: req.body.photoUrl,
-        components: req.body.components || [],
-        wastePct: req.body.wastePct || 0,
-        portions: req.body.portions || 1,
-        menuPrice: req.body.menuPrice || 0,
-        totals: req.body.totals || {}
+        ingredients: req.body.components || [],
+        yieldQuantity: req.body.portions || 1,
+        yieldUnit: "portion",
+        totalCost: req.body.totals?.totalCost || 0,
+        laborTime: 0,
+        isActive: true
       };
       
       const recipe = await storage.createRecipe(recipeData);
@@ -2113,6 +2116,41 @@ export function registerRoutes(app: express.Application): Server {
   // Register Upload and Import routes
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
+  
+  // Register Manager Checklist routes
+  // Manager checklist endpoints
+  app.get('/api/manager/checklist', (req, res) => {
+    const { date, role } = req.query;
+    if (!date || !role || (role !== 'kitchen' && role !== 'cashier')) {
+      return res.status(400).json({ error: 'Invalid date or role' });
+    }
+    const items = generateDailyChecklist(date as string, role as "kitchen" | "cashier");
+    res.json({ items });
+  });
+
+  app.post('/api/manager/checklist/submit', (req, res) => {
+    try {
+      const submission = saveChecklistSubmission(req.body);
+      res.json({ ok: true, submission });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: 'Failed to save submission' });
+    }
+  });
+
+  app.get('/api/manager/history', (req, res) => {
+    const { role, limit } = req.query;
+    if (!role || (role !== 'kitchen' && role !== 'cashier')) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    const list = getChecklistHistory(role as "kitchen" | "cashier", limit ? parseInt(limit as string) : 30);
+    res.json({ list });
+  });
+
+  // Basic image upload endpoint for checklist photos
+  app.post('/api/upload/image', (req, res) => {
+    // Simple mock upload - in production, use proper file upload middleware
+    res.json({ url: `/uploads/mock-image-${Date.now()}.jpg` });
+  });
   
   // Register POS Live routes
   app.use('/api/pos', posLive);

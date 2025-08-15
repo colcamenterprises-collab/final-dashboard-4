@@ -67,6 +67,13 @@ const NAV = [
       { label: "Promotions Manager", path: "/marketing/promotions", icon: Icon.meg },
     ],
   },
+  {
+    title: "Managers",
+    items: [
+      { label: "Nightly Checklist", path: "/managers/checklist", icon: Icon.form },
+      { label: "Checklist History", path: "/managers/history",   icon: Icon.list },
+    ],
+  },
 ];
 
 export default function Sidebar(){

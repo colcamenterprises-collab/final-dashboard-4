@@ -1,0 +1,402 @@
+Manager’s Nightly Checklist that’s short, randomized, Thai-friendly, and logged. Below is drop-in code for your stack (Vite + React + Node/Express) that does exactly this:
+
+New Managers tab → Nightly Checklist
+
+One set per night (for everyone) – 5 randomized tasks from a bank per role (Kitchen / Cashier)
+
+Each task has multiple wording variants (keeps staff reading)
+
+Manager completes & signs; submission is stored & time-stamped (Bangkok time)
+
+Optional photo evidence (uses your existing /api/upload/image)
+
+History list for the last 30 days
+
+Easy to add more tasks (and Thai variants)
+
+1) Backend – routes, task bank, per-day randomizer
+1.1 Router
+// server/managerChecklist.ts
+import { Router } from "express";
+import express from "express";
+import crypto from "crypto";
+import dayjs from "dayjs";
+import tz from "dayjs/plugin/timezone.js";
+import utc from "dayjs/plugin/utc.js";
+dayjs.extend(utc); dayjs.extend(tz);
+
+export const managerRouter = Router();
+managerRouter.use(express.json());
+
+type Role = "kitchen" | "cashier";
+
+type TaskVariant = { text: string };  // add thai versions too if you like
+type Task = {
+  id: string;
+  role: Role;
+  weight?: number;        // future use
+  variants: TaskVariant[]; // different wordings
+  requiresPhoto?: boolean; // optional
+  requiresNote?: boolean;  // optional
+};
+
+// ——— TASK BANK ———
+// Keep it short here; add as many as you like (aim ~30 per role).
+const TASKS: Task[] = [
+  // Kitchen — START/DURING/END style (paraphrased)
+  { id: "k-start-surfaces", role:"kitchen", variants:[
+    { text:"Wipe and sanitize prep benches (use approved sanitizer)" },
+    { text:"Clean & sanitize all prep tables before service" },
+    { text:"แผงเตรียมอาหาร — เช็ดและฆ่าเชื้อให้เรียบร้อย" },
+  ]},
+  { id: "k-fridge-check", role:"kitchen", variants:[
+    { text:"Check fridges: remove expired food & label new items (FIFO)" },
+    { text:"ตู้แช่ — เช็ควันหมดอายุ / ติดสติ๊กเกอร์วันผลิต (FIFO)" },
+  ], requiresPhoto:true },
+  { id: "k-hot-hold", role:"kitchen", variants:[
+    { text:"Verify hot-holding units reach safe temp before service" },
+    { text:"ตรวจอุณหภูมิอุปกรณ์อุ่นอาหารให้ถึงค่ามาตรฐาน" },
+  ]},
+  { id: "k-knife-board", role:"kitchen", variants:[
+    { text:"Sanitize knives & cutting boards (color code respected)" },
+    { text:"มีด/เขียง — ฆ่าเชื้อและแยกสีให้ถูกประเภท" },
+  ]},
+  { id: "k-end-clean", role:"kitchen", variants:[
+    { text:"End of shift: degrease cookline, wipe walls & mop floor" },
+    { text:"ท้ายกะ — ขจัดคราบมัน เตา/ผนัง/พื้นให้สะอาด" },
+  ], requiresPhoto:true },
+
+  // Cashier tasks
+  { id: "c-float-count", role:"cashier", variants:[
+    { text:"Count starting cash float and record amount" },
+    { text:"นับเงินทอนยกแรกและบันทึกยอด" },
+  ]},
+  { id: "c-qr-test", role:"cashier", variants:[
+    { text:"Test QR scanner payment flow before opening" },
+    { text:"ทดสอบการรับชำระ QR ก่อนเปิดร้าน" },
+  ]},
+  { id: "c-receipt-roll", role:"cashier", variants:[
+    { text:"Check receipt paper stock; keep spare at counter" },
+    { text:"ตรวจเช็คกระดาษใบเสร็จ — เตรียมม้วนสำรองไว้" },
+  ]},
+  { id: "c-bank-pouch", role:"cashier", variants:[
+    { text:"Prepare bank deposit pouch (date & sign)" },
+    { text:"เตรียมซองฝากเงิน — ลงวันที่และลายเซ็น" },
+  ], requiresPhoto:true },
+  { id: "c-end-cashup", role:"cashier", variants:[
+    { text:"End of shift: cash up & reconcile with POS totals" },
+    { text:"ท้ายกะ — ตรวจนับเงินและเทียบยอด POS" },
+  ]},
+];
+
+// Simple seed from date+role to get deterministic nightly set
+function seedFrom(dateISO: string, role: Role) {
+  return crypto.createHash("sha1").update(`${dateISO}|${role}`).digest();
+}
+function pickForDate(dateISO: string, role: Role, count = 5) {
+  const pool = TASKS.filter(t => t.role === role);
+  const seed = seedFrom(dateISO, role);
+  // Fisher–Yates using seed as PRNG
+  let arr = [...pool];
+  let h = seed.readUInt32BE(0);
+  for (let i = arr.length - 1; i > 0; i--) {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    const j = h % (i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, Math.min(count, arr.length)).map((t, idx) => {
+    const vIdx = seed.readUInt8((idx+1)%seed.length) % (t.variants.length || 1);
+    return { ...t, chosenText: t.variants[vIdx]?.text ?? t.variants[0].text };
+  });
+}
+
+// Simple in-memory store; swap to DB later if you want
+type Submission = {
+  id: string;
+  dateISO: string;       // local date in Asia/Bangkok e.g. 2025-08-14
+  role: Role;
+  managerName: string;
+  completedAt: string;   // ISO
+  items: Array<{
+    taskId: string;
+    text: string;
+    done: boolean;
+    note?: string;
+    photoUrl?: string;
+  }>;
+};
+const SUBMISSIONS: Submission[] = [];
+
+function todayTH() {
+  return dayjs().tz("Asia/Bangkok").format("YYYY-MM-DD");
+}
+
+// GET checklist for a date/role
+managerRouter.get("/checklist", (req, res) => {
+  const dateISO = (req.query.date as string) || todayTH();
+  const role = ((req.query.role as string) || "kitchen") as Role;
+  const items = pickForDate(dateISO, role, 5).map(t => ({
+    taskId: t.id,
+    text: t.chosenText,
+    requiresPhoto: !!t.requiresPhoto,
+    requiresNote: !!t.requiresNote
+  }));
+  res.json({ dateISO, role, items });
+});
+
+// POST submit
+managerRouter.post("/checklist/submit", (req, res) => {
+  const { dateISO, role, managerName, items } = req.body as {
+    dateISO: string; role: Role; managerName: string;
+    items: Array<{ taskId:string; text:string; done:boolean; note?:string; photoUrl?:string }>
+  };
+  if (!dateISO || !role || !managerName || !Array.isArray(items)) {
+    return res.status(400).json({ error: "Invalid payload" });
+  }
+  // replace existing submission (one per date/role)
+  const existingIdx = SUBMISSIONS.findIndex(s => s.dateISO===dateISO && s.role===role);
+  const sub: Submission = {
+    id: crypto.randomUUID(),
+    dateISO, role, managerName,
+    completedAt: new Date().toISOString(),
+    items
+  };
+  if (existingIdx >= 0) SUBMISSIONS.splice(existingIdx, 1, sub);
+  else SUBMISSIONS.push(sub);
+  res.json({ ok:true, submission: sub });
+});
+
+// GET history (last N days)
+managerRouter.get("/history", (req, res) => {
+  const limit = Math.min(parseInt((req.query.limit as string) || "30", 10), 90);
+  const role = ((req.query.role as string) || "kitchen") as Role;
+  const list = SUBMISSIONS
+    .filter(s => s.role === role)
+    .sort((a,b)=> b.dateISO.localeCompare(a.dateISO))
+    .slice(0,limit);
+  res.json({ role, list });
+});
+
+
+Register it:
+
+// server/index.ts (or routes.ts)
+import { managerRouter } from "./managerChecklist";
+// ...
+app.use("/api/manager", managerRouter);
+
+2) Frontend – Managers tab & Nightly Checklist
+2.1 Sidebar entry
+
+Add under Operations:
+
+Managers
+  - Nightly Checklist
+  - (History)
+
+2.2 Nightly Checklist page
+// client/src/pages/Managers/NightlyChecklist.tsx
+import { useEffect, useMemo, useState } from "react";
+
+type Role = "kitchen" | "cashier";
+type Item = { taskId:string; text:string; requiresPhoto?:boolean; requiresNote?:boolean };
+
+export default function NightlyChecklist(){
+  const [dateISO, setDateISO] = useState<string>(new Date().toLocaleDateString("sv-SE")); // YYYY-MM-DD
+  const [role, setRole] = useState<Role>("kitchen");
+  const [managerName, setManagerName] = useState<string>("");
+  const [items, setItems] = useState<Item[]>([]);
+  const [answers, setAnswers] = useState<Record<string, {done:boolean; note?:string; photoUrl?:string}>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function fetchChecklist(){
+    setLoading(true);
+    try{
+      const r = await fetch(`/api/manager/checklist?date=${dateISO}&role=${role}`);
+      const data = await r.json();
+      setItems(data.items);
+      // reset answers
+      const init: any = {};
+      data.items.forEach((it:Item)=> init[it.taskId] = { done:false });
+      setAnswers(init);
+    } finally { setLoading(false); }
+  }
+
+  useEffect(()=>{ fetchChecklist(); /* eslint-disable-next-line */ },[dateISO, role]);
+
+  async function uploadPhoto(taskId: string, file: File){
+    const fd = new FormData();
+    fd.append("image", file);
+    const r = await fetch("/api/upload/image", { method:"POST", body:fd });
+    if(!r.ok) { alert("Upload failed"); return; }
+    const { url } = await r.json();
+    setAnswers(a => ({ ...a, [taskId]: { ...(a[taskId]||{}), photoUrl: url }}));
+  }
+
+  async function submit(){
+    if (!managerName.trim()) { alert("Enter manager name"); return; }
+    setSaving(true);
+    try{
+      const payload = {
+        dateISO, role, managerName,
+        items: items.map(it => ({
+          taskId: it.taskId,
+          text: it.text,
+          done: !!answers[it.taskId]?.done,
+          note: answers[it.taskId]?.note,
+          photoUrl: answers[it.taskId]?.photoUrl
+        }))
+      };
+      const r = await fetch("/api/manager/checklist/submit", {
+        method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if(!r.ok || !data.ok) throw new Error("Submit failed");
+      alert("Submitted. Nice work. ✅");
+    } catch (e:any){
+      alert(e.message || "Failed");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold">Nightly Checklist</h1>
+        <div className="flex gap-2">
+          <input type="date" value={dateISO} onChange={e=>setDateISO(e.target.value)} className="border rounded-lg px-3 py-2"/>
+          <select value={role} onChange={e=>setRole(e.target.value as Role)} className="border rounded-lg px-3 py-2">
+            <option value="kitchen">Kitchen</option>
+            <option value="cashier">Cashier</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-5">
+        <div className="grid md:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="text-sm text-gray-600">Manager Name</label>
+            <input value={managerName} onChange={e=>setManagerName(e.target.value)} className="w-full border rounded-lg px-3 py-2"/>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="py-10 text-center text-gray-500">Loading checklist…</div>
+        ) : (
+          <ul className="space-y-4">
+            {items.map((it, idx)=>(
+              <li key={it.taskId} className="rounded-xl border p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 w-5 h-5 accent-emerald-600"
+                    checked={!!answers[it.taskId]?.done}
+                    onChange={e=>setAnswers(a=>({ ...a, [it.taskId]: { ...(a[it.taskId]||{}), done: e.target.checked }}))}
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold">{idx+1}. {it.text}</div>
+
+                    {it.requiresNote && (
+                      <div className="mt-2">
+                        <textarea
+                          placeholder="Note"
+                          value={answers[it.taskId]?.note || ""}
+                          onChange={e=>setAnswers(a=>({ ...a, [it.taskId]: { ...(a[it.taskId]||{}), note: e.target.value }}))}
+                          className="w-full border rounded-lg px-3 py-2"
+                        />
+                      </div>
+                    )}
+
+                    {it.requiresPhoto && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <label className="px-3 py-2 rounded-lg bg-emerald-600 text-white cursor-pointer">
+                          <input type="file" accept="image/*" className="hidden"
+                            onChange={e=>{ const f=e.target.files?.[0]; if(f) uploadPhoto(it.taskId, f); }}
+                          />
+                          Upload Photo
+                        </label>
+                        {answers[it.taskId]?.photoUrl && (
+                          <img src={answers[it.taskId]?.photoUrl} className="w-16 h-16 rounded-lg object-cover border" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={submit}
+            disabled={saving || loading}
+            className="px-5 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-50"
+          >
+            {saving ? "Submitting…" : "Submit Checklist"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+2.3 History page (quick view)
+// client/src/pages/Managers/ChecklistHistory.tsx
+import { useEffect, useState } from "react";
+type Role = "kitchen" | "cashier";
+
+export default function ChecklistHistory(){
+  const [role, setRole] = useState<Role>("kitchen");
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(()=>{
+    (async()=>{
+      const r = await fetch(`/api/manager/history?role=${role}&limit=30`);
+      const data = await r.json();
+      setRows(data.list || []);
+    })();
+  },[role]);
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold">Checklist History</h1>
+        <select value={role} onChange={e=>setRole(e.target.value as Role)} className="border rounded-lg px-3 py-2">
+          <option value="kitchen">Kitchen</option>
+          <option value="cashier">Cashier</option>
+        </select>
+      </div>
+      <div className="rounded-2xl border bg-white overflow-hidden">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left">Date (TH)</th>
+              <th className="px-3 py-2 text-left">Manager</th>
+              <th className="px-3 py-2 text-left">Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r:any)=>(
+              <tr key={r.id} className="border-t">
+                <td className="px-3 py-2">{r.dateISO}</td>
+                <td className="px-3 py-2">{r.managerName}</td>
+                <td className="px-3 py-2">
+                  {r.items.filter((i:any)=>i.done).length}/{r.items.length}
+                </td>
+              </tr>
+            ))}
+            {rows.length===0 && (
+              <tr><td className="px-3 py-6 text-center text-gray-500" colSpan={3}>No submissions</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+3) Notes & options (quick wins)
+
+One set per night: Deterministic by date + role → everyone sees the same 5 tasks.
+
+Bangkok time: Dates are generated and displayed in Asia/Bangkok.
