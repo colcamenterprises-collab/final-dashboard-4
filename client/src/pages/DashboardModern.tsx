@@ -28,35 +28,33 @@ export default function DashboardModern() {
   const payTotal = payments.reduce((a,b)=>a+b.amount,0);
 
   return (
-    <div className="px-5 sm:px-8 py-6" style={{ fontFamily: "Poppins, sans-serif" }}>
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Good morning, Cam</h1>
-          <p className="text-sm text-gray-500">Real-time operational insights from Smash Brothers Burgers</p>
+          <h1 className="text-2xl font-bold text-gray-900">Good morning Cam 👋</h1>
+          <p className="text-sm text-gray-500 mt-1">Here's what's happening with your restaurant today</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-lg px-4 py-2 text-sm bg-white">
+            <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
+          </select>
+          <button className="rounded-lg bg-emerald-600 text-white text-sm px-4 py-2 font-medium">Download report</button>
           <div className="flex items-center gap-2">
-            <select value={period} onChange={e=>setPeriod(e.target.value)} className="border rounded-full px-4 py-2 text-sm bg-white">
-              <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
-            </select>
-            <button className="rounded-full bg-emerald-600 text-white text-sm px-5 py-2">Download report</button>
-          </div>
-          <div className="hidden sm:flex items-center gap-2">
             <span className="text-sm text-gray-600">Your balance</span>
             <span className="text-emerald-700 font-semibold">฿566.55</span>
-            <div className="w-8 h-8 rounded-full bg-gray-300" />
+            <div className="w-8 h-8 rounded-full bg-gray-200" />
           </div>
         </div>
       </div>
 
-      {/* KPI row (rounded banner look) */}
-      <div className="mt-6 rounded-3xl bg-white shadow-sm border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {KPIS.map(k => (
-            <div key={k.label} className="rounded-2xl bg-emerald-600 text-white px-5 py-4">
-              <div className="text-emerald-100 text-xs">{k.label.toUpperCase()}</div>
-              <div className="text-3xl font-semibold tabular-nums mt-1">
+      {/* Main KPI Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
+        <div className="grid grid-cols-4 gap-8">
+          {KPIS.map((k,i)=>(
+            <div key={i} className="text-center">
+              <div className="text-sm opacity-90 mb-1">{k.label}</div>
+              <div className="text-2xl font-bold">
                 {typeof k.value === "number" ? `${k.prefix ?? ""}${fmt(k.value)}` : k.value}
               </div>
             </div>
@@ -65,59 +63,66 @@ export default function DashboardModern() {
       </div>
 
       {/* Content grid */}
-      <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Manager Checklist Status */}
-        <ManagerChecklistStatusCard />
-        
-        {/* Payments */}
-        <div className="rounded-3xl bg-white shadow-sm border p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Summary Revenue</h3>
+      <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Summary Revenue Chart */}
+        <div className="xl:col-span-2 rounded-2xl bg-white shadow-sm border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Summary Revenue</h3>
             <div className="text-xs text-gray-500">Last update last week</div>
           </div>
-          <div className="mt-4 rounded-2xl border p-4">
-            <div className="text-sm text-gray-600 mb-2">Payment Breakdown</div>
-            <div className="space-y-4">
-              {payments.map(p=>(
-                <div key={p.method}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700">{p.method}</span>
-                    <span className="font-semibold">฿{fmt(p.amount)}</span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
-                    <div className="h-full bg-emerald-600" style={{ width: `${payTotal?(p.amount/payTotal)*100:0}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+            <div className="text-gray-400">Chart placeholder</div>
           </div>
         </div>
 
+        {/* Manager Checklist */}
+        <ManagerChecklistStatusCard />
+      </div>
+
+      {/* Bottom row */}
+      <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Orange promo */}
-        <div className="rounded-3xl p-6 bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-sm">
-          <div className="text-lg font-semibold">Need more information?</div>
-          <div className="text-sm text-orange-50 mt-1">Present information in a visually appealing way</div>
-          <button className="mt-5 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 px-5 py-2 text-sm">See more</button>
+        <div className="rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 text-white p-6">
+          <h3 className="text-lg font-semibold mb-2">Need more information?</h3>
+          <p className="text-sm text-orange-100 mb-4">Present information in a visually appealing way</p>
+          <button className="rounded-lg bg-white/20 hover:bg-white/30 px-4 py-2 text-sm font-medium">
+            See more →
+          </button>
+        </div>
+
+        {/* Additional card placeholder */}
+        <div className="rounded-2xl bg-white shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <div className="space-y-3">
+            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+              Daily Sales Form
+            </button>
+            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+              Stock Management
+            </button>
+            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+              Recipe Management
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Best seller - Full width */}
-      <div className="mt-6 rounded-3xl bg-white shadow-sm border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Best Seller</h3>
+      {/* Best Seller */}
+      <div className="mt-6 rounded-2xl bg-white shadow-sm border p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Best Seller</h3>
+          <button className="text-sm text-gray-500 hover:text-gray-700">→</button>
         </div>
-        <div className="grid grid-cols-5 gap-4">
-          {best.map((b,i)=>(
-            <div key={i} className="rounded-2xl border p-3">
-              <div className="relative rounded-xl bg-[#ccfbf1] h-24 mb-3 overflow-hidden">
-                <img src={`https://picsum.photos/seed/sbb${i}/300/200`} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-80"/>
-                <span className="absolute top-2 left-2 bg-white/90 text-emerald-700 text-xs font-semibold rounded-md px-2 py-1">
-                  {b.qty}x
-                </span>
+        <div className="grid grid-cols-3 gap-4">
+          {best.slice(0, 3).map((b,i)=>(
+            <div key={i} className="rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+              <div className="w-16 h-16 rounded-lg bg-gray-100 mx-auto mb-3 flex items-center justify-center">
+                <div className="w-8 h-8 bg-gray-300 rounded"></div>
               </div>
-              <div className="text-sm font-medium truncate">{b.name}</div>
-              <div className="text-xs text-gray-500">Qty: {b.qty}</div>
-              <div className="text-emerald-700 font-semibold mt-1">฿{fmt(b.price)}</div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-gray-900 truncate">{b.name}</div>
+                <div className="text-xs text-gray-500 mt-1">{b.qty}x</div>
+              </div>
             </div>
           ))}
         </div>
