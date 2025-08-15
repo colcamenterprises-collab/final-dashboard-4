@@ -49,6 +49,7 @@ const NAV = [
     title: "Menu Mgmt",
     items: [
       { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: Icon.calc },
+      { label: "Menu Import",      path: "/menu/import",          icon: Icon.file },
       { label: "Ingredient Mgmt",  path: "/ingredients",     icon: Icon.list },
       { label: "Recipe Cards",     path: "/recipes",         icon: Icon.file },
       { label: "Menu Performance", path: "/menu/performance",     icon: Icon.chart },

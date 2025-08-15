@@ -57,6 +57,7 @@ import ShiftSummary from "@/pages/operations/analysis/ShiftSummary";
 import DailySalesLibrary from "@/pages/operations/daily-sales/Library";
 import ViewDailySales from "@/pages/operations/daily-sales/View";
 import CostCalculator from "@/pages/menu/CostCalculator";
+import MenuImportWizard from "@/pages/menu/MenuImportWizard";
 
 import NotFound from "@/pages/not-found";
 
@@ -96,6 +97,7 @@ function App() {
 
           {/* Menu Mgmt */}
           <Route path="/menu/cost-calculator" component={CostCalculator} />
+          <Route path="/menu/import" component={MenuImportWizard} />
           <Route path="/menu/performance" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Menu Performance</h1><p>Menu performance analytics — coming soon</p></div>} />
           <Route path="/menu/seasonal" component={() => <div className="p-6"><h1 className="text-2xl font-bold">Seasonal Planner</h1><p>Seasonal menu planning — coming soon</p></div>} />
 

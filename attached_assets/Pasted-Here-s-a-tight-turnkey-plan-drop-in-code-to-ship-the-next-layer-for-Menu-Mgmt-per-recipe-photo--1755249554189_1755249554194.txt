@@ -1,0 +1,544 @@
+Here’s a tight, turnkey plan + drop-in code to ship the next layer for Menu Mgmt:
+
+per-recipe photo upload (with preview)
+
+CSV menu import (Grab/Loyverse) with a mapping wizard
+
+visual “delivery menu map” (flow diagram)
+
+exportable recipe cards (PNG/PDF) from inside the app
+
+hooks in the cost calculator to “Save as Recipe” with image + auto-desc from Chef Ramsay Gordon
+
+unit fixes (kg/g/ml/l/pcs/each) already supported
+
+Below is ready-to-paste code for your stack (Vite + React + Node/Express). I’m assuming local uploads to /uploads (simple + fast). If you want S3 later, it’s a small swap.
+
+1) Minimal backend additions
+1.1 Multer upload (images)
+// server/uploads.ts
+import path from "path";
+import fs from "fs";
+import multer from "multer";
+import { Router } from "express";
+
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const name = path.basename(file.originalname, ext).replace(/\W+/g, "-");
+    cb(null, `${Date.now()}-${name}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    const ok = /image\/(png|jpe?g|webp)/i.test(file.mimetype);
+    cb(ok ? null : new Error("Only images allowed"), ok);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+export const uploadsRouter = Router();
+
+uploadsRouter.post("/image", upload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file" });
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ url });
+});
+
+
+Register it:
+
+// server/index.ts (or routes.ts where you create app)
+import express from "express";
+import path from "path";
+import { uploadsRouter } from "./uploads";
+
+const app = express();
+// …
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/api/upload", uploadsRouter);
+// …
+
+1.2 CSV import (Grab / Loyverse POS)
+// server/imports.ts
+import { Router } from "express";
+import multer from "multer";
+import csv from "csv-parse/sync";
+
+const mem = multer({ storage: multer.memoryStorage() });
+export const importRouter = Router();
+
+/**
+ * POST /api/import/menu?source=grab|loyverse&mode=items|modifiers|sales
+ * Body: multipart/form-data { file: CSV }
+ * Returns parsed rows; does NOT persist until user confirms.
+ */
+import type { Request, Response } from "express";
+
+import { mapGrabColumns, mapLoyverseColumns } from "./mappings"; // create below
+
+importRouter.post("/menu", mem.single("file"), async (req: Request, res: Response) => {
+  const { source = "loyverse", mode = "items" } = req.query as any;
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const text = req.file.buffer.toString("utf8");
+  const rows = csv.parse(text, { columns: true, skip_empty_lines: true });
+
+  // normalize columns to unified shape the UI understands
+  let normalized: any[] = [];
+  if (source === "grab") normalized = mapGrabColumns(mode as string, rows);
+  else normalized = mapLoyverseColumns(mode as string, rows);
+
+  return res.json({ rows: normalized, count: normalized.length, source, mode });
+});
+
+/**
+ * POST /api/import/menu/commit
+ * Body: { source, mode, mappings, rows }  // mappings are user-confirmed columns
+ */
+importRouter.post("/menu/commit", express.json(), async (req: any, res: any) => {
+  const { rows, mappings, source, mode } = req.body;
+  if (!rows?.length) return res.status(400).json({ error: "No rows" });
+
+  // TODO: upsert into MenuItem / Modifier / Price tables
+  // Use mappings to map required fields (name, sku, price, size, category, platformTag)
+  // Example only:
+  // await db.menuItem.bulkUpsert(rows.map(r => ({
+  //   name: r[mappings.name], sku: r[mappings.sku], priceSatang: toSatang(r[mappings.price]),
+  //   size: r[mappings.size] || 'standard', platform: source, category: r[mappings.category] || 'Uncategorized'
+  // })));
+
+  return res.json({ ok: true, inserted: rows.length, source, mode });
+});
+
+
+Basic mappers (quick shims—you can expand per real CSV headers):
+
+// server/mappings.ts
+export function mapLoyverseColumns(mode: string, rows: any[]) {
+  if (mode === "items") {
+    return rows.map((r) => ({
+      name: r["Item"] ?? r["Item name"],
+      sku: r["SKU"] ?? "",
+      category: r["Category"] ?? "",
+      price: r["Price"] ?? r["Gross sales"] ?? "",
+      quantity: r["Quantity"] ?? r["Qty"] ?? "",
+      paymentType: r["Payment type"] ?? r["Payment"] ?? "",
+    }));
+  }
+  if (mode === "modifiers") {
+    return rows.map((r) => ({
+      modifier: r["Modifier"] ?? r["Modifier name"],
+      quantity: r["Quantity"] ?? r["Qty"] ?? 0,
+      sales: r["Sales"] ?? r["Gross sales"] ?? 0,
+    }));
+  }
+  // sales summary / default
+  return rows.map((r) => ({ ...r }));
+}
+
+export function mapGrabColumns(mode: string, rows: any[]) {
+  // Adjust to Grab CSV columns
+  return mapLoyverseColumns(mode, rows);
+}
+
+
+Register:
+
+// server/index.ts
+import { importRouter } from "./imports";
+// …
+app.use("/api/import", importRouter);
+
+2) Schema tweaks (simple JSON store or Prisma—pseudo)
+
+Add photoUrl to Recipe and units to Ingredient.
+
+// shared/schema.ts (illustrative)
+export type Unit = "kg" | "g" | "l" | "ml" | "pcs";
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category?: string;
+  supplier?: string;
+  priceSatang: number;        // stored minor units
+  packageSize: number;        // e.g., 1
+  packageUnit: Unit;          // e.g., "kg"
+  portionSize?: number;       // optional base
+  portionUnit?: Unit;
+  updatedAt: string;
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  description?: string;
+  photoUrl?: string;          // NEW
+  yieldQty: number;           // servings produced
+  steps?: string[];
+  components: { ingredientId: string; qty: number; unit: Unit }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+3) Frontend: Recipe editor — photo upload + save from Cost Calculator
+3.1 Small upload client
+// client/src/lib/uploader.ts
+export async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("image", file);
+  const r = await fetch("/api/upload/image", { method: "POST", body: fd });
+  if (!r.ok) throw new Error("Upload failed");
+  const { url } = await r.json();
+  return url as string;
+}
+
+3.2 Hook it into Recipe Editor
+// client/src/pages/MenuMgmt/RecipeEditor.tsx
+import { useState } from "react";
+import { uploadImage } from "../../lib/uploader";
+
+export function RecipeEditor({ initial, onSave }: { initial?: any; onSave: (r:any)=>void }) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [desc, setDesc] = useState(initial?.description ?? "");
+  const [photoUrl, setPhotoUrl] = useState(initial?.photoUrl ?? "");
+  const [uploading, setUploading] = useState(false);
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(f);
+      setPhotoUrl(url);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-6">
+        <div>
+          <label className="text-sm font-medium text-gray-700">Dish Photo</label>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="w-28 h-28 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+              {photoUrl ? <img src={photoUrl} className="w-full h-full object-cover" /> : <span className="text-xs text-gray-400">No image</span>}
+            </div>
+            <label className="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-600 text-white cursor-pointer">
+              <input type="file" className="hidden" accept="image/*" onChange={onPick}/>
+              {uploading ? "Uploading…" : "Upload"}
+            </label>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-3">
+          <label className="block text-sm font-medium text-gray-700">Recipe Name</label>
+          <input value={name} onChange={e=>setName(e.target.value)} className="w-full rounded-lg border px-3 py-2"/>
+          <label className="block text-sm font-medium text-gray-700 mt-3">Description</label>
+          <textarea value={desc} onChange={e=>setDesc(e.target.value)} className="w-full rounded-lg border px-3 py-2 h-24"/>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={()=>onSave({ name, description: desc, photoUrl })}
+          className="px-4 py-2 rounded-lg bg-emerald-600 text-white"
+        >
+          Save Recipe
+        </button>
+      </div>
+    </div>
+  );
+}
+
+3.3 From Cost Calculator → “Save as Recipe”
+
+In your Cost Calculator page, after user finalizes ingredients/quantities:
+
+// client/src/pages/MenuMgmt/CostCalculator.tsx (snippet)
+import { useState } from "react";
+import { RecipeEditor } from "./RecipeEditor";
+import { callChefRamsay } from "../../lib/chef"; // your existing helper
+
+export function SaveAsRecipePanel({ currentFormula }: { currentFormula: any }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<any>(null);
+
+  async function openWithAutoDesc() {
+    const desc = await callChefRamsay({
+      name: currentFormula.name,
+      items: currentFormula.components
+        .map((c:any)=> `${c.qty}${c.unit} ${c.ingredientName}`)
+        .join(", "),
+      vibe: "casual",
+    });
+    setDraft({ name: currentFormula.name, description: desc, photoUrl: "" });
+    setOpen(true);
+  }
+
+  return (
+    <>
+      <button className="px-4 py-2 rounded-lg bg-emerald-600 text-white" onClick={openWithAutoDesc}>
+        Save as Recipe
+      </button>
+      {open && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl w-full max-w-3xl p-6">
+            <RecipeEditor
+              initial={draft}
+              onSave={(r)=>{ /* POST to /api/recipes */ setOpen(false); }}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+4) Import Wizard (CSV) with column mapping
+// client/src/pages/MenuMgmt/MenuImportWizard.tsx
+import { useState } from "react";
+
+const PRESETS = {
+  loyverse: { items: ["Item","SKU","Category","Price","Quantity"], modifiers: ["Modifier","Quantity","Sales"] },
+  grab:     { items: ["Item Name","SKU","Category","Price","Quantity"] }
+};
+
+export default function MenuImportWizard(){
+  const [source, setSource] = useState<"loyverse"|"grab">("loyverse");
+  const [mode, setMode] = useState<"items"|"modifiers"|"sales">("items");
+  const [file, setFile] = useState<File|null>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [mappings, setMappings] = useState<Record<string,string>>({});
+
+  async function upload(){
+    if(!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch(`/api/import/menu?source=${source}&mode=${mode}`, { method: "POST", body: fd });
+    const data = await r.json();
+    setRows(data.rows);
+    // propose default mappings from headers
+    const headers = Object.keys(data.rows[0] || {});
+    const wanted = PRESETS[source][mode as "items"|"modifiers"] || [];
+    const guess: Record<string,string> = {};
+    for(const w of wanted){
+      const h = headers.find(h => h.toLowerCase().includes(w.toLowerCase().split(" ")[0]));
+      if (h) guess[w.toLowerCase()] = h;
+    }
+    setMappings(guess);
+  }
+
+  async function commit(){
+    const r = await fetch(`/api/import/menu/commit`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ source, mode, rows, mappings })
+    });
+    const data = await r.json();
+    alert(data.ok ? `Imported ${data.inserted}` : "Import failed");
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold">Menu Import</h1>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <select className="border rounded-lg px-3 py-2" value={source} onChange={e=>setSource(e.target.value as any)}>
+          <option value="loyverse">Loyverse</option>
+          <option value="grab">Grab</option>
+        </select>
+        <select className="border rounded-lg px-3 py-2" value={mode} onChange={e=>setMode(e.target.value as any)}>
+          <option value="items">Items</option>
+          <option value="modifiers">Modifiers</option>
+          <option value="sales">Sales Summary</option>
+        </select>
+        <input type="file" accept=".csv" onChange={e=>setFile(e.target.files?.[0]||null)} />
+        <button onClick={upload} className="px-4 py-2 rounded-lg bg-emerald-600 text-white">Upload & Preview</button>
+      </div>
+
+      {rows.length>0 && (
+        <>
+          <div className="rounded-xl border p-4">
+            <h3 className="font-semibold mb-3">Map Columns</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {Object.entries(PRESETS[source][mode as "items"|"modifiers"] ?? {}).map(([i,label])=>null)}
+              {Object.keys(PRESETS[source][mode as any] ?? []).map((key) => (
+                <div key={key} className="space-y-1">
+                  <div className="text-xs text-gray-500">Target: {key}</div>
+                  <select
+                    className="w-full border rounded-lg px-2 py-2"
+                    value={mappings[key] || ""}
+                    onChange={e=>setMappings(prev => ({...prev, [key]: e.target.value}))}
+                  >
+                    <option value="">— choose column —</option>
+                    {Object.keys(rows[0]).map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border p-4">
+            <h3 className="font-semibold mb-2">Preview (first 20)</h3>
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr>{Object.keys(rows[0]).map(h=><th key={h} className="px-2 py-1 text-left border-b">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0,20).map((r,i)=>(
+                    <tr key={i} className={i%2? "bg-gray-50": ""}>
+                      {Object.keys(rows[0]).map(h => <td key={h} className="px-2 py-1 border-b">{r[h]}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button onClick={commit} className="px-4 py-2 rounded-lg bg-emerald-600 text-white">Commit Import</button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+Add a menu link under Menu Mgmt → “Menu Import” to route to this page.
+
+5) Visual “Delivery Menu Map” (flow diagram)
+
+Using React Flow (lightweight, no design blocking):
+
+npm i reactflow
+
+// client/src/pages/MenuMgmt/MenuFlow.tsx
+import React, { useMemo } from "react";
+import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
+import "reactflow/dist/style.css";
+
+export default function MenuFlow({ items = [] as any[] }){
+  // items = [{id,name,category,price,size,platform}]
+  const nodes = useMemo(()=> {
+    const cats = Array.from(new Set(items.map(i=>i.category || "Uncategorized")));
+    const nodes:any[] = [];
+    cats.forEach((c, idx) => {
+      nodes.push({ id:`cat-${c}`, position:{x: idx*280, y: 0}, data:{ label:c }, style:{ padding:10, background:"#E8F5F3", borderRadius:12, border:"1px solid #cce7e0" }});
+      items.filter(i=> (i.category||"Uncategorized")===c).forEach((it, j) => {
+        nodes.push({
+          id: `item-${it.id}`,
+          position: { x: idx*280, y: 80 + j*90 },
+          data: { label: `${it.name} • ฿${(it.price/100).toFixed(0)} ${it.size?`• ${it.size}`:""}` },
+          style: { padding:10, background:"#fff", borderRadius:12, border:"1px solid #eee" }
+        });
+      });
+    });
+    return nodes;
+  }, [items]);
+
+  const edges:any[] = []; // optional: draw cat -> item edges
+  return (
+    <div style={{ height: "70vh" }} className="rounded-2xl border">
+      <ReactFlow nodes={nodes} edges={edges} fitView>
+        <MiniMap />
+        <Controls />
+        <Background />
+      </ReactFlow>
+    </div>
+  );
+}
+
+
+Later, wire an AI Suggest button that posts items to /api/ai/menu-suggestions (you already have OpenAI wired for Chef Ramsay). It can return: missing sizes, pricing anomalies, bundle ideas, top-sellers from uploaded sales.
+
+6) Recipe Card generator (PNG/PDF download)
+npm i html-to-image jspdf
+
+// client/src/pages/MenuMgmt/RecipeCard.tsx
+import * as htmlToImage from "html-to-image";
+import jsPDF from "jspdf";
+import { useRef } from "react";
+
+export function RecipeCard({ recipe }: { recipe: any }){
+  const ref = useRef<HTMLDivElement>(null);
+
+  async function downloadPNG(){
+    if(!ref.current) return;
+    const dataUrl = await htmlToImage.toPng(ref.current, { pixelRatio: 2 });
+    const a = document.createElement("a");
+    a.href = dataUrl; a.download = `${recipe.name}-card.png`; a.click();
+  }
+  async function downloadPDF(){
+    if(!ref.current) return;
+    const dataUrl = await htmlToImage.toPng(ref.current, { pixelRatio: 2 });
+    const pdf = new jsPDF({ orientation:"portrait", unit:"pt", format: "a5" });
+    const img = new Image(); img.src = dataUrl;
+    await new Promise(r => img.onload = r);
+    const w = pdf.internal.pageSize.getWidth();
+    const h = (img.height / img.width) * w;
+    pdf.addImage(img, "PNG", 0, 0, w, h);
+    pdf.save(`${recipe.name}-card.pdf`);
+  }
+
+  return (
+    <div>
+      <div ref={ref} className="w-[560px] bg-yellow-400 text-black rounded-2xl shadow-xl overflow-hidden">
+        {/* header */}
+        <div className="px-20 py-14">
+          <div className="inline-block bg-black text-white px-4 py-2 rounded-lg text-xs tracking-wider">RECIPECARD</div>
+          <h1 className="mt-6 text-5xl font-extrabold leading-tight uppercase">{recipe.name}</h1>
+        </div>
+        {/* body */}
+        <div className="px-20 pb-16 grid grid-cols-2 gap-10 items-start">
+          <div>
+            <div className="bg-white rounded-xl px-4 py-2 inline-block text-2xl font-bold mb-4">Ingredients & Order:</div>
+            <ul className="list-disc pl-6 space-y-3 text-2xl">
+              {recipe.components.map((c:any, i:number)=>(
+                <li key={i}>{c.qty}{c.unit} {c.ingredientName}</li>
+              ))}
+            </ul>
+            {recipe.notes && (
+              <div className="mt-8">
+                <div className="bg-white rounded-xl px-4 py-2 inline-block text-2xl font-bold mb-4">Notes:</div>
+                <div className="text-2xl whitespace-pre-wrap">{recipe.notes}</div>
+              </div>
+            )}
+          </div>
+          <div className="justify-self-end">
+            <div className="w-[320px] h-[320px] rounded-2xl overflow-hidden shadow-2xl">
+              {recipe.photoUrl ? <img src={recipe.photoUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-white/40 flex items-center justify-center text-emerald-900">No Photo</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-3">
+        <button onClick={downloadPNG} className="px-4 py-2 rounded-lg bg-emerald-600 text-white">Download PNG</button>
+        <button onClick={downloadPDF} className="px-4 py-2 rounded-lg bg-emerald-600 text-white">Download PDF</button>
+      </div>
+    </div>
+  );
+}
+
+
+Canva: they don’t expose a simple “push-to-design” API publicly. Best workflow: export PNG/PDF (above) and drag into your Canva brand kit/templates. If/when you want, we can explore Canva Apps (requires their dev platform).
+
+7) Tie-ins & polish
+
+Units: in Ingredient/Recipe editors, use a <select> with kg, g, l, ml, pcs. Add a small converter (e.g., if user enters 500 g, store 0.5 kg under the hood for consistent costing).
+
+Cost Calculator: when you click “Save as Recipe”, we already pull in the current components and call Chef Ramsay Gordon for a crisp description. (He’ll also roast bad combos as requested 😄).
+
+Photos: the uploaded image URL is stored on the recipe and shown in Cost Calculator, Recipe Editor, and Recipe Card.
+
+Menu Import: place the Import Wizard under Menu Mgmt → Menu Import. After commit, show a toast (“Imported N items”). Those items become nodes in Menu Flow automatically.
+
+Dashboard hooks: once you’ve imported sales by item/modifier, we can surface “Top sellers” and “Bundles” in the Analysis page with the same dataset.

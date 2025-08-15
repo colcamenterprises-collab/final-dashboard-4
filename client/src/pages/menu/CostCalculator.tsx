@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ChefRamsayGordon from "@/components/ChefRamsayGordon";
+import { RecipeEditor } from "./RecipeEditor";
 
 // ---- Types ----
 type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb" | "each";
@@ -73,6 +74,7 @@ export default function CostCalculator(){
   const [note, setNote] = useState("");
   const [desc, setDesc] = useState("");                 // AI description
   const [chefMode, setChefMode] = useState<"helpful"|"ramsay">("ramsay");
+  const [showRecipeEditor, setShowRecipeEditor] = useState(false);
 
   // ---- Load Ingredients (live from Ingredient Management) ----
   useEffect(()=>{
@@ -186,6 +188,49 @@ export default function CostCalculator(){
     alert("Saved to Recipe Cards ✅");
   }
 
+  // ---- Save as Recipe with Photo ----
+  const handleSaveAsRecipe = async (recipeData: any) => {
+    const payload = {
+      ...recipeData,
+      wastePct, 
+      portions, 
+      menuPrice,
+      components: linesWithCosts.map(l => ({
+        ingredientId: l.ingredientId,
+        name: l.name,
+        qty: l.qty,
+        unit: l.unit,
+        unitCostTHB: l.unitCostTHB,
+        costTHB: l.costTHB,
+        supplier: l.supplier
+      })),
+      totals: { recipeCostTHB, costPerPortionTHB, foodCostPct, gpTHB, marginPct }
+    };
+    
+    try {
+      const r = await fetch("/api/recipes/save-with-photo", {
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify(payload)
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Save failed");
+      
+      alert("Recipe saved with photo ✅");
+      setShowRecipeEditor(false);
+      
+      // Clear the calculator for next recipe
+      setLines([]);
+      setRecipeName("");
+      setNote("");
+      setDesc("");
+      setMenuPrice(0);
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Failed to save recipe: " + (error as Error).message);
+    }
+  };
+
   // ---- UI ----
   const filtered = ingredients.filter(i => i.name.toLowerCase().includes(search.toLowerCase())).slice(0, 12);
 
@@ -199,6 +244,7 @@ export default function CostCalculator(){
             <option value="helpful">Helpful</option>
             <option value="ramsay">Ramsay Mode</option>
           </select>
+          <button onClick={() => setShowRecipeEditor(true)} className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm hover:bg-emerald-700">Save as Recipe</button>
           <button onClick={saveToRecipes} className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm hover:bg-teal-700">Save to Recipe Cards</button>
         </div>
       </div>
@@ -357,6 +403,23 @@ export default function CostCalculator(){
           menuPrice
         }}
       />
+
+      {/* Recipe Editor Modal */}
+      {showRecipeEditor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <RecipeEditor
+              initial={{
+                name: recipeName,
+                description: desc || note,
+                components: linesWithCosts
+              }}
+              onSave={handleSaveAsRecipe}
+              onCancel={() => setShowRecipeEditor(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

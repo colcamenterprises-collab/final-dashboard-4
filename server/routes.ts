@@ -13,6 +13,8 @@ import dailySalesLibrary from "./routes/dailySalesLibrary";
 import dailyStock from "./routes/dailyStock";
 import chef from "./routes/chef";
 import recipes from "./routes/recipes";
+import { uploadsRouter } from "./routes/uploads";
+import { importRouter } from "./routes/imports";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -2016,6 +2018,26 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  app.post("/api/recipes/save-with-photo", async (req: Request, res: Response) => {
+    try {
+      const recipeData = {
+        name: req.body.name,
+        description: req.body.description,
+        photoUrl: req.body.photoUrl,
+        components: req.body.components || [],
+        wastePct: req.body.wastePct || 0,
+        portions: req.body.portions || 1,
+        menuPrice: req.body.menuPrice || 0,
+        totals: req.body.totals || {}
+      };
+      
+      const recipe = await storage.createRecipe(recipeData);
+      res.json({ ok: true, recipe });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: "Failed to save recipe", details: (error as Error).message });
+    }
+  });
+
   app.get("/api/recipes/:id", async (req: Request, res: Response) => {
     try {
       const recipe = await storage.getRecipeById(parseInt(req.params.id));
@@ -2087,6 +2109,10 @@ export function registerRoutes(app: express.Application): Server {
   // Register Chef and Recipe routes
   app.use('/api/chef', chef);
   app.use('/api/recipes', recipes);
+  
+  // Register Upload and Import routes
+  app.use('/api/upload', uploadsRouter);
+  app.use('/api/import', importRouter);
   
   // Register POS Live routes
   app.use('/api/pos', posLive);

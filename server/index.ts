@@ -75,6 +75,9 @@ app.use((req, res, next) => {
 // Serve static files from attached_assets folder
 app.use('/attached_assets', express.static(path.resolve(process.cwd(), 'attached_assets')));
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+
 // Serve tablet cache clear page
 app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
 
