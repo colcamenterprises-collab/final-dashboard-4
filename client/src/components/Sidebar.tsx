@@ -4,40 +4,36 @@ import { useState } from "react";
 
 const sections = [
   {
-    title: "Home",
-    items: [{ label: "Home", to: "/dashboard" }]
-  },
-  {
     title: "Operations",
     items: [
-      { label: "Daily Sales & Stock", to: "/daily-stock-sales" },
-      { label: "Daily Sales Library", to: "/daily-sales-library" },
-      { label: "Manager's Nightly Checklist", to: "/managers/nightly-checklist" },
-      { label: "Expenses", to: "/expenses" },
-      { label: "Upload Statements", to: "/uploads" },
-      { label: "Receipts", to: "/receipts" },
-      { label: "Shift Summary", to: "/shift-summary" }
+      { label: "Daily Sales & Stock", to: "/daily-stock-sales", icon: Calendar },
+      { label: "Daily Sales Library", to: "/daily-sales-library", icon: FileText },
+      { label: "Manager's Nightly Checklist", to: "/managers/nightly-checklist", icon: CheckSquare },
+      { label: "Expenses", to: "/expenses", icon: DollarSign },
+      { label: "Upload Statements", to: "/uploads", icon: TrendingUp },
+      { label: "Receipts", to: "/receipts", icon: FileText },
+      { label: "Shift Summary", to: "/shift-summary", icon: Users }
     ]
   },
   {
     title: "Finance",
     items: [
-      { label: "Profit & Loss", to: "/pl" },
-      { label: "Analysis", to: "/finance/analysis" }
+      { label: "Profit & Loss", to: "/pl", icon: DollarSign },
+      { label: "Analysis", to: "/finance/analysis", icon: TrendingUp }
     ]
   },
   {
     title: "Menu Mgmt",
     items: [
-      { label: "Cost Calculator", to: "/menu/cost-calculator" },
-      { label: "Ingredient Mgmt", to: "/menu/ingredients" },
-      { label: "Recipe Cards", to: "/menu/recipes" }
+      { label: "Cost Calculator", to: "/menu/cost-calculator", icon: Calculator },
+      { label: "Ingredient Mgmt", to: "/menu/ingredients", icon: Menu },
+      { label: "Recipe Cards", to: "/menu/recipes", icon: FileText }
     ]
   },
   {
     title: "Marketing",
     items: [
-      { label: "Social Media AI", to: "/marketing" }
+      { label: "Social Media AI", to: "/marketing", icon: Megaphone }
     ]
   }
 ];
@@ -75,6 +71,25 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="px-3 pb-6 overflow-y-auto">
+        {/* Home item */}
+        <div className="mb-5">
+          <Link
+            href="/dashboard"
+            className={`
+              flex items-center gap-2 rounded-lg px-2.5 py-2
+              text-[15px] text-slate-900 transition-colors
+              ${
+                location === "/dashboard" || location === "/"
+                  ? "bg-emerald-50 ring-1 ring-emerald-200"
+                  : "hover:bg-slate-50"
+              }
+            `}
+          >
+            <Home className="h-4 w-4" />
+            <span className="truncate">Home</span>
+          </Link>
+        </div>
+
         {sections.map((section) => {
           const isExpanded = expandedSections.has(section.title);
           return (
@@ -109,6 +124,7 @@ export default function Sidebar() {
                             }
                           `}
                         >
+                          {item.icon && <item.icon className="h-4 w-4" />}
                           <span className="truncate">{item.label}</span>
                         </Link>
                       </li>
