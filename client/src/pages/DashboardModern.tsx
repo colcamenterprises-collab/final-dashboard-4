@@ -107,21 +107,25 @@ export default function DashboardModern() {
         </div>
       </div>
 
-      {/* Best Seller */}
+      {/* Top 5 Menu Items */}
       <div className="mt-6 rounded-2xl bg-white shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Best Seller</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Top 5 Menu Items</h3>
           <button className="text-sm text-gray-500 hover:text-gray-700">→</button>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          {best.slice(0, 3).map((b,i)=>(
-            <div key={i} className="rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
-              <div className="w-16 h-16 rounded-lg bg-gray-100 mx-auto mb-3 flex items-center justify-center">
-                <div className="w-8 h-8 bg-gray-300 rounded"></div>
+        <div className="grid grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="rounded-lg border border-gray-100 p-3 hover:shadow-sm transition-shadow">
+              <div className="w-12 h-12 rounded-md bg-gray-100 mx-auto mb-2 flex items-center justify-center overflow-hidden">
+                <img 
+                  src={`https://picsum.photos/seed/menu${item}/100/100`} 
+                  alt={`Menu item ${item}`}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="text-center">
-                <div className="text-sm font-medium text-gray-900 truncate">{b.name}</div>
-                <div className="text-xs text-gray-500 mt-1">{b.qty}x</div>
+                <div className="text-xs font-medium text-gray-900 truncate">Item {item}</div>
+                <div className="text-xs text-gray-500">#{item}</div>
               </div>
             </div>
           ))}
