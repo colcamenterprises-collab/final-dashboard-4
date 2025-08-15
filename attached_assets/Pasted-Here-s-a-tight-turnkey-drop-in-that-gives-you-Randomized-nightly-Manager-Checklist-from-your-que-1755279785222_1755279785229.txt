@@ -1,0 +1,449 @@
+Here’s a tight, turnkey drop-in that gives you:
+
+Randomized nightly Manager Checklist (from your question bank, editable by you)
+
+Anonymous Shift Notes field bundled with the checklist
+
+Dashboard alert card showing tonight’s completion status at a glance
+
+Simple admin UI to add/remove questions
+
+Uses the random pop-up/photo gate we just built (manager only)
+
+I’m giving you concrete server + client code. Paste as-is into your project.
+
+1) Server: models + routes
+1.1 Types & storage (add to server/storage.ts)
+// ==== Manager Checklist types ====
+export type ChecklistQuestion = {
+  id: string;
+  text: string;             // question (English/Thai ok)
+  area?: string;            // e.g., "Kitchen", "Cashier", "Front"
+  active: boolean;          // toggle without deleting
+};
+
+export type NightlyDraw = {
+  dateISO: string;          // "YYYY-MM-DD" (TH)
+  questionIds: string[];    // 5 randomized ids (or N)
+  createdAtISO: string;
+};
+
+export type ChecklistSubmission = {
+  id: string;
+  dateISO: string;
+  completedAtISO: string;
+  managerName: string;
+  attesterPhotoUrl?: string;
+  answers: { questionId: string; value: boolean; note?: string }[];
+  shiftNotes?: string;              // anonymous free text
+};
+
+export interface ManagerChecklistStorage {
+  listQuestions(): Promise<ChecklistQuestion[]>;
+  upsertQuestion(q: Omit<ChecklistQuestion,"id"> & { id?: string }): Promise<ChecklistQuestion>;
+  deleteQuestion(id: string): Promise<void>;
+
+  getOrCreateNightlyDraw(dateISO: string, count: number): Promise<NightlyDraw>;
+  getSubmission(dateISO: string): Promise<ChecklistSubmission | null>;
+  saveSubmission(s: ChecklistSubmission): Promise<void>;
+}
+
+// ==== In-memory (replace with DB if you want) ====
+const MC_QUESTIONS: ChecklistQuestion[] = [
+  { id: "q1", text: "Fridge temps logged accurately", area:"Kitchen", active:true },
+  { id: "q2", text: "Handwash station stocked (soap/towels)", area:"Kitchen", active:true },
+  { id: "q3", text: "Cash counted & matched to report", area:"Cashier", active:true },
+  { id: "q4", text: "Waste recorded correctly", area:"Kitchen", active:true },
+  { id: "q5", text: "Dining area clean & sanitized", area:"Front", active:true },
+  // add more… or via UI below
+];
+const MC_DRAWS: NightlyDraw[] = [];
+const MC_SUBMISSIONS: ChecklistSubmission[] = [];
+
+// seeded RNG (stable per date)
+function seededRng(seed: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h += (h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24); }
+  return () => (h = Math.imul(48271, h >>> 0) % 0x7fffffff) / 0x7fffffff;
+}
+
+export class ManagerChecklistStore implements ManagerChecklistStorage {
+  async listQuestions() { return MC_QUESTIONS.slice(); }
+
+  async upsertQuestion(q: Omit<ChecklistQuestion,"id"> & { id?: string }) {
+    if (q.id) {
+      const i = MC_QUESTIONS.findIndex(x=>x.id===q.id);
+      if (i>=0) { MC_QUESTIONS[i] = { ...MC_QUESTIONS[i], ...q, id:q.id }; return MC_QUESTIONS[i]; }
+    }
+    const id = "q" + Math.random().toString(36).slice(2,8);
+    const created = { id, text:q.text, area:q.area, active:q.active ?? true };
+    MC_QUESTIONS.push(created);
+    return created;
+  }
+  async deleteQuestion(id: string) { 
+    const i = MC_QUESTIONS.findIndex(x=>x.id===id); if (i>=0) MC_QUESTIONS.splice(i,1);
+  }
+
+  async getOrCreateNightlyDraw(dateISO: string, count: number) {
+    const exist = MC_DRAWS.find(d=>d.dateISO===dateISO);
+    if (exist) return exist;
+    const rng = seededRng(dateISO);
+    const pool = MC_QUESTIONS.filter(q=>q.active);
+    const picked: string[] = [];
+    if (pool.length <= count) picked.push(...pool.map(p=>p.id));
+    else {
+      const copy = pool.slice();
+      for (let i=0;i<count;i++){
+        const idx = Math.floor(rng()*copy.length);
+        picked.push(copy[idx].id); copy.splice(idx,1);
+      }
+    }
+    const draw: NightlyDraw = { dateISO, questionIds: picked, createdAtISO: new Date().toISOString() };
+    MC_DRAWS.push(draw); return draw;
+  }
+
+  async getSubmission(dateISO:string) {
+    return MC_SUBMISSIONS.find(s=>s.dateISO===dateISO) || null;
+  }
+  async saveSubmission(s: ChecklistSubmission) {
+    const i = MC_SUBMISSIONS.findIndex(x=>x.dateISO===s.dateISO);
+    if (i>=0) MC_SUBMISSIONS[i] = s; else MC_SUBMISSIONS.push(s);
+  }
+}
+
+// singleton
+export const managerChecklistStore = new ManagerChecklistStore();
+
+1.2 Routes (add file server/routes.managerChecklist.ts)
+import { Router } from "express";
+import { managerChecklistStore } from "../storage";
+import dayjs from "dayjs";
+import tz from "dayjs/plugin/timezone.js"; import utc from "dayjs/plugin/utc.js";
+dayjs.extend(utc); dayjs.extend(tz);
+const TH = "Asia/Bangkok";
+function todayTH(){ return dayjs().tz(TH).format("YYYY-MM-DD"); }
+
+export const managerChecklistRouter = Router();
+
+// Admin (you): manage questions
+managerChecklistRouter.get("/questions", async (req,res)=>{
+  const rows = await managerChecklistStore.listQuestions();
+  res.json({ rows });
+});
+managerChecklistRouter.post("/questions", async (req,res)=>{
+  const q = await managerChecklistStore.upsertQuestion(req.body);
+  res.json(q);
+});
+managerChecklistRouter.delete("/questions/:id", async (req,res)=>{
+  await managerChecklistStore.deleteQuestion(req.params.id);
+  res.json({ ok:true });
+});
+
+// Nightly draw (stable set for the date)
+managerChecklistRouter.get("/nightly", async (req,res)=>{
+  const dateISO = (req.query.date as string) || todayTH();
+  const count = Number(req.query.count ?? 5);
+  const draw = await managerChecklistStore.getOrCreateNightlyDraw(dateISO, count);
+  res.json(draw);
+});
+
+// Status for dashboard
+managerChecklistRouter.get("/status", async (req,res)=>{
+  const dateISO = (req.query.date as string) || todayTH();
+  const sub = await managerChecklistStore.getSubmission(dateISO);
+  res.json({
+    dateISO,
+    completed: !!sub,
+    completedAtISO: sub?.completedAtISO ?? null,
+    notesPresent: !!sub?.shiftNotes,
+  });
+});
+
+// Submit (manager only)
+managerChecklistRouter.post("/submit", async (req,res)=>{
+  const {
+    dateISO = todayTH(),
+    managerName,
+    attesterPhotoUrl,
+    answers,             // [{questionId, value, note?}]
+    shiftNotes,
+  } = req.body || {};
+
+  if (!managerName || !Array.isArray(answers)) {
+    return res.status(400).json({ error:"managerName & answers required" });
+  }
+  const submission = {
+    id: `sub-${dateISO}`,
+    dateISO,
+    completedAtISO: new Date().toISOString(),
+    managerName,
+    attesterPhotoUrl,
+    answers,
+    shiftNotes,
+  };
+  await managerChecklistStore.saveSubmission(submission);
+  res.json({ ok:true, submission });
+});
+
+
+Register the router:
+
+// server/index.ts
+import { managerChecklistRouter } from "./routes.managerChecklist";
+app.use("/api/manager-checklist", managerChecklistRouter);
+
+2) Client: Manager Checklist UI (random questions) + Shift Notes
+2.1 Nightly Checklist page (add client/src/pages/ManagerChecklist.tsx)
+import { useEffect, useMemo, useRef, useState } from "react";
+import dayjs from "dayjs";
+
+type Draw = { dateISO:string; questionIds:string[] };
+type Q = { id:string; text:string; area?:string };
+
+export default function ManagerChecklistPage(){
+  const [loading, setLoading] = useState(true);
+  const [draw, setDraw] = useState<Draw|null>(null);
+  const [questions, setQuestions] = useState<Q[]>([]);
+  const [answers, setAnswers] = useState<Record<string, {value:boolean; note?:string}>>({});
+  const [managerName, setManagerName] = useState("");
+  const [shiftNotes, setShiftNotes] = useState("");
+  const attesterPhotoUrlRef = useRef<string|undefined>(undefined);
+
+  const selectedQuestions = useMemo(()=> {
+    if (!draw) return [];
+    const ids = new Set(draw.questionIds);
+    return questions.filter(q=>ids.has(q.id));
+  }, [draw, questions]);
+
+  useEffect(()=> {
+    (async ()=> {
+      const today = dayjs().format("YYYY-MM-DD");
+      const d = await fetch(`/api/manager-checklist/nightly?date=${today}&count=5`).then(r=>r.json());
+      setDraw(d);
+      const qs = await fetch(`/api/manager-checklist/questions`).then(r=>r.json());
+      setQuestions(qs.rows || []);
+      setLoading(false);
+    })();
+  }, []);
+
+  async function handleStartViaGate() {
+    // If you used the random pop-up/photo gate, pass the photo URL here
+    // For now, we try to fetch a temporary from session (optional)
+    try {
+      const r = await fetch("/api/tmp/attester-photo"); // optional endpoint if you saved it
+      if (r.ok) { const { url } = await r.json(); attesterPhotoUrlRef.current = url; }
+    } catch {}
+  }
+
+  async function submit() {
+    const payload = {
+      dateISO: draw?.dateISO,
+      managerName,
+      attesterPhotoUrl: attesterPhotoUrlRef.current,
+      shiftNotes,
+      answers: selectedQuestions.map(q => ({
+        questionId: q.id,
+        value: !!answers[q.id]?.value,
+        note: answers[q.id]?.note || ""
+      }))
+    };
+    const r = await fetch("/api/manager-checklist/submit", {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      alert("Submitted. ขอบคุณครับ/ค่ะ");
+      window.location.href = "/dashboard";
+    } else {
+      alert("Submit failed");
+    }
+  }
+
+  if (loading) return <div className="p-6">Loading…</div>;
+
+  return (
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold">Manager Checklist — {draw?.dateISO}</h1>
+      <p className="text-sm text-gray-600 mt-1">
+        5 randomized items per night. Answer honestly. Shift notes are anonymous.
+      </p>
+
+      <div className="mt-6 grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium">Manager Name</label>
+          <input className="mt-1 w-full rounded-lg border p-2" value={managerName} onChange={e=>setManagerName(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Date</label>
+          <input className="mt-1 w-full rounded-lg border p-2" value={draw?.dateISO || ""} readOnly />
+        </div>
+      </div>
+
+      <button className="mt-4 text-xs text-emerald-700 underline" onClick={handleStartViaGate}>
+        (If camera gate used, bind photo now)
+      </button>
+
+      <div className="mt-6 space-y-4">
+        {selectedQuestions.map((q,idx)=> (
+          <div key={q.id} className="rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm uppercase tracking-wide text-gray-500">{q.area || "General"}</div>
+                <div className="font-medium text-gray-900 mt-1">{idx+1}. {q.text}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-1 text-sm">
+                  <input type="radio" name={`ans-${q.id}`} onChange={()=>setAnswers(a=>({...a,[q.id]:{...a[q.id],value:true}}))} />
+                  Yes
+                </label>
+                <label className="inline-flex items-center gap-1 text-sm">
+                  <input type="radio" name={`ans-${q.id}`} onChange={()=>setAnswers(a=>({...a,[q.id]:{...a[q.id],value:false}}))} />
+                  No
+                </label>
+              </div>
+            </div>
+            <textarea
+              className="mt-3 w-full rounded-lg border p-2 text-sm"
+              placeholder="Note (optional)…"
+              value={answers[q.id]?.note || ""}
+              onChange={e=>setAnswers(a=>({...a,[q.id]:{...a[q.id],note:e.target.value}}))}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <label className="text-sm font-medium">Anonymous Shift Notes (optional)</label>
+        <textarea
+          className="mt-1 w-full rounded-lg border p-3"
+          rows={4}
+          placeholder="Anything the owner should know (anonymous)…"
+          value={shiftNotes}
+          onChange={(e)=>setShiftNotes(e.target.value)}
+        />
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button className="rounded-xl bg-emerald-600 text-white px-5 py-2" onClick={submit}>Submit</button>
+      </div>
+    </div>
+  );
+}
+
+
+Mount this page at /managers/checklist and only link it for managers. (If you already use the random pop-up/photo gate, call its onOpenChecklist to open this page or embed it in a modal.)
+
+2.2 Dashboard alert card (add to your home page dashboard)
+// client/src/components/ManagerChecklistStatusCard.tsx
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+
+export default function ManagerChecklistStatusCard(){
+  const [data, setData] = useState<{completed:boolean; completedAtISO:string|null} | null>(null);
+
+  useEffect(()=> {
+    const date = dayjs().format("YYYY-MM-DD");
+    fetch(`/api/manager-checklist/status?date=${date}`).then(r=>r.json()).then(d=>setData(d));
+  }, []);
+
+  if (!data) return null;
+
+  const ok = data.completed;
+  return (
+    <div className={`rounded-2xl p-4 border ${ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+      <div className="text-sm font-semibold">{ok ? "Manager Checklist Completed" : "Manager Checklist MISSING"}</div>
+      <div className="text-xs mt-1 text-gray-600">
+        {ok ? `Submitted at ${new Date(data.completedAtISO!).toLocaleTimeString()}` : "No submission yet today"}
+      </div>
+      <div className="mt-3">
+        <a className="text-xs text-emerald-700 underline" href="/managers/checklist">View / Submit</a>
+      </div>
+    </div>
+  );
+}
+
+
+Drop <ManagerChecklistStatusCard /> into the top row of your dashboard so you see it immediately.
+
+2.3 Simple Admin UI to manage the question bank
+// client/src/pages/ManagerChecklistQuestions.tsx
+import { useEffect, useState } from "react";
+
+type Q = { id?:string; text:string; area?:string; active:boolean };
+
+export default function ManagerChecklistQuestions(){
+  const [rows, setRows] = useState<Q[]>([]);
+  const [form, setForm] = useState<Q>({ text:"", area:"", active:true });
+
+  async function load(){ 
+    const d = await fetch("/api/manager-checklist/questions").then(r=>r.json());
+    setRows(d.rows || []);
+  }
+  useEffect(()=>{ load(); },[]);
+
+  async function save(){
+    await fetch("/api/manager-checklist/questions", {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(form)
+    });
+    setForm({ text:"", area:"", active:true });
+    await load();
+  }
+  async function del(id?:string){
+    if (!id) return;
+    await fetch(`/api/manager-checklist/questions/${id}`, { method:"DELETE" });
+    await load();
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold">Manager Checklist – Questions</h1>
+      <div className="mt-4 rounded-xl border p-4">
+        <div className="grid sm:grid-cols-3 gap-3">
+          <input className="border rounded-lg p-2 sm:col-span-2" placeholder="Question…" value={form.text}
+                 onChange={e=>setForm({...form, text:e.target.value})}/>
+          <input className="border rounded-lg p-2" placeholder="Area (Kitchen/Cashier/Front)…" value={form.area}
+                 onChange={e=>setForm({...form, area:e.target.value})}/>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm mt-3">
+          <input type="checkbox" checked={form.active} onChange={e=>setForm({...form, active:e.target.checked})}/>
+          Active
+        </label>
+        <div className="mt-3">
+          <button className="px-4 py-2 rounded-xl bg-emerald-600 text-white" onClick={save}>Add</button>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        {rows.map(r=>(
+          <div key={r.id} className="rounded-xl border p-3 mb-3 flex items-center justify-between">
+            <div>
+              <div className="text-sm text-gray-500">{r.area || "General"} • {r.active ? "Active" : "Inactive"}</div>
+              <div className="font-medium">{r.text}</div>
+            </div>
+            <button className="text-rose-600 text-sm" onClick={()=>del(r.id)}>Delete</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+Link this page under Managers (only you/admin can access) so you can add/edit the bank anytime. The nightly draw will automatically randomize 5 active questions (adjust via count in the call).
+
+3) Wire with the camera pop-up gate (manager only)
+
+Keep the SSE random gate we built but only render it for manager accounts.
+
+On “Start Checklist”, navigate/open /managers/checklist (or embed the page as a modal) and pass the attesterPhotoUrl if you captured one (you can stash it in session or append as query).
+
+4) What you’ll see on the home page
+
+A green/amber card saying “Manager Checklist Completed” with timestamp or “MISSING”.
+
+Click View/Submit to go straight to the page.
+
+5) Notes
+
+Anonymous Shift Notes are stored on the submission (shiftNotes) with no author field; timestamp only.
+
+You can change the number of nightly questions globally by changing count=5 in the client call or making it a setting.

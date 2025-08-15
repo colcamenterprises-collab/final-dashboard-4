@@ -60,6 +60,7 @@ import CostCalculator from "@/pages/menu/CostCalculator";
 import MenuImportWizard from "@/pages/menu/MenuImportWizard";
 import NightlyChecklist from "@/pages/managers/NightlyChecklist";
 import ChecklistHistory from "@/pages/managers/ChecklistHistory";
+import AdminQuestions from "@/pages/managers/AdminQuestions";
 
 import NotFound from "@/pages/not-found";
 
@@ -114,6 +115,7 @@ function App() {
           {/* Managers */}
           <Route path="/managers/checklist" component={NightlyChecklist} />
           <Route path="/managers/history" component={ChecklistHistory} />
+          <Route path="/managers/admin" component={AdminQuestions} />
           
           {/* Keep all your existing routes */}
           <Route path="/dashboard-old" component={Dashboard} />

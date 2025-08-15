@@ -1,102 +1,128 @@
-// Manager's Nightly Checklist System
-// Randomized daily operational tasks with Thai language support and photo evidence
+// ==== Manager Checklist types ====
+export type ChecklistQuestion = {
+  id: string;
+  text: string;             // question (English/Thai ok)
+  area?: string;            // e.g., "Kitchen", "Cashier", "Front"
+  active: boolean;          // toggle without deleting
+};
 
-const kitchenTasks = [
-  { id: "k1", text: "Check all equipment temperatures and log readings", requiresNote: true },
-  { id: "k2", text: "Clean and sanitize all prep surfaces", requiresPhoto: true },
-  { id: "k3", text: "Verify all food items are properly labeled with dates", requiresNote: true },
-  { id: "k4", text: "Check freezer and refrigerator organization", requiresPhoto: true },
-  { id: "k5", text: "Inspect hand washing stations - soap, towels, sanitizer", requiresPhoto: true },
-  { id: "k6", text: "Review oil quality and filter status", requiresNote: true },
-  { id: "k7", text: "Check grill temperature consistency", requiresNote: true },
-  { id: "k8", text: "Verify proper food storage containers and lids", requiresPhoto: true },
-  { id: "k9", text: "Clean and organize spice/seasoning area", requiresPhoto: true },
-  { id: "k10", text: "Check all kitchen timers are working properly" },
-  { id: "k11", text: "ตรวจสอบความสะอาดของเครื่องมือทำอาหาร (Check cleanliness of cooking utensils)", requiresPhoto: true },
-  { id: "k12", text: "ตรวจสอบระบบระบายอากาศและดูดควัน (Check ventilation and exhaust systems)" },
-  { id: "k13", text: "ตรวจสอบการจัดเก็บวัตถุดิบให้ถูกต้อง (Verify proper raw material storage)", requiresNote: true }
-];
+export type NightlyDraw = {
+  dateISO: string;          // "YYYY-MM-DD" (TH)
+  questionIds: string[];    // 5 randomized ids (or N)
+  createdAtISO: string;
+};
 
-const cashierTasks = [
-  { id: "c1", text: "Count and verify cash register totals", requiresNote: true },
-  { id: "c2", text: "Check POS system connectivity and backup", requiresNote: true },
-  { id: "c3", text: "Verify receipt printer paper and toner levels" },
-  { id: "c4", text: "Clean and organize customer service area", requiresPhoto: true },
-  { id: "c5", text: "Check card reader functionality with test transaction", requiresNote: true },
-  { id: "c6", text: "Verify menu boards are clean and current", requiresPhoto: true },
-  { id: "c7", text: "Count and secure promotional materials" },
-  { id: "c8", text: "Check customer seating area cleanliness", requiresPhoto: true },
-  { id: "c9", text: "Verify all payment methods are functioning" },
-  { id: "c10", text: "Check loyalty program system status", requiresNote: true },
-  { id: "c11", text: "ตรวจสอบความสะอาดของเคาน์เตอร์หน้าร้าน (Check front counter cleanliness)", requiresPhoto: true },
-  { id: "c12", text: "ตรวจสอบการทำงานของระบบสั่งอาหาร (Check ordering system functionality)", requiresNote: true },
-  { id: "c13", text: "นับเงินในลิ้นชักและบันทึกยอด (Count cash drawer and record totals)", requiresNote: true }
-];
-
-// Pseudo-random shuffle based on date to ensure same tasks on same date
-function shuffleWithSeed(array: any[], seed: string): any[] {
-  const arr = [...array];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  for (let i = arr.length - 1; i > 0; i--) {
-    // Generate deterministic "random" index based on hash
-    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-    const j = hash % (i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-export function generateDailyChecklist(dateISO: string, role: "kitchen" | "cashier", taskCount: number = 8) {
-  const tasks = role === "kitchen" ? kitchenTasks : cashierTasks;
-  const seed = `${dateISO}-${role}`;
-  const shuffled = shuffleWithSeed(tasks, seed);
-  
-  return shuffled.slice(0, Math.min(taskCount, tasks.length)).map(task => ({
-    taskId: task.id,
-    text: task.text,
-    requiresPhoto: task.requiresPhoto,
-    requiresNote: task.requiresNote
-  }));
-}
-
-export interface ChecklistSubmission {
-  id?: number;
+export type ChecklistSubmission = {
+  id: string;
   dateISO: string;
-  role: "kitchen" | "cashier";
+  completedAtISO: string;
   managerName: string;
-  items: Array<{
-    taskId: string;
-    text: string;
-    done: boolean;
-    note?: string;
-    photoUrl?: string;
-  }>;
-  completedAt: Date;
+  attesterPhotoUrl?: string;
+  answers: { questionId: string; value: boolean; note?: string }[];
+  shiftNotes?: string;              // anonymous free text
+};
+
+export interface ManagerChecklistStorage {
+  listQuestions(): Promise<ChecklistQuestion[]>;
+  upsertQuestion(q: Omit<ChecklistQuestion,"id"> & { id?: string }): Promise<ChecklistQuestion>;
+  deleteQuestion(id: string): Promise<void>;
+
+  getOrCreateNightlyDraw(dateISO: string, count: number): Promise<NightlyDraw>;
+  getSubmission(dateISO: string): Promise<ChecklistSubmission | null>;
+  saveSubmission(s: ChecklistSubmission): Promise<void>;
 }
 
-// In-memory storage for demo (replace with database in production)
-const submissions: ChecklistSubmission[] = [];
-let nextId = 1;
+// ==== In-memory (replace with DB if you want) ====
+const MC_QUESTIONS: ChecklistQuestion[] = [
+  { id: "q1", text: "Fridge temps logged accurately", area:"Kitchen", active:true },
+  { id: "q2", text: "Handwash station stocked (soap/towels)", area:"Kitchen", active:true },
+  { id: "q3", text: "Cash counted & matched to report", area:"Cashier", active:true },
+  { id: "q4", text: "Waste recorded correctly", area:"Kitchen", active:true },
+  { id: "q5", text: "Dining area clean & sanitized", area:"Front", active:true },
+  { id: "q6", text: "ตรวจสอบความสะอาดของเครื่องมือทำอาหาร (Check cleanliness of cooking utensils)", area:"Kitchen", active:true },
+  { id: "q7", text: "ตรวจสอบระบบระบายอากาศและดูดควัน (Check ventilation and exhaust systems)", area:"Kitchen", active:true },
+  { id: "q8", text: "ตรวจสอบการจัดเก็บวัตถุดิบให้ถูกต้อง (Verify proper raw material storage)", area:"Kitchen", active:true },
+  { id: "q9", text: "ตรวจสอบความสะอาดของเคาน์เตอร์หน้าร้าน (Check front counter cleanliness)", area:"Cashier", active:true },
+  { id: "q10", text: "ตรวจสอบการทำงานของระบบสั่งอาหาร (Check ordering system functionality)", area:"Cashier", active:true },
+  { id: "q11", text: "นับเงินในลิ้นชักและบันทึกยอด (Count cash drawer and record totals)", area:"Cashier", active:true },
+  { id: "q12", text: "Equipment temperature checks completed", area:"Kitchen", active:true },
+  { id: "q13", text: "Food storage areas organized properly", area:"Kitchen", active:true },
+  { id: "q14", text: "Customer service area presentable", area:"Front", active:true },
+  { id: "q15", text: "Receipt printer supplies adequate", area:"Cashier", active:true },
+];
+const MC_DRAWS: NightlyDraw[] = [];
+const MC_SUBMISSIONS: ChecklistSubmission[] = [];
 
-export function saveChecklistSubmission(submission: Omit<ChecklistSubmission, 'id' | 'completedAt'>): ChecklistSubmission {
-  const saved: ChecklistSubmission = {
-    ...submission,
-    id: nextId++,
-    completedAt: new Date()
-  };
-  submissions.push(saved);
-  return saved;
+// seeded RNG (stable per date)
+function seededRng(seed: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) { 
+    h ^= seed.charCodeAt(i); 
+    h += (h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24); 
+  }
+  return () => (h = Math.imul(48271, h >>> 0) % 0x7fffffff) / 0x7fffffff;
 }
 
-export function getChecklistHistory(role: "kitchen" | "cashier", limit: number = 30): ChecklistSubmission[] {
-  return submissions
-    .filter(s => s.role === role)
-    .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
-    .slice(0, limit);
+export class ManagerChecklistStore implements ManagerChecklistStorage {
+  async listQuestions() { return MC_QUESTIONS.slice(); }
+
+  async upsertQuestion(q: Omit<ChecklistQuestion,"id"> & { id?: string }) {
+    if (q.id) {
+      const i = MC_QUESTIONS.findIndex(x=>x.id===q.id);
+      if (i>=0) { 
+        MC_QUESTIONS[i] = { ...MC_QUESTIONS[i], ...q, id:q.id }; 
+        return MC_QUESTIONS[i]; 
+      }
+    }
+    const id = "q" + Math.random().toString(36).slice(2,8);
+    const created = { id, text:q.text, area:q.area, active:q.active ?? true };
+    MC_QUESTIONS.push(created);
+    return created;
+  }
+  
+  async deleteQuestion(id: string) { 
+    const i = MC_QUESTIONS.findIndex(x=>x.id===id); 
+    if (i>=0) MC_QUESTIONS.splice(i,1);
+  }
+
+  async getOrCreateNightlyDraw(dateISO: string, count: number) {
+    const exist = MC_DRAWS.find(d=>d.dateISO===dateISO);
+    if (exist) return exist;
+    
+    const rng = seededRng(dateISO);
+    const pool = MC_QUESTIONS.filter(q=>q.active);
+    const picked: string[] = [];
+    
+    if (pool.length <= count) {
+      picked.push(...pool.map(p=>p.id));
+    } else {
+      const copy = pool.slice();
+      for (let i=0; i<count; i++){
+        const idx = Math.floor(rng()*copy.length);
+        picked.push(copy[idx].id); 
+        copy.splice(idx,1);
+      }
+    }
+    
+    const draw: NightlyDraw = { 
+      dateISO, 
+      questionIds: picked, 
+      createdAtISO: new Date().toISOString() 
+    };
+    MC_DRAWS.push(draw); 
+    return draw;
+  }
+
+  async getSubmission(dateISO:string) {
+    return MC_SUBMISSIONS.find(s=>s.dateISO===dateISO) || null;
+  }
+  
+  async saveSubmission(s: ChecklistSubmission) {
+    const i = MC_SUBMISSIONS.findIndex(x=>x.dateISO===s.dateISO);
+    if (i>=0) MC_SUBMISSIONS[i] = s; 
+    else MC_SUBMISSIONS.push(s);
+  }
 }
+
+// singleton
+export const managerChecklistStore = new ManagerChecklistStore();

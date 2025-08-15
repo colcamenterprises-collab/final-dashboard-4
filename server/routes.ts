@@ -15,7 +15,7 @@ import chef from "./routes/chef";
 import recipes from "./routes/recipes";
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
-import { generateDailyChecklist, saveChecklistSubmission, getChecklistHistory } from "./managerChecklist";
+import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -2118,32 +2118,100 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/import', importRouter);
   
   // Register Manager Checklist routes
-  // Manager checklist endpoints
-  app.get('/api/manager/checklist', (req, res) => {
-    const { date, role } = req.query;
-    if (!date || !role || (role !== 'kitchen' && role !== 'cashier')) {
-      return res.status(400).json({ error: 'Invalid date or role' });
-    }
-    const items = generateDailyChecklist(date as string, role as "kitchen" | "cashier");
-    res.json({ items });
+  // Enhanced Manager Checklist endpoints
+  
+  // Admin: manage questions
+  app.get("/api/manager-checklist/questions", async (req,res)=>{
+    const rows = await managerChecklistStore.listQuestions();
+    res.json({ rows });
+  });
+  
+  app.post("/api/manager-checklist/questions", async (req,res)=>{
+    const q = await managerChecklistStore.upsertQuestion(req.body);
+    res.json(q);
+  });
+  
+  app.delete("/api/manager-checklist/questions/:id", async (req,res)=>{
+    await managerChecklistStore.deleteQuestion(req.params.id);
+    res.json({ ok:true });
   });
 
-  app.post('/api/manager/checklist/submit', (req, res) => {
+  // Nightly draw (stable set for the date)
+  app.get("/api/manager-checklist/nightly", async (req,res)=>{
+    const dateISO = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const count = Number(req.query.count ?? 5);
+    const draw = await managerChecklistStore.getOrCreateNightlyDraw(dateISO, count);
+    res.json(draw);
+  });
+
+  // Status for dashboard
+  app.get("/api/manager-checklist/status", async (req,res)=>{
+    const dateISO = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const sub = await managerChecklistStore.getSubmission(dateISO);
+    res.json({
+      dateISO,
+      completed: !!sub,
+      completedAtISO: sub?.completedAtISO ?? null,
+      notesPresent: !!sub?.shiftNotes,
+    });
+  });
+
+  // Submit (manager only)
+  app.post("/api/manager-checklist/submit", async (req,res)=>{
+    const {
+      dateISO = new Date().toISOString().split('T')[0],
+      managerName,
+      attesterPhotoUrl,
+      answers,             // [{questionId, value, note?}]
+      shiftNotes,
+    } = req.body || {};
+
+    if (!managerName || !Array.isArray(answers)) {
+      return res.status(400).json({ error:"managerName & answers required" });
+    }
+    
+    const submission = {
+      id: `sub-${dateISO}`,
+      dateISO,
+      completedAtISO: new Date().toISOString(),
+      managerName,
+      attesterPhotoUrl,
+      answers,
+      shiftNotes,
+    };
+    
+    await managerChecklistStore.saveSubmission(submission);
+    res.json({ ok:true, submission });
+  });
+
+  // Seed sample checklist questions
+  app.post("/api/manager-checklist/seed", async (req, res) => {
+    const sampleQuestions = [
+      { text: "All equipment cleaned and sanitized properly", area: "Kitchen", active: true },
+      { text: "Temperature logs recorded for all refrigeration units", area: "Kitchen", active: true },
+      { text: "Food storage areas organized and labeled correctly", area: "Kitchen", active: true },
+      { text: "Prep station surfaces wiped down and sanitized", area: "Kitchen", active: true },
+      { text: "Oil quality checked and documented", area: "Kitchen", active: true },
+      { text: "Register balanced and cash counted accurately", area: "Cashier", active: true },
+      { text: "Credit card machine cleaned and tested", area: "Cashier", active: true },
+      { text: "Receipt paper and supplies restocked", area: "Cashier", active: true },
+      { text: "Customer area tables and chairs cleaned", area: "Front", active: true },
+      { text: "Floors mopped and entrance area tidy", area: "Front", active: true },
+      { text: "Restroom checked and supplies restocked", area: "Front", active: true },
+      { text: "Menu boards and signage clean and readable", area: "Front", active: true },
+      { text: "Waste and recycling bins emptied and cleaned", area: "General", active: true },
+      { text: "Lights and electrical equipment turned off", area: "General", active: true },
+      { text: "Security system activated before leaving", area: "General", active: true }
+    ];
+
     try {
-      const submission = saveChecklistSubmission(req.body);
-      res.json({ ok: true, submission });
+      for (const question of sampleQuestions) {
+        await managerChecklistStore.upsertQuestion(question);
+      }
+      res.json({ ok: true, message: "Sample questions seeded successfully", count: sampleQuestions.length });
     } catch (error) {
-      res.status(400).json({ ok: false, error: 'Failed to save submission' });
+      res.status(500).json({ ok: false, error: "Failed to seed questions" });
     }
-  });
-
-  app.get('/api/manager/history', (req, res) => {
-    const { role, limit } = req.query;
-    if (!role || (role !== 'kitchen' && role !== 'cashier')) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-    const list = getChecklistHistory(role as "kitchen" | "cashier", limit ? parseInt(limit as string) : 30);
-    res.json({ list });
   });
 
   // Basic image upload endpoint for checklist photos

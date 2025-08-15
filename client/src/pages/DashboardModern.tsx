@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ManagerChecklistStatusCard from "@/components/ManagerChecklistStatusCard";
 
 const fmt = (n:number, d=0)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:d}).format(n);
 
@@ -64,6 +65,9 @@ export default function DashboardModern() {
 
       {/* Content grid */}
       <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Manager Checklist Status */}
+        <ManagerChecklistStatusCard />
+        
         {/* Payments */}
         <div className="rounded-3xl bg-white shadow-sm border p-5">
           <div className="flex items-center justify-between">

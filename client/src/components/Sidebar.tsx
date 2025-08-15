@@ -72,6 +72,7 @@ const NAV = [
     items: [
       { label: "Nightly Checklist", path: "/managers/checklist", icon: Icon.form },
       { label: "Checklist History", path: "/managers/history",   icon: Icon.list },
+      { label: "Admin Questions",   path: "/managers/admin",     icon: Icon.grid },
     ],
   },
 ];
