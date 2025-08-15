@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Home, Calendar, DollarSign, Menu, Megaphone, Users, TrendingUp, FileText, Calculator, CheckSquare } from "lucide-react";
 import { useState } from "react";
 
 const sections = [
