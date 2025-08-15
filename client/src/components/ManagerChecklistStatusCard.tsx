@@ -14,42 +14,20 @@ export default function ManagerChecklistStatusCard(){
   if (!data) return null;
 
   return (
-    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-emerald-100 p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-emerald-900">Manager Checklist</h3>
-          <p className="text-sm text-emerald-700 mt-1">Tonight's status</p>
-        </div>
-        <div className={`w-3 h-3 rounded-full ${data.completed ? 'bg-emerald-500' : 'bg-orange-400'}`} />
+    <div className="rounded-3xl p-6 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white shadow-sm">
+      <div className="text-lg font-semibold">Manager Checklist</div>
+      <div className="text-sm text-emerald-50 mt-1">
+        {data.completed ? "Completed for tonight" : "Pending completion"}
       </div>
-      
-      <div className="mt-3">
-        {data.completed ? (
-          <div>
-            <div className="text-sm text-emerald-800 font-medium">✅ Completed</div>
-            <div className="text-xs text-emerald-600 mt-1">
-              {data.completedAtISO && new Date(data.completedAtISO).toLocaleTimeString()}
-            </div>
-            {data.notesPresent && (
-              <div className="text-xs text-emerald-600">+ Anonymous notes included</div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div className="text-sm text-orange-800 font-medium">⏳ Pending</div>
-            <div className="text-xs text-orange-600 mt-1">Not completed yet</div>
-          </div>
-        )}
-      </div>
-      
-      <div className="mt-4">
-        <a 
-          href="/managers/checklist" 
-          className="text-sm text-emerald-700 hover:text-emerald-800 underline font-medium"
-        >
-          {data.completed ? "View checklist" : "Complete checklist"}
-        </a>
-      </div>
+      {data.completed && data.notesPresent && (
+        <div className="text-sm text-emerald-50">Anonymous notes included</div>
+      )}
+      <button 
+        onClick={() => window.location.href = '/managers/checklist'}
+        className="mt-5 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 px-5 py-2 text-sm"
+      >
+        {data.completed ? "View checklist" : "Complete checklist"}
+      </button>
     </div>
   );
 }

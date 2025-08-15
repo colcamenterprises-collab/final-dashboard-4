@@ -20,6 +20,7 @@ const best = [
   { name: "Cheesy Bacon", price: 833, qty: 7 },
   { name: "Single Smash", price: 824, qty: 5 },
   { name: "Sweet Potato Fries", price: 396, qty: 4 },
+  { name: "Classic Burger", price: 550, qty: 3 },
 ];
 
 export default function DashboardModern() {
@@ -98,27 +99,27 @@ export default function DashboardModern() {
           <div className="text-sm text-orange-50 mt-1">Present information in a visually appealing way</div>
           <button className="mt-5 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 px-5 py-2 text-sm">See more</button>
         </div>
+      </div>
 
-        {/* Best seller */}
-        <div className="rounded-3xl bg-white shadow-sm border p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Best Seller</h3>
-          </div>
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-4">
-            {best.map((b,i)=>(
-              <div key={i} className="rounded-2xl border p-3">
-                <div className="relative rounded-xl bg-[#ccfbf1] h-24 mb-3 overflow-hidden">
-                  <img src={`https://picsum.photos/seed/sbb${i}/300/200`} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-80"/>
-                  <span className="absolute top-2 left-2 bg-white/90 text-emerald-700 text-xs font-semibold rounded-md px-2 py-1">
-                    {b.qty}x
-                  </span>
-                </div>
-                <div className="text-sm font-medium truncate">{b.name}</div>
-                <div className="text-xs text-gray-500">Qty: {b.qty}</div>
-                <div className="text-emerald-700 font-semibold mt-1">฿{fmt(b.price)}</div>
+      {/* Best seller - Full width */}
+      <div className="mt-6 rounded-3xl bg-white shadow-sm border p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900">Best Seller</h3>
+        </div>
+        <div className="grid grid-cols-5 gap-4">
+          {best.map((b,i)=>(
+            <div key={i} className="rounded-2xl border p-3">
+              <div className="relative rounded-xl bg-[#ccfbf1] h-24 mb-3 overflow-hidden">
+                <img src={`https://picsum.photos/seed/sbb${i}/300/200`} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-80"/>
+                <span className="absolute top-2 left-2 bg-white/90 text-emerald-700 text-xs font-semibold rounded-md px-2 py-1">
+                  {b.qty}x
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="text-sm font-medium truncate">{b.name}</div>
+              <div className="text-xs text-gray-500">Qty: {b.qty}</div>
+              <div className="text-emerald-700 font-semibold mt-1">฿{fmt(b.price)}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
