@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import ChefRamsayGordon from "@/components/ChefRamsayGordon";
 
 // ---- Types ----
+type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb";
+
 type Ingredient = {
   id: string;
   name: string;
-  unit: "g"|"ml"|"pcs";
+  unit: UnitType;
   packageSize: number;            // e.g., 1000 (g/ml) or 1 (pcs)
   packageCostTHB: number;         // total price per package
   supplier?: string;
@@ -14,15 +16,49 @@ type Ingredient = {
 type RecipeLine = {
   ingredientId: string;
   name: string;
-  qty: number;         // quantity used in recipe (same unit as ingredient.unit)
-  unit: "g"|"ml"|"pcs";
-  unitCostTHB: number; // derived: packageCost / packageSize
+  qty: number;         // quantity used in recipe
+  unit: UnitType;      // can be different from ingredient base unit
+  unitCostTHB: number; // cost per unit (converted if needed)
   costTHB: number;     // qty * unitCostTHB (with yield if applied)
   supplier?: string;
 };
 
 const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:2}).format(n||0);
 const num = (v:any)=> isFinite(+v) ? +v : 0;
+
+// Unit conversion factors (everything converted to base units)
+const UNIT_CONVERSIONS: Record<UnitType, { toBase: number; baseUnit: string }> = {
+  // Weight
+  "g": { toBase: 1, baseUnit: "g" },
+  "kg": { toBase: 1000, baseUnit: "g" },
+  "oz": { toBase: 28.35, baseUnit: "g" },
+  "lb": { toBase: 453.6, baseUnit: "g" },
+  
+  // Volume
+  "ml": { toBase: 1, baseUnit: "ml" },
+  "litre": { toBase: 1000, baseUnit: "ml" },
+  "cup": { toBase: 240, baseUnit: "ml" },
+  "tbsp": { toBase: 15, baseUnit: "ml" },
+  "tsp": { toBase: 5, baseUnit: "ml" },
+  
+  // Count
+  "pcs": { toBase: 1, baseUnit: "pcs" }
+};
+
+// Convert between units
+function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
+  const fromConv = UNIT_CONVERSIONS[fromUnit];
+  const toConv = UNIT_CONVERSIONS[toUnit];
+  
+  // Only convert within same category (weight/volume/count)
+  if (fromConv.baseUnit !== toConv.baseUnit) return fromQty;
+  
+  // Convert to base unit, then to target unit
+  const baseQty = fromQty * fromConv.toBase;
+  return baseQty / toConv.toBase;
+}
+
+const UNIT_OPTIONS: UnitType[] = ["g", "kg", "ml", "litre", "cup", "tbsp", "tsp", "pcs", "oz", "lb"];
 
 export default function CostCalculator(){
   // ---- Data ----
@@ -46,7 +82,7 @@ export default function CostCalculator(){
       const rows: Ingredient[] = (j.rows || j || []).map((x:any)=>({
         id: String(x.id ?? x.slug ?? x.name),
         name: x.name,
-        unit: (x.unit || "g"),
+        unit: (x.unit || "g") as UnitType,
         packageSize: num(x.packageSize ?? x.size ?? 1),
         packageCostTHB: num(x.packageCostTHB ?? x.priceTHB ?? 0),
         supplier: x.supplier || ""
@@ -78,7 +114,7 @@ export default function CostCalculator(){
       ingredientId: ing.id,
       name: ing.name,
       qty: 0,
-      unit: ing.unit,
+      unit: ing.unit, // Start with ingredient's default unit
       unitCostTHB: unitCost,
       costTHB: 0,
       supplier: ing.supplier
@@ -88,6 +124,26 @@ export default function CostCalculator(){
 
   function updateQty(idx:number, q:number){
     setLines(prev => prev.map((l,i)=> i===idx ? { ...l, qty: q } : l));
+  }
+
+  function updateUnit(idx:number, newUnit: UnitType){
+    setLines(prev => prev.map((l,i)=> {
+      if (i !== idx) return l;
+      
+      // Find the original ingredient to get base unit cost
+      const ingredient = ingredients.find(ing => ing.id === l.ingredientId);
+      if (!ingredient) return { ...l, unit: newUnit };
+      
+      // Calculate cost per new unit
+      const baseCostPerUnit = ingredient.packageCostTHB / Math.max(1, ingredient.packageSize);
+      const convertedCostPerUnit = baseCostPerUnit * convertUnits(1, ingredient.unit, newUnit);
+      
+      return { 
+        ...l, 
+        unit: newUnit,
+        unitCostTHB: convertedCostPerUnit
+      };
+    }));
   }
 
   function removeLine(idx:number){
@@ -213,7 +269,13 @@ export default function CostCalculator(){
                     <td className="p-2 text-right">
                       <input type="number" min={0} value={l.qty} onChange={e=>updateQty(idx, num(e.target.value))} className="w-28 border rounded-xl px-2 py-1 text-right" />
                     </td>
-                    <td className="p-2">{l.unit}</td>
+                    <td className="p-2">
+                      <select value={l.unit} onChange={e=>updateUnit(idx, e.target.value as UnitType)} className="border rounded-xl px-2 py-1 text-sm bg-white">
+                        {UNIT_OPTIONS.map(unit => (
+                          <option key={unit} value={unit}>{unit}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="p-2 text-right tabular-nums">{THB(l.unitCostTHB)}</td>
                     <td className="p-2 text-right tabular-nums">{THB(l.costTHB)}</td>
                     <td className="p-2">{l.supplier || "-"}</td>
