@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import ChefRamsayGordon from "@/components/ChefRamsayGordon";
 
 // ---- Types ----
-type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb";
+type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb" | "each";
 
 type Ingredient = {
   id: string;
@@ -42,7 +42,8 @@ const UNIT_CONVERSIONS: Record<UnitType, { toBase: number; baseUnit: string }> =
   "tsp": { toBase: 5, baseUnit: "ml" },
   
   // Count
-  "pcs": { toBase: 1, baseUnit: "pcs" }
+  "pcs": { toBase: 1, baseUnit: "pcs" },
+  "each": { toBase: 1, baseUnit: "each" }
 };
 
 // Convert between units
@@ -58,7 +59,7 @@ function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): nu
   return baseQty / toConv.toBase;
 }
 
-const UNIT_OPTIONS: UnitType[] = ["g", "kg", "ml", "litre", "cup", "tbsp", "tsp", "pcs", "oz", "lb"];
+const UNIT_OPTIONS: UnitType[] = ["g", "kg", "ml", "litre", "cup", "tbsp", "tsp", "pcs", "oz", "lb", "each"];
 
 export default function CostCalculator(){
   // ---- Data ----
