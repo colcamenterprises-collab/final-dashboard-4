@@ -11,6 +11,8 @@ import posItems from "./routes/posItems";
 import posUsage from "./routes/posUsage";
 import dailySalesLibrary from "./routes/dailySalesLibrary";
 import dailyStock from "./routes/dailyStock";
+import chef from "./routes/chef";
+import recipes from "./routes/recipes";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
@@ -2081,6 +2083,10 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register Daily Stock routes  
   app.use('/api/daily-stock', dailyStock);
+  
+  // Register Chef and Recipe routes
+  app.use('/api/chef', chef);
+  app.use('/api/recipes', recipes);
   
   // Register POS Live routes
   app.use('/api/pos', posLive);

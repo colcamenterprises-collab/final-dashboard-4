@@ -1,0 +1,613 @@
+here’s a drop-in, production-ready Cost Calculator with Chef Ramsay Gordon always visible, reactive, chat-enabled, themed to your current UI, with pre-loaded tips & roasts.
+
+I kept it tight: two frontend files + two backend routes + tiny wiring. It pulls ingredients from your existing Ingredient Mgmt API (you can swap the fetch URL), calculates costs live, saves recipes, and pings an AI endpoint for descriptions/chat (stubbed with safe fallbacks).
+
+Frontend
+1) client/src/pages/menu/CostCalculator.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import ChefRamsayGordon from "../../shared/ChefRamsayGordon";
+
+// ---- Types ----
+type Ingredient = {
+  id: string;
+  name: string;
+  unit: "g"|"ml"|"pcs";
+  packageSize: number;            // e.g., 1000 (g/ml) or 1 (pcs)
+  packageCostTHB: number;         // total price per package
+  supplier?: string;
+};
+
+type RecipeLine = {
+  ingredientId: string;
+  name: string;
+  qty: number;         // quantity used in recipe (same unit as ingredient.unit)
+  unit: "g"|"ml"|"pcs";
+  unitCostTHB: number; // derived: packageCost / packageSize
+  costTHB: number;     // qty * unitCostTHB (with yield if applied)
+  supplier?: string;
+};
+
+const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:2}).format(n||0);
+const num = (v:any)=> isFinite(+v) ? +v : 0;
+
+export default function CostCalculator(){
+  // ---- Data ----
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [search, setSearch] = useState("");
+  const [lines, setLines] = useState<RecipeLine[]>([]);
+  const [wastePct, setWastePct] = useState(0);           // 0..100
+  const [portions, setPortions] = useState(1);
+  const [menuPrice, setMenuPrice] = useState(0);
+  const [recipeName, setRecipeName] = useState("");
+  const [note, setNote] = useState("");
+  const [desc, setDesc] = useState("");                 // AI description
+  const [chefMode, setChefMode] = useState<"helpful"|"ramsay">("ramsay");
+
+  // ---- Load Ingredients (live from Ingredient Management) ----
+  useEffect(()=>{
+    (async ()=>{
+      // Swap URL to your real endpoint that lists current ingredients
+      const r = await fetch("/api/ingredients");
+      const j = await r.json();
+      const rows: Ingredient[] = (j.rows || j || []).map((x:any)=>({
+        id: String(x.id ?? x.slug ?? x.name),
+        name: x.name,
+        unit: (x.unit || "g"),
+        packageSize: num(x.packageSize ?? x.size ?? 1),
+        packageCostTHB: num(x.packageCostTHB ?? x.priceTHB ?? 0),
+        supplier: x.supplier || ""
+      }));
+      setIngredients(rows);
+    })();
+  },[]);
+
+  // ---- Derived ----
+  const linesWithCosts = useMemo(()=>{
+    const yieldFactor = (100 - Math.max(0, Math.min(100, wastePct)))/100; // e.g., 90% if 10% waste
+    return lines.map(l => {
+      const unitCost = num(l.unitCostTHB);
+      const cost = num(l.qty) * unitCost / Math.max(0.0001, yieldFactor);
+      return { ...l, costTHB: cost };
+    });
+  }, [lines, wastePct]);
+
+  const recipeCostTHB = useMemo(()=> linesWithCosts.reduce((a,l)=> a + l.costTHB, 0), [linesWithCosts]);
+  const costPerPortionTHB = useMemo(()=> recipeCostTHB / Math.max(1, portions), [recipeCostTHB, portions]);
+  const foodCostPct = useMemo(()=> menuPrice > 0 ? (costPerPortionTHB / menuPrice) * 100 : 0, [costPerPortionTHB, menuPrice]);
+  const gpTHB = useMemo(()=> menuPrice - costPerPortionTHB, [menuPrice, costPerPortionTHB]);
+  const marginPct = useMemo(()=> menuPrice>0 ? (gpTHB/menuPrice)*100 : 0, [gpTHB, menuPrice]);
+
+  // ---- Actions ----
+  function addIngredient(ing: Ingredient){
+    const unitCost = ing.packageCostTHB / Math.max(1, ing.packageSize);
+    setLines(prev => [...prev, {
+      ingredientId: ing.id,
+      name: ing.name,
+      qty: 0,
+      unit: ing.unit,
+      unitCostTHB: unitCost,
+      costTHB: 0,
+      supplier: ing.supplier
+    }]);
+    setSearch("");
+  }
+
+  function updateQty(idx:number, q:number){
+    setLines(prev => prev.map((l,i)=> i===idx ? { ...l, qty: q } : l));
+  }
+
+  function removeLine(idx:number){
+    setLines(prev => prev.filter((_,i)=> i!==idx));
+  }
+
+  async function generateDescription(){
+    const payload = {
+      mode: chefMode,
+      recipeName,
+      lines: linesWithCosts.map(l=>({ name: l.name, qty: l.qty, unit: l.unit })),
+      targetPrice: menuPrice
+    };
+    const r = await fetch("/api/chef/describe", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+    const j = await r.json();
+    setDesc(j.text || "");
+  }
+
+  async function saveToRecipes(){
+    const payload = {
+      recipeName, note, wastePct, portions, menuPrice,
+      lines: linesWithCosts.map(l=> ({
+        ingredientId: l.ingredientId,
+        name: l.name,
+        qty: l.qty,
+        unit: l.unit,
+        unitCostTHB: l.unitCostTHB,
+        costTHB: l.costTHB,
+        supplier: l.supplier
+      })),
+      totals: { recipeCostTHB, costPerPortionTHB, foodCostPct, gpTHB, marginPct },
+      description: desc
+    };
+    const r = await fetch("/api/recipes/save", {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
+    });
+    const j = await r.json();
+    if (!j.ok) return alert(j.error || "Save failed");
+    alert("Saved to Recipe Cards ✅");
+  }
+
+  // ---- UI ----
+  const filtered = ingredients.filter(i => i.name.toLowerCase().includes(search.toLowerCase())).slice(0, 12);
+
+  return (
+    <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">Cost Calculator</h1>
+        <div className="flex gap-3 items-center">
+          <label className="text-sm text-gray-600">Mode</label>
+          <select value={chefMode} onChange={e=>setChefMode(e.target.value as any)} className="header-pill px-3 py-2 text-sm">
+            <option value="helpful">Helpful</option>
+            <option value="ramsay">Ramsay Mode</option>
+          </select>
+          <button onClick={saveToRecipes} className="bg-teal-600 text-white rounded-xl px-4 py-2 text-sm">Save to Recipe Cards</button>
+        </div>
+      </div>
+
+      {/* Recipe Header */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+        <div className="card">
+          <div className="card-inner">
+            <div className="text-sm text-[var(--muted)]">Recipe Name</div>
+            <input value={recipeName} onChange={e=>setRecipeName(e.target.value)} placeholder="e.g., Ultimate Double" className="mt-2 w-full border rounded-xl px-3 py-2" />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-sm text-[var(--muted)]">Portions Per Recipe</div>
+                <input type="number" min={1} value={portions} onChange={e=>setPortions(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
+              </div>
+              <div>
+                <div className="text-sm text-[var(--muted)]">Waste / Yield Loss %</div>
+                <input type="number" min={0} max={100} value={wastePct} onChange={e=>setWastePct(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-sm text-[var(--muted)]">Menu Price (THB)</div>
+              <input type="number" min={0} value={menuPrice} onChange={e=>setMenuPrice(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card lg:col-span-2">
+          <div className="card-inner">
+            <div className="flex items-center gap-3">
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search ingredients…" className="flex-1 border rounded-xl px-3 py-2" />
+            </div>
+            {search && (
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {filtered.map(ing=>(
+                  <button key={ing.id} onClick={()=>addIngredient(ing)} className="border rounded-xl px-3 py-2 text-left hover:bg-gray-50">
+                    <div className="font-medium">{ing.name}</div>
+                    <div className="text-xs text-gray-500">Unit cost: {THB(ing.packageCostTHB/Math.max(1,ing.packageSize))} / {ing.unit}</div>
+                    {ing.supplier && <div className="text-xs text-gray-400">Supplier: {ing.supplier}</div>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Ingredients Table */}
+      <div className="card mt-6">
+        <div className="card-inner">
+          <h3 className="text-[18px] font-semibold">Ingredients</h3>
+          <div className="mt-3 overflow-auto">
+            <table className="min-w-[820px] w-full">
+              <thead>
+                <tr>
+                  <th className="p-2 text-left text-xs text-[var(--muted)]">Ingredient</th>
+                  <th className="p-2 text-right text-xs text-[var(--muted)]">Qty</th>
+                  <th className="p-2 text-left text-xs text-[var(--muted)]">Unit</th>
+                  <th className="p-2 text-right text-xs text-[var(--muted)]">Unit Cost</th>
+                  <th className="p-2 text-right text-xs text-[var(--muted)]">Cost</th>
+                  <th className="p-2 text-left text-xs text-[var(--muted)]">Supplier</th>
+                  <th className="p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {linesWithCosts.map((l,idx)=>(
+                  <tr key={idx} className={idx%2?"bg-gray-50/50":""}>
+                    <td className="p-2">{l.name}</td>
+                    <td className="p-2 text-right">
+                      <input type="number" min={0} value={l.qty} onChange={e=>updateQty(idx, num(e.target.value))} className="w-28 border rounded-xl px-2 py-1 text-right" />
+                    </td>
+                    <td className="p-2">{l.unit}</td>
+                    <td className="p-2 text-right tabular-nums">{THB(l.unitCostTHB)}</td>
+                    <td className="p-2 text-right tabular-nums">{THB(l.costTHB)}</td>
+                    <td className="p-2">{l.supplier || "-"}</td>
+                    <td className="p-2 text-right">
+                      <button onClick={()=>removeLine(idx)} className="text-sm text-rose-600 underline">Remove</button>
+                    </td>
+                  </tr>
+                ))}
+                {!linesWithCosts.length && (
+                  <tr><td className="p-4 text-sm text-[var(--muted)]" colSpan={7}>Add ingredients to start costing.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+        <div className="card">
+          <div className="card-inner">
+            <div className="text-xs text-[var(--muted)]">Recipe Cost</div>
+            <div className="text-2xl font-semibold tabular-nums">{THB(recipeCostTHB)}</div>
+            <div className="mt-3 text-xs text-[var(--muted)]">Cost per Portion</div>
+            <div className="text-2xl font-semibold tabular-nums">{THB(costPerPortionTHB)}</div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-inner">
+            <div className="text-xs text-[var(--muted)]">Menu Price</div>
+            <div className="text-2xl font-semibold tabular-nums">{THB(menuPrice)}</div>
+            <div className="mt-3 text-xs text-[var(--muted)]">Food Cost %</div>
+            <div className={`inline-block mt-1 px-3 py-1 rounded-md text-sm font-semibold ${foodCostPct<=32? "bg-green-100 text-green-800" : foodCostPct<=38? "bg-amber-100 text-amber-800":"bg-rose-100 text-rose-800"}`}>
+              {foodCostPct.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+        <div className="card lg:col-span-1">
+          <div className="card-inner">
+            <div className="text-xs text-[var(--muted)]">Gross Profit (per portion)</div>
+            <div className="text-2xl font-semibold tabular-nums">{THB(gpTHB)}</div>
+            <div className="mt-3 text-xs text-[var(--muted)]">Margin %</div>
+            <div className="text-xl font-semibold tabular-nums">{marginPct.toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Description + Notes */}
+      <div className="card mt-6">
+        <div className="card-inner">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[18px] font-semibold">Menu Description</h3>
+            <button onClick={generateDescription} className="border rounded-xl px-3 py-2 text-sm">Generate with Chef</button>
+          </div>
+          <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Let Chef Ramsay Gordon write something tempting…" className="mt-3 w-full border rounded-xl px-3 py-2" rows={4}/>
+          <div className="mt-3">
+            <div className="text-sm text-[var(--muted)]">Notes (private)</div>
+            <textarea value={note} onChange={e=>setNote(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2" rows={3}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Chef (always visible, reactive) */}
+      <ChefRamsayGordon
+        mode={chefMode}
+        context={{
+          recipeName,
+          lines: linesWithCosts,
+          wastePct,
+          portions,
+          menuPrice,
+          costPerPortionTHB,
+          foodCostPct,
+          gpTHB,
+          marginPct
+        }}
+      />
+    </div>
+  );
+}
+
+2) client/src/shared/ChefRamsayGordon.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(n||0);
+
+type Ctx = {
+  recipeName: string;
+  lines: { name:string; qty:number; unit:string; costTHB:number }[];
+  wastePct: number;
+  portions: number;
+  menuPrice: number;
+  costPerPortionTHB: number;
+  foodCostPct: number;
+  gpTHB: number;
+  marginPct: number;
+};
+
+const PRELOADED_TIPS = [
+  "Target food cost 28–32% for burgers. Adjust portion or price.",
+  "If buns are premium, trim sauce costs to balance.",
+  "Standardize portion scoops. Guesswork kills margins.",
+  "Track supplier price changes weekly. Lock in bulk discounts.",
+  "Batch-prep sauces to cut waste and labor.",
+  "Weigh proteins. A few grams over adds up fast."
+];
+
+const PRELOADED_ROASTS = [
+  "Are you serious adding that? What is this, a charity?",
+  "That portion cost is a disaster. Fix it, now!",
+  "You’re seasoning your margins with tears.",
+  "I’ve seen better costing in a toddler’s lemonade stand.",
+  "That price? You trying to go bankrupt stylishly?",
+  "Stop. Breathe. Re-cost the protein before serving this mess."
+];
+
+export default function ChefRamsayGordon({ mode, context }: { mode:"helpful"|"ramsay"; context: Ctx }){
+  const [open, setOpen] = useState(true);
+  const [messages, setMessages] = useState<{role:"chef"|"user", text:string}[]>([
+    { role:"chef", text:"Right, let's cost this properly. No nonsense." }
+  ]);
+  const roastTimer = useRef<any>(null);
+
+  // Reactive nudges
+  useEffect(()=>{
+    // Simple heuristics
+    if (context.foodCostPct > 38 && mode==="ramsay") pushChef(randomFrom(PRELOADED_ROASTS));
+    else if (context.foodCostPct > 32) pushChef("Food cost is creeping up. Consider portion control or price uptick.");
+    if (context.costPerPortionTHB <= 0 && context.lines.length>0) pushChef("Add quantities to calculate costs, mate.");
+    if (context.wastePct > 15) pushChef("Your waste is too high. Trim, standardize, or renegotiate.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context.foodCostPct, context.costPerPortionTHB, context.wastePct, context.lines.length, mode]);
+
+  // Random roast mode (occasional)
+  useEffect(()=>{
+    if (roastTimer.current) clearInterval(roastTimer.current);
+    roastTimer.current = setInterval(()=>{
+      if (mode==="ramsay" && Math.random() < 0.33) pushChef(randomFrom(PRELOADED_ROASTS));
+      else if (Math.random() < 0.20) pushChef(randomFrom(PRELOADED_TIPS));
+    }, 20000);
+    return ()=> clearInterval(roastTimer.current);
+  }, [mode]);
+
+  function randomFrom<T>(arr:T[]):T{ return arr[Math.floor(Math.random()*arr.length)]; }
+  function pushChef(text:string){ setMessages(m=> [...m, { role:"chef", text }]); }
+  function pushUser(text:string){ setMessages(m=> [...m, { role:"user", text }]); }
+
+  async function sendChat(q:string){
+    pushUser(q);
+    const r = await fetch("/api/chef/chat", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ mode, question:q, context })});
+    const j = await r.json();
+    pushChef(j.text || "I’ve got nothing. Fix your inputs and try again.");
+  }
+
+  const summary = useMemo(()=> {
+    const items = context.lines.map(l=> `${l.name} (${l.qty}${l.unit}, ${THB(l.costTHB)})`).join(", ");
+    return `Name: ${context.recipeName || "Untitled"} | Price: ${THB(context.menuPrice)} | Portions: ${context.portions} | Cost/portion: ${THB(context.costPerPortionTHB)} | Food%: ${context.foodCostPct.toFixed(1)}% | Items: ${items}`;
+  }, [context]);
+
+  return (
+    <div className="fixed right-4 bottom-4 z-50 w-[320px]">
+      <div className="rounded-2xl shadow-lg border bg-white overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 bg-[#0d9488] text-white">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-white/20 border border-white/30 overflow-hidden">
+              {/* Placeholder avatar (swap with your generated image URL if you have one) */}
+              <img alt="Chef Ramsay Gordon" src="https://picsum.photos/seed/chef-ramsay-gordon/64/64" className="w-full h-full object-cover"/>
+            </div>
+            <div className="text-sm font-semibold">Chef Ramsay Gordon</div>
+          </div>
+          <button onClick={()=>setOpen(!open)} className="text-xs underline">{open?"Minimize":"Open"}</button>
+        </div>
+
+        {open && (
+          <>
+            {/* Live context hint */}
+            <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">{summary}</div>
+
+            {/* Messages */}
+            <div className="max-h-72 overflow-auto px-3 py-2 space-y-2">
+              {messages.map((m,idx)=>(
+                <div key={idx} className={`text-sm ${m.role==="chef"?"":"text-right"}`}>
+                  <div className={`inline-block px-3 py-2 rounded-xl ${m.role==="chef"?"bg-gray-100 text-gray-800":"bg-teal-600 text-white"}`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Chat box */}
+            <ChatBox onSend={sendChat} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChatBox({ onSend }:{ onSend:(t:string)=>void }){
+  const [v,setV]=useState("");
+  return (
+    <div className="flex gap-2 p-2 border-t bg-white">
+      <input value={v} onChange={e=>setV(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter" && v.trim()) { onSend(v.trim()); setV(""); }}} placeholder="Ask the Chef…" className="flex-1 border rounded-xl px-3 py-2 text-sm"/>
+      <button onClick={()=>{ if(v.trim()){ onSend(v.trim()); setV(""); }}} className="bg-teal-600 text-white rounded-xl px-3 py-2 text-sm">Send</button>
+    </div>
+  );
+}
+
+Backend
+1) Chef routes — server/routes/chef.ts
+import { Router } from "express";
+import fetch from "node-fetch";
+
+const router = Router();
+
+// Simple safety wrapper so we never emulate a real person.
+// We use a fictional persona "Chef Ramsay Gordon".
+const SYSTEM_PROMPT = (mode:"helpful"|"ramsay") => `
+You are "Chef Ramsay Gordon", a fictional chef persona.
+Tone: ${mode==="ramsay" ? "blunt, sarcastic, funny, short" : "direct, helpful, concise"}.
+NEVER claim to be a real person. Keep replies under 120 words.
+Focus on food cost optimization, substitutions, portion control, supplier strategies, yield and waste reduction.
+When something is silly, you may say: "Are you serious adding that?" sparingly.
+`;
+
+router.post("/chat", async (req, res) => {
+  try {
+    const { mode = "ramsay", question = "", context = {} } = req.body || {};
+    const content = `
+Question: ${question}
+Context: ${JSON.stringify(context)}
+Return: 2-4 sentences max. One concrete tip if possible.
+`;
+    const text = await callOpenAI(SYSTEM_PROMPT(mode), content);
+    res.json({ ok: true, text });
+  } catch (e:any) {
+    console.error(e);
+    res.json({ ok: true, text: "If the API’s down, the maths still works. Check your portions and protein cost first." });
+  }
+});
+
+router.post("/describe", async (req, res) => {
+  try {
+    const { mode = "helpful", recipeName = "", lines = [], targetPrice = 0 } = req.body || {};
+    const content = `
+Create a mouthwatering, concise menu description for: "${recipeName}".
+Ingredients: ${lines.map((l:any)=>`${l.name} (${l.qty}${l.unit})`).join(", ")}
+Style: ${mode==="ramsay"?"bold, cheeky":"elegant, inviting"}
+Max 55 words. No emojis. No brand names.`;
+    const text = await callOpenAI(SYSTEM_PROMPT(mode), content);
+    res.json({ ok: true, text });
+  } catch (e:any) {
+    console.error(e);
+    res.json({ ok: true, text: "Smash-griddled perfection with melty layers and crisp edges. Simple, honest, and outrageously satisfying." });
+  }
+});
+
+export default router;
+
+// --- OpenAI helper (compatible with API key via env) ---
+async function callOpenAI(system:string, content:string){
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method:"POST",
+    headers:{ "Authorization":`Bearer ${apiKey}`, "Content-Type":"application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content }
+      ],
+      temperature: 0.6,
+      max_tokens: 180
+    })
+  });
+  const j:any = await r.json();
+  const text = j?.choices?.[0]?.message?.content || "";
+  return text.trim();
+}
+
+2) Recipes save route — server/routes/recipes.ts
+import { Router } from "express";
+import { Pool } from "pg";
+export const router = Router();
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+router.post("/save", async (req, res) => {
+  try {
+    const { recipeName, note, wastePct, portions, menuPrice, lines, totals, description } = req.body || {};
+    if (!recipeName || !Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Recipe name and at least one ingredient required." });
+
+    // Minimal schema: adjust to your existing Recipe Cards table names/columns
+    const { rows } = await pool.query(
+      `INSERT INTO recipes (name, note, waste_pct, portions, menu_price_thb, totals_json, description, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, now()) RETURNING id`,
+      [recipeName, note||"", wastePct||0, portions||1, menuPrice||0, JSON.stringify(totals||{}), description||""]
+    );
+    const recipeId = rows[0].id;
+
+    const values:any[] = [];
+    const vals = lines.map((l:any, i:number)=>{
+      values.push(recipeId, l.ingredientId, l.name, l.qty, l.unit, l.unitCostTHB, l.costTHB, l.supplier||"");
+      const p = i*8;
+      return `($${p+1}, $${p+2}, $${p+3}, $${p+4}, $${p+5}, $${p+6}, $${p+7}, $${p+8})`;
+    }).join(",");
+
+    await pool.query(
+      `INSERT INTO recipe_lines (recipe_id, ingredient_id, ingredient_name, qty, unit, unit_cost_thb, cost_thb, supplier) VALUES ${vals}`,
+      values
+    );
+
+    res.json({ ok:true, id: recipeId });
+  } catch (e:any) {
+    console.error(e);
+    res.status(500).json({ error: e.message || "Failed to save" });
+  }
+});
+
+export default router;
+
+
+(If you don’t have recipes / recipe_lines tables yet, create minimal ones:)
+
+CREATE TABLE IF NOT EXISTS recipes (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  note TEXT,
+  waste_pct NUMERIC DEFAULT 0,
+  portions INT DEFAULT 1,
+  menu_price_thb NUMERIC DEFAULT 0,
+  totals_json JSONB,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS recipe_lines (
+  id BIGSERIAL PRIMARY KEY,
+  recipe_id BIGINT REFERENCES recipes(id) ON DELETE CASCADE,
+  ingredient_id TEXT,
+  ingredient_name TEXT NOT NULL,
+  qty NUMERIC NOT NULL DEFAULT 0,
+  unit TEXT NOT NULL,
+  unit_cost_thb NUMERIC NOT NULL DEFAULT 0,
+  cost_thb NUMERIC NOT NULL DEFAULT 0,
+  supplier TEXT
+);
+
+Wiring
+
+Register routes:
+
+// server/routes.ts
+import chef from "./routes/chef";
+import recipes from "./routes/recipes";
+app.use("/api/chef", chef);
+app.use("/api/recipes", recipes);
+
+
+Sidebar (Menu Mgmt → Cost Calculator):
+
+// client/src/components/Sidebar.tsx (Menu Mgmt section)
+{ label: "Cost Calculator", path: "/menu/cost-calculator" },
+
+
+Route:
+Place CostCalculator.tsx under client/src/pages/menu/ and ensure your router maps /menu/cost-calculator to it.
+
+Env:
+
+OPENAI_API_KEY=sk-...
+
+How Chef Ramsay Gordon behaves (preloaded)
+
+Always visible bottom-right, collapsible.
+
+Reacts in real time to:
+
+Food cost % drifting high (>32%) → tips; >38% + Ramsay Mode → roast.
+
+Waste % > 15% → warning.
+
+Lines added with zero qty → prompt to enter amounts.
+
+Random roasts every ~20s in Ramsay Mode (33% chance), otherwise helpful tip (20% chance).
+
+Chat uses your context (price, portions, ingredients) to answer succinctly.
+
+Description: one click, returns a tight, menu-ready blurb.
