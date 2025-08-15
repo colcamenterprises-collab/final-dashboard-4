@@ -144,7 +144,7 @@ export default function Sidebar(){
                         className={`sb-item w-full flex items-center ${collapsed ? "justify-center px-0" : "px-3"} ${active ? "sb-active" : "hover:bg-gray-50"}`}
                       >
                         <span className={`text-current ${collapsed ? "" : "mr-3"}`}>{item.icon}</span>
-                        {collapsed ? null : <span className="text-sm">{item.label}</span>}
+                        {collapsed ? null : <span className="text-xs">{item.label}</span>}
                       </button>
                     </li>
                   );
