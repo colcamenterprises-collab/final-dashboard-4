@@ -1,0 +1,221 @@
+1) Email composer (extend your existing email util)
+server/email.ts
+import nodemailer from "nodemailer";
+import { managerChecklistStore } from "./storage"; // from earlier
+import dayjs from "dayjs";
+
+type Money = number;
+const fmtTHB = (n: Money) => "฿" + new Intl.NumberFormat("en-TH", { maximumFractionDigits: 0 }).format(n);
+
+export type SalesSummaryForEmail = {
+  dateISO: string;
+  staff: string;
+  cashStart: Money;
+  cashSales: Money;
+  qrSales: Money;
+  grabSales: Money;
+  aroiDeeSales: Money;
+  directSales: Money;
+  endingCash: Money;
+  cashBanked: Money;
+  qrTransferred: Money;
+};
+
+export type ShoppingLine = { item: string; shop: string; amount: Money };
+export type EmailPayload = {
+  to: string[];
+  sales: SalesSummaryForEmail;
+  shopping: ShoppingLine[];
+};
+
+function checklistSectionHTML(submission: any | null, nightlyIds: string[], allQuestions: {id:string;text:string;area?:string}[]) {
+  if (!submission) {
+    return `
+      <h3 style="margin:24px 0 8px 0;">Manager Checklist</h3>
+      <div style="padding:12px;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;">
+        <strong>STATUS:</strong> <span style="color:#b91c1c;">MISSING</span><br/>
+        <small>Manager has not submitted tonight’s checklist yet.</small>
+      </div>
+    `;
+  }
+
+  const qById = new Map(allQuestions.map(q=>[q.id,q]));
+  const rows = submission.answers.map((a:any)=>({
+    q: qById.get(a.questionId)?.text ?? a.questionId,
+    area: qById.get(a.questionId)?.area ?? "General",
+    value: a.value ? "Yes" : "No",
+    note: a.note || ""
+  }));
+
+  const rowsHTML = rows.map(r => `
+    <tr>
+      <td style="padding:8px;border-bottom:1px solid #eee;">${r.area}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;">${r.q}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;font-weight:600;">${r.value}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;">${r.note}</td>
+    </tr>
+  `).join("");
+
+  const photoHTML = submission.attesterPhotoUrl ? `
+    <div style="margin-top:8px;">
+      <small>Attester photo:</small><br/>
+      <img src="${submission.attesterPhotoUrl}" alt="Manager" style="max-width:200px;border-radius:6px;border:1px solid #eee"/>
+    </div>` : "";
+
+  const notesHTML = submission.shiftNotes ? `
+    <div style="margin-top:12px;padding:12px;border-left:4px solid #3b82f6;background:#eff6ff;border-radius:6px;">
+      <strong>Anonymous Shift Notes</strong><br/>
+      <div style="white-space:pre-wrap;">${submission.shiftNotes}</div>
+    </div>` : "";
+
+  return `
+    <h3 style="margin:24px 0 8px 0;">Manager Checklist</h3>
+    <div style="color:#16a34a;font-weight:700;">STATUS: Completed at ${new Date(submission.completedAtISO).toLocaleTimeString()}</div>
+    ${photoHTML}
+    <table style="margin-top:12px;border-collapse:collapse;width:100%;font-size:14px;">
+      <thead>
+        <tr>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Area</th>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Question</th>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Answer</th>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Note</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHTML}</tbody>
+    </table>
+    ${notesHTML}
+  `;
+}
+
+export async function sendManagementSummaryEmail(payload: EmailPayload) {
+  const { sales, shopping } = payload;
+  const dateISO = sales.dateISO;
+
+  // —— Pull checklist status
+  const [submission, draw, qResp] = await Promise.all([
+    managerChecklistStore.getSubmission(dateISO),
+    managerChecklistStore.getOrCreateNightlyDraw(dateISO, 5),
+    managerChecklistStore.listQuestions()
+  ]);
+
+  // —— Build sections
+  const totals = sales.cashSales + sales.qrSales + sales.grabSales + sales.aroiDeeSales + sales.directSales;
+
+  const shoppingHTML = shopping.length ? `
+    <h3 style="margin:24px 0 8px 0;">Shift Shopping</h3>
+    <table style="border-collapse:collapse;width:100%;font-size:14px;">
+      <thead>
+        <tr>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Item</th>
+          <th align="left" style="padding:8px;border-bottom:2px solid #e5e7eb;">Shop</th>
+          <th align="right" style="padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${shopping.map(s=>`
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #eee;">${s.item}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;">${s.shop}</td>
+            <td align="right" style="padding:8px;border-bottom:1px solid #eee;">${fmtTHB(s.amount)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  ` : `
+    <h3 style="margin:24px 0 8px 0;">Shift Shopping</h3>
+    <div style="color:#6b7280;">No shift shopping recorded.</div>
+  `;
+
+  const checklistHTML = checklistSectionHTML(submission, draw.questionIds, qResp);
+
+  const html = `
+    <div style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+      <h2 style="margin:0 0 12px 0;">Smash Brothers — Management Summary</h2>
+      <div style="color:#6b7280;margin-bottom:20px;">${dayjs(dateISO).format("ddd, D MMM YYYY")} (TH)</div>
+
+      <h3 style="margin:0 0 8px 0;">Sales</h3>
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <tbody>
+          <tr><td style="padding:6px;">Staff</td><td style="padding:6px;">${sales.staff}</td></tr>
+          <tr><td style="padding:6px;">Cash Start</td><td style="padding:6px;">${fmtTHB(sales.cashStart)}</td></tr>
+          <tr><td style="padding:6px;">Cash Sales</td><td style="padding:6px;">${fmtTHB(sales.cashSales)}</td></tr>
+          <tr><td style="padding:6px;">QR Sales</td><td style="padding:6px;">${fmtTHB(sales.qrSales)}</td></tr>
+          <tr><td style="padding:6px;">Grab Sales</td><td style="padding:6px;">${fmtTHB(sales.grabSales)}</td></tr>
+          <tr><td style="padding:6px;">Aroi Dee Sales</td><td style="padding:6px;">${fmtTHB(sales.aroiDeeSales)}</td></tr>
+          <tr><td style="padding:6px;">Direct Sales</td><td style="padding:6px;">${fmtTHB(sales.directSales)}</td></tr>
+          <tr><td style="padding:6px;font-weight:600;">Total Sales</td><td style="padding:6px;font-weight:600;">${fmtTHB(totals)}</td></tr>
+          <tr><td style="padding:6px;">Ending Cash</td><td style="padding:6px;">${fmtTHB(sales.endingCash)}</td></tr>
+          <tr><td style="padding:6px;">Cash Banked</td><td style="padding:6px;">${fmtTHB(sales.cashBanked)}</td></tr>
+          <tr><td style="padding:6px;">QR Transferred</td><td style="padding:6px;">${fmtTHB(sales.qrTransferred)}</td></tr>
+        </tbody>
+      </table>
+
+      ${shoppingHTML}
+
+      ${checklistHTML}
+
+      <div style="margin-top:28px;color:#9ca3af;font-size:12px;">
+        This summary is auto-generated. Line notifications can be enabled once your token is connected.
+      </div>
+    </div>
+  `;
+
+  const transporter = nodemailer.createTransport({
+    // your SMTP creds
+    host: process.env.SMTP_HOST!,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user: process.env.SMTP_USER!, pass: process.env.SMTP_PASS! },
+  });
+
+  await transporter.sendMail({
+    from: `"Restaurant Hub" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    to: payload.to.join(","),
+    subject: `Management Summary — ${dayjs(dateISO).format("D MMM YYYY")}`,
+    html,
+  });
+}
+
+2) Trigger it from your existing Daily Sales submission
+
+Wherever you send the summary now (after Daily Sales is saved), call the new function and pass the shopping lines and sales block.
+
+Example (inside your sales submit route)
+import { sendManagementSummaryEmail } from "../email";
+
+app.post("/api/daily-sales/submit", async (req, res) => {
+  const { dateISO, staff, cashStart, cashSales, qrSales, grabSales, aroiDeeSales, directSales, endingCash, cashBanked, qrTransferred, shopping } = req.body;
+
+  // ...save your sales & shopping to DB...
+
+  await sendManagementSummaryEmail({
+    to: [process.env.MGMT_EMAIL_PRIMARY!, process.env.MGMT_EMAIL_CC || ""].filter(Boolean),
+    sales: {
+      dateISO,
+      staff,
+      cashStart,
+      cashSales,
+      qrSales,
+      grabSales,
+      aroiDeeSales,
+      directSales,
+      endingCash,
+      cashBanked,
+      qrTransferred,
+    },
+    shopping: shopping || [],
+  });
+
+  res.json({ ok: true });
+});
+
+
+If the manager hasn’t completed the checklist yet, the email will show MISSING. When they submit later that night (or next morning), you can re-send on submit by calling sendManagementSummaryEmail(...) from the checklist route too, or just leave it for the next day’s summary.
+
+3) Future: Line push (ready hook)
+
+Once you have a LINE Notify token:
+
+Add LINE_NOTIFY_TOKEN to env
+
+Create sendLine(text) util and call it when submission is missing at a cutoff (e.g., 02:30) or when it’s completed with a red “No” in answers.
