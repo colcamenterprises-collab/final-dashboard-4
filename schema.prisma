@@ -12,54 +12,105 @@ model DailySales {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   status          String   @default("draft") // "draft" or "submitted"
+  shiftDate       String   // "DD/MM/YYYY" (as entered)
+  submittedAtISO  DateTime?
 
   completedBy     String
-  startingCash    Float
+  startingCash    Int      @default(0)
+  endingCash      Int      @default(0)
+  cashBanked      Int      @default(0)
 
   // Sales
-  cashSales       Float
-  qrSales         Float
-  grabSales       Float
-  aroiDeeSales    Float
-  totalSales      Float
+  cashSales       Int      @default(0)
+  qrSales         Int      @default(0)
+  grabSales       Int      @default(0)
+  aroiSales       Int      @default(0) // renamed from aroiDeeSales
+  totalSales      Int      @default(0)
 
-  // Expenses
-  shoppingExpenses Json
-  wages            Json
-  totalExpenses    Float
+  // Expenses totals
+  shoppingTotal   Int      @default(0)
+  wagesTotal      Int      @default(0)
+  othersTotal     Int      @default(0)
+  totalExpenses   Int      @default(0)
 
   // Banking
-  closingCash      Float
-  cashBanked       Float
-  qrTransferred    Float
-  amountBanked     Float
+  closingCash     Int      @default(0)
+  qrTransfer      Int      @default(0)
+
+  // Relations
+  shopping        ShoppingPurchase[]
+  wages           WageEntry[]
+  others          OtherExpense[]
+  stock           DailyStock?
 
   // Notes
-  notes            String?
+  notes           String?
 
   // Soft delete
-  deletedAt        DateTime? // null = active, otherwise hidden
+  deletedAt       DateTime? // null = active, otherwise hidden
   
   // Phase 2 Relations
-  snapshots        ShiftSnapshot[]
-  comparisons      JussiComparison[]
+  snapshots       ShiftSnapshot[]
+  comparisons     JussiComparison[]
+}
+
+model ShoppingPurchase {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  item      String
+  cost      Int      @default(0)
+  shop      String
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("shopping_purchases")
+}
+
+model WageEntry {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  staff     String
+  amount    Int      @default(0)
+  type      String   // WAGES | OVERTIME | BONUS | REIMBURSEMENT
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("wage_entries")
+}
+
+model OtherExpense {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  label     String
+  amount    Int      @default(0)
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("other_expenses")
 }
 
 model DailyStock {
   id                String   @id @default(uuid())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  salesId           String   @unique
+  sales             DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
-  // Link to the Prisma DailySales form entry (already exists); if not available yet, keep nullable for now
-  salesFormId       String?
-  // @relation(fields: [salesFormId], references: [id])
-  // salesForm         DailySales? 
+  // Stock counts (per your ops rules)
+  burgerBuns        Int      @default(0) // end-of-shift count
+  meatWeightG       Int      @default(0) // grams remaining
+  // Drinks by item – simple JSON to stay flexible
+  drinksJson        Json?
 
-  meatGrams         Int
-  burgerBuns        Int
-
-  drinkStock        Json     // full map of drink -> number
-  stockRequests     Json     // full map of item -> number (all items; zeros allowed)
+  // Notes & purchasing needs
+  notes             String?  // free text
+  purchasingJson    Json?    // items requested (>0) from Form 2
 
   // Status
   status            String   @default("submitted") // keep simple for now

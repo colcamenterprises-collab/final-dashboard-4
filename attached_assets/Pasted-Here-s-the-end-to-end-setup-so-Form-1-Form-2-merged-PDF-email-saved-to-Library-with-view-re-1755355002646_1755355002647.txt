@@ -1,0 +1,668 @@
+Here’s the end-to-end setup so Form 1 → Form 2 → merged PDF + email → saved to Library (with view/restore/export). Full files, ready to paste.
+
+0) ENV (once)
+
+Add these (or map to your existing secrets):
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=smashbrothersburgersth@gmail.com
+SMTP_PASS=********
+MAIL_FROM="Smash Brothers <smashbrothersburgersth@gmail.com>"
+MAIL_TO="smashbrothersburgersth@gmail.com"
+APP_BASE_URL=https://your-repl-url.repl.co
+
+1) Prisma schema
+prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DailySales {
+  id            String         @id @default(uuid())
+  createdAt     DateTime       @default(now())
+  shiftDate     String         // "DD/MM/YYYY" (as entered)
+  submittedAtISO DateTime
+
+  completedBy   String
+
+  // Cash management
+  startingCash  Int            @default(0)
+  endingCash    Int            @default(0)
+  cashBanked    Int            @default(0)
+
+  // Sales
+  cashSales     Int            @default(0)
+  qrSales       Int            @default(0)
+  grabSales     Int            @default(0)
+  aroiSales     Int            @default(0)
+  totalSales    Int            @default(0)
+
+  // Expenses totals
+  shoppingTotal Int            @default(0)
+  wagesTotal    Int            @default(0)
+  othersTotal   Int            @default(0)
+  totalExpenses Int            @default(0)
+
+  // Banking
+  closingCash   Int            @default(0)
+  qrTransfer    Int            @default(0)
+
+  // Relations
+  shopping      ShoppingPurchase[]
+  wages         WageEntry[]
+  others        OtherExpense[]
+  stock         DailyStock?
+
+  // Library / archive
+  deletedAt     DateTime?
+}
+
+model ShoppingPurchase {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  item      String
+  cost      Int      @default(0)
+  shop      String
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+}
+
+model WageEntry {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  staff     String
+  amount    Int      @default(0)
+  type      String   // WAGES | OVERTIME | BONUS | REIMBURSEMENT
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+}
+
+model OtherExpense {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  label     String
+  amount    Int      @default(0)
+
+  salesId   String
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+}
+
+model DailyStock {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  salesId      String   @unique
+  sales        DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  // Stock counts (per your ops rules)
+  burgerBuns   Int      @default(0) // end-of-shift count
+  meatWeightG  Int      @default(0) // grams remaining
+  // Drinks by item – simple JSON to stay flexible
+  drinksJson   Json?
+
+  // Notes & purchasing needs
+  notes        String?  // free text
+  purchasingJson Json?  // items requested (>0) from Form 2
+
+  // Library / archive
+  deletedAt    DateTime?
+}
+
+
+Run:
+
+npx prisma generate
+npx prisma migrate dev -n "daily_sales_and_stock_v1"
+
+2) Server libs
+server/lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+let prisma: PrismaClient;
+export function db() {
+  if (!prisma) prisma = new PrismaClient({ log: ["error"] });
+  return prisma;
+}
+
+server/lib/pdf.ts (simple, solid PDF using pdfkit)
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
+import { DailySales, DailyStock, ShoppingPurchase, WageEntry, OtherExpense } from "@prisma/client";
+
+export async function buildDailyReportPDF(opts: {
+  sales: DailySales & { shopping: ShoppingPurchase[]; wages: WageEntry[]; others: OtherExpense[] };
+  stock?: DailyStock | null;
+  outDir?: string;
+}) {
+  const { sales, stock } = opts;
+  const dir = opts.outDir ?? path.join(process.cwd(), "tmp");
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `daily-report-${sales.id}.pdf`);
+  const doc = new PDFDocument({ margin: 40 });
+  const stream = fs.createWriteStream(file);
+  doc.pipe(stream);
+
+  doc.fontSize(18).text("Smash Brothers Burgers — Daily Report", { align: "center" });
+  doc.moveDown(0.5);
+  doc.fontSize(10).text(`Shift Date: ${sales.shiftDate}`);
+  doc.text(`Completed By: ${sales.completedBy}`);
+  doc.text(`Submitted At: ${new Date(sales.submittedAtISO).toLocaleString()}`);
+  doc.moveDown();
+
+  // Sales
+  doc.fontSize(14).text("Sales");
+  doc.fontSize(10)
+    .text(`Cash: ฿${sales.cashSales.toLocaleString()}`)
+    .text(`QR: ฿${sales.qrSales.toLocaleString()}`)
+    .text(`Grab: ฿${sales.grabSales.toLocaleString()}`)
+    .text(`Aroi Dee: ฿${sales.aroiSales.toLocaleString()}`)
+    .text(`Total Sales: ฿${sales.totalSales.toLocaleString()}`);
+  doc.moveDown();
+
+  // Expenses
+  doc.fontSize(14).text("Expenses");
+  doc.fontSize(12).text("Shopping");
+  doc.fontSize(10);
+  sales.shopping.forEach(s => doc.text(`• ${s.item} — ฿${s.cost.toLocaleString()} (${s.shop})`));
+  doc.text(`Subtotal: ฿${sales.shoppingTotal.toLocaleString()}`).moveDown(0.5);
+
+  doc.fontSize(12).text("Wages");
+  doc.fontSize(10);
+  sales.wages.forEach(w => doc.text(`• ${w.staff} — ฿${w.amount.toLocaleString()} (${w.type})`));
+  doc.text(`Subtotal: ฿${sales.wagesTotal.toLocaleString()}`).moveDown(0.5);
+
+  doc.fontSize(12).text("Other");
+  doc.fontSize(10);
+  sales.others.forEach(o => doc.text(`• ${o.label} — ฿${o.amount.toLocaleString()}`));
+  doc.text(`Subtotal: ฿${sales.othersTotal.toLocaleString()}`).moveDown(0.5);
+
+  doc.fontSize(12).text(`Total Expenses: ฿${sales.totalExpenses.toLocaleString()}`);
+  doc.moveDown();
+
+  // Banking
+  doc.fontSize(14).text("Banking");
+  doc.fontSize(10)
+    .text(`Starting Cash: ฿${sales.startingCash.toLocaleString()}`)
+    .text(`Ending Cash: ฿${sales.endingCash.toLocaleString()}`)
+    .text(`Cash Banked: ฿${sales.cashBanked.toLocaleString()}`)
+    .text(`QR Transfer: ฿${sales.qrTransfer.toLocaleString()}`);
+  doc.moveDown();
+
+  // Stock
+  if (stock) {
+    doc.fontSize(14).text("Stock (End of Shift)");
+    doc.fontSize(10)
+      .text(`Burger Buns: ${stock.burgerBuns}`)
+      .text(`Meat Remaining: ${stock.meatWeightG} g`);
+    if (stock.drinksJson) doc.text(`Drinks: ${JSON.stringify(stock.drinksJson)}`);
+    if (stock.purchasingJson) doc.text(`Purchasing Requests: ${JSON.stringify(stock.purchasingJson)}`);
+    if (stock.notes) doc.text(`Notes: ${stock.notes}`);
+    doc.moveDown();
+  }
+
+  doc.end();
+  await new Promise(res => stream.on("finish", res));
+  return file;
+}
+
+server/lib/email.ts
+import nodemailer from "nodemailer";
+const tx = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT ?? 587),
+  secure: false,
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
+
+export async function sendDailyReportMail(args: { subject: string; html: string; attachments?: { filename: string; path: string }[] }) {
+  const from = process.env.MAIL_FROM!;
+  const to = process.env.MAIL_TO!;
+  await tx.sendMail({ from, to, subject: args.subject, html: args.html, attachments: args.attachments });
+}
+
+3) Routes (Form 1, Form 2, Library)
+server/routes/forms.ts
+import { Router } from "express";
+import { db } from "../lib/prisma";
+import { buildDailyReportPDF } from "../lib/pdf";
+import { sendDailyReportMail } from "../lib/email";
+
+export const formsRouter = Router();
+
+/**
+ * Form 1 — Daily Sales
+ */
+formsRouter.post("/daily-sales", async (req, res) => {
+  const body = req.body ?? {};
+  const prisma = db();
+
+  // create sales + children in a single transaction
+  const sales = await prisma.dailySales.create({
+    data: {
+      shiftDate: body.shiftDate,
+      submittedAtISO: new Date(body.submittedAtISO ?? new Date()),
+      completedBy: body.completedBy ?? "",
+
+      startingCash: body.cashManagement?.startingCash ?? 0,
+      endingCash: body.cashManagement?.endingCash ?? 0,
+      cashBanked: body.cashManagement?.cashBanked ?? 0,
+
+      cashSales: body.sales?.cashSales ?? 0,
+      qrSales: body.sales?.qrSales ?? 0,
+      grabSales: body.sales?.grabSales ?? 0,
+      aroiSales: body.sales?.aroiSales ?? 0,
+      totalSales: body.sales?.totalSales ?? 0,
+
+      shoppingTotal: body.expenses?.totals?.shoppingTotal ?? 0,
+      wagesTotal: body.expenses?.totals?.wagesTotal ?? 0,
+      othersTotal: body.expenses?.totals?.othersTotal ?? 0,
+      totalExpenses: body.expenses?.totals?.totalExpenses ?? 0,
+
+      closingCash: body.banking?.closingCash ?? 0,
+      qrTransfer: body.banking?.qrTransfer ?? 0,
+
+      shopping: {
+        create: (body.expenses?.shopping ?? []).map((r: any) => ({
+          item: r.item ?? "",
+          cost: Number(r.cost ?? 0),
+          shop: r.shop ?? "",
+        })),
+      },
+      wages: {
+        create: (body.expenses?.wages ?? []).map((r: any) => ({
+          staff: r.staff ?? "",
+          amount: Number(r.amount ?? 0),
+          type: r.type ?? "WAGES",
+        })),
+      },
+      others: {
+        create: (body.expenses?.others ?? []).map((r: any) => ({
+          label: r.label ?? "",
+          amount: Number(r.amount ?? 0),
+        })),
+      },
+    },
+    include: { shopping: true, wages: true, others: true },
+  });
+
+  // Return salesId so client can route to Form 2
+  res.json({ ok: true, salesId: sales.id });
+});
+
+/**
+ * Form 2 — Daily Stock (links to a DailySales entry by salesId)
+ * On completion: generate merged PDF + email
+ */
+formsRouter.post("/daily-stock", async (req, res) => {
+  const body = req.body ?? {};
+  const prisma = db();
+
+  const salesId = String(body.salesId);
+  if (!salesId) return res.status(400).send("Missing salesId");
+
+  const stock = await prisma.dailyStock.upsert({
+    where: { salesId },
+    update: {
+      burgerBuns: body.burgerBuns ?? 0,
+      meatWeightG: body.meatWeightG ?? 0,
+      drinksJson: body.drinksJson ?? null,
+      purchasingJson: body.purchasingJson ?? null,
+      notes: body.notes ?? null,
+    },
+    create: {
+      salesId,
+      burgerBuns: body.burgerBuns ?? 0,
+      meatWeightG: body.meatWeightG ?? 0,
+      drinksJson: body.drinksJson ?? null,
+      purchasingJson: body.purchasingJson ?? null,
+      notes: body.notes ?? null,
+    },
+  });
+
+  // Load full sales + children for PDF
+  const sales = await prisma.dailySales.findUnique({
+    where: { id: salesId },
+    include: { shopping: true, wages: true, others: true },
+  });
+  if (!sales) return res.status(404).send("Sales not found");
+
+  // Build PDF
+  const pdfPath = await buildDailyReportPDF({ sales, stock });
+
+  // Email
+  const subject = `Daily Report — ${sales.shiftDate} — ${sales.completedBy}`;
+  const html = `
+    <h2>Smash Brothers — Daily Report</h2>
+    <p><b>Date:</b> ${sales.shiftDate}</p>
+    <p><b>By:</b> ${sales.completedBy}</p>
+    <p>Total Sales: ฿${sales.totalSales.toLocaleString()} | Total Expenses: ฿${sales.totalExpenses.toLocaleString()}</p>
+  `;
+  await sendDailyReportMail({ subject, html, attachments: [{ filename: `daily-report-${sales.shiftDate}.pdf`, path: pdfPath }] });
+
+  res.json({ ok: true, stockId: stock.id, pdf: pdfPath });
+});
+
+server/routes/library.ts
+import { Router } from "express";
+import { db } from "../lib/prisma";
+import { buildDailyReportPDF } from "../lib/pdf";
+import path from "path";
+
+export const libraryRouter = Router();
+
+// List (most recent first)
+libraryRouter.get("/", async (req, res) => {
+  const prisma = db();
+  const rows = await prisma.dailySales.findMany({
+    where: { deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    include: { stock: true },
+    take: 200,
+  });
+  res.json({ rows });
+});
+
+// Archived
+libraryRouter.get("/archived", async (_req, res) => {
+  const prisma = db();
+  const rows = await prisma.dailySales.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: "desc" },
+    include: { stock: true },
+    take: 200,
+  });
+  res.json({ rows });
+});
+
+// Soft delete / restore
+libraryRouter.post("/:id/archive", async (req, res) => {
+  const prisma = db();
+  await prisma.dailySales.update({ where: { id: String(req.params.id) }, data: { deletedAt: new Date() } });
+  res.json({ ok: true });
+});
+libraryRouter.post("/:id/restore", async (req, res) => {
+  const prisma = db();
+  await prisma.dailySales.update({ where: { id: String(req.params.id) }, data: { deletedAt: null } });
+  res.json({ ok: true });
+});
+
+// View PDF (regenerate on demand)
+libraryRouter.get("/:id/pdf", async (req, res) => {
+  const prisma = db();
+  const sales = await prisma.dailySales.findUnique({
+    where: { id: String(req.params.id) },
+    include: { shopping: true, wages: true, others: true, stock: true },
+  });
+  if (!sales) return res.status(404).send("Not found");
+  const pdf = await buildDailyReportPDF({ sales, stock: sales.stock ?? undefined, outDir: path.join(process.cwd(), "tmp") });
+  res.download(pdf);
+});
+
+// Export range (YYYY-MM-DD to YYYY-MM-DD)
+libraryRouter.get("/export", async (req, res) => {
+  const prisma = db();
+  const from = new Date(String(req.query.from));
+  const to = new Date(String(req.query.to));
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return res.status(400).send("Bad range");
+  const rows = await prisma.dailySales.findMany({
+    where: { createdAt: { gte: from, lte: to }, deletedAt: null },
+    orderBy: { createdAt: "asc" },
+    include: { stock: true },
+  });
+  res.json({ rows }); // (Keep simple JSON; front-end can zip PDFs if needed)
+});
+
+server/index.ts (wire routers)
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { formsRouter } from "./routes/forms";
+import { expensesRouter } from "./routes/expenses"; // from earlier step
+import { libraryRouter } from "./routes/library";
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+
+app.use("/api/forms", formsRouter);
+app.use("/api/expenses", expensesRouter);
+app.use("/api/library", libraryRouter);
+
+// static (if serving client)
+app.use(express.static(path.join(process.cwd(), "dist")));
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on :${port}`));
+
+4) Client — Form 1: auto-route to Form 2 with salesId
+
+Update your Form 1 submit handler in src/pages/DailySalesStock.tsx:
+
+async function onSubmit() {
+  const res = await fetch("/api/forms/daily-sales", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return alert(`Save failed: ${res.status} ${await res.text()}`);
+  const { salesId } = await res.json();
+  // store for convenience
+  localStorage.setItem("currentSalesId", salesId);
+  // → Form 2
+  navigate("/operations/daily-stock?salesId=" + salesId);
+}
+
+5) Client — Form 2 page
+src/pages/DailyStockForm.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+export default function DailyStockForm() {
+  const navigate = useNavigate();
+  const [sp] = useSearchParams();
+  const salesId = sp.get("salesId") || localStorage.getItem("currentSalesId") || "";
+
+  const [burgerBuns, setBurgerBuns] = useState<number>(0);
+  const [meatWeightG, setMeatWeightG] = useState<number>(0);
+
+  // Simple drinks map
+  const [drinks, setDrinks] = useState<Record<string, number>>({
+    "Coke 330ml": 0,
+    "Coke Zero 330ml": 0,
+    "Sprite 330ml": 0,
+    "Fanta 330ml": 0,
+    "Water 600ml": 0,
+  });
+
+  const [notes, setNotes] = useState("");
+  const [purchasing, setPurchasing] = useState<Record<string, number>>({}); // >0 requests
+
+  const canSubmit = useMemo(() => !!salesId, [salesId]);
+
+  async function onSubmit() {
+    const res = await fetch("/api/forms/daily-stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        salesId,
+        burgerBuns,
+        meatWeightG,
+        drinksJson: drinks,
+        purchasingJson: purchasing,
+        notes,
+      }),
+    });
+    if (!res.ok) return alert(`Save failed: ${res.status} ${await res.text()}`);
+    alert("Form 2 saved. PDF emailed.");
+    navigate("/operations/daily-sales-library");
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold">Daily Stock (Form 2)</h1>
+        <div className="flex gap-2">
+          <button className="px-3 py-2 border rounded-xl" onClick={() => navigate(-1)}>Back</button>
+          <button disabled={!canSubmit} className="px-3 py-2 border rounded-xl bg-emerald-600 text-white disabled:opacity-50" onClick={onSubmit}>
+            Submit & Email PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-5 shadow-sm mb-5">
+        <div className="text-lg font-semibold mb-3">Core Counts</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="text-sm font-medium">
+            Burger Buns (end-of-shift)
+            <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2" value={burgerBuns} onChange={(e) => setBurgerBuns(Number(e.target.value))} />
+          </label>
+          <label className="text-sm font-medium">
+            Meat Remaining (grams)
+            <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2" value={meatWeightG} onChange={(e) => setMeatWeightG(Number(e.target.value))} />
+          </label>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-5 shadow-sm mb-5">
+        <div className="text-lg font-semibold mb-3">Drinks</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {Object.keys(drinks).map(k => (
+            <label key={k} className="text-sm font-medium">
+              {k}
+              <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2" value={drinks[k]} onChange={(e) => setDrinks(d => ({ ...d, [k]: Number(e.target.value) }))} />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-5 shadow-sm mb-5">
+        <div className="text-lg font-semibold mb-3">Purchasing Requests</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {["Buns", "Beef", "Cheese", "Bacon", "Fries", "Sauce"].map(k => (
+            <label key={k} className="text-sm font-medium">
+              {k}
+              <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2"
+                value={purchasing[k] ?? 0}
+                onChange={(e) => setPurchasing(p => ({ ...p, [k]: Number(e.target.value) }))} />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="text-lg font-semibold mb-3">Notes</div>
+        <textarea className="w-full border rounded-xl px-3 py-2" rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+    </div>
+  );
+}
+
+Add route
+
+Add a route constant and whitelist entry for /operations/daily-stock
+
+Register the page in App.tsx
+
+// RouteRegistry.ts
+export const ROUTES = {
+  /* ...existing... */
+  DAILY_STOCK: "/operations/daily-stock",
+} as const;
+
+export const ALLOWED_PATHS = [
+  /* ...existing... */
+  "/operations/daily-stock",
+];
+
+// App.tsx
+import DailyStockForm from "./pages/DailyStockForm";
+/* ... */
+<Route path={ROUTES.DAILY_STOCK} element={<Guard><DailyStockForm /></Guard>} />
+
+6) Client — Library page wired to API (date as title, archive/restore, view PDF, export)
+src/pages/DailySalesLibrary.tsx (replace)
+import { useEffect, useState } from "react";
+
+type Row = {
+  id: string; createdAt: string; shiftDate: string; completedBy: string;
+  totalSales: number; totalExpenses: number;
+  stock?: { id: string } | null;
+};
+
+export default function DailySalesLibrary() {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [archived, setArchived] = useState<Row[]>([]);
+  const [tab, setTab] = useState<"active"|"archived">("active");
+  const [from, setFrom] = useState<string>(""); // YYYY-MM-DD
+  const [to, setTo] = useState<string>("");
+
+  async function load() {
+    const r = await fetch("/api/library").then(r=>r.json());
+    setRows(r.rows);
+    const a = await fetch("/api/library/archived").then(r=>r.json());
+    setArchived(a.rows);
+  }
+  useEffect(()=>{ void load(); },[]);
+
+  async function archive(id: string) { await fetch(`/api/library/${id}/archive`, { method: "POST" }); await load(); }
+  async function restore(id: string) { await fetch(`/api/library/${id}/restore`, { method: "POST" }); await load(); }
+  function viewPdf(id: string) { window.open(`/api/library/${id}/pdf`, "_blank"); }
+  async function exportRange() {
+    if (!from || !to) return alert("Select from & to");
+    const url = `/api/library/export?from=${from}&to=${to}`;
+    const r = await fetch(url).then(r=>r.json());
+    const blob = new Blob([JSON.stringify(r.rows, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `daily-library-${from}_to_${to}.json`;
+    a.click();
+  }
+
+  const list = tab==="active" ? rows : archived;
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold">Daily Sales Library</h1>
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="border rounded-lg px-2 py-1"/>
+          <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="border rounded-lg px-2 py-1"/>
+          <button className="px-3 py-2 border rounded-xl" onClick={exportRange}>Export Range</button>
+        </div>
+      </div>
+
+      <div className="mb-3 flex gap-2">
+        <button onClick={()=>setTab("active")} className={`px-3 py-1 rounded-lg border ${tab==="active"?"bg-emerald-600 text-white":""}`}>Active</button>
+        <button onClick={()=>setTab("archived")} className={`px-3 py-1 rounded-lg border ${tab==="archived"?"bg-emerald-600 text-white":""}`}>Archived</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {list.map((m) => (
+          <div key={m.id} className="border rounded-xl p-4 bg-white">
+            <div className="font-semibold">{m.shiftDate}</div>
+            <div className="text-sm text-neutral-500">By {m.completedBy}</div>
+            <div className="mt-2 text-sm">Sales: ฿{m.totalSales.toLocaleString()} | Expenses: ฿{m.totalExpenses.toLocaleString()}</div>
+            <div className="mt-3 flex gap-2">
+              <button className="px-3 py-1 border rounded-lg" onClick={() => viewPdf(m.id)}>View PDF</button>
+              {tab==="active" ? (
+                <button className="px-3 py-1 border rounded-lg" onClick={() => archive(m.id)}>Archive</button>
+              ) : (
+                <button className="px-3 py-1 border rounded-lg" onClick={() => restore(m.id)}>Restore</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
