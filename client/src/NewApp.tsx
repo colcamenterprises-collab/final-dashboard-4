@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -51,6 +51,7 @@ function App() {
                   </GuardedRoute>
                 }
               />
+              {/* Hard-redirect any unknown path to NotFound (guard will still run) */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
