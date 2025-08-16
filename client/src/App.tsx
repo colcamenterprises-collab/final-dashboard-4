@@ -1,113 +1,77 @@
-/**
- * ⚠️ LOCKED FILE — Route Registry implementation.
- * This is the FINAL implementation used in production. All alternatives were removed on purpose.
- */
-
-import { Route, Switch } from "wouter";
+// src/App.tsx
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import PageShell from "./components/PageShell";
+import Sidebar from "./components/Sidebar";
+import NotFound from "./pages/NotFound";
 
-// Import only the golden locked pages
+// Existing pages you already have:
 import Overview from "./pages/dashboard/Overview";
 import DailySalesStock from "./pages/operations/DailySalesStock";
 import DailySalesLibrary from "./pages/operations/DailySalesLibrary";
+import Receipts from "./pages/Receipts";
+import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
 
-// Placeholder pages that need to be created
-function UploadStatements() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Upload Statements</h1>
-      <p className="text-gray-600">Bank and credit statement upload functionality</p>
-    </div>
-  );
+// New/Restored pages:
+import UploadStatements from "./pages/UploadStatements";
+import ProfitLoss from "./pages/ProfitLoss";
+import CostCalculator from "./pages/CostCalculator";
+import Ingredients from "./pages/Ingredients";
+import NightlyChecklist from "./pages/NightlyChecklist";
+import JussiOps from "./pages/JussiOps";
+import JaneAccounts from "./pages/JaneAccounts";
+
+import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
+
+function Guard({ children }: { children: JSX.Element }) {
+  const { pathname } = useLocation();
+  return isAllowedPath(pathname) ? children : <NotFound />;
 }
 
-function Receipts() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">POS Receipts</h1>
-      <p className="text-gray-600">View and manage POS receipt data</p>
-    </div>
-  );
-}
-
-function ShiftSummary() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Shift Summary</h1>
-      <p className="text-gray-600">Detailed shift analysis and reporting</p>
-    </div>
-  );
-}
-
-function ProfitAndLoss() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Profit & Loss</h1>
-      <p className="text-gray-600">Monthly P&L reporting with Jan-Dec columns</p>
-    </div>
-  );
-}
-
-function Ingredients() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Ingredients</h1>
-      <p className="text-gray-600">Manage ingredient database and pricing</p>
-    </div>
-  );
-}
-
-function CostCalculator() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Cost Calculator</h1>
-      <p className="text-gray-600">Calculate recipe costs with Chef Ramsay AI</p>
-    </div>
-  );
-}
-
-function NightlyChecklist() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Manager's Nightly Checklist</h1>
-      <p className="text-gray-600">Randomized operational tasks with Thai support</p>
-    </div>
-  );
-}
-
-function App() {
-  return (
-    <PageShell>
-      <Switch>
-        <Route path="/" component={Overview} />
-        <Route path="/daily-sales" component={DailySalesStock} />
-        <Route path="/daily-sales-library" component={DailySalesLibrary} />
-        <Route path="/upload-statements" component={UploadStatements} />
-        <Route path="/receipts" component={Receipts} />
-        <Route path="/shift-summary" component={ShiftSummary} />
-        <Route path="/profit-and-loss" component={ProfitAndLoss} />
-        <Route path="/ingredients" component={Ingredients} />
-        <Route path="/cost-calculator" component={CostCalculator} />
-        <Route path="/managers-nightly-checklist" component={NightlyChecklist} />
-        <Route component={() => <div className="p-6 text-center"><h1 className="text-xl">Page Not Found</h1></div>} />
-      </Switch>
-    </PageShell>
-  );
-}
-
-function AppWrapper() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <App />
+        <BrowserRouter>
+          <div className="min-h-screen w-full flex bg-neutral-50">
+            <Sidebar />
+            <PageShell>
+              <Suspense fallback={<div className="p-6">Loading…</div>}>
+                <Routes>
+                  {/* Dashboard */}
+                  <Route path={ROUTES.OVERVIEW} element={<Guard><Overview /></Guard>} />
+
+                  {/* Operations */}
+                  <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
+                  <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
+                  <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
+                  <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
+                  <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
+
+                  {/* Finance */}
+                  <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
+
+                  {/* Menu Mgmt */}
+                  <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
+                  <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
+
+                  {/* Managers / AI */}
+                  <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
+                  <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
+                  <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </PageShell>
+          </div>
+          <Toaster />
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
-export default AppWrapper;

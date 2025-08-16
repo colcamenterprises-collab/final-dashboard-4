@@ -1,0 +1,327 @@
+copy/paste in this order.
+
+1) Routes allow-list
+src/router/RouteRegistry.ts
+// src/router/RouteRegistry.ts
+export const ROUTES = {
+  // Dashboard
+  OVERVIEW: "/",
+
+  // Operations
+  DAILY_SALES_STOCK: "/operations/daily-sales-stock",
+  DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
+  UPLOAD_STATEMENTS: "/operations/upload-statements",
+  RECEIPTS: "/operations/receipts",
+  SHIFT_SUMMARY: "/operations/shift-summary",
+
+  // Finance
+  PROFIT_LOSS: "/finance/profit-loss",
+
+  // Menu Mgmt
+  COST_CALCULATOR: "/menu/cost-calculator",
+  INGREDIENTS: "/menu/ingredients",
+
+  // Managers / AI
+  NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
+  JUSSI_AI: "/ai/jussi-ops",
+  JANE_ACCOUNTS: "/ai/jane-accounts",
+} as const;
+
+export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
+
+export const ALLOWED_PATHS: string[] = [
+  // Dashboard
+  ROUTES.OVERVIEW,
+
+  // Operations
+  ROUTES.DAILY_SALES_STOCK,
+  ROUTES.DAILY_SALES_LIBRARY,
+  ROUTES.UPLOAD_STATEMENTS,
+  ROUTES.RECEIPTS,
+  ROUTES.SHIFT_SUMMARY,
+
+  // Finance
+  ROUTES.PROFIT_LOSS,
+
+  // Menu Mgmt
+  ROUTES.COST_CALCULATOR,
+  ROUTES.INGREDIENTS,
+
+  // Managers / AI
+  ROUTES.NIGHTLY_CHECKLIST,
+  ROUTES.JUSSI_AI,
+  ROUTES.JANE_ACCOUNTS,
+];
+
+export const isAllowedPath = (path: string) =>
+  ALLOWED_PATHS.includes((path || "/").replace(/\/+$/, "") || "/");
+
+2) App routes
+src/App.tsx
+// src/App.tsx
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Suspense } from "react";
+import PageShell from "./layouts/PageShell";
+import Sidebar from "./components/Sidebar";
+import NotFound from "./pages/NotFound";
+
+// Existing pages you already have:
+import Overview from "./pages/Overview";
+import DailySalesStock from "./pages/DailySalesStock";
+import DailySalesLibrary from "./pages/DailySalesLibrary";
+import Receipts from "./pages/Receipts";
+import ShiftSummary from "./pages/ShiftSummary";
+
+// New/Restored pages below:
+import UploadStatements from "./pages/UploadStatements";
+import ProfitLoss from "./pages/ProfitLoss";
+import CostCalculator from "./pages/CostCalculator";
+import Ingredients from "./pages/Ingredients";
+import NightlyChecklist from "./pages/NightlyChecklist";
+import JussiOps from "./pages/JussiOps";
+import JaneAccounts from "./pages/JaneAccounts";
+
+import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
+
+function Guard({ children }: { children: JSX.Element }) {
+  const { pathname } = useLocation();
+  return isAllowedPath(pathname) ? children : <NotFound />;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen w-full flex bg-neutral-50">
+        <Sidebar />
+        <PageShell>
+          <Suspense fallback={<div className="p-6">Loading…</div>}>
+            <Routes>
+              {/* Dashboard */}
+              <Route path={ROUTES.OVERVIEW} element={<Guard><Overview /></Guard>} />
+
+              {/* Operations */}
+              <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
+              <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
+              <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
+              <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
+              <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
+
+              {/* Finance */}
+              <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
+
+              {/* Menu Mgmt */}
+              <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
+              <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
+
+              {/* Managers / AI */}
+              <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
+              <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
+              <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </PageShell>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+3) Sidebar with the sections you remember
+src/components/Sidebar.tsx
+// src/components/Sidebar.tsx
+import { NavLink } from "react-router-dom";
+import { ROUTES } from "../router/RouteRegistry";
+
+const item = "block px-4 py-2 rounded-xl hover:bg-emerald-600/10";
+const active = "bg-emerald-600 text-white hover:bg-emerald-600";
+const group = "px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-400";
+
+const Link = ({ to, children }: { to: string; children: React.ReactNode }) => (
+  <NavLink to={to} className={({ isActive }) => `${item} ${isActive ? active : ""}`}>
+    {children}
+  </NavLink>
+);
+
+export default function Sidebar() {
+  return (
+    <aside className="w-72 border-r bg-white min-h-screen">
+      <div className="px-5 py-4 border-b">
+        <div className="font-extrabold text-lg">Smash Brothers</div>
+      </div>
+
+      <nav className="p-4">
+        <div className={group}>Dashboard</div>
+        <Link to={ROUTES.OVERVIEW}>Overview</Link>
+
+        <div className={group}>Operations</div>
+        <Link to={ROUTES.DAILY_SALES_STOCK}>Daily Sales & Stock</Link>
+        <Link to={ROUTES.DAILY_SALES_LIBRARY}>Daily Sales Library</Link>
+        <Link to={ROUTES.UPLOAD_STATEMENTS}>Upload Statements</Link>
+        <Link to={ROUTES.RECEIPTS}>Receipts</Link>
+        <Link to={ROUTES.SHIFT_SUMMARY}>Shift Summary</Link>
+
+        <div className={group}>Finance</div>
+        <Link to={ROUTES.PROFIT_LOSS}>Profit & Loss</Link>
+
+        <div className={group}>Menu Mgmt</div>
+        <Link to={ROUTES.COST_CALCULATOR}>Cost Calculator</Link>
+        <Link to={ROUTES.INGREDIENTS}>Ingredients</Link>
+
+        <div className={group}>Managers</div>
+        <Link to={ROUTES.NIGHTLY_CHECKLIST}>Nightly Checklist</Link>
+        <Link to={ROUTES.JUSSI_AI}>Jussi (Ops AI)</Link>
+        <Link to={ROUTES.JANE_ACCOUNTS}>Jane (Accounting)</Link>
+      </nav>
+    </aside>
+  );
+}
+
+4) Restored page shells
+
+Create these files (simple, clean stubs so nothing 404s; we’ll wire functionality after):
+
+src/pages/UploadStatements.tsx
+export default function UploadStatements() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Upload Statements</h1>
+      <p className="text-neutral-600 mb-4">Attach bank/POS statements for reconciliation.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <input type="file" className="block mb-3" multiple />
+        <button className="px-3 py-2 border rounded-xl">Upload</button>
+      </div>
+    </div>
+  );
+}
+
+src/pages/ProfitLoss.tsx
+export default function ProfitLoss() {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Profit & Loss</h1>
+      <p className="text-neutral-600 mb-4">Monthly P&L reporting with Jan–Dec columns.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm overflow-x-auto">
+        <table className="min-w-[800px] w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left p-2">Account</th>
+              {months.map(m => <th key={m} className="text-right p-2">{m}</th>)}
+              <th className="text-right p-2">YTD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {["Sales","COGS","Gross Profit","Expenses","Net Profit"].map(row => (
+              <tr key={row} className="border-t">
+                <td className="p-2 font-medium">{row}</td>
+                {months.map(m => <td key={m} className="p-2 text-right">0</td>)}
+                <td className="p-2 text-right font-semibold">0</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+src/pages/CostCalculator.tsx
+export default function CostCalculator() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Cost Calculator</h1>
+      <p className="text-neutral-600 mb-4">Calculate recipe costs with Chef Ramsay AI.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="text-sm font-medium">Recipe Name
+            <input className="mt-1 w-full border rounded-xl px-3 py-2" placeholder="e.g., Double Smash"/>
+          </label>
+          <label className="text-sm font-medium">Yield (servings)
+            <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2" defaultValue={1}/>
+          </label>
+          <label className="text-sm font-medium">Target Margin %
+            <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2" defaultValue={70}/>
+          </label>
+        </div>
+        <div className="mt-4">
+          <button className="px-3 py-2 border rounded-xl">Add Ingredient</button>
+          <button className="ml-2 px-3 py-2 border rounded-xl bg-emerald-600 text-white">Calculate</button>
+        </div>
+        <div className="mt-4 text-sm text-neutral-500">
+          (We’ll hook this to Ingredients + Chef Ramsay chat when you’re ready.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+src/pages/Ingredients.tsx
+export default function Ingredients() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Ingredients</h1>
+      <p className="text-neutral-600 mb-4">Ingredient master with units & latest costs.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <button className="px-3 py-2 border rounded-xl">Add Ingredient</button>
+        <div className="mt-4 text-sm text-neutral-500">
+          (Connect to supplier uploads / Expenses to auto-update costs.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+src/pages/NightlyChecklist.tsx
+export default function NightlyChecklist() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Nightly Checklist</h1>
+      <p className="text-neutral-600 mb-4">Randomized 5 tasks, photo on first, shift notes.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <button className="px-3 py-2 border rounded-xl">Start Checklist</button>
+        <div className="text-sm text-neutral-500 mt-3">
+          (We’ll connect this to the Manager Summary email + Library.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+src/pages/JussiOps.tsx
+export default function JussiOps() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Jussi — Ops AI</h1>
+      <p className="text-neutral-600 mb-4">Daily ops analysis and recommendations.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="text-sm text-neutral-500">
+          (Chat panel & daily analysis stream will appear here.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+src/pages/JaneAccounts.tsx
+export default function JaneAccounts() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-2">Jane — Accounting</h1>
+      <p className="text-neutral-600 mb-4">Reconciliation, P&L rollups, vendor statements.</p>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="text-sm text-neutral-500">
+          (We’ll wire her to statements + receipts for automated reconciliation.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Sanity checklist (1 minute)
+
+Sidebar shows all sections: Operations, Finance, Menu Mgmt, Managers (including Cost Calculator, Ingredients, Profit & Loss, Nightly Checklist, Jussi, Jane).
+
+Clicking every item renders a page (no 404).
+
+Guard is still on (allow-list includes all paths).
