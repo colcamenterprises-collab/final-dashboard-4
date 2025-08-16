@@ -15,7 +15,6 @@ import chef from "./routes/chef";
 import recipes from "./routes/recipes";
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
-import { expensesRouter } from "./routes/expenses";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -1781,9 +1780,6 @@ export function registerRoutes(app: express.Application): Server {
     app.get('/api/forms/:id', formsModule.getForm);
     app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
-
-  // Expenses Routes
-  app.use('/api/expenses', expensesRouter);
 
   // Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
