@@ -35,14 +35,16 @@ export default function DashboardModern() {
         <h1 className="text-3xl md:text-[34px] font-extrabold tracking-tight">
           Good morning, Cam
         </h1>
-        <div className="flex items-center gap-3">
-          <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+        <div className="flex items-center gap-4">
+          <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-lg px-4 py-2 text-sm bg-white">
             <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
           </select>
           <button className="rounded-lg bg-emerald-600 text-white text-sm px-4 py-2 font-medium">Download report</button>
-          <span className="text-sm text-gray-600">Your balance</span>
-          <span className="text-emerald-700 font-semibold">฿566.55</span>
-          <div className="w-8 h-8 rounded-full bg-gray-200" />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Your balance</span>
+            <span className="text-emerald-700 font-semibold">฿566.55</span>
+            <div className="w-8 h-8 rounded-full bg-gray-200" />
+          </div>
         </div>
       </header>
 
