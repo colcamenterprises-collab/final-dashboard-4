@@ -1,0 +1,219 @@
+1) Golden file list (what must exist and be used)
+
+Tell the agent: “Only these routes/components are the source of truth. Delete or rename nothing outside this list without my approval.”
+
+client/src/App.tsx                           # Router (Wouter) with the FINAL route map
+
+# Shell / shared UI
+client/src/components/Sidebar.tsx
+client/src/components/Topbar.tsx
+client/src/components/PageShell.tsx          # shared page paddings, headings, shadows (the new template)
+
+# Dashboard
+client/src/pages/dashboard/Overview.tsx      # "Home" (Overview) – FINAL look and spacing
+
+# Operations
+client/src/pages/operations/DailySalesStock.tsx        # FINAL locked Daily Sales & Stock form (2-step)
+client/src/pages/operations/DailySalesLibrary.tsx      # Library/list view of submissions
+client/src/pages/operations/UploadStatements.tsx
+client/src/pages/operations/Receipts.tsx
+client/src/pages/operations/ShiftSummary.tsx
+
+# Finance
+client/src/pages/finance/ProfitAndLoss.tsx
+
+# Menu Mgmt
+client/src/pages/menu/Ingredients.tsx
+client/src/pages/menu/CostCalculator.tsx               # With Chef “Ramsay Gordon” sidebar assistant
+
+# Managers
+client/src/pages/managers/NightlyChecklist.tsx         # Randomized, photo-on-open, notes
+
+# Shared utils, styles, and api
+client/src/lib/api.ts
+client/src/lib/validators.ts
+client/src/lib/ui.ts
+client/src/styles/tailwind.css
+
+# Server / storage (single implementation)
+server/routes.ts
+server/storage.ts
+shared/schema.ts
+
+
+If any “old”, “copy”, “backup”, “v1/v2/v3” components exist for these areas—delete them.
+
+2) Route registry (single source of truth)
+
+Create/update client/src/App.tsx to import exactly these pages and export a centralized route list. Nothing else should mount a page.
+
+// client/src/App.tsx
+import { Route, Switch } from "wouter";
+import PageShell from "./components/PageShell";
+
+// Pages (final)
+import Overview from "./pages/dashboard/Overview";
+import DailySalesStock from "./pages/operations/DailySalesStock";
+import DailySalesLibrary from "./pages/operations/DailySalesLibrary";
+import UploadStatements from "./pages/operations/UploadStatements";
+import Receipts from "./pages/operations/Receipts";
+import ShiftSummary from "./pages/operations/ShiftSummary";
+import ProfitAndLoss from "./pages/finance/ProfitAndLoss";
+import Ingredients from "./pages/menu/Ingredients";
+import CostCalculator from "./pages/menu/CostCalculator";
+import NightlyChecklist from "./pages/managers/NightlyChecklist";
+
+export default function App() {
+  return (
+    <PageShell>
+      <Switch>
+        <Route path="/" component={Overview} />
+        <Route path="/daily-sales" component={DailySalesStock} />
+        <Route path="/daily-sales-library" component={DailySalesLibrary} />
+        <Route path="/upload-statements" component={UploadStatements} />
+        <Route path="/receipts" component={Receipts} />
+        <Route path="/shift-summary" component={ShiftSummary} />
+        <Route path="/profit-and-loss" component={ProfitAndLoss} />
+        <Route path="/ingredients" component={Ingredients} />
+        <Route path="/cost-calculator" component={CostCalculator} />
+        <Route path="/managers-nightly-checklist" component={NightlyChecklist} />
+      </Switch>
+    </PageShell>
+  );
+}
+
+
+Guard rail: All new routes must be added here. Anywhere else = build fails (see §4).
+
+3) Lock banners (cannot be edited without approval)
+
+At the very top of these files add the banner comment:
+
+client/src/pages/operations/DailySalesStock.tsx
+
+shared/schema.ts
+
+server/routes.ts
+
+server/storage.ts
+
+client/src/pages/dashboard/Overview.tsx
+
+client/src/components/PageShell.tsx
+
+/**
+ * ⚠️ LOCKED FILE — Do not replace or “refactor” without Cam’s written approval.
+ * This is the FINAL implementation used in production. All alternatives were removed on purpose.
+ */
+
+4) Prebuild protector (block margin hacks, legacy filenames, rogue routes)
+
+Add a small Node script and wire it into package.json so the build fails if someone re-introduces bad patterns.
+
+scripts/guard-build.js
+
+import fs from "fs";
+import glob from "glob";
+
+// 1) Disallow hard-coded left paddings/margins for layout (we use PageShell)
+const layoutBad = /(ml-|pl-|margin-left:|padding-left:).(64|72|256|280|sidebar)/i;
+
+// 2) Disallow legacy/duplicate filenames that agents tend to re-create
+const legacyName = /(old|backup|copy|legacy|v\d+|_old|_bak)\.(tsx|ts|jsx|js)$/i;
+
+// 3) Only routes allowed (must match App.tsx)
+const allowedRoutes = new Set([
+  "/", "/daily-sales", "/daily-sales-library", "/upload-statements",
+  "/receipts", "/shift-summary", "/profit-and-loss",
+  "/ingredients", "/cost-calculator", "/managers-nightly-checklist"
+]);
+
+function die(msg) { console.error("\n⛔  " + msg + "\n"); process.exit(1); }
+
+// Scan source files
+const files = glob.sync("client/src/**/*.{ts,tsx,js,jsx}");
+const offenders = files.filter(f => layoutBad.test(fs.readFileSync(f, "utf8")));
+if (offenders.length) die("Blocked build: hard-coded page layout found:\n" + offenders.join("\n"));
+
+// Scan for legacy names
+const legacies = files.filter(f => legacyName.test(f));
+if (legacies.length) die("Blocked build: legacy file names detected:\n" + legacies.join("\n"));
+
+// Enforce route single-source (search for Route components)
+const routesSrc = files
+  .filter(f => f.endsWith("App.tsx"))
+  .map(f => fs.readFileSync(f, "utf8"))
+  .join("\n");
+
+const routeMatches = [...routesSrc.matchAll(/path\s*=\s*"(.*?)"/g)].map(m => m[1]);
+const unknown = routeMatches.filter(p => !allowedRoutes.has(p));
+if (unknown.length) die("Blocked build: unknown routes registered:\n" + unknown.join("\n"));
+
+console.log("✅ Layout and route guard passed.");
+
+
+package.json
+
+{
+  "scripts": {
+    "prebuild": "node ./scripts/guard-build.js",
+    "build": "vite build"
+  }
+}
+
+5) Legacy file purge (one-time clean)
+
+Ask the agent to run this search and show you any hits; then delete them:
+
+# show suspicious duplicates
+rg -n --iglob '!node_modules' '(DailySales|SalesForm|StockForm|Form).*\.tsx'
+rg -n --iglob '!node_modules' '(old|backup|copy|legacy|v[0-9]|_old|_bak)\.(tsx|ts|jsx|js)$'
+rg -n --iglob '!node_modules' '(Daily|Sales).*\.{tsx,ts}' client/src/pages
+
+# remove known legacy dirs if present
+rm -rf client/src/pages/old client/src/pages/legacy client/src/pages/forms-old
+
+6) README.locked (human guardrails)
+
+README.locked.md
+
+# LOCKDOWN NOTICE
+
+These files are FINAL and must not be replaced or reintroduced under any other names:
+
+- Daily Sales & Stock form: `client/src/pages/operations/DailySalesStock.tsx`
+- Profit & Loss: `client/src/pages/finance/ProfitAndLoss.tsx`
+- Cost Calculator: `client/src/pages/menu/CostCalculator.tsx`
+- Ingredients: `client/src/pages/menu/Ingredients.tsx`
+- Nightly Manager Checklist: `client/src/pages/managers/NightlyChecklist.tsx`
+- App Route Registry: `client/src/App.tsx`
+- Server storage & routes: `server/storage.ts`, `server/routes.ts`, `shared/schema.ts`
+
+If you want to change UI styles, do it via:
+- `client/src/components/PageShell.tsx` (spacing, heading sizes, shadows)
+- `client/src/components/Sidebar.tsx` and `Topbar.tsx`
+
+Do NOT create alternates like `*Old.tsx`, `*Copy.tsx`, `*v2.tsx`. The build will fail.
+
+7) Git snapshot (quick rollback)
+
+Ask the agent to create a tagged snapshot:
+
+git add -A
+git commit -m "LOCKED: final forms + guard rails"
+git tag -a locked-forms-v1 -m "Golden snapshot of locked forms"
+git push --follow-tags
+
+
+If anything ever regresses, you can instantly roll back:
+
+git reset --hard locked-forms-v1
+
+8) Husky (optional) local pre-commit
+
+If you want local guardrails too:
+
+npm i -D husky
+npx husky init
+echo 'npm run prebuild' > .husky/pre-commit
+chmod +x .husky/pre-commit
