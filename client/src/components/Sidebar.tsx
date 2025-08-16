@@ -15,64 +15,39 @@ const Icon = {
   calc:  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h3M8 15h3M13 15h3"/></svg>,
 };
 
-/* Groups + items */
+/* Groups + items - Updated to match actual routes */
 const NAV = [
   {
     title: "Dashboard",
-    items: [{ label: "Overview", path: "/dashboard", icon: Icon.grid }],
+    items: [{ label: "Overview", path: "/", icon: Icon.grid }],
   },
   {
     title: "Operations",
     items: [
-      { label: "Daily Sales & Stock", path: "/operations/daily", icon: Icon.form },
-      { label: "Daily Sales Library", path: "/operations/daily-sales/library", icon: Icon.list },
-      { label: "Expenses",     path: "/expenses", icon: Icon.money },
-      { label: "Upload Statements",   path: "/expense-upload",    icon: Icon.file },
+      { label: "Daily Sales & Stock", path: "/daily-sales", icon: Icon.form },
+      { label: "Daily Sales Library", path: "/daily-sales-library", icon: Icon.list },
+      { label: "Upload Statements",   path: "/upload-statements",    icon: Icon.file },
       { label: "Receipts",     path: "/receipts", icon: Icon.file },
-      { label: "Shift Summary", path: "/operations/analysis/shift-summary", icon: Icon.chart },
-      { label: "Delivery Partners", path: "/operations/delivery", icon: Icon.list },
-      { label: "Shift Reports",     path: "/operations/reports",  icon: Icon.file },
+      { label: "Shift Summary", path: "/shift-summary", icon: Icon.chart },
     ],
   },
   {
     title: "Finance",
     items: [
-      { label: "Profit & Loss",       path: "/finance/pnl",       icon: Icon.money },
-      { label: "Analysis",            path: "/finance/analysis",  icon: Icon.chart },
-      { label: "Forecast & Budget",   path: "/finance/forecast",  icon: Icon.list },
-      { label: "Supplier Payments",   path: "/finance/suppliers", icon: Icon.list },
-      { label: "Cash Flow",           path: "/finance/cashflow",  icon: Icon.money },
-      { label: "Tax & Compliance",    path: "/finance/tax",       icon: Icon.file },
+      { label: "Profit & Loss", path: "/profit-and-loss", icon: Icon.money },
     ],
   },
   {
     title: "Menu Mgmt",
     items: [
-      { label: "Cost Calculator",  path: "/menu/cost-calculator", icon: Icon.calc },
-      { label: "Menu Import",      path: "/menu/import",          icon: Icon.file },
-      { label: "Ingredient Mgmt",  path: "/ingredients",     icon: Icon.list },
-      { label: "Recipe Cards",     path: "/recipes",         icon: Icon.file },
-      { label: "Menu Performance", path: "/menu/performance",     icon: Icon.chart },
-      { label: "Seasonal Planner", path: "/menu/seasonal",        icon: Icon.list },
-    ],
-  },
-  {
-    title: "Marketing",
-    items: [
-      { label: "Add Reviews",        path: "/marketing/reviews",    icon: Icon.star },
-      { label: "Social Posting",     path: "/marketing/social",     icon: Icon.meg },
-      { label: "Campaign Analytics", path: "/marketing/analytics",  icon: Icon.chart },
-      { label: "Loyalty & Rewards",  path: "/marketing/loyalty",    icon: Icon.star },
-      { label: "Email/SMS Automation", path: "/marketing/automation", icon: Icon.list },
-      { label: "Promotions Manager", path: "/marketing/promotions", icon: Icon.meg },
+      { label: "Cost Calculator",  path: "/cost-calculator", icon: Icon.calc },
+      { label: "Ingredients",  path: "/ingredients",     icon: Icon.list },
     ],
   },
   {
     title: "Managers",
     items: [
-      { label: "Nightly Checklist", path: "/managers/checklist", icon: Icon.form },
-      { label: "Checklist History", path: "/managers/history",   icon: Icon.list },
-      { label: "Admin Questions",   path: "/managers/admin",     icon: Icon.grid },
+      { label: "Nightly Checklist", path: "/managers-nightly-checklist", icon: Icon.form },
     ],
   },
 ];

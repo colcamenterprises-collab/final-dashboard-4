@@ -21,6 +21,8 @@ const dailySalesSchema = z.object({
   cashStart: z.number().min(0, 'Starting cash must be positive'),
   cashEnd: z.number().min(0, 'Ending cash must be positive'),
   cashBanked: z.number().min(0, 'Cash banked must be positive'),
+  cashSales: z.number().min(0, 'Cash sales must be positive'),
+  qrSales: z.number().min(0, 'QR sales must be positive'),
   grabSales: z.number().min(0, 'Grab sales must be positive'),
   aroiDeeSales: z.number().min(0, 'Aroi Dee sales must be positive'),
   burgerBunsStart: z.number().min(0, 'Starting buns must be positive'),
@@ -45,6 +47,8 @@ export default function DailySalesStock() {
       cashStart: 0,
       cashEnd: 0,
       cashBanked: 0,
+      cashSales: 0,
+      qrSales: 0,
       grabSales: 0,
       aroiDeeSales: 0,
       burgerBunsStart: 0,
@@ -197,6 +201,24 @@ export default function DailySalesStock() {
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Sales Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="cashSales">Cash Sales (฿)</Label>
+              <Input
+                id="cashSales"
+                type="number"
+                step="0.01"
+                {...form.register('cashSales', { valueAsNumber: true })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="qrSales">QR Sales (฿)</Label>
+              <Input
+                id="qrSales"
+                type="number"
+                step="0.01"
+                {...form.register('qrSales', { valueAsNumber: true })}
+              />
+            </div>
             <div>
               <Label htmlFor="grabSales">Grab Sales (฿)</Label>
               <Input

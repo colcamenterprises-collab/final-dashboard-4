@@ -1601,21 +1601,19 @@ export function registerRoutes(app: express.Application): Server {
       
       const data = {
         completedBy: payload.completedBy || 'Unknown',
-        startingCash: Number(payload.cashStart) || 0, // Updated field name
+        startingCash: Number(payload.cashStart) || 0,
         cashSales: Number(payload.cashSales) || 0,
         qrSales: Number(payload.qrSales) || 0,
         grabSales: Number(payload.grabSales) || 0,
         aroiDeeSales: Number(payload.aroiDeeSales) || 0,
-        directSales: Number(payload.directSales) || 0, // Added directSales
-        totalSales: payload.totalSales || (Number(payload.cashSales) + Number(payload.qrSales) + Number(payload.grabSales) + Number(payload.aroiDeeSales) + Number(payload.directSales)),
-        shoppingExpenses: JSON.stringify(payload.shopping || []),
-        wages: JSON.stringify(payload.wages || []),
-        otherMoneyOut: JSON.stringify(payload.otherMoneyOut || []), // Added other money out
+        totalSales: Number(payload.totalSales) || (Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.aroiDeeSales || 0)),
+        shoppingExpenses: payload.shopping || {},
+        wages: payload.wages || {},
         totalExpenses: Number(payload.totalExpenses) || 0,
-        closingCash: Number(payload.endingCash) || 0, // Updated field name
+        closingCash: Number(payload.endingCash) || 0,
         cashBanked: Number(payload.cashBanked) || 0,
         qrTransferred: Number(payload.qrTransferred) || 0,
-        amountBanked: Number(payload.cashBanked) || 0,
+        amountBanked: Number(payload.amountBanked) || 0,
         notes: payload.notes || null,
         status: 'submitted'
       };

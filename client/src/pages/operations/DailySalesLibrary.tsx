@@ -45,8 +45,8 @@ export default function DailySalesLibrary() {
 
   useEffect(() => {
     const filtered = records.filter(record => 
-      record.shiftDate.includes(searchTerm) ||
-      record.completedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.shiftDate?.includes(searchTerm) ||
+      record.completedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.notes?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredRecords(filtered);
