@@ -1,5 +1,29 @@
+a full drop-in file that restores:
+
+Shift info (auto timestamp + Completed By)
+
+Cash Management (Starting, Ending, Cash Banked)
+
+Sales (Cash, QR, Grab, Aroi Dee → Total Sales auto)
+
+Expenses
+
+Shopping Purchases (Item, Cost, Shop Name; add/remove rows)
+
+Wages (Staff, Amount, Type: Wages/Overtime/Bonus/Reimbursement; add/remove rows)
+
+Other Expenses (label + amount; add/remove rows)
+
+Total Expenses auto
+
+Banking (Closing Cash, Cash Banked, QR Transfer Amount)
+
+Back button and Submit (POSTs to /api/forms/daily-sales as a single payload)
+
+Replace this file
+src/pages/DailySalesStock.tsx
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 
 type WageType = "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT";
 
@@ -10,7 +34,7 @@ type OtherRow = { id: string; label: string; amount: number };
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function DailySalesStock() {
-  const [location, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");
@@ -164,7 +188,7 @@ export default function DailySalesStock() {
     }
     alert("Saved.");
     // On success → route to Stock (Form 2) if you want:
-    // setLocation("/operations/daily-stock");  // or whatever your Form 2 path is
+    // navigate("/operations/daily-stock");  // or whatever your Form 2 path is
   }
 
   const box = "rounded-2xl border bg-white p-5 shadow-sm";
@@ -178,7 +202,7 @@ export default function DailySalesStock() {
         <div className="flex gap-2">
           <button
             className="px-3 py-2 border rounded-xl"
-            onClick={() => window.history.back()}
+            onClick={() => navigate(-1)}
           >
             Back
           </button>
@@ -565,3 +589,47 @@ export default function DailySalesStock() {
     </div>
   );
 }
+
+Minimal backend stub (so Submit doesn’t 500)
+
+Add this route if you don’t have it yet:
+
+server/routes/forms.ts
+
+import { Router } from "express";
+export const formsRouter = Router();
+
+formsRouter.post("/daily-sales", async (req, res) => {
+  // TODO: persist to Prisma (DailySales)
+  console.log("[daily-sales] payload", req.body);
+  return res.json({ ok: true });
+});
+
+
+Wire it in your server entry:
+
+server/index.ts
+
+import express from "express";
+import cors from "cors";
+import { formsRouter } from "./routes/forms";
+// ...other imports
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+
+app.use("/api/forms", formsRouter);
+// existing routes...
+
+Quick test
+
+Reload the app → Daily Sales & Stock shows all sections.
+
+Add a couple of Shopping/Wages/Other rows → Total Expenses updates live.
+
+Enter sales numbers → Total Sales updates live.
+
+Back button works.
+
+Click Submit → expect 200 OK and a “[daily-sales] payload” log on the server.

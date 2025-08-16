@@ -15,6 +15,7 @@ import chef from "./routes/chef";
 import recipes from "./routes/recipes";
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
+import { formsRouter } from "./routes/forms";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2114,6 +2115,9 @@ export function registerRoutes(app: express.Application): Server {
   // Register Upload and Import routes
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
+  
+  // Register Forms routes
+  app.use('/api/forms', formsRouter);
   
   // Register Manager Checklist routes
   // Enhanced Manager Checklist endpoints
