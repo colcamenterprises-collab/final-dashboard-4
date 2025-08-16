@@ -54,42 +54,47 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// POST /api/forms - Create new daily sales form (Form 1)
-router.post("/", async (req, res) => {
+// POST /api/forms/daily-sales - Create new daily sales form (Form 1)
+router.post("/daily-sales", async (req, res) => {
   try {
-    const salesData = req.body;
+    const body = req.body;
     
-    // Calculate totals from related data
-    const shoppingItems = salesData.shopping || [];
-    const wageItems = salesData.wages || [];
-    const otherItems = salesData.others || [];
+    // Extract data from new payload structure
+    const shoppingItems = body.expenses?.shopping || [];
+    const wageItems = body.expenses?.wages || [];
+    const otherItems = body.expenses?.others || [];
 
     const shoppingTotal = shoppingItems.reduce((sum: number, item: any) => sum + (item.cost || 0), 0);
     const wagesTotal = wageItems.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
     const othersTotal = otherItems.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
     const totalExpenses = shoppingTotal + wagesTotal + othersTotal;
-    const totalSales = (salesData.cashSales || 0) + (salesData.qrSales || 0) + (salesData.grabSales || 0) + (salesData.aroiSales || 0);
+    const totalSales = body.sales?.totalSales || 0;
 
     const form = await db().dailySales.create({
       data: {
-        status: salesData.status || "draft",
-        shiftDate: salesData.shiftDate || new Date().toISOString().split('T')[0],
-        completedBy: salesData.completedBy,
-        startingCash: salesData.startingCash || 0,
-        endingCash: salesData.endingCash || 0,
-        cashBanked: salesData.cashBanked || 0,
-        cashSales: salesData.cashSales || 0,
-        qrSales: salesData.qrSales || 0,
-        grabSales: salesData.grabSales || 0,
-        aroiSales: salesData.aroiSales || 0,
+        status: body.status || "draft",
+        shiftDate: body.shiftDate || new Date().toISOString().split('T')[0],
+        completedBy: body.completedBy,
+        startingCash: body.cashManagement?.startingCash || 0,
+        // Map closingCash from banking section to endingCash
+        endingCash: Number(
+          body.banking?.closingCash ??
+          body.cashManagement?.endingCash ??
+          0
+        ),
+        cashBanked: body.banking?.cashBanked || 0,
+        cashSales: body.sales?.cashSales || 0,
+        qrSales: body.sales?.qrSales || 0,
+        grabSales: body.sales?.grabSales || 0,
+        aroiSales: body.sales?.aroiSales || 0,
         totalSales,
         shoppingTotal,
         wagesTotal,
         othersTotal,
         totalExpenses,
-        closingCash: salesData.closingCash || 0,
-        qrTransfer: salesData.qrTransfer || 0,
-        notes: salesData.notes || null
+        closingCash: body.banking?.closingCash || 0,
+        qrTransfer: body.banking?.qrTransfer || 0,
+        notes: body.notes || null
       }
     });
 
@@ -126,18 +131,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Fetch the complete form with relations
-    const completeForm = await db().dailySales.findUnique({
-      where: { id: form.id },
-      include: {
-        shopping: true,
-        wages: true,
-        others: true,
-        stock: true
-      }
-    });
-
-    res.status(201).json(completeForm);
+    // Return the salesId that the frontend expects
+    res.status(201).json({ salesId: form.id, message: "Form 1 saved successfully" });
   } catch (error) {
     console.error("Error creating sales form:", error);
     res.status(500).json({ error: "Internal server error" });

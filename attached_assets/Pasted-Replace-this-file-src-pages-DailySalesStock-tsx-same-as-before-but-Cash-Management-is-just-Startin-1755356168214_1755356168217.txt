@@ -1,5 +1,10 @@
+Replace this file
+src/pages/DailySalesStock.tsx
+
+(same as before but Cash Management is just Starting Cash; no Ending/Cash Banked here; payload adjusted)
+
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 
 type WageType = "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT";
 type ShoppingRow = { id: string; item: string; cost: number; shop: string };
@@ -9,7 +14,7 @@ type OtherRow = { id: string; label: string; amount: number };
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function DailySalesStock() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");
@@ -94,7 +99,7 @@ export default function DailySalesStock() {
     const { salesId } = await res.json();
     localStorage.setItem("currentSalesId", salesId);
     // push to Form 2 when you add it
-    // setLocation("/operations/daily-stock?salesId=" + salesId);
+    // navigate("/operations/daily-stock?salesId=" + salesId);
     alert("Saved Form 1.");
   }
 
@@ -107,7 +112,7 @@ export default function DailySalesStock() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">Daily Sales & Stock Form</h1>
         <div className="flex gap-2">
-          <button className="px-3 py-2 border rounded-xl" onClick={() => window.history.back()}>Back</button>
+          <button className="px-3 py-2 border rounded-xl" onClick={() => navigate(-1)}>Back</button>
           <button className="px-3 py-2 border rounded-xl bg-emerald-600 text-white" onClick={onSubmit}>Submit</button>
         </div>
       </div>
@@ -267,3 +272,24 @@ export default function DailySalesStock() {
     </div>
   );
 }
+
+Small server tweak (mirror Closing→Ending)
+
+So the DB’s endingCash gets the value you enter as Closing Cash.
+
+server/routes/forms.ts (Form 1 handler)
+
+Change the create data mapping for endingCash:
+
+// before
+endingCash: body.cashManagement?.endingCash ?? 0,
+
+// after (derive from Banking.ClosingCash if provided)
+endingCash: Number(
+  body.banking?.closingCash ??
+  body.cashManagement?.endingCash ??
+  0
+),
+
+
+Everything else stays the same.
