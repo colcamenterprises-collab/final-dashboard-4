@@ -1,0 +1,131 @@
+You have my approval to delete every file in your list and then create the missing “golden” files per the lockdown spec.
+
+1) Delete these now (all of them)
+
+Legacy form files
+
+DailyShiftForm.tsx.backup
+
+DailyShiftForm.tsx
+
+DailySalesAndStockForm.tsx
+
+DailyStockForm.tsx
+
+DailyStockSales.tsx
+
+DailyStockSalesNew.tsx
+
+DailyStockSalesQuick.tsx
+
+DailyStockSalesSchema.tsx
+
+DailyStockSalesSearch.tsx
+
+DailyStockSalesSimple.tsx
+
+SalesForm.tsx
+
+Legacy dashboard files
+
+DashboardModern.tsx (keep only the golden Overview page)
+
+Legacy form-library files
+
+DraftForms.tsx
+
+DraftFormsLibrary.tsx
+
+FormLibrary.tsx
+
+FormView.tsx
+
+FormsLibrary.tsx
+
+PastForms.tsx
+
+2) Before deleting – make a safety tag
+git add -A
+git commit -m "Pre-lock cleanup snapshot"
+git tag -a pre-lock-snapshot -m "Snapshot before legacy purge"
+git push --follow-tags
+
+3) Create the missing golden files
+
+Create these exact paths and wire them to the current, working versions you see in the app today:
+
+client/src/components/PageShell.tsx            # shared layout, paddings, headings, shadows
+client/src/pages/dashboard/Overview.tsx        # Home page (final)
+client/src/pages/operations/DailySalesLibrary.tsx
+client/src/pages/operations/DailySalesStock.tsx  # 2-step Daily Sales & Stock (the locked version)
+
+
+For each of the above files: add the LOCKED banner at the very top:
+
+/**
+ * ⚠️ LOCKED FILE — Do not replace or refactor without Cam’s written approval.
+ * This is the FINAL implementation used in production. All alternatives were removed on purpose.
+ */
+
+
+Use the versions that match what Cam reviewed yesterday (no schema or layout changes, only the agreed styling).
+
+4) Route registry (single source)
+
+Replace client/src/App.tsx with the Route Registry we provided in the lockdown kit so only these routes are mounted:
+
+/ → Overview
+
+/daily-sales → DailySalesStock
+
+/daily-sales-library → DailySalesLibrary
+
+/upload-statements → UploadStatements
+
+/receipts → Receipts
+
+/shift-summary → ShiftSummary
+
+/profit-and-loss → ProfitAndLoss
+
+/ingredients → Ingredients
+
+/cost-calculator → CostCalculator
+
+/managers-nightly-checklist → NightlyChecklist
+
+5) Guard the build
+
+Add the prebuild guard (as sent earlier):
+
+scripts/guard-build.js
+
+package.json → "prebuild": "node ./scripts/guard-build.js"
+
+Then run:
+
+node scripts/guard-build.js
+npm run build
+
+
+Paste the guard output in your reply.
+
+6) Final commit & tag
+git add -A
+git commit -m "LOCKDOWN: delete legacy files, add golden pages, add build guards"
+git tag -a locked-forms-v1 -m "Golden snapshot of locked forms"
+git push --follow-tags
+
+7) Report back with:
+
+The deletion list actually removed (paths).
+
+Confirmation the four golden files were created and contain the LOCKED banner.
+
+guard-build output (should say “✅ Layout and route guard passed.”).
+
+Screenshot of the app running with the Daily Sales & Stock form exactly as yesterday’s locked version and the Daily Sales Library visible.
+
+Diff or commit hash for locked-forms-v1.
+
+Proceed.

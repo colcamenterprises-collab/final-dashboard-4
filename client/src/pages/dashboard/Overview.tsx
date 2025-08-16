@@ -1,34 +1,72 @@
-import { useState } from "react";
+/**
+ * ⚠️ LOCKED FILE — Do not replace or refactor without Cam's written approval.
+ * This is the FINAL implementation used in production. All alternatives were removed on purpose.
+ */
+
+import React, { useEffect, useMemo, useState } from 'react';
 import ManagerChecklistStatusCard from "@/components/ManagerChecklistStatusCard";
 
-const fmt = (n:number, d=0)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:d}).format(n);
+type DashboardDTO = {
+  snapshot: {
+    id: string;
+    windowStartUTC: string;
+    windowEndUTC: string;
+    totalReceipts: number;
+    totalSalesTHB: number;
+    reconcileState: 'OK'|'MISMATCH'|'MISSING_DATA';
+    reconcileNotes?: string | null;
+    payments: { channel: 'CASH'|'QR'|'GRAB'|'CARD'|'OTHER'; count: number; totalTHB: number }[];
+  } | null;
+  expenses?: { totalTHB: number; linesCount: number };
+  comparison?: {
+    opening: { buns: number|null; meatGram: number|null; drinks: number|null };
+    purchases: { buns: number; meatGram: number; drinks: number };
+    usagePOS: { buns: number; meatGram: number; drinks: number };
+    expectedClose: { buns: number; meatGram: number; drinks: number };
+    staffClose: { buns: number|null; meatGram: number|null; drinks: number|null };
+    variance: { buns: number|null; meatGram: number|null; drinks: number|null };
+    state: 'OK'|'MISMATCH'|'MISSING_DATA';
+  } | null;
+  balance?: {
+    staff: { closingCashTHB: number; cashBankedTHB: number; qrTransferTHB: number };
+    pos: { cashTHB: number; qrTHB: number; grabTHB: number };
+    diffs: { cashTHB: number; qrTHB: number };
+  };
+  topItems?: { itemName: string; qty: number; revenueTHB: number }[];
+};
 
+const currency = (n: number) =>
+  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(n);
+
+const fmt = (n: number) => n.toLocaleString();
+
+// Sample data for display
 const KPIS = [
-  { label: "Total sales", value: 321000, prefix: "฿" },
-  { label: "Orders", value: 22000 },
-  { label: "Avg order", value: 789, prefix: "฿" },
-  { label: "Status", value: "OK" },
+  { label: "Total Orders", value: 1249, prefix: "" },
+  { label: "Total Revenue", value: 89542, prefix: "฿" },
+  { label: "Growth", value: "+12.5%", prefix: "" },
+  { label: "Active Items", value: 32, prefix: "" }
 ];
 
 const payments = [
-  { method: "CASH", amount: 3457 },
-  { method: "OTHER", amount: 4210 },
+  { method: "Cash", amount: 35420 },
+  { method: "QR Code", amount: 28150 },
+  { method: "Card", amount: 15970 },
+  { method: "Grab/Food", amount: 10002 }
 ];
 
 const best = [
-  { name: "Ultimate Double", price: 2100, qty: 9 },
-  { name: "Cheesy Bacon", price: 833, qty: 7 },
-  { name: "Single Smash", price: 824, qty: 5 },
-  { name: "Sweet Potato Fries", price: 396, qty: 4 },
-  { name: "Classic Burger", price: 550, qty: 3 },
+  { name: "Classic Burger", qty: 45, price: 189 },
+  { name: "Cheese Deluxe", qty: 38, price: 219 },
+  { name: "BBQ Special", qty: 32, price: 249 }
 ];
 
-export default function DashboardModern() {
+export default function Overview() {
   const [period, setPeriod] = useState("This year");
   const payTotal = payments.reduce((a,b)=>a+b.amount,0);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
