@@ -9,9 +9,8 @@ const router = Router();
 // GET /api/forms - List all submitted forms for the library
 router.get("/", async (req, res) => {
   try {
-    const forms = await db().dailySales.findMany({
+    const forms = await db().dailySalesV2.findMany({
       where: {
-        status: "submitted",
         deletedAt: null
       },
       include: {
@@ -33,7 +32,7 @@ router.get("/", async (req, res) => {
 // GET /api/forms/:id - Get specific form with all details
 router.get("/:id", async (req, res) => {
   try {
-    const form = await db().dailySales.findUnique({
+    const form = await db().dailySalesV2.findUnique({
       where: { id: req.params.id },
       include: {
         shopping: true,
@@ -70,10 +69,10 @@ router.post("/daily-sales", async (req, res) => {
     const totalExpenses = shoppingTotal + wagesTotal + othersTotal;
     const totalSales = body.sales?.totalSales || 0;
 
-    const form = await db().dailySales.create({
+    const form = await db().dailySalesV2.create({
       data: {
-        status: body.status || "draft",
         shiftDate: body.shiftDate || new Date().toISOString().split('T')[0],
+        submittedAtISO: new Date(),
         completedBy: body.completedBy,
         startingCash: body.cashManagement?.startingCash || 0,
         // Map closingCash from banking section to endingCash
@@ -92,15 +91,13 @@ router.post("/daily-sales", async (req, res) => {
         wagesTotal,
         othersTotal,
         totalExpenses,
-        closingCash: body.banking?.closingCash || 0,
-        qrTransfer: body.banking?.qrTransfer || 0,
-        notes: body.notes || null
+        qrTransfer: body.banking?.qrTransfer || 0
       }
     });
 
     // Create related records
     if (shoppingItems.length > 0) {
-      await db().shoppingPurchase.createMany({
+      await db().shoppingPurchaseV2.createMany({
         data: shoppingItems.map((item: any) => ({
           item: item.item,
           cost: item.cost,
@@ -111,7 +108,7 @@ router.post("/daily-sales", async (req, res) => {
     }
 
     if (wageItems.length > 0) {
-      await db().wageEntry.createMany({
+      await db().wageEntryV2.createMany({
         data: wageItems.map((item: any) => ({
           staff: item.staff,
           amount: item.amount,
@@ -122,7 +119,7 @@ router.post("/daily-sales", async (req, res) => {
     }
 
     if (otherItems.length > 0) {
-      await db().otherExpense.createMany({
+      await db().otherExpenseV2.createMany({
         data: otherItems.map((item: any) => ({
           label: item.label,
           amount: item.amount,
