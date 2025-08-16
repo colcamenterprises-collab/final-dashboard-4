@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 
 type WageType = "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT";
 type ShoppingRow = { id: string; item: string; cost: number; shop: string };
@@ -9,7 +9,7 @@ type OtherRow = { id: string; label: string; amount: number };
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function DailySalesStock() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");

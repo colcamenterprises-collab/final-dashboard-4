@@ -1,0 +1,110 @@
+1) Scan for duplicate sidebar mounts
+
+Run these in the project root:
+
+# All places that render the Sidebar component
+grep -Rn --exclude-dir=node_modules "<Sidebar" src || true
+
+# Any imports of Sidebar (helps catch lazy mounts)
+grep -Rn --exclude-dir=node_modules "from .*Sidebar" src || true
+
+# Does PageShell render aside/nav (it shouldn’t)?
+grep -Rn --exclude-dir=node_modules -E "aside|<Sidebar" src/layouts/PageShell.tsx || true
+
+# Any nested routers that could cause double layouts or broken links
+grep -Rns --exclude-dir=node_modules -E "BrowserRouter|HashRouter|MemoryRouter" src || true
+
+# Any leftover wouter usage we should remove
+grep -Rns --exclude-dir=node_modules -E "wouter" src || true
+
+
+What you want to see
+
+Exactly one <Sidebar /> usage (in src/App.tsx).
+
+PageShell.tsx should NOT contain <Sidebar>, aside, or other nav chrome.
+
+Only a single BrowserRouter (in App.tsx).
+
+2) Auto-fix PageShell (make it a pure content wrapper)
+
+If the scans show PageShell.tsx contains sidebar or aside markup, replace it with this minimal shell:
+
+// src/layouts/PageShell.tsx
+export default function PageShell({ children }: { children: React.ReactNode }) {
+  return <main className="flex-1 p-6 overflow-auto">{children}</main>;
+}
+
+3) Ensure App.tsx owns the layout chrome
+
+Open src/App.tsx and confirm exactly this top-level structure:
+
+// src/App.tsx (excerpt)
+<BrowserRouter>
+  <div className="min-h-screen w-full flex bg-neutral-50">
+    <Sidebar />                 {/* the only sidebar in the app */}
+    <PageShell>
+      {/* <Routes> ... </Routes> */}
+    </PageShell>
+  </div>
+</BrowserRouter>
+
+4) (Optional) One-shot patch script
+
+If you want this automated, drop this script and run it once.
+
+scripts/fix-layout.js
+
+const fs = require("fs");
+const path = require("path");
+
+const APP = path.join("src","App.tsx");
+const SHELL = path.join("src","layouts","PageShell.tsx");
+
+function read(p){ return fs.existsSync(p) ? fs.readFileSync(p,"utf8") : ""; }
+function write(p,s){ fs.mkdirSync(path.dirname(p),{recursive:true}); fs.writeFileSync(p,s); }
+
+let shell = read(SHELL);
+if (shell && /<Sidebar|<aside|<\/aside>/.test(shell)) {
+  write(SHELL, `export default function PageShell({ children }: { children: React.ReactNode }) {
+  return <main className="flex-1 p-6 overflow-auto">{children}</main>;
+}
+`);
+  console.log("✓ PageShell cleaned");
+}
+
+let app = read(APP);
+if (app) {
+  // Remove any accidental second PageShell with Sidebar inside, keep only one <Sidebar />
+  const double = app.match(/<Sidebar[\s\S]*?<Sidebar/);
+  if (double) console.log("! App.tsx appears to have multiple <Sidebar/>. Please inspect manually.");
+
+  // Ensure structure comment exists (not strictly necessary)
+  console.log("✓ App.tsx checked");
+}
+
+
+Run it:
+
+node scripts/fix-layout.js
+
+5) Guard + routes sanity check
+
+After fixing the layout, verify no “Page Not Found” due to the allow-list:
+
+# List all <Route path="...">
+grep -Rno --exclude-dir=node_modules '<Route\s\+path=' src | sed -E 's/.*path={[\"\']([^\"\']+).*/\1/' | sort -u
+
+# List all sidebar links (NavLink to="...")
+grep -Rno --exclude-dir=node_modules 'to={[\"\']' src/components/Sidebar.tsx | sed -E 's/.*to={[\"\']([^\"\']+).*/\1/' | sort -u
+
+
+Make sure every path in those lists exists in ALLOWED_PATHS in src/router/RouteRegistry.ts.
+
+6) Quick visual test (30 sec)
+
+Reload the app.
+
+You should see one sidebar.
+
+Click every menu item; no “Page Not Found”.

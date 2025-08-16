@@ -1,15 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation } from 'react-router-dom';
 import { ChatAgentProvider } from './ChatAgentProvider';
 
 export const JussiChatBubble = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [location] = useLocation();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   
   // Only show on Operations pages
-  const allowedPaths = ['/daily-sales-stock', '/reports-analysis', '/purchasing', '/expenses'];
-  const isOnOperationsPage = allowedPaths.some(path => location.includes(path));
+  const allowedPaths = ['/operations/daily-sales-stock', '/reports-analysis', '/purchasing', '/expenses'];
+  const isOnOperationsPage = allowedPaths.some(path => location.pathname.includes(path));
   
   if (!isOnOperationsPage) return null;
 
