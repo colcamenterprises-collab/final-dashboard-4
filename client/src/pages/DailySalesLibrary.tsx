@@ -1,7 +1,5 @@
 // src/pages/DailySalesLibrary.tsx
-// Minimal render to verify route + page wiring. Replace list with real data.
 type Row = { id: string; submittedAt: string };
-
 const mock: Row[] = [
   { id: "demo-1", submittedAt: "2025-08-15T03:00:00+07:00" },
   { id: "demo-2", submittedAt: "2025-08-14T03:00:00+07:00" },
@@ -27,7 +25,7 @@ export default function DailySalesLibrary() {
           ))}
         </div>
         <div className="text-sm text-neutral-500 mt-4">
-          (Replace mock data with Prisma query; title should be submission date.)
+          (Replace mock data with a Prisma query; card title is submission date.)
         </div>
       </div>
     </div>

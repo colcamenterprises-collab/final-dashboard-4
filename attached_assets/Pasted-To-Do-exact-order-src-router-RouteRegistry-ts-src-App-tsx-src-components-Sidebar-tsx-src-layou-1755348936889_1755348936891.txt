@@ -1,0 +1,490 @@
+To-Do (exact order)
+
+src/router/RouteRegistry.ts
+
+src/App.tsx
+
+src/components/Sidebar.tsx
+
+src/layouts/PageShell.tsx
+
+Pages:
+
+src/pages/Overview.tsx
+
+src/pages/DailySalesStock.tsx
+
+src/pages/DailySalesLibrary.tsx
+
+src/pages/Expenses.tsx
+
+src/pages/NotFound.tsx
+
+(Backend) Minimal endpoints so buttons don’t 500:
+
+server/index.ts
+
+server/routes/expenses.ts
+
+server/lib/prisma.ts (safe client stub)
+
+1) src/router/RouteRegistry.ts
+// src/router/RouteRegistry.ts
+export const ROUTES = {
+  OVERVIEW: "/",
+  DAILY_SALES_STOCK: "/operations/daily-sales-stock",
+  DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
+  EXPENSES: "/operations/expenses",
+} as const;
+
+export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
+
+export const ALLOWED_PATHS: string[] = [
+  ROUTES.OVERVIEW,
+  ROUTES.DAILY_SALES_STOCK,
+  ROUTES.DAILY_SALES_LIBRARY,
+  ROUTES.EXPENSES,
+];
+
+export const isAllowedPath = (path: string) =>
+  ALLOWED_PATHS.includes((path || "/").replace(/\/+$/, "") || "/");
+
+2) src/App.tsx
+// src/App.tsx
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Suspense } from "react";
+import PageShell from "./layouts/PageShell";
+import Sidebar from "./components/Sidebar";
+import Overview from "./pages/Overview";
+import DailySalesStock from "./pages/DailySalesStock";
+import DailySalesLibrary from "./pages/DailySalesLibrary";
+import Expenses from "./pages/Expenses";
+import NotFound from "./pages/NotFound";
+import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
+
+function Guard({ children }: { children: JSX.Element }) {
+  const { pathname } = useLocation();
+  return isAllowedPath(pathname) ? children : <NotFound />;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen w-full flex bg-neutral-50">
+        <Sidebar />
+        <PageShell>
+          <Suspense fallback={<div className="p-6">Loading…</div>}>
+            <Routes>
+              <Route path={ROUTES.OVERVIEW} element={<Guard><Overview /></Guard>} />
+              <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
+              <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
+              <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </PageShell>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+3) src/components/Sidebar.tsx
+// src/components/Sidebar.tsx
+import { NavLink } from "react-router-dom";
+import { ROUTES } from "../router/RouteRegistry";
+
+const linkBase = "block px-4 py-2 rounded-xl hover:bg-emerald-600/10";
+const linkActive = "bg-emerald-600 text-white hover:bg-emerald-600";
+
+export default function Sidebar() {
+  const nav = [
+    { label: "Overview", to: ROUTES.OVERVIEW },
+    { label: "Daily Sales & Stock", to: ROUTES.DAILY_SALES_STOCK },
+    { label: "Daily Sales Library", to: ROUTES.DAILY_SALES_LIBRARY },
+    { label: "Expenses", to: ROUTES.EXPENSES },
+  ];
+
+  return (
+    <aside className="w-72 border-r bg-white min-h-screen">
+      <div className="px-5 py-4 border-b">
+        <div className="font-extrabold text-lg">Smash Brothers</div>
+      </div>
+      <nav className="p-4 space-y-1">
+        {nav.map((n) => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.to === ROUTES.OVERVIEW}
+            className={({ isActive }) => `${linkBase} ${isActive ? linkActive : "text-neutral-800"}`}
+          >
+            {n.label}
+          </NavLink>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+4) src/layouts/PageShell.tsx
+// src/layouts/PageShell.tsx
+import { ReactNode } from "react";
+
+export default function PageShell({ children }: { children: ReactNode }) {
+  return (
+    <main className="flex-1 min-h-screen overflow-y-auto">
+      <div className="max-w-7xl mx-auto px-6 py-6">{children}</div>
+    </main>
+  );
+}
+
+5a) src/pages/Overview.tsx
+// src/pages/Overview.tsx
+export default function Overview() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-4">Overview</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm text-neutral-500">KPI</div>
+          <div className="text-3xl font-bold">—</div>
+        </div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm text-neutral-500">Manager Checklist</div>
+          <div className="text-base">Status appears here.</div>
+        </div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm text-neutral-500">Alerts</div>
+          <div className="text-base">None</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+5b) src/pages/DailySalesStock.tsx
+// src/pages/DailySalesStock.tsx
+export default function DailySalesStock() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-4">Daily Sales & Stock</h1>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <p className="mb-2">Form 1 → Sales/Cash/Expenses. Then auto-route to Form 2.</p>
+        <p className="mb-4">Form 2 → Stock Counts & Purchasing. Completion → Email + PDF.</p>
+        <div className="text-sm text-neutral-500">(Mount your locked Prisma forms here.)</div>
+      </div>
+    </div>
+  );
+}
+
+5c) src/pages/DailySalesLibrary.tsx
+// src/pages/DailySalesLibrary.tsx
+type Row = { id: string; submittedAt: string };
+const mock: Row[] = [
+  { id: "demo-1", submittedAt: "2025-08-15T03:00:00+07:00" },
+  { id: "demo-2", submittedAt: "2025-08-14T03:00:00+07:00" },
+];
+
+export default function DailySalesLibrary() {
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-4">Daily Sales Library</h1>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {mock.map((m) => (
+            <div key={m.id} className="border rounded-xl p-4">
+              <div className="font-semibold">
+                {new Date(m.submittedAt).toLocaleString()}
+              </div>
+              <div className="text-sm text-neutral-500">ID: {m.id}</div>
+              <div className="mt-3 flex gap-2">
+                <button className="px-3 py-1 border rounded-lg">View PDF</button>
+                <button className="px-3 py-1 border rounded-lg">Archive</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="text-sm text-neutral-500 mt-4">
+          (Replace mock data with a Prisma query; card title is submission date.)
+        </div>
+      </div>
+    </div>
+  );
+}
+
+5d) src/pages/Expenses.tsx
+// src/pages/Expenses.tsx
+import { useState } from "react";
+
+type PaidState = "PAID" | "UNPAID";
+
+function Modal({
+  open, onClose, title, children, onSave, saveLabel = "Save",
+}: {
+  open: boolean; onClose: () => void; title: string;
+  children: React.ReactNode; onSave: () => Promise<void> | void; saveLabel?: string;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+        <div className="px-5 pt-5 pb-3 border-b">
+          <div className="text-lg font-semibold">{title}</div>
+        </div>
+        <div className="p-5">{children}</div>
+        <div className="px-5 pb-5 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1 rounded-lg border">Close</button>
+          <button onClick={() => void onSave()} className="px-3 py-1 rounded-lg border bg-emerald-600 text-white">
+            {saveLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Expenses() {
+  // Rolls
+  const [rollsOpen, setRollsOpen] = useState(false);
+  const [rollsAmount, setRollsAmount] = useState<number>(0);
+  const [rollsCost, setRollsCost] = useState<number>(0);
+  const [rollsPaid, setRollsPaid] = useState<PaidState>("PAID");
+  const [rollsTs, setRollsTs] = useState<string>(new Date().toISOString().slice(0,16));
+
+  // Meat
+  const [meatOpen, setMeatOpen] = useState(false);
+  const [meatWeight, setMeatWeight] = useState<number>(0);
+  const [meatType, setMeatType] = useState<string>("90g patty");
+  const [meatTs, setMeatTs] = useState<string>(new Date().toISOString().slice(0,16));
+
+  // Drinks
+  const [drinksOpen, setDrinksOpen] = useState(false);
+  const [drinkName, setDrinkName] = useState<string>("Coke 330ml");
+  const [drinkQty, setDrinkQty] = useState<number>(0);
+  const [drinkTs, setDrinkTs] = useState<string>(new Date().toISOString().slice(0,16));
+
+  // Upload
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function postJSON(path: string, body: any) {
+    const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(await res.text());
+  }
+
+  const saveRolls = async () => {
+    await postJSON("/api/expenses/purchase", {
+      type: "ROLLS",
+      amount: Number(rollsAmount),
+      cost: Number(rollsCost),
+      paid: rollsPaid,
+      timestamp: new Date(rollsTs).toISOString(),
+    });
+    setRollsOpen(false); setRollsAmount(0); setRollsCost(0);
+  };
+
+  const saveMeat = async () => {
+    await postJSON("/api/expenses/purchase", {
+      type: "MEAT",
+      weightGrams: Number(meatWeight),
+      meatType,
+      timestamp: new Date(meatTs).toISOString(),
+    });
+    setMeatOpen(false); setMeatWeight(0);
+  };
+
+  const saveDrinks = async () => {
+    await postJSON("/api/expenses/purchase", {
+      type: "DRINKS",
+      itemName: drinkName,
+      quantity: Number(drinkQty),
+      timestamp: new Date(drinkTs).toISOString(),
+    });
+    setDrinksOpen(false); setDrinkQty(0);
+  };
+
+  const uploadStatements = async () => {
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/expenses/upload-statements", { method: "POST", body: fd });
+    setUploading(false);
+    if (!res.ok) throw new Error(await res.text());
+    setFile(null);
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-extrabold mb-4">Expenses</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Quick capture */}
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="font-semibold mb-3">Quick Purchases</div>
+          <div className="flex flex-wrap gap-2">
+            <button className="px-3 py-2 border rounded-lg" onClick={() => setRollsOpen(true)}>Add Rolls</button>
+            <button className="px-3 py-2 border rounded-lg" onClick={() => setMeatOpen(true)}>Add Meat</button>
+            <button className="px-3 py-2 border rounded-lg" onClick={() => setDrinksOpen(true)}>Add Drinks</button>
+          </div>
+          <div className="text-sm text-neutral-500 mt-3">
+            Rolls: Amount, Cost, Paid/Unpaid, Timestamp — Meat: Weight & Type — Drinks: Item & Qty.
+          </div>
+        </div>
+
+        {/* Upload statements (moved from its own page) */}
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="font-semibold mb-3">Upload Bank Statements</div>
+          <input
+            type="file"
+            accept=".csv,.xls,.xlsx,.pdf,.ofx,.qif,image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="block mb-3"
+          />
+          <button
+            disabled={!file || uploading}
+            onClick={() => void uploadStatements()}
+            className="px-3 py-2 border rounded-lg disabled:opacity-50"
+          >
+            {uploading ? "Uploading…" : "Upload"}
+          </button>
+          <div className="text-sm text-neutral-500 mt-3">
+            Files are parsed and attached to this shift’s expenses review.
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <Modal open={rollsOpen} onClose={() => setRollsOpen(false)} title="Add Rolls Purchase" onSave={saveRolls}>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">Amount
+            <input type="number" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={rollsAmount} onChange={(e) => setRollsAmount(Number(e.target.value))} />
+          </label>
+          <label className="text-sm">Cost
+            <input type="number" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={rollsCost} onChange={(e) => setRollsCost(Number(e.target.value))} />
+          </label>
+          <label className="text-sm">Paid
+            <select className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={rollsPaid} onChange={(e) => setRollsPaid(e.target.value as PaidState)}>
+              <option value="PAID">Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+          </label>
+          <label className="text-sm">Timestamp
+            <input type="datetime-local" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={rollsTs} onChange={(e) => setRollsTs(e.target.value)} />
+          </label>
+        </div>
+      </Modal>
+
+      <Modal open={meatOpen} onClose={() => setMeatOpen(false)} title="Add Meat Purchase" onSave={saveMeat}>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">Weight (grams)
+            <input type="number" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={meatWeight} onChange={(e) => setMeatWeight(Number(e.target.value))} />
+          </label>
+          <label className="text-sm">Type
+            <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={meatType} onChange={(e) => setMeatType(e.target.value)} />
+          </label>
+          <label className="text-sm">Timestamp
+            <input type="datetime-local" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={meatTs} onChange={(e) => setMeatTs(e.target.value)} />
+          </label>
+        </div>
+      </Modal>
+
+      <Modal open={drinksOpen} onClose={() => setDrinksOpen(false)} title="Add Drinks Purchase" onSave={saveDrinks}>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">Drink
+            <select className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={drinkName} onChange={(e) => setDrinkName(e.target.value)}>
+              <option>Coke 330ml</option><option>Coke Zero 330ml</option>
+              <option>Sprite 330ml</option><option>Fanta 330ml</option>
+              <option>Water 600ml</option>
+            </select>
+          </label>
+          <label className="text-sm">Quantity
+            <input type="number" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={drinkQty} onChange={(e) => setDrinkQty(Number(e.target.value))} />
+          </label>
+          <label className="text-sm">Timestamp
+            <input type="datetime-local" className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={drinkTs} onChange={(e) => setDrinkTs(e.target.value)} />
+          </label>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+5e) src/pages/NotFound.tsx
+// src/pages/NotFound.tsx
+export default function NotFound() {
+  return (
+    <div className="w-full h-full flex items-start justify-center pt-16">
+      <h1 className="text-2xl font-extrabold">Page Not Found</h1>
+    </div>
+  );
+}
+
+6) Backend (minimal, safe)
+server/lib/prisma.ts
+// server/lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+let prisma: PrismaClient;
+
+export function getPrisma() {
+  if (!prisma) prisma = new PrismaClient({ log: ["error"] });
+  return prisma;
+}
+
+server/routes/expenses.ts
+// server/routes/expenses.ts
+import { Router } from "express";
+import multer from "multer";
+const upload = multer({ storage: multer.memoryStorage() });
+
+export const expensesRouter = Router();
+
+// Minimal stubs — replace with real Prisma writes later
+expensesRouter.post("/purchase", async (req, res) => {
+  const body = req.body || {};
+  console.log("[purchase]", body); // TODO: write to DB
+  return res.json({ ok: true });
+});
+
+expensesRouter.post("/upload-statements", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).send("No file");
+  console.log("[upload]", req.file.originalname, req.file.mimetype, req.file.size);
+  // TODO: parse + attach to day/shift
+  return res.json({ ok: true, name: req.file.originalname, size: req.file.size });
+});
+
+server/index.ts
+// server/index.ts
+import express from "express";
+import path from "path";
+import { expensesRouter } from "./routes/expenses";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+
+app.use("/api/expenses", expensesRouter);
+
+// static client (if you serve from same process)
+app.use(express.static(path.join(process.cwd(), "dist")));
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on :${port}`));
+
+Sanity checks
+
+Sidebar shows Overview, Daily Sales & Stock, Daily Sales Library, Expenses.
+
+Clicking each route renders content (no 404).
+
+Expenses: buttons open modals; “Save” hits /api/expenses/purchase; file upload posts to /api/expenses/upload-statements.
