@@ -36,7 +36,7 @@
 
 /* Sidebar */
 .sb           { background:#fff; border-right:1px solid #e5e7eb; box-shadow: 2px 0 12px rgba(0,0,0,.03); }
-.sb-group     { color:#9aa2b1; letter-spacing:.08em; font-weight:700; font-size:14px; }
+.sb-group     { color:#9aa2b1; letter-spacing:.08em; font-weight:700; font-size:12px; }
 .sb-item      { height:40px; border-radius:999px; }
 .sb-active    { background: var(--brand); color:#fff; box-shadow: var(--shadow-1); }
 .sb-rail      { width:56px; } /* collapsed width */

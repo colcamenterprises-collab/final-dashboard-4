@@ -22,7 +22,7 @@ html, body {
   --label: #6B7280;
   --border: #E5E7EB;
   --sidebar-bg: #1f1f1f;
-  --sidebar-text: #0f172a; /* slate-900 */
+  --sidebar-text: #ffffff;
   
   /* Tailwind compatibility */
   --background-hsl: hsl(0, 0%, 100%);

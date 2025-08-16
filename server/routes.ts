@@ -1622,7 +1622,7 @@ export function registerRoutes(app: express.Application): Server {
 
       const result = await prisma.dailySales.create({ data });
       
-      // Send email with shopping list included (now with checklist status)
+      // Send email with shopping list included
       try {
         await sendDailySalesEmail(payload);
         console.log('Daily Sales email sent successfully for ID:', result.id);
@@ -2181,11 +2181,6 @@ export function registerRoutes(app: express.Application): Server {
     };
     
     await managerChecklistStore.saveSubmission(submission);
-    
-    // Note: Updated management email will be sent when daily sales form is submitted, 
-    // which will now include the completed checklist status
-    console.log(`Manager checklist completed for ${dateISO} by ${managerName}`);
-    
     res.json({ ok:true, submission });
   });
 

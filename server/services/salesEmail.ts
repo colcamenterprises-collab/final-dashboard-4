@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { managerChecklistStore } from "../managerChecklist";
 
 export async function sendDailySalesEmail(submission: any) {
   const {
@@ -8,15 +7,6 @@ export async function sendDailySalesEmail(submission: any) {
     shopping = [], wages = [], otherMoneyOut = [],
     totalExpenses, endingCash, cashBanked, qrTransferred
   } = submission;
-
-  // Get manager checklist status for today
-  const dateISO = shiftDate || new Date().toISOString().split('T')[0];
-  let checklistStatus = null;
-  try {
-    checklistStatus = await managerChecklistStore.getSubmission(dateISO);
-  } catch (error) {
-    console.warn('Could not fetch checklist status:', error);
-  }
 
   // TRANSPORT (using existing Gmail configuration)
   const transporter = nodemailer.createTransport({
@@ -43,25 +33,6 @@ export async function sendDailySalesEmail(submission: any) {
   const otherRows = otherMoneyOut.length
     ? otherMoneyOut.map((r:any)=> tr([r.type, r.notes||'', money(r.amount)])).join("")
     : tr(['<em>No rows</em>','','']);
-
-  // Manager Checklist status section
-  const checklistStatusHtml = checklistStatus 
-    ? `
-      <h3 style="margin:16px 0 8px">Manager Checklist Status</h3>
-      <table cellspacing="0" cellpadding="0">
-        ${tr(['Status', `<span style="color:#059669;font-weight:bold">✓ Completed</span>`])}
-        ${tr(['Manager', checklistStatus.managerName || 'Unknown'])}
-        ${tr(['Completed At', new Date(checklistStatus.completedAtISO).toLocaleString('en-TH')])}
-        ${checklistStatus.shiftNotes ? tr(['Shift Notes', checklistStatus.shiftNotes]) : ''}
-        ${checklistStatus.attesterPhotoUrl ? tr(['Photo Evidence', `<a href="${checklistStatus.attesterPhotoUrl}" style="color:#0066cc">View Photo</a>`]) : ''}
-      </table>
-    `
-    : `
-      <h3 style="margin:16px 0 8px">Manager Checklist Status</h3>
-      <table cellspacing="0" cellpadding="0">
-        ${tr(['Status', `<span style="color:#dc2626;font-weight:bold">⚠ Not Completed</span>`])}
-      </table>
-    `;
 
   const html = `
   <div style="font-family:Poppins,system-ui,Segoe UI,Arial,sans-serif;color:#0f172a">
@@ -111,8 +82,6 @@ export async function sendDailySalesEmail(submission: any) {
       ${tr(['Cash Banked', money(cashBanked)])}
       ${tr(['QR Sales Transferred', money(qrTransferred)])}
     </table>
-
-    ${checklistStatusHtml}
   </div>`;
 
   await transporter.sendMail({

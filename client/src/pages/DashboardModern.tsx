@@ -1,14 +1,13 @@
 import { useState } from "react";
 import ManagerChecklistStatusCard from "@/components/ManagerChecklistStatusCard";
-import { TrendingUp, Users, ShoppingCart, FileText } from "lucide-react";
 
 const fmt = (n:number, d=0)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:d}).format(n);
 
 const KPIS = [
-  { label: "Total sales", value: 321, suffix: "k", icon: TrendingUp },
-  { label: "Visitor", value: 678, suffix: "k", icon: Users },
-  { label: "CVR", value: 7.89, icon: ShoppingCart },
-  { label: "Total orders", value: 211, suffix: "k", icon: FileText },
+  { label: "Total sales", value: 321000, prefix: "฿" },
+  { label: "Orders", value: 22000 },
+  { label: "Avg order", value: 789, prefix: "฿" },
+  { label: "Status", value: "OK" },
 ];
 
 const payments = [
@@ -29,12 +28,13 @@ export default function DashboardModern() {
   const payTotal = payments.reduce((a,b)=>a+b.amount,0);
 
   return (
-    <div className="max-w-[1200px] mx-auto">
-      {/* Single clean title row */}
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl md:text-[34px] font-extrabold tracking-tight">
-          Good morning, Cam
-        </h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Good morning Cam 👋</h1>
+          <p className="text-sm text-gray-500 mt-1">Here's what's happening with your restaurant today</p>
+        </div>
         <div className="flex items-center gap-4">
           <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-lg px-4 py-2 text-sm bg-white">
             <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
@@ -46,21 +46,16 @@ export default function DashboardModern() {
             <div className="w-8 h-8 rounded-full bg-gray-200" />
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main KPI Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
-        <div className="grid grid-cols-4 divide-x divide-white/20">
+        <div className="grid grid-cols-4 gap-8">
           {KPIS.map((k,i)=>(
-            <div key={i} className="flex items-center justify-center gap-4 px-6">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                <k.icon className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide opacity-80 mb-1">{k.label}</div>
-                <div className="text-2xl font-bold">
-                  {fmt(k.value)}{k.suffix || ""}
-                </div>
+            <div key={i} className="text-center">
+              <div className="text-sm opacity-90 mb-1">{k.label}</div>
+              <div className="text-2xl font-bold">
+                {typeof k.value === "number" ? `${k.prefix ?? ""}${fmt(k.value)}` : k.value}
               </div>
             </div>
           ))}
@@ -112,25 +107,21 @@ export default function DashboardModern() {
         </div>
       </div>
 
-      {/* Top 5 Menu Items */}
+      {/* Best Seller */}
       <div className="mt-6 rounded-2xl bg-white shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Top 5 Menu Items</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Best Seller</h3>
           <button className="text-sm text-gray-500 hover:text-gray-700">→</button>
         </div>
-        <div className="grid grid-cols-5 gap-3">
-          {[1, 2, 3, 4, 5].map((item) => (
-            <div key={item} className="rounded-lg border border-gray-100 p-3 hover:shadow-sm transition-shadow">
-              <div className="w-12 h-12 rounded-md bg-gray-100 mx-auto mb-2 flex items-center justify-center overflow-hidden">
-                <img 
-                  src={`https://picsum.photos/seed/menu${item}/100/100`} 
-                  alt={`Menu item ${item}`}
-                  className="w-full h-full object-cover"
-                />
+        <div className="grid grid-cols-3 gap-4">
+          {best.slice(0, 3).map((b,i)=>(
+            <div key={i} className="rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+              <div className="w-16 h-16 rounded-lg bg-gray-100 mx-auto mb-3 flex items-center justify-center">
+                <div className="w-8 h-8 bg-gray-300 rounded"></div>
               </div>
               <div className="text-center">
-                <div className="text-xs font-medium text-gray-900 truncate">Item {item}</div>
-                <div className="text-xs text-gray-500">#{item}</div>
+                <div className="text-sm font-medium text-gray-900 truncate">{b.name}</div>
+                <div className="text-xs text-gray-500 mt-1">{b.qty}x</div>
               </div>
             </div>
           ))}
