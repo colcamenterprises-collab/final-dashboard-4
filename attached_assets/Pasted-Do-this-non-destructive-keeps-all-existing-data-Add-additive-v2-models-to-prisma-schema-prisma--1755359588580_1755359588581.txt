@@ -1,0 +1,149 @@
+Do this (non-destructive, keeps all existing data)
+
+Add additive v2 models to prisma/schema.prisma (new tables with @@map so they won’t collide):
+
+model DailySalesV2 {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  shiftDate      String
+  submittedAtISO DateTime
+  completedBy    String
+  startingCash   Int      @default(0)
+  endingCash     Int      @default(0)
+  cashBanked     Int      @default(0)
+  cashSales      Int      @default(0)
+  qrSales        Int      @default(0)
+  grabSales      Int      @default(0)
+  aroiSales      Int      @default(0)
+  totalSales     Int      @default(0)
+  shoppingTotal  Int      @default(0)
+  wagesTotal     Int      @default(0)
+  othersTotal    Int      @default(0)
+  totalExpenses  Int      @default(0)
+  qrTransfer     Int      @default(0)
+  shopping       ShoppingPurchaseV2[]
+  wages          WageEntryV2[]
+  others         OtherExpenseV2[]
+  stock          DailyStockV2?
+  deletedAt      DateTime?
+  @@map("daily_sales_v2")
+}
+model ShoppingPurchaseV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  item      String
+  cost      Int      @default(0)
+  shop      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("shopping_purchase_v2")
+}
+model WageEntryV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  staff     String
+  amount    Int      @default(0)
+  type      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("wage_entry_v2")
+}
+model OtherExpenseV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  label     String
+  amount    Int      @default(0)
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("other_expense_v2")
+}
+model DailyStockV2 {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  salesId       String   @unique
+  sales         DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  burgerBuns    Int      @default(0)
+  meatWeightG   Int      @default(0)
+  drinksJson    Json?
+  purchasingJson Json?
+  notes         String?
+  deletedAt     DateTime?
+  @@map("daily_stock_v2")
+}
+
+
+Push schema additively (no reset):
+
+npx prisma db push
+npx prisma generate
+
+
+Point the server to V2 models. In server/routes/forms.ts and server/routes/library.ts, change model names:
+
+dailySales → dailySalesV2
+
+dailyStock → dailyStockV2
+
+child tables to their *V2 versions.
+
+Example (create Form 1):
+
+const sales = await prisma.dailySalesV2.create({
+  data: {
+    shiftDate: body.shiftDate,
+    submittedAtISO: new Date(body.submittedAtISO ?? new Date()),
+    completedBy: body.completedBy ?? "",
+    startingCash: body.cashManagement?.startingCash ?? 0,
+    endingCash: Number(body.banking?.closingCash ?? 0), // map Closing→Ending
+    cashBanked: body.banking?.cashBanked ?? 0,
+    cashSales: body.sales?.cashSales ?? 0,
+    qrSales: body.sales?.qrSales ?? 0,
+    grabSales: body.sales?.grabSales ?? 0,
+    aroiSales: body.sales?.aroiSales ?? 0,
+    totalSales: body.sales?.totalSales ?? 0,
+    shoppingTotal: body.expenses?.totals?.shoppingTotal ?? 0,
+    wagesTotal: body.expenses?.totals?.wagesTotal ?? 0,
+    othersTotal: body.expenses?.totals?.othersTotal ?? 0,
+    totalExpenses: body.expenses?.totals?.totalExpenses ?? 0,
+    qrTransfer: body.banking?.qrTransfer ?? 0,
+    shopping: { create: (body.expenses?.shopping ?? []).map((r:any)=>({ item:r.item||"", cost:+r.cost||0, shop:r.shop||"" })) },
+    wages:    { create: (body.expenses?.wages ?? []).map((r:any)=>({ staff:r.staff||"", amount:+r.amount||0, type:r.type||"WAGES" })) },
+    others:   { create: (body.expenses?.others ?? []).map((r:any)=>({ label:r.label||"", amount:+r.amount||0 })) },
+  },
+  include: { shopping: true, wages: true, others: true },
+});
+
+
+Example (Form 2 upsert):
+
+await prisma.dailyStockV2.upsert({
+  where: { salesId },
+  update: {
+    burgerBuns: body.burgerBuns ?? 0,
+    meatWeightG: body.meatWeightG ?? 0,
+    drinksJson: body.drinksJson ?? null,
+    purchasingJson: body.purchasingJson ?? null,
+    notes: body.notes ?? null,
+  },
+  create: {
+    salesId,
+    burgerBuns: body.burgerBuns ?? 0,
+    meatWeightG: body.meatWeightG ?? 0,
+    drinksJson: body.drinksJson ?? null,
+    purchasingJson: body.purchasingJson ?? null,
+    notes: body.notes ?? null,
+  },
+});
+
+
+Library list:
+
+const rows = await prisma.dailySalesV2.findMany({
+  where: { deletedAt: null },
+  orderBy: { createdAt: "desc" },
+  include: { stock: true },
+  take: 200,
+});
+
+
+Keep the “schema-guard” try/catch I gave earlier in library.ts so even if something’s off, the page won’t hard-crash.

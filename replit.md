@@ -23,7 +23,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **UI Framework**: shadcn/ui components built on Radix UI primitives.
 - **Styling**: Tailwind CSS with custom restaurant-specific design tokens.
 - **State Management**: TanStack Query (React Query) for server state.
-- **Routing**: Wouter for lightweight client-side routing.
+- **Routing**: React Router (migrated from Wouter) for modern navigation with clean sidebar layout.
 - **Forms**: React Hook Form with Zod validation.
 - **UI/UX Decisions**: Consistent button styling, responsive design, rounded corners, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
 
@@ -57,6 +57,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
 - Restaurant, PosConnection, Receipt, ReceiptItem, ReceiptPayment, MenuItem, Expense, AnalyticsDaily, Job, PosSyncLog, IngestionError for POS, analytics, and job management.
+- **V2 Models Added (Aug 16, 2025)**: DailySalesV2, DailyStockV2, ShoppingPurchaseV2, WageEntryV2, OtherExpenseV2 - additive schema enhancement preserving all existing data.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.

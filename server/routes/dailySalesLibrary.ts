@@ -19,7 +19,7 @@ r.get("/", async (req, res) => {
   const off = (pageN-1)*ps;
 
   const sql = `
-    SELECT id, "createdAt", "completedBy", "startingCash", "cashSales", "qrSales", "grabSales", "aroiDeeSales",
+    SELECT id, "createdAt", "completedBy", "startingCash", "cashSales", "qrSales", "grabSales", "aroiSales",
            "totalSales", "shoppingExpenses", wages, "totalExpenses", "closingCash", "cashBanked", "qrTransferred", status
     FROM "DailySales"
     ${baseWhere}

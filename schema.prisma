@@ -558,3 +558,77 @@ model JussiComparison {
   @@index([salesFormId])
 }
 
+// V2 Models (additive, non-destructive)
+model DailySalesV2 {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  shiftDate      String
+  submittedAtISO DateTime
+  completedBy    String
+  startingCash   Int      @default(0)
+  endingCash     Int      @default(0)
+  cashBanked     Int      @default(0)
+  cashSales      Int      @default(0)
+  qrSales        Int      @default(0)
+  grabSales      Int      @default(0)
+  aroiSales      Int      @default(0)
+  totalSales     Int      @default(0)
+  shoppingTotal  Int      @default(0)
+  wagesTotal     Int      @default(0)
+  othersTotal    Int      @default(0)
+  totalExpenses  Int      @default(0)
+  qrTransfer     Int      @default(0)
+  shopping       ShoppingPurchaseV2[]
+  wages          WageEntryV2[]
+  others         OtherExpenseV2[]
+  stock          DailyStockV2?
+  deletedAt      DateTime?
+  @@map("daily_sales_v2")
+}
+
+model ShoppingPurchaseV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  item      String
+  cost      Int      @default(0)
+  shop      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("shopping_purchase_v2")
+}
+
+model WageEntryV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  staff     String
+  amount    Int      @default(0)
+  type      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("wage_entry_v2")
+}
+
+model OtherExpenseV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  label     String
+  amount    Int      @default(0)
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  @@map("other_expense_v2")
+}
+
+model DailyStockV2 {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  salesId       String   @unique
+  sales         DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+  burgerBuns    Int      @default(0)
+  meatWeightG   Int      @default(0)
+  drinksJson    Json?
+  purchasingJson Json?
+  notes         String?
+  deletedAt     DateTime?
+  @@map("daily_stock_v2")
+}
+
