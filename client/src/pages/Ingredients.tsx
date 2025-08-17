@@ -14,14 +14,30 @@ export default function Ingredients() {
   });
 
   const importMutation = useMutation({
-    mutationFn: (csv: string) => apiRequest("/api/costing/ingredients/import", "POST", { csv }),
-    onSuccess: () => {
-      toast({ title: "Success", description: "Ingredients imported successfully" });
+    mutationFn: async (csv: string) => {
+      const r = await fetch("/api/costing/ingredients/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv }),
+      });
+
+      // If server didn't return JSON OK, read the text so we don't get the '<!DOCTYPE' error
+      if (!r.ok) {
+        const msg = await r.text();
+        throw new Error(`Import failed: ${msg}`);
+      }
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Import failed");
+      return j;
+    },
+    onSuccess: (data) => {
+      toast({ title: "Success", description: `Imported ${data.imported} ingredients` });
       queryClient.invalidateQueries({ queryKey: ["/api/costing/ingredients"] });
       setCsvContent("");
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error(error);
+      toast({ title: "Error", description: error.message || "Import failed", variant: "destructive" });
     }
   });
 

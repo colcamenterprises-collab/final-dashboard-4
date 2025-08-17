@@ -2117,6 +2117,8 @@ export function registerRoutes(app: express.Application): Server {
   // Register Upload and Import routes
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
+  app.use('/api/costing', costingRouter);
+  app.use('/api/expenses', expensesRouter);
   
   // Register Forms routes
   app.use('/api/forms', formsRouter);
