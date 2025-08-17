@@ -1,0 +1,96 @@
+1) Replace the alert with navigation
+
+Search your client for the alert:
+
+"Saved Form 1."
+
+
+You’ll likely find it in client/src/pages/DailySales.tsx (or wherever Form 1 saves). Replace that success block with this:
+
+// AFTER successful POST
+const FORM2_PATH = "/operations/stock"; // <- make sure this is the actual route
+const shiftId =
+  data?.shiftId ?? data?.salesId ?? data?.id ?? null; // accept any server shape
+
+if (!shiftId) {
+  console.error("[Form1] Missing shiftId in response:", data);
+  // last-resort: still move the user to Form 2 (without context)
+  window.location.assign(FORM2_PATH);
+} else {
+  const next = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
+  console.log("[Form1] navigating to:", next);
+  // use one of these two; either is fine:
+  // react-router:
+  // navigate(next, { replace: true });
+  // or hard redirect (100% reliable):
+  window.location.assign(next);
+}
+
+
+Remove the alert() entirely. It blocks the event loop and, as implemented, doesn’t trigger navigation after dismissal.
+
+2) Make sure the route actually exists
+
+In your router:
+
+// App.tsx
+import DailySalesStock from "./pages/DailySalesStock";
+
+<Route path="/operations/stock" element={<DailySalesStock />} />
+
+// Safety aliases (optional)
+<Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/stock" replace />} />
+<Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
+
+
+In the sidebar, point to the same path:
+
+// Sidebar.tsx
+<NavLink to="/operations/stock">Daily Sales & Stock</NavLink>
+
+3) Stop native form reloads
+
+Make sure your submit handler prevents a full page reload:
+
+async function handleSubmit(e?: React.FormEvent) {
+  e?.preventDefault();
+  if (submitting) return;
+  // ...post, then navigate (as above)
+}
+
+
+And ensure your form uses that handler:
+
+<form onSubmit={handleSubmit}>
+  {/* …fields… */}
+  <button type="submit">Submit</button>
+</form>
+
+4) (Optional) Prominent “database-style” success panel
+
+If you still want a visible confirmation before redirect, swap the hard redirect for a small modal that auto-continues:
+
+setSavedShiftId(String(shiftId));
+setShowSuccess(true); // show panel
+
+// in Success panel 'Go now' button (or after 3–4s)
+window.location.assign(`${FORM2_PATH}?shift=${savedShiftId}`);
+
+
+(I shared a complete “SuccessCard” component earlier; you can drop it in after this fix.)
+
+5) Quick sanity check
+
+Submit Form 1 once.
+
+In DevTools Console you should see:
+"[Form1] navigating to: /operations/stock?shift=..."
+
+You should land on /operations/stock?shift=....
+
+In Form 2, read the shift param:
+
+const shift = new URLSearchParams(location.search).get("shift");
+
+
+If it still doesn’t move, paste the console line you see (or tell me if /operations/stock is a different actual path), and I’ll give you the exact string to use.

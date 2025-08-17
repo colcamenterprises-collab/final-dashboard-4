@@ -112,9 +112,16 @@ export default function DailySales() {
         data?.salesId ?? // some endpoints return salesId
         data?.id ?? null;
       
-      if (!res.ok || !data?.ok || !shiftId) {
+      if (!shiftId) {
+        console.error("[Form1] Missing shiftId in response:", data);
+        // Last resort: still move user to Form 2 (without context)
+        window.location.assign(FORM2_PATH);
+        return;
+      }
+      
+      if (!res.ok || !data?.ok) {
         throw new Error(
-          data?.error || "Submit OK flag or shiftId missing from response."
+          data?.error || "Submit OK flag missing from response."
         );
       }
       
@@ -123,8 +130,8 @@ export default function DailySales() {
       (window as any).__lastNav = target; // dev helper
       console.log("[Form1] will navigate:", target);
       
-      // Navigate directly to Form 2 with shift parameter
-      navigate(target);
+      // Navigate directly to Form 2 with shift parameter (100% reliable)
+      window.location.assign(target);
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
       setError(e?.message || "Failed to submit. Please try again.");
