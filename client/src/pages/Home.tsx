@@ -12,8 +12,8 @@ export default function Home() {
           { label: "Active Items", value: "32" },
         ].map((k) => (
           <div key={k.label} className="rounded-2xl border bg-emerald-600 text-white p-5 shadow-sm">
-            <div className="text-sm opacity-90">{k.label}</div>
-            <div className="text-2xl font-extrabold mt-1">{k.value}</div>
+            <div className="text-base font-medium opacity-90">{k.label}</div>
+            <div className="text-3xl font-extrabold mt-1">{k.value}</div>
           </div>
         ))}
       </div>
