@@ -128,8 +128,8 @@ router.post("/daily-sales", async (req, res) => {
       });
     }
 
-    // Return the salesId that the frontend expects
-    res.status(201).json({ salesId: form.id, message: "Form 1 saved successfully" });
+    // Return the expected format for the frontend workflow
+    res.status(201).json({ ok: true, shiftId: form.id, salesId: form.id, message: "Form 1 saved successfully" });
   } catch (error) {
     console.error("Error creating sales form:", error);
     res.status(500).json({ error: "Internal server error" });
