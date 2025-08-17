@@ -101,6 +101,7 @@ export default function DailySales() {
       });
       
       const data = await res.json();
+      
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error ?? "Failed to submit.");
       }

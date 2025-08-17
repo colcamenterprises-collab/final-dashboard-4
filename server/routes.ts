@@ -1606,19 +1606,17 @@ export function registerRoutes(app: express.Application): Server {
       
       const data = {
         completedBy: payload.completedBy || 'Unknown',
-        startingCash: Number(payload.cashStart) || 0,
-        cashSales: Number(payload.cashSales) || 0,
-        qrSales: Number(payload.qrSales) || 0,
-        grabSales: Number(payload.grabSales) || 0,
-        aroiDeeSales: Number(payload.aroiDeeSales) || 0,
-        totalSales: Number(payload.totalSales) || (Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.aroiDeeSales || 0)),
-        shoppingExpenses: payload.shopping || {},
-        wages: payload.wages || {},
-        totalExpenses: Number(payload.totalExpenses) || 0,
-        closingCash: Number(payload.endingCash) || 0,
-        cashBanked: Number(payload.cashBanked) || 0,
-        qrTransferred: Number(payload.qrTransferred) || 0,
-        amountBanked: Number(payload.amountBanked) || 0,
+        shiftDate: payload.shiftDate ? new Date(payload.shiftDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
+        startingCash: Math.round(Number(payload.cashStart) * 100) || 0, // Convert to satang
+        cashSales: Math.round(Number(payload.cashSales) * 100) || 0,
+        qrSales: Math.round(Number(payload.qrSales) * 100) || 0,
+        grabSales: Math.round(Number(payload.grabSales) * 100) || 0,
+        aroiSales: Math.round(Number(payload.aroiDeeSales) * 100) || 0, // Note: using correct field name
+        totalSales: Math.round(Number(payload.totalSales) * 100) || Math.round((Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.aroiDeeSales || 0)) * 100),
+        totalExpenses: Math.round(Number(payload.totalExpenses) * 100) || 0,
+        closingCash: Math.round(Number(payload.endingCash) * 100) || 0,
+        cashBanked: Math.round(Number(payload.cashBanked) * 100) || 0,
+        qrTransfer: Math.round(Number(payload.qrTransferred) * 100) || 0,
         notes: payload.notes || null,
         status: 'submitted'
       };
