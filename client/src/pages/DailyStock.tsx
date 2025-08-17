@@ -14,18 +14,16 @@ function Lock({ message }: { message: string }) {
 }
 
 export default function DailyStock() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const params = new URLSearchParams(location.split("?")[1] || "");
-  const salesId = params.get("salesId") || "";
+  const shiftId = params.get("shift") || "";
 
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    const token = sessionStorage.getItem("lastSalesFormId");
-    const when = Number(sessionStorage.getItem("lastSalesFormTs") || 0);
-    const fresh = Date.now() - when < 1000 * 60 * 15; // 15 minutes
-    setOk(!!salesId && token === salesId && fresh);
-  }, [salesId]);
+    // Allow access if we have a valid shift ID
+    setOk(!!shiftId);
+  }, [shiftId]);
 
   if (!ok) {
     return <Lock message="Please complete Daily Sales first. We'll auto-forward you here after submit." />;
@@ -33,20 +31,46 @@ export default function DailyStock() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-extrabold tracking-tight">Daily Stock</h1>
-      <p className="text-sm text-gray-600">Step 2 of 2 — linked to Sales ID: <span className="font-mono">{salesId}</span></p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Daily Stock</h1>
+          <p className="text-sm text-gray-600 mt-1">Step 2 of 2 — linked to Shift ID: <span className="font-mono">{shiftId}</span></p>
+        </div>
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
+        >
+          Back
+        </button>
+      </div>
 
       <div className="mt-6 rounded-2xl border bg-white p-5">
+        <h2 className="text-lg font-bold mb-4">Stock Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label className="text-sm text-gray-600">Buns Used</label><input className="w-full border rounded-xl px-3 py-2 mt-1" /></div>
-          <div><label className="text-sm text-gray-600">Patties Used</label><input className="w-full border rounded-xl px-3 py-2 mt-1" /></div>
-          <div><label className="text-sm text-gray-600">Drinks Sold</label><input className="w-full border rounded-xl px-3 py-2 mt-1" /></div>
-          <div><label className="text-sm text-gray-600">Notes</label><input className="w-full border rounded-xl px-3 py-2 mt-1" /></div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Buns Used</label>
+            <input className="w-full border rounded-xl px-3 py-2.5 h-10" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Patties Used</label>
+            <input className="w-full border rounded-xl px-3 py-2.5 h-10" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Drinks Sold</label>
+            <input className="w-full border rounded-xl px-3 py-2.5 h-10" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Notes</label>
+            <input className="w-full border rounded-xl px-3 py-2.5 h-10" />
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-end mt-6">
-        <button className="rounded-xl bg-teal-600 text-white px-5 py-2">Submit Stock</button>
+      <div className="flex items-center justify-end gap-3 mt-6">
+        <button className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700">
+          Submit Stock
+        </button>
       </div>
     </div>
   );

@@ -1635,7 +1635,7 @@ export function registerRoutes(app: express.Application): Server {
       }
       
       console.log('Daily Sales Form submitted with ID:', result.id);
-      res.status(200).json({ success: true, id: result.id });
+      res.status(200).json({ ok: true, shiftId: result.id });
     } catch (err) {
       console.error('Daily Sales submission error:', err);
       res.status(500).json({ error: 'Failed to save sales form' });
@@ -2121,7 +2121,7 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
   app.use('/api/expenses', expensesRouter);
-  app.use('/api/expenses-v2', expensesV2Router);
+  // app.use('/api/expenses-v2', expensesV2Router); // Parked until end-of-day per Cam's request
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);

@@ -1,0 +1,206 @@
+1) Backend: return a stable ID after Form 1 save
+
+Make sure your Form-1 POST returns { ok: true, shiftId }.
+
+// server/routes/ops.ts (or wherever Form 1 posts now)
+router.post("/ops/form1", async (req, res) => {
+  try {
+    // ... validate & create the shift record
+    const shift = await prisma.shift.create({
+      data: {
+        date: new Date(req.body.shiftDate),
+        completedBy: req.body.completedBy,
+        // ...rest of your fields
+      },
+      select: { id: true }
+    });
+
+    return res.json({ ok: true, shiftId: shift.id });
+  } catch (err:any) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "Failed to save form." });
+  }
+});
+
+
+If you already have a record, just return its ID in the same shape.
+
+2) Frontend: prevent double submit, show success modal, then route
+
+In your DailySalesForm (Form 1) component:
+
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+// Add a tiny modal component or use your existing modal
+function SuccessModal({
+  open,
+  onClose,
+  onGo,
+  countdown
+}: {
+  open: boolean;
+  onClose: () => void;
+  onGo: () => void;
+  countdown: number;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <h3 className="text-xl font-semibold">Form submitted 🎉</h3>
+        <p className="mt-2 text-sm text-gray-600">
+          Daily Sales has been saved successfully.
+        </p>
+        <p className="mt-2 text-sm">
+          Continue to <span className="font-medium">Form 2 (Stock)</span> in{" "}
+          <span className="font-semibold">{countdown}</span> sec…
+        </p>
+
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={onGo}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Go to Stock now
+          </button>
+          <button
+            onClick={onClose}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Stay here
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function DailySalesForm() {
+  const nav = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [shiftId, setShiftId] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(4);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showSuccess) return;
+    setCountdown(4);
+    const t = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(t);
+          if (shiftId) nav(`/operations/form2?shift=${shiftId}`);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [showSuccess, shiftId, nav]);
+
+  async function onSubmit(values: any) {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ops/form1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error ?? "Failed to submit.");
+      }
+      setShiftId(data.shiftId);
+      setShowSuccess(true);
+      // leave navigation to the modal (auto + button)
+    } catch (e: any) {
+      setError(e.message || "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      {/* page header/actions */}
+      {/* your form fields… */}
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => nav(-1)}
+          className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
+        >
+          Back
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+          onClick={() => {
+            // trigger your form lib submit here if not using <form onSubmit>
+          }}
+        >
+          {submitting ? "Saving…" : "Submit"}
+        </button>
+      </div>
+
+      <SuccessModal
+        open={showSuccess}
+        countdown={countdown}
+        onClose={() => setShowSuccess(false)}
+        onGo={() => shiftId && nav(`/operations/form2?shift=${shiftId}`)}
+      />
+    </>
+  );
+}
+
+Notes
+
+No double submit: we gate on submitting.
+
+Clear success UX: modal + countdown + explicit button.
+
+Deep-link: Stock form reads ?shift=<id> to load context.
+
+3) Form 2 route (Stock) expects the ID
+
+Make sure Form 2 reads the id:
+
+// DailyStockForm.tsx
+import { useSearchParams } from "react-router-dom";
+
+const [sp] = useSearchParams();
+const shiftId = sp.get("shift");
+
+// fetch shift context if needed
+
+4) Aesthetic quick wins you mentioned
+
+Increase vertical spacing under page title: mt-6
+
+Make section headings 18px / 700
+
+Make inputs consistent height (40px), tighter label spacing
+
+Ensure “Back” button is present on top right or left of form
+
+(Those are safe tweaks that won’t break your workflow.)
+
+5) Expenses integration (so it doesn’t blow up tonight)
+
+Keep existing expenses endpoints live for today.
+
+Park the new V2 router mounting until end-of-day (don’t mount /api/expensesV2).
+
+We’ll reconcile the old table with the lookup approach tomorrow; I’ll map your provided Type and Supplier lists into lookups without touching current reads.
