@@ -1,6 +1,8 @@
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 
+const FORM2_PATH = "/daily-stock"; // Route to Form 2
+
 // Success Modal Component
 function SuccessModal({
   open,
@@ -76,7 +78,7 @@ export default function DailySales() {
   }, [showSuccess, shiftId, navigate]);
 
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission/page reload
     if (submitting) return;
     setSubmitting(true);
     setError(null);
@@ -94,22 +96,33 @@ export default function DailySales() {
         status: 'submitted'
       };
 
+      // Always call the canonical endpoint
       const res = await fetch("/api/daily-sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
       
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as any));
+      console.log("[Form1] submit response:", data);
       
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error ?? "Failed to submit.");
+      // Accept any ID shape we might get back
+      const shiftId = 
+        data?.shiftId ?? 
+        data?.salesId ?? // some endpoints return salesId
+        data?.id ?? null;
+      
+      if (!res.ok || !data?.ok || !shiftId) {
+        throw new Error(
+          data?.error || "Submit OK flag or shiftId missing from response."
+        );
       }
       
-      setShiftId(data.shiftId);
-      setShowSuccess(true);
+      // Navigate directly to Form 2 with shift parameter
+      navigate(`${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`);
     } catch (e: any) {
-      setError(e.message || "Something went wrong.");
+      console.error("[Form1] submit error:", e);
+      setError(e?.message || "Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -211,7 +224,7 @@ export default function DailySales() {
               disabled={submitting}
               className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {submitting ? "Saving…" : "Submit"}
+              {submitting ? "Saving…" : "Submit & Continue"}
             </button>
           </div>
         </form>

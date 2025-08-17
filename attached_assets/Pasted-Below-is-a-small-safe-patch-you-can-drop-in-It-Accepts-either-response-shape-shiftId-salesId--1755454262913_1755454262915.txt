@@ -1,0 +1,139 @@
+Below is a small, safe patch you can drop in. It:
+
+Accepts either response shape (shiftId, salesId, or id)
+
+Avoids any form default submit/reload issues
+
+Navigates immediately to Form 2 (we can re-enable the pretty modal later)
+
+Uses a single path constant for the Form-2 route
+
+Logs clearly to the console so you can see what happened
+
+1) Frontend hot-fix (DailySales.tsx)
+// DailySales.tsx
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+
+const FORM2_PATH = "/operations/daily-sales-stock"; // <- make sure this matches your route
+
+export default function DailySalesForm() {
+  const nav = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault(); // stop native submit/page-reload
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // TODO: collect your actual form values here
+      const payload = collectDailySalesValuesSomehow(); // <- your existing function / state
+
+      // Always call the canonical endpoint:
+      const res = await fetch("/api/daily-sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+      console.log("[Form1] submit response:", data);
+
+      // Accept any ID shape we might get back
+      const shiftId =
+        data?.shiftId ??
+        data?.salesId ?? // some agents returned salesId
+        data?.id ?? null;
+
+      if (!res.ok || !data?.ok || !shiftId) {
+        throw new Error(
+          data?.error || "Submit OK flag or shiftId missing from response."
+        );
+      }
+
+      // FOR TONIGHT: navigate immediately, no modal
+      nav(`${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`, {
+        replace: true,
+      });
+    } catch (err: any) {
+      console.error("[Form1] submit error:", err);
+      setError(err?.message || "Failed to submit. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* ... your fields ... */}
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
+        >
+          Back
+        </button>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+        >
+          {submitting ? "Saving…" : "Submit & Continue"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+
+Why this works tonight
+
+preventDefault() stops accidental page reloads.
+
+We accept shiftId | salesId | id so either backend variant works.
+
+We navigate immediately to Form 2 using a single, correct route.
+
+2) (Optional) Backend alias for safety
+
+If /api/forms/daily-sales is still used anywhere, 307-redirect it to the canonical endpoint so both flows behave the same:
+
+// server/routes/forms.ts (top of the daily-sales handler)
+router.post("/forms/daily-sales", async (req, res) => {
+  res.redirect(307, "/api/daily-sales");
+});
+
+
+And ensure the canonical handler returns:
+
+{ "ok": true, "shiftId": "<uuid-or-int>", "salesId": "<optional>" }
+
+3) Quick sanity checklist
+
+ Confirm Form-2 route path. If your file is DailySalesStock.tsx, the route often is /operations/daily-sales-stock. Adjust FORM2_PATH if needed.
+
+ Open DevTools → Network tab, submit once. You should see 200 from /api/daily-sales and a console line [Form1] submit response: … with shiftId and then instant navigation.
+
+ On Stock page, read const id = new URLSearchParams(location.search).get("shift") and load the shift.
+
+4) If you still want the modal later
+
+Once things are calm, you can re-enable the success modal by:
+
+showing it after a successful submit,
+
+and navigating after a 3–4s countdown or “Go now” button.
+(The earlier modal snippet I sent will drop straight in.)

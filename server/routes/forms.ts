@@ -53,8 +53,13 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// POST /api/forms/daily-sales - Create new daily sales form (Form 1)
-router.post("/daily-sales", async (req, res) => {
+// Redirect to canonical endpoint for consistency
+router.post("/daily-sales", (req, res) => {
+  res.redirect(307, "/api/daily-sales");
+});
+
+// POST /api/forms/daily-sales-v2 - Create new daily sales form (Form 1) - V2 Model
+router.post("/daily-sales-v2", async (req, res) => {
   try {
     const body = req.body;
     
