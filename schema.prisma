@@ -632,3 +632,36 @@ model DailyStockV2 {
   @@map("daily_stock_v2")
 }
 
+model IngredientV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  name      String   @unique
+  unit      String
+  unitCost  Decimal  @default(0)
+  supplier  String?
+  notes     String?
+  recipeItems RecipeItemV2[]
+  @@map("ingredient_v2")
+}
+
+model RecipeV2 {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  name         String   @unique
+  yield        Decimal  @default(1)
+  targetMargin Decimal  @default(0)
+  items        RecipeItemV2[]
+  @@map("recipe_v2")
+}
+
+model RecipeItemV2 {
+  id           String   @id @default(uuid())
+  recipeId     String
+  ingredientId String
+  qty          Decimal  @default(0)
+  recipe       RecipeV2      @relation(fields:[recipeId], references:[id], onDelete:Cascade)
+  ingredient   IngredientV2  @relation(fields:[ingredientId], references:[id], onDelete:Restrict)
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_item_v2")
+}
+

@@ -1,13 +1,18 @@
+import PageShell from "@/layouts/PageShell";
+
 export default function JussiOps() {
   return (
-    <div>
-      <h1 className="text-2xl font-extrabold mb-2">Jussi — Ops AI</h1>
-      <p className="text-neutral-600 mb-4">Daily ops analysis and recommendations.</p>
-      <div className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="text-sm text-neutral-500">
-          (Chat panel & daily analysis stream will appear here.)
+    <PageShell>
+      <div className="space-y-6">
+        <h1 className="h1">Jussi — Ops AI</h1>
+        <div className="rounded-2xl border bg-white p-5 h-[520px] grid place-items-center text-neutral-400">
+          <div className="text-center">
+            <div className="text-4xl mb-4">🤖</div>
+            <p className="text-lg font-medium mb-2">Jussi AI Assistant</p>
+            <p className="text-sm">Chat panel placeholder (connected to Upload/Receipts when ready)</p>
+          </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

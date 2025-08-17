@@ -20,6 +20,8 @@ import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
 import CostCalculator from "./pages/CostCalculator";
 import Ingredients from "./pages/Ingredients";
+import Expenses from "./pages/Expenses";
+import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
@@ -61,6 +63,8 @@ export default function App() {
                   <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
                   <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
                   <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
+                  <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+                  <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
 
                   {/* Finance */}
                   <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />

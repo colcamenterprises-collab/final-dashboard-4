@@ -8,6 +8,8 @@ export const ROUTES = {
   ANALYSIS: "/operations/analysis",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
+  EXPENSES: "/operations/expenses",
+  SHIFT_REPORTS: "/operations/shift-reports",
 
   // Legacy routes for compatibility
   OVERVIEW: "/",

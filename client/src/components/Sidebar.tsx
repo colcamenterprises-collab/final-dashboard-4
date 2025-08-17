@@ -99,6 +99,18 @@ export default function Sidebar() {
           collapsed={collapsed}
         />
         <SLink
+          to={ROUTES.EXPENSES}
+          Icon={FileSpreadsheet}
+          label="Expenses"
+          collapsed={collapsed}
+        />
+        <SLink
+          to={ROUTES.SHIFT_REPORTS}
+          Icon={ClipboardCheck}
+          label="Shift Reports"
+          collapsed={collapsed}
+        />
+        <SLink
           to={ROUTES.NIGHTLY_CHECKLIST}
           Icon={ClipboardCheck}
           label="Nightly Checklist"

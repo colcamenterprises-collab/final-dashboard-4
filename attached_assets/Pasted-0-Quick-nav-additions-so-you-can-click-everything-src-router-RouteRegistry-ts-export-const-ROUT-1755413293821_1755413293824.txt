@@ -1,0 +1,261 @@
+0) Quick nav additions (so you can click everything)
+
+src/router/RouteRegistry.ts
+
+export const ROUTES = {
+  // existing...
+  COST_CALCULATOR: "/menu/cost-calculator",
+  INGREDIENTS: "/menu/ingredients",
+
+  // Ops additions
+  EXPENSES: "/operations/expenses",
+  SHIFT_REPORTS: "/operations/shift-reports",
+  NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
+  JUSSI_AI: "/ai/jussi-ops",
+};
+
+
+Add Expenses and Shift Reports entries into the sidebar (same style as others).
+
+1) Cost Calculator + Ingredients (DB-backed, with CSV restore)
+
+If you haven’t already added the V2 tables, add these to prisma/schema.prisma:
+
+model IngredientV2 {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  name      String   @unique
+  unit      String
+  unitCost  Decimal  @default(0)
+  supplier  String?
+  notes     String?
+  @@map("ingredient_v2")
+}
+
+model RecipeV2 {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  name         String   @unique
+  yield        Decimal  @default(1)
+  targetMargin Decimal  @default(0)
+  items        RecipeItemV2[]
+  @@map("recipe_v2")
+}
+
+model RecipeItemV2 {
+  id           String   @id @default(uuid())
+  recipeId     String
+  ingredientId String
+  qty          Decimal  @default(0)
+  recipe       RecipeV2      @relation(fields:[recipeId], references:[id], onDelete:Cascade)
+  ingredient   IngredientV2  @relation(fields:[ingredientId], references:[id], onDelete:Restrict)
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_item_v2")
+}
+
+
+Run:
+
+npx prisma db push && npx prisma generate
+
+Server routes
+
+Create server/routes/costing.ts:
+
+import { Router } from "express";
+import { db } from "../lib/prisma";
+import { parse } from "csv-parse/sync";
+
+export const costingRouter = Router();
+
+// CSV import (name,unit,unitCost,supplier)
+costingRouter.post("/ingredients/import", async (req, res) => {
+  const csv = req.body?.csv as string;
+  if (!csv) return res.status(400).send("CSV missing");
+  const rows:any[] = parse(csv, { columns:true, trim:true, skip_empty_lines:true });
+  for (const r of rows) {
+    const name = (r.name||"").trim();
+    if (!name) continue;
+    await db().ingredientV2.upsert({
+      where: { name },
+      update: { unit:r.unit||"g", unitCost:Number(r.unitCost||0), supplier:r.supplier||null },
+      create: { name, unit:r.unit||"g", unitCost:Number(r.unitCost||0), supplier:r.supplier||null }
+    });
+  }
+  res.json({ ok:true, count: rows.length });
+});
+
+costingRouter.get("/ingredients", async (_req,res) => {
+  const list = await db().ingredientV2.findMany({ orderBy:{name:"asc"}});
+  res.json({ list });
+});
+
+costingRouter.post("/recipes", async (req,res) => {
+  const { name, yield:yl=1, targetMargin=0, items=[] } = req.body||{};
+  const recipe = await db().recipeV2.upsert({
+    where: { name },
+    update: {
+      yield:Number(yl), targetMargin:Number(targetMargin),
+      items:{ deleteMany:{}, create: items.map((i:any)=>({ ingredientId:i.ingredientId, qty:Number(i.qty||0) })) }
+    },
+    create: {
+      name, yield:Number(yl), targetMargin:Number(targetMargin),
+      items:{ create: items.map((i:any)=>({ ingredientId:i.ingredientId, qty:Number(i.qty||0) })) }
+    },
+    include:{ items:{ include:{ ingredient:true } } }
+  });
+  res.json({ recipe });
+});
+
+costingRouter.get("/recipes/:name/calc", async (req,res) => {
+  const recipe = await db().recipeV2.findUnique({
+    where:{ name:String(req.params.name) },
+    include:{ items:{ include:{ ingredient:true } } }
+  });
+  if (!recipe) return res.status(404).send("Not found");
+  const totalCost = recipe.items.reduce((s,it)=> s + Number(it.qty)*Number(it.ingredient.unitCost), 0);
+  const costPerServe = totalCost / Number(recipe.yield||1);
+  const m = Number(recipe.targetMargin||0);
+  const suggestedPrice = m>0 ? costPerServe/(1-m) : costPerServe;
+  res.json({ name:recipe.name, yield:recipe.yield, targetMargin:m, totalCost, costPerServe, suggestedPrice,
+    lines: recipe.items.map(it=>({ ingredient:it.ingredient.name, unit:it.ingredient.unit, qty:it.qty,
+      unitCost:it.ingredient.unitCost, lineCost:Number(it.qty)*Number(it.ingredient.unitCost) })) });
+});
+
+
+Mount in server/index.ts:
+
+import express from "express";
+import { costingRouter } from "./routes/costing";
+const app = express();
+app.use(express.json({ limit:"10mb" }));
+app.use("/api/costing", costingRouter);
+
+Frontend pages
+
+Ingredients list + CSV import: src/pages/Ingredients.tsx (simple table + file input that reads text and posts to /api/costing/ingredients/import).
+
+CostCalculator: use the full page I sent earlier (lets you select ingredients, save recipe, and see suggested price).
+
+That brings back the work you did + ensures data is persisted.
+
+2) Expenses page (rolls / meat / drinks modals)
+
+Create src/pages/Expenses.tsx with three quick actions opening modals:
+
+Rolls: Amount, Timestamp, Cost, Paid/Unpaid
+
+Meat: Weight, Type, Timestamp
+
+Drinks: Dropdown (drink), Qty, Timestamp
+
+Server routes (lightweight) in server/routes/expenses.ts:
+
+import { Router } from "express";
+import { db } from "../lib/prisma";
+export const expensesRouter = Router();
+
+expensesRouter.post("/rolls", async (req,res)=>{
+  const { amount, timestamp, cost, status } = req.body||{};
+  await db().shopping_purchase_v2.create({ data: {
+    item: `Rolls x${amount}`, cost:Number(cost||0), shop: status||"unpaid",
+    salesId: req.body.salesId ?? "standalone" // or null if permitted by schema
+  }});
+  res.json({ ok:true });
+});
+
+expensesRouter.post("/meat", async (req,res)=>{
+  const { weightG, meatType, timestamp } = req.body||{};
+  await db().other_expense_v2.create({ data:{
+    label:`Meat ${meatType||""} ${weightG||0}g`, amount:0, salesId: req.body.salesId ?? "standalone"
+  }});
+  res.json({ ok:true });
+});
+
+expensesRouter.post("/drinks", async (req,res)=>{
+  const { drink, qty, timestamp } = req.body||{};
+  await db().other_expense_v2.create({ data:{
+    label:`Drinks ${drink} x${qty}`, amount:0, salesId: req.body.salesId ?? "standalone"
+  }});
+  res.json({ ok:true });
+});
+
+
+Mount: app.use("/api/expenses", expensesRouter);
+
+If you want these attached to a specific DailySales row, pass salesId from the page; otherwise store standalone and link later.
+
+Add route:
+<Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+
+3) Nightly Checklist → make the button do something
+
+On src/pages/NightlyChecklist.tsx, wire the button to navigate to a checklist run page (even a stub is fine):
+
+import { useNavigate } from "react-router-dom";
+export default function NightlyChecklist() {
+  const nav = useNavigate();
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Nightly Checklist</h1>
+      <div className="rounded-2xl border p-5 bg-white">
+        <button onClick={()=>nav("/managers/nightly-checklist/run")}
+          className="rounded-xl border px-4 py-2">Start Checklist</button>
+        <p className="text-sm text-neutral-500 mt-3">
+          Randomized 5 tasks, photo on first, shift notes. Results go to Manager Summary email + Library.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
+Add a very simple Run page at /managers/nightly-checklist/run that shows 5 tasks and a submit; store to a checklist_v2 table later if you want persistence.
+
+4) Jussi (Ops AI) panel back
+
+Keep the Analysis page’s right column as the Jussi panel.
+
+Also expose a dedicated page at /ai/jussi-ops so the menu item works on its own.
+
+src/pages/JussiOps.tsx:
+
+export default function JussiOps(){
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Jussi — Ops AI</h1>
+      <div className="rounded-2xl border bg-white p-5 h-[520px] grid place-items-center text-neutral-400">
+        Chat panel placeholder (connected to Upload/Receipts when ready)
+      </div>
+    </div>
+  );
+}
+
+
+Route:
+
+<Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
+
+5) Shift Reports menu
+
+Add a simple page src/pages/ShiftReports.tsx:
+
+export default function ShiftReports(){
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Shift Reports</h1>
+      <div className="rounded-2xl border bg-white p-5">
+        <p className="text-sm text-neutral-600">Daily sales + stock, expenses, and checklist summaries.</p>
+        {/* Table or list of last 30 reports goes here. */}
+      </div>
+    </div>
+  );
+}
+
+
+Route:
+
+<Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
+
+
+Add to Operations section in the sidebar.

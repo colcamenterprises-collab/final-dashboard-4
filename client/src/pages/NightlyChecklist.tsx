@@ -1,14 +1,25 @@
+import { useNavigate } from "react-router-dom";
+import PageShell from "@/layouts/PageShell";
+
 export default function NightlyChecklist() {
+  const nav = useNavigate();
+  
   return (
-    <div>
-      <h1 className="text-2xl font-extrabold mb-2">Nightly Checklist</h1>
-      <p className="text-neutral-600 mb-4">Randomized 5 tasks, photo on first, shift notes.</p>
-      <div className="rounded-2xl border bg-white p-5 shadow-sm">
-        <button className="px-3 py-2 border rounded-xl">Start Checklist</button>
-        <div className="text-sm text-neutral-500 mt-3">
-          (We'll connect this to the Manager Summary email + Library.)
+    <PageShell>
+      <div className="space-y-6">
+        <h1 className="h1">Nightly Checklist</h1>
+        <div className="rounded-2xl border p-5 bg-white">
+          <button 
+            onClick={() => nav("/managers/nightly-checklist/run")}
+            className="rounded-xl border px-4 py-2 hover:bg-gray-50"
+          >
+            Start Checklist
+          </button>
+          <p className="text-sm text-neutral-500 mt-3">
+            Randomized 5 tasks, photo on first, shift notes. Results go to Manager Summary email + Library.
+          </p>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

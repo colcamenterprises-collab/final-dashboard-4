@@ -16,6 +16,8 @@ import recipes from "./routes/recipes";
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
 import formsRouter from "./routes/forms";
+import { costingRouter } from "./routes/costing";
+import { expensesRouter } from "./routes/expenses";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
