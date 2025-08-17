@@ -1,13 +1,16 @@
-// src/router/RouteRegistry.ts
 export const ROUTES = {
-  // Dashboard
-  OVERVIEW: "/",
+  // Home
+  HOME: "/",
 
   // Operations
   DAILY_SALES_STOCK: "/operations/daily-sales-stock",
   DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
-  UPLOAD_STATEMENTS: "/operations/upload-statements",
-  RECEIPTS: "/operations/receipts",
+  ANALYSIS: "/operations/analysis",
+  UPLOAD_STATEMENTS: "/operations/analysis/upload",
+  RECEIPTS: "/operations/analysis/receipts",
+
+  // Legacy routes for compatibility
+  OVERVIEW: "/",
   SHIFT_SUMMARY: "/operations/shift-summary",
 
   // Finance
@@ -17,7 +20,7 @@ export const ROUTES = {
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
 
-  // Managers / AI
+  // Managers
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
   JUSSI_AI: "/ai/jussi-ops",
   JANE_ACCOUNTS: "/ai/jane-accounts",
@@ -25,29 +28,7 @@ export const ROUTES = {
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
 
-export const ALLOWED_PATHS: string[] = [
-  // Dashboard
-  ROUTES.OVERVIEW,
-
-  // Operations
-  ROUTES.DAILY_SALES_STOCK,
-  ROUTES.DAILY_SALES_LIBRARY,
-  ROUTES.UPLOAD_STATEMENTS,
-  ROUTES.RECEIPTS,
-  ROUTES.SHIFT_SUMMARY,
-
-  // Finance
-  ROUTES.PROFIT_LOSS,
-
-  // Menu Mgmt
-  ROUTES.COST_CALCULATOR,
-  ROUTES.INGREDIENTS,
-
-  // Managers / AI
-  ROUTES.NIGHTLY_CHECKLIST,
-  ROUTES.JUSSI_AI,
-  ROUTES.JANE_ACCOUNTS,
-];
+export const ALLOWED_PATHS: string[] = Object.values(ROUTES);
 
 export const isAllowedPath = (path: string) =>
   ALLOWED_PATHS.includes((path || "/").replace(/\/+$/, "") || "/");

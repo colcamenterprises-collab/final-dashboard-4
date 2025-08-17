@@ -5,6 +5,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Typography helpers */
+.h1 { @apply text-3xl font-extrabold; }
+.h2 { @apply text-xl md:text-2xl font-bold; }
+.h3 { @apply text-lg font-semibold; }
+.text-body { @apply text-sm; }
+
 /* Global responsive guards */
 html, body { 
   overflow-x: hidden; 

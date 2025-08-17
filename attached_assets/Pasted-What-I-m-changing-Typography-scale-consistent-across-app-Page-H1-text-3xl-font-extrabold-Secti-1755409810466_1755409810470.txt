@@ -1,0 +1,331 @@
+What I’m changing
+
+Typography scale (consistent across app)
+
+Page H1: text-3xl font-extrabold
+
+Section/card titles: text-lg font-semibold
+
+Body text: text-sm
+
+Sidebar items: text-base
+
+Sidebar group labels: text-xs font-semibold tracking-wide text-neutral-400
+
+Top bar & alignment
+
+Single Topbar with logo at far-left on the same horizontal line as the page greeting (“Hi/Good morning Cam”).
+
+Removed logo block from sidebar.
+
+Menu structure
+
+Replace Dashboard/Overview with a single Home item.
+
+Add Analysis under Operations; move Upload Statements + Receipts into this page.
+
+Keep Jussi (Ops AI) and Jane (Accounting) under Managers (bottom).
+
+Icons restored (lucide-react).
+
+Collapsible sidebar (minimise/expand).
+
+Whitespace/layout
+
+Uniform container width and vertical rhythm.
+
+Sidebar first section aligns with top content.
+
+Below are full files to paste.
+
+1) Add a Topbar
+src/components/Topbar.tsx
+import { Bell, Download } from "lucide-react";
+
+export default function Topbar() {
+  return (
+    <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
+      <div className="mx-auto max-w-[1400px] px-6 h-14 flex items-center gap-4">
+        {/* Logo (left) */}
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-xl bg-emerald-600 text-white grid place-items-center font-bold">S</div>
+          {/* Keep logo only per request; no title here */}
+        </div>
+
+        {/* Greeting row — aligns horizontally with logo */}
+        <div className="flex-1 flex items-center">
+          <div className="text-xl font-extrabold">Hi Cam</div>
+        </div>
+
+        {/* Right actions (optional) */}
+        <button className="hidden md:inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm">
+          <Download className="h-4 w-4" />
+          Download report
+        </button>
+        <button className="rounded-xl border p-2">
+          <Bell className="h-5 w-5" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+2) Sidebar (icons, collapse, new structure)
+src/components/Sidebar.tsx
+import { NavLink } from "react-router-dom";
+import {
+  LayoutGrid, CalendarCheck, Library, LineChart, Upload, Receipt,
+  TrendingUp, Calculator, Sandwich, ClipboardCheck, Bot, FileSpreadsheet,
+  ChevronLeft, ChevronRight
+} from "lucide-react";
+import { useState } from "react";
+import { ROUTES } from "../router/RouteRegistry";
+
+const item =
+  "flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-emerald-600/10 transition-colors";
+const active = "bg-emerald-600 text-white hover:bg-emerald-600";
+const group = "px-4 pt-4 pb-2 text-xs font-semibold tracking-wide text-neutral-400";
+
+function SLink({ to, icon: Icon, children, collapsed }:{
+  to:string; icon:any; children:string; collapsed:boolean;
+}) {
+  return (
+    <NavLink to={to} className={({isActive}) => `${item} ${isActive?active:""}`}>
+      <Icon className="h-5 w-5 shrink-0" />
+      {!collapsed && <span className="text-base">{children}</span>}
+    </NavLink>
+  );
+}
+
+export default function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const width = collapsed ? "w-[84px]" : "w-72";
+
+  return (
+    <aside className={`${width} border-r bg-white min-h-screen transition-[width] duration-200`}>
+      <div className="px-3 py-3 border-b flex items-center justify-between">
+        {/* empty block so logo only lives in Topbar */}
+        <button
+          aria-label="Toggle sidebar"
+          className="ml-auto rounded-xl border p-2"
+          onClick={() => setCollapsed(v => !v)}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
+
+      <nav className="p-3">
+        <div className={group}>{!collapsed && "Dashboard"}</div>
+        <SLink to={ROUTES.HOME} icon={LayoutGrid} collapsed={collapsed}>Home</SLink>
+
+        <div className={group}>{!collapsed && "Operations"}</div>
+        <SLink to={ROUTES.DAILY_SALES_STOCK} icon={CalendarCheck} collapsed={collapsed}>Daily Sales & Stock</SLink>
+        <SLink to={ROUTES.DAILY_SALES_LIBRARY} icon={Library} collapsed={collapsed}>Daily Sales Library</SLink>
+        <SLink to={ROUTES.ANALYSIS} icon={LineChart} collapsed={collapsed}>Analysis</SLink>
+
+        <div className={group}>{!collapsed && "Finance"}</div>
+        <SLink to={ROUTES.PROFIT_LOSS} icon={TrendingUp} collapsed={collapsed}>Profit & Loss</SLink>
+
+        <div className={group}>{!collapsed && "Menu Mgmt"}</div>
+        <SLink to={ROUTES.COST_CALCULATOR} icon={Calculator} collapsed={collapsed}>Cost Calculator</SLink>
+        <SLink to={ROUTES.INGREDIENTS} icon={Sandwich} collapsed={collapsed}>Ingredients</SLink>
+
+        <div className={group}>{!collapsed && "Managers"}</div>
+        <SLink to={ROUTES.NIGHTLY_CHECKLIST} icon={ClipboardCheck} collapsed={collapsed}>Nightly Checklist</SLink>
+        <SLink to={ROUTES.JUSSI_AI} icon={Bot} collapsed={collapsed}>Jussi (Ops AI)</SLink>
+        <SLink to={ROUTES.JANE_ACCOUNTS} icon={FileSpreadsheet} collapsed={collapsed}>Jane (Accounting)</SLink>
+
+        {/* Hidden direct links (now inside Analysis), keep for deep routes if needed */}
+        <div className="hidden">
+          <SLink to={ROUTES.UPLOAD_STATEMENTS} icon={Upload} collapsed={collapsed}>Upload Statements</SLink>
+          <SLink to={ROUTES.RECEIPTS} icon={Receipt} collapsed={collapsed}>Receipts</SLink>
+        </div>
+      </nav>
+    </aside>
+  );
+}
+
+3) Route registry (Home + Analysis; keep deep routes)
+src/router/RouteRegistry.ts
+export const ROUTES = {
+  // Home
+  HOME: "/",
+
+  // Operations
+  DAILY_SALES_STOCK: "/operations/daily-sales-stock",
+  DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
+  ANALYSIS: "/operations/analysis",
+  UPLOAD_STATEMENTS: "/operations/analysis/upload",
+  RECEIPTS: "/operations/analysis/receipts",
+
+  // Finance
+  PROFIT_LOSS: "/finance/profit-loss",
+
+  // Menu Mgmt
+  COST_CALCULATOR: "/menu/cost-calculator",
+  INGREDIENTS: "/menu/ingredients",
+
+  // Managers
+  NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
+  JUSSI_AI: "/ai/jussi-ops",
+  JANE_ACCOUNTS: "/ai/jane-accounts",
+} as const;
+
+export const ALLOWED_PATHS: string[] = Object.values(ROUTES);
+
+export const isAllowedPath = (p: string) =>
+  ALLOWED_PATHS.includes((p || "/").replace(/\/+$/, "") || "/");
+
+4) Page shell (topbar + whitespace)
+src/layouts/PageShell.tsx
+import Topbar from "../components/Topbar";
+
+export default function PageShell({ children }:{children: React.ReactNode}) {
+  return (
+    <div className="flex-1 flex flex-col min-h-screen">
+      <Topbar />
+      <main className="flex-1">
+        {/* global layout container + vertical spacing */}
+        <div className="mx-auto max-w-[1400px] px-6 py-6 space-y-6">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+5) Home page (rename Overview → Home, apply type scale)
+src/pages/Home.tsx
+export default function Home() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Good morning Cam 👋</h1>
+
+      {/* KPI bar */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Orders", value: "1,249" },
+          { label: "Total Revenue", value: "฿89,542" },
+          { label: "Growth", value: "+12.5%" },
+          { label: "Active Items", value: "32" },
+        ].map((k) => (
+          <div key={k.label} className="rounded-2xl border bg-emerald-600 text-white p-5 shadow-sm">
+            <div className="text-sm opacity-90">{k.label}</div>
+            <div className="text-2xl font-extrabold mt-1">{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* two columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-lg font-semibold mb-3">Summary Revenue</div>
+          <div className="h-60 grid place-items-center text-neutral-400 text-sm border rounded-xl">
+            Chart placeholder
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-lg font-semibold mb-3">Manager's Checklist</div>
+          <div className="text-sm text-neutral-600">Today's Tasks <span className="font-semibold">8/12 Complete</span></div>
+          <div className="mt-3 h-2 rounded-full bg-neutral-200">
+            <div className="h-2 rounded-full bg-emerald-600" style={{width:"70%"}} />
+          </div>
+          <button className="mt-4 w-full rounded-xl border px-3 py-2">Complete Tasks →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+If you already have Overview.tsx, you can just rename the export and file to Home.tsx or keep the component but route it as HOME.
+
+6) Analysis page (hosts Upload + Receipts + Jussi chat)
+src/pages/Analysis.tsx
+import { Outlet, NavLink } from "react-router-dom";
+import { Upload, Receipt, Bot } from "lucide-react";
+
+export default function Analysis() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Analysis</h1>
+
+      {/* quick actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <NavLink to="upload" className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3 hover:bg-neutral-50">
+          <Upload className="h-5 w-5" />
+          <div>
+            <div className="text-lg font-semibold">Upload Statements</div>
+            <div className="text-sm text-neutral-500">Bank/POS reports for reconciliation</div>
+          </div>
+        </NavLink>
+        <NavLink to="receipts" className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3 hover:bg-neutral-50">
+          <Receipt className="h-5 w-5" />
+          <div>
+            <div className="text-lg font-semibold">Receipts</div>
+            <div className="text-sm text-neutral-500">Manage scanned receipts</div>
+          </div>
+        </NavLink>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3">
+          <Bot className="h-5 w-5" />
+          <div>
+            <div className="text-lg font-semibold">Jussi (Ops AI)</div>
+            <div className="text-sm text-neutral-500">Ask questions about uploaded reports</div>
+          </div>
+        </div>
+      </div>
+
+      {/* two-panel: content + Jussi chat */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Outlet />
+        </div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm h-[520px]">
+          <div className="text-lg font-semibold mb-3">Jussi — Ops AI</div>
+          <div className="h-full grid place-items-center text-neutral-400 text-sm border rounded-xl">
+            Chat panel placeholder (wired to your upload data)
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+This uses nested routes: /operations/analysis (landing), /operations/analysis/upload, /operations/analysis/receipts rendered in the Outlet. You can reuse your existing UploadStatements and Receipts components as the children.
+
+7) Hook routes
+src/App.tsx (excerpt)
+import Home from "./pages/Home";
+import Analysis from "./pages/Analysis";
+import UploadStatements from "./pages/UploadStatements";
+import Receipts from "./pages/Receipts";
+// ...others
+
+// inside <Routes>
+<Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
+
+{/* Operations */}
+<Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
+<Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
+
+{/* Analysis with nested routes */}
+<Route path={ROUTES.ANALYSIS} element={<Guard><Analysis /></Guard>}>
+  <Route path="upload" element={<UploadStatements />} />
+  <Route path="receipts" element={<Receipts />} />
+</Route>
+
+8) Minor polish (type scale utilities)
+
+If you have a global CSS, you can drop a small utility so card titles don’t drift:
+
+src/index.css (or global)
+/* Typography helpers */
+.h1 { @apply text-3xl font-extrabold; }
+.h2 { @apply text-xl md:text-2xl font-bold; }
+.h3 { @apply text-lg font-semibold; }
+.text-body { @apply text-sm; }
+
+
+Then use .h3 in every card header for uniformity.
