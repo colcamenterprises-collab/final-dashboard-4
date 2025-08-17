@@ -271,6 +271,42 @@ export const expenseCategories = pgTable("expense_categories", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// New Lookup Tables for Enhanced Expense System
+export const expenseTypeLkp = pgTable("expense_type_lkp", {
+  id: text("id").primaryKey().default('gen_random_uuid()'),
+  name: text("name").notNull().unique(),
+  active: boolean("active").default(true),
+});
+
+export const supplierLkp = pgTable("supplier_lkp", {
+  id: text("id").primaryKey().default('gen_random_uuid()'),
+  name: text("name").notNull().unique(),
+  active: boolean("active").default(true),
+});
+
+// Enhanced Expense Entry table with lookups
+export const expenseEntry = pgTable("expense_entry", {
+  id: text("id").primaryKey().default('gen_random_uuid()'),
+  date: timestamp("date").notNull(),
+  typeId: text("type_id").notNull(),
+  supplierId: text("supplier_id"),
+  label: text("label"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  paid: boolean("paid").default(false),
+  method: text("method"),
+  reference: text("reference"),
+  receiptUrl: text("receipt_url"),
+  categoryNote: text("category_note"),
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dateIdx: index("expense_entry_date_idx").on(table.date),
+  typeIdx: index("expense_entry_type_idx").on(table.typeId),
+  supplierIdx: index("expense_entry_supplier_idx").on(table.supplierId),
+  paidIdx: index("expense_entry_paid_idx").on(table.paid),
+}));
+
 // Bank Statements table
 export const bankStatements = pgTable("bank_statements", {
   id: serial("id").primaryKey(),

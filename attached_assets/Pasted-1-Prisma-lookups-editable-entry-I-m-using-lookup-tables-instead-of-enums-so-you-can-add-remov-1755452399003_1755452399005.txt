@@ -1,0 +1,298 @@
+1) Prisma: lookups (editable) + entry
+
+I’m using lookup tables instead of enums so you can add/remove types & suppliers without a migration.
+
+// prisma/schema.prisma
+
+model ExpenseTypeLkp {
+  id      String  @id @default(uuid())
+  name    String  @unique
+  active  Boolean @default(true)
+  entries ExpenseEntry[]
+}
+
+model SupplierLkp {
+  id      String  @id @default(uuid())
+  name    String  @unique
+  active  Boolean @default(true)
+  entries ExpenseEntry[]
+}
+
+model ExpenseEntry {
+  id           String          @id @default(uuid())
+  date         DateTime
+  typeId       String
+  supplierId   String?
+  label        String?         // free text if needed
+  amount       Decimal         @default(0)
+  paid         Boolean         @default(false)
+  method       String?         // cash, bank, qr
+  reference    String?         // bank ref / slip no
+  receiptUrl   String?
+  categoryNote String?         // optional notes
+  meta         Json?           // wage hours/rate etc
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  type         ExpenseTypeLkp  @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  supplier     SupplierLkp?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([date, paid, typeId, supplierId])
+}
+
+
+Run:
+
+npx prisma db push && npx prisma generate
+
+2) Seed your dropdowns (exact lists)
+
+Create prisma/seed-expenses.ts:
+
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
+const TYPES = [
+  "Food","F&B","Beverage","Staff Expenses (Bonus Pay)","Staff Expenses (from Account)",
+  "Rent","Administration","Advertising - Grab","Advertising - Other",
+  "Delivery Fee Discount (Merchant-Funded)","Director Payment",
+  "Discount (Merchant-Funded)","Fittings","Kitchen Supplies or Packaging",
+  "Marketing","Marketing success fee","Misc","Printers","Renovations",
+  "Subscriptions","Stationary","Travel","Utilities",
+];
+
+const SUPPLIERS = [
+  "Makro","Mr DIY","Bakery","Big C","Printers","Supercheap","Burger Boxes",
+  "Cameron","Colin","DTAC","Company Expense","Gas","GO Wholesale","Grab Merchant",
+  "HomePro","Landlord","Lawyer","Lazada","Lotus","Loyverse","MEA","AIS","Other",
+];
+
+async function main() {
+  for (const name of TYPES) {
+    await prisma.expenseTypeLkp.upsert({
+      where: { name },
+      update: { active: true },
+      create: { name },
+    });
+  }
+  for (const name of SUPPLIERS) {
+    await prisma.supplierLkp.upsert({
+      where: { name },
+      update: { active: true },
+      create: { name },
+    });
+  }
+  console.log("Seeded expense types & suppliers.");
+}
+main().finally(()=>prisma.$disconnect());
+
+
+Run once:
+
+ts-node prisma/seed-expenses.ts
+
+
+(Or add to your existing seed script.)
+
+3) API (simple & powerful)
+
+Base: /api/expenses
+
+// server/routes/expenses.ts
+import { Router } from "express";
+import { db } from "../lib/prisma"; // your prisma wrapper
+export const expensesRouter = Router();
+
+// meta lists for dropdowns
+expensesRouter.get("/meta", async (_req,res)=>{
+  const [types, suppliers] = await Promise.all([
+    db().expenseTypeLkp.findMany({ where:{active:true}, orderBy:{name:"asc"} }),
+    db().supplierLkp.findMany({ where:{active:true}, orderBy:{name:"asc"} }),
+  ]);
+  res.json({ types, suppliers });
+});
+
+// quick add (Purchase/Wage/Other via one endpoint)
+expensesRouter.post("/", async (req,res)=>{
+  const { date, typeName, supplierName, label, amount, paid=false, method, reference, receiptUrl, meta, categoryNote } = req.body;
+
+  // find or create lookup ids (keep it forgiving like before)
+  const type = await db().expenseTypeLkp.upsert({
+    where:{ name: String(typeName).trim() },
+    update:{ active:true },
+    create:{ name: String(typeName).trim() }
+  });
+
+  let supplierId: string|undefined = undefined;
+  if (supplierName && String(supplierName).trim() !== "") {
+    const sup = await db().supplierLkp.upsert({
+      where:{ name: String(supplierName).trim() },
+      update:{ active:true },
+      create:{ name: String(supplierName).trim() }
+    });
+    supplierId = sup.id;
+  }
+
+  const entry = await db().expenseEntry.create({
+    data:{
+      date: new Date(date),
+      typeId: type.id,
+      supplierId,
+      label: label ?? null,
+      amount: Number(amount || 0),
+      paid: !!paid,
+      method: method ?? null,
+      reference: reference ?? null,
+      receiptUrl: receiptUrl ?? null,
+      categoryNote: categoryNote ?? null,
+      meta: meta ?? undefined,
+    }
+  });
+  res.json({ ok:true, entry });
+});
+
+// list + totals
+expensesRouter.get("/", async (req,res)=>{
+  const { from, to, q, type, supplier, paid } = req.query as any;
+  const where:any = {};
+  if (from || to) {
+    where.date = {};
+    if (from) where.date.gte = new Date(from);
+    if (to) where.date.lte = new Date(to);
+  }
+  if (paid === "true") where.paid = true;
+  if (paid === "false") where.paid = false;
+  if (type) {
+    const t = await db().expenseTypeLkp.findUnique({ where:{ name:String(type) }});
+    if (t) where.typeId = t.id;
+  }
+  if (supplier) {
+    const s = await db().supplierLkp.findUnique({ where:{ name:String(supplier) }});
+    if (s) where.supplierId = s.id;
+  }
+  if (q) where.OR = [
+    { label: { contains: String(q), mode:"insensitive" }},
+    { reference: { contains: String(q), mode:"insensitive" }},
+    { supplier: { name: { contains: String(q), mode:"insensitive" }}},
+  ];
+
+  const items = await db().expenseEntry.findMany({
+    where,
+    include:{ type:true, supplier:true },
+    orderBy:{ date:"desc" },
+  });
+
+  const totals = items.reduce((acc:any, e:any)=>{
+    const v = Number(e.amount);
+    acc.all += v;
+    if (e.paid) acc.paid += v; else acc.unpaid += v;
+    return acc;
+  }, { paid:0, unpaid:0, all:0 });
+
+  res.json({ items, totals });
+});
+
+expensesRouter.post("/:id/mark-paid", async (req,res)=>{
+  const { method, reference } = req.body || {};
+  const entry = await db().expenseEntry.update({
+    where:{ id: String(req.params.id) },
+    data:{ paid:true, method: method ?? "unknown", reference: reference ?? null }
+  });
+  res.json({ ok:true, entry });
+});
+
+expensesRouter.put("/:id", async (req,res)=>{
+  const { date, typeName, supplierName, label, amount, paid, method, reference, receiptUrl, categoryNote, meta } = req.body;
+
+  let update:any = {};
+  if (date) update.date = new Date(date);
+  if (label!==undefined) update.label = label;
+  if (amount!==undefined) update.amount = Number(amount);
+  if (paid!==undefined) update.paid = !!paid;
+  if (method!==undefined) update.method = method;
+  if (reference!==undefined) update.reference = reference;
+  if (receiptUrl!==undefined) update.receiptUrl = receiptUrl;
+  if (categoryNote!==undefined) update.categoryNote = categoryNote;
+  if (meta!==undefined) update.meta = meta;
+
+  if (typeName) {
+    const t = await db().expenseTypeLkp.upsert({
+      where:{ name:String(typeName).trim() },
+      update:{ active:true },
+      create:{ name:String(typeName).trim() },
+    });
+    update.typeId = t.id;
+  }
+  if (supplierName!==undefined) {
+    if (supplierName===null || supplierName==="") update.supplierId = null;
+    else {
+      const s = await db().supplierLkp.upsert({
+        where:{ name:String(supplierName).trim() },
+        update:{ active:true },
+        create:{ name:String(supplierName).trim() },
+      });
+      update.supplierId = s.id;
+    }
+  }
+
+  const entry = await db().expenseEntry.update({ where:{ id:String(req.params.id) }, data:update });
+  res.json({ ok:true, entry });
+});
+
+expensesRouter.delete("/:id", async (req,res)=>{
+  await db().expenseEntry.delete({ where:{ id:String(req.params.id) }});
+  res.json({ ok:true });
+});
+
+
+Mount it:
+
+// server/index.ts
+import { expensesRouter } from "./routes/expenses";
+app.use("/api/expenses", expensesRouter);
+
+4) Front-end wiring (dropdowns that “just work”)
+
+On Expenses page load, call GET /api/expenses/meta and populate:
+
+Type dropdown with your list (sorted).
+
+Supplier dropdown with your list (sorted).
+
+Both dropdowns should allow free text + “Add ‘X’” (we upsert on the server).
+
+Quick-Add modals:
+
+Purchase → sends { typeName: selectedType, supplierName: selectedSupplier, amount, paid, method, reference, date, label }
+
+Wage → { typeName: "Staff Expenses (from Account)" | "Staff Expenses (Bonus Pay)" , staff name in label/meta, amount, ... }
+
+Other → { typeName: selectedType, label, amount, ... }
+
+Table fetches from GET /api/expenses with filters (date/type/supplier/paid).
+
+Use Mark Paid action to flip quickly with method/ref.
+
+5) CSV import tolerance
+
+Accept Date, Type, Supplier, Label, Amount, Paid, Method, Reference (any order, case-insensitive).
+
+For Type and Supplier, upsert to lookup if not found.
+
+Paid accepts TRUE/FALSE/Yes/No/1/0.
+
+Numbers: strip , and currency symbols before parse.
+
+6) Styling quick pass (apply now)
+
+Sidebar section headers: 14px / 600 / #0B0B0B
+
+Sidebar items: 12px / 500, icon gap 8px
+
+Cards: rounded-2xl border border-[#ECECEC] p-6 with gap-6
+
+Buttons: 40px height, 14px / 600, consistent
+
+Page heading 28px / 800, card heading 18px / 700
+
+Single top bar; remove duplicate “Hi Cam” strip; align with logo

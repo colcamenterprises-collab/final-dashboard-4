@@ -18,6 +18,7 @@ import { importRouter } from "./routes/imports";
 import formsRouter from "./routes/forms";
 import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
+import { expensesV2Router } from "./routes/expensesV2";
 import { menuRouter } from "./routes/menu";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
@@ -2120,6 +2121,7 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
   app.use('/api/expenses', expensesRouter);
+  app.use('/api/expenses-v2', expensesV2Router);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
