@@ -665,3 +665,55 @@ model RecipeItemV2 {
   @@map("recipe_item_v2")
 }
 
+enum MenuSource {
+  house
+  pos
+  grab
+  foodpanda
+  other
+}
+
+model MenuV2 {
+  id          String      @id @default(uuid())
+  name        String
+  source      MenuSource
+  fileType    String
+  version     String?     // optional partner version tag
+  importedAt  DateTime    @default(now())
+  notes       String?
+  items       MenuItemV2[]
+  @@index([source])
+  @@map("menu_v2")
+}
+
+model MenuItemV2 {
+  id          String   @id @default(uuid())
+  menuId      String
+  externalId  String?  // partner id / SKU
+  name        String
+  category    String?
+  basePrice   Decimal  @default(0)
+  description String?
+  active      Boolean  @default(true)
+
+  menu        MenuV2     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  modifiers   MenuModifierV2[]
+
+  @@unique([menuId, name])
+  @@index([name])
+  @@map("menu_item_v2")
+}
+
+model MenuModifierV2 {
+  id        String   @id @default(uuid())
+  itemId    String
+  groupName String?
+  name      String
+  price     Decimal  @default(0)
+
+  item      MenuItemV2 @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("menu_modifier_v2")
+}
+

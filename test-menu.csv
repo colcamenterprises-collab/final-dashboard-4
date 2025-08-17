@@ -1,0 +1,11 @@
+name,category,price,description,modifiers
+Double Smash Burger,Burgers,189,Our signature double smash burger with two beef patties,"Cheese:+15|Bacon:+25|Double Cheese:+30"
+Classic Cheeseburger,Burgers,149,Classic beef burger with cheese,"Bacon:+25|Extra Cheese:+15"
+Chicken Deluxe,Burgers,169,Crispy chicken breast with special sauce,"Spicy Mayo:+10|Avocado:+20"
+BBQ Bacon Burger,Burgers,199,BBQ sauce with crispy bacon,"Extra BBQ:+10|Onion Rings:+15"
+Veggie Burger,Burgers,139,Plant-based patty option,"Cheese:+15|Avocado:+20"
+French Fries,Sides,59,Golden crispy fries,"Large:+20|Cheese:+15"
+Onion Rings,Sides,69,Crispy beer-battered onion rings,
+Chicken Wings,Sides,129,Buffalo or BBQ wings (6 pieces),"12 pieces:+60|Extra Sauce:+10"
+Coca-Cola,Beverages,39,Classic Coca-Cola,"Large:+10"
+Iced Tea,Beverages,35,Fresh brewed iced tea,"Large:+10|Lemon:+5"

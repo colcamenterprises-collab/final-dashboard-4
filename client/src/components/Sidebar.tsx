@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutGrid, CalendarCheck, Library, LineChart, TrendingUp,
   Calculator, Sandwich, ClipboardCheck, Bot, FileSpreadsheet,
-  ChevronLeft, ChevronRight
+  Upload, FileText, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useState } from "react";
 import { ROUTES } from "../router/RouteRegistry";
@@ -162,6 +162,24 @@ export default function Sidebar() {
           to={ROUTES.INGREDIENTS}
           Icon={Sandwich}
           label="Ingredients"
+          collapsed={collapsed}
+        />
+        <SLink
+          to={ROUTES.MENU_MGR}
+          Icon={LayoutGrid}
+          label="Menu Manager"
+          collapsed={collapsed}
+        />
+        <SLink
+          to={ROUTES.MENU_IMPORT}
+          Icon={Upload}
+          label="Import Menu"
+          collapsed={collapsed}
+        />
+        <SLink
+          to={ROUTES.MENU_DESC_TOOL}
+          Icon={FileText}
+          label="Description Tool"
           collapsed={collapsed}
         />
 

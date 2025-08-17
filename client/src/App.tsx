@@ -21,6 +21,9 @@ import ProfitLoss from "./pages/ProfitLoss";
 import CostCalculator from "./pages/CostCalculator";
 import Ingredients from "./pages/Ingredients";
 import Expenses from "./pages/Expenses";
+import MenuManager from "./pages/menu/MenuManager";
+import MenuImport from "./pages/menu/MenuImport";
+import DescriptionTool from "./pages/menu/DescriptionTool";
 import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
@@ -72,6 +75,9 @@ export default function App() {
                   {/* Menu Mgmt */}
                   <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
                   <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
+                  <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
+                  <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
+                  <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
 
                   {/* Managers */}
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />

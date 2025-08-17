@@ -18,6 +18,7 @@ import { importRouter } from "./routes/imports";
 import formsRouter from "./routes/forms";
 import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
+import { menuRouter } from "./routes/menu";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2119,6 +2120,9 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
   app.use('/api/expenses', expensesRouter);
+  
+  // Register Menu Management routes
+  app.use('/api/menus', menuRouter);
   
   // Register Forms routes
   app.use('/api/forms', formsRouter);

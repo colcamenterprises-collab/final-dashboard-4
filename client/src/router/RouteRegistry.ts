@@ -21,6 +21,9 @@ export const ROUTES = {
   // Menu Mgmt
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
+  MENU_MGR: "/menu/manager",
+  MENU_IMPORT: "/menu/import",
+  MENU_DESC_TOOL: "/menu/description-tool",
 
   // Managers
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",

@@ -1,0 +1,738 @@
+Alright Cam — here’s a working Menu Management module you can drop in today.
+It covers:
+
+Multi-format import (CSV/JSON/XLSX) for delivery partners / POS.
+
+Menu storage (menus, items, modifiers).
+
+Cross-reference / diff between any two menus.
+
+Chef Ramsay review (cost-based suggestions + promo ideas).
+
+Menu “mind map” JSON for a visual (simple tree UI now; can swap to react-flow later).
+
+Delivery-partner description generator (short & long variants).
+
+I kept the UI minimal and functional so we can style later. Everything returns JSON and is wired to your existing DB patterns.
+
+0) Install deps
+npm i csv-parse xlsx
+
+
+csv-parse for robust CSV, xlsx for Excel files. No external services.
+
+1) Prisma: add menu models
+
+Append to prisma/schema.prisma:
+
+enum MenuSource {
+  house
+  pos
+  grab
+  foodpanda
+  other
+}
+
+model Menu {
+  id          String      @id @default(uuid())
+  name        String
+  source      MenuSource
+  fileType    String
+  version     String?     // optional partner version tag
+  importedAt  DateTime    @default(now())
+  notes       String?
+  items       MenuItem[]
+  @@index([source])
+}
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  menuId      String
+  externalId  String?  // partner id / SKU
+  name        String
+  category    String?
+  basePrice   Decimal  @default(0)
+  description String?
+  active      Boolean  @default(true)
+
+  menu        Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  modifiers   MenuModifier[]
+
+  @@unique([menuId, name])
+  @@index([name])
+}
+
+model MenuModifier {
+  id        String   @id @default(uuid())
+  itemId    String
+  groupName String?
+  name      String
+  price     Decimal  @default(0)
+
+  item      MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+}
+
+
+Then:
+
+npx prisma db push && npx prisma generate
+
+2) Server routes — server/routes/menu.ts
+
+Create this file. It handles import (CSV/JSON/XLSX), list, details, compare, review, mindmap, and description generation.
+
+import { Router } from "express";
+import { db } from "../lib/prisma";
+import { parse as parseCSV } from "csv-parse/sync";
+import * as XLSX from "xlsx";
+
+export const menuRouter = Router();
+
+/** ---------- helpers ---------- **/
+const n = (v: any) => {
+  if (v == null || v === "") return 0;
+  const s = String(v).replace(/[^\d.\-]/g, "");
+  const num = Number(s);
+  return isFinite(num) ? num : 0;
+};
+const norm = (s?: string) =>
+  (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+function pick(obj: any, keys: string[]) {
+  for (const k of keys) {
+    if (obj[k] != null && String(obj[k]).trim() !== "") return obj[k];
+  }
+  return undefined;
+}
+
+/** map a generic row to MenuItem + modifiers */
+function mapRow(row: any) {
+  const name = String(pick(row, ["name", "item", "item name", "menu_item", "product"]) || "").trim();
+  const category = pick(row, ["category", "group"]);
+  const price = pick(row, ["price", "baseprice", "base_price", "amount", "list price"]);
+  const description = pick(row, ["description", "desc", "item description", "long description"]);
+  const externalId = pick(row, ["id", "sku", "external_id", "partner_id"]);
+
+  // modifiers as JSON array or delimited
+  let modifiersRaw =
+    pick(row, ["modifiers", "modifier", "options"]) ||
+    pick(row, ["variant", "variants"]);
+
+  const modifiers: Array<{ name: string; price: number; groupName?: string }> = [];
+  if (Array.isArray(modifiersRaw)) {
+    for (const m of modifiersRaw) {
+      if (!m) continue;
+      const mname = String(m.name ?? m).trim();
+      const mprice = n(m.price ?? 0);
+      modifiers.push({ name: mname, price: mprice, groupName: m.group ?? undefined });
+    }
+  } else if (typeof modifiersRaw === "string") {
+    // e.g. "Cheese:+15|Bacon:+25; Size:Large:+30,Small:+0"
+    const groups = modifiersRaw.split(";"); // groups ;
+    for (const g of groups) {
+      const [gname, rest] = g.split(":");
+      const items = (rest ?? gname).split(/[|,]/);
+      for (const it of items) {
+        const [mn, mp] = it.split(/[+]/);
+        const mname = String(mn || "").trim();
+        if (!mname) continue;
+        modifiers.push({ name: mname, price: n(mp), groupName: rest ? gname?.trim() : undefined });
+      }
+    }
+  }
+
+  return {
+    name,
+    category: category ? String(category).trim() : null,
+    basePrice: n(price),
+    description: description ? String(description).trim() : null,
+    externalId: externalId ? String(externalId).trim() : null,
+    modifiers,
+  };
+}
+
+/** ---------- import ---------- **/
+/**
+ * POST /api/menus/import
+ * body: {
+ *   name: string,
+ *   source: 'house'|'pos'|'grab'|'foodpanda'|'other',
+ *   filename: string,
+ *   fileType?: 'csv'|'xlsx'|'json',
+ *   text?: string   // CSV or JSON
+ *   base64?: string // for xlsx if you prefer
+ *   version?: string
+ * }
+ */
+menuRouter.post("/import", async (req, res) => {
+  try {
+    const { name, source, filename, fileType, text, base64, version } = req.body || {};
+    if (!name || !source) return res.status(400).json({ ok: false, error: "name/source required" });
+
+    // parse rows
+    let rows: any[] = [];
+
+    const ft = (fileType || (filename?.split(".").pop() ?? "")).toLowerCase();
+
+    if (ft === "csv") {
+      if (!text) return res.status(400).json({ ok: false, error: "CSV text missing" });
+      rows = parseCSV(text, { columns: true, skip_empty_lines: true, trim: true });
+    } else if (ft === "json") {
+      if (!text) return res.status(400).json({ ok: false, error: "JSON text missing" });
+      const j = JSON.parse(text);
+      rows = Array.isArray(j) ? j : j.rows ?? [];
+    } else if (ft === "xlsx" || ft === "xls") {
+      const b64 = base64 ?? text; // allow both
+      if (!b64) return res.status(400).json({ ok: false, error: "XLSX base64 missing" });
+      const buf = Buffer.from(b64, "base64");
+      const wb = XLSX.read(buf, { type: "buffer" });
+      const sh = wb.SheetNames[0];
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[sh], { raw: false });
+    } else {
+      return res.status(400).json({ ok: false, error: `Unsupported fileType ${ft}` });
+    }
+
+    const menu = await db().menu.create({
+      data: { name, source, fileType: ft, version: version ?? null },
+    });
+
+    let imported = 0;
+    for (const r of rows) {
+      const mapped = mapRow(r);
+      if (!mapped.name) continue;
+
+      const item = await db().menuItem.create({
+        data: {
+          menuId: menu.id,
+          externalId: mapped.externalId,
+          name: mapped.name,
+          category: mapped.category,
+          basePrice: mapped.basePrice,
+          description: mapped.description,
+        },
+      });
+      if (mapped.modifiers?.length) {
+        await db().menuModifier.createMany({
+          data: mapped.modifiers.map((m) => ({
+            itemId: item.id,
+            name: m.name,
+            price: m.price,
+            groupName: m.groupName ?? null,
+          })),
+        });
+      }
+      imported++;
+    }
+
+    return res.json({ ok: true, menuId: menu.id, imported });
+  } catch (e: any) {
+    console.error("[/menus/import] error", e);
+    return res.status(500).json({ ok: false, error: "Import failed" });
+  }
+});
+
+/** ---------- list & details ---------- **/
+menuRouter.get("/", async (_req, res) => {
+  const menus = await db().menu.findMany({
+    orderBy: { importedAt: "desc" },
+    select: { id: true, name: true, source: true, fileType: true, importedAt: true, version: true },
+  });
+  res.json({ menus });
+});
+
+menuRouter.get("/:id/details", async (req, res) => {
+  const m = await db().menu.findUnique({
+    where: { id: String(req.params.id) },
+    include: { items: { include: { modifiers: true } } },
+  });
+  if (!m) return res.status(404).json({ ok: false, error: "Not found" });
+  res.json({ menu: m });
+});
+
+/** ---------- compare ---------- **/
+/**
+ * POST /api/menus/:id/compare
+ * body: { otherMenuId: string }
+ */
+menuRouter.post("/:id/compare", async (req, res) => {
+  const baseId = String(req.params.id);
+  const otherId = String(req.body?.otherMenuId ?? "");
+  if (!otherId) return res.status(400).json({ ok: false, error: "otherMenuId required" });
+
+  const [A, B] = await Promise.all([
+    db().menu.findUnique({ where: { id: baseId }, include: { items: { include: { modifiers: true } } } }),
+    db().menu.findUnique({ where: { id: otherId }, include: { items: { include: { modifiers: true } } } }),
+  ]);
+  if (!A || !B) return res.status(404).json({ ok: false, error: "Menu not found" });
+
+  const mapByName = (items: any[]) => {
+    const m = new Map<string, any>();
+    for (const it of items) m.set(norm(it.name), it);
+    return m;
+  };
+  const a = mapByName(A.items);
+  const b = mapByName(B.items);
+
+  const missingInB: any[] = [];
+  const missingInA: any[] = [];
+  const priceMismatches: any[] = [];
+  const descDiffs: any[] = [];
+
+  // find missing + mismatches
+  for (const [k, v] of a) {
+    if (!b.has(k)) missingInB.push({ name: v.name, price: v.basePrice });
+    else {
+      const x = b.get(k);
+      if (Number(v.basePrice) !== Number(x.basePrice)) {
+        priceMismatches.push({ name: v.name, A: Number(v.basePrice), B: Number(x.basePrice) });
+      }
+      if ((v.description || "").trim() !== (x.description || "").trim()) {
+        descDiffs.push({ name: v.name });
+      }
+    }
+  }
+  for (const [k, v] of b) if (!a.has(k)) missingInA.push({ name: v.name, price: v.basePrice });
+
+  res.json({ ok: true, A: A.name, B: B.name, missingInB, missingInA, priceMismatches, descDiffs });
+});
+
+/** ---------- Chef Ramsay Review (heuristic, data-backed) ---------- **/
+/**
+ * POST /api/menus/:id/review
+ * Uses IngredientV2 + RecipeV2 (if present) to suggest margin fixes, cuts, upsells, and promos.
+ */
+menuRouter.post("/:id/review", async (req, res) => {
+  const menu = await db().menu.findUnique({
+    where: { id: String(req.params.id) },
+    include: { items: { include: { modifiers: true } } },
+  });
+  if (!menu) return res.status(404).json({ ok: false, error: "Menu not found" });
+
+  // very simple linkage: match RecipeV2 by exact item name (can extend with aliases)
+  const recipes = await db().recipeV2.findMany({
+    include: { items: { include: { ingredient: true } } },
+  });
+  const recipeMap = new Map(recipes.map(r => [norm(r.name), r]));
+
+  const findings: any[] = [];
+  let promoIdeas: string[] = [];
+  let costCuts: string[] = [];
+  let upsells: string[] = [];
+
+  for (const it of menu.items) {
+    const r = recipeMap.get(norm(it.name));
+    let foodCost = 0;
+    if (r) {
+      for (const ri of r.items) foodCost += Number(ri.qty) * Number(ri.ingredient.unitCost);
+    }
+    const price = Number(it.basePrice);
+    const margin = price > 0 ? (price - foodCost) / price : 0;
+
+    if (r) {
+      if (margin < 0.55) {
+        findings.push({ item: it.name, issue: "Low margin", price, foodCost, margin: +margin.toFixed(2) });
+        costCuts.push(`Review portion/costs for ${it.name} (margin ${Math.round(margin*100)}%).`);
+      } else if (margin > 0.80) {
+        findings.push({ item: it.name, issue: "High margin", price, foodCost, margin: +margin.toFixed(2) });
+      }
+    } else {
+      findings.push({ item: it.name, issue: "No cost model (RecipeV2 not found)" });
+    }
+
+    // simple upsell: if no modifiers, propose add-ons
+    if (!it.modifiers?.length) {
+      upsells.push(`Add modifiers to ${it.name} (cheese, bacon, double patty).`);
+    }
+    // simple promo: pair burgers with fries/drink combos
+    if (/burger|smash/i.test(it.name)) {
+      promoIdeas.push(`Create combo for ${it.name} + fries + drink at ~15% discount.`);
+    }
+  }
+
+  // dedupe / trim
+  promoIdeas = Array.from(new Set(promoIdeas)).slice(0, 10);
+  costCuts = Array.from(new Set(costCuts)).slice(0, 10);
+  upsells = Array.from(new Set(upsells)).slice(0, 10);
+
+  res.json({
+    ok: true,
+    summary: {
+      itemsReviewed: menu.items.length,
+      lowMarginCount: findings.filter(f => f.issue === "Low margin").length,
+      uncostedCount: findings.filter(f => f.issue.startsWith("No cost")).length,
+    },
+    findings,
+    recommendations: {
+      costCuts,
+      promoIdeas,
+      upsells,
+      tone: "Direct and helpful — like Chef Ramsay, minus the shouting.",
+    },
+  });
+});
+
+/** ---------- mind map JSON (tree) ---------- **/
+menuRouter.get("/:id/mindmap", async (req, res) => {
+  const m = await db().menu.findUnique({
+    where: { id: String(req.params.id) },
+    include: { items: { include: { modifiers: true } } },
+  });
+  if (!m) return res.status(404).json({ ok: false, error: "Menu not found" });
+
+  // Very simple tree structure
+  const nodes = [
+    { id: `menu:${m.id}`, label: m.name, type: "menu" },
+    ...m.items.map(it => ({ id: `item:${it.id}`, label: it.name, type: "item" })),
+    ...m.items.flatMap(it => it.modifiers.map(mm => ({
+      id: `mod:${mm.id}`, label: `${mm.name} (+฿${Number(mm.price).toFixed(0)})`, type: "modifier", itemId: it.id
+    }))),
+  ];
+  const edges = [
+    ...m.items.map(it => ({ from: `menu:${m.id}`, to: `item:${it.id}` })),
+    ...m.items.flatMap(it => it.modifiers.map(mm => ({ from: `item:${it.id}`, to: `mod:${mm.id}` }))),
+  ];
+
+  res.json({ ok: true, nodes, edges });
+});
+
+/** ---------- Delivery-partner Description Generator ---------- **/
+/**
+ * POST /api/menus/description/generate
+ * body: { itemName, basePrice?, modifiers?:string[], tone?:'grab'|'foodpanda'|'default', maxLen?:number }
+ */
+menuRouter.post("/description/generate", async (req, res) => {
+  const { itemName, basePrice, modifiers = [], tone = "default", maxLen = 220 } = req.body || {};
+  if (!itemName) return res.status(400).json({ ok: false, error: "itemName required" });
+
+  const base = String(itemName).trim();
+  const upsell = modifiers?.length ? ` Add ${modifiers.slice(0,3).join(", ")}.` : "";
+  const priceLine = basePrice ? ` Only ฿${Number(basePrice).toFixed(0)}.` : "";
+
+  let desc = "";
+  if (tone === "grab") {
+    desc = `${base} — juicy, smash-seared, and stacked with flavor.${upsell}${priceLine}`;
+  } else if (tone === "foodpanda") {
+    desc = `${base}. Crowd-favorite with bold taste and quick prep.${upsell}${priceLine}`;
+  } else {
+    desc = `${base}: house recipe, cooked fresh for every order.${upsell}${priceLine}`;
+  }
+
+  // produce two sizes
+  const short = desc.slice(0, Math.min(120, maxLen)).trim();
+  const long = (desc + " Perfect with fries and a cold drink.").slice(0, maxLen).trim();
+
+  res.json({ ok: true, short, long });
+});
+
+
+Mount in server/index.ts:
+
+import { menuRouter } from "./routes/menu";
+app.use(express.json({ limit: "15mb" }));
+app.use("/api/menus", menuRouter);
+
+3) Frontend pages (minimal & working)
+A) Menu Manager (list + actions) — src/pages/menu/MenuManager.tsx
+import { useEffect, useState } from "react";
+
+type Menu = { id:string; name:string; source:string; fileType:string; importedAt:string; version?:string|null };
+
+export default function MenuManager(){
+  const [menus, setMenus] = useState<Menu[]>([]);
+  const [a, setA] = useState<string>("");
+  const [b, setB] = useState<string>("");
+  const [compare, setCompare] = useState<any>(null);
+  const [review, setReview] = useState<any>(null);
+  const [mindmap, setMindmap] = useState<any>(null);
+
+  async function load() {
+    const r = await fetch("/api/menus");
+    const j = await r.json();
+    setMenus(j.menus || []);
+  }
+  useEffect(()=>{ load(); }, []);
+
+  async function doCompare(){
+    if(!a || !b) return;
+    const r = await fetch(`/api/menus/${a}/compare`, {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ otherMenuId: b })
+    });
+    setCompare(await r.json());
+  }
+  async function doReview(){
+    if(!a) return;
+    const r = await fetch(`/api/menus/${a}/review`, { method:"POST" });
+    setReview(await r.json());
+  }
+  async function loadMindmap(){
+    if(!a) return;
+    const r = await fetch(`/api/menus/${a}/mindmap`);
+    setMindmap(await r.json());
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Menu Management</h1>
+
+      <div className="rounded-2xl border bg-white p-5">
+        <div className="text-lg font-semibold mb-3">Menus</div>
+        <table className="w-full text-sm">
+          <thead><tr className="text-left">
+            <th>Name</th><th>Source</th><th>Type</th><th>Version</th><th>Imported</th>
+          </tr></thead>
+          <tbody>
+            {menus.map(m=>(
+              <tr key={m.id} className="border-t">
+                <td>{m.name}</td>
+                <td className="capitalize">{m.source}</td>
+                <td>{m.fileType}</td>
+                <td>{m.version ?? "-"}</td>
+                <td>{new Date(m.importedAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="rounded-2xl border bg-white p-5">
+          <div className="text-lg font-semibold mb-2">Compare Menus</div>
+          <select className="border rounded-xl px-3 py-2 text-sm w-full mb-2" value={a} onChange={e=>setA(e.target.value)}>
+            <option value="">Select base menu (A)</option>
+            {menus.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <select className="border rounded-xl px-3 py-2 text-sm w-full mb-2" value={b} onChange={e=>setB(e.target.value)}>
+            <option value="">Select compare to (B)</option>
+            {menus.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <button className="border rounded-xl px-3 py-2 text-sm" onClick={doCompare}>Run Compare</button>
+          {compare?.ok && (
+            <div className="mt-3 text-sm">
+              <div className="font-medium">Missing in {compare.B}:</div>
+              <ul className="list-disc ml-4">{compare.missingInB.map((x:any,i:number)=><li key={i}>{x.name}</li>)}</ul>
+              <div className="font-medium mt-2">Missing in {compare.A}:</div>
+              <ul className="list-disc ml-4">{compare.missingInA.map((x:any,i:number)=><li key={i}>{x.name}</li>)}</ul>
+              <div className="font-medium mt-2">Price mismatches:</div>
+              <ul className="list-disc ml-4">{compare.priceMismatches.map((x:any,i:number)=><li key={i}>{x.name}: A ฿{x.A} vs B ฿{x.B}</li>)}</ul>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5">
+          <div className="text-lg font-semibold mb-2">Chef Review</div>
+          <select className="border rounded-xl px-3 py-2 text-sm w-full mb-2" value={a} onChange={e=>setA(e.target.value)}>
+            <option value="">Select menu</option>
+            {menus.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <button className="border rounded-xl px-3 py-2 text-sm" onClick={doReview}>Run Review</button>
+          {review?.ok && (
+            <div className="mt-3 text-sm space-y-2">
+              <div>Items reviewed: {review.summary.itemsReviewed}</div>
+              <div>Low margin: {review.summary.lowMarginCount}</div>
+              <div>Uncosted: {review.summary.uncostedCount}</div>
+              <div className="font-medium mt-2">Recommendations</div>
+              <ul className="list-disc ml-4">
+                {review.recommendations.costCuts.map((x:string,i:number)=><li key={i}>{x}</li>)}
+                {review.recommendations.upsells.map((x:string,i:number)=><li key={i}>{x}</li>)}
+                {review.recommendations.promoIdeas.map((x:string,i:number)=><li key={i}>{x}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5">
+          <div className="text-lg font-semibold mb-2">Mind Map</div>
+          <select className="border rounded-xl px-3 py-2 text-sm w-full mb-2" value={a} onChange={e=>setA(e.target.value)}>
+            <option value="">Select menu</option>
+            {menus.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <button className="border rounded-xl px-3 py-2 text-sm" onClick={loadMindmap}>Load</button>
+          {mindmap?.ok && (
+            <div className="mt-3 text-sm">
+              <div className="font-medium">Nodes: {mindmap.nodes.length}, Edges: {mindmap.edges.length}</div>
+              {/* simple tree preview */}
+              <ul className="list-disc ml-4 max-h-64 overflow-auto">
+                {mindmap.nodes.filter((n:any)=>n.type==="item").slice(0,50).map((n:any)=>(
+                  <li key={n.id}>{n.label}</li>
+                ))}
+              </ul>
+              <div className="text-neutral-500 mt-1">Full graph data available for react-flow later.</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+B) Menu Import — src/pages/menu/MenuImport.tsx
+import { useState } from "react";
+
+export default function MenuImport(){
+  const [source, setSource] = useState("grab");
+  const [name, setName] = useState("");
+  const [fileType, setFileType] = useState<"csv"|"xlsx"|"json">("csv");
+  const [text, setText] = useState("");
+  const [base64, setBase64] = useState("");
+  const [filename, setFilename] = useState("");
+  const [done, setDone] = useState<any>(null);
+
+  function onFile(e:any) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFilename(f.name);
+    const ext = f.name.split(".").pop()?.toLowerCase();
+    if (ext === "xlsx" || ext === "xls") {
+      setFileType("xlsx");
+      const r = new FileReader();
+      r.onload = () => {
+        const b64 = (r.result as string).split(",")[1];
+        setBase64(b64);
+      };
+      r.readAsDataURL(f); // will give base64
+    } else {
+      setFileType(ext === "json" ? "json" : "csv");
+      const r = new FileReader();
+      r.onload = () => setText(String(r.result || ""));
+      r.readAsText(f);
+    }
+  }
+
+  async function upload(){
+    const body:any = { name, source, filename, fileType, version:"v1" };
+    if (fileType === "xlsx") body.base64 = base64;
+    else body.text = text;
+
+    const r = await fetch("/api/menus/import", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    setDone(j);
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Import Menu</h1>
+      <div className="rounded-2xl border bg-white p-5 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="text-sm font-medium">Menu Name
+            <input className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+              value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Grab 2025-08"/>
+          </label>
+          <label className="text-sm font-medium">Source
+            <select className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+              value={source} onChange={e=>setSource(e.target.value)}>
+              <option value="house">House</option>
+              <option value="pos">POS</option>
+              <option value="grab">Grab</option>
+              <option value="foodpanda">Foodpanda</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium">File
+            <input className="mt-1 w-full text-sm" type="file" onChange={onFile}/>
+          </label>
+        </div>
+
+        <button className="border rounded-xl px-4 py-2 text-sm" onClick={upload}>Import</button>
+        {done && (
+          <div className="text-sm mt-2">
+            {done.ok ? `Imported ${done.imported} items into ${done.menuId}` : `Error: ${done.error || "failed"}`}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+C) Description Generator (quick utility) — src/pages/menu/DescriptionTool.tsx
+import { useState } from "react";
+
+export default function DescriptionTool(){
+  const [itemName, setItemName] = useState("");
+  const [price, setPrice] = useState<number|''>('');
+  const [mods, setMods] = useState<string>("");
+  const [tone, setTone] = useState<"grab"|"foodpanda"|"default">("grab");
+  const [out, setOut] = useState<any>(null);
+
+  async function gen(){
+    const r = await fetch("/api/menus/description/generate", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        itemName, basePrice: price || undefined,
+        modifiers: mods.split(",").map(s=>s.trim()).filter(Boolean),
+        tone
+      })
+    });
+    setOut(await r.json());
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-extrabold">Delivery Partner Description Generator</h1>
+      <div className="rounded-2xl border bg-white p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <label className="text-sm font-medium">Item name
+          <input className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+            value={itemName} onChange={e=>setItemName(e.target.value)} placeholder="Double Smash"/>
+        </label>
+        <label className="text-sm font-medium">Base price (THB)
+          <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+            value={price} onChange={e=>setPrice(e.target.value === "" ? "" : +e.target.value)} />
+        </label>
+        <label className="text-sm font-medium">Modifiers (comma-separated)
+          <input className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+            value={mods} onChange={e=>setMods(e.target.value)} placeholder="Cheese,Bacon,Double Patty"/>
+        </label>
+        <label className="text-sm font-medium">Tone
+          <select className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+            value={tone} onChange={e=>setTone(e.target.value as any)}>
+            <option value="grab">Grab style</option>
+            <option value="foodpanda">Foodpanda style</option>
+            <option value="default">Default</option>
+          </select>
+        </label>
+        <div className="md:col-span-3">
+          <button className="border rounded-xl px-4 py-2 text-sm" onClick={gen}>Generate</button>
+        </div>
+        {out?.ok && (
+          <div className="md:col-span-3 text-sm space-y-2">
+            <div><span className="font-medium">Short:</span> {out.short}</div>
+            <div><span className="font-medium">Long:</span> {out.long}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+4) Routes & Sidebar
+
+src/router/RouteRegistry.ts (add):
+
+export const ROUTES = {
+  // ...
+  MENU_MGR: "/menu/manager",
+  MENU_IMPORT: "/menu/import",
+  MENU_DESC_TOOL: "/menu/description-tool",
+};
+
+
+src/App.tsx (add):
+
+import MenuManager from "./pages/menu/MenuManager";
+import MenuImport from "./pages/menu/MenuImport";
+import DescriptionTool from "./pages/menu/DescriptionTool";
+
+<Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager/></Guard>} />
+<Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport/></Guard>} />
+<Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool/></Guard>} />
+
+
+Sidebar (under “Menu Mgmt”): add links for Menu Manager, Import Menu, Description Tool (keep Ingredients + Cost Calculator).
+
+What you can do now
