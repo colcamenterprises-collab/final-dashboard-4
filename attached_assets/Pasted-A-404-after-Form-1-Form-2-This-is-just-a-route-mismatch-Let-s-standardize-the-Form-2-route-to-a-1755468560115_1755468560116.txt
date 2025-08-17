@@ -1,0 +1,136 @@
+A) 404 after Form 1 → Form 2
+
+This is just a route mismatch. Let’s standardize the Form 2 route to a single path and use it everywhere.
+
+Pick one canonical path (recommended):
+
+/operations/stock
+
+1) Ensure the route exists
+// App.tsx (or wherever you define routes)
+import DailySalesStock from "./pages/DailySalesStock";
+
+<Route path="/operations/stock" element={<DailySalesStock />} />
+
+2) Ensure the sidebar links to the same path
+// Sidebar.tsx
+<NavLink to="/operations/stock">Daily Sales & Stock</NavLink>
+
+3) Ensure Form 1 navigates to the same path
+// DailySales.tsx
+const FORM2_PATH = "/operations/stock"; // <- single source of truth
+nav(`${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`, { replace: true });
+
+4) (Optional safety) Add router aliases to cover any old links
+<Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/stock" replace />} />
+<Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
+
+
+After this, the 404 disappears. If it still shows, open the browser console and paste:
+window.__lastNav (I log it below) to confirm the exact path your code tried to open.
+
+B) Success notification: “database-styled” and obvious
+
+This drops in a clean, prominent success card (centered, green accent), then auto-routes. It also logs the exact path it’s sending you to—handy while we lock routes.
+
+function SuccessCard({
+  open, shiftId, seconds = 4, onGo, onStay
+}: { open: boolean; shiftId: string; seconds?: number; onGo: () => void; onStay: () => void; }) {
+  const [s, setS] = useState(seconds);
+  useEffect(() => {
+    if (!open) return;
+    setS(seconds);
+    const t = setInterval(() => setS(v => (v <= 1 ? (clearInterval(t), onGo(), 0) : v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [open, seconds, onGo]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+      <div className="w-[440px] rounded-2xl border border-emerald-200 bg-white shadow-xl">
+        <div className="flex items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-5 py-4">
+          <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-white">✓</div>
+          <div className="font-semibold text-emerald-800">Daily Sales saved</div>
+        </div>
+        <div className="px-5 py-4 text-sm">
+          <div className="text-gray-700">
+            Shift ID: <span className="font-mono">{shiftId}</span>
+          </div>
+          <div className="mt-1 text-gray-600">
+            Continuing to <b>Form 2 (Stock)</b> in <b>{s}</b> seconds…
+          </div>
+          <div className="mt-4 flex gap-8">
+            <button onClick={onGo}
+              className="h-10 rounded-lg bg-emerald-600 px-4 text-white font-semibold hover:bg-emerald-700">
+              Go now
+            </button>
+            <button onClick={onStay}
+              className="h-10 rounded-lg border border-gray-300 px-4 font-semibold text-gray-700 hover:bg-gray-50">
+              Stay here
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+Use it in Form 1:
+
+// DailySales.tsx
+const FORM2_PATH = "/operations/stock"; // keep this consistent
+const [successOpen, setSuccessOpen] = useState(false);
+const [savedShiftId, setSavedShiftId] = useState<string | null>(null);
+
+async function handleSubmit(e?: React.FormEvent) {
+  e?.preventDefault();
+  if (submitting) return;
+  setSubmitting(true); setError(null);
+
+  try {
+    const payload = collectDailySalesValuesSomehow();
+    const res = await fetch("/api/daily-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({} as any));
+    const shiftId = data?.shiftId ?? data?.salesId ?? data?.id ?? null;
+    if (!res.ok || !data?.ok || !shiftId) throw new Error(data?.error || "Missing shiftId");
+
+    setSavedShiftId(String(shiftId));
+    setSuccessOpen(true);
+
+    // helpful during testing:
+    const target = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
+    window.__lastNav = target; // dev helper
+    console.log("[Form1] will navigate:", target);
+  } catch (err:any) {
+    setError(err?.message || "Failed to submit.");
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+<SuccessCard
+  open={successOpen && !!savedShiftId}
+  shiftId={savedShiftId ?? ""}
+  onGo={() => nav(`${FORM2_PATH}?shift=${savedShiftId}`, { replace: true })}
+  onStay={() => setSuccessOpen(false)}
+/>
+
+
+This is the “database-panel” visual you asked for: clear header strip, ID in mono, strong CTAs, and a timed auto-continue.
+
+Quick sanity list
+
+In App.tsx, confirm the exact path for Form 2 is /operations/stock.
+
+In Sidebar.tsx, confirm the menu item points to /operations/stock.
+
+In DailySales.tsx, confirm FORM2_PATH is /operations/stock.
+
+Submit once; in the console you should see [Form1] will navigate: /operations/stock?shift=….
+
+If anything still 404s, paste window.__lastNav into the console; that’s the exact path the app tried to open.

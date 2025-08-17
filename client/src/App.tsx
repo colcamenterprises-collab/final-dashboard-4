@@ -56,6 +56,11 @@ export default function App() {
                   <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
                   
+                  {/* Legacy route aliases for Form 2 */}
+                  <Route path="/operations/daily-sales-stock" element={<Guard><DailySalesStock /></Guard>} />
+                  <Route path="/daily-stock" element={<Guard><DailySalesStock /></Guard>} />
+                  <Route path="/operations/form2" element={<Guard><DailySalesStock /></Guard>} />
+                  
                   {/* Analysis with nested routes */}
                   <Route path={ROUTES.ANALYSIS} element={<Guard><Analysis /></Guard>}>
                     <Route path="upload" element={<UploadStatements />} />

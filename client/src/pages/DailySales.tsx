@@ -1,7 +1,7 @@
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-const FORM2_PATH = "/daily-stock"; // Route to Form 2
+const FORM2_PATH = "/operations/stock"; // Route to Form 2
 
 // Success Modal Component
 function SuccessModal({
@@ -48,7 +48,7 @@ function SuccessModal({
 }
 
 export default function DailySales() {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
   const [cash, setCash] = useState(0);
@@ -118,8 +118,13 @@ export default function DailySales() {
         );
       }
       
+      // Helpful debugging during development
+      const target = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
+      (window as any).__lastNav = target; // dev helper
+      console.log("[Form1] will navigate:", target);
+      
       // Navigate directly to Form 2 with shift parameter
-      navigate(`${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`);
+      navigate(target);
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
       setError(e?.message || "Failed to submit. Please try again.");

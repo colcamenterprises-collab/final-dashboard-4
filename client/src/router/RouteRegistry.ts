@@ -3,7 +3,7 @@ export const ROUTES = {
   HOME: "/",
 
   // Operations
-  DAILY_SALES_STOCK: "/operations/daily-sales-stock",
+  DAILY_SALES_STOCK: "/operations/stock",
   DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
   ANALYSIS: "/operations/analysis",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
