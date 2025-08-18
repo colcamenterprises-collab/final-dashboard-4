@@ -1,0 +1,106 @@
+IMPLEMENT THIS (ROUTING ONLY) — NO FREESTYLE
+
+Do not touch DB/schema/server. Do not change API shapes. This is frontend routing + sidebar only.
+
+Goal
+
+Canonical Form 1 route: /operations/daily-sales
+
+Canonical Form 2 route (already set): /operations/stock
+
+Aliases for older links (so no 404s)
+
+Sidebar points to the canonical Form 1
+
+1) App routes
+
+File: client/src/App.tsx
+
+Imports (add if missing)
+
+import DailySales from "./pages/DailySales";
+import DailySalesStock from "./pages/operations/DailySalesStock";
+import { Navigate } from "react-router-dom";
+
+
+Routes (inside your <Routes> block). Keep existing ones; add these if not present:
+
+{/* ---- FORM 1: canonical + aliases ---- */}
+<Route path="/operations/daily-sales" element={<DailySales />} />
+<Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
+<Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
+
+{/* ---- FORM 2: canonical + aliases (already added earlier, ensure present) ---- */}
+<Route path="/operations/stock" element={<DailySalesStock />} />
+<Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
+
+
+If any of these routes already exist, don’t remove them; just ensure the canonical + aliases above are present exactly.
+
+2) Sidebar link
+
+File: client/src/components/Sidebar.tsx
+
+Make the “Daily Sales & Stock” item point to the canonical Form 1:
+
+<NavLink to="/operations/daily-sales">Daily Sales & Stock</NavLink>
+
+
+Do not point it to /operations/stock. Form 1 → “Next” (sticky bar) already navigates to Form 2 with ?shift=….
+
+3) Form 1 handoff (confirm only)
+
+File: client/src/pages/DailySales.tsx
+
+Confirm we already have:
+
+const FORM2_PATH = "/operations/stock";
+
+On success:
+
+const shiftId = data?.shiftId ?? data?.salesId ?? data?.id ?? null;
+const next = `${FORM2_PATH}${shiftId ? `?shift=${encodeURIComponent(String(shiftId))}` : ""}`;
+window.location.assign(next);
+
+
+No blocking alert() anywhere.
+
+Do not change form logic — only confirm it matches the above.
+
+4) QA – paste results in PR
+
+Routes present
+
+Hit these URLs in the browser:
+
+/operations/daily-sales → Form 1 shows
+
+/daily-sales → redirects to /operations/daily-sales
+
+/operations/daily-sales-stock → redirects to /operations/daily-sales
+
+/operations/stock → Form 2 shows
+
+/operations/form2 → redirects to /operations/stock
+
+Paste a screenshot of Form 1 and Form 2.
+
+Sidebar
+
+Click “Daily Sales & Stock” → lands on /operations/daily-sales. Paste screenshot of URL bar.
+
+End-to-end handoff
+
+Fill minimal Form 1 (Shift Date, Completed By, Starting Cash).
+
+Click Next in the sticky bar.
+
+Confirm browser navigates to /operations/stock?shift=....
+
+Paste console log lines showing:
+
+[Form1] navigating to: /operations/stock?shift=...
+
+[Form2] Received shift parameter: ...
+
+If anything doesn’t match the repo, pause and ask for approval before changing behavior.

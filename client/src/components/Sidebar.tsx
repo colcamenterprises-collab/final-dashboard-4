@@ -81,7 +81,7 @@ export default function Sidebar() {
           )}
         </div>
         <SLink
-          to={ROUTES.DAILY_SALES_STOCK}
+          to="/operations/daily-sales"
           Icon={CalendarCheck}
           label="Daily Sales & Stock"
           collapsed={collapsed}

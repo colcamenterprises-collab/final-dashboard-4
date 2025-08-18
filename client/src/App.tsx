@@ -28,6 +28,7 @@ import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
+import DailySales from "./pages/DailySales";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -56,8 +57,13 @@ export default function App() {
                   <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
                   
-                  {/* Safety aliases while stabilising; do not remove other routes */}
-                  <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/stock" replace />} />
+                  {/* ---- FORM 1: canonical + aliases ---- */}
+                  <Route path="/operations/daily-sales" element={<DailySales />} />
+                  <Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
+                  <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
+
+                  {/* ---- FORM 2: canonical + aliases ---- */}
+                  <Route path="/operations/stock" element={<DailySalesStock />} />
                   <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
                   
                   {/* Analysis with nested routes */}
