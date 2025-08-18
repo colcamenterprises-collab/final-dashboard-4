@@ -1,0 +1,241 @@
+IMPLEMENT THIS — DO NOT FREESTYLE
+
+If anything below doesn’t match the repo, STOP and ask for approval before changing behavior, data models, or APIs.
+No backend/schema changes. No endpoint renames. Accept both current response shapes.
+
+Guardrails
+
+Do not change DB schema, server endpoints, or email/PDF logic.
+
+Do not delete existing routes; you may add client route aliases.
+
+Frontend-only changes unless explicitly noted here.
+
+If any step needs adjusting, pause and ask.
+
+0) Branch & backups
+
+Create branch: feat/form1-handoff-and-expenses-ui.
+
+Commit after each step with clear messages.
+
+1) DAILY SALES (FORM 1) — FORCE HANDOFF TO FORM 2
+
+File: client/src/pages/DailySales.tsx
+
+Remove any alert('Saved Form 1.').
+
+Add the constant at top of file:
+
+const FORM2_PATH = "/operations/stock"; // canonical Form 2 route
+
+
+Replace the current success block (after successful POST) with:
+
+const shiftId = data?.shiftId ?? data?.salesId ?? data?.id ?? null;
+
+if (!shiftId) {
+  console.error("[Form1] Missing shiftId in response:", data);
+  window.location.assign(FORM2_PATH); // still move user forward
+} else {
+  const next = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
+  console.log("[Form1] navigating to:", next);
+  window.location.assign(next); // guaranteed redirect
+  // If you prefer react-router: navigate(next, { replace: true });
+}
+
+
+Ensure handleSubmit(e) begins with e?.preventDefault() and blocks re-entrancy (submitting guard).
+
+Why: Currently we show a blocking alert and never navigate. This fixes the handoff regardless of whether the API returns shiftId, salesId, or id.
+
+2) ROUTES — ENSURE FORM 2 EXISTS & ALIASES
+
+File: client/src/App.tsx (or wherever routes are defined)
+
+import DailySalesStock from "./pages/DailySalesStock";
+
+<Route path="/operations/stock" element={<DailySalesStock />} />
+
+{/* Safety aliases while stabilising; do not remove other routes */}
+<Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/stock" replace />} />
+<Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
+
+
+File: client/src/components/Sidebar.tsx
+
+<NavLink to="/operations/stock">Daily Sales & Stock</NavLink>
+
+3) STICKY BOTTOM ACTION BAR (Next + Save Draft)
+
+New file: client/src/components/StickyActions.tsx
+
+import React from "react";
+
+export default function StickyActions({
+  onNext,
+  onSaveDraft,
+  nextLabel = "Next",
+  disableNext = false,
+}: {
+  onNext: () => void;
+  onSaveDraft: () => void;
+  nextLabel?: string;
+  disableNext?: boolean;
+}) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75">
+      <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          className="h-10 rounded-lg border border-gray-300 px-4 font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Save draft
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={disableNext}
+          className="h-10 rounded-lg bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {nextLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+Wire it into Form 1 (client/src/pages/DailySales.tsx):
+
+Remove the top “Submit” button.
+
+At the bottom, render:
+
+import StickyActions from "../components/StickyActions";
+
+// …
+<StickyActions
+  nextLabel="Next"
+  onNext={() => handleSubmit()}
+  onSaveDraft={() => {
+    const draft = collectDailySalesValuesSomehow(); // existing getter or construct object from state
+    localStorage.setItem("daily_sales_draft", JSON.stringify(draft));
+  }}
+/>
+
+
+On mount, restore drafts if present:
+
+useEffect(() => {
+  try {
+    const raw = localStorage.getItem("daily_sales_draft");
+    if (raw) {
+      const draft = JSON.parse(raw);
+      restoreFormValues(draft); // map fields to your local state
+    }
+  } catch {}
+}, []);
+
+4) SHIFT INFORMATION — MOVE “STARTING CASH” & REMOVE CASH MANAGEMENT
+
+File: client/src/pages/DailySales.tsx
+
+In Shift Information card:
+
+Make a 3-column grid: Shift Date, Completed By, Starting Cash (฿).
+
+Remove the separate Cash Management section completely.
+
+Example structure:
+
+<section className="rounded-xl border bg-white p-5">
+  <h3 className="mb-4 text-lg font-semibold">Shift Information</h3>
+  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    {/* Shift Date */}
+    {/* Completed By */}
+    {/* Starting Cash (฿) — moved here */}
+  </div>
+  <p className="mt-2 text-xs text-gray-500">Auto timestamp: {autoTimestamp}</p>
+</section>
+
+5) EXPENSES UI — 2 SECTIONS ONLY + LABEL FIXES
+
+File: client/src/pages/DailySales.tsx (or wherever the expenses UI lives)
+
+Rename “Shopping Purchases” → Shift Expenses.
+
+Rename “Wages” → Staff Wages.
+
+Remove “Other Expenses” section entirely.
+
+Staff Wages row input placeholder: “Staff Name” (not “Bank”).
+
+Replace the rounded “minus” pill with a clear Delete button:
+
+<button
+  type="button"
+  onClick={() => removeRow(i)}
+  className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+>
+  Delete
+</button>
+
+
+Do not change underlying data posting; keep the payload mapping exactly as-is. We are only changing labels/layout.
+
+6) NO BLOCKING ALERTS
+
+Remove all window.alert(...) calls from this flow.
+
+Success is shown by immediate navigation to Form 2 (/operations/stock?shift=...).
+
+If you need a temporary “saved” toast, use a non-blocking UI (optional; ask for approval first).
+
+7) QA — paste these results in the PR
+
+Run and paste each outcome:
+
+Handoff
+
+Fill minimal Form 1 → click Next in bottom bar.
+
+Console shows: "[Form1] navigating to: /operations/stock?shift=..."
+
+Browser lands on /operations/stock?shift=... (no 404).
+
+In Form 2, log the shift query param once to confirm it’s read.
+
+Drafts
+
+Enter values → click Save draft → reload page.
+
+Values auto-restore.
+
+Submit → confirm draft still present (we’re not auto-clearing; note this).
+
+Layout checks
+
+“Shift Information” has Date, Completed By, Starting Cash in the same row (on md+).
+
+“Cash Management” section is gone.
+
+“Expenses” shows Shift Expenses and Staff Wages only.
+
+“Staff Wages” placeholder reads “Staff Name”.
+
+Row Delete button appears and removes a row.
+
+No alerts
+
+No blocking browser alerts appear.
+
+Notes / Approval Gates
+
+If the Form 2 canonical route is not /operations/stock, pause and ask for the correct path.
+
+If any server response shape is different (e.g., neither shiftId nor salesId present), pause and post the actual JSON so we can approve a minimal adapter.
+
+Done.
+Implement exactly this. Ask approval before deviating.

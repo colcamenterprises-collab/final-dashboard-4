@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -56,10 +56,9 @@ export default function App() {
                   <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
                   
-                  {/* Legacy route aliases for Form 2 */}
-                  <Route path="/operations/daily-sales-stock" element={<Guard><DailySalesStock /></Guard>} />
-                  <Route path="/daily-stock" element={<Guard><DailySalesStock /></Guard>} />
-                  <Route path="/operations/form2" element={<Guard><DailySalesStock /></Guard>} />
+                  {/* Safety aliases while stabilising; do not remove other routes */}
+                  <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/stock" replace />} />
+                  <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
                   
                   {/* Analysis with nested routes */}
                   <Route path={ROUTES.ANALYSIS} element={<Guard><Analysis /></Guard>}>

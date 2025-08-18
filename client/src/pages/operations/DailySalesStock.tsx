@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 type WageType = "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT";
 type ShoppingRow = { id: string; item: string; cost: number; shop: string };
@@ -10,6 +10,15 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function DailySalesStock() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Log shift parameter once for QA verification
+  useEffect(() => {
+    const shiftParam = searchParams.get('shift');
+    if (shiftParam) {
+      console.log('[Form2] Received shift parameter:', shiftParam);
+    }
+  }, [searchParams]);
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");
@@ -49,7 +58,7 @@ export default function DailySalesStock() {
   const remOther = (id: string) => setOthers((o) => (o.length > 1 ? o.filter((r) => r.id !== id) : o));
   const othersTotal = useMemo(() => others.reduce((sum, r) => sum + (Number(r.amount) || 0), 0), [others]);
 
-  const totalExpenses = useMemo(() => shoppingTotal + wagesTotal + othersTotal, [shoppingTotal, wagesTotal, othersTotal]);
+  const totalExpenses = useMemo(() => shoppingTotal + wagesTotal, [shoppingTotal, wagesTotal]);
 
   // ---- Banking (moved here; the only place for these numbers) ----
   const [closingCash, setClosingCash] = useState<number>(0); // a.k.a. ending cash
@@ -165,7 +174,7 @@ export default function DailySalesStock() {
         <div className="text-lg font-semibold mb-4">Expenses</div>
 
         <div className="mb-4">
-          <div className="font-medium mb-2">Shopping Purchases</div>
+          <div className="font-medium mb-2">Shift Expenses</div>
           <div className="space-y-3">
             {shopping.map((row) => (
               <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -179,7 +188,13 @@ export default function DailySalesStock() {
                   <input className={input} value={row.shop} onChange={(e) => setShopping((s) => s.map(r => r.id===row.id ? { ...r, shop: e.target.value } : r))} placeholder="Makro / Lotus" />
                 </label>
                 <div className="md:col-span-1">
-                  <button className="px-3 py-2 border rounded-xl w-full" onClick={() => remShopping(row.id)} disabled={shopping.length===1}>−</button>
+                  <button
+                    type="button"
+                    onClick={() => remShopping(row.id)}
+                    className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
@@ -192,12 +207,12 @@ export default function DailySalesStock() {
 
         {/* Wages */}
         <div className="mb-4">
-          <div className="font-medium mb-2">Wages</div>
+          <div className="font-medium mb-2">Staff Wages</div>
           <div className="space-y-3">
             {wages.map((row) => (
               <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                 <label className={`${label} md:col-span-5`}>Staff Name
-                  <input className={input} value={row.staff} onChange={(e) => setWages((w) => w.map(r => r.id===row.id ? { ...r, staff: e.target.value } : r))} placeholder="e.g., Bank" />
+                  <input className={input} value={row.staff} onChange={(e) => setWages((w) => w.map(r => r.id===row.id ? { ...r, staff: e.target.value } : r))} placeholder="Staff Name" />
                 </label>
                 <label className={`${label} md:col-span-3`}>Amount (฿)
                   <input type="number" className={input} value={row.amount} onChange={(e) => setWages((w) => w.map(r => r.id===row.id ? { ...r, amount: Number(e.target.value) } : r))} />
@@ -211,7 +226,13 @@ export default function DailySalesStock() {
                   </select>
                 </label>
                 <div className="md:col-span-1">
-                  <button className="px-3 py-2 border rounded-xl w-full" onClick={() => remWage(row.id)} disabled={wages.length===1}>−</button>
+                  <button
+                    type="button"
+                    onClick={() => remWage(row.id)}
+                    className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
@@ -219,30 +240,6 @@ export default function DailySalesStock() {
           <div className="mt-3 flex items-center justify-between">
             <button className="px-3 py-2 border rounded-xl" onClick={addWage}>+ Add Row</button>
             <div className="font-semibold">Subtotal: ฿ {wagesTotal.toLocaleString()}</div>
-          </div>
-        </div>
-
-        {/* Other */}
-        <div>
-          <div className="font-medium mb-2">Other Expenses</div>
-          <div className="space-y-3">
-            {others.map((row) => (
-              <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <label className={`${label} md:col-span-6`}>Label
-                  <input className={input} value={row.label} onChange={(e) => setOthers((o) => o.map(r => r.id===row.id ? { ...r, label: e.target.value } : r))} placeholder="e.g., Gas bottle" />
-                </label>
-                <label className={`${label} md:col-span-5`}>Amount (฿)
-                  <input type="number" className={input} value={row.amount} onChange={(e) => setOthers((o) => o.map(r => r.id===row.id ? { ...r, amount: Number(e.target.value) } : r))} />
-                </label>
-                <div className="md:col-span-1">
-                  <button className="px-3 py-2 border rounded-xl w-full" onClick={() => remOther(row.id)} disabled={others.length===1}>−</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <button className="px-3 py-2 border rounded-xl" onClick={addOther}>+ Add Row</button>
-            <div className="font-semibold">Subtotal: ฿ {othersTotal.toLocaleString()}</div>
           </div>
         </div>
 

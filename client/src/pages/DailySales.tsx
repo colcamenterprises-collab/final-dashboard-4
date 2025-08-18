@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import StickyActions from "../components/StickyActions";
 
 const FORM2_PATH = "/operations/stock"; // Route to Form 2
 
@@ -77,6 +78,22 @@ export default function DailySales() {
     return () => clearInterval(t);
   }, [showSuccess, shiftId, navigate]);
 
+  // Restore drafts on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("daily_sales_draft");
+      if (raw) {
+        const draft = JSON.parse(raw);
+        setCompletedBy(draft.completedBy || "");
+        setCashStart(draft.cashStart || 0);
+        setCash(draft.cash || 0);
+        setQr(draft.qr || 0);
+        setGrab(draft.grab || 0);
+        setAroi(draft.aroi || 0);
+      }
+    } catch {}
+  }, []);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent default form submission/page reload
     if (submitting) return;
@@ -140,6 +157,20 @@ export default function DailySales() {
     }
   };
 
+  const collectDailySalesValues = () => ({
+    completedBy,
+    cashStart,
+    cash,
+    qr,
+    grab,
+    aroi
+  });
+
+  const handleSaveDraft = () => {
+    const draft = collectDailySalesValues();
+    localStorage.setItem("daily_sales_draft", JSON.stringify(draft));
+  };
+
   return (
     <>
       <div className="max-w-5xl mx-auto p-6">
@@ -158,9 +189,18 @@ export default function DailySales() {
         </div>
 
         <form onSubmit={submit} className="mt-6 space-y-6">
-          <section className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-bold mb-4">Shift Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <section className="rounded-xl border bg-white p-5">
+            <h3 className="mb-4 text-lg font-semibold">Shift Information</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Shift Date</label>
+                <input 
+                  type="text"
+                  value={new Date().toLocaleDateString()}
+                  readOnly
+                  className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50" 
+                />
+              </div>
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Completed By</label>
                 <input 
@@ -171,7 +211,7 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Starting Cash</label>
+                <label className="text-sm text-gray-600 block mb-1">Starting Cash (฿)</label>
                 <input 
                   type="number" 
                   value={cashStart} 
@@ -180,6 +220,7 @@ export default function DailySales() {
                 />
               </div>
             </div>
+            <p className="mt-2 text-xs text-gray-500">Auto timestamp: {new Date().toISOString()}</p>
           </section>
 
           <section className="rounded-2xl border bg-white p-5">
@@ -230,17 +271,16 @@ export default function DailySales() {
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {submitting ? "Saving…" : "Submit & Continue"}
-            </button>
-          </div>
+
         </form>
       </div>
+
+      <StickyActions
+        nextLabel="Next"
+        onNext={() => submit(undefined)}
+        onSaveDraft={handleSaveDraft}
+        disableNext={submitting}
+      />
 
       <SuccessModal
         open={showSuccess}
