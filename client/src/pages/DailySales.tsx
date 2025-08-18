@@ -304,7 +304,7 @@ export default function DailySales() {
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.item} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
-                        placeholder="e.g., Buns 140pcs" 
+                        placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
                       />
                     </div>
                     <div className="md:col-span-3">
