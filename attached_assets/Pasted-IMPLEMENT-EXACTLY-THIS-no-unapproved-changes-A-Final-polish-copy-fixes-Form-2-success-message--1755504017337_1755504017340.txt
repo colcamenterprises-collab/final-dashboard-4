@@ -1,0 +1,123 @@
+IMPLEMENT EXACTLY THIS (no unapproved changes)
+A) Final polish & copy fixes
+
+Form 2 success message
+
+Remove any alert("Saved Form 1") from client/src/pages/operations/DailySalesStock.tsx.
+
+Replace with a neutral inline success note that disappears after 3–5s:
+
+const [saved, setSaved] = useState<null | "ok" | "err">(null);
+
+// after successful save:
+setSaved("ok");
+setTimeout(() => setSaved(null), 4000);
+
+
+Render (top-right of the form body is fine):
+
+{saved === "ok" && (
+  <div className="rounded-md bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
+    Stock & expenses saved
+  </div>
+)}
+{saved === "err" && (
+  <div className="rounded-md bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+    Save failed — please try again
+  </div>
+)}
+
+
+Form names & labels (verify, do not rework UI):
+
+Form 1 title: “Daily Sales”
+Subtitle: “Step 1 of 2 — complete Sales, then you’ll be redirected to Stock.”
+
+Form 2 title: “Daily Stock & Expenses”
+
+Expenses section headers (Form 2):
+
+“Shift Expenses” (shopping items)
+
+“Staff Wages” (placeholder “Staff Name”)
+
+Buttons:
+
+Form 1: Next, Save draft
+
+Form 2: Save (or Submit Day — your choice, but use that single label everywhere)
+
+Delete buttons in expenses rows must be explicit Delete, not rounded “–”.
+
+No modals/alerts anywhere in either form for success/failure.
+
+API response contracts (unchanged)
+
+POST /api/daily-sales → { ok: true, shiftId } (already correct)
+
+Form 2 save → return { ok: true, shiftId } as well (if not already)
+
+Sticky actions
+
+Form 1 already uses bottom sticky actions.
+
+Optional (nice-to-have): add the same bottom bar to Form 2 with Save on the right. If you implement, match the existing StickyActions component style.
+
+B) QA you must run & paste back
+
+Routing
+
+/operations/daily-sales → Form 1 (200)
+
+/daily-sales → redirects to /operations/daily-sales (200 on final)
+
+/operations/daily-sales-stock → redirects to /operations/daily-sales
+
+/operations/stock → Form 2 (200)
+
+/operations/form2 → redirects to /operations/stock
+
+End-to-end
+
+Open /operations/daily-sales. Enter minimal data (date, completed by, starting cash; any sales).
+
+Click Next.
+
+Paste console line:
+
+[Form1] will navigate: /operations/stock?shift=<uuid>
+
+Confirm browser at /operations/stock?shift=<uuid>.
+
+Paste console line from Form 2:
+
+[Form2] shift: <uuid>
+
+Screenshot of Form 2 showing Shift Expenses and Staff Wages sections rendered immediately.
+
+Add one row in each expenses section and Save.
+
+Paste the network response JSON from Form 2 save ({ ok: true, shiftId }).
+
+Screenshot of the inline “Stock & expenses saved” note (no modal/alert).
+
+API curl (Form 1)
+
+curl -s -X POST http://localhost:5000/api/daily-sales \
+  -H "Content-Type: application/json" \
+  -d '{"completedBy":"QA","cashStart":1000,"cashSales":10,"qrSales":0,"grabSales":0,"aroiDeeSales":0,"totalSales":10,"shiftDate":"2025-08-18T00:00:00.000Z","status":"submitted"}'
+# Expect: {"ok":true,"shiftId":"..."}
+
+C) Out of scope (log only, do not touch in this PR)
+
+Global Expenses module for company-account purchases (with supplier/category lookups).
+
+Menu Management features (import/compare, Chef review, descriptions).
+
+Any typography/spacing/branding overhaul.
+
+D) Merge check
+
+Keep the Freeze Report in the PR description (route map, form map, API map, and CLI outputs).
+
+Confirm no new alerts, and both forms follow the same { ok, shiftId } response pattern.

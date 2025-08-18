@@ -11,10 +11,13 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 export default function DailySalesStock() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Save state for inline success/error messages
+  const [saved, setSaved] = useState<null | "ok" | "err">(null);
 
   // Always render the form; if shiftId missing, show a small note near the title:
   const shiftId = searchParams.get('shift');
-  console.log('[Form2] Received shift parameter:', shiftId ?? 'none');
+  console.log('[Form2] shift:', shiftId ?? 'none');
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");
@@ -92,15 +95,13 @@ export default function DailySalesStock() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const msg = await res.text();
-      alert(`Save failed: ${res.status} ${msg}`);
+      setSaved("err");
+      setTimeout(() => setSaved(null), 4000);
       return;
     }
-    const { salesId } = await res.json();
-    localStorage.setItem("currentSalesId", salesId);
-    // push to Form 2 when you add it
-    // setLocation("/operations/daily-stock?salesId=" + salesId);
-    alert("Saved Form 1.");
+    const json = await res.json();
+    setSaved("ok");
+    setTimeout(() => setSaved(null), 4000);
   }
 
   const box = "rounded-2xl border bg-white p-5 shadow-sm";
@@ -110,10 +111,27 @@ export default function DailySalesStock() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">Daily Sales & Stock Form</h1>
-        <div className="flex gap-2">
-          <button className="px-3 py-2 border rounded-xl" onClick={() => window.history.back()}>Back</button>
-          <button className="px-3 py-2 border rounded-xl bg-emerald-600 text-white" onClick={onSubmit}>Submit</button>
+        <div>
+          <h1 className="text-2xl font-extrabold">Daily Stock & Expenses</h1>
+          {!shiftId && (
+            <div className="text-sm text-amber-600 mt-1">No shift ID found - form can still be submitted</div>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          {saved === "ok" && (
+            <div className="rounded-md bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
+              Stock & expenses saved
+            </div>
+          )}
+          {saved === "err" && (
+            <div className="rounded-md bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+              Save failed — please try again
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button className="px-3 py-2 border rounded-xl" onClick={() => window.history.back()}>Back</button>
+            <button className="px-3 py-2 border rounded-xl bg-emerald-600 text-white" onClick={onSubmit}>Save</button>
+          </div>
         </div>
       </div>
 
