@@ -28,21 +28,17 @@ router.post('/', async (req, res) => {
       notes,
     } = req.body;
 
+    // Create the basic daily sales record with just the fields sent from Form 1
     const result = await prisma.dailySales.create({
       data: {
-        completedBy,
+        completedBy: req.body.completedBy,
         shiftDate: req.body.shiftDate ? new Date(req.body.shiftDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
-        startingCash: Math.round(parseFloat(startingCash) * 100) || 0,
-        cashSales: Math.round(parseFloat(cashSales) * 100) || 0,
-        qrSales: Math.round(parseFloat(qrSales) * 100) || 0,
-        grabSales: Math.round(parseFloat(grabSales) * 100) || 0,
-        aroiSales: Math.round(parseFloat(aroiDeeSales) * 100) || 0,
-        totalSales: Math.round(parseFloat(totalSales) * 100) || 0,
-        totalExpenses: Math.round(parseFloat(totalExpenses) * 100) || 0,
-        closingCash: Math.round(parseFloat(closingCash) * 100) || 0,
-        cashBanked: Math.round(parseFloat(cashBanked) * 100) || 0,
-        qrTransfer: Math.round(parseFloat(qrTransferred) * 100) || 0,
-        notes: notes || null,
+        startingCash: Math.round(parseFloat(req.body.cashStart || 0) * 100),
+        cashSales: Math.round(parseFloat(req.body.cashSales || 0) * 100),
+        qrSales: Math.round(parseFloat(req.body.qrSales || 0) * 100),
+        grabSales: Math.round(parseFloat(req.body.grabSales || 0) * 100),
+        aroiSales: Math.round(parseFloat(req.body.aroiDeeSales || 0) * 100),
+        totalSales: Math.round(parseFloat(req.body.totalSales || 0) * 100),
         status: 'submitted'
       },
     });
