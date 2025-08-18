@@ -1,0 +1,218 @@
+IMPLEMENT THIS — DO NOT DEVIATE WITHOUT APPROVAL
+0) Freeze & report (no code changes yet)
+
+Produce a concise map of what exists so we stop guessing.
+
+Deliver these three artifacts as a comment in the PR:
+
+Route map (frontend):
+
+File and component for each path.
+
+For Vite/React Router: dump from client/src/App.tsx or RouteRegistry.ts.
+
+Include every alias/redirect.
+
+Form ownership map:
+
+Which component is “Form 1 (Daily Sales)” and its file path.
+
+Which component is “Form 2 (Stock + Expenses)” and its file path.
+
+Which API each form calls, the request payload & the exact JSON it expects back.
+
+API map (backend):
+
+List of handlers that mention “daily sales”, “stock”, “forms”.
+
+For each: method, path, req/resp shape, and which DB tables they touch.
+
+Commands to help you gather it (post the outputs in the PR):
+
+# FRONTEND
+rg -n "Route|path|<Route" client/src | sort
+rg -n "DailySales|DailySalesStock|Stock" client/src | sort
+
+# BACKEND
+rg -n "/api/.*daily|/api/.*stock|daily-sales|forms" server/ | sort
+
+# FILE TREE (top 2 levels only)
+tree -L 2 -I "node_modules|dist|build|.git"
+
+
+Only after posting this report, proceed to the fixes below.
+
+1) Normalize routes (single source of truth)
+
+Canonical paths
+
+Form 1 (Daily Sales): /operations/daily-sales
+
+Form 2 (Stock + Expenses): /operations/stock
+
+Aliases (temporary)
+
+/daily-sales → redirect to /operations/daily-sales
+
+/operations/daily-sales-stock → redirect to /operations/daily-sales
+
+/operations/form2 → redirect to /operations/stock
+
+Sidebar
+
+“Daily Sales & Stock” must link to /operations/daily-sales (Form 1).
+
+Acceptance
+
+Navigating to any alias lands on the canonical route (HTTP 200).
+
+Sidebar item opens Form 1.
+
+2) Form 1 behavior (Sales only → handoff to Form 2)
+
+Component: client/src/pages/DailySales.tsx
+Fields: Shift Date, Completed By, Starting Cash + Sales (cash/QR/grab/aroi).
+Bottom sticky bar: Next and Save draft.
+
+Submit contract
+
+POST /api/daily-sales
+
+Request body: { shiftDate, completedBy, cashStart, cashSales, qrSales, grabSales, aroiDeeSales, totalSales, status: "submitted" }
+
+Response must be exactly: { ok: true, shiftId: "<uuid>" }
+
+Navigation (no modal/alert)
+
+const submit = async (e?: React.FormEvent) => {
+  e?.preventDefault();
+  if (submitting) return;
+  setSubmitting(true);
+  const res = await fetch("/api/daily-sales", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+  const json = await res.json();
+  if (!json?.ok || !json?.shiftId) { setSubmitting(false); setError("Save failed."); return; }
+  const target = `/operations/stock?shift=${encodeURIComponent(json.shiftId)}`;
+  console.log("[Form1] navigate:", target);
+  window.location.assign(target);
+};
+
+
+Remove all alert() calls.
+
+In StickyActions, call onNext={() => submit()} (no event).
+
+Draft
+
+Keep localStorage autosave/restore as implemented.
+
+Acceptance
+
+Click Next → browser navigates to /operations/stock?shift=<uuid> with no popups.
+
+3) Form 2 behavior (Stock + Expenses always visible)
+
+Component: client/src/pages/operations/DailySalesStock.tsx
+Sections shown unconditionally:
+
+Expenses
+
+Shift Expenses (item, cost, shop; add/delete rows)
+
+Staff Wages (staff name, amount, type; add/delete rows)
+
+Remove any “Other Expenses” section entirely.
+
+Placeholder for wages name must be “Staff Name”.
+
+Row delete buttons are clear Delete buttons (no round minus pills).
+
+“Total Expenses” = Shift + Wages only.
+
+Shift parameter
+
+Read ?shift=<uuid>. If missing, still render the full UI.
+
+console.log("[Form2] shift:", shiftId ?? "none").
+
+Submit/Save buttons (top or bottom—your call)
+
+On save/submit, do not show “Saved Form 1”. Use a neutral toast or inline success note: “Stock & expenses saved.”
+
+API may be /api/daily-sales/stock (or the existing one), but the response must be
+{ ok: true, shiftId } for consistency.
+
+Acceptance
+
+Hitting /operations/stock?shift=anything renders both expense sections immediately.
+
+Add/delete rows work; total updates.
+
+Saving shows the correct success message (no Form 1 text).
+
+4) Label & copy cleanup (tiny)
+
+Form 1 page title: Daily Sales (subtitle: “Step 1 of 2 — complete Sales, then you’ll be redirected to Stock.”)
+
+Form 2 page title: Daily Stock & Expenses (no “Form 1” wording anywhere)
+
+Buttons:
+
+Form 1: Next, Save draft
+
+Form 2: Save (or Submit Day—your choice, but consistent)
+
+No modal alerts. Use inline error/success or toast.
+
+5) QA — run and paste these exact results
+
+Routing (paste URLs + final URL + HTTP 200)
+
+/operations/daily-sales
+
+/daily-sales → /operations/daily-sales
+
+/operations/daily-sales-stock → /operations/daily-sales
+
+/operations/stock
+
+/operations/form2 → /operations/stock
+
+End-to-end flow
+
+Open /operations/daily-sales.
+
+Enter minimal valid data (date, name, starting cash) + any sales.
+
+Click Next.
+
+Paste console output showing
+"[Form1] navigate: /operations/stock?shift=<uuid>".
+
+Confirm browser URL is /operations/stock?shift=<uuid>.
+
+Paste console output from Form 2:
+"[Form2] shift: <uuid>".
+
+Screenshot showing Shift Expenses and Staff Wages sections rendered.
+
+Add one expense row in each section, save.
+
+Paste network response from the save call (must be { ok: true, shiftId }).
+
+Screenshot or text of the success message (must not say “Saved Form 1”).
+
+APIs (curl)
+
+curl -s -X POST http://localhost:5000/api/daily-sales \
+  -H "Content-Type: application/json" \
+  -d '{"completedBy":"QA","cashStart":1000,"cashSales":10,"qrSales":0,"grabSales":0,"aroiDeeSales":0,"totalSales":10,"shiftDate":"2025-08-18T00:00:00.000Z","status":"submitted"}'
+# => {"ok":true,"shiftId":"..."}
+
+
+(Attach the JSON returned.)
+
+6) Out-of-scope for this patch (log them only)
+
+The “global Expenses” module (full supplier/category lookup & company expenses) is separate from Form 2 shift expenses—do not entangle in this PR.
+
+Styling polish (fonts, spacing, icons) and the Menu Management features (menu import/compare, Chef Ramsay review, DP descriptions) will follow in subsequent PRs.
