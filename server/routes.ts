@@ -232,32 +232,33 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Stock master endpoint (loads grouped stock items)
-  app.get('/api/stock-master', async (req: Request, res: Response) => {
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      const cwd = process.cwd();
-      const stockMasterPath = path.join(cwd, 'data', 'stock_master.json');
-      
-      if (!fs.existsSync(stockMasterPath)) {
-        return res.status(404).json({ error: 'Stock master file not found', path: stockMasterPath });
-      }
-      
-      const stockMasterData = fs.readFileSync(stockMasterPath, 'utf8');
-      const stockMaster = JSON.parse(stockMasterData);
-      
-      // Count total items for QA
-      const totalItems = Object.values(stockMaster).reduce((total: number, items: any) => total + items.length, 0);
-      console.log('Stock master loaded, total items:', totalItems);
-      
-      res.json(stockMaster);
-    } catch (err) {
-      console.error('Stock master load error:', err);
-      res.status(500).json({ error: 'Failed to load stock master', details: (err as Error).message });
-    }
+  // Stock catalog endpoints (Prisma-based)
+  app.get('/api/stock-catalog', async (req: Request, res: Response) => {
+    const { getStockCatalog } = await import('./api/stock-catalog');
+    return getStockCatalog(req, res);
   });
+  
+  app.post('/api/stock-catalog/import', async (req: Request, res: Response) => {
+    const { importStockCatalog, uploadMiddleware } = await import('./api/stock-catalog');
+    uploadMiddleware(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ error: 'File upload failed' });
+      }
+      return importStockCatalog(req, res);
+    });
+  });
+  
+  app.get('/api/daily-stock', async (req: Request, res: Response) => {
+    const { getDailyStock } = await import('./api/daily-stock');
+    return getDailyStock(req, res);
+  });
+  
+  app.post('/api/daily-stock', async (req: Request, res: Response) => {
+    const { saveDailyStock } = await import('./api/daily-stock');
+    return saveDailyStock(req, res);
+  });
+  
+
 
   app.get("/api/dashboard/stock-discrepancies", async (req: Request, res: Response) => {
     try {

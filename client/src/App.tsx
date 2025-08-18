@@ -29,6 +29,7 @@ import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
 import DailySales from "./pages/DailySales";
+import DailyStock from "./pages/operations/DailyStock";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -63,7 +64,7 @@ export default function App() {
                   <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
 
                   {/* ---- FORM 2: canonical + aliases ---- */}
-                  <Route path="/operations/stock" element={<DailySalesStock />} />
+                  <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} />
                   <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
                   
                   {/* Analysis with nested routes */}

@@ -103,8 +103,8 @@ model DailyStock {
   sales             DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   // Stock counts (per your ops rules)
-  burgerBuns        Int      @default(0) // end-of-shift count
-  meatWeightG       Int      @default(0) // grams remaining
+  burgerBuns        Int      @default(0) // end-of-shift count - RENAMED: was bunsCount
+  meatWeightG       Int      @default(0) // grams remaining - RENAMED: was meatGrams
   // Drinks by item – simple JSON to stay flexible
   drinksJson        Json?
 
@@ -115,6 +115,10 @@ model DailyStock {
   // Status
   status            String   @default("submitted") // keep simple for now
   deletedAt         DateTime?
+  
+  // Additional fields for new spec
+  bunsCount         Int      @default(0) // new alias for burgerBuns
+  meatGrams         Int      @default(0) // new alias for meatWeightG
 }
 
 // New models for POS ingestion and analytics
@@ -715,5 +719,40 @@ model MenuModifierV2 {
 
   @@index([itemId])
   @@map("menu_modifier_v2")
+}
+
+// ========= Stock Catalog System =========
+// Stock catalog (imported from CSV)
+model StockItem {
+  id             Int       @id @default(autoincrement())
+  name           String
+  category       String     // e.g., "Fresh Food", "Drinks", "Packaging"
+  isDrink        Boolean    @default(false)
+  isExcluded     Boolean    @default(false) // will be true for the first 4 rows from CSV
+  displayOrder   Int        @default(0)     // for stable ordering within categories
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // reverse relation
+  stockRequests  StockRequest[]
+
+  @@map("stock_items")
+}
+
+// One row per (shiftId, item)
+model StockRequest {
+  id         Int      @id @default(autoincrement())
+  shiftId    String   // UUID from Form 1
+  stockItemId Int
+  requestedQty Int?   // null or >= 0; null treated like "not requested"
+
+  // audit
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  StockItem  StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@unique([shiftId, stockItemId])
+  @@map("stock_requests")
 }
 

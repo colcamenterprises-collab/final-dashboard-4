@@ -1,0 +1,363 @@
+IMPLEMENTATION PACK — Daily Stock (Form 2) + Stock Catalog Import
+
+Golden rule: Implement exactly as written. If anything is ambiguous, pause and ask for approval before changing scope.
+
+0) Goals (what “done” looks like)
+
+Form 2 shows Buns, Meat, and a Drinks table (each drink has its own input).
+
+Below that, it shows the stock catalog grouped by category (4–5 items per row), each with a numeric input.
+
+No duplicate Shift Info entry — the form inherits Form 1 via shiftId in the query string and displays a small banner “Linked to shift: …”.
+
+First 4 items from the CSV are excluded (covered by meat count).
+
+“Shift Expenses” remain in Form 1 (already done).
+
+Saving stores rolls, meat, drinks counts, and requisition quantities, all linked to the shiftId.
+
+All text/buttons/body copy use 14px. Buttons live at the bottom only (not floating).
+
+Spacing: generous whitespace between sections and between “Shift Expenses” & “Staff Wages” (already done on Form 1). Use same spacing rhythm here.
+
+1) Routes (no change unless missing)
+
+Form 1 (Daily Sales & Expenses): /operations/daily-sales
+
+Form 2 (Daily Stock): /operations/stock?shift=:uuid
+
+Aliases that should remain:
+/operations/form2 → /operations/stock
+/daily-sales → /operations/daily-sales
+/operations/daily-sales-stock → /operations/daily-sales
+
+2) Backend — Data model & APIs
+
+We’ll use a small catalog to render the stock items and a per-shift collection to store counts/requests.
+
+2.1 Prisma schema (append if not present)
+// Stock catalog (imported from CSV)
+model StockItem {
+  id             Int       @id @default(autoincrement())
+  name           String
+  category       String     // e.g., "Fresh Produce", "Dairy", "Drinks", "Packaging"
+  isDrink        Boolean    @default(false)
+  isExcluded     Boolean    @default(false) // will be true for the first 4 rows from CSV
+  displayOrder   Int        @default(0)     // for stable ordering within categories
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // reverse relation
+  stockRequests  StockRequest[]
+}
+
+// One row per (shiftId, item)
+model StockRequest {
+  id         Int      @id @default(autoincrement())
+  shiftId    String   // UUID from Form 1
+  stockItemId Int
+  requestedQty Int?   // null or >= 0; null treated like "not requested"
+
+  // audit
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  StockItem  StockItem @relation(fields: [stockItemId], references: [id])
+}
+
+// Per-shift roll/meat/drinks aggregate counts
+model DailyStock {
+  id           Int      @id @default(autoincrement())
+  shiftId      String   @unique
+  bunsCount    Int      @default(0)   // “Rolls (pcs)”
+  meatGrams    Int      @default(0)   // grams
+  // drinks are per-item in StockRequest where isDrink = true (requestedQty stores count)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+
+If we already have these tables under slightly different names, do not rename; adapt API handlers to match the intent. If foreign keys or column names differ, ask before changing schema.
+
+2.2 API contracts
+(A) Import catalog from CSV
+
+POST /api/stock-catalog/import
+Body: multipart/form-data with field file (CSV).
+Behavior:
+
+Parse CSV; for each row produce {name, category}.
+
+Mark the first 4 rows as isExcluded=true. (We exclude them from the UI.)
+
+Mark isDrink=true if category matches a drinks category keyword: any of ["drinks","beverage","soft drinks","soda"] (case-insensitive).
+
+Assign sequential displayOrder within each category.
+
+Upsert by name (case-insensitive).
+
+Return { ok: true, inserted, updated }.
+
+(B) Read catalog for the form
+
+GET /api/stock-catalog
+
+Returns:
+
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Coke",
+      "category": "Drinks",
+      "isDrink": true,
+      "isExcluded": false,
+      "displayOrder": 10
+    },
+    ...
+  ]
+}
+
+
+Server sorts by category ASC, displayOrder ASC, name ASC.
+
+(C) Load any saved values for a shift
+
+GET /api/daily-stock?shift=:uuid
+
+Returns:
+
+{
+  "ok": true,
+  "stock": {
+    "shiftId": "…",
+    "bunsCount": 0,
+    "meatGrams": 0
+  },
+  "requests": [
+    { "stockItemId": 12, "requestedQty": 4 }, ...
+  ]
+}
+
+
+If no row yet, return defaults.
+
+(D) Save daily stock for a shift
+
+POST /api/daily-stock
+
+Body:
+
+{
+  "shiftId": "uuid-from-form1",
+  "bunsCount": 0,
+  "meatGrams": 0,
+  "requests": [
+    { "stockItemId": 12, "requestedQty": 4 },
+    { "stockItemId": 34, "requestedQty": 0 },
+    ...
+  ]
+}
+
+
+Behavior:
+
+Upsert DailyStock by shiftId.
+
+For each request: upsert by (shiftId, stockItemId).
+
+Return { ok: true }.
+
+No schema deletions. If existing handlers already cover this, adapt payloads to these shapes.
+
+3) Frontend — Form 2 (Daily Stock)
+
+File: client/src/pages/operations/DailySalesStock.tsx
+Style: Tailwind (14px base), section cards with consistent padding/margin, buttons only at bottom.
+
+3.1 Header
+
+Title: Daily Stock
+
+Subheader: if shiftId present → Linked to shift: <uuid>; else No shift ID provided (but form still usable).
+
+3.2 Sections
+
+End-of-Shift Counts (single row, 3 columns)
+
+Buns (pcs) → numeric input (default 0)
+
+Meat (grams) → numeric input (default 0)
+
+Drinks → table rendering only items with isDrink=true, each as a row:
+
+Columns: Drink Name | Count
+
+Count is numeric input (default 0)
+
+(No “Drinks total”.)
+
+Requisition List (by Category)
+
+Render all non-excluded, non-drink items, grouped by category.
+
+Category header bar (sticky within card not required).
+
+Items displayed horizontally using a responsive grid:
+
+Mobile: 2 columns; Tablet: 3–4; Desktop: 5.
+
+Each item is: Label + small number input (default blank).
+
+No notes fields.
+
+Do not render the first 4 imported items (those have isExcluded=true).
+
+Actions (bottom only, not floating)
+
+Save (primary) → POST /api/daily-stock.
+
+On success: inline green notice “Stock saved” (fades after 4s).
+
+On error: inline red notice with the error text.
+
+3.3 Data flow
+
+On mount:
+
+Read shiftId from ?shift= in URL.
+
+Fetch /api/stock-catalog, store in state.
+
+If shiftId, fetch /api/daily-stock?shift=…, prefill buns/meat and requests.
+
+On save:
+
+Build payload as specified and POST.
+
+Inputs are numeric with clamping to >= 0 (empty counts treated as null for requisitions, 0 for buns/meat/drinks).
+
+All inputs and labels use 14px. Add extra whitespace between the Drinks and the first category, and between categories.
+
+4) CSV Importer (Admin/one-time per update)
+
+File: server/api/stock-catalog.ts (or server/api/stock-catalog/index.ts)
+
+Handler for POST /api/stock-catalog/import as above.
+
+CSV columns vary; we only need:
+
+name → “Item” or first non-empty text column
+
+category → “Internal Category” or default "General"
+
+Normalize:
+
+Trim, title-case names.
+
+Derive isDrink by category keywords.
+
+Mark first 4 rows with isExcluded=true.
+
+Keep idempotent upsert (by case-insensitive name).
+
+Add a small CLI script scripts/import-stock-csv.ts that posts the CSV to this endpoint (nice to have).
+
+5) Acceptance criteria (QA)
+
+Given I open /operations/stock?shift=UUID
+When the page loads
+Then
+
+I see “Linked to shift: UUID”.
+
+End-of-Shift Counts shows inputs for Buns and Meat, and a Drinks table with each drink item listed individually.
+
+I see category sections listing non-drink items in rows (4–5 per row).
+
+The first 4 imported items are not present.
+
+Given I type numbers and click Save
+Then
+
+I get a green inline notice: “Stock saved”.
+
+A GET to /api/daily-stock?shift=UUID returns the saved values.
+
+Given I open /operations/stock without shift
+Then
+
+The form still renders (no shift banner), I can save and get ok: true.
+
+(It’s acceptable to require a shiftId for production; for now this must not block the UI.)
+
+Styling checks
+
+All text/buttons 14px.
+
+Buttons only at the bottom, not floating.
+
+Clear whitespace between Drinks and the first category, and between categories.
+
+6) File map (expected changes)
+
+client/src/pages/operations/DailySalesStock.tsx → Replace UI per spec; remove duplicate Shift Info inputs; add banner and sections above.
+
+server/api/daily-stock.ts → Ensure it supports the payload & returns { ok: true }.
+
+server/api/stock-catalog.ts → New: GET /api/stock-catalog, POST /api/stock-catalog/import.
+
+prisma/schema.prisma → Add StockItem, StockRequest, DailyStock (or adapt existing tables).
+
+scripts/import-stock-csv.ts → optional helper to import via CLI.
+
+7) Deployment notes
+
+Run Prisma migration (or drizzle equivalent) after schema changes.
+
+Import the CSV provided by Cam:
+
+Use the latest file (attached in chat).
+
+Confirm API reports { inserted, updated }.
+
+Open /api/stock-catalog to verify items & categories look correct.
+
+8) Rollback plan
+
+Keep migrations reversible.
+
+Don’t remove/rename existing columns without explicit approval.
+
+If anything fails, revert to previous commit and share console/server logs.
+
+9) What to send back (proof)
+
+A short note confirming:
+
+Migration applied successfully.
+
+Catalog imported successfully (counts).
+
+Screenshot of:
+
+Form 2 with the drinks table + at least two categories visible in grid layout.
+
+Saved success notice.
+
+JSON snippets from:
+
+GET /api/stock-catalog (first 10 items).
+
+GET /api/daily-stock?shift=<uuid> after a save.
+
+CSV to use
+
+Use the latest file I shared:
+“Food Costings - Supplier List - Portions - Final Prices Makro FINAL 06.08.25.csv”
+
+Exclude the first 4 rows (isExcluded=true).
+
+Category mapping is taken from the Internal Category column (fallback: “General”).
+
+Drinks detection by category keyword as defined above.
