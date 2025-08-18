@@ -1,0 +1,177 @@
+IMPLEMENT EXACTLY THIS (Form 2 stock restore) — NO DEVIATIONS
+0) Inputs you already have (use these)
+
+Route: /operations/stock
+
+Load API: GET /api/forms/:id → returns { sales, stock }
+
+Save API: POST /api/daily-stock
+expects body:
+{ shiftId, stockRequests, drinkStock, meatGrams, burgerBuns }
+responds: { success: true }
+
+Catalog file: add the provided JSON to the repo at:
+
+client/public/data/stock_catalog.json
+(Use the one Cam attached.)
+
+1) UI sections (exact order)
+
+Shift Information (readonly from Form 1)
+
+Date, Completed By (use values from GET /api/forms/:id)
+
+End-of-Shift Counts
+
+Rolls (pcs) → field key: burgerBuns
+
+Meat (grams) → field key: meatGrams
+
+Drinks total (pcs) → field key: drinkStock
+
+Requisition List (catalog-backed, add/remove rows)
+
+Item (searchable select; options from stock_catalog.json excluding the first 4 beef rows per Cam)
+
+Qty (number)
+
+Unit (pre-fill from catalog; editable)
+
+Notes (optional)
+
+Delete (red “Delete” button)
+
++ Add Row (adds an empty row)
+
+Rule: rows with Qty <= 0 or blank are not saved.
+
+Save button at the bottom (non-floating)
+
+On success show inline: “Stock saved.” (auto-hide ~4s).
+
+No alerts.
+
+Console logs
+
+On mount: console.log("[Form2] shift:", shiftId ?? "none")
+
+On save success: console.log("[Form2] saved:", shiftId)
+
+2) Data mapping (match existing backend exactly)
+Load (prefill)
+
+GET /api/forms/:id → { sales, stock }
+
+If stock has burgerBuns, meatGrams, drinkStock, prefill those fields.
+
+If stock.stockRequests exists, render them as initial requisition rows.
+
+Save (build body exactly like this)
+const body = {
+  shiftId,                     // from URL ?shift=
+  burgerBuns: Number(rolls) || 0,
+  meatGrams:  Number(meat)  || 0,
+  drinkStock: Number(drinks) || 0,
+  stockRequests: requisitionRows
+    .filter(r => Number(r.qty) > 0)
+    .map(r => ({
+      item: r.item,            // item name from catalog
+      qty: Number(r.qty),
+      unit: r.unit || "",      // allow override
+      notes: r.notes || "",
+      supplier: r.supplier || "" // if present in catalog
+    }))
+};
+await fetch("/api/daily-stock", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body)
+}); // expect { success: true }
+
+
+Important: Do not rename any keys. Use exactly burgerBuns, meatGrams, drinkStock, stockRequests as above.
+
+3) Catalog wiring (front-end only)
+
+Place Cam’s file at: client/public/data/stock_catalog.json
+
+On Form 2 mount:
+
+const res = await fetch("/data/stock_catalog.json");
+const catalog = await res.json();
+// catalog.counted_items are NOT used for save; we just use labels
+// catalog.requisition_items populate the Item select
+console.log("[Form2] catalog loaded:", catalog.requisition_items?.length);
+
+
+Ensure the first 4 beef entries (Topside, Chuck, Brisket, Trimmings) are not in the requisition select (Cam already provided a cleaned file; use it as-is).
+
+4) Files to edit (only these)
+
+client/src/pages/operations/DailySalesStock.tsx
+
+Render the four sections above
+
+Implement load → prefill
+
+Implement save → POST body above
+
+Inline success/error notes (no alerts)
+
+client/public/data/stock_catalog.json
+
+Add the file
+
+client/src/App.tsx
+
+Verify /operations/stock route exists (no change if already present)
+
+No other files. No server/schema changes.
+
+5) QA — paste these in the PR (with screenshots)
+
+Catalog
+
+Network 200 for /data/stock_catalog.json
+
+Console: "[Form2] catalog loaded: <N>"
+
+Render
+
+Screenshot: End-of-Shift Counts (Rolls / Meat grams / Drinks total)
+
+Screenshot: Requisition List grid with + Add Row
+
+Prefill
+
+Visit /operations/stock?shift=<id> where stock exists
+→ counts prefilled; any previous stockRequests render as rows
+
+Save
+
+Enter: Rolls=200, Meat=3500, Drinks=46
+
+Add two requisition rows (Qty > 0) + one row with Qty=0
+
+Click Save → Network response { success: true }
+
+Console: "[Form2] saved: <id>"
+
+Inline note “Stock saved.” shown (and disappears)
+
+Persistence
+
+Refresh /operations/stock?shift=<id> → counts/rows reload
+(Row with Qty=0 must not be present.)
+
+No alerts
+
+Confirm no browser alert() calls; only inline notes.
+
+6) Guardrails
+
+Do not change API paths or DB schema.
+
+Do not mix any Expenses/Banking into Form 2 (they live in Form 1).
+
+If existing API uses slightly different field names, stop and paste the exact JSON; we’ll approve a 1:1 mapper.
