@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import StickyActions from "../components/StickyActions";
+
 
 const FORM2_PATH = "/operations/stock"; // Route to Form 2
 
@@ -289,16 +289,16 @@ export default function DailySales() {
           </section>
 
           {/* Expenses Section */}
-          <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">Expenses</h3>
+          <section className="rounded-xl border bg-white p-6 mt-6">
+            <h3 className="mb-4 text-[14px] font-semibold">Expenses</h3>
             
             {/* Shift Expenses */}
-            <div className="mb-6">
-              <h4 className="font-medium mb-3">Shift Expenses</h4>
-              <div className="space-y-3">
+            <div className="mb-8">
+              <h4 className="mb-3 text-[14px] font-semibold">Shift Expenses</h4>
+              <div className="space-y-4">
                 {shiftExpenses.map((row) => (
-                  <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                    <div className="md:col-span-5">
+                  <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Item</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -307,7 +307,7 @@ export default function DailySales() {
                         placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
                       />
                     </div>
-                    <div className="md:col-span-3">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Cost (฿)</label>
                       <input 
                         type="number" 
@@ -316,7 +316,7 @@ export default function DailySales() {
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, cost: Number(e.target.value) } : r))} 
                       />
                     </div>
-                    <div className="md:col-span-3">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Shop Name</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -325,7 +325,7 @@ export default function DailySales() {
                         placeholder="Makro / Lotus" 
                       />
                     </div>
-                    <div className="md:col-span-1">
+                    <div>
                       <button
                         type="button"
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
@@ -350,12 +350,12 @@ export default function DailySales() {
             </div>
 
             {/* Staff Wages */}
-            <div className="mb-4">
-              <h4 className="font-medium mb-3">Staff Wages</h4>
-              <div className="space-y-3">
+            <div>
+              <h4 className="mb-3 text-[14px] font-semibold">Staff Wages</h4>
+              <div className="space-y-4">
                 {staffWages.map((row) => (
-                  <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                    <div className="md:col-span-5">
+                  <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Staff Name</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -364,7 +364,7 @@ export default function DailySales() {
                         placeholder="Staff Name" 
                       />
                     </div>
-                    <div className="md:col-span-3">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Amount (฿)</label>
                       <input 
                         type="number" 
@@ -373,7 +373,7 @@ export default function DailySales() {
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, amount: Number(e.target.value) } : r))} 
                       />
                     </div>
-                    <div className="md:col-span-3">
+                    <div>
                       <label className="text-sm text-gray-600 block mb-1">Type</label>
                       <select 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -386,7 +386,7 @@ export default function DailySales() {
                         <option value="REIMBURSEMENT">Reimbursement</option>
                       </select>
                     </div>
-                    <div className="md:col-span-1">
+                    <div>
                       <button
                         type="button"
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
@@ -410,7 +410,7 @@ export default function DailySales() {
               </div>
             </div>
 
-            <div className="mt-4 text-right font-bold">
+            <div className="mt-6 pt-4 border-t text-[14px] text-right font-bold">
               Total Expenses: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
@@ -476,15 +476,26 @@ export default function DailySales() {
             </div>
           )}
 
+          {/* END-OF-FORM ACTIONS (non-floating) */}
+          <div className="mt-8 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="h-10 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Save draft
+            </button>
+            <button
+              type="button"
+              onClick={() => submit()}
+              className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
+            >
+              Next →
+            </button>
+          </div>
+
         </form>
       </div>
-
-      <StickyActions
-        nextLabel="Next →"
-        onNext={() => submit()}
-        onSaveDraft={handleSaveDraft}
-        disableNext={submitting}
-      />
 
       <SuccessModal
         open={showSuccess}

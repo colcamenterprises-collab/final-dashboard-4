@@ -1,0 +1,137 @@
+IMPLEMENT THIS EXACTLY (no deviations, ask before changing anything)
+1) Remove floating bar; show actions only at end of Form 1
+
+Goal: The Save Draft and Next buttons should not float. They appear only at the bottom of the form.
+
+Change (Form 1)
+File: client/src/pages/DailySales.tsx
+
+Remove the StickyActions import and component usage entirely.
+
+Add this actions block as the last element inside the form (end of page):
+
+{/* END-OF-FORM ACTIONS (non-floating) */}
+<div className="mt-8 flex items-center justify-end gap-3">
+  <button
+    type="button"
+    onClick={saveDraft} // existing function; keep behavior
+    className="h-10 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-700 hover:bg-gray-50"
+  >
+    Save draft
+  </button>
+  <button
+    type="button"
+    onClick={() => submit()} // existing submit(); no event param
+    className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
+  >
+    Next →
+  </button>
+</div>
+
+
+Do not re-introduce any sticky/fixed positioning for these buttons.
+
+Optional (Form 2 consistency):
+At the bottom of client/src/pages/operations/DailySalesStock.tsx, render a similar non-floating actions row with a single Save button using the same classes.
+
+2) Increase whitespace in Expenses + across rows
+
+Goal: Add visual breathing room, especially between Shift Expenses and Staff Wages, and increase row spacing everywhere.
+
+Change (Form 1)
+File: client/src/pages/DailySales.tsx
+
+Wrap the Expenses section blocks with stronger spacing utilities:
+
+<section className="rounded-xl border bg-white p-6 mt-6">
+  <h3 className="mb-4 text-[14px] font-semibold">Expenses</h3>
+
+  {/* Shift Expenses */}
+  <div className="mb-8">  {/* <- extra white space below this block */}
+    <h4 className="mb-3 text-[14px] font-semibold">Shift Expenses</h4>
+    {/* table / rows container */}
+    <div className="space-y-4"> {/* <- vertical gap between rows */}
+      {/* each row (add class on row wrapper) */}
+      {/* row wrapper should include: className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto]" */}
+    </div>
+  </div>
+
+  {/* Staff Wages */}
+  <div>
+    <h4 className="mb-3 text-[14px] font-semibold">Staff Wages</h4>
+    <div className="space-y-4">
+      {/* each row wrapper same as above */}
+    </div>
+  </div>
+
+  {/* Total Expenses line */}
+  <div className="mt-6 pt-4 border-t text-[14px]">
+    {/* total expenses summary */}
+  </div>
+</section>
+
+
+For every repeating row (both Shift Expenses and Staff Wages), ensure the row wrapper has className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto]" (or your current template) and remove tight gaps; use gap-4 at minimum.
+
+For non-table layouts, apply space-y-4 to the container holding rows.
+
+3) Apply a simple style guide: 14px for paragraphs & buttons
+
+Goal: Standardize text to 14px for body copy and buttons.
+
+Global change
+File: client/src/index.css (or your global styles entry)
+
+Add:
+
+/* === Base Typography === */
+html { font-size: 14px; } /* sets 1rem = 14px for consistent sizing */
+
+/* Ensure buttons and paragraph text are 14px */
+button, .btn, p, .prose p { font-size: 14px !important; }
+
+/* Optional: inputs and selects */
+input, select, textarea { font-size: 14px; }
+
+
+Tailwind usage notes
+
+Replace text-sm/text-base inconsistencies on buttons/paragraphs with explicit text-[14px] where needed (as shown in the buttons above).
+
+Keep section titles at 14px but bold (font-semibold) per your ask.
+
+Do not change existing layout tokens beyond what’s listed. This is a typography pass, not a redesign.
+
+4) QA the changes (paste these results)
+
+Form 1 actions
+
+Scroll the entire form: no floating bar visible.
+
+Buttons only at the very end of the form.
+
+Click Save draft → inline confirmation (existing behavior).
+
+Click Next → same handoff to /operations/stock?shift=….
+
+Whitespace
+
+There is clear extra space between Shift Expenses and Staff Wages (the gap from mb-8).
+
+Within each expenses section, rows have larger vertical spacing (space-y-4).
+
+No row content is cramped; columns have gap-4.
+
+Typography
+
+Paragraph text renders at 14px.
+
+Buttons render at 14px.
+
+Section headings show at 14px + bold (as per spec).
+
+Regression
+
+No sticky action bar appears on any page.
+
+Form 1 → Form 2 navigation unchanged and working.

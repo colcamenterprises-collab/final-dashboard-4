@@ -5,6 +5,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === Base Typography === */
+html { font-size: 14px; } /* sets 1rem = 14px for consistent sizing */
+
+/* Ensure buttons and paragraph text are 14px */
+button, .btn, p, .prose p { font-size: 14px !important; }
+
+/* Optional: inputs and selects */
+input, select, textarea { font-size: 14px; }
+
 /* Typography helpers */
 .h1 { @apply text-3xl font-extrabold; }
 .h2 { @apply text-xl md:text-2xl font-bold; }

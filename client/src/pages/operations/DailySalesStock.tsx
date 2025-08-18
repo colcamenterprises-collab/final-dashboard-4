@@ -134,25 +134,24 @@ export default function DailySalesStock() {
         </div>
       </div>
 
-      {/* Actions Section */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+      {/* Actions Section (non-floating) */}
+      <div className="mt-8 flex items-center justify-between">
+        <div>
           {saved === "ok" && (
-            <div className="text-emerald-600 font-medium">Stock form saved successfully!</div>
+            <div className="text-emerald-600 font-medium text-[14px]">Stock form saved successfully!</div>
           )}
           {saved === "err" && (
-            <div className="text-red-600 font-medium">Error saving stock form. Please try again.</div>
+            <div className="text-red-600 font-medium text-[14px]">Error saving stock form. Please try again.</div>
           )}
-          {!saved && <div></div>}
-          
-          <button
-            type="button"
-            onClick={onSubmit}
-            className="h-10 rounded-lg bg-emerald-600 px-6 font-semibold text-white hover:bg-emerald-700"
-          >
-            Save
-          </button>
         </div>
+        
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="h-10 rounded-lg bg-emerald-600 px-6 text-[14px] font-semibold text-white hover:bg-emerald-700"
+        >
+          Save
+        </button>
       </div>
 
     </div>
