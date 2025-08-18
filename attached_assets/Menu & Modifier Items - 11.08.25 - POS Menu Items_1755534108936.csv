@@ -1,0 +1,35 @@
+Menu Name,SKU,Category,Description,Cost,Price,Ratio,Modifiers,Kids Drink Options,"Modifier - ""Make Fries Great Again""",Drink Options (Sets),"Modifier - ""Loaded Fries (Options)""","Modifier - ""Kids Sauce Options""",Upgrade Burger to Set ,PLEASE NO,Kids Next Level Burger Options,"Modifier - ""⚡⚡SUPER UPGRADE fries, slaw, drink⚡⚡""","Mega Upgrade Mega Savings Single Burger""","Modifier - ""Burger Extra Options ตัวเลือกเบอร์เกอร์""","Modifier - ""Mix and Match - Burger Option""","Modifier - ""Mix and Match - Drink Options"""
+Bottle Water,10031,Drinks,<p>1 Bottle of Drinking Water</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Coke Can,10012,Drinks,<p>1 Can of Coke</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Coke Zero,10013,Drinks,<p>1 Can of Coke Zero</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Fanta Orange,10027,Drinks,<p>1 Can of Fanta Orange</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Fanta Strawberry,10028,Drinks,<p>1 Can of Fanta Strawberry</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Juice Box (Apple),10040,Drinks,,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Juice Box (Orange),10039,Drinks,,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Pepsi Can,10042,Drinks,1 Can of Pepsi,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Schweppes Lime,10021,Drinks,<p>1 can of Schweppes lime,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Soda Water,10029,Drinks,<p>1 Bottle of Soda Water</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Sprite,10026,Drinks,<p>1 Can of Sprite</p>,,40,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Mix and Match Meal Deal,10069,PROMOTIONS,"2 x Burgers of their choice, 2 fries, 2 drinks and a coleslaw.",,697,,,N,N,N,N,N,N,N,N,N,N,N,Y,Y
+Kids Double Cheeseburger,10017,Kids Will Love This,,,189,,,N,N,N,N,Y,N,Y,Y,N,N,Y,N,N
+Kids Single Cheeseburger,10015,Kids Will Love This,,,149,,,N,N,N,N,Y,N,Y,N,N,N,Y,N,N
+Kids Single Meal Set (Burger Fries Drink),10003,Kids Will Love This,"Kids Single Cheese Burger, French Fries, Juice",,189,,,Y,N,N,N,Y,N,Y,N,N,N,N,N,N
+Cajun Fries,10018,Side Orders,1 Serving of Cajun Fries - 150 grams,,99,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Cheesy Bacon Fries,10010,Side Orders,"Single serving of French fries with bacon rasher, cheese and crunchy onions.",,119,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Chicken Nuggets,10002,Side Orders,"Chicken Nuggets - Serving sizes = 6, 9, 12, 24",,129,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Coleslaw with Bacon,10025,Side Orders,<p>1 serving of coleslaw with bacon</p>,,99,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+French Fries,10030,Side Orders,<p>1 serving of French Fries 130 grams</p>,,89,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Loaded Fries (Original),10035,Side Orders,,,170,,,N,N,N,N,N,N,Y,N,N,N,N,N,N
+Onion Rings,10020,Side Orders,,,99,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Potato Poppers (Tator tots),10023,Side Orders,,,79,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Sweet Potato Fries,10022,Side Orders,<p>1 Serving of sweet potato fries - 130 grams</p>,,99,,,N,N,N,N,N,N,N,N,N,N,N,N,N
+Double Set (Meal Deal),10032,Smash Burger Sets (Meal Deals),<p>Double Smash with Drink and Fries</p>,,299,,,N,N,Y,N,N,N,Y,N,N,N,Y,N,N
+Single Meal Set (Meal Deal),10033,Smash Burger Sets (Meal Deals),,,239,,,N,N,Y,N,N,N,Y,N,N,N,Y,N,N
+Super Double Bacon & Cheese Set (Meal Deal),10036,Smash Burger Sets (Meal Deals),,,319,,,N,N,Y,N,N,N,Y,N,N,N,Y,N,N
+Triple Smash Set (Meal Deal),10034,Smash Burger Sets (Meal Deals),,,369,,,N,N,Y,N,N,N,Y,N,N,N,Y,N,N
+Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น),10066,Smash Burgers,Chicken fillet Burger,,169,,,N,N,N,N,N,Y,Y,N,N,N,Y,N,N
+Single Smash Burger (ซิงเกิ้ล),10004,Smash Burgers,,,160,,,N,N,N,N,N,N,Y,N,Y,N,Y,N,N
+Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน),10019,Smash Burgers,,,240,,,N,N,N,N,N,Y,Y,N,Y,N,Y,N,N
+Triple Smash Burger (สาม),10009,Smash Burgers,,,290,,,N,N,N,N,N,Y,Y,N,Y,N,Y,N,N
+Ultimate Double (คู่),10006,Smash Burgers,,,220,,,N,N,N,N,N,Y,Y,N,Y,N,Y,N,N
+🐔 Big Rooster Sriracha Chicken ไก่ศรีราชาตัวใหญ่,10068,Smash Burgers,"Bun, coleslaw, chicken, cheese, jalapenos",,249,,,N,N,N,N,N,Y,Y,N,N,N,Y,N,N

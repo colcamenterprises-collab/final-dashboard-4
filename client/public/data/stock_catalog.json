@@ -1,0 +1,469 @@
+{
+  "counted_items": [
+    {
+      "name": "Burger Buns",
+      "category": "Fresh Food",
+      "unit": "pcs"
+    },
+    {
+      "name": "Meat",
+      "category": "Meat",
+      "unit": "grams"
+    },
+    {
+      "name": "Drinks",
+      "category": "Drinks", 
+      "unit": "pcs"
+    }
+  ],
+  "requisition_items": [
+    {
+      "name": "Coke",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 315.00,
+      "unit": "1 box 24 Cans",
+      "portion": "Each",
+      "minimum_stock": "20"
+    },
+    {
+      "name": "Coke Zero",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 315.00,
+      "unit": "1 box 24 Cans",
+      "portion": "Each",
+      "minimum_stock": "16"
+    },
+    {
+      "name": "Fanta Orange",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 81.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Fanta Strawberry",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 81.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Schweppes Manow",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 84.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Kids Juice (Orange)",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 99.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Kids Juice (Apple)",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 99.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Sprite",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 81.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Soda Water",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 52.00,
+      "unit": "1 box 6 Cans",
+      "portion": "Each",
+      "minimum_stock": "10"
+    },
+    {
+      "name": "Bottled Water",
+      "category": "Drinks",
+      "supplier": "Makro",
+      "cost": 49.00,
+      "unit": "1 box 12 Bottles",
+      "portion": "Each",
+      "minimum_stock": "12"
+    },
+    {
+      "name": "Salad (Iceberg Lettuce)",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 99.00,
+      "unit": "kg",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Milk",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 80.00,
+      "unit": "litre",
+      "portion": "TBA"
+    },
+    {
+      "name": "Burger Bun",
+      "category": "Fresh Food",
+      "supplier": "Bakery",
+      "cost": 8.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Tomatos",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 89.00,
+      "unit": "kg",
+      "portion": "25 gr"
+    },
+    {
+      "name": "White Cabbage",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 45.00,
+      "unit": "kg"
+    },
+    {
+      "name": "Purple Cabbage",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 41.25,
+      "unit": "kg"
+    },
+    {
+      "name": "Onions Bulk 10kg",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 290.00,
+      "unit": "kg",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Onions (small bags)",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 29.00,
+      "unit": "kg",
+      "portion": "26 gr"
+    },
+    {
+      "name": "Cheese",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 359.00,
+      "unit": "kg",
+      "portion": "1 slice",
+      "notes": "1 kg = 84 slices"
+    },
+    {
+      "name": "Bacon Short",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 305.00,
+      "unit": "kg"
+    },
+    {
+      "name": "Bacon Long",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 430.00,
+      "unit": "kg",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Jalapenos",
+      "category": "Fresh Food",
+      "supplier": "Makro",
+      "cost": 190.00,
+      "unit": "kg",
+      "portion": "20 grams"
+    },
+    {
+      "name": "French Fries 7mm",
+      "category": "Frozen Food",
+      "supplier": "Makro",
+      "cost": 129.00,
+      "unit": "kg",
+      "portion": "150 gr"
+    },
+    {
+      "name": "Chicken Nuggets",
+      "category": "Frozen Food",
+      "supplier": "Makro",
+      "cost": 155.00,
+      "unit": "kg"
+    },
+    {
+      "name": "Chicken Fillets",
+      "category": "Frozen Food",
+      "supplier": "Makro",
+      "cost": 199.00,
+      "unit": "kg",
+      "portion": "93 grams",
+      "notes": "32 fillets per 1 kg bag on average"
+    },
+    {
+      "name": "Sweet Potato Fries",
+      "category": "Frozen Food",
+      "supplier": "Makro",
+      "cost": 145.00,
+      "unit": "kg",
+      "portion": "150 grams"
+    },
+    {
+      "name": "Oil (Fryer)",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 195.00,
+      "unit": "litre"
+    },
+    {
+      "name": "Plastic Food Wrap",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 375.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Paper Towel Long",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 79.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Paper Towel Short (Serviettes)",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 116.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Food Gloves (Large)",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 197.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Food Gloves (Medium)",
+      "category": "Kitchen Supplies",
+      "supplier": "Supercheap",
+      "cost": 133.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Food Gloves (Small)",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 133.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Aluminum Foil",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 385.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Plastic Meat Gloves",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 22.50,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Kitchen Cleaner",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 149.00,
+      "unit": "litre",
+      "portion": "each"
+    },
+    {
+      "name": "Alcohol Sanitiser",
+      "category": "Kitchen Supplies",
+      "supplier": "Makro",
+      "cost": 69.00,
+      "unit": "g"
+    },
+    {
+      "name": "French Fries Box",
+      "category": "Packaging",
+      "supplier": "Makro",
+      "cost": 105.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Plastic Carry Bags (Size- 6×14)",
+      "category": "Packaging",
+      "supplier": "Makro",
+      "cost": 36.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Plastic Carry Bags (Size - 9×18)",
+      "category": "Packaging",
+      "supplier": "Makro",
+      "cost": 36.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Brown Paper Food Bags",
+      "category": "Packaging",
+      "supplier": "Online",
+      "cost": 139.00,
+      "unit": "each",
+      "portion": "each",
+      "notes": "Thaibox Food Lazada (12.5cm x 20cm x 30cm) - Price includes postage"
+    },
+    {
+      "name": "Loaded Fries Boxes",
+      "category": "Packaging",
+      "supplier": "Makro",
+      "cost": 89.00,
+      "unit": "each",
+      "portion": "each"
+    },
+    {
+      "name": "Packaging Labels",
+      "category": "Packaging",
+      "supplier": "Printers",
+      "cost": 50.00,
+      "unit": "each",
+      "portion": "each",
+      "notes": "depends on size, small stickers are 50 THB per sheet, average 45 stickers per sheet. 1 sticker per order takeaway"
+    },
+    {
+      "name": "Knife, Fork, Spoon Set",
+      "category": "Packaging",
+      "supplier": "Makro",
+      "cost": 89.00,
+      "unit": "each",
+      "portion": "1"
+    },
+    {
+      "name": "Cajun Fries Seasoning",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 508.00,
+      "unit": "g",
+      "portion": "20 grams"
+    },
+    {
+      "name": "Crispy Fried Onions",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 79.00,
+      "unit": "g",
+      "portion": "20 grams"
+    },
+    {
+      "name": "Pickles(standard dill pickles)",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 89.00,
+      "unit": "g",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Pickles Sweet (standard)",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 89.00,
+      "unit": "g",
+      "portion": "15 grams"
+    },
+    {
+      "name": "Mustard",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 88.00,
+      "unit": "kg",
+      "portion": "5 gr"
+    },
+    {
+      "name": "Mayonnaise",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 90.00,
+      "unit": "litre",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Tomato Sauce",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 175.00,
+      "unit": "litre",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Chili Sauce (Sriracha)",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 108.00,
+      "unit": "g",
+      "portion": "20 gr"
+    },
+    {
+      "name": "BBQ Sauce",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 110.00,
+      "unit": "g",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Sriracha Sauce",
+      "category": "Shelf Items",
+      "supplier": "Makro",
+      "cost": 108.00,
+      "unit": "g",
+      "portion": "20 gr"
+    },
+    {
+      "name": "Salt (Coarse Sea Salt)",
+      "category": "Shelf Items",
+      "supplier": "Online",
+      "cost": 121.00,
+      "unit": "kg",
+      "portion": "5 grams"
+    }
+  ]
+}

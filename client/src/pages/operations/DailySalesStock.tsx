@@ -1,144 +1,363 @@
-import { useMemo, useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-
-type WageType = "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT";
-type ShoppingRow = { id: string; item: string; cost: number; shop: string };
-type WageRow = { id: string; staff: string; amount: number; type: WageType };
-type OtherRow = { id: string; label: string; amount: number };
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-export default function DailySalesStock() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  
-  // Save state for inline success/error messages
-  const [saved, setSaved] = useState<null | "ok" | "err">(null);
+interface CatalogItem {
+  name: string;
+  category: string;
+  supplier?: string;
+  cost?: number;
+  unit: string;
+  portion?: string;
+  minimum_stock?: string;
+  notes?: string;
+}
 
-  // Always render the form; if shiftId missing, show a small note near the title:
+interface StockCatalog {
+  counted_items: CatalogItem[];
+  requisition_items: CatalogItem[];
+}
+
+interface RequisitionRow {
+  id: string;
+  item: string;
+  qty: number;
+  unit: string;
+  notes: string;
+  supplier?: string;
+}
+
+export default function DailySalesStock() {
+  const [searchParams] = useSearchParams();
   const shiftId = searchParams.get('shift');
+  
   console.log('[Form2] shift:', shiftId ?? 'none');
 
-  // ---- Shift info ----
+  // Catalog data
+  const [catalog, setCatalog] = useState<StockCatalog | null>(null);
+  
+  // Shift info (readonly from Form 1)
+  const [shiftDate, setShiftDate] = useState("");
   const [completedBy, setCompletedBy] = useState("");
-  const [shiftDate, setShiftDate] = useState<string>(() => {
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-  });
-  const submittedAtISO = new Date().toISOString();
 
-  // ---- Stock counts ----
-  const [burgerBuns, setBurgerBuns] = useState<number>(0);
-  const [meatGrams, setMeatGrams] = useState<number>(0);
-  const [drinks, setDrinks] = useState<number>(0);
-  const [otherRequests, setOtherRequests] = useState<string>("");
+  // End-of-Shift Counts
+  const [rolls, setRolls] = useState<number>(0);  // burgerBuns
+  const [meat, setMeat] = useState<number>(0);    // meatGrams
+  const [drinks, setDrinks] = useState<number>(0); // drinkStock
 
-  // ---- Submit payload ----
-  const payload = {
-    shiftDate,
-    completedBy,
-    submittedAtISO,
-    shiftId,
-    stock: {
-      burgerBuns,
-      meatGrams,
-      drinks,
-      otherRequests,
-    },
+  // Requisition List
+  const [requisitionRows, setRequisitionRows] = useState<RequisitionRow[]>([]);
+
+  // Save state
+  const [saved, setSaved] = useState<null | "ok" | "err">(null);
+
+  // Load catalog on mount
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        const res = await fetch("/data/stock_catalog.json");
+        const catalogData = await res.json();
+        setCatalog(catalogData);
+        console.log("[Form2] catalog loaded:", catalogData.requisition_items?.length);
+      } catch (error) {
+        console.error("Failed to load catalog:", error);
+      }
+    };
+    
+    loadCatalog();
+  }, []);
+
+  // Load existing form data when shiftId is available
+  useEffect(() => {
+    if (!shiftId) return;
+
+    const loadFormData = async () => {
+      try {
+        const res = await fetch(`/api/forms/${shiftId}`);
+        if (!res.ok) return;
+        
+        const { sales, stock } = await res.json();
+        
+        // Set shift info from sales data
+        if (sales) {
+          setShiftDate(sales.shiftDate || "");
+          setCompletedBy(sales.completedBy || "");
+        }
+
+        // Set stock counts if they exist
+        if (stock) {
+          if (stock.burgerBuns) setRolls(Number(stock.burgerBuns) || 0);
+          if (stock.meatGrams) setMeat(Number(stock.meatGrams) || 0);
+          if (stock.drinkStock) setDrinks(Number(stock.drinkStock) || 0);
+
+          // Set requisition rows if they exist
+          if (stock.stockRequests && Array.isArray(stock.stockRequests)) {
+            const rows = stock.stockRequests.map((req: any) => ({
+              id: uid(),
+              item: req.item || "",
+              qty: Number(req.qty) || 0,
+              unit: req.unit || "",
+              notes: req.notes || "",
+              supplier: req.supplier || ""
+            }));
+            setRequisitionRows(rows);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load form data:", error);
+      }
+    };
+
+    loadFormData();
+  }, [shiftId]);
+
+  const addRequisitionRow = () => {
+    const newRow: RequisitionRow = {
+      id: uid(),
+      item: "",
+      qty: 0,
+      unit: "",
+      notes: "",
+      supplier: ""
+    };
+    setRequisitionRows(prev => [...prev, newRow]);
   };
 
-  async function onSubmit() {
-    const res = await fetch("/api/forms/daily-stock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
+  const removeRequisitionRow = (id: string) => {
+    setRequisitionRows(prev => prev.filter(row => row.id !== id));
+  };
+
+  const updateRequisitionRow = (id: string, field: keyof RequisitionRow, value: string | number) => {
+    setRequisitionRows(prev => 
+      prev.map(row => {
+        if (row.id === id) {
+          if (field === 'item' && typeof value === 'string') {
+            // When item changes, auto-fill unit and supplier from catalog
+            const catalogItem = catalog?.requisition_items.find(item => item.name === value);
+            return {
+              ...row,
+              [field]: value,
+              unit: catalogItem?.unit || row.unit,
+              supplier: catalogItem?.supplier || row.supplier
+            };
+          }
+          return { ...row, [field]: value };
+        }
+        return row;
+      })
+    );
+  };
+
+  const handleSave = async () => {
+    if (!shiftId) {
       setSaved("err");
       setTimeout(() => setSaved(null), 4000);
       return;
     }
-    const json = await res.json();
-    setSaved("ok");
-    setTimeout(() => setSaved(null), 4000);
-  }
 
-  const box = "rounded-2xl border bg-white p-5 shadow-sm";
-  const label = "text-sm font-medium";
-  const input = "mt-1 w-full border rounded-xl px-3 py-2";
+    // Build body exactly as specified
+    const body = {
+      shiftId,
+      burgerBuns: Number(rolls) || 0,
+      meatGrams: Number(meat) || 0,
+      drinkStock: Number(drinks) || 0,
+      stockRequests: requisitionRows
+        .filter(r => Number(r.qty) > 0)
+        .map(r => ({
+          item: r.item,
+          qty: Number(r.qty),
+          unit: r.unit || "",
+          notes: r.notes || "",
+          supplier: r.supplier || ""
+        }))
+    };
+
+    try {
+      const res = await fetch("/api/daily-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        setSaved("err");
+        setTimeout(() => setSaved(null), 4000);
+        return;
+      }
+
+      const result = await res.json();
+      if (result.success) {
+        console.log("[Form2] saved:", shiftId);
+        setSaved("ok");
+        setTimeout(() => setSaved(null), 4000);
+      } else {
+        setSaved("err");
+        setTimeout(() => setSaved(null), 4000);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      setSaved("err");
+      setTimeout(() => setSaved(null), 4000);
+    }
+  };
+
+  const getAvailableItems = () => {
+    if (!catalog) return [];
+    return catalog.requisition_items.map(item => item.name);
+  };
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold">Daily Stock</h1>
-          {!shiftId && (
-            <div className="text-sm text-amber-600 mt-1">No shift ID found - form can still be submitted</div>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          {saved === "ok" && (
-            <div className="rounded-md bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
-              Stock & expenses saved
-            </div>
-          )}
-          {saved === "err" && (
-            <div className="rounded-md bg-rose-50 text-rose-700 px-3 py-2 text-sm">
-              Save failed — please try again
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button className="px-3 py-2 border rounded-xl" onClick={() => window.history.back()}>Back</button>
-            <button className="px-3 py-2 border rounded-xl bg-emerald-600 text-white" onClick={onSubmit}>Save</button>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[14px]">Daily Stock</h1>
+        {!shiftId && (
+          <p className="text-sm text-gray-500 mt-1">No shift ID provided</p>
+        )}
+      </div>
+
+      {/* Shift Information (readonly) */}
+      <section className="rounded-xl border bg-white p-5">
+        <h3 className="mb-4 text-[14px] font-semibold">Shift Information</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Date</label>
+            <input 
+              type="text"
+              value={shiftDate}
+              readOnly
+              className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50 text-[14px]"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Completed By</label>
+            <input 
+              type="text"
+              value={completedBy}
+              readOnly
+              className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50 text-[14px]"
+            />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Shift info (readonly) */}
-      <div className={`${box} mb-5`}>
-        <div className="text-lg font-semibold mb-3">Shift Information</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className={label}>
-            Shift Date
-            <input className={`${input} bg-gray-50`} value={shiftDate} readOnly placeholder="Pulled from Form 1" />
-          </label>
-          <label className={label}>
-            Completed By
-            <input className={`${input} bg-gray-50`} value={completedBy} readOnly placeholder="Pulled from Form 1" />
-          </label>
+      {/* End-of-Shift Counts */}
+      <section className="rounded-xl border bg-white p-5">
+        <h3 className="mb-4 text-[14px] font-semibold">End-of-Shift Counts</h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Rolls (pcs)</label>
+            <input 
+              type="number"
+              value={rolls}
+              onChange={(e) => setRolls(Number(e.target.value) || 0)}
+              className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Meat (grams)</label>
+            <input 
+              type="number"
+              value={meat}
+              onChange={(e) => setMeat(Number(e.target.value) || 0)}
+              className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">Drinks total (pcs)</label>
+            <input 
+              type="number"
+              value={drinks}
+              onChange={(e) => setDrinks(Number(e.target.value) || 0)}
+              className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+            />
+          </div>
         </div>
-        <div className="text-xs text-neutral-500 mt-2">Information from Form 1 • {new Date(submittedAtISO).toLocaleString()}</div>
-      </div>
+      </section>
 
-      {/* Stock Counts */}
-      <div className={`${box} mb-5`}>
-        <div className="text-lg font-semibold mb-3">Stock Counts</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <label className={label}>
-            Burger Buns (count)
-            <input type="number" className={input} value={burgerBuns} onChange={e=>setBurgerBuns(+e.target.value||0)} placeholder="e.g., 50" />
-          </label>
-          <label className={label}>
-            Meat (grams)
-            <input type="number" className={input} value={meatGrams} onChange={e=>setMeatGrams(+e.target.value||0)} placeholder="e.g., 2500" />
-          </label>
-          <label className={label}>
-            Drinks (count)
-            <input type="number" className={input} value={drinks} onChange={e=>setDrinks(+e.target.value||0)} placeholder="e.g., 24" />
-          </label>
-          <label className={label}>
-            Other Ingredient Purchase Requests
-            <textarea className={`${input} min-h-20`} value={otherRequests} onChange={e=>setOtherRequests(e.target.value)} placeholder="List any ingredient requests..." />
-          </label>
+      {/* Requisition List */}
+      <section className="rounded-xl border bg-white p-5">
+        <h3 className="mb-4 text-[14px] font-semibold">Requisition List</h3>
+        
+        <div className="space-y-4">
+          {requisitionRows.map((row) => (
+            <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_1fr_auto] items-end">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Item</label>
+                <select
+                  value={row.item}
+                  onChange={(e) => updateRequisitionRow(row.id, 'item', e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+                >
+                  <option value="">Select item...</option>
+                  {getAvailableItems().map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Qty</label>
+                <input
+                  type="number"
+                  value={row.qty}
+                  onChange={(e) => updateRequisitionRow(row.id, 'qty', Number(e.target.value) || 0)}
+                  className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Unit</label>
+                <input
+                  type="text"
+                  value={row.unit}
+                  onChange={(e) => updateRequisitionRow(row.id, 'unit', e.target.value)}
+                  className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={row.notes}
+                  onChange={(e) => updateRequisitionRow(row.id, 'notes', e.target.value)}
+                  placeholder="Optional"
+                  className="w-full border rounded-xl px-3 py-2.5 h-10 text-[14px]"
+                />
+              </div>
+              
+              <div>
+                <button
+                  type="button"
+                  onClick={() => removeRequisitionRow(row.id)}
+                  className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100 text-[14px]"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
 
-      {/* Actions Section (non-floating) */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={addRequisitionRow}
+            className="px-4 py-2 border rounded-xl hover:bg-gray-50 text-[14px]"
+          >
+            + Add Row
+          </button>
+        </div>
+      </section>
+
+      {/* Save button (non-floating) */}
       <div className="mt-8 flex items-center justify-between">
         <div>
           {saved === "ok" && (
-            <div className="text-emerald-600 font-medium text-[14px]">Stock form saved successfully!</div>
+            <div className="text-emerald-600 font-medium text-[14px]">Stock saved.</div>
           )}
           {saved === "err" && (
             <div className="text-red-600 font-medium text-[14px]">Error saving stock form. Please try again.</div>
@@ -147,13 +366,12 @@ export default function DailySalesStock() {
         
         <button
           type="button"
-          onClick={onSubmit}
+          onClick={handleSave}
           className="h-10 rounded-lg bg-emerald-600 px-6 text-[14px] font-semibold text-white hover:bg-emerald-700"
         >
           Save
         </button>
       </div>
-
     </div>
   );
 }
