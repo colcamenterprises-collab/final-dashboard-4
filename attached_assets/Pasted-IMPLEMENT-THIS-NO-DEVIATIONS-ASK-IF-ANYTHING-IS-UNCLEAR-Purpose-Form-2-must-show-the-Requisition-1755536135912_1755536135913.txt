@@ -1,0 +1,164 @@
+IMPLEMENT THIS (NO DEVIATIONS, ASK IF ANYTHING IS UNCLEAR)
+Purpose
+
+Form 2 must show the Requisition List as a pre-listed, categorized set of items (from our menu/ingredients CSV), so staff only type quantities needed. No “add row” UX for these items.
+
+Data Source
+
+Use the CSV we supplied (same one already in the repo).
+
+Skip the first 4 rows (they’re covered by the meat stock count).
+
+Group items by the Category column from the CSV.
+
+For each item we need: id (stable slug), category, name, unit (if present), defaultQty = 0.
+
+Create a seed file at: /data/stock_master.json (grouped by category).
+Example shape:
+
+{
+  "Sauces": [
+    {"id":"ketchup-20l","name":"Ketchup 20L","unit":"bottle","defaultQty":0},
+    {"id":"mayo-5l","name":"Mayonnaise 5L","unit":"tub","defaultQty":0}
+  ],
+  "Veg": [
+    {"id":"lettuce-head","name":"Lettuce","unit":"head","defaultQty":0}
+  ]
+}
+
+UI — Form 2 (Daily Stock & Expenses)
+
+Route: /operations/stock
+
+Sections (order fixed):
+
+Header: “Daily Stock” + subline Shift ${date} or “No shift ID provided” if missing.
+
+Shift Information (read the shift query param; if present, show date/username read-only if available)
+
+End-of-Shift Counts: Rolls (pcs), Meat (grams), Drinks total (pcs)
+
+Requisition List (the big one)
+
+Render accordion groups by category (collapsible).
+
+Inside each category, list every item from /data/stock_master.json (already filtered to skip first 4 rows).
+
+Each row: Item name (read-only) · Unit (muted text if present) · Quantity input (number) · optional Notes (text, small, not required).
+
+Default quantity = 0 (blank renders as 0 on save).
+
+Only quantities > 0 are saved.
+
+Add a Search box above the accordion (filters items across all categories by name).
+
+Provide Expand all / Collapse all toggles.
+
+Spacing: add generous white space between category groups and rows (match our 14px style guide).
+
+Save button – fixed at the end of the form (no floating bar). Show an inline success toast “Stock & requisitions saved” for 4s on success.
+
+Keep existing end-of-shift counts and banking behavior unchanged.
+
+Styling Rules (apply to this page)
+
+14px for paragraphs, labels, inputs, and buttons (our “database UI” style).
+
+Add vertical white space between Shift Expenses (now “Requisition List”) and Staff Wages (those wages remain part of Form 1; nothing to do here on Form 2).
+
+Frontend Implementation
+
+Files to touch
+
+client/src/pages/operations/DailySalesStock.tsx
+
+Load /api/stock-master (see backend note) on mount.
+
+If an existing shift has saved requisitions, merge: show all master items but pre-fill qtys for any saved items.
+
+Render accordion groups by category.
+
+On save, build payload:
+
+{
+  shiftId,            // from query param (string | undefined)
+  rolls: number,
+  meatGrams: number,
+  drinksTotal: number,
+  stockRequests: [
+    { id, category, name, unit, qty, notes? } // ONLY where qty > 0
+  ]
+}
+
+
+POST to /api/daily-stock.
+
+client/src/components/Accordion.tsx (if none exists, create a tiny local one inside the page; no third-party deps).
+
+client/src/styles/...
+
+Ensure 14px text; add spacing tokens (e.g., gap-4 between rows, mt-6 between sections).
+
+Backend Implementation
+
+New endpoint
+
+server/api/stock-master.ts
+
+GET /api/stock-master → returns the contents of /data/stock_master.json (already grouped).
+
+Cache in memory for performance.
+
+Existing endpoints
+
+server/api/daily-stock.ts
+
+Accept payload described above.
+
+Persist only stockRequests with qty > 0.
+
+Persist end-of-shift counts (rolls, meatGrams, drinksTotal) as before.
+
+Respond { ok: true }.
+
+server/api/forms.ts
+
+For GET /api/forms/:id include:
+
+{
+  "sales": {...},
+  "stock": {
+    "rolls": ...,
+    "meatGrams": ...,
+    "drinksTotal": ...,
+    "stockRequests": [ { id, category, name, unit, qty, notes? } ]
+  }
+}
+
+Behavioural Rules
+
+Skip first 4 rows from the CSV (do not appear in requisition list).
+
+Always render categories & items, even when there is no previous shift data.
+
+Search filters rows case-insensitively.
+
+Save ignores empty/0 rows.
+
+If shift param missing, allow manual input of shift date/name; still save.
+
+QA Checklist (run and paste results)
+
+Load master: /api/stock-master returns grouped JSON (≥ 60 items total after skipping first 4).
+
+Render: /operations/stock shows categories (accordion), each with items, inputs default 0.
+
+Search: typing a fragment filters visible rows across groups.
+
+Expand/Collapse: expand all/collapse all works.
+
+Save: enter qtys for 3 items in different categories + end-of-shift counts → POST /api/daily-stock returns { ok: true } → inline success toast shown.
+
+Reload: page reload merges saved qtys back into the full master list (others remain visible at 0).
+
+Performance: initial render < 500ms on dev hardware.

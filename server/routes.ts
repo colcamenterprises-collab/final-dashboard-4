@@ -232,6 +232,33 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Stock master endpoint (loads grouped stock items)
+  app.get('/api/stock-master', async (req: Request, res: Response) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const cwd = process.cwd();
+      const stockMasterPath = path.join(cwd, 'data', 'stock_master.json');
+      
+      if (!fs.existsSync(stockMasterPath)) {
+        return res.status(404).json({ error: 'Stock master file not found', path: stockMasterPath });
+      }
+      
+      const stockMasterData = fs.readFileSync(stockMasterPath, 'utf8');
+      const stockMaster = JSON.parse(stockMasterData);
+      
+      // Count total items for QA
+      const totalItems = Object.values(stockMaster).reduce((total: number, items: any) => total + items.length, 0);
+      console.log('Stock master loaded, total items:', totalItems);
+      
+      res.json(stockMaster);
+    } catch (err) {
+      console.error('Stock master load error:', err);
+      res.status(500).json({ error: 'Failed to load stock master', details: (err as Error).message });
+    }
+  });
+
   app.get("/api/dashboard/stock-discrepancies", async (req: Request, res: Response) => {
     try {
       // Pull last shift's receipts right out of DB and analyze against staff forms

@@ -1,0 +1,69 @@
+{
+  "Drinks": [
+    {"id": "coke", "name": "Coke", "unit": "1 box 24 Cans", "defaultQty": 0},
+    {"id": "coke-zero", "name": "Coke Zero", "unit": "1 box 24 Cans", "defaultQty": 0},
+    {"id": "fanta-orange", "name": "Fanta Orange", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "fanta-strawberry", "name": "Fanta Strawberry", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "schweppes-manow", "name": "Schweppes Manow", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "kids-juice-orange", "name": "Kids Juice (Orange)", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "kids-juice-apple", "name": "Kids Juice (Apple)", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "sprite", "name": "Sprite", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "soda-water", "name": "Soda Water", "unit": "1 box 6 Cans", "defaultQty": 0},
+    {"id": "bottled-water", "name": "Bottled Water", "unit": "1 box 12 Bottles", "defaultQty": 0}
+  ],
+  "Fresh Food": [
+    {"id": "salad-iceberg-lettuce", "name": "Salad (Iceberg Lettuce)", "unit": "kg", "defaultQty": 0},
+    {"id": "milk", "name": "Milk", "unit": "litre", "defaultQty": 0},
+    {"id": "burger-bun", "name": "Burger Bun", "unit": "each", "defaultQty": 0},
+    {"id": "tomatos", "name": "Tomatos", "unit": "kg", "defaultQty": 0},
+    {"id": "white-cabbage", "name": "White Cabbage", "unit": "kg", "defaultQty": 0},
+    {"id": "purple-cabbage", "name": "Purple Cabbage", "unit": "kg", "defaultQty": 0},
+    {"id": "onions-bulk-10kg", "name": "Onions Bulk 10kg", "unit": "kg", "defaultQty": 0},
+    {"id": "onions-small-bags", "name": "Onions (small bags)", "unit": "kg", "defaultQty": 0},
+    {"id": "cheese", "name": "Cheese", "unit": "kg", "defaultQty": 0},
+    {"id": "bacon-short", "name": "Bacon Short", "unit": "kg", "defaultQty": 0},
+    {"id": "bacon-long", "name": "Bacon Long", "unit": "kg", "defaultQty": 0},
+    {"id": "jalapenos", "name": "Jalapenos", "unit": "kg", "defaultQty": 0}
+  ],
+  "Frozen Food": [
+    {"id": "french-fries-7mm", "name": "French Fries 7mm", "unit": "kg", "defaultQty": 0},
+    {"id": "chicken-nuggets", "name": "Chicken Nuggets", "unit": "kg", "defaultQty": 0},
+    {"id": "chicken-fillets", "name": "Chicken Fillets", "unit": "kg", "defaultQty": 0},
+    {"id": "sweet-potato-fries", "name": "Sweet Potato Fries", "unit": "kg", "defaultQty": 0}
+  ],
+  "Kitchen Supplies": [
+    {"id": "oil-fryer", "name": "Oil (Fryer)", "unit": "litre", "defaultQty": 0},
+    {"id": "plastic-food-wrap", "name": "Plastic Food Wrap", "unit": "each", "defaultQty": 0},
+    {"id": "paper-towel-long", "name": "Paper Towel Long", "unit": "each", "defaultQty": 0},
+    {"id": "paper-towel-short", "name": "Paper Towel Short (Serviettes)", "unit": "each", "defaultQty": 0},
+    {"id": "food-gloves-large", "name": "Food Gloves (Large)", "unit": "each", "defaultQty": 0},
+    {"id": "food-gloves-medium", "name": "Food Gloves (Medium)", "unit": "each", "defaultQty": 0},
+    {"id": "food-gloves-small", "name": "Food Gloves (Small)", "unit": "each", "defaultQty": 0},
+    {"id": "aluminum-foil", "name": "Aluminum Foil", "unit": "each", "defaultQty": 0},
+    {"id": "plastic-meat-gloves", "name": "Plastic Meat Gloves", "unit": "each", "defaultQty": 0},
+    {"id": "kitchen-cleaner", "name": "Kitchen Cleaner", "unit": "litre", "defaultQty": 0},
+    {"id": "alcohol-sanitiser", "name": "Alcohol Sanitiser", "unit": "g", "defaultQty": 0}
+  ],
+  "Packaging": [
+    {"id": "french-fries-box", "name": "French Fries Box", "unit": "each", "defaultQty": 0},
+    {"id": "plastic-carry-bags-6x14", "name": "Plastic Carry Bags (Size- 6×14)", "unit": "each", "defaultQty": 0},
+    {"id": "plastic-carry-bags-9x18", "name": "Plastic Carry Bags (Size - 9×18)", "unit": "each", "defaultQty": 0},
+    {"id": "brown-paper-food-bags", "name": "Brown Paper Food Bags", "unit": "each", "defaultQty": 0},
+    {"id": "loaded-fries-boxes", "name": "Loaded Fries Boxes", "unit": "each", "defaultQty": 0},
+    {"id": "packaging-labels", "name": "Packaging Labels", "unit": "each", "defaultQty": 0},
+    {"id": "knife-fork-spoon-set", "name": "Knife, Fork, Spoon Set", "unit": "each", "defaultQty": 0}
+  ],
+  "Shelf Items": [
+    {"id": "cajun-fries-seasoning", "name": "Cajun Fries Seasoning", "unit": "g", "defaultQty": 0},
+    {"id": "crispy-fried-onions", "name": "Crispy Fried Onions", "unit": "g", "defaultQty": 0},
+    {"id": "pickles-dill", "name": "Pickles(standard dill pickles)", "unit": "g", "defaultQty": 0},
+    {"id": "pickles-sweet", "name": "Pickles Sweet (standard)", "unit": "g", "defaultQty": 0},
+    {"id": "mustard", "name": "Mustard", "unit": "kg", "defaultQty": 0},
+    {"id": "mayonnaise", "name": "Mayonnaise", "unit": "litre", "defaultQty": 0},
+    {"id": "tomato-sauce", "name": "Tomato Sauce", "unit": "litre", "defaultQty": 0},
+    {"id": "chili-sauce-sriracha", "name": "Chili Sauce (Sriracha)", "unit": "g", "defaultQty": 0},
+    {"id": "bbq-sauce", "name": "BBQ Sauce", "unit": "g", "defaultQty": 0},
+    {"id": "sriracha-sauce", "name": "Sriracha Sauce", "unit": "g", "defaultQty": 0},
+    {"id": "salt-coarse-sea", "name": "Salt (Coarse Sea Salt)", "unit": "kg", "defaultQty": 0}
+  ]
+}
