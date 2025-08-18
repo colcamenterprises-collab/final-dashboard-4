@@ -12,13 +12,9 @@ export default function DailySalesStock() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Log shift parameter once for QA verification
-  useEffect(() => {
-    const shiftParam = searchParams.get('shift');
-    if (shiftParam) {
-      console.log('[Form2] Received shift parameter:', shiftParam);
-    }
-  }, [searchParams]);
+  // Always render the form; if shiftId missing, show a small note near the title:
+  const shiftId = searchParams.get('shift');
+  console.log('[Form2] Received shift parameter:', shiftId ?? 'none');
 
   // ---- Shift info ----
   const [completedBy, setCompletedBy] = useState("");

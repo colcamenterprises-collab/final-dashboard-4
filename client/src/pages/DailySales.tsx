@@ -94,8 +94,8 @@ export default function DailySales() {
     } catch {}
   }, []);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission/page reload
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault(); // allow call from button with no event
     if (submitting) return;
     setSubmitting(true);
     setError(null);
@@ -142,12 +142,9 @@ export default function DailySales() {
         );
       }
       
-      // Helpful debugging during development
-      const target = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
-      (window as any).__lastNav = target; // dev helper
-      console.log("[Form1] will navigate:", target);
-      
-      // Navigate directly to Form 2 with shift parameter (100% reliable)
+      // on success -> hard navigation (no alert, no setTimeout)
+      const target = `/operations/stock?shift=${shiftId}`;
+      console.log('[Form1] will navigate:', target);
       window.location.assign(target);
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
@@ -277,7 +274,7 @@ export default function DailySales() {
 
       <StickyActions
         nextLabel="Next"
-        onNext={() => submit(undefined)}
+        onNext={() => submit()}
         onSaveDraft={handleSaveDraft}
         disableNext={submitting}
       />

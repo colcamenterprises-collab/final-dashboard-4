@@ -1,0 +1,169 @@
+IMPLEMENT THIS (exactly, nothing more)
+Goal
+
+Make Next on Form 1 navigate to Form 2 reliably (no alerts, no crashes).
+
+Ensure Form 2 renders Shift Expenses and Staff Wages sections (rows add/delete), regardless of whether a shift query param is present.
+
+Do not refactor anything else. Ask before changing anything beyond what’s listed.
+
+Changes
+1) Fix Form 1 submit/Next crash and navigation
+
+File: client/src/pages/DailySales.tsx
+
+Change the submit handler to accept an optional event and guard preventDefault():
+
+// BEFORE
+// const submit = async (e: React.FormEvent) => {
+//   e.preventDefault();
+//   ...
+
+// AFTER
+const submit = async (e?: React.FormEvent) => {
+  e?.preventDefault(); // allow call from button with no event
+  if (submitting) return;
+  setSubmitting(true);
+
+  // ... keep existing payload/POST exactly as-is
+
+  // on success -> hard navigation (no alert, no setTimeout)
+  const target = `/operations/stock?shift=${shiftId}`;
+  console.log('[Form1] will navigate:', target);
+  window.location.assign(target);
+};
+
+
+Remove any alert(...) calls still present in this file.
+
+File: client/src/components/StickyActions.tsx
+
+Ensure the prop type and handler do not pass an event; call the function with no args:
+
+// props
+type Props = {
+  nextLabel?: string;
+  onNext: () => void;         // <- no event
+  onSaveDraft?: () => void;
+};
+
+// button
+<button type="button" onClick={onNext} ...> {nextLabel ?? 'Next'} </button>
+
+
+File: client/src/pages/DailySales.tsx
+
+When rendering StickyActions, pass the handler with no event:
+
+<StickyActions nextLabel="Next" onNext={() => submit()} onSaveDraft={saveDraft} />
+
+
+Do not change anything else in this file beyond the lines above.
+
+2) Always render Expenses on Form 2
+
+File: client/src/pages/operations/DailySalesStock.tsx
+
+Do not hide the expenses UI if shift is missing. The page must render the two sections regardless of query param. If there is a guard like:
+
+if (!shiftId) return ...
+
+
+replace it with:
+
+// Always render the form; if shiftId missing, show a small note near the title:
+console.log('[Form2] Received shift parameter:', shiftId ?? 'none');
+
+
+Ensure the expenses sections exist exactly as follows (names only; keep existing state management and add/remove logic you already have):
+
+Section 1 title: “Shift Expenses”
+Fields per row: Item, Cost (฿), Shop Name (existing dropdown), Delete button
+Keep + Add Row as-is.
+
+Section 2 title: “Staff Wages”
+Fields per row: Staff Name (placeholder exactly this), Amount (฿), Type (existing wages type select), Delete button
+Keep + Add Row as-is.
+
+Completely remove any “Other Expenses” block if it still exists (UI only; do not drop tables).
+
+Ensure the Delete control is a clear “Delete” button (red) — not a tiny “–” chip.
+
+Keep your existing totals/subtotals logic; if it referenced “others”, remove that reference and sum the two sections.
+
+Do not change any API calls or back-end code in this step.
+
+3) Routes / Sidebar (only verify)
+
+(These were reportedly added already — verify only.)
+
+/operations/daily-sales → Form 1
+
+/daily-sales → redirects to /operations/daily-sales
+
+/operations/daily-sales-stock → redirects to /operations/daily-sales
+
+/operations/stock → Form 2
+
+/operations/form2 → redirects to /operations/stock
+
+Sidebar “Daily Sales & Stock” → /operations/daily-sales
+
+No edits if already correct.
+
+QA – Agent must run and report
+
+Form 1 → Form 2 flow
+
+Go to /operations/daily-sales.
+
+Fill minimal fields (Date, Completed By, Starting Cash).
+
+Click Next.
+
+Expect: no alert, no error overlay, hard navigate to /operations/stock?shift=<uuid>.
+
+Console must show:
+[Form1] will navigate: /operations/stock?shift=<uuid>
+[Form2] Received shift parameter: <uuid>
+
+Form 2 UI
+
+On /operations/stock?shift=<uuid> confirm both sections render:
+
+Shift Expenses (rows add/delete)
+
+Staff Wages (rows add/delete, placeholder “Staff Name”)
+
+Confirm totals update when rows added/removed.
+
+No shift param fallback
+
+Visit /operations/stock without ?shift=.
+
+Page must still render both sections; log:
+[Form2] Received shift parameter: none.
+
+Regression quick check
+
+Sidebar “Daily Sales & Stock” → /operations/daily-sales
+
+Aliases redirect correctly (see list above).
+
+Provide the console logs + screenshots of:
+
+Form 1 after clicking Next (no overlay/crash),
+
+Form 2 with both sections visible,
+
+Form 2 opened without ?shift= showing both sections.
+
+Don’ts
+
+Do not refactor unrelated code, styles, or APIs.
+
+Do not touch back-end routes or DB.
+
+Do not reintroduce any alert(...).
+
+If anything not listed must change to complete this, pause and ask for approval before proceeding.
