@@ -258,10 +258,10 @@ export default function DailyStock() {
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Requisition List</h3>
               
-              {Object.entries(groupedItems).length === 0 ? (
+              {stockItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 text-sm">No stock items loaded. Items: {stockItems.length}</p>
-                  <p className="text-gray-400 text-xs">Debug: {JSON.stringify(catalogResponse)}</p>
+                  <p className="text-gray-500 text-sm">Loading stock items...</p>
+                  <p className="text-gray-400 text-xs">API: {catalogLoading ? 'Loading...' : 'Loaded'}</p>
                 </div>
               ) : (
                 Object.entries(groupedItems).map(([category, items], categoryIndex) => (
