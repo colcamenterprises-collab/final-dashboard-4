@@ -1,0 +1,209 @@
+IMPLEMENT THIS (no deviations; ask before changing anything)
+Scope
+
+Update Form 2: Daily Stock (/operations/stock) to:
+
+Remove the “Drinks total (pcs)” aggregate field (we count each drink individually).
+
+Show stock items in a 4–5 column grid, not a long vertical list.
+
+No Notes field anywhere for stock items.
+
+Group items into categories with collapsible headers.
+
+Carry the shift context from Form 1 and auto-fill shift info (no duplicate manual entry required).
+
+Keep rolls + meat end-of-shift counts, but no “drinks total” there.
+
+Files to change
+
+client/src/pages/operations/DailySalesStock.tsx
+
+client/src/styles/* (if needed for grid utilities)
+
+server/api/forms.ts (ensure GET /api/forms/:shiftId returns stock + shift meta)
+
+server/api/daily-stock.ts (payload shape persists, see section “Data shape”)
+
+Do not rename routes. Do not change database schema unless specified.
+
+UX / UI — exact layout
+A) Header (top of page)
+
+Title: Daily Stock
+
+Subtitle: If shiftId present in query: “Shift: <date> • ID: <uuid>”
+If missing: show a pill “No shift ID provided” (but do not block rendering).
+
+B) Shift Information (read-only if shiftId present)
+
+Date (read-only if provided by shift)
+
+Completed By (keep editable)
+
+Remove any duplicate/up-front info already captured in Form 1—no need to enter the date again if shiftId is present.
+
+C) End-of-Shift Counts (only these 2 fields)
+
+Rolls (pcs) input
+
+Meat (grams) input
+
+REMOVE “Drinks total (pcs)” entirely
+
+Layout: 2 fields side-by-side (md+) / stacked (mobile)
+
+D) Requisition List (items to request)
+
+Controls (top-right of the card):
++ Expand all (expands all categories) • – Collapse all (collapses all)
+
+Search bar (filters items by name across categories)
+
+Categories:
+
+Counted at shift end (shows nothing here; these are handled in the section above: rolls + meat; do not include their child items)
+
+Fresh Food
+
+Dry Goods
+
+Sauces & Condiments
+
+Packaging
+
+Cleaning
+
+Beverages (by SKU)
+
+Other
+
+Grid inside each expanded category: 4 columns on desktop (xl), 3 on md, 2 on sm.
+Each cell = one item row with:
+
+Item name (left)
+
+Qty input (right, small numeric)
+
+NO Notes field, no minus button; item stays visible with “0” default. If qty > 0 it is included in the save payload; if 0 or blank, it is ignored.
+
+Exclude the first 4 meat items from any category listing (they are covered by the “Meat (grams)” count):
+
+Topside Beef
+
+Brisket Point End
+
+Chuck Roll Beef
+
+(the 4th meat line from your file; continue the same rule)
+
+E) Save area
+
+Single Save button at the bottom (no floating bar).
+
+Data shape (front ↔ back)
+GET load (when a shiftId exists)
+
+GET /api/forms/:shiftId must return (add if missing):
+
+{
+  "shift": {
+    "id": "uuid",
+    "date": "YYYY-MM-DD",
+    "completedBy": "string|null"
+  },
+  "stock": {
+    "rolls": number|null,
+    "meatGrams": number|null,
+    "drinks": { "Coke 330ml": 12, "Sprite 330ml": 7, "...": 0 },
+    "requisition": { "Sesame Buns": 40, "Ketchup": 2, "...": 0 }
+  },
+  "catalog": {
+    "categories": [
+      {
+        "name": "Fresh Food",
+        "items": ["Lettuce", "Tomato", "..."]
+      },
+      ...
+    ]
+  }
+}
+
+POST save
+
+POST /api/daily-stock (no schema change) — send:
+
+{
+  "shiftId": "uuid|null",
+  "rolls": number,
+  "meatGrams": number,
+  "requisition": { "Item A": 2, "Item B": 0, "Item C": 5 }
+}
+
+
+Backend must ignore 0/blank entries.
+(If you already accept drinkStock, keep supporting it, but we are not sending an aggregate; drinks are individual requisition items now.)
+
+Catalog / categories source
+
+Read the existing Ingredients/Items source (CSV you’ve already imported for costings) and map into categories listed above.
+
+Do not render the first 4 meat items anywhere on the requisition grid (they’re covered by Meat grams).
+
+Persist the category order shown above.
+
+Interaction rules
+
+Search filters items within all categories (keep categories that match at least one item visible).
+
+Expand all/Collapse all affect only the category accordions, not the grid in each.
+
+Numeric inputs accept only integers ≥ 0.
+
+No notes, no delete, no dynamic add/remove of items—catalog is fixed.
+
+Acceptance tests (run after implementation)
+
+No drinks aggregate
+
+Open /operations/stock. Confirm there are only Rolls (pcs) and Meat (grams) under End-of-Shift; no “Drinks total”.
+
+Grid layout
+
+Expand “Fresh Food”. Confirm items render in a 4-column grid (3 on medium screens, 2 on small).
+
+No Notes fields
+
+Inspect any item card. Confirm it has only item name + qty.
+
+Categories present
+
+Confirm all required categories appear and are collapsible.
+
+Confirm meat items (top 4) do not appear in any category list.
+
+Shift carryover
+
+Submit Form 1, get redirected to Form 2 with ?shift=<uuid>.
+
+Confirm Shift Information shows the correct date and “Completed By” (read-only date).
+
+Save payload
+
+Enter: Rolls=20, Meat=3500, type some requisition quantities (>0).
+
+Click Save and verify network payload equals the POST shape above and ignores zeros.
+
+Search
+
+Type a partial item name; grid reduces to matches only.
+
+Non-goals (do NOT build)
+
+No item-level “notes”.
+
+No drag & drop reordering.
+
+No per-item delete/hide.
+
+No drinks aggregate count anywhere.
