@@ -59,7 +59,7 @@ export default function DailySalesStock() {
   useEffect(() => {
     const loadStockMaster = async () => {
       try {
-        const res = await fetch("/api/stock-master");
+        const res = await fetch("/api/stock-catalog");
         const masterData = await res.json();
         setStockMaster(masterData);
         
@@ -73,7 +73,7 @@ export default function DailySalesStock() {
           setExpandedCategories(new Set([firstCategory]));
         }
       } catch (error) {
-        console.error("Failed to load stock master:", error);
+        console.error("Failed to load stock catalog:", error);
       }
     };
     
