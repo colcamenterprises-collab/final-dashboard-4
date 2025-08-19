@@ -272,14 +272,14 @@ export default function DailyStock() {
                       </h4>
                     </div>
                   
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-4 lg:grid-cols-5 gap-4">
                       {items.map((item) => (
                         <div
                           key={item.id}
                           className="p-3 bg-white border rounded-lg hover:border-gray-300 transition-colors"
                         >
                           <div className="space-y-2">
-                            <Label htmlFor={`item-${item.id}`} className="text-sm font-medium text-gray-900 block leading-tight">
+                            <Label htmlFor={`item-${item.id}`} className="text-xs font-medium text-gray-900 block leading-tight">
                               {item.name}
                             </Label>
                             <Input
@@ -288,10 +288,10 @@ export default function DailyStock() {
                               min="0"
                               value={stockRequests[item.id] || ''}
                               onChange={(e) => {
-                                const value = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0).toString();
+                                const value = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0);
                                 setStockRequests(prev => ({
                                   ...prev,
-                                  [item.id]: value === '' ? 0 : parseInt(value)
+                                  [item.id]: value
                                 }));
                               }}
                               className="w-full text-sm h-8"
