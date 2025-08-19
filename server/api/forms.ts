@@ -84,9 +84,29 @@ export async function getForm(req: Request, res: Response) {
   try {
     const id = String(req.query.id || req.params.id);
     const sales = await prisma.dailySales.findUnique({ where: { id } });
-    if (!sales) return res.status(404).json({ error: 'Not found' });
+    if (!sales) return res.status(404).json({ error: 'Form not found' });
+    
     const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: id } });
-    res.json({ sales, stock });
+    
+    // Return in the expected format per specification
+    const response = {
+      shift: {
+        id: sales.id,
+        date: sales.shiftDate,
+        completedBy: sales.completedBy
+      },
+      stock: stock ? {
+        rolls: stock.bunsCount || stock.burgerBuns || 0,
+        meatGrams: stock.meatGrams || stock.meatWeightG || 0,
+        requisition: stock.purchasingJson || {}
+      } : {
+        rolls: 0,
+        meatGrams: 0,
+        requisition: {}
+      }
+    };
+    
+    res.json(response);
   } catch (error) {
     console.error('Error fetching form:', error);
     res.status(500).json({ error: 'Failed to fetch form' });

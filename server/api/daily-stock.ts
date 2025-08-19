@@ -51,56 +51,37 @@ export async function getDailyStock(req: Request, res: Response) {
 // POST /api/daily-stock - Save daily stock for a shift
 export async function saveDailyStock(req: Request, res: Response) {
   try {
-    const { shiftId, bunsCount, meatGrams, requests } = req.body;
+    const { shiftId, rolls, meatGrams, requisition } = req.body;
 
     if (!shiftId) {
       return res.status(400).json({ error: 'shiftId is required' });
     }
 
+    // Filter out zero/empty requisition entries
+    const filteredRequisition = Object.fromEntries(
+      Object.entries(requisition || {}).filter(([_, qty]) => Number(qty) > 0)
+    );
+
     // Upsert DailyStock by shiftId (salesId)
     await prisma.dailyStock.upsert({
       where: { salesId: shiftId },
       update: {
-        bunsCount: Number(bunsCount) || 0,
+        bunsCount: Number(rolls) || 0,
         meatGrams: Number(meatGrams) || 0,
-        burgerBuns: Number(bunsCount) || 0, // Keep legacy field synced
+        burgerBuns: Number(rolls) || 0, // Keep legacy field synced
         meatWeightG: Number(meatGrams) || 0, // Keep legacy field synced
+        purchasingJson: filteredRequisition,
         updatedAt: new Date()
       },
       create: {
         salesId: shiftId,
-        bunsCount: Number(bunsCount) || 0,
+        bunsCount: Number(rolls) || 0,
         meatGrams: Number(meatGrams) || 0,
-        burgerBuns: Number(bunsCount) || 0, // Keep legacy field synced
-        meatWeightG: Number(meatGrams) || 0 // Keep legacy field synced
+        burgerBuns: Number(rolls) || 0, // Keep legacy field synced
+        meatWeightG: Number(meatGrams) || 0, // Keep legacy field synced
+        purchasingJson: filteredRequisition
       }
     });
-
-    // Handle stock requests - upsert each one
-    if (requests && Array.isArray(requests)) {
-      for (const request of requests) {
-        const { stockItemId, requestedQty } = request;
-        
-        if (stockItemId && requestedQty !== undefined) {
-          await prisma.stockRequest.upsert({
-            where: {
-              shiftId_stockItemId: {
-                shiftId,
-                stockItemId: Number(stockItemId)
-              }
-            },
-            update: {
-              requestedQty: Number(requestedQty) || null
-            },
-            create: {
-              shiftId,
-              stockItemId: Number(stockItemId),
-              requestedQty: Number(requestedQty) || null
-            }
-          });
-        }
-      }
-    }
 
     res.json({ ok: true });
   } catch (error) {
