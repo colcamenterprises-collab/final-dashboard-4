@@ -258,45 +258,52 @@ export default function DailyStock() {
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Requisition List</h3>
               
-              {Object.entries(groupedItems).map(([category, items], categoryIndex) => (
-                <div key={category} className={categoryIndex > 0 ? "mt-8" : ""}>
-                  <div className="mb-4">
-                    <h4 className="text-base font-medium text-gray-800 bg-gray-100 px-3 py-2 rounded-md">
-                      {category}
-                    </h4>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-3 bg-white border rounded-lg hover:border-gray-300 transition-colors"
-                      >
-                        <div className="space-y-2">
-                          <Label htmlFor={`item-${item.id}`} className="text-sm font-medium text-gray-900 block">
-                            {item.name}
-                          </Label>
-                          <Input
-                            id={`item-${item.id}`}
-                            type="number"
-                            min="0"
-                            value={stockRequests[item.id] || ''}
-                            onChange={(e) => {
-                              const value = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0);
-                              setStockRequests(prev => ({
-                                ...prev,
-                                [item.id]: value
-                              }));
-                            }}
-                            className="w-full text-sm"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {Object.entries(groupedItems).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-sm">No stock items loaded. Items: {stockItems.length}</p>
+                  <p className="text-gray-400 text-xs">Debug: {JSON.stringify(catalogResponse)}</p>
                 </div>
-              ))}
+              ) : (
+                Object.entries(groupedItems).map(([category, items], categoryIndex) => (
+                  <div key={category} className={categoryIndex > 0 ? "mt-8" : ""}>
+                    <div className="mb-4">
+                      <h4 className="text-base font-medium text-gray-800 bg-gray-100 px-3 py-2 rounded-md">
+                        {category} ({items.length} items)
+                      </h4>
+                    </div>
+                  
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3 bg-white border rounded-lg hover:border-gray-300 transition-colors"
+                        >
+                          <div className="space-y-2">
+                            <Label htmlFor={`item-${item.id}`} className="text-sm font-medium text-gray-900 block leading-tight">
+                              {item.name}
+                            </Label>
+                            <Input
+                              id={`item-${item.id}`}
+                              type="number"
+                              min="0"
+                              value={stockRequests[item.id] || ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0).toString();
+                                setStockRequests(prev => ({
+                                  ...prev,
+                                  [item.id]: value === '' ? 0 : parseInt(value)
+                                }));
+                              }}
+                              className="w-full text-sm h-8"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Actions (bottom only) */}
