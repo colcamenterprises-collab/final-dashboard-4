@@ -1,0 +1,86 @@
+the handler you’re wiring in isn’t a function at runtime:
+
+TypeError: getStockCatalog is not a function
+ at server/routes.ts:239
+
+
+That happens when the export/import shape doesn’t match (named vs default, or CJS vs ESM). Here’s a quick, surgical fix you/agent can apply — no freestyling beyond this.
+
+1) Make the handler a named export (ESM/TS)
+
+server/api/stockCatalog.ts
+
+// ✅ keep it a plain named function export
+import type { Request, Response } from "express";
+
+export async function getStockCatalog(req: Request, res: Response) {
+  try {
+    // ...read/parse CSV and shape categories/items...
+    // return unified payload
+    res.json({ ok: true, categories, itemsByCategory });
+  } catch (err) {
+    console.error("[stockCatalog] error:", err);
+    res.status(500).json({ ok: false, error: "Failed to load stock catalog" });
+  }
+}
+
+// (optional) additional helpers as named exports too
+export async function loadStockCatalog() { /* ... */ }
+
+
+Do not export default an object. Keep export function … so the import is unambiguous.
+
+2) Import it as a named import and wire the route
+
+server/routes.ts
+
+// ✅ named import (ESM/TS)
+import { getStockCatalog } from "./api/stockCatalog";
+
+// …
+
+// ✅ register directly; Express will call it with (req, res)
+app.get("/api/stock-catalog", getStockCatalog);
+
+
+If your project mixes CJS/ESM and you must use require, use:
+
+const { getStockCatalog } = require("./api/stockCatalog");
+app.get("/api/stock-catalog", getStockCatalog);
+
+3) If you must keep a default export (not recommended)
+
+If your file currently does:
+
+export default { getStockCatalog };
+
+
+then your import must match:
+
+import stockCatalog from "./api/stockCatalog";
+app.get("/api/stock-catalog", stockCatalog.getStockCatalog);
+
+
+…but again, prefer named — it avoids this exact error.
+
+4) Quick sanity check (optional)
+
+Right before registering the route:
+
+console.log("[routes] typeof getStockCatalog =", typeof getStockCatalog);
+// should log: "function"
+
+5) Restart & test
+
+Restart the app.
+
+Hit the endpoint:
+
+curl -s http://localhost:5000/api/stock-catalog | jq .
+
+
+You should get { ok: true, categories: [...], itemsByCategory: { ... } }.
+
+Why this happened
+
+The handler file exported an object or default, but routes.ts imported it as a function, so at runtime it was an object (or undefined), not callable — hence the TypeError.

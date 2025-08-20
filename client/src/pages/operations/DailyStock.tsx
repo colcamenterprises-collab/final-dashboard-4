@@ -48,6 +48,7 @@ const DailyStock: React.FC = () => {
 
   // Split catalog → drinks vs requisition items (non‑drinks)
   const drinksList: DrinksRow[] = useMemo(() => {
+    if (!Array.isArray(catalog)) return [];
     return catalog
       .filter((c) => c.type === "drink")
       .map((c) => ({ id: c.id, name: c.name, qty: drinks[c.id] ?? 0 }))
@@ -55,6 +56,7 @@ const DailyStock: React.FC = () => {
   }, [catalog, drinks]);
 
   const blocks: CategoryBlock[] = useMemo(() => {
+    if (!Array.isArray(catalog)) return [];
     const map = new Map<string, { id: string; label: string }[]>();
     for (const item of catalog) {
       if (item.type === "drink") continue; // drinks are counted in EoS drinks table

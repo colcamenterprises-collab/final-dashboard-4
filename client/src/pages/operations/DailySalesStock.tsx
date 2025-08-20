@@ -60,15 +60,26 @@ export default function DailySalesStock() {
     const loadStockMaster = async () => {
       try {
         const res = await fetch("/api/stock-catalog");
-        const masterData = await res.json();
-        setStockMaster(masterData);
+        const response = await res.json();
         
-        // Count total items for console log
-        const totalItems = Object.values(masterData).reduce((total: number, items: any) => total + items.length, 0);
-        console.log("[Form2] stock master loaded:", totalItems, "items");
+        if (!response.ok || !response.items) {
+          throw new Error("Invalid response format");
+        }
+
+        // Group items by category
+        const groupedItems: StockMaster = {};
+        response.items.forEach((item: any) => {
+          if (!groupedItems[item.category]) {
+            groupedItems[item.category] = [];
+          }
+          groupedItems[item.category].push(item);
+        });
+        
+        setStockMaster(groupedItems);
+        console.log("[Form2] stock master loaded:", response.items.length, "items in", Object.keys(groupedItems).length, "categories");
         
         // Expand first category by default
-        const firstCategory = Object.keys(masterData)[0];
+        const firstCategory = Object.keys(groupedItems)[0];
         if (firstCategory) {
           setExpandedCategories(new Set([firstCategory]));
         }
