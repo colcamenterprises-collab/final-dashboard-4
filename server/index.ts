@@ -382,8 +382,14 @@ async function checkSchema() {
 
   // Serve static files from public directory
   // Add stock catalog API route
-  const { getStockCatalog } = await import('./api/stock-catalog');
-  app.get('/api/stock-catalog', getStockCatalog);
+  const stockCatalogRouter = (await import('./api/stock-catalog-new')).default;
+  app.use('/api/stock-catalog', stockCatalogRouter);
+  
+  const dailyStockRouter = (await import('./api/daily-stock')).default;
+  app.use('/api/daily-stock-new', dailyStockRouter);
+  
+  const ingredientsRouter = (await import('./api/ingredients-import')).default;
+  app.use('/api/ingredients', ingredientsRouter);
   
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 

@@ -824,6 +824,31 @@ export const chatLogs = pgTable('chat_logs', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Shopping Master table - CSV-driven stock catalog
+export const shoppingMaster = pgTable("shopping_master", {
+  id: serial("id").primaryKey(),
+  item: text("item").notNull(),
+  internalCategory: text("internal_category").notNull(),
+  supplier: text("supplier"),
+  brand: text("brand"),
+  costMinor: integer("cost_minor").notNull(), // cost *100 (THB in satang)
+  packagingQty: text("packaging_qty"),
+  unitMeasure: text("unit_measure"),
+  portionSize: text("portion_size"),
+  minStockAmount: text("min_stock_amount"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+// Shopping Master schema and types
+export const insertShoppingMasterSchema = createInsertSchema(shoppingMaster).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+
+export type ShoppingMaster = typeof shoppingMaster.$inferSelect;
+export type InsertShoppingMaster = z.infer<typeof insertShoppingMasterSchema>;
+
 export const insertChatLogSchema = createInsertSchema(chatLogs).omit({ 
   id: true, 
   createdAt: true 

@@ -1,0 +1,259 @@
+Make-It-So: Daily Stock (Form 2)
+0) Outcome
+
+Form 2 shows only:
+
+Shift info (read-only when a shift is passed from Form 1),
+
+End-of-shift counts (Rolls (pcs), Meat (grams)),
+
+Requisition List grouped by categories from the CSV, rendered in a 4-column grid on desktop (2 on mobile), no Notes column, one numeric input per item.
+
+No “Drinks total (pcs)” input; drinks are counted per-item within the Requisition List.
+
+The first 4 meat sub-items (that are covered by the meat count) are not shown in the Requisition List.
+
+Save persists the requisition counts + rolls/meat to the same shift.
+
+Everything is driven by a small “stock catalog” built from the CSV you provided.
+
+1) CSV Contract (source of truth)
+
+We will parse the CSV you uploaded (Food Costings - Supplier - Portions - Prices v2.0 20.08.25.csv) into a stock catalog using only these columns (by header name). If a column is missing, error out with a readable message.
+
+Required columns
+
+name – display name shown on the form (string)
+
+category – one of the exact categories below (string)
+
+include_in_stock – TRUE/FALSE (string → boolean). If FALSE, the item is hidden from the Requisition List
+
+exclude_reason – optional string. If equals "MEAT_COMPONENT", item is hidden because it’s already covered by Meat grams (this is how we’ll exclude the first 4 meat items)
+
+count_type – pcs or weight (drives input step; weight shows grams)
+
+display_order – integer for ordering within category (default 9999 if blank)
+
+Allowed categories (final)
+
+Drinks
+
+Fresh Food
+
+Frozen Food
+
+Packaging
+
+Sauces
+
+Dry Goods
+
+Dairy
+
+Produce
+
+Cleaning & Consumables
+
+Bakery
+
+Other
+
+If a row has a category not in that list → reject the CSV with a clear error listing the offending rows.
+
+CSV Rules
+
+Any item with include_in_stock = FALSE → do not render.
+
+Any item with exclude_reason = "MEAT_COMPONENT" → do not render.
+
+Drinks appear only within the Drinks category (per-item counts).
+
+If count_type = weight, the input is grams (integer step = 1). Otherwise pcs (integer step = 1).
+
+2) Database
+
+Create a small table to store the parsed catalog and a table for per-shift requisitions.
+
+Tables
+
+stock_catalog
+
+id PK
+
+name text (unique within category)
+
+category text
+
+count_type text (pcs|weight)
+
+include_in_stock boolean
+
+exclude_reason text nullable
+
+display_order int
+
+created_at, updated_at
+
+daily_stock (if you already have this, add fields if missing)
+
+id PK
+
+shift_id FK → daily_sales.id (or your shift table)
+
+rolls_pcs int
+
+meat_grams int
+
+created_at, updated_at
+
+daily_stock_requisition
+
+id PK
+
+shift_id FK
+
+catalog_id FK → stock_catalog.id
+
+qty int (grams for weight items, pcs for pcs items)
+
+created_at, updated_at
+
+UNIQUE constraint on (shift_id, catalog_id)
+
+3) Backend
+
+Routes
+
+GET /api/stock-catalog
+Returns { categories: [{ name, items: [{id,name,countType,displayOrder}] }...] }
+Categories sorted by name in the order list above; items sorted by display_order then name.
+
+POST /api/stock-catalog/import (admin use only)
+Body: multipart CSV file.
+Validates per contract. Upserts into stock_catalog.
+On error: JSON with line numbers + messages.
+
+GET /api/daily-stock?shift=UUID
+Returns:
+
+{
+  shift: { id, date, completedBy },
+  eos: { rolls_pcs, meat_grams },
+  requisition: [{ catalogId, qty }]
+}
+
+
+POST /api/daily-stock
+Body:
+
+{
+  shiftId: "UUID",
+  eos: { rolls_pcs: int, meat_grams: int },
+  requisition: [{ catalogId: number, qty: int }, ...]   // only items with qty > 0 need to be sent
+}
+
+
+Upserts daily_stock and daily_stock_requisition rows. Returns { ok: true }.
+
+Important removals
+
+Remove/ignore “drinks_total” from the eos payload & schema. Drinks are per-item only.
+
+4) Frontend (Form 2: /operations/stock)
+4.1 Shift Information
+
+If ?shift=UUID is present:
+
+Fetch /api/daily-stock?shift=UUID and show Shift Date and Completed By as read-only (from the shift created in Form 1).
+
+If missing, show them as editable (fallback mode).
+
+Title: Daily Stock
+
+Subtitle: Shift <shiftId> (small text)
+
+4.2 End-of-Shift Counts
+
+Grid 3 columns (desktop): Rolls (pcs) | Meat (grams) | (remove Drinks total entirely)
+
+Numeric inputs, min=0, step=1.
+
+4.3 Requisition List
+
+Controls: global Search, Expand all / Collapse all.
+
+For each category with at least one item:
+
+Card titled CategoryName (N) with chevron collapse.
+
+4-column responsive grid (2 on mobile).
+
+Each cell: Item name (left) + single numeric input (right).
+No Notes column.
+For count_type = weight, label the input with a subtle “g” suffix inside the input (e.g., using an inline adornment).
+
+Default value = 0. We accept blanks as 0 on submit.
+
+4.4 Buttons
+
+One Save button at the bottom (no sticky bar).
+
+On save:
+
+optimistic UI + toast “Stock saved” (4s)
+
+validation: show first invalid input in red with small help text.
+
+5) Validation & Guardrails
+
+If the CSV import has an unknown category OR missing required headers → fail fast with a readable list:
+
+Row 23: unknown category "Foood"; expected one of [...]
+
+Header "include_in_stock" missing
+
+If the frontend receives an empty catalog → show an inline error panel with:
+“No stock catalog found. Please import the latest CSV in Menu Mgmt → Import Menu (Stock).”
+
+When submitting:
+
+Any negative qty → block with “Quantities must be 0 or more”.
+
+If no shiftId and no date/completedBy are provided → block and prompt for completion.
+
+6) Acceptance Criteria (QA)
+
+No Drinks total input under End-of-Shift.
+
+Date & Completed By are read-only when ?shift= is present, editable otherwise.
+
+Requisition List is grouped by categories, 4-column grid, no Notes column.
+
+The first 4 meat components (flagged as exclude_reason = "MEAT_COMPONENT") are not shown.
+
+Numeric steps work (pcs vs grams).
+
+Save creates/updates:
+
+daily_stock with rolls_pcs + meat_grams
+
+daily_stock_requisition rows for all catalog items with qty > 0
+
+Refresh the page and see previous values loaded.
+
+Importing a bad CSV shows a readable error; a good CSV re-renders categories in the correct order.
+
+7) Quick Fixes for What You Noted
+
+Remove “Drinks total (pcs)” field from End-of-Shift.
+
+No Notes inputs anywhere in Requisition.
+
+Grid layout: 4 items per row on desktop (2 on mobile).
+
+Categorize list using categories above.
+
+Hide first 4 meat items by tagging them in CSV (exclude_reason = "MEAT_COMPONENT") or via a “skip list” mapping during import.
+
+Shift details prefilled (read-only) when navigated from Form 1 with ?shift=….

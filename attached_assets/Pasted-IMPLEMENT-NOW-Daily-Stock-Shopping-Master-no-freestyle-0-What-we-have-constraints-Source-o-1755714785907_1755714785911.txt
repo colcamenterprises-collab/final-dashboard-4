@@ -1,0 +1,192 @@
+IMPLEMENT NOW — Daily Stock + Shopping Master (no freestyle)
+0) What we have (constraints)
+
+Source of truth = CSV Cam uploads (latest attached):
+Food Costings - Supplier - Portions - Prices v2.0 20.08.25.csv
+
+This is a shopping list master, not recipe ingredients.
+
+Remove SKU everywhere (ignore/strip if present).
+
+Form 2 must not be hardcoded. It must read from DB that is populated by the CSV upload page.
+
+1) Data model (Postgres) — single master table
+
+Create table shopping_master (if exists, replace/alter; do not drop data silently):
+
+id                SERIAL PRIMARY KEY
+item              TEXT NOT NULL                -- display name
+internal_category TEXT NOT NULL                -- used for grouping
+supplier          TEXT                         -- Makro/Lotus/etc
+brand             TEXT
+cost_minor        INTEGER NOT NULL             -- cost *100 (THB in satang)
+packaging_qty     TEXT                         -- keep text, e.g. "10kg", "1kg", "24 pcs"
+unit_measure      TEXT                         -- kg / g / L / ml / pcs, etc. (from CSV Unit Measurement)
+portion_size      TEXT                         -- keep text for now
+min_stock_amount  TEXT                         -- keep text; we only show it
+updated_at        TIMESTAMP DEFAULT now()
+is_active         BOOLEAN DEFAULT TRUE
+
+
+Mapping from CSV columns → fields (case-insensitive, trim spaces):
+
+Item → item
+
+Internal Category → internal_category
+
+Supplier → supplier
+
+Brand → brand
+
+Cost → cost_minor (parse number; THB → satang = *100; if blank → 0)
+
+Packaging Qty → packaging_qty
+
+Unit Measurement → unit_measure
+
+Portion Size → portion_size
+
+Minimum Stock Amount (or Minimum Stock) → min_stock_amount
+
+Ignore / drop: SKU, Notes, any unknowns
+
+Category normalization (exact labels):
+
+Drinks
+
+Fresh Food
+
+Frozen Food
+
+Packaging
+
+Sauces / Condiments
+
+Dry Goods
+
+Cleaning
+
+Other
+
+(If a CSV row has a different spelling, map it to the closest of the above. If unknown, set to Other. No freestyle beyond that mapping.)
+
+2) Upload page (Menu Mgmt → Ingredients)
+
+Keep “Choose file → Import Ingredients” UI.
+
+On upload:
+
+Parse CSV (server-side), validate required columns.
+
+Upsert into shopping_master by (item, internal_category) combo.
+
+Set is_active=true for rows present in the new CSV.
+
+Soft-deactivate rows missing from CSV: is_active=false (no deletion).
+
+Show short import summary: “Imported N, updated M, deactivated K.”
+
+Important: no hardcoded CSV paths in code.
+
+3) Form 2 (Daily Stock) UI behavior (canonical route: /operations/stock)
+
+Header shows Shift … if ?shift= present; otherwise “No shift ID provided” (but page still works).
+
+End-of-Shift Counts: keep three boxes
+
+Rolls (pcs)
+
+Meat (grams)
+
+Remove “Drinks total (pcs)” – there is no drinks total. (Drinks are per-item below.)
+
+Requisition List (from shopping_master where is_active=true)
+
+Group sections by internal_category in the normalized order above.
+
+Each section = grid 4-up (responsive):
+
+Label (item)
+
+Qty input (number, default 0)
+
+NO notes column (remove)
+
+“Expand all / Collapse all” works on sections.
+
+Search box filters by item substring across all sections.
+
+Do not show SKU. Do not show cost/packaging here. (They’re used for the shopping list output later.)
+
+4) Save payload (POST /api/daily-stock)
+
+Request:
+
+{
+  "shiftId": "<uuid|null>", 
+  "rollsPcs": 0,
+  "meatGrams": 0,
+  "drinks": { "Coke": 2, "Sprite": 0, ... },         // only non-zero are fine; zeros allowed
+  "requisition": { "Cheese": 3, "French Fries 7mm": 5, ... } // only non-zero needed
+}
+
+
+Response:
+
+{ "ok": true, "savedId": "<uuid>" }
+
+5) Shopping list generation (after save)
+
+Derive Shopping List (for PDF/email & on-screen preview) from non-zero requisition union any items below min stock (optional for now).
+
+For each item, display:
+
+item, supplier, brand (if present), packaging_qty, unit_measure, cost_minor/100
+
+Sort by internal_category, then by item.
+
+6) Remove Notes + Drinks total + vertical-only layout
+
+Remove all “Notes (optional)” fields in the requisition area.
+
+Remove “Drinks total (pcs)” from counts.
+
+Display requisition as grid, 4 columns per row on desktop (breakpoints: 4/3/2/1).
+
+7) Styling touches (match Form 1)
+
+Base font 14px for labels, inputs, buttons.
+
+Section spacing increased (16–24px).
+
+Buttons at bottom only (no sticky bar).
+
+8) QA checklist (run now)
+
+Upload the attached CSV on Ingredients page → see summary (N/M/K) and items listed.
+
+Go to /operations/stock:
+
+See sections (Drinks, Fresh Food, Frozen Food, Packaging, Sauces / Condiments, Dry Goods, Cleaning, Other).
+
+Each section shows items in a 4-up grid; no Notes column.
+
+No “Drinks total” box in counts.
+
+Enter a few non-zero requisition quantities + some drink item counts + rolls + meat.
+
+Click Save → {"ok": true, "savedId": …} and inline success toast.
+
+Confirm shopping list render (on-screen preview or in the daily summary) with items, supplier, packaging, cost.
+
+9) Non-goals (don’t do now)
+
+Don’t attach recipe costing yet.
+
+Don’t backfill legacy ingredient tables.
+
+Don’t hardcode any CSV path.
+
+Don’t introduce new categories beyond the normalized list.
+
+If anything here conflicts with current code paths, don’t patch silently — report the exact file + line + your proposed change before editing.
