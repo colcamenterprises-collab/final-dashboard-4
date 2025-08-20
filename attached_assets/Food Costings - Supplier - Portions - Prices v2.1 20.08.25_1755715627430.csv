@@ -1,0 +1,67 @@
+Item,Internal Category,Supplier,Brand,Cost,Purchase Quantity,Unit Measurement,Portion Size,Min Stock Amount,Last Review Date
+Topside Beef,Meat,Makro,Harvey Beef,฿319.00,1kg,kg,95 gr,10kg,20.08.25
+Brisket Point End,Meat,Makro,Harvey Beef,฿299.00,1kg,kg,95 gr,,20.08.25
+Chuck Roll Beef,Meat,Makro,Harvey Beef,฿319.00,1kg,kg,95 gr,,20.08.25
+Other Beef (Mixed),Meat,Makro,Harvey Beef,฿310.00,1kg,kg,95 gr,,20.08.25
+,,,,,,,,,
+Coke,Drinks,Makro,325 ml,฿315.00,24,1 box 24 Cans,Each,24,20.08.25
+Coke Zero,Drinks,Makro,325 ml,฿315.00,24,1 box 24 Cans,Each,16,20.08.25
+Fanta Orange,Drinks,Makro,325 ML,฿81.00,6,1 box 6 Cans,Each,12,20.08.25
+Fanta Strawberry,Drinks,Makro,325 ML,฿81.00,6,1 box 6 Cans,Each,12,20.08.25
+Schweppes Manow,Drinks,Makro,330 ML,฿84.00,6,1 box 6 Cans,Each,12,20.08.25
+Kids Juice (Orange),Drinks,Makro,200 ML,฿99.00,6,1 box 6 Cans,Each,12,20.08.25
+Kids Juice (Apple),Drinks,Makro,200 ML,฿99.00,6,1 box 6 Cans,Each,12,20.08.25
+Sprite,Drinks,Makro,325 ML,฿81.00,6,1 box 6 Cans,Each,12,20.08.25
+Soda Water,Drinks,Makro,325 ML,฿52.00,6,1 box 6 Cans,Each,12,20.08.25
+Bottled Water,Drinks,Makro,0.6 L,฿49.00,12,1 box 12 Bottles,Each,12,20.08.25
+,,,,,,,,,
+Salad (Iceberg Lettuce),Fresh Food,Makro,Makro,฿99.00,N/A,kg,20 gr,N/A,20.08.25
+Milk,Fresh Food,Makro,Makro,฿80.00,1 litre,litre,TBA,N/A,20.08.25
+Burger Bun,Fresh Food,Bakery,Bakery,฿8.00,1,each,each,N/A,20.08.25
+Tomatos,Fresh Food,Makro,Makro,฿89.00,1kg,kg,25 gr,N/A,20.08.25
+White Cabbage,Fresh Food,Makro,Makro,฿45.00,1kg,kg,,N/A,20.08.25
+Purple Cabbage,Fresh Food,Makro,Makro,฿41.25,1kg,kg,,N/A,20.08.25
+Onions Bulk 10kg,Fresh Food,Makro,Makro,฿290.00,10kg,kg,20 gr,N/A,20.08.25
+Onions (small bags),Fresh Food,Makro,Makro,฿29.00,1kg,kg,20 gr,N/A,20.08.25
+Cheese,Fresh Food,Makro,Horecav,฿359.00,1 kg,kg,1 slice,N/A,20.08.25
+Bacon Short,Fresh Food,Makro,305/66,฿305.00,1 kg,kg,,N/A,20.08.25
+Bacon Long,Fresh Food,Makro,BMP,฿430.00,2 kg,kg,20 gr,N/A,20.08.25
+Jalapenos (tin),Fresh Food,Makro,Aro,฿190.00,1 kg,kg,20 grams,N/A,20.08.25
+Jalapenos (fresh),Fresh Food,Chiang Rai - Shoppee,Thai Peppers,฿150.00,1 kg,kg,30 grams,N/A,20.08.25
+,,,,,,,,,
+French Fries 7mm,Frozen Food,Makro,Savepak 7mm,฿129.00,2kg,kg,150 gr,N/A,20.08.25
+Chicken Nuggets,Frozen Food,Makro,Aro,฿155.00,1kg,kg,,N/A,20.08.25
+Chicken Fillets,Frozen Food,Makro,,฿199.00,1kg,kg,93 grams,N/A,20.08.25
+Sweet Potato Fries,Frozen Food,Makro,Aro,฿145.00,1kg,kg,150 grams,N/A,20.08.25
+,,,,,,,,,
+Oil (Fryer),Kitchen Supplies,Makro,Bonus Palm Oil,฿195.00,5 L,litre,N/A,N/A,20.08.25
+Plastic Food Wrap,Kitchen Supplies,Makro,Aro,฿375.00,500M,each,each,N/A,20.08.25
+Paper Towel Long,Kitchen Supplies,Makro,savepack,฿79.00,1 bag 6 pieces,each,each,N/A,20.08.25
+Paper Towel Short (Serviettes),Kitchen Supplies,Makro,Aro,฿116.00,`,each,each,N/A,20.08.25
+Food Gloves (Large),Kitchen Supplies,Makro,Satory,฿197.00,100,each,each,N/A,20.08.25
+Food Gloves (Medium),Kitchen Supplies,Supercheap,Satory,฿133.00,100,each,each,N/A,20.08.25
+Food Gloves (Small),Kitchen Supplies,Makro,Satory,฿133.00,100,each,each,N/A,20.08.25
+Aluminum Foil,Kitchen Supplies,Makro,Aro,฿385.00,29.5 CM 90M,each,each,N/A,20.08.25
+Plastic Meat Gloves,Kitchen Supplies,Makro,M Glover,฿22.50,1 bag 24 pieces,each,each,N/A,20.08.25
+Kitchen Cleaner,Kitchen Supplies,Makro,Aro Kitchen Cleaner,฿149.00,3.5 ltre,litre,each,N/A,20.08.25
+Alcohol Sanitiser,Kitchen Supplies,Makro,Alsoff,฿69.00,450g,g,,N/A,20.08.25
+,,,,,,,,,
+French Fries Box,Packaging,Makro,Fest,฿105.00,1 bag 50 piece,each,each,N/A,20.08.25
+Plastic Carry Bags (Size- 6×14),Packaging,Makro,Koi Fish,฿36.00,500h,each,each,N/A,20.08.25
+Plastic Carry Bags (Size - 9×18),Packaging,Makro,Koi Fish,฿36.00,500g,each,each,N/A,20.08.25
+Brown Paper Food Bags,Packaging,Online,,฿139.00,50 Bags,each,each,N/A,20.08.25
+Loaded Fries Boxes,Packaging,Makro,Pac Away - Lazada 17x11x4.5,฿89.00,50 Boxes,each,each,N/A,20.08.25
+Packaging Labels,Packaging,Printers,,฿50.00,45 per sheet,each,each,N/A,20.08.25
+"Knife, Fork, Spoon Set",Packaging,Makro,,฿89.00,50,each,1,N/A,20.08.25
+,,,,,,,,,
+Cajun Fries Seasoning,Shelf Items,Makro,McCormick,฿508.00,510 G,g,20 grams,N/A,20.08.25
+Crispy Fried Onions,Shelf Items,Makro,Fried Shallots,฿79.00,500g,g,20 grams,N/A,20.08.25
+Pickles(standard dill pickles),Shelf Items,Makro,Sis,฿89.00,480 g,g,20 gr,N/A,20.08.25
+Pickles Sweet (standard),Shelf Items,Makro,SIS,฿89.00,480 gr,g,15 grams,N/A,20.08.25
+Mustard,Shelf Items,Makro,Aro,฿88.00,1kg,kg,5 gr,N/A,20.08.25
+Mayonnaise,Shelf Items,Makro,Aro,฿90.00,1,litre,20 gr,N/A,20.08.25
+Tomato Sauce,Shelf Items,Makro,Aro,฿175.00,5 Litres,litre,20 gr,N/A,20.08.25
+Chili Sauce (Sriracha),Shelf Items,Makro,Aro,฿108.00,1000g,g,20 gr,N/A,20.08.25
+BBQ Sauce,Shelf Items,Makro,HEINZ,฿110.00,500g,g,20 gr,N/A,20.08.25
+Sriracha Sauce,Shelf Items,Makro,Aro,฿108.00,950g,g,20 gr,N/A,20.08.25
+Salt (Coarse Sea Salt),Shelf Items,Online,Salt Odyssey - Lazada,฿121.00,1kg,kg,5 grams,N/A,20.08.25

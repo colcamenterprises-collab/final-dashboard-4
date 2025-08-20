@@ -63,13 +63,13 @@ const DailyStock: React.FC = () => {
       if (!map.has(item.category)) map.set(item.category, []);
       map.get(item.category)!.push({ id: item.id, label: item.name });
     }
-    return [...map.entries()]
+    return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([category, items]) => ({
+      .map(([category, items]: [string, { id: string; label: string }[]]) => ({
         category,
         items: items
-          .sort((a, b) => a.label.localeCompare(b.label))
-          .map((i) => ({ id: i.id, label: i.label, qty: rows[i.id] ?? 0 })),
+          .sort((a: { id: string; label: string }, b: { id: string; label: string }) => a.label.localeCompare(b.label))
+          .map((i: { id: string; label: string }) => ({ id: i.id, label: i.label, qty: rows[i.id] ?? 0 })),
       }));
   }, [catalog, rows]);
 
