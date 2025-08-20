@@ -20,6 +20,7 @@ import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
 import { expensesV2Router } from "./routes/expensesV2";
 import { menuRouter } from "./routes/menu";
+import stockCatalog from "./api/stock-catalog";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process

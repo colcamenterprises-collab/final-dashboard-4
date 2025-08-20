@@ -1,0 +1,457 @@
+# Form 2 — Daily Stock (CSV‑Driven) — Implementation Pack
+
+**Goal**
+
+* Build Daily Stock from your CSV **upfront** (no later sync), grouped by real CSV categories.
+* End‑of‑shift counts: **Rolls (pcs)** and **Meat (grams)** only (no Drinks aggregate).
+* **Drinks counted per SKU** (table/grid), **not** as a single total.
+* Requisition list: **categories → grid (4–5 wide) → item + qty**. **No notes** fields.
+* **Buttons only at bottom** (not floating). Typography **14px** as default.
+* Works with existing `/api/daily-stock` save endpoint.
+
+---
+
+## ✅ File Map (add/replace exactly)
+
+```
+server/
+  api/
+    stock-catalog.ts         # NEW – serves parsed CSV as a catalog (drinks + items)
+  lib/
+    stockCatalog.ts          # NEW – CSV parser & in‑memory cache
+client/
+  src/
+    components/
+      StockGrid.tsx          # NEW – category accordion + 5‑col grid inputs
+    pages/
+      operations/
+        DailySalesStock.tsx  # REPLACE – end‑of‑shift counts + drinks table + requisition grid
+```
+
+> If your server entry mounts API routers in `server/routes.ts` or `server/index.ts`, wire `stock-catalog` there (instruction included below).
+
+---
+
+## 1) Server — CSV Parser & Catalog Endpoint
+
+### `server/lib/stockCatalog.ts` (NEW)
+
+```ts
+import fs from "fs";
+import path from "path";
+import { parse } from "csv-parse/sync";
+
+export type CatalogRow = {
+  id: string;           // slug of Item
+  name: string;         // Item
+  category: string;     // Internal Category
+  type: "drink" | "item"; // drinks are counted per SKU; others go to requisition grid
+  raw?: Record<string, string>;
+};
+
+let CACHE: { items: CatalogRow[]; mtime: number } | null = null;
+
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function isHeaderRepeat(row: Record<string, string>) {
+  const values = Object.values(row).map(v => (v ?? "").toString().trim().toLowerCase());
+  // If the row looks like another header (starts with "item" and "internal category" again)
+  return values.includes("item") && values.includes("internal category");
+}
+
+function detectIsDrink(category: string) {
+  const c = (category || "").toLowerCase();
+  return c.includes("drink") || c.includes("beverage") || c.includes("soft");
+}
+
+function excludeFirstFourMeat(rows: any[]) {
+  // Rule from Cam: first 4 (beef cuts) are covered by meat grams, not listed in requisition
+  // We exclude the first 4 distinct items where Internal Category looks like Meat.
+  let excluded = 0;
+  return rows.filter(r => {
+    const cat = (r["Internal Category"] ?? r["internal category"] ?? "").toString();
+    if (excluded < 4 && /meat/i.test(cat)) {
+      excluded++;
+      return false;
+    }
+    return true;
+  });
+}
+
+export function loadCatalogFromCSV() {
+  const csvPath = process.env.STOCK_CSV_PATH || path.resolve(process.cwd(), "data/Food Costings - Supplier - Portions - Prices v2.0 20.08.25.csv");
+  const stat = fs.statSync(csvPath);
+  if (CACHE && CACHE.mtime === stat.mtimeMs) return CACHE.items;
+
+  const raw = fs.readFileSync(csvPath, "utf8");
+  const rows = parse(raw, { columns: true, skip_empty_lines: true });
+
+  // Clean & normalize headers/rows
+  const clean = rows
+    .filter((r: any) => Object.values(r).some((v: any) => (v ?? "").toString().trim() !== ""))
+    .filter((r: any) => !isHeaderRepeat(r))
+    .map((r: any) => {
+      const obj: Record<string, string> = {};
+      for (const [k, v] of Object.entries(r)) obj[(k as string).trim()] = (v as string ?? "").trim();
+      return obj;
+    });
+
+  const pruned = excludeFirstFourMeat(clean);
+
+  const items: CatalogRow[] = pruned.map((r: any) => {
+    const name = r["Item"] || r["item"] || r["Name"] || r["name"] || "";
+    const category = r["Internal Category"] || r["internal category"] || r["Category"] || r["category"] || "General";
+    const id = slugify(name || category + Math.random());
+    const type: "drink" | "item" = detectIsDrink(category) ? "drink" : "item";
+    return { id, name, category, type, raw: r };
+  }).filter(r => r.name);
+
+  CACHE = { items, mtime: stat.mtimeMs };
+  return items;
+}
+```
+
+### `server/api/stock-catalog.ts` (NEW)
+
+```ts
+import { Router } from "express";
+import { loadCatalogFromCSV } from "../lib/stockCatalog";
+
+const router = Router();
+
+router.get("/", (_req, res) => {
+  const items = loadCatalogFromCSV();
+  // Sort server‑side for stability
+  items.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  res.json({ items });
+});
+
+export default router;
+```
+
+### Wire the route (add once)
+
+In your server bootstrap (e.g. `server/index.ts` or `server/routes.ts`):
+
+```ts
+import stockCatalog from "./api/stock-catalog";
+// ...
+app.use("/api/stock-catalog", stockCatalog);
+```
+
+> **Env/Path**: Place your CSV at `data/Food Costings - Supplier - Portions - Prices v2.0 20.08.25.csv` (or set `STOCK_CSV_PATH` env var). The parser caches on mtime; updating the file refreshes next request.
+
+---
+
+## 2) Client — Category Grid & Page
+
+### `client/src/components/StockGrid.tsx` (NEW)
+
+```tsx
+import React from "react";
+
+export type StockItemQty = { id: string; label: string; qty: number };
+export type CategoryBlock = { category: string; items: StockItemQty[] };
+
+export function StockGrid({
+  blocks,
+  onChange,
+}: {
+  blocks: CategoryBlock[];
+  onChange: (id: string, qty: number) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {blocks.map((block) => (
+        <details data-accordion="catalog" key={block.category} open className="rounded-lg border">
+          <summary className="cursor-pointer select-none px-4 py-2 font-medium text-[14px]">
+            {block.category}
+          </summary>
+          <div className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+              {block.items.map((it) => (
+                <div key={it.id} className="rounded-md border p-3 flex items-center justify-between gap-3">
+                  <div className="text-[14px] font-medium leading-snug">{it.label}</div>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    className="w-20 border rounded-md px-2 py-1 text-[14px]"
+                    value={it.qty}
+                    onChange={(e) => onChange(it.id, Number(e.target.value || 0))}
+                    placeholder="0"
+                    aria-label={`qty-${it.label}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+```
+
+### `client/src/pages/operations/DailySalesStock.tsx` (REPLACE)
+
+```tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { StockGrid, CategoryBlock } from "../../components/StockGrid";
+
+// Server catalog row
+type CatalogItem = {
+  id: string;
+  name: string;
+  category: string;
+  type: "drink" | "item";
+};
+
+type CatalogResponse = { items: CatalogItem[] };
+
+type RequisitionRow = { id: string; qty: number };
+
+type DrinksRow = { id: string; name: string; qty: number };
+
+const DailySalesStock: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [rolls, setRolls] = useState<number>(0);
+  const [meatGrams, setMeatGrams] = useState<number>(0);
+  const [drinks, setDrinks] = useState<Record<string, number>>({});
+  const [rows, setRows] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+
+  const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/stock-catalog");
+        const data: CatalogResponse = await res.json();
+        if (!mounted) return;
+        setCatalog(data.items);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Split catalog → drinks vs requisition items (non‑drinks)
+  const drinksList: DrinksRow[] = useMemo(() => {
+    return catalog
+      .filter((c) => c.type === "drink")
+      .map((c) => ({ id: c.id, name: c.name, qty: drinks[c.id] ?? 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [catalog, drinks]);
+
+  const blocks: CategoryBlock[] = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }[]>();
+    for (const item of catalog) {
+      if (item.type === "drink") continue; // drinks are counted in EoS drinks table
+      if (!map.has(item.category)) map.set(item.category, []);
+      map.get(item.category)!.push({ id: item.id, label: item.name });
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([category, items]) => ({
+        category,
+        items: items
+          .sort((a, b) => a.label.localeCompare(b.label))
+          .map((i) => ({ id: i.id, label: i.label, qty: rows[i.id] ?? 0 })),
+      }));
+  }, [catalog, rows]);
+
+  const setDrinkQty = (id: string, qty: number) =>
+    setDrinks((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+
+  const setReqQty = (id: string, qty: number) =>
+    setRows((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+
+  const expandAll = () => {
+    document
+      .querySelectorAll<HTMLDetailsElement>("details[data-accordion='catalog']")
+      .forEach((d) => (d.open = true));
+  };
+  const collapseAll = () => {
+    document
+      .querySelectorAll<HTMLDetailsElement>("details[data-accordion='catalog']")
+      .forEach((d) => (d.open = false));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setNote(null);
+    try {
+      const requisitions: RequisitionRow[] = Object.entries(rows)
+        .filter(([, qty]) => (qty ?? 0) > 0)
+        .map(([id, qty]) => ({ id, qty }));
+
+      const drinksPayload = Object.entries(drinks)
+        .filter(([, qty]) => (qty ?? 0) > 0)
+        .map(([id, qty]) => ({ id, qty }));
+
+      const payload = {
+        shiftId,
+        endOfShift: { rolls, meatGrams },
+        drinks: drinksPayload,
+        requisitions,
+      };
+
+      const res = await fetch("/api/daily-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setNote({ type: "ok", msg: "Stock saved." });
+    } catch (e: any) {
+      setNote({ type: "err", msg: e?.message || "Failed to save." });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setNote(null), 4000);
+    }
+  };
+
+  if (loading) return <div className="p-6 text-[14px]">Loading stock…</div>;
+
+  return (
+    <div className="p-6 space-y-8 text-[14px]">
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold">Daily Stock</h1>
+        <div className="text-[12px] text-gray-600">
+          {shiftId ? (
+            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1">Linked to shift: {shiftId}</span>
+          ) : (
+            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 bg-amber-50">No shift ID provided</span>
+          )}
+        </div>
+      </div>
+
+      {/* End-of-Shift Counts */}
+      <section className="rounded-xl border p-4">
+        <h2 className="font-semibold mb-4">End-of-Shift Counts</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1">Rolls (pcs)</label>
+            <input
+              type="number"
+              min={0}
+              className="w-full border rounded-md px-3 py-2"
+              value={rolls}
+              onChange={(e) => setRolls(Number(e.target.value || 0))}
+            />
+          </div>
+          <div>
+            <label className="block mb-1">Meat (grams)</label>
+            <input
+              type="number"
+              min={0}
+              className="w-full border rounded-md px-3 py-2"
+              value={meatGrams}
+              onChange={(e) => setMeatGrams(Number(e.target.value || 0))}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Drinks Count by SKU */}
+      <section className="rounded-xl border p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-semibold">Drinks (by SKU)</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          {drinksList.map((d) => (
+            <div key={d.id} className="rounded-md border p-3 flex items-center justify-between gap-3">
+              <div className="font-medium leading-snug">{d.name}</div>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                className="w-20 border rounded-md px-2 py-1"
+                value={d.qty}
+                onChange={(e) => setDrinkQty(d.id, Number(e.target.value || 0))}
+                placeholder="0"
+                aria-label={`drink-${d.name}`}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Requisition List (all other categories) */}
+      <section className="rounded-xl border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">Requisition List</h2>
+          <div className="flex gap-2">
+            <button className="border rounded-md px-3 py-1" onClick={expandAll}>+ Expand all</button>
+            <button className="border rounded-md px-3 py-1" onClick={collapseAll}>− Collapse all</button>
+          </div>
+        </div>
+        <div className="mt-4">
+          <StockGrid
+            blocks={blocks}
+            onChange={(id, qty) => setReqQty(id, qty)}
+          />
+        </div>
+      </section>
+
+      <div className="flex items-center gap-3">
+        <button className="bg-emerald-600 text-white rounded-lg px-4 py-2" disabled={saving} onClick={save}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {note && (
+          <span className={note.type === "ok" ? "text-green-700" : "text-red-600"}>{note.msg}</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DailySalesStock;
+```
+
+---
+
+## 3) QA Checklist (paste results in PR)
+
+1. `GET /api/stock-catalog` returns JSON with **items** and real categories from CSV; first 4 meat rows are excluded.
+2. **End‑of‑Shift** shows **only Rolls + Meat**.
+3. **Drinks** render as a grid of SKUs (no total box).
+4. **Requisition List** renders as category accordions with **5‑col grid** (xl), **3‑col** (md), **2‑col** (sm).
+5. No **Notes** fields anywhere.
+6. Save → `POST /api/daily-stock` with payload `{ shiftId, endOfShift:{rolls,meatGrams}, drinks:[{id,qty}], requisitions:[{id,qty}] }` → returns OK.
+7. Buttons are **only at bottom**; text/buttons render at **14px**.
+
+---
+
+## 4) Dependencies
+
+* **Server**: `csv-parse` (sync API)
+
+```bash
+npm i csv-parse
+```
+
+> If your server is TypeScript, ensure `tsconfig` includes `esModuleInterop` or import accordingly.
+
+---
+
+## 5) Notes
+
+* This keeps your CSV as the **source of truth**. Updating the CSV file updates the UI on next request (mtime‑cached).
+* Drinks are **counted**, not requisitioned (unless you intentionally add drink items into requisition later).
+* The first 4 meat rows are excluded from the requisition list by rule; adjust in `excludeFirstFourMeat()` if your CSV changes ordering.

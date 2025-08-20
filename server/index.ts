@@ -381,6 +381,10 @@ async function checkSchema() {
   });
 
   // Serve static files from public directory
+  // Add stock catalog API route
+  const stockCatalog = await import('./api/stock-catalog');
+  app.use('/api/stock-catalog', stockCatalog.default);
+  
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks
