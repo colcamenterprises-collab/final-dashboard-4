@@ -74,7 +74,7 @@ const DailyStock: React.FC = () => {
 
   // Helper function for safe integer parsing
   const safeInt = (v: string) => {
-    const n = parseInt((v ?? '').toString().replace(/[^\p{Nd}]/gu, ''), 10);
+    const n = parseInt((v ?? '').toString().replace(/[^\d]/g, ''), 10);
     return Number.isFinite(n) ? n : 0;
   };
 
