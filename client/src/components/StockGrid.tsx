@@ -10,10 +10,10 @@ export function StockGrid({
   blocks: CategoryBlock[];
   onChange: (id: string, qty: number) => void;
 }) {
-  // Helper function for safe integer parsing
+  // Helper function for safe integer parsing (supports Unicode digits including Thai)
   const safeInt = (v: string) => {
-    const n = parseInt(v.replace(/[^\d]/g, '') || '0', 10);
-    return isNaN(n) ? 0 : n;
+    const n = parseInt((v ?? '').toString().replace(/[^\p{Nd}]/gu, ''), 10);
+    return Number.isFinite(n) ? n : 0;
   };
 
   return (

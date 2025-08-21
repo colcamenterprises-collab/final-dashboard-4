@@ -1,0 +1,259 @@
+IMPLEMENT THIS – Daily Stock (Form 2) FINAL CUT
+
+Scope lock (do only this)
+
+Fix the UI layout to a true grid (no notes field).
+
+Remove “Drinks total (pcs)” from End-of-Shift.
+
+Make CSV upload the single source of truth (already mostly there) and refresh the catalog on upload.
+
+Parse Cost properly (no NaN).
+
+Keep sections collapsed by default.
+
+Inline save message (no modal/alert).
+
+No other refactors.
+
+
+
+---
+
+Data contract (unchanged; just verify)
+
+CSV columns (case-insensitive; trimmed)
+Name, Category, Unit, Cost, Supplier, Portions
+
+Name (string) – display label in Form 2
+
+Category (string) – accordion group in Form 2
+
+Unit (string) – purchase unit (for shopping list + payload)
+
+Cost (number) – purchase cost for shopping list; parse rules below
+
+Supplier (string) – vendor
+
+Portions (number|blank) – optional (for later cost calc)
+
+Ignore/never store: SKU or any other cols
+
+
+Upsert rule on upload: key = (Category, Name)
+
+New in CSV → add
+
+Missing from CSV → remove from catalog
+
+Existing → update fields
+
+After upload, Form 2 must reflect immediately (no hardcoded lists).
+
+
+Cost parsing (fix NaN):
+
+Strip currency and non-numeric except decimal point: /[^0-9.,-]/g
+
+If value looks like 1,234.56 → thousands commas allowed
+
+If value looks like 1.234,56 → treat comma as decimal (EU style)
+
+Final store as numeric (float). If empty → null.
+
+
+
+---
+
+Backend endpoints (use existing where present)
+
+GET /api/costing/ingredients → returns the catalog (category grouped or flat list; current shape OK).
+
+POST /api/ingredients/import → accepts the CSV file, runs upsert/replace logic, then invalidates cache so Form 2 reloads fresh.
+
+
+Do not hardcode a CSV path. Always use the uploaded CSV.
+
+
+---
+
+Form 2 UI (Daily Stock)
+
+1) End-of-Shift Counts
+
+Keep: Rolls (pcs), Meat (grams)
+
+Remove: Drinks total (pcs)
+
+
+2) Requisition List (from catalog)
+
+Sections = Categories from CSV
+
+Collapsed by default on initial page load
+
+Keep Expand all / Collapse all controls (default remains collapsed)
+
+
+3) Item layout (replace list + notes)
+
+Remove all Notes fields entirely.
+
+Render a responsive grid per category:
+
+
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  {/* Item cards */}
+</div>
+
+Item card (14px, compact, number right-aligned):
+
+
+<div className="flex items-center justify-between rounded-lg border p-3">
+  <div className="text-[14px] font-medium truncate pr-3">{item.name}</div>
+  <input
+    type="number"
+    inputMode="numeric"
+    min="0"
+    step="1"
+    aria-label={`${item.name} quantity`}
+    className="w-24 rounded-md border px-3 py-2 text-right text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+    value={qty[item.id] ?? 0}
+    onChange={(e) => setQtyFor(item.id, safeInt(e.target.value))}
+  />
+</div>
+
+Helper (coerce digits; tolerates Thai numerals if browser supplies):
+
+
+const safeInt = (v: string) => {
+  const n = parseInt((v ?? '').toString().replace(/[^\p{Nd}]/gu, ''), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+Debounce input state updates ~100–150 ms to avoid thrash.
+
+
+4) Styling guide (apply consistently)
+
+Base text: 14px
+
+Comfortable whitespace: gap-4 grids, space-y-6 between sections
+
+Save button is fixed at the bottom of page content area (not floating overlay)
+
+All quantities right-aligned numbers
+
+
+
+---
+
+Save behavior (no schema changes)
+
+On Save, POST the existing stock endpoint (already wired; keep its URL) with this payload (don’t rename keys):
+
+{
+  "shiftId": "<uuid-or-null>",
+  "rolls": 0,
+  "meatGrams": 0,
+  "items": [
+    { "name": "Coke Zero", "category": "Drinks", "quantity": 12, "unit": "1 box 24 cans" },
+    { "name": "White Cabbage", "category": "Fresh Food", "quantity": 3, "unit": "kg" }
+  ]
+}
+
+It’s OK if server filters out zeros later for the shopping list.
+
+
+UX after save: inline success note (green, 4s fade) “Stock saved.”
+On error: inline red note with error text. No alert/modal.
+
+
+---
+
+QA checklist (must all pass)
+
+1. Upload CSV (latest file) in Ingredients page
+
+Ingredients table shows Cost parsed numerically (no NaN)
+
+Categories match CSV exactly
+
+
+
+2. Open /operations/stock?shift=…
+
+End-of-Shift shows only Rolls + Meat (no Drinks total)
+
+All categories collapsed
+
+
+
+3. Expand Drinks
+
+You see grid (4 per row on desktop, 2 on tablet, 1 on mobile)
+
+No Notes column anywhere
+
+
+
+4. Enter a few quantities (e.g., Drinks + Fresh Food)
+
+Click Save → inline green “Stock saved.”
+
+Refresh page → values persist (loaded from API)
+
+
+
+5. Upload a modified CSV (remove 1 item, add 1 item)
+
+Old item disappears, new item appears without code changes
+
+
+
+6. Mobile viewport sanity: inputs usable; grid collapses to 1–2 cols
+
+
+
+Record: console logs, network payload of the save, and 2–3 screenshots.
+
+
+---
+
+What’s currently wrong (fix list from latest screenshots)
+
+Drinks total (pcs) is still visible in End-of-Shift → remove it.
+
+Category sections render as linear rows with “Notes (optional)” → remove notes and switch to the grid card layout above.
+
+Cost shows NaN in Ingredients table → fix Cost parsing per rules.
+
+Default state should be collapsed (keep Expand/Collapse all).
+
+
+
+---
+
+Done signal (acceptance)
+
+Reply with:
+
+3 screenshots:
+
+1. Ingredients table with numeric Costs,
+
+
+2. Form 2 with categories collapsed,
+
+
+3. Drinks expanded showing 4-col grid (no Notes).
+
+
+
+Save request payload (redacted shiftId ok).
+
+One CSV swap demo: before/after item list change.
+
+
+
+---
