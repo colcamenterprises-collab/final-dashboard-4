@@ -1,0 +1,242 @@
+FINAL IMPLEMENTATION SPEC (Hand to agent)
+
+0) Scope lock
+
+Do only the items listed below. No extra refactors or reorganising. If something differs, ask for approval first.
+
+
+---
+
+1) Data contract (unchanged; just confirm)
+
+CSV → Ingredients store → Stock Form
+
+Required columns (case-insensitive, trimmed):
+
+Name (string) – the display label on the stock form
+
+Category (string) – used to group items in Form 2 (accordion)
+
+Unit (string) – purchasing unit (e.g., “pcs”, “kg”, “tray”)
+
+Cost (number) – purchasing cost (for shopping list & later cost calc)
+
+Supplier (string) – vendor name
+
+Portions (number | blank) – optional, for cost calculator later
+
+
+Do not store or display SKU.
+
+Import behavior:
+
+Replace the in-memory + DB ingredient catalog with the latest CSV (upsert by Name within a Category).
+
+If an item disappears from the CSV, remove it from the catalog.
+
+This catalog is the single source for Form 2; no hardcoded lists.
+
+
+
+---
+
+2) Form 2 (Daily Stock) UI adjustments
+
+2.1 End-of-Shift Counts (top)
+
+Keep:
+
+Rolls (pcs)
+
+Meat (grams)
+
+
+Remove: “Drinks total (pcs)”. Drinks are counted per brand in the item list.
+
+Leave existing values/labels otherwise as-is.
+
+
+2.2 Requisition List (from Ingredients)
+
+Sections = Categories from CSV.
+
+Collapsed by default on initial load.
+
+Add Expand all / Collapse all buttons (already present). Default remains collapsed.
+
+
+2.3 Item layout per category
+
+Remove Notes column/field entirely.
+
+Render items in a responsive grid, 4 items per row on desktop, 2 per row on tablet, 1 per row on mobile.
+
+
+Example (Tailwind) for the grid container:
+
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  {/* Item cards */}
+</div>
+
+Item card structure (no Notes):
+
+<div className="flex items-center justify-between rounded-lg border p-3">
+  <div className="text-[14px] font-medium truncate pr-3">{item.name}</div>
+  <input
+    type="number"
+    inputMode="numeric"
+    min="0"
+    step="1"
+    className="w-24 rounded-md border px-3 py-2 text-right text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+    value={qty[item.id] ?? 0}
+    onChange={(e) => setQtyFor(item.id, safeInt(e.target.value))}
+  />
+</div>
+
+Helper:
+
+const safeInt = (v: string) => {
+  const n = parseInt(v.replace(/[^\d]/g, '') || '0', 10);
+  return isNaN(n) ? 0 : n;
+};
+
+2.4 Styling guide (apply consistently)
+
+Base text: 14px
+
+Add comfortable whitespace between sections and within grids (gap-4 grids, space-y-6 sections)
+
+Keep the Save button fixed at the bottom of the page content (not floating over inputs).
+
+Inputs are right-aligned numbers.
+
+
+
+---
+
+3) Behavior & persistence
+
+The form should load the ingredient catalog (by category) each time.
+
+Quantities typed are kept in local component state; on Save:
+
+POST to existing endpoint (/api/daily-stock or the current stock-save route you already wired)
+
+Payload shape (don’t change keys; add only if missing):
+
+{
+  "shiftId": "<uuid-or-null>",
+  "rolls": 0,
+  "meatGrams": 0,
+  "items": [
+    { "name": "Coke Zero", "category": "Drinks", "quantity": 12, "unit": "can" },
+    { "name": "White Cabbage", "category": "Fresh Food", "quantity": 3, "unit": "head" }
+  ]
+}
+
+
+Any items with quantity 0 or blank are still saved but the backend may ignore them when producing the shopping list. (OK to filter out 0s server-side on report generation.)
+
+Categories must reflect the latest CSV upload every time with no code changes.
+
+
+
+---
+
+4) Performance / UX
+
+Render all categories but collapsed initially.
+
+“Expand all” expands only the visible categories.
+
+Debounce number inputs (100–150ms) to avoid heavy re-renders on fast typing.
+
+Keyboard UX: Tab advances through inputs in reading order.
+
+
+
+---
+
+5) Accessibility / i18n
+
+Inputs: aria-label={${item.name} quantity} for screen readers.
+
+Accept only digits; coerce Thai numerals if the browser provides them (we already sanitize in safeInt).
+
+No trailing toast/alert popups. On Save success, show inline green note: “Stock saved.” (4s fade). On error, red note with error text.
+
+
+
+---
+
+6) Testing checklist (run & record)
+
+Before:
+
+Upload the latest CSV in Ingredients.
+
+Confirm categories reflect the CSV.
+
+
+Then test:
+
+1. Load /operations/stock?shift=…
+
+End-of-Shift shows only Rolls + Meat, no Drinks total.
+
+Categories appear collapsed.
+
+
+
+2. Expand “Drinks”: check grid layout (4 per row desktop), no Notes.
+
+
+3. Enter a few quantities (Drinks + Fresh Food).
+
+
+4. Click Save → inline “Stock saved.” message, no modal/alert.
+
+
+5. Refresh page → confirm values persist (from API).
+
+
+6. Upload a new CSV removing 1 item, adding 1 item:
+
+Old item disappears, new item appears, with no code changes.
+
+
+
+7. Mobile viewport: grid degrades to 1–2 columns, inputs remain usable.
+
+
+
+Record console output, network request payload, and screenshots. Share in the QA note.
+
+
+---
+
+7) Non-goals (do not change now)
+
+No changes to Form 1 (already good).
+
+No changes to Cost Calculator logic (portions/cost integration will be next).
+
+No Notes fields anywhere in Form 2.
+
+No “Drinks total” input in End-of-Shift.
+
+
+
+---
+
+8) Acceptance criteria (sign-off)
+
+CSV upload fully drives categories/items with no hardcoding.
+
+Form 2 shows categories collapsed, with grid rows (no Notes).
+
+End-of-Shift has no drinks total; only Rolls & Meat remain.
+
+Save works reliably; reload shows saved state.
+
+All text/buttons at 14px, spacing tidy.
