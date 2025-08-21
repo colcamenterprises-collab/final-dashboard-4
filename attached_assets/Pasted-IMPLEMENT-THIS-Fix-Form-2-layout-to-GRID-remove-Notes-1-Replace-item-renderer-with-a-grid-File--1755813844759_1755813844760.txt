@@ -1,0 +1,97 @@
+IMPLEMENT-THIS: Fix Form 2 layout to GRID & remove Notes
+1) Replace item renderer with a grid
+
+File: client/src/pages/operations/DailyStock.tsx
+(or if you split it: wherever each category section renders its items; sometimes named StockCategory, StockGrid, or similar)
+
+A) Find this (or similar)
+
+You’ll see an items .map() that renders a row and a notes input:
+
+{/* inside a category section */}
+{category.items.map(item => (
+  <div key={item.id} className="flex items-center gap-3 border-b py-3">
+    <div className="flex-1">{item.name}</div>
+    <input type="number" ... />   {/* quantity */}
+    <input placeholder="Notes (optional)" ... />   {/* REMOVE THIS */}
+  </div>
+))}
+
+B) Replace that block with this grid:
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  {category.items.map(item => (
+    <div
+      key={item.id}
+      className="flex items-center justify-between rounded-lg border p-3"
+    >
+      <div className="text-[14px] font-medium truncate pr-3">{item.name}</div>
+
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={1}
+        aria-label={`${item.name} quantity`}
+        className="w-24 rounded-md border px-3 py-2 text-right text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        value={qty[item.id] ?? 0}
+        onChange={(e) => setQtyFor(item.id, safeInt(e.target.value))}
+      />
+    </div>
+  ))}
+</div>
+
+
+Add the helper (top of file or a utils module):
+
+const safeInt = (v: string) => {
+  const n = parseInt((v ?? '').toString().replace(/[^\p{Nd}]/gu, ''), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+
+🔎 Search-and-remove every occurrence of Notes (optional) and the corresponding input component across the file(s).
+
+2) Remove “Drinks total (pcs)” in End-of-Shift
+
+File: same page (DailyStock.tsx) where the header section is rendered.
+
+Delete the whole Drinks total (pcs) input block and any state it used.
+
+Keep only Rolls (pcs) and Meat (grams).
+
+3) Default collapsed sections
+
+Where you render each category accordion, ensure default is collapsed. Examples:
+
+If using your own accordion:
+
+// Ensure default expand = false
+const [openCatIds, setOpenCatIds] = useState<Record<string, boolean>>({});
+// When first loading, do NOT open anything.
+
+
+If using a library component, set defaultOpen={false} (or equivalent).
+
+Keep the existing Expand all / Collapse all buttons; just wire them to set all categories open/closed.
+
+4) Style baseline
+
+Make sure text uses 14px: either a parent wrapper text-[14px] or each control (already set in snippet).
+
+Keep comfortable spacing: category container can use space-y-6, grids already use gap-4.
+
+5) Save payload (unchanged keys)
+
+When saving, continue POSTing the payload like:
+
+{
+  "shiftId": "<uuid-or-null>",
+  "rolls": 0,
+  "meatGrams": 0,
+  "items": [
+    { "name": "Coke Zero", "category": "Drinks", "quantity": 12, "unit": "1 box 24 cans" }
+  ]
+}
+
+
+Show inline green note “Stock saved.” on success (4s), inline red note on error. No alerts/modals.
