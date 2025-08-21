@@ -223,8 +223,7 @@ async function checkSchema() {
           totalExpenses: parseFloat(totalExpenses) || 0,
           closingCash: parseFloat(closingCash) || 0,
           cashBanked: parseFloat(cashBanked) || 0,
-          qrTransferred: parseFloat(qrTransferred) || 0,
-          amountBanked: parseFloat(amountBanked) || 0,
+          qrTransfer: parseFloat(qrTransferred) || 0,
           notes: notes || '',
           status
         },

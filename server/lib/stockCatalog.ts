@@ -49,8 +49,75 @@ function excludeFirstFourMeat(rows: any[]) {
 }
 
 export function loadCatalogFromCSV(): CatalogRow[] {
-  // Temporary hardcoded data to test the system works
-  console.log("[stockCatalog] Loading temporary test data");
+  try {
+    const csvPath = path.join(process.cwd(), "attached_assets", "Food Costings - Supplier - Portions - Prices v2.1 20.08.25_1755715627430.csv");
+    
+    if (!fs.existsSync(csvPath)) {
+      console.warn("[stockCatalog] CSV file not found, using fallback test data");
+      return getFallbackData();
+    }
+
+    const stat = fs.statSync(csvPath);
+    
+    // Use cache if file hasn't changed
+    if (CACHE && CACHE.mtime >= stat.mtimeMs) {
+      console.log("[stockCatalog] Using cached data");
+      return CACHE.items;
+    }
+
+    console.log("[stockCatalog] Loading from CSV:", csvPath);
+    const csvContent = fs.readFileSync(csvPath, "utf8");
+    
+    const records = parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    });
+
+    // Filter out rows with missing Item names and header repeats
+    const cleanRows = records.filter((row: any) => {
+      const item = (row["Item"] || "").toString().trim();
+      if (!item || item.toLowerCase() === "item") return false;
+      if (isHeaderRepeat(row)) return false;
+      return true;
+    });
+
+    // Apply business rule: exclude first 4 meat items
+    const filteredRows = excludeFirstFourMeat(cleanRows);
+
+    const items: CatalogRow[] = filteredRows.map((row: any) => {
+      const item = (row["Item"] || "").toString().trim();
+      const category = (row["Internal Category"] || "").toString().trim();
+      
+      return {
+        id: slugify(item),
+        name: item,
+        category: category,
+        type: detectIsDrink(category) ? "drink" : "item",
+        raw: row
+      };
+    });
+
+    CACHE = { items, mtime: stat.mtimeMs };
+    console.log(`[stockCatalog] Loaded ${items.length} items from CSV`);
+    
+    // Log category summary
+    const categoryCount = items.reduce((acc, item) => {
+      acc[item.category] = (acc[item.category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log("[stockCatalog] Categories:", Object.entries(categoryCount).map(([cat, count]) => `${cat}: ${count}`).join(", "));
+    
+    return items;
+  } catch (error) {
+    console.error("[stockCatalog] Error loading CSV:", error);
+    return getFallbackData();
+  }
+}
+
+function getFallbackData(): CatalogRow[] {
+  console.log("[stockCatalog] Using fallback test data");
   
   const testItems: CatalogRow[] = [
     { id: "coke", name: "Coke", category: "Drinks", type: "drink" },
@@ -65,7 +132,5 @@ export function loadCatalogFromCSV(): CatalogRow[] {
     { id: "chicken-nuggets", name: "Chicken Nuggets", category: "Frozen Food", type: "item" }
   ];
   
-  CACHE = { items: testItems, mtime: Date.now() };
-  console.log("[stockCatalog] Test data loaded:", testItems.length, "items");
   return testItems;
 }

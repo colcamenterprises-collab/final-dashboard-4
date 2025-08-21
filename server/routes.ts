@@ -1752,11 +1752,11 @@ export function registerRoutes(app: express.Application): Server {
       } = req.body || {};
 
       const data = {
-        salesFormId: salesFormId || null,
+        salesId: salesFormId || null, // Updated to match schema
         meatGrams: parseInt(String(meatGrams), 10) || 0,
         burgerBuns: parseInt(String(burgerBuns), 10) || 0,
-        drinkStock: Object.fromEntries(Object.entries(drinks).map(([k, v]) => [k, parseInt(String(v), 10) || 0])),
-        stockRequests: Object.fromEntries(Object.entries(stockRequests).map(([k, v]) => [k, parseInt(String(v), 10) || 0])),
+        drinksJson: Object.fromEntries(Object.entries(drinks).map(([k, v]) => [k, parseInt(String(v), 10) || 0])), // Updated to match schema
+        purchasingJson: Object.fromEntries(Object.entries(stockRequests).map(([k, v]) => [k, parseInt(String(v), 10) || 0])), // Updated to match schema
         status: 'submitted' as const,
       };
 

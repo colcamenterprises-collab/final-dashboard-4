@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { parse } from "csv-parse/sync";
+import { loadCatalogFromCSV } from "../lib/stockCatalog";
 
 const prisma = new PrismaClient();
 export const costingRouter = Router();
@@ -83,9 +84,30 @@ costingRouter.post("/ingredients/import", async (req, res) => {
   }
 });
 
-costingRouter.get("/ingredients", async (_req, res) => {
-  const list = await prisma.ingredientV2.findMany({ orderBy: { name: "asc" } });
-  res.json({ list });
+// /api/costing/ingredients - CSV-driven ingredient data with proper format
+costingRouter.get("/ingredients", async (req: Request, res: Response) => {
+  try {
+    const catalogItems = loadCatalogFromCSV();
+    
+    // Transform catalog items to match frontend expectations
+    const ingredients = catalogItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      unit: item.raw?.["Unit Measurement"] || "each",
+      cost: parseFloat(item.raw?.["Cost"]?.replace(/[฿,]/g, '') || "0") || 0,
+      supplier: item.raw?.["Supplier"] || "Unknown",
+      portions: parseInt(item.raw?.["Portion Size"]?.replace(/[^\d]/g, '') || "1") || 1
+    }));
+
+    console.log(`[costing/ingredients] Returning ${ingredients.length} ingredients across categories:`,
+      [...new Set(ingredients.map(i => i.category))].join(", "));
+
+    res.json({ list: ingredients });
+  } catch (err) {
+    console.error('[costing/ingredients] Error:', err);
+    res.status(500).json({ ok: false, error: 'Failed to load ingredients' });
+  }
 });
 
 costingRouter.post("/recipes", async (req, res) => {
