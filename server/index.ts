@@ -174,8 +174,7 @@ async function checkSchema() {
       const { salesFormId } = req.params;
       
       const stockForm = await prisma.dailyStock.findUnique({
-        where: { salesFormId },
-        include: { salesForm: true },
+        where: { id: salesFormId },
       });
 
       if (!stockForm) {
@@ -218,10 +217,9 @@ async function checkSchema() {
           cashSales: parseFloat(cashSales) || 0,
           qrSales: parseFloat(qrSales) || 0,
           grabSales: parseFloat(grabSales) || 0,
-          aroiDeeSales: parseFloat(aroiDeeSales) || 0,
+          aroiSales: parseFloat(aroiDeeSales) || 0,
           totalSales: parseFloat(totalSales) || 0,
-          shoppingExpenses: shoppingExpenses || [],
-          wages: wages || [],
+          // Note: shoppingExpenses and wages fields not in current schema
           totalExpenses: parseFloat(totalExpenses) || 0,
           closingCash: parseFloat(closingCash) || 0,
           cashBanked: parseFloat(cashBanked) || 0,

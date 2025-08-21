@@ -1856,7 +1856,8 @@ export function registerRoutes(app: express.Application): Server {
       
       if (mode === 'backfill') {
         // Trigger backfill sync (last 90 days)
-        const { syncReceiptsWindow } = await import('./services/pos-ingestion/ingester.js');
+        const ingesterModule = await import('./services/pos-ingestion/ingester.js');
+        const syncReceiptsWindow = (ingesterModule as any).syncReceiptsWindow;
         
         const endDate = new Date();
         const startDate = new Date();
@@ -1866,7 +1867,8 @@ export function registerRoutes(app: express.Application): Server {
         res.json({ mode: 'backfill', result });
       } else {
         // Trigger incremental sync (last 15 minutes)
-        const { syncReceiptsWindow } = await import('./services/pos-ingestion/ingester.js');
+        const ingesterModule = await import('./services/pos-ingestion/ingester.js');
+        const syncReceiptsWindow = (ingesterModule as any).syncReceiptsWindow;
         
         const endDate = new Date();
         const startDate = new Date();
@@ -1912,7 +1914,8 @@ export function registerRoutes(app: express.Application): Server {
   // Trigger Analytics Processing
   app.post('/api/analytics/process', async (req: Request, res: Response) => {
     try {
-      const { processAnalytics } = await import('./services/analytics/processor.js');
+      const analyticsModule = await import('./services/analytics/processor.js');
+      const processAnalytics = (analyticsModule as any).processAnalytics;
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
       
@@ -1975,7 +1978,8 @@ export function registerRoutes(app: express.Application): Server {
   // Trigger Jussi Summary
   app.post('/api/jussi/generate', async (req: Request, res: Response) => {
     try {
-      const { generateDailySummary } = await import('./services/jussi/summaryGenerator.js');
+      const jussiModule = await import('./services/jussi/summaryGenerator.js');
+      const generateDailySummary = (jussiModule as any).generateDailySummary;
       
       const result = await generateDailySummary();
       
