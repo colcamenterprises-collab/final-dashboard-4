@@ -55,7 +55,6 @@ export default function App() {
                   <Route path={ROUTES.OVERVIEW} element={<Guard><Overview /></Guard>} />
 
                   {/* Operations */}
-                  <Route path={ROUTES.DAILY_SALES_STOCK} element={<Guard><DailySalesStock /></Guard>} />
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesLibrary /></Guard>} />
                   
                   {/* ---- FORM 1: canonical + aliases ---- */}
