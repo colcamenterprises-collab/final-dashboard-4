@@ -1,6 +1,6 @@
 import React from "react";
 
-export type StockItemQty = { id: string; label: string; qty: number };
+export type StockItemQty = { id: string; label: string; qty: number; unit?: string };
 export type CategoryBlock = { category: string; items: StockItemQty[] };
 
 export function StockGrid({
@@ -10,27 +10,33 @@ export function StockGrid({
   blocks: CategoryBlock[];
   onChange: (id: string, qty: number) => void;
 }) {
+  // Helper function for safe integer parsing
+  const safeInt = (v: string) => {
+    const n = parseInt(v.replace(/[^\d]/g, '') || '0', 10);
+    return isNaN(n) ? 0 : n;
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {blocks.map((block) => (
-        <details data-accordion="catalog" key={block.category} open className="rounded-lg border">
+        <details data-accordion="catalog" key={block.category} className="rounded-lg border">
           <summary className="cursor-pointer select-none px-4 py-2 font-medium text-[14px]">
             {block.category}
           </summary>
           <div className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-              {block.items.map((it) => (
-                <div key={it.id} className="rounded-md border p-3 flex items-center justify-between gap-3">
-                  <div className="text-[14px] font-medium leading-snug">{it.label}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {block.items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="text-[14px] font-medium truncate pr-3">{item.label}</div>
                   <input
                     type="number"
-                    min={0}
                     inputMode="numeric"
-                    className="w-20 border rounded-md px-2 py-1 text-[14px]"
-                    value={it.qty}
-                    onChange={(e) => onChange(it.id, Number(e.target.value || 0))}
-                    placeholder="0"
-                    aria-label={`qty-${it.label}`}
+                    min="0"
+                    step="1"
+                    className="w-24 rounded-md border px-3 py-2 text-right text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={item.qty ?? 0}
+                    onChange={(e) => onChange(item.id, safeInt(e.target.value))}
+                    aria-label={`${item.label} quantity`}
                   />
                 </div>
               ))}

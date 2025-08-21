@@ -1,27 +1,30 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { StockGrid, CategoryBlock } from "../../components/StockGrid";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { StockGrid } from "../../components/StockGrid";
 
-// Server catalog row
-type CatalogItem = {
+// Server ingredient catalog from CSV import
+type IngredientItem = {
   id: string;
   name: string;
   category: string;
-  type: "drink" | "item";
+  unit: string;
+  cost: number;
+  supplier: string;
+  portions?: number;
 };
 
-type CatalogResponse = { items: CatalogItem[] };
+type IngredientsResponse = { list: IngredientItem[] };
 
-type RequisitionRow = { id: string; qty: number };
-
-type DrinksRow = { id: string; name: string; qty: number };
+export type CategoryBlock = {
+  category: string;
+  items: { id: string; label: string; qty: number; unit: string }[];
+};
 
 const DailyStock: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
-  const [drinks, setDrinks] = useState<Record<string, number>>({});
-  const [rows, setRows] = useState<Record<string, number>>({});
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
@@ -31,12 +34,12 @@ const DailyStock: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/stock-catalog");
-        const data: CatalogResponse = await res.json();
+        const res = await fetch("/api/costing/ingredients");
+        const data: IngredientsResponse = await res.json();
         if (!mounted) return;
-        setCatalog(data.items);
+        setIngredients(data.list || []);
       } catch (e) {
-        console.error(e);
+        console.error("Failed to load ingredients catalog:", e);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -46,38 +49,39 @@ const DailyStock: React.FC = () => {
     };
   }, []);
 
-  // Split catalog → drinks vs requisition items (non‑drinks)
-  const drinksList: DrinksRow[] = useMemo(() => {
-    if (!Array.isArray(catalog)) return [];
-    return catalog
-      .filter((c) => c.type === "drink")
-      .map((c) => ({ id: c.id, name: c.name, qty: drinks[c.id] ?? 0 }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [catalog, drinks]);
-
+  // Group ingredients by category
   const blocks: CategoryBlock[] = useMemo(() => {
-    if (!Array.isArray(catalog)) return [];
-    const map = new Map<string, { id: string; label: string }[]>();
-    for (const item of catalog) {
-      if (item.type === "drink") continue; // drinks are counted in EoS drinks table
-      if (!map.has(item.category)) map.set(item.category, []);
-      map.get(item.category)!.push({ id: item.id, label: item.name });
+    if (!Array.isArray(ingredients)) return [];
+    const map = new Map<string, IngredientItem[]>();
+    for (const ingredient of ingredients) {
+      if (!map.has(ingredient.category)) map.set(ingredient.category, []);
+      map.get(ingredient.category)!.push(ingredient);
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([category, items]: [string, { id: string; label: string }[]]) => ({
+      .map(([category, items]) => ({
         category,
         items: items
-          .sort((a: { id: string; label: string }, b: { id: string; label: string }) => a.label.localeCompare(b.label))
-          .map((i: { id: string; label: string }) => ({ id: i.id, label: i.label, qty: rows[i.id] ?? 0 })),
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((item) => ({ 
+            id: item.name,  // Use name as ID for consistent lookup
+            label: item.name, 
+            qty: quantities[item.name] ?? 0,
+            unit: item.unit
+          })),
       }));
-  }, [catalog, rows]);
+  }, [ingredients, quantities]);
 
-  const setDrinkQty = (id: string, qty: number) =>
-    setDrinks((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+  // Helper function for safe integer parsing
+  const safeInt = (v: string) => {
+    const n = parseInt(v.replace(/[^\d]/g, '') || '0', 10);
+    return isNaN(n) ? 0 : n;
+  };
 
-  const setReqQty = (id: string, qty: number) =>
-    setRows((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+  // Debounced quantity update function
+  const setQuantity = useCallback((id: string, qty: number) => {
+    setQuantities((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+  }, []);
 
   const expandAll = () => {
     document
@@ -94,15 +98,21 @@ const DailyStock: React.FC = () => {
     setSaving(true);
     setNote(null);
     try {
-      const filteredRequisition = Object.fromEntries(
-        Object.entries(rows).filter(([_, qty]) => Number(qty) > 0)
-      );
+      // Build items array from ingredients with quantities
+      const items = ingredients
+        .map(ingredient => ({
+          name: ingredient.name,
+          category: ingredient.category,
+          quantity: quantities[ingredient.name] || 0,
+          unit: ingredient.unit
+        }))
+        .filter(item => item.quantity > 0); // Only include items with quantities > 0
 
       const payload = {
-        shiftId,
+        shiftId: shiftId || null,
         rolls,
         meatGrams,
-        requisition: filteredRequisition,
+        items
       };
 
       const res = await fetch("/api/daily-stock", {
@@ -136,96 +146,73 @@ const DailyStock: React.FC = () => {
       </div>
 
       {/* End-of-Shift Counts */}
-      <section className="rounded-xl border p-4">
-        <h2 className="font-semibold mb-4">End-of-Shift Counts</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block mb-1">Rolls (pcs)</label>
-            <input
-              type="number"
-              min={0}
-              className="w-full border rounded-md px-3 py-2"
-              value={rolls}
-              onChange={(e) => setRolls(Number(e.target.value || 0))}
-            />
-          </div>
-          <div>
-            <label className="block mb-1">Meat (grams)</label>
-            <input
-              type="number"
-              min={0}
-              className="w-full border rounded-md px-3 py-2"
-              value={meatGrams}
-              onChange={(e) => setMeatGrams(Number(e.target.value || 0))}
-            />
+      <section className="space-y-6">
+        <div className="rounded-xl border p-4">
+          <h2 className="text-[14px] font-semibold mb-4">End-of-Shift Counts</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[14px] mb-1">Rolls (pcs)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={rolls}
+                onChange={(e) => setRolls(safeInt(e.target.value))}
+                aria-label="Rolls quantity"
+              />
+            </div>
+            <div>
+              <label className="block text-[14px] mb-1">Meat (grams)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={meatGrams}
+                onChange={(e) => setMeatGrams(safeInt(e.target.value))}
+                aria-label="Meat quantity in grams"
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Drinks Count by SKU */}
-      <section className="rounded-xl border p-4">
-        <h2 className="font-semibold mb-4">Drinks Count by SKU</h2>
-        {drinksList.length === 0 ? (
-          <p className="text-gray-500">No drinks found in catalog</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2 font-medium">Drink</th>
-                  <th className="text-left p-2 font-medium w-24">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drinksList.map((drink) => (
-                  <tr key={drink.id} className="border-b">
-                    <td className="p-2">{drink.name}</td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        min={0}
-                        className="w-20 border rounded-md px-2 py-1"
-                        value={drink.qty}
-                        onChange={(e) => setDrinkQty(drink.id, Number(e.target.value || 0))}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+
 
       {/* Requisition Grid */}
-      <section className="rounded-xl border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Requisition List</h2>
-          <div className="space-x-2">
-            <button 
-              type="button" 
-              onClick={expandAll}
-              className="px-3 py-1 text-xs border rounded hover:bg-gray-50"
-            >
-              Expand All
-            </button>
-            <button 
-              type="button" 
-              onClick={collapseAll}
-              className="px-3 py-1 text-xs border rounded hover:bg-gray-50"
-            >
-              Collapse All
-            </button>
+      <section className="space-y-6">
+        <div className="rounded-xl border p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[14px] font-semibold">Requisition List</h2>
+            <div className="space-x-2">
+              <button 
+                type="button" 
+                onClick={expandAll}
+                className="px-3 py-1 text-[14px] border rounded hover:bg-gray-50"
+              >
+                Expand All
+              </button>
+              <button 
+                type="button" 
+                onClick={collapseAll}
+                className="px-3 py-1 text-[14px] border rounded hover:bg-gray-50"
+              >
+                Collapse All
+              </button>
+            </div>
           </div>
+          <StockGrid blocks={blocks} onChange={setQuantity} />
         </div>
-        <StockGrid blocks={blocks} onChange={setReqQty} />
       </section>
 
       {/* Save Button */}
       <div className="flex items-center justify-between">
         <div>
           {note && (
-            <span className={`text-sm ${note.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+            <span className={`text-[14px] ${note.type === "ok" ? "text-green-600" : "text-red-600"}`}>
               {note.msg}
             </span>
           )}
@@ -233,10 +220,10 @@ const DailyStock: React.FC = () => {
         <button
           type="button"
           onClick={save}
-          disabled={saving || !shiftId}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={saving}
+          className="px-6 py-2 text-[14px] bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? "Saving..." : "Save Stock"}
+          {saving ? "Saving..." : "Save"}
         </button>
       </div>
     </div>

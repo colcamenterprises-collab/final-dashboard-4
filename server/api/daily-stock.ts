@@ -5,10 +5,14 @@ const router = express.Router();
 
 interface DailyStockRequest {
   shiftId: string | null;
-  rollsPcs: number;
+  rolls: number;
   meatGrams: number;
-  drinks: Record<string, number>;
-  requisition: Record<string, number>;
+  items: Array<{
+    name: string;
+    category: string;
+    quantity: number;
+    unit: string;
+  }>;
 }
 
 // POST /api/daily-stock - Save daily stock form data
@@ -16,27 +20,20 @@ router.post('/', async (req, res) => {
   try {
     console.log('[daily-stock] Received payload:', JSON.stringify(req.body, null, 2));
 
-    const { shiftId, rollsPcs, meatGrams, drinks, requisition }: DailyStockRequest = req.body;
+    const { shiftId, rolls, meatGrams, items }: DailyStockRequest = req.body;
 
     // Validate required fields
-    if (typeof rollsPcs !== 'number' || typeof meatGrams !== 'number') {
+    if (typeof rolls !== 'number' || typeof meatGrams !== 'number') {
       return res.status(400).json({
         ok: false,
-        error: 'Missing required fields: rollsPcs and meatGrams must be numbers'
+        error: 'Missing required fields: rolls and meatGrams must be numbers'
       });
     }
 
-    if (!drinks || typeof drinks !== 'object') {
+    if (!Array.isArray(items)) {
       return res.status(400).json({
         ok: false,
-        error: 'Missing required field: drinks must be an object'
-      });
-    }
-
-    if (!requisition || typeof requisition !== 'object') {
-      return res.status(400).json({
-        ok: false,
-        error: 'Missing required field: requisition must be an object'
+        error: 'Missing required field: items must be an array'
       });
     }
 
@@ -44,23 +41,21 @@ router.post('/', async (req, res) => {
     const savedId = shiftId || uuidv4();
 
     console.log('[daily-stock] Processing stock data:');
-    console.log('- Rolls:', rollsPcs, 'pcs');
+    console.log('- Rolls:', rolls, 'pcs');
     console.log('- Meat:', meatGrams, 'grams');
-    console.log('- Drinks:', Object.keys(drinks).length, 'items');
-    console.log('- Requisition:', Object.keys(requisition).length, 'items');
+    console.log('- Items:', items.length, 'total items');
 
-    // Filter non-zero drinks and requisition items
-    const nonZeroDrinks = Object.fromEntries(
-      Object.entries(drinks).filter(([_, qty]) => qty > 0)
-    );
+    // Group items by category for logging
+    const itemsByCategory = items.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(`${item.name}: ${item.quantity} ${item.unit}`);
+      return acc;
+    }, {} as Record<string, string[]>);
 
-    const nonZeroRequisition = Object.fromEntries(
-      Object.entries(requisition).filter(([_, qty]) => qty > 0)
-    );
-
-    console.log('[daily-stock] Non-zero items:');
-    console.log('- Drinks with stock:', Object.keys(nonZeroDrinks));
-    console.log('- Requisition items:', Object.keys(nonZeroRequisition));
+    console.log('[daily-stock] Items by category:');
+    Object.entries(itemsByCategory).forEach(([category, itemList]) => {
+      console.log(`- ${category}:`, itemList.join(', '));
+    });
 
     // TODO: Save to database when required
     // For now, just log and return success
@@ -69,11 +64,10 @@ router.post('/', async (req, res) => {
       ok: true,
       savedId,
       summary: {
-        rollsPcs,
+        rolls,
         meatGrams,
-        drinksCount: Object.keys(nonZeroDrinks).length,
-        requisitionCount: Object.keys(nonZeroRequisition).length,
-        totalItems: Object.keys(nonZeroDrinks).length + Object.keys(nonZeroRequisition).length
+        totalItems: items.length,
+        categoriesCount: Object.keys(itemsByCategory).length
       }
     });
 

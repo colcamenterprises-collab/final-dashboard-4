@@ -165,45 +165,9 @@ async function checkSchema() {
   const bigboss = new BigBossAgent();
   const jussi = new JussiAgent();
 
-  // Prisma-based Daily Stock API endpoints
-  app.post('/api/daily-stock', async (req: Request, res: Response) => {
-    try {
-      const {
-        salesFormId,
-        meatWeight,
-        burgerBunsStock,
-        drinkStock,
-        freshFood,
-        frozenFood,
-        shelfItems,
-        kitchenSupplies,
-        packaging,
-      } = req.body;
-
-      if (!salesFormId) {
-        return res.status(400).json({ error: 'Sales form ID is required' });
-      }
-
-      const result = await prisma.dailyStock.create({
-        data: {
-          salesFormId,
-          meatWeight: parseInt(meatWeight) || 0,
-          burgerBunsStock: parseInt(burgerBunsStock) || 0,
-          drinkStock: drinkStock || {},
-          freshFood: freshFood || {},
-          frozenFood: frozenFood || {},
-          shelfItems: shelfItems || {},
-          kitchenSupplies: kitchenSupplies || {},
-          packaging: packaging || {},
-        },
-      });
-
-      res.status(200).json({ success: true, id: result.id });
-    } catch (err) {
-      console.error('[daily-stock] Error saving form:', err);
-      res.status(500).json({ error: 'Failed to save stock form' });
-    }
-  });
+  // Mount the daily stock API router
+  const dailyStockRouter = (await import('./api/daily-stock')).default;
+  app.use('/api/daily-stock', dailyStockRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {
@@ -385,8 +349,7 @@ async function checkSchema() {
   const stockCatalogRouter = (await import('./api/stock-catalog-new')).default;
   app.use('/api/stock-catalog', stockCatalogRouter);
   
-  const dailyStockRouter = (await import('./api/daily-stock')).default;
-  app.use('/api/daily-stock-new', dailyStockRouter);
+
   
   const ingredientsRouter = (await import('./api/ingredients-import')).default;
   app.use('/api/ingredients', ingredientsRouter);
