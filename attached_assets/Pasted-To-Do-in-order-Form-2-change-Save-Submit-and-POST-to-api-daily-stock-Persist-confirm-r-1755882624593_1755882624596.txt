@@ -1,0 +1,422 @@
+To-Do (in order)
+
+Form 2: change “Save” → “Submit” and POST to /api/daily-stock
+
+Persist + confirm reload
+
+Library API: fix date (ISO) and numeric fields
+
+Library UI: add formatters (date + currency)
+
+CSV import: verify upsert/remove behavior
+
+Run QA checklist
+
+1) Form 2 → Submit + Persist
+API: /api/daily-stock (POST)
+
+Accepts: shiftId | salesFormId, rollsCount (int), meatWeightGrams (int), requisition (array of {name, category, unit, qty, costPerUnit} for nonzero items)
+
+Returns: { ok: true, id }
+
+Guarantees: ISO timestamps, server-side number parsing, transaction safety
+
+// /src/pages/api/daily-stock.ts (or /app/api/daily-stock/route.ts for App Router)
+import type { NextApiRequest, NextApiResponse } from "next";
+import { z } from "zod";
+import { prisma } from "@/server/prisma"; // your prisma client
+
+const ReqItem = z.object({
+  name: z.string().min(1),
+  category: z.string().min(1),
+  unit: z.string().min(1),
+  qty: z.number().int().nonnegative(),
+  costPerUnit: z.number().nonnegative()
+});
+
+const Schema = z.object({
+  salesFormId: z.string().uuid().optional(),
+  shiftId: z.string().optional(),
+  rollsCount: z.number().int().nonnegative(),
+  meatWeightGrams: z.number().int().nonnegative(),
+  requisition: z.array(ReqItem).default([]),
+  completedBy: z.string().min(1)
+});
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+
+  try {
+    // Parse and coerce numerics from form
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const parsed = Schema.parse({
+      ...body,
+      rollsCount: Number(body?.rollsCount ?? 0),
+      meatWeightGrams: Number(body?.meatWeightGrams ?? 0),
+      requisition: Array.isArray(body?.requisition)
+        ? body.requisition.map((r: any) => ({
+            ...r,
+            qty: Number(r?.qty ?? 0),
+            costPerUnit: Number(r?.costPerUnit ?? 0)
+          }))
+        : []
+    });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const stock = await tx.dailyStock.create({
+        data: {
+          salesFormId: parsed.salesFormId ?? null,
+          shiftId: parsed.shiftId ?? null,
+          rollsCount: parsed.rollsCount,
+          meatWeightGrams: parsed.meatWeightGrams,
+          requisitionJson: parsed.requisition, // JSON column
+          completedBy: parsed.completedBy
+        }
+      });
+      return stock;
+    });
+
+    return res.status(200).json({
+      ok: true,
+      id: result.id,
+      createdAt: result.createdAt.toISOString()
+    });
+  } catch (e: any) {
+    return res.status(400).json({ ok: false, error: e?.message ?? "Invalid payload" });
+  }
+}
+
+
+Prisma (confirm fields exist)
+Add if missing: shiftId (string, optional), requisitionJson (Json), completedBy (string).
+
+model DailyStock {
+  id               String   @id @default(uuid())
+  createdAt        DateTime @default(now())
+  salesFormId      String?
+  shiftId          String?
+  rollsCount       Int
+  meatWeightGrams  Int
+  requisitionJson  Json
+  completedBy      String
+
+  @@index([salesFormId])
+}
+
+UI: swap button + submit flow
+// /src/components/forms/DailyStockForm.tsx
+import { useState } from "react";
+
+export function DailyStockForm({ salesFormId, shiftId, initial }: {
+  salesFormId?: string; shiftId?: string; initial?: any;
+}) {
+  const [rolls, setRolls] = useState<number>(initial?.rollsCount ?? 0);
+  const [meat, setMeat] = useState<number>(initial?.meatWeightGrams ?? 0);
+  const [requisition, setReq] = useState<any[]>(initial?.requisition ?? []);
+  const [busy, setBusy] = useState(false);
+  const [okMsg, setOkMsg] = useState<string>("");
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setOkMsg("");
+    const payload = {
+      salesFormId,
+      shiftId,
+      rollsCount: Number(rolls),
+      meatWeightGrams: Number(meat),
+      requisition: requisition.filter(r => Number(r.qty) > 0)
+        .map(r => ({ ...r, qty: Number(r.qty), costPerUnit: Number(r.costPerUnit) })),
+      completedBy: initial?.completedBy ?? "Manager"
+    };
+    const resp = await fetch("/api/daily-stock", { method: "POST", body: JSON.stringify(payload) });
+    const data = await resp.json();
+    setBusy(false);
+    if (data?.ok) {
+      setOkMsg("Stock saved.");
+      setTimeout(() => setOkMsg(""), 4000);
+      // OPTIONAL: navigate to Library or keep user here
+      // router.push("/library/daily-sales");
+    } else {
+      alert(data?.error ?? "Save failed");
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      {/* ... your fields ... */}
+      <div className="fixed bottom-0 inset-x-0 border-t bg-white p-3 flex justify-end gap-2">
+        {/* Remove Save Draft for Form 2; keep single action */}
+        <button type="submit" disabled={busy} className="px-4 py-2 rounded-md border">
+          {busy ? "Submitting..." : "Submit"}
+        </button>
+      </div>
+      {!!okMsg && (
+        <div className="fixed bottom-16 right-4 bg-green-50 border border-green-200 px-3 py-2 rounded-md">
+          {okMsg}
+        </div>
+      )}
+    </form>
+  );
+}
+
+2) Library Backend: fix date + numerics
+API: /api/library/daily-sales (GET)
+
+Return ISO date strings only (no localized strings in API)
+
+Return numbers as numbers (no “฿” in API)
+
+// /src/pages/api/library/daily-sales.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { prisma } from "@/server/prisma";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "GET") return res.status(405).json({ ok: false });
+
+  const rows = await prisma.dailySales.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      completedBy: true,
+      startingCash: true,
+      closingCash: true,
+      totalSales: true,
+      totalExpenses: true,
+      bankCash: true,
+      bankQr: true,
+      status: true
+    }
+  });
+
+  const data = rows.map(r => ({
+    id: r.id,
+    dateISO: r.createdAt.toISOString(),
+    staff: r.completedBy ?? "",
+    startingCash: Number(r.startingCash ?? 0),
+    closingCash: Number(r.closingCash ?? 0),
+    totalSales: Number(r.totalSales ?? 0),
+    totalExpenses: Number(r.totalExpenses ?? 0),
+    bankCash: Number(r.bankCash ?? 0),
+    bankQr: Number(r.bankQr ?? 0),
+    status: r.status ?? "Completed"
+  }));
+
+  res.json({ ok: true, data });
+}
+
+
+Prisma fields to verify on DailySales:
+startingCash, closingCash, totalSales, totalExpenses, bankCash, bankQr should be numeric (Int/Decimal). If any are String, migrate them to numeric.
+
+3) Library UI: date + currency formatting
+
+Add a tiny formatter util and use in the library table.
+
+// /src/lib/format.ts
+export const fmtB = (n: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(n);
+
+export const fmtDate = (iso: string) => {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+};
+
+// /src/components/library/DailySalesLibrary.tsx
+import useSWR from "swr";
+import { fmtB, fmtDate } from "@/lib/format";
+
+const fetcher = (u: string) => fetch(u).then(r => r.json());
+
+export default function DailySalesLibrary() {
+  const { data } = useSWR("/api/library/daily-sales", fetcher);
+  const rows = data?.data ?? [];
+
+  return (
+    <div className="p-4">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left border-b">
+            <th className="py-2">Date</th>
+            <th>Staff</th>
+            <th className="text-right">Cash Start</th>
+            <th className="text-right">Cash End</th>
+            <th className="text-right">Total Sales</th>
+            <th className="text-right">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r: any) => (
+            <tr key={r.id} className="border-b">
+              <td className="py-2">{fmtDate(r.dateISO)}</td>
+              <td>{r.staff}</td>
+              <td className="text-right">{fmtB(r.startingCash)}</td>
+              <td className="text-right">{fmtB(r.closingCash)}</td>
+              <td className="text-right">{fmtB(r.totalSales)}</td>
+              <td className="text-right">{r.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+Styling notes satisfied: base 14px (text-sm), right-aligned numbers, clean spacing.
+
+4) CSV Import (upsert + remove)
+
+Key: Name + Category
+
+When uploading a new CSV, remove items no longer present.
+
+// /src/pages/api/ingredients/upload.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { prisma } from "@/server/prisma";
+import { parse } from "csv-parse/sync";
+
+type Row = { Name:string; Category:string; Unit:string; Cost:string; Supplier:string; Portions?:string };
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return res.status(405).json({ ok: false });
+
+  const csv = typeof req.body === "string" ? req.body : req.body?.csv;
+  const records = parse(csv, { columns: true, skip_empty_lines: true }) as Row[];
+
+  const incomingKeys = new Set(records.map(r => `${r.Name}|||${r.Category}`));
+
+  await prisma.$transaction(async (tx) => {
+    // Upsert present rows
+    for (const r of records) {
+      await tx.ingredient.upsert({
+        where: { name_category: { name: r.Name, category: r.Category } },
+        update: {
+          unit: r.Unit,
+          cost: Number(r.Cost ?? 0),
+          supplier: r.Supplier ?? "",
+          portions: r.Portions ? Number(r.Portions) : null
+        },
+        create: {
+          name: r.Name,
+          category: r.Category,
+          unit: r.Unit,
+          cost: Number(r.Cost ?? 0),
+          supplier: r.Supplier ?? "",
+          portions: r.Portions ? Number(r.Portions) : null
+        }
+      });
+    }
+
+    // Remove absent rows
+    const all = await tx.ingredient.findMany({ select: { id: true, name: true, category: true } });
+    const toDelete = all.filter(a => !incomingKeys.has(`${a.name}|||${a.category}`)).map(a => a.id);
+    if (toDelete.length) {
+      await tx.ingredient.deleteMany({ where: { id: { in: toDelete } } });
+    }
+  });
+
+  res.json({ ok: true, count: records.length });
+}
+
+
+Prisma unique:
+
+model Ingredient {
+  id        String  @id @default(uuid())
+  name      String
+  category  String
+  unit      String
+  cost      Decimal @db.Decimal(10,2)
+  supplier  String
+  portions  Int?
+
+  @@unique([name, category], name: "name_category")
+}
+
+5) QA – what to run/check
+Database spot checks
+-- Latest sales + stock linkage
+SELECT s.id, s."createdAt", s."completedBy", s."totalSales", st.id as stock_id, st."rollsCount", st."meatWeightGrams"
+FROM "DailySales" s
+LEFT JOIN "DailyStock" st ON st."salesFormId" = s.id
+ORDER BY s."createdAt" DESC LIMIT 10;
+
+-- Ingredients present after CSV upload
+SELECT name, category, unit, cost FROM "Ingredient" ORDER BY category, name;
+
+Manual steps (must pass)
+
+Upload CSV → categories/items update immediately; no code or restart required.
+
+Complete Form 1 then Form 2 (Submit) → DB shows entries; reload Form 2 shows persisted values.
+
+Library shows: Date (DD/MM/YYYY HH:mm), Staff, Cash Start, Cash End, Total Sales, Status with correct currency formatting (no Invalid Date / NaN).
+
+Remove one item from CSV → re-upload → item disappears from Form 2 requisition grid.
+
+Add a new item → appears in Form 2.
+
+Mobile: Form 2 grid = 1 per row; tablet = 2; desktop = 4; categories collapsed by default; Expand/Collapse All works.
+
+6) Hooks for Roadmap (stubs, safe to add now)
+Shopping list generation on Form 2 submit
+// /src/server/shoppingList.ts
+import { prisma } from "@/server/prisma";
+
+export async function generateShoppingListFromStock(stockId: string) {
+  const stock = await prisma.dailyStock.findUnique({ where: { id: stockId } });
+  if (!stock) return;
+
+  const req = (stock.requisitionJson as any[]).filter(r => Number(r.qty) > 0);
+  // Save or update a ShoppingList table entry here, e.g.:
+  // await prisma.shoppingList.upsert({ ... })
+}
+
+
+Call it after dailyStock.create succeeds (non-blocking).
+
+Jussi/Jane entry points
+
+Add two no-op endpoints now to wire later:
+
+/api/ops/jussi/compare-shift
+
+/api/acc/jane/reconcile-day
+
+Acceptance Criteria Mapping
+
+CSV drives catalog → /api/ingredients/upload.ts upsert+remove implemented
+
+Form 2 → only Rolls/Meat in End-of-Shift; others in requisition grid; submit flow implemented; inline “Stock saved.” message
+
+Persistence → POST creates record; reload uses initial values; DB checks provided
+
+Library → API returns ISO + numbers; UI formats date DD/MM/YYYY HH:mm and currency ฿#,###
+
+CSV add/remove → verified by QA steps
+
+Styling → 14px base, right-aligned numeric columns, clean whitespace
+
+Quick Dev Checklist (copy/paste for the agent)
+
+ Add /api/daily-stock.ts (POST) per code above
+
+ Ensure DailyStock has: shiftId?, requisitionJson Json, completedBy String
+
+ Replace Form 2 footer: single Submit button → calls API, shows “Stock saved.” 4s fade
+
+ Add /api/library/daily-sales.ts (GET) returning ISO dates + numeric fields
+
+ Create /src/lib/format.ts and update Library UI to use fmtDate + fmtB
+
+ Verify DailySales numeric columns are numeric (not string); migrate if needed
+
+ Ensure /api/ingredients/upload.ts upserts by (name, category) and deletes missing
+
+ Run SQL checks provided and execute QA steps end-to-end

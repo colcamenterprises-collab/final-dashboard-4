@@ -2136,6 +2136,30 @@ export function registerRoutes(app: express.Application): Server {
   // Register Daily Sales Library routes
   app.use('/api/daily-sales', dailySalesLibrary);
   
+  // Register Library API endpoints
+  app.get('/api/library/daily-sales', async (req: Request, res: Response) => {
+    const { getDailySalesLibrary } = await import('./api/library/daily-sales');
+    return getDailySalesLibrary(req, res);
+  });
+  
+  // Register CSV Import endpoints
+  app.post('/api/ingredients/upload', async (req: Request, res: Response) => {
+    try {
+      res.json({ ok: true, message: 'CSV import endpoint placeholder - implementation pending' });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: 'Import failed' });
+    }
+  });
+  
+  // Roadmap hooks (stubs for future implementation)
+  app.post('/api/ops/jussi/compare-shift', async (req: Request, res: Response) => {
+    res.json({ ok: true, message: 'Jussi comparison endpoint - implementation pending' });
+  });
+  
+  app.post('/api/acc/jane/reconcile-day', async (req: Request, res: Response) => {
+    res.json({ ok: true, message: 'Jane reconciliation endpoint - implementation pending' });
+  });
+  
   // Register Daily Stock routes  
   app.use('/api/daily-stock', dailyStock);
   
