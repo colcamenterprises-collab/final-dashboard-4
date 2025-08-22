@@ -14,9 +14,9 @@ interface LibraryRecord {
   status: string;
   pdfPath?: string;
   type?: string;
-  rolls?: number;
-  meatGrams?: number;
-  shiftId?: string;
+  rolls?: number | null;
+  meatGrams?: number | null;
+  hasStockData?: boolean;
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -52,11 +52,11 @@ export default function DailySalesLibrary() {
         <thead>
           <tr className="text-left border-b">
             <th className="py-2">Date</th>
-            <th>Type</th>
             <th>Staff</th>
             <th className="text-right">Cash Start</th>
             <th className="text-right">Cash End</th>
             <th className="text-right">Total Sales</th>
+            <th className="text-right">Stock Info</th>
             <th className="text-right">Status</th>
             <th className="text-right">PDF</th>
           </tr>
@@ -65,29 +65,19 @@ export default function DailySalesLibrary() {
           {rows.map((r: LibraryRecord) => (
             <tr key={r.id} className="border-b">
               <td className="py-2">{fmtDate(r.dateISO)}</td>
-              <td>
-                <span className={`px-2 py-1 text-xs rounded ${
-                  r.type === "stock" 
-                    ? "bg-blue-100 text-blue-800" 
-                    : "bg-green-100 text-green-800"
-                }`}>
-                  {r.type === "stock" ? "Stock" : "Sales"}
-                </span>
-              </td>
               <td>{r.staff}</td>
-              <td className="text-right">
-                {r.type === "stock" ? 
-                  `${r.rolls} rolls` : 
-                  fmtB(r.startingCash)
-                }
-              </td>
-              <td className="text-right">
-                {r.type === "stock" ? 
-                  `${r.meatGrams}g meat` : 
-                  fmtB(r.closingCash)
-                }
-              </td>
+              <td className="text-right">{fmtB(r.startingCash)}</td>
+              <td className="text-right">{fmtB(r.closingCash)}</td>
               <td className="text-right">{fmtB(r.totalSales)}</td>
+              <td className="text-right">
+                {r.hasStockData ? (
+                  <span className="text-xs">
+                    {r.rolls} rolls, {r.meatGrams}g
+                  </span>
+                ) : (
+                  <span className="text-gray-400 text-xs">No stock data</span>
+                )}
+              </td>
               <td className="text-right">{r.status}</td>
               <td className="text-right">
                 {r.pdfPath ? (
