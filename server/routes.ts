@@ -2731,5 +2731,33 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // POS Integration routes
+  app.use('/api/pos', async (req, res, next) => {
+    try {
+      const { default: posUploadRoutes } = await import('./routes/posUpload');
+      posUploadRoutes(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.use('/api/pos', async (req, res, next) => {
+    try {
+      const { default: posReceiptsRoutes } = await import('./routes/posReceipts');
+      posReceiptsRoutes(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.use('/api/pos', async (req, res, next) => {
+    try {
+      const { default: posAnalysisRoutes } = await import('./routes/posAnalysis');
+      posAnalysisRoutes(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return server;
 }

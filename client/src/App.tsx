@@ -30,6 +30,7 @@ import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
 import DailySales from "./pages/DailySales";
 import DailyStock from "./pages/operations/DailyStock";
+import PosAnalysis from "./pages/operations/PosAnalysis";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -78,6 +79,7 @@ export default function App() {
                   <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
+                  <Route path={ROUTES.POS_ANALYSIS} element={<Guard><PosAnalysis /></Guard>} />
 
                   {/* Finance */}
                   <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />

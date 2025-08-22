@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1013,5 +1014,96 @@ export type PLCategoryMap = typeof plCategoryMap.$inferSelect;
 export type InsertPLCategoryMap = z.infer<typeof insertPLCategoryMapSchema>;
 export type PLMonthCache = typeof plMonthCache.$inferSelect;
 export type InsertPLMonthCache = z.infer<typeof insertPLMonthCacheSchema>;
+
+// === POS Integration Tables (Start) ===
+
+// Main batch container for POS data imports
+export const posBatch = pgTable("pos_batch", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow(),
+  title: text("title"),
+  shiftStart: timestamp("shift_start"),
+  shiftEnd: timestamp("shift_end"),
+});
+
+// Individual receipts from POS exports
+export const posReceipt = pgTable("pos_receipt", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => posBatch.id),
+  receiptId: text("receipt_id").notNull(),
+  datetime: timestamp("datetime").notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  itemsJson: jsonb("items_json").default([]), // [{name, qty, price, modifiers:[...]}]
+  payment: text("payment"), // "Cash" | "Card" | "QR" | etc.
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Shift summary report from POS
+export const posShiftReport = pgTable("pos_shift_report", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().unique().references(() => posBatch.id),
+  grossSales: decimal("gross_sales", { precision: 10, scale: 2 }).notNull(),
+  discounts: decimal("discounts", { precision: 10, scale: 2 }).notNull(),
+  netSales: decimal("net_sales", { precision: 10, scale: 2 }).notNull(),
+  cashInDrawer: decimal("cash_in_drawer", { precision: 10, scale: 2 }).notNull(),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).notNull(),
+  qrSales: decimal("qr_sales", { precision: 10, scale: 2 }).notNull(),
+  otherSales: decimal("other_sales", { precision: 10, scale: 2 }).notNull(),
+  receiptCount: integer("receipt_count").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Sales breakdown by item from POS
+export const posSalesItem = pgTable("pos_sales_item", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => posBatch.id),
+  name: text("name").notNull(),
+  qty: integer("qty").notNull(),
+  net: decimal("net", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Sales breakdown by modifier from POS
+export const posSalesModifier = pgTable("pos_sales_modifier", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => posBatch.id),
+  name: text("name").notNull(),
+  qty: integer("qty").notNull(),
+  net: decimal("net", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Payment method breakdown from POS
+export const posPaymentSummary = pgTable("pos_payment_summary", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => posBatch.id),
+  method: text("method").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === POS Integration Tables (End) ===
+
+// POS Insert Schemas
+export const insertPosBatchSchema = createInsertSchema(posBatch);
+export const insertPosReceiptSchema = createInsertSchema(posReceipt);
+export const insertPosShiftReportSchema = createInsertSchema(posShiftReport);
+export const insertPosSalesItemSchema = createInsertSchema(posSalesItem);
+export const insertPosSalesModifierSchema = createInsertSchema(posSalesModifier);
+export const insertPosPaymentSummarySchema = createInsertSchema(posPaymentSummary);
+
+// POS Types
+export type InsertPosBatch = typeof posBatch.$inferInsert;
+export type SelectPosBatch = typeof posBatch.$inferSelect;
+export type InsertPosReceipt = typeof posReceipt.$inferInsert;
+export type SelectPosReceipt = typeof posReceipt.$inferSelect;
+export type InsertPosShiftReport = typeof posShiftReport.$inferInsert;
+export type SelectPosShiftReport = typeof posShiftReport.$inferSelect;
+export type InsertPosSalesItem = typeof posSalesItem.$inferInsert;
+export type SelectPosSalesItem = typeof posSalesItem.$inferSelect;
+export type InsertPosSalesModifier = typeof posSalesModifier.$inferInsert;
+export type SelectPosSalesModifier = typeof posSalesModifier.$inferSelect;
+export type InsertPosPaymentSummary = typeof posPaymentSummary.$inferInsert;
+export type SelectPosPaymentSummary = typeof posPaymentSummary.$inferSelect;
 
 

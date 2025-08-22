@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutGrid, CalendarCheck, Library, LineChart, TrendingUp,
   Calculator, Sandwich, ClipboardCheck, Bot, FileSpreadsheet,
-  Upload, FileText, ChevronLeft, ChevronRight
+  Upload, FileText, ChevronLeft, ChevronRight, Database
 } from "lucide-react";
 import { useState } from "react";
 import { ROUTES } from "../router/RouteRegistry";
@@ -108,6 +108,12 @@ export default function Sidebar() {
           to={ROUTES.SHIFT_REPORTS}
           Icon={ClipboardCheck}
           label="Shift Reports"
+          collapsed={collapsed}
+        />
+        <SLink
+          to="/operations/pos-analysis"
+          Icon={Database}
+          label="POS Analysis"
           collapsed={collapsed}
         />
         <SLink
