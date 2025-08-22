@@ -135,7 +135,7 @@ const DailyStock: React.FC = () => {
 
       // ✅ Redirect to Daily Sales Library 
       setTimeout(() => {
-        window.location.assign("/operations/daily-sales/library");
+        window.location.assign("/operations/daily-sales-library");
       }, 1500);
 
     } catch (err: any) {
