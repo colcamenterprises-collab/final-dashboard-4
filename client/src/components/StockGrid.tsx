@@ -33,7 +33,7 @@ export function StockGrid({
                     inputMode="numeric"
                     min="0"
                     step="1"
-                    className="w-24 rounded-md border px-3 py-2 text-right text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-24 rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={item.qty ?? 0}
                     onChange={(e) => onChange(item.id, safeInt(e.target.value))}
                     aria-label={`${item.label} quantity`}

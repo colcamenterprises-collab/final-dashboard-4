@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
         data: {
           salesId: shiftId,
           burgerBuns: rolls,
-          meatGrams: meatGrams,
+          meatWeightG: meatGrams,
           purchasingJson: items,
           drinksJson: items.filter(item => 
             item.category?.toLowerCase().includes('drink')
@@ -176,7 +176,7 @@ export async function saveDailyStock(req: express.Request, res: express.Response
         data: {
           salesId: shiftId,
           burgerBuns: rolls,
-          meatGrams: meatGrams,
+          meatWeightG: meatGrams,
           purchasingJson: items,
           drinksJson: items.filter(item => 
             item.category?.toLowerCase().includes('drink')

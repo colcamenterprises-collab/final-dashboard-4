@@ -172,7 +172,7 @@ const DailyStock: React.FC = () => {
               <input
                 type="text"
                 inputMode="numeric"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 value={rolls || ''}
                 onChange={(e) => setRolls(safeInt(e.target.value))}
                 placeholder=""
@@ -184,7 +184,7 @@ const DailyStock: React.FC = () => {
               <input
                 type="text"
                 inputMode="numeric"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 value={meatGrams || ''}
                 onChange={(e) => setMeatGrams(safeInt(e.target.value))}
                 placeholder=""
