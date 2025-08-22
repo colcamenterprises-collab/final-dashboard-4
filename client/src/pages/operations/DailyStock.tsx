@@ -170,26 +170,24 @@ const DailyStock: React.FC = () => {
             <div>
               <label className="block text-[14px] mb-1">Rolls (pcs)</label>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min="0"
-                step="1"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                value={rolls}
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={rolls || ''}
                 onChange={(e) => setRolls(safeInt(e.target.value))}
+                placeholder=""
                 aria-label="Rolls quantity"
               />
             </div>
             <div>
               <label className="block text-[14px] mb-1">Meat (grams)</label>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min="0"
-                step="1"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                value={meatGrams}
+                className="w-full border rounded-md px-3 py-2 text-[14px] text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={meatGrams || ''}
                 onChange={(e) => setMeatGrams(safeInt(e.target.value))}
+                placeholder=""
                 aria-label="Meat quantity in grams"
               />
             </div>
