@@ -25,8 +25,8 @@ const DailyStock: React.FC = () => {
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
 
@@ -94,39 +94,54 @@ const DailyStock: React.FC = () => {
       .forEach((d) => (d.open = false));
   };
 
-  const save = async () => {
-    setSaving(true);
-    setNote(null);
+  const buildItemsFromState = () => {
+    return ingredients
+      .map(ingredient => ({
+        name: ingredient.name,
+        category: ingredient.category,
+        quantity: quantities[ingredient.name] || 0,
+        unit: ingredient.unit
+      }))
+      .filter(item => item.quantity > 0); // Only include items with quantities > 0
+  };
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setMessage(null);
+
+    // Build payload
+    const payload = {
+      shiftId,
+      rolls,
+      meatGrams,
+      items: buildItemsFromState(), // [{ name, category, quantity, unit }]
+    };
+
     try {
-      // Build items array from ingredients with quantities
-      const items = ingredients
-        .map(ingredient => ({
-          name: ingredient.name,
-          category: ingredient.category,
-          quantity: quantities[ingredient.name] || 0,
-          unit: ingredient.unit
-        }))
-        .filter(item => item.quantity > 0); // Only include items with quantities > 0
-
-      const payload = {
-        shiftId: shiftId || null,
-        rolls,
-        meatGrams,
-        items
-      };
-
       const res = await fetch("/api/daily-stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text());
-      setNote({ type: "ok", msg: "Stock saved." });
-    } catch (e: any) {
-      setNote({ type: "err", msg: e?.message || "Failed to save." });
+      const data = await res.json();
+
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "Unable to submit stock.");
+      }
+
+      // ✅ Inline success note
+      setMessage({ type: "success", text: "Stock submitted." });
+
+      // ✅ Complete workflow: go to Shift Summary
+      window.location.assign(`/shift-summary?shift=${encodeURIComponent(shiftId ?? "")}`);
+
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Submit failed." });
     } finally {
-      setSaving(false);
-      setTimeout(() => setNote(null), 4000);
+      setSubmitting(false);
+      // auto-clear message after 4s
+      setTimeout(() => setMessage(null), 4000);
     }
   };
 
@@ -208,22 +223,22 @@ const DailyStock: React.FC = () => {
         </div>
       </section>
 
-      {/* Save Button */}
+      {/* Submit Button */}
       <div className="flex items-center justify-between">
         <div>
-          {note && (
-            <span className={`text-[14px] ${note.type === "ok" ? "text-green-600" : "text-red-600"}`}>
-              {note.msg}
+          {message && (
+            <span className={`text-[14px] ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+              {message.text}
             </span>
           )}
         </div>
         <button
           type="button"
-          onClick={save}
-          disabled={saving}
-          className="px-6 py-2 text-[14px] bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="rounded-md bg-emerald-600 px-5 py-2 text-white text-[14px] hover:bg-emerald-700 disabled:opacity-60"
         >
-          {saving ? "Saving..." : "Save"}
+          {submitting ? "Submitting…" : "Submit"}
         </button>
       </div>
     </div>

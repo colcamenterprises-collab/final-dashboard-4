@@ -1,0 +1,141 @@
+IMPLEMENT-THIS: Form 2 “Submit” (finalize stock + workflow)
+1) Button & copy
+
+File: client/src/pages/operations/DailyStock.tsx
+
+Change the button label from Save ➜ Submit.
+
+Disable while submitting: disabled={submitting}; show spinner text “Submitting…” when true.
+
+<button
+  onClick={handleSubmit}
+  disabled={submitting}
+  className="rounded-md bg-emerald-600 px-5 py-2 text-white text-[14px] hover:bg-emerald-700 disabled:opacity-60"
+>
+  {submitting ? "Submitting…" : "Submit"}
+</button>
+
+2) Submit handler (POST + success UX + navigation)
+
+Keep the payload shape we already use; just wire it to a single submit function and finish the flow.
+
+const handleSubmit = async () => {
+  if (submitting) return;
+  setSubmitting(true);
+  setMessage(null);
+
+  // Build payload
+  const payload = {
+    shiftId,
+    rolls,
+    meatGrams,
+    items: buildItemsFromState(), // [{ name, category, quantity, unit }]
+  };
+
+  try {
+    const res = await fetch("/api/daily-stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || "Unable to submit stock.");
+    }
+
+    // ✅ Inline success note
+    setMessage({ type: "success", text: "Stock submitted." });
+
+    // ✅ Complete workflow: go to Shift Summary (or back to library)
+    // Choose ONE and keep it consistent:
+    // 1) Summary page (preferred if present)
+    window.location.assign(`/shift-summary?shift=${encodeURIComponent(shiftId ?? "")}`);
+    // or 2) Library:
+    // window.location.assign("/daily-sales-library");
+
+  } catch (err:any) {
+    setMessage({ type: "error", text: err.message || "Submit failed." });
+  } finally {
+    setSubmitting(false);
+    // auto-clear message after 4s
+    window.setTimeout(() => setMessage(null), 4000);
+  }
+};
+
+
+Keep the inline message (no alerts/modals).
+Do not change the payload keys.
+
+3) Backend (no schema change)
+
+File: server/api/daily-stock.ts
+
+Ensure it accepts the payload { shiftId, rolls, meatGrams, items: [...] }
+
+Return a uniform success response used above:
+
+return res.json({ ok: true, shiftId });
+
+
+On validation error, res.status(400).json({ ok:false, error:"…" }).
+
+(If this already exists and returns { success:true }, add ok:true too to avoid front-end conditionals.)
+
+4) Remove any legacy “saveDraft” submitters
+
+Ensure Form 2 uses only handleSubmit.
+
+If a “save draft” is needed in future, add a second button later; for now keep it clean.
+
+QA: 90-second test script
+
+Start at Form 1 /operations/daily-sales, fill minimal fields ➜ Next
+
+Confirm redirect to /operations/stock?shift=<uuid>.
+
+On Form 2:
+
+Confirm categories collapsed; expand Drinks grid; type a few quantities.
+
+Set Rolls / Meat (optional).
+
+Click Submit.
+
+Expect inline green note “Stock submitted.” then navigation to Shift Summary (or Library, per choice above).
+
+On destination page:
+
+If Shift Summary: confirm the submitted counts & requisition items appear for that shift ID.
+
+If Library: open the just-submitted shift and verify the same.
+
+Hard refresh Form 2 URL with the same ?shift=...
+
+Confirm values persist from API (they should load into the UI).
+
+Console/Network (capture once):
+
+Outgoing POST /api/daily-stock body matches:
+
+{
+  "shiftId":"<uuid>",
+  "rolls":80,
+  "meatGrams":3200,
+  "items":[{"name":"Coke","category":"Drinks","quantity":2,"unit":"1 box 24 cans"}]
+}
+
+
+Response: { "ok": true, "shiftId": "<uuid>" }.
+
+Acceptance
+
+Button reads Submit (not Save), disables while sending, shows “Submitting…”.
+
+Posts the unchanged payload shape.
+
+Inline success message (no popups), then navigates to Summary (or Library).
+
+Reloading shows persisted values.
+
+If you want the destination to be something else (e.g., back to Dashboard), say the word and I’ll switch the one window.location.assign line accordingly.

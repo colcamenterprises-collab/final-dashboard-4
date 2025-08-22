@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
 
     res.json({
       ok: true,
-      savedId,
+      shiftId: savedId,
       summary: {
         rolls,
         meatGrams,
