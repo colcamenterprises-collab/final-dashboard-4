@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { Upload, Receipt, Bot } from "lucide-react";
+import { Upload, Receipt, Bot, Database, BarChart3 } from "lucide-react";
 
 export default function Analysis() {
   return (
@@ -7,7 +7,7 @@ export default function Analysis() {
       <h1 className="text-3xl font-extrabold">Analysis</h1>
 
       {/* quick actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <NavLink to="upload" className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3 hover:bg-neutral-50">
           <Upload className="h-5 w-5" />
           <div>
@@ -20,6 +20,20 @@ export default function Analysis() {
           <div>
             <div className="text-lg font-semibold">Receipts</div>
             <div className="text-sm text-neutral-500">Manage scanned receipts</div>
+          </div>
+        </NavLink>
+        <NavLink to="pos-upload" className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3 hover:bg-neutral-50">
+          <Database className="h-5 w-5" />
+          <div>
+            <div className="text-lg font-semibold">POS Upload</div>
+            <div className="text-sm text-neutral-500">Upload CSV bundles from POS</div>
+          </div>
+        </NavLink>
+        <NavLink to="shift-analysis" className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3 hover:bg-neutral-50">
+          <BarChart3 className="h-5 w-5" />
+          <div>
+            <div className="text-lg font-semibold">Shift Analysis</div>
+            <div className="text-sm text-neutral-500">Compare POS vs staff forms</div>
           </div>
         </NavLink>
         <div className="rounded-2xl border bg-white p-5 shadow-sm flex items-center gap-3">

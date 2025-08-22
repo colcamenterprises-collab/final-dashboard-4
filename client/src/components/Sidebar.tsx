@@ -111,12 +111,6 @@ export default function Sidebar() {
           collapsed={collapsed}
         />
         <SLink
-          to="/operations/pos-analysis"
-          Icon={Database}
-          label="POS Analysis"
-          collapsed={collapsed}
-        />
-        <SLink
           to={ROUTES.NIGHTLY_CHECKLIST}
           Icon={ClipboardCheck}
           label="Nightly Checklist"

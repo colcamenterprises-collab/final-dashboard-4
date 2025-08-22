@@ -14,7 +14,6 @@ export const ROUTES = {
   // Legacy routes for compatibility
   OVERVIEW: "/",
   SHIFT_SUMMARY: "/operations/shift-summary",
-  POS_ANALYSIS: "/operations/pos-analysis",
 
   // Finance
   PROFIT_LOSS: "/finance/profit-loss",
