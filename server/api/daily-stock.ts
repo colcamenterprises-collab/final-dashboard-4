@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
     try {
       const stockRecord = await db().dailyStockV2.create({
         data: {
-          salesId: shiftId,
+          salesId: shiftId ?? undefined,
           burgerBuns: rolls,
           meatWeightG: meatGrams,
           purchasingJson: items,
@@ -174,7 +174,7 @@ export async function saveDailyStock(req: express.Request, res: express.Response
     try {
       const stockRecord = await db().dailyStockV2.create({
         data: {
-          salesId: shiftId,
+          salesId: shiftId ?? undefined,
           burgerBuns: rolls,
           meatWeightG: meatGrams,
           purchasingJson: items,
