@@ -131,10 +131,12 @@ const DailyStock: React.FC = () => {
       }
 
       // ✅ Inline success note
-      setMessage({ type: "success", text: "Stock submitted." });
+      setMessage({ type: "success", text: "Stock saved." });
 
-      // ✅ Complete workflow: go to Shift Summary
-      window.location.assign(`/shift-summary?shift=${encodeURIComponent(shiftId ?? "")}`);
+      // ✅ Redirect to existing page (no more /shift-summary 404)
+      setTimeout(() => {
+        window.location.assign("/operations/daily-sales");
+      }, 1500);
 
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Submit failed." });
