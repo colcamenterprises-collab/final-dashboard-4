@@ -13,6 +13,10 @@ interface LibraryRecord {
   bankQr: number;
   status: string;
   pdfPath?: string;
+  type?: string;
+  rolls?: number;
+  meatGrams?: number;
+  shiftId?: string;
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -48,6 +52,7 @@ export default function DailySalesLibrary() {
         <thead>
           <tr className="text-left border-b">
             <th className="py-2">Date</th>
+            <th>Type</th>
             <th>Staff</th>
             <th className="text-right">Cash Start</th>
             <th className="text-right">Cash End</th>
@@ -60,9 +65,28 @@ export default function DailySalesLibrary() {
           {rows.map((r: LibraryRecord) => (
             <tr key={r.id} className="border-b">
               <td className="py-2">{fmtDate(r.dateISO)}</td>
+              <td>
+                <span className={`px-2 py-1 text-xs rounded ${
+                  r.type === "stock" 
+                    ? "bg-blue-100 text-blue-800" 
+                    : "bg-green-100 text-green-800"
+                }`}>
+                  {r.type === "stock" ? "Stock" : "Sales"}
+                </span>
+              </td>
               <td>{r.staff}</td>
-              <td className="text-right">{fmtB(r.startingCash)}</td>
-              <td className="text-right">{fmtB(r.closingCash)}</td>
+              <td className="text-right">
+                {r.type === "stock" ? 
+                  `${r.rolls} rolls` : 
+                  fmtB(r.startingCash)
+                }
+              </td>
+              <td className="text-right">
+                {r.type === "stock" ? 
+                  `${r.meatGrams}g meat` : 
+                  fmtB(r.closingCash)
+                }
+              </td>
               <td className="text-right">{fmtB(r.totalSales)}</td>
               <td className="text-right">{r.status}</td>
               <td className="text-right">

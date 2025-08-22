@@ -133,9 +133,9 @@ const DailyStock: React.FC = () => {
       // ✅ Inline success note
       setMessage({ type: "success", text: "Stock saved." });
 
-      // ✅ Redirect to existing page (no more /shift-summary 404)
+      // ✅ Redirect to Daily Sales Library 
       setTimeout(() => {
-        window.location.assign("/operations/daily-sales");
+        window.location.assign("/operations/daily-sales/library");
       }, 1500);
 
     } catch (err: any) {
