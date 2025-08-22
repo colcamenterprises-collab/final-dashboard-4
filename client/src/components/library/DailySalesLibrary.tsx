@@ -12,6 +12,7 @@ interface LibraryRecord {
   bankCash: number;
   bankQr: number;
   status: string;
+  pdfPath?: string;
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -52,6 +53,7 @@ export default function DailySalesLibrary() {
             <th className="text-right">Cash End</th>
             <th className="text-right">Total Sales</th>
             <th className="text-right">Status</th>
+            <th className="text-right">PDF</th>
           </tr>
         </thead>
         <tbody>
@@ -63,6 +65,15 @@ export default function DailySalesLibrary() {
               <td className="text-right">{fmtB(r.closingCash)}</td>
               <td className="text-right">{fmtB(r.totalSales)}</td>
               <td className="text-right">{r.status}</td>
+              <td className="text-right">
+                {r.pdfPath ? (
+                  <a href={r.pdfPath} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                    View PDF
+                  </a>
+                ) : (
+                  "-"
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

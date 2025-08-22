@@ -107,9 +107,18 @@ export const inventory = pgTable("inventory", {
   pricePerUnit: decimal("price_per_unit", { precision: 8, scale: 2 }).notNull(),
 });
 
-// Shopping List table
+// Shopping List table (enhanced for v2)
 export const shoppingList = pgTable("shopping_list", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey().default('gen_random_uuid()'),
+  createdAt: timestamp("created_at").defaultNow(),
+  salesFormId: text("sales_form_id"),
+  stockFormId: text("stock_form_id"),
+  rollsCount: integer("rolls_count").default(0),
+  meatWeightGrams: integer("meat_weight_grams").default(0),
+  drinksCounts: jsonb("drinks_counts").default('[]'), // [{name, qty}]
+  items: jsonb("items").default('[]'), // purchase requests
+  totalItems: integer("total_items").default(0),
+  // Legacy fields for backwards compatibility
   itemName: varchar("item_name", { length: 255 }),
   quantity: integer("quantity"),
   unit: varchar("unit", { length: 50 }).default('unit'),
@@ -126,7 +135,6 @@ export const shoppingList = pgTable("shopping_list", {
   isCompleted: boolean("is_completed").default(false), // Mark entire list as completed
   completedAt: timestamp("completed_at"), // When the list was completed
   actualCost: decimal("actual_cost", { precision: 10, scale: 2 }).default('0'), // Actual cost when completed
-  createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -531,7 +539,7 @@ export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: 
 });
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
-export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true });
+export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true }).extend({
   supplier: z.string().nullable().optional(),
   items: z.string().nullable().optional(),

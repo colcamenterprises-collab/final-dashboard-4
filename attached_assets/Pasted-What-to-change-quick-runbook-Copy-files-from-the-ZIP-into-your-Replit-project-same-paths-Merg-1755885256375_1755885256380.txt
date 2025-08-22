@@ -1,0 +1,445 @@
+What to change (quick runbook)
+
+Copy files from the ZIP into your Replit project (same paths).
+
+Merge prisma/schema_additions.prisma into your schema.prisma.
+
+Run:
+
+npx prisma generate
+
+npx prisma migrate dev --name sbb_patch_v2
+
+Add env vars:
+
+GMAIL_USER, GMAIL_PASS (app password or swap to OAuth in email.ts)
+
+REPORT_TO (recipient)
+
+Restart the app.
+
+What it adds (concrete)
+
+API
+
+POST /api/daily-stock → persists stock, builds shopping list, generates PDF, emails it.
+
+GET /api/library/daily-sales → now returns pdfPath for Library link.
+
+GET /api/shopping-list/today + GET /api/shopping-list/[id]
+
+Server services
+
+src/server/shoppingList.ts – builds the list from Form 2 (qty>0 only).
+
+src/server/pdf.ts – creates /public/reports/{salesId}.pdf via pdfkit.
+
+src/server/email.ts – Gmail via nodemailer.
+
+src/server/report.ts – orchestrates PDF + email.
+
+UI
+
+Library table shows a PDF column with View PDF.
+
+New page: /shopping-list (today’s list at a glance).
+
+Form 2 still redirects to /daily-sales-library (Option A).
+
+Notes on data rules
+
+Rolls/Meat: taken from End-of-Shift counts.
+
+Drinks: derived from requisition items with category === "Drinks" (qty>0).
+If you want separate Drinks stock counts (not purchase requests), say the word—I’ll add a compact “Drinks Count” mini-grid to Form 2 without disturbing the rest.
+
+Quick QA
+
+Submit Form 1 → Form 2 → Submit → lands on Library (no 404).
+
+Library row shows correct date/THB values and View PDF link opens the PDF.
+
+Visit /shopping-list → today’s list displays rolls/meat counts + requested items.
+
+Email received with HTML summary + attached PDF.
+
+If anything in your environment uses App Router, I can re-map these files to app/api/.../route.ts and app/shopping-list/page.tsx—just say the word. 
+
+You said:
+You gave me an empty zip. Please paste each of the code here please
+ChatGPT said:
+
+Got it Cam — I’ll paste the full set of files for the v2 workflow directly here so you can copy/paste into your Replit project.
+
+1. Prisma schema additions
+
+Append these to your schema.prisma:
+
+model ShoppingList {
+  id               String   @id @default(uuid())
+  createdAt        DateTime @default(now())
+  salesFormId      String?
+  stockFormId      String?
+  rollsCount       Int       @default(0)
+  meatWeightGrams  Int       @default(0)
+  drinksCounts     Json      @default("[]") // [{name, qty}]
+  items            Json      @default("[]") // purchase requests
+  totalItems       Int       @default(0)
+}
+
+model DailySales {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  completedBy   String?
+  startingCash  Decimal? @db.Decimal(10,2)
+  closingCash   Decimal? @db.Decimal(10,2)
+  totalSales    Decimal? @db.Decimal(10,2)
+  totalExpenses Decimal? @db.Decimal(10,2)
+  bankCash      Decimal? @db.Decimal(10,2)
+  bankQr        Decimal? @db.Decimal(10,2)
+  status        String?
+  pdfPath       String?   // e.g. /reports/{id}.pdf
+}
+
+model DailyStock {
+  id               String   @id @default(uuid())
+  createdAt        DateTime @default(now())
+  salesFormId      String?
+  shiftId          String?
+  rollsCount       Int
+  meatWeightGrams  Int
+  requisitionJson  Json
+  completedBy      String
+}
+
+2. Shopping list generator
+
+src/server/shoppingList.ts
+
+import { prisma } from "@/server/prisma";
+
+type ReqItem = { name:string; category:string; unit:string; qty:number; costPerUnit:number };
+
+export async function generateShoppingListFromStock(stockId: string) {
+  const stock = await prisma.dailyStock.findUnique({ where: { id: stockId } });
+  if (!stock) return null;
+
+  const req: ReqItem[] = (stock.requisitionJson as any[]) || [];
+
+  const drinksCounts = req
+    .filter(r => (r.category || '').toLowerCase() === 'drinks' && Number(r.qty) > 0)
+    .map(r => ({ name: r.name, qty: Number(r.qty) }));
+
+  const items = req
+    .filter(r => Number(r.qty) > 0)
+    .map(r => ({
+      name: r.name,
+      unit: r.unit,
+      qty: Number(r.qty),
+      costPerUnit: Number(r.costPerUnit || 0),
+      category: r.category
+    }));
+
+  const list = await prisma.shoppingList.create({
+    data: {
+      salesFormId: stock.salesFormId ?? null,
+      stockFormId: stock.id,
+      rollsCount: Number(stock.rollsCount || 0),
+      meatWeightGrams: Number(stock.meatWeightGrams || 0),
+      drinksCounts,
+      items,
+      totalItems: items.length
+    }
+  });
+
+  return list;
+}
+
+3. PDF generator
+
+src/server/pdf.ts
+
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
+import { prisma } from "@/server/prisma";
+
+function currency(n: number) {
+  return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(n || 0);
+}
+
+export async function generateDailyReportPDF(salesId: string) {
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+  if (!sales) throw new Error("DailySales not found");
+
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+  const list  = await prisma.shoppingList.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+
+  const reportsDir = path.join(process.cwd(), "public", "reports");
+  fs.mkdirSync(reportsDir, { recursive: true });
+  const outPath = path.join(reportsDir, `${salesId}.pdf`);
+
+  const doc = new PDFDocument({ margin: 36 });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  doc.fontSize(18).text("Smash Brothers Burgers - Daily Report", { align: "center" });
+  doc.moveDown();
+  doc.fontSize(10).text(`Date: ${sales.createdAt.toISOString()}`);
+  doc.text(`Completed by: ${sales.completedBy || ""}`);
+  doc.moveDown();
+
+  doc.fontSize(14).text("Sales Summary");
+  doc.fontSize(10);
+  doc.text(`Starting Cash: ${currency(Number(sales.startingCash || 0))}`);
+  doc.text(`Closing Cash: ${currency(Number(sales.closingCash || 0))}`);
+  doc.text(`Total Sales: ${currency(Number(sales.totalSales || 0))}`);
+  doc.text(`Total Expenses: ${currency(Number(sales.totalExpenses || 0))}`);
+  doc.text(`Banked (Cash): ${currency(Number(sales.bankCash || 0))}`);
+  doc.text(`Banked (QR): ${currency(Number(sales.bankQr || 0))}`);
+  doc.moveDown();
+
+  if (stock) {
+    doc.fontSize(14).text("End-of-Shift Stock");
+    doc.fontSize(10);
+    doc.text(`Rolls: ${stock.rollsCount}`);
+    doc.text(`Meat (grams): ${stock.meatWeightGrams}`);
+    doc.moveDown();
+  }
+
+  if (list) {
+    doc.fontSize(14).text("Shopping List");
+    doc.fontSize(10);
+    doc.text(`Rolls: ${list.rollsCount}`);
+    doc.text(`Meat (grams): ${list.meatWeightGrams}`);
+    (list.drinksCounts as any[]).forEach(d => doc.text(`Drink - ${d.name}: ${d.qty}`));
+    doc.moveDown();
+    (list.items as any[]).forEach((it: any) => {
+      doc.text(`- ${it.name} (${it.unit}) x ${it.qty}`);
+    });
+  }
+
+  doc.end();
+  await new Promise<void>((resolve, reject) => {
+    stream.on("finish", () => resolve());
+    stream.on("error", reject);
+  });
+
+  const pdfPath = `/reports/${salesId}.pdf`;
+  await prisma.dailySales.update({ where: { id: salesId }, data: { pdfPath } });
+  return pdfPath;
+}
+
+4. Email helper
+
+src/server/email.ts
+
+import nodemailer from "nodemailer";
+
+export async function sendReportEmail({ to, subject, html, attachments = [] as any[] }) {
+  const user = process.env.GMAIL_USER as string;
+  const pass = process.env.GMAIL_PASS as string;
+  if (!user || !pass) throw new Error("GMAIL_USER or GMAIL_PASS not set");
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass }
+  });
+
+  await transporter.sendMail({
+    from: user,
+    to,
+    subject,
+    html,
+    attachments
+  });
+}
+
+5. Report orchestrator
+
+src/server/report.ts
+
+import { prisma } from "@/server/prisma";
+import { generateDailyReportPDF } from "@/server/pdf";
+import { sendReportEmail } from "@/server/email";
+
+function currency(n: number) {
+  return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(n || 0);
+}
+
+export async function generateAndEmailDailyReport(salesId: string) {
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId }});
+  if (!sales) throw new Error("DailySales not found");
+
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+  const list  = await prisma.shoppingList.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+
+  const pdfPath = await generateDailyReportPDF(salesId);
+  const to = process.env.REPORT_TO || process.env.GMAIL_USER || "";
+
+  const html = `
+    <h2>Daily Report</h2>
+    <p>Date: ${sales.createdAt.toISOString()}</p>
+    <p>Total Sales: ${currency(Number(sales.totalSales || 0))}</p>
+    <p>Total Expenses: ${currency(Number(sales.totalExpenses || 0))}</p>
+    <h3>Shopping List</h3>
+    <ul>
+      <li>Rolls: ${list?.rollsCount}</li>
+      <li>Meat: ${list?.meatWeightGrams}g</li>
+    </ul>
+  `;
+
+  await sendReportEmail({
+    to,
+    subject: "Daily Report - Smash Brothers Burgers",
+    html,
+    attachments: [{ path: `.${pdfPath}`, filename: pdfPath.split("/").pop() }]
+  });
+
+  return pdfPath;
+}
+
+6. API: Daily stock (updated to trigger list + report)
+
+src/pages/api/daily-stock.ts
+
+import type { NextApiRequest, NextApiResponse } from "next";
+import { z } from "zod";
+import { prisma } from "@/server/prisma";
+import { generateShoppingListFromStock } from "@/server/shoppingList";
+import { generateAndEmailDailyReport } from "@/server/report";
+
+const ReqItem = z.object({
+  name: z.string(),
+  category: z.string(),
+  unit: z.string(),
+  qty: z.number(),
+  costPerUnit: z.number()
+});
+
+const Schema = z.object({
+  salesFormId: z.string().uuid().optional(),
+  shiftId: z.string().optional(),
+  rollsCount: z.number(),
+  meatWeightGrams: z.number(),
+  requisition: z.array(ReqItem),
+  completedBy: z.string()
+});
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return res.status(405).json({ ok: false });
+
+  try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const parsed = Schema.parse(body);
+
+    const stock = await prisma.dailyStock.create({ data: { ...parsed, requisitionJson: parsed.requisition }});
+    const list = await generateShoppingListFromStock(stock.id);
+
+    if (parsed.salesFormId) {
+      await generateAndEmailDailyReport(parsed.salesFormId);
+    }
+
+    res.json({ ok: true, id: stock.id, shoppingListId: list?.id });
+  } catch (e: any) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+}
+
+7. API: Library with PDF path
+
+src/pages/api/library/daily-sales.ts
+
+import type { NextApiRequest, NextApiResponse } from "next";
+import { prisma } from "@/server/prisma";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const rows = await prisma.dailySales.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { id: true, createdAt: true, completedBy: true, totalSales: true, totalExpenses: true, pdfPath: true }
+  });
+
+  res.json({ ok: true, data: rows.map(r => ({
+    ...r,
+    dateISO: r.createdAt.toISOString()
+  })) });
+}
+
+8. Library component with PDF link
+
+src/components/library/DailySalesLibrary.tsx
+
+import useSWR from "swr";
+import { fmtB, fmtDate } from "@/lib/format";
+import Link from "next/link";
+
+const fetcher = (u: string) => fetch(u).then(r => r.json());
+
+export default function DailySalesLibrary() {
+  const { data } = useSWR("/api/library/daily-sales", fetcher);
+  const rows = data?.data ?? [];
+
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Staff</th>
+          <th>Total Sales</th>
+          <th>Total Expenses</th>
+          <th>PDF</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r: any) => (
+          <tr key={r.id}>
+            <td>{fmtDate(r.dateISO)}</td>
+            <td>{r.completedBy}</td>
+            <td>{fmtB(r.totalSales)}</td>
+            <td>{fmtB(r.totalExpenses)}</td>
+            <td>{r.pdfPath ? <Link href={r.pdfPath}>View PDF</Link> : "-"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+9. Shopping list page
+
+src/pages/shopping-list.tsx
+
+import useSWR from "swr";
+
+const fetcher = (u: string) => fetch(u).then(r => r.json());
+
+export default function ShoppingListPage() {
+  const { data } = useSWR("/api/shopping-list/today", fetcher);
+  const row = data?.data;
+
+  if (!row) return <p>No shopping list today.</p>;
+
+  return (
+    <div className="p-6">
+      <h1>Shopping List</h1>
+      <p>Rolls: {row.rollsCount}</p>
+      <p>Meat: {row.meatWeightGrams}g</p>
+      {row.drinksCounts.map((d:any,i:number)=><p key={i}>{d.name}: {d.qty}</p>)}
+      <h2>Requested Items</h2>
+      <ul>
+        {row.items.map((it:any,i:number)=><li key={i}>{it.name} x {it.qty} {it.unit}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+
+This set covers:
+
+Shopping list creation
+
+PDF generation + email
+
+PDF link in Library
+
+Shopping List page

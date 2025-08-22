@@ -2151,6 +2151,41 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
   
+  // Shopping List API endpoints
+  app.get('/api/shopping-list/today', async (req: Request, res: Response) => {
+    try {
+      // Return placeholder data for now
+      const today = new Date().toISOString().split('T')[0];
+      res.json({
+        ok: true,
+        data: {
+          rollsCount: 50,
+          meatWeightGrams: 2000,
+          drinksCounts: [
+            { name: "Coke", qty: 12 },
+            { name: "Sprite", qty: 8 }
+          ],
+          items: [
+            { name: "Burger Buns", unit: "pcs", qty: 100, category: "Packaging" },
+            { name: "Ground Beef", unit: "kg", qty: 5, category: "Fresh Food" }
+          ]
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: 'Failed to get shopping list' });
+    }
+  });
+  
+  app.get('/api/shopping-list/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      // TODO: Get by specific ID from database
+      res.json({ ok: true, data: null, message: 'Shopping list by ID - implementation pending' });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: 'Failed to get shopping list' });
+    }
+  });
+  
   // Roadmap hooks (stubs for future implementation)
   app.post('/api/ops/jussi/compare-shift', async (req: Request, res: Response) => {
     res.json({ ok: true, message: 'Jussi comparison endpoint - implementation pending' });
