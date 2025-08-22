@@ -16,13 +16,11 @@ router.get('/', async (req, res) => {
           createdAt: true,
           completedBy: true,
           startingCash: true,
-          closingCash: true,
+          endingCash: true,
           totalSales: true,
           totalExpenses: true,
-          bankCash: true,
-          bankQr: true,
-          status: true,
-          pdfPath: true
+          cashBanked: true,
+          qrSales: true
         }
       }),
       db().dailyStockV2.findMany({
@@ -33,8 +31,7 @@ router.get('/', async (req, res) => {
           createdAt: true,
           salesId: true,
           burgerBuns: true,
-          meatGrams: true,
-          status: true,
+          meatWeightG: true,
           notes: true
         }
       })
@@ -46,13 +43,13 @@ router.get('/', async (req, res) => {
       dateISO: r.createdAt.toISOString(),
       staff: r.completedBy ?? "",
       startingCash: Number(r.startingCash ?? 0),
-      closingCash: Number(r.closingCash ?? 0),
+      closingCash: Number(r.endingCash ?? 0),
       totalSales: Number(r.totalSales ?? 0),
       totalExpenses: Number(r.totalExpenses ?? 0),
-      bankCash: Number(r.bankCash ?? 0),
-      bankQr: Number(r.bankQr ?? 0),
-      status: r.status ?? "Completed",
-      pdfPath: r.pdfPath,
+      bankCash: Number(r.cashBanked ?? 0),
+      bankQr: Number(r.qrSales ?? 0),
+      status: "Completed",
+      pdfPath: null,
       type: "sales"
     }));
     
@@ -66,11 +63,11 @@ router.get('/', async (req, res) => {
       totalExpenses: 0,
       bankCash: 0,
       bankQr: 0,
-      status: r.status ?? "Completed",
+      status: "Completed",
       pdfPath: null,
       type: "stock",
       rolls: r.burgerBuns ?? 0,
-      meatGrams: r.meatGrams ?? 0,
+      meatGrams: r.meatWeightG ?? 0,
       shiftId: r.salesId
     }));
     
@@ -97,13 +94,11 @@ export async function getDailySalesLibrary(req: express.Request, res: express.Re
           createdAt: true,
           completedBy: true,
           startingCash: true,
-          closingCash: true,
+          endingCash: true,
           totalSales: true,
           totalExpenses: true,
-          bankCash: true,
-          bankQr: true,
-          status: true,
-          pdfPath: true
+          cashBanked: true,
+          qrSales: true
         }
       }),
       db().dailyStockV2.findMany({
@@ -114,8 +109,7 @@ export async function getDailySalesLibrary(req: express.Request, res: express.Re
           createdAt: true,
           salesId: true,
           burgerBuns: true,
-          meatGrams: true,
-          status: true,
+          meatWeightG: true,
           notes: true
         }
       })
@@ -127,13 +121,13 @@ export async function getDailySalesLibrary(req: express.Request, res: express.Re
       dateISO: r.createdAt.toISOString(),
       staff: r.completedBy ?? "",
       startingCash: Number(r.startingCash ?? 0),
-      closingCash: Number(r.closingCash ?? 0),
+      closingCash: Number(r.endingCash ?? 0),
       totalSales: Number(r.totalSales ?? 0),
       totalExpenses: Number(r.totalExpenses ?? 0),
-      bankCash: Number(r.bankCash ?? 0),
-      bankQr: Number(r.bankQr ?? 0),
-      status: r.status ?? "Completed",
-      pdfPath: r.pdfPath,
+      bankCash: Number(r.cashBanked ?? 0),
+      bankQr: Number(r.qrSales ?? 0),
+      status: "Completed",
+      pdfPath: null,
       type: "sales"
     }));
     
@@ -147,11 +141,11 @@ export async function getDailySalesLibrary(req: express.Request, res: express.Re
       totalExpenses: 0,
       bankCash: 0,
       bankQr: 0,
-      status: r.status ?? "Completed",
+      status: "Completed",
       pdfPath: null,
       type: "stock",
       rolls: r.burgerBuns ?? 0,
-      meatGrams: r.meatGrams ?? 0,
+      meatGrams: r.meatWeightG ?? 0,
       shiftId: r.salesId
     }));
     
