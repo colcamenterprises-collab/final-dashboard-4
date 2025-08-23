@@ -289,11 +289,26 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // POS Receipts by Batch
+  app.get('/api/pos/receipts', async (req: Request, res: Response) => {
+    try {
+      const { batchId } = req.query;
+      const receipts = await prisma.posReceipt.findMany({
+        where: { batchId: batchId as string },
+        orderBy: { datetime: 'desc' }
+      });
+      res.json({ data: receipts });
+    } catch (error) {
+      console.error('Failed to fetch receipts:', error);
+      res.status(500).json({ error: 'Failed to fetch receipts' });
+    }
+  });
+
   // Jussi Analysis
   app.get('/api/pos/:batchId/analyze', async (req: Request, res: Response) => {
     try {
       const analysis = await analyzeShift(req.params.batchId);
-      res.json(analysis);
+      res.json({ ok: true, report: analysis });
     } catch (error) {
       console.error('Analysis failed:', error);
       res.status(500).json({ error: 'Analysis failed' });
