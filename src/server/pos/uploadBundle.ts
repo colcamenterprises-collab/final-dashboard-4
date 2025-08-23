@@ -23,17 +23,37 @@ export async function importPosBundle(body: Body) {
     }
   });
 
-  // Receipts (receipts-YYYY.csv)
+  // Receipts
   if (body.receiptsCsv) {
     const rows = parse(body.receiptsCsv, { columns: true, skip_empty_lines: true }) as any[];
+
+    const norm = (r:any, key:string[]) => {
+      for (const k of key) {
+        if (r[k] !== undefined) return r[k];
+        // case-insensitive fallback
+        const hit = Object.keys(r).find(h => h.toLowerCase() === k.toLowerCase());
+        if (hit) return r[hit];
+      }
+      return undefined;
+    };
+
+    const parseDateTime = (r:any) => {
+      const dt = norm(r, ["Date/time","Date/Time","Date time"]);
+      if (dt) return new Date(dt);
+      const d = norm(r, ["Date"]);
+      const t = norm(r, ["Time"]);
+      if (d && t) return new Date(`${d} ${t}`);
+      return new Date();
+    };
+
     await prisma.posReceipt.createMany({
       data: rows.map(r => ({
         batchId: batch.id,
-        receiptId: r["Receipt #"],
-        datetime: toDate(r["Date/time"]),
-        total: num(r["Total"]),
+        receiptId: String(norm(r, ["Receipt #","Receipt number","Receipt"]) || ""),
+        datetime: parseDateTime(r),
+        total: num(norm(r, ["Total","Total amount","Amount"])),
         itemsJson: [],
-        payment: r["Payment method"] || r["Payment Method"] || null
+        payment: String(norm(r, ["Payment method","Payment Method","Payment type","Payment Type"]) || null)
       }))
     });
   }
@@ -83,15 +103,19 @@ export async function importPosBundle(body: Body) {
     });
   }
 
-  // Payment Type Sales (payment-type-sales-YYYY.csv)
+  // Payment Type Sales
   if (body.paymentTypeSalesCsv) {
     const rows = parse(body.paymentTypeSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
     await prisma.posPaymentSummary.createMany({
-      data: rows.map(r => ({
-        batchId: batch.id,
-        method: String(r["Payment method"] ?? r["Payment Method"] ?? ""),
-        amount: num(r["Total"])
-      }))
+      data: rows.map(r => {
+        const method = r["Payment method"] ?? r["Payment Method"] ?? r["Payment type"] ?? r["Payment Type"] ?? "";
+        const total  = r["Total"] ?? r["Amount"] ?? r["Sum"] ?? 0;
+        return {
+          batchId: batch.id,
+          method: String(method),
+          amount: num(total)
+        };
+      })
     });
   }
 

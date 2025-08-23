@@ -13,12 +13,32 @@ type Detected = {
 const fmtTHB = (n:number)=>new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(Number(n)||0);
 
 function detectFileKind(text: string) {
-  const header = text.split(/\r?\n/,1)[0].toLowerCase();
-  if (header.includes("receipt #") && header.includes("date/time")) return "receiptsCsv";
-  if (header.includes("shift opening time") && header.includes("actual cash amount")) return "shiftReportCsv";
-  if (header.includes("payment method") && header.includes("total")) return "paymentTypeSalesCsv";
-  if (header.includes("modifier") && header.includes("net sales")) return "modifierSalesCsv";
-  if (header.includes("item") && header.includes("net sales")) return "itemSalesCsv";
+  const firstLine = text.split(/\r?\n/,1)[0].toLowerCase().trim();
+
+  // Receipts (Loyverse variants)
+  // Examples seen: "Receipt #,Date/time,Employee,..."
+  //                "Receipt number,Date,Time,..."
+  const isReceipts =
+    (firstLine.includes("receipt #") || firstLine.includes("receipt number") || firstLine.startsWith("receipt,")) &&
+    (firstLine.includes("date/time") || firstLine.includes("date"));
+  if (isReceipts) return "receiptsCsv";
+
+  // Shift report indicators
+  if (firstLine.includes("shift opening time") && firstLine.includes("actual cash amount")) {
+    return "shiftReportCsv";
+  }
+
+  // Payment Type / Method summary
+  // Examples: "Payment method,Total" or "Payment type,Total"
+  if ((firstLine.includes("payment method") || firstLine.includes("payment type")) && firstLine.includes("total")) {
+    return "paymentTypeSalesCsv";
+  }
+
+  // Modifiers and Items
+  const hasNet = firstLine.includes("net sales");
+  if (hasNet && firstLine.includes("modifier")) return "modifierSalesCsv";
+  if (hasNet && firstLine.includes("item"))     return "itemSalesCsv";
+
   return "unknown";
 }
 
@@ -91,10 +111,7 @@ export default function AnalysisPage() {
 
   async function uploadBundle() {
     setUploadMsg("Uploading…");
-    const body = {
-      title: desc || undefined,
-      ...detected
-    };
+    const body = { title: desc || undefined, ...detected };
     const res = await fetch("/api/pos/upload-bundle", {
       method:"POST",
       headers: { "Content-Type":"application/json" },
@@ -105,7 +122,7 @@ export default function AnalysisPage() {
       setBatchId(data.batchId);
       setUploadMsg(`Uploaded successfully. Batch created.`);
     } else {
-      setUploadMsg(`Upload failed: ${data?.error||"unknown error"}`);
+      setUploadMsg(`Upload failed: ${data?.error || res.statusText || "unknown error"}`);
     }
   }
 

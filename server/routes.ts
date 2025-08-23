@@ -274,11 +274,10 @@ export function registerRoutes(app: express.Application): Server {
   // POS Bundle Upload (Alternative endpoint)
   app.post('/api/pos/upload-bundle', async (req: Request, res: Response) => {
     try {
-      const { batchId } = await importPosBundle(req.body);
-      res.json({ ok: true, batchId });
-    } catch (error) {
-      console.error('POS upload failed:', error);
-      res.status(500).json({ error: 'Import failed' });
+      const result = await importPosBundle(req.body);
+      res.json({ ok: true, ...result });
+    } catch (e:any) {
+      res.status(400).json({ ok: false, error: e?.message || "import failed", stack: e?.stack });
     }
   });
 

@@ -1,0 +1,156 @@
+1) Frontend: make detection tolerant + show real server error
+A) Update the file-type detector (Receipts/Payment headers vary)
+
+Replace your detectFileKind function with this more tolerant version:
+
+function detectFileKind(text: string) {
+  const firstLine = text.split(/\r?\n/,1)[0].toLowerCase().trim();
+
+  // Receipts (Loyverse variants)
+  // Examples seen: "Receipt #,Date/time,Employee,..."
+  //                "Receipt number,Date,Time,..."
+  const isReceipts =
+    (firstLine.includes("receipt #") || firstLine.includes("receipt number") || firstLine.startsWith("receipt,")) &&
+    (firstLine.includes("date/time") || firstLine.includes("date"));
+  if (isReceipts) return "receiptsCsv";
+
+  // Shift report indicators
+  if (firstLine.includes("shift opening time") && firstLine.includes("actual cash amount")) {
+    return "shiftReportCsv";
+  }
+
+  // Payment Type / Method summary
+  // Examples: "Payment method,Total" or "Payment type,Total"
+  if ((firstLine.includes("payment method") || firstLine.includes("payment type")) && firstLine.includes("total")) {
+    return "paymentTypeSalesCsv";
+  }
+
+  // Modifiers and Items
+  const hasNet = firstLine.includes("net sales");
+  if (hasNet && firstLine.includes("modifier")) return "modifierSalesCsv";
+  if (hasNet && firstLine.includes("item"))     return "itemSalesCsv";
+
+  return "unknown";
+}
+
+B) Show the actual server error message
+
+In your upload function, change the error handling to surface data.error:
+
+async function uploadBundle() {
+  setUploadMsg("Uploading…");
+  const body = { title: desc || undefined, ...detected };
+  const res = await fetch("/api/pos/upload-bundle", {
+    method:"POST",
+    headers: { "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data?.ok) {
+    setBatchId(data.batchId);
+    setUploadMsg(`Uploaded successfully. Batch created.`);
+  } else {
+    setUploadMsg(`Upload failed: ${data?.error || res.statusText || "unknown error"}`);
+  }
+}
+
+2) Backend: accept header variations for Receipts + Payment Types
+
+Open src/server/pos/uploadBundle.ts and update the two blocks as follows.
+
+A) Receipts: support “Receipt number”, “Date/Time” or split Date+Time
+// Receipts
+if (body.receiptsCsv) {
+  const rows = parse(body.receiptsCsv, { columns: true, skip_empty_lines: true }) as any[];
+
+  const norm = (r:any, key:string[]) => {
+    for (const k of key) {
+      if (r[k] !== undefined) return r[k];
+      // case-insensitive fallback
+      const hit = Object.keys(r).find(h => h.toLowerCase() === k.toLowerCase());
+      if (hit) return r[hit];
+    }
+    return undefined;
+  };
+
+  const parseDateTime = (r:any) => {
+    const dt = norm(r, ["Date/time","Date/Time","Date time"]);
+    if (dt) return new Date(dt);
+    const d = norm(r, ["Date"]);
+    const t = norm(r, ["Time"]);
+    if (d && t) return new Date(`${d} ${t}`);
+    return new Date();
+  };
+
+  await prisma.posReceipt.createMany({
+    data: rows.map(r => ({
+      batchId: batch.id,
+      receiptId: String(norm(r, ["Receipt #","Receipt number","Receipt"]) || ""),
+      datetime: parseDateTime(r),
+      total: num(norm(r, ["Total","Total amount","Amount"])),
+      itemsJson: [],
+      payment: String(norm(r, ["Payment method","Payment Method","Payment type","Payment Type"]) || null)
+    }))
+  });
+}
+
+B) Payment types: support “Payment type” or “Payment method”
+// Payment Type Sales
+if (body.paymentTypeSalesCsv) {
+  const rows = parse(body.paymentTypeSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+  await prisma.posPaymentSummary.createMany({
+    data: rows.map(r => {
+      const method = r["Payment method"] ?? r["Payment Method"] ?? r["Payment type"] ?? r["Payment Type"] ?? "";
+      const total  = r["Total"] ?? r["Amount"] ?? r["Sum"] ?? 0;
+      return {
+        batchId: batch.id,
+        method: String(method),
+        amount: num(total)
+      };
+    })
+  });
+}
+
+
+(No changes needed for shift/items/modifiers.)
+
+3) Server: return helpful errors (not just “failed”)
+
+In server/routes.ts, for the /api/pos/upload-bundle handler, return the message + stack so we can see what failed in the UI:
+
+app.post("/api/pos/upload-bundle", async (req, res) => {
+  try {
+    const result = await importPosBundle(req.body);
+    res.json({ ok: true, ...result });
+  } catch (e:any) {
+    res.status(400).json({ ok: false, error: e?.message || "import failed", stack: e?.stack });
+  }
+});
+
+Then test in 30 seconds
+
+Refresh Analysis.
+
+Drop the same five CSVs again.
+
+You should now see Receipts and Payment Types detected (green).
+
+Click Upload & Process.
+
+Message should say “Uploaded successfully. Batch created.”
+
+Click Run Jussi Analysis.
+
+You’ll get the side-by-side + variances.
+
+Click View Receipts.
+
+Receipts list should populate.
+
+Notes
+
+Sales Summary is intentionally ignored (it’s redundant for Jussi).
+
+The shift window at the bottom is UTC (from the CSV raw). That’s fine; Jussi converts to BKK when comparing with staff forms.
+
+If anything still barks, the UI will now show the precise error message (thanks to #1B + #3), so we can squash it in one go.
