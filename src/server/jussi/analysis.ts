@@ -1,32 +1,26 @@
 import { prisma } from "../../../lib/prisma";
-const THB = (n:number)=>Number.isFinite(Number(n)) ? Number(n) : 0;
 
-// tolerances
-const TOL = {
-  salesVariance: 40,     // THB
-  bankCash: 0,           // THB
-  bankQr: 0,             // THB
-  rolls: 3,              // pcs
-  meat: 200              // grams
-};
+const THB = (n:number)=>Number.isFinite(Number(n)) ? Number(n) : 0;
+const TOL = { salesVariance: 40, bankCash: 0, bankQr: 0, rolls: 3, meat: 200 };
 
 export async function analyzeShift(batchId: string) {
   const batch = await prisma.posBatch.findUnique({ where: { id: batchId } });
   if (!batch) throw new Error("POS batch not found");
 
-  // POS side
   const shift = await prisma.posShiftReport.findUnique({ where: { batchId } });
   const pays  = await prisma.posPaymentSummary.findMany({ where: { batchId } });
   const payMap = Object.fromEntries(pays.map(p => [p.method, Number(p.amount)]));
 
-  // Staff side: pick most recent DailySales inside window; fallback latest
+  // robust receipt count
+  const receiptCount = await prisma.posReceipt.count({ where: { batchId } });
+
+  // Staff forms inside window (if available)
   const staff = await prisma.dailySales.findFirst({
     where: batch.shiftStart && batch.shiftEnd ? {
       createdAt: { gte: batch.shiftStart!, lte: batch.shiftEnd! }
     } : {},
     orderBy: { createdAt: "desc" }
   });
-
   const stock = staff
     ? await prisma.dailyStock.findFirst({ where: { salesId: staff.id }, orderBy: { createdAt: "desc" }})
     : null;
@@ -42,11 +36,31 @@ export async function analyzeShift(batchId: string) {
     meat: stock?.meatWeightG ?? null
   };
 
+  // Compose POS with fallbacks:
+  // prefer shift.netSales; else sum of payments; else sum of items net
+  const itemsNet = await prisma.posSalesItem.aggregate({
+    where: { batchId },
+    _sum: { net: true }
+  });
+
+  const posNet =
+    THB(Number(shift?.netSales || 0)) ||
+    THB(Object.values(payMap).reduce((a:any,b:any)=>a+Number(b||0),0)) ||
+    THB(Number(itemsNet._sum.net || 0));
+
+  const posCash =
+    THB(Number(shift?.cashSales || 0)) ||
+    THB(Number(payMap["Cash"] || payMap["CASH"] || 0));
+
+  const posQr =
+    THB(Number(shift?.qrSales || 0)) ||
+    THB(Number(payMap["QR"] || payMap["Card"] || payMap["CARD"] || 0));
+
   const posData = {
-    netSales: THB(shift?.netSales || 0),
-    receiptCount: shift?.receiptCount || 0,
-    cashSales: THB(shift?.cashSales ?? (payMap["Cash"] ?? 0)),
-    qrSales: THB(shift?.qrSales ?? (payMap["QR"] ?? payMap["Card"] ?? 0)),
+    netSales: posNet,
+    receiptCount,
+    cashSales: posCash,
+    qrSales: posQr,
     methodBreakdown: payMap
   };
 
@@ -65,10 +79,7 @@ export async function analyzeShift(batchId: string) {
     flags.push(`Banked QR mismatch: staff ${staffData.bankQr} vs POS QR/Card ${posData.qrSales}`);
 
   return {
-    batch: {
-      id: batch.id,
-      window: { start: batch.shiftStart?.toISOString(), end: batch.shiftEnd?.toISOString() }
-    },
+    batch: { id: batch.id, window: { start: batch.shiftStart?.toISOString(), end: batch.shiftEnd?.toISOString() } },
     staff: staffData,
     pos: posData,
     variances,
