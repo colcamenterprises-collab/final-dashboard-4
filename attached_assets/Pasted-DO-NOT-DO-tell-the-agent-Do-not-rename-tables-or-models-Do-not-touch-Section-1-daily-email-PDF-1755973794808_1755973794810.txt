@@ -1,0 +1,107 @@
+DO-NOT-DO (tell the agent)
+
+Do not rename tables or models.
+
+Do not touch Section 1 (daily email/PDF) or the new Analysis UI.
+
+Do not add new routes or libs.
+
+Only make the exact edits below, then build.
+
+
+
+---
+
+0) Confirm the two real build errors
+
+From your screenshot:
+
+1. Missing export dailySalesV2 in shared/schema.ts
+
+
+2. Duplicate class member updateDailyStockSales in server/storage.ts
+
+
+
+We’ll fix just these.
+
+
+---
+
+1) Fix missing export in shared/schema.ts
+
+Open shared/schema.ts and append these named exports (don’t remove anything):
+
+// ---- v2 table name exports used by server build ----
+export const dailySalesV2 = "daily_sales_v2";
+export const dailyStockV2 = "daily_stock_v2";
+
+> Rationale: some parts of the code import the table names as constants from shared/schema.ts. The error means those names weren’t exported. The above is safe and backwards-compatible.
+
+
+
+If you also see imports for dailyStockSales/dailyStockV2, keep both:
+
+export const dailyStockSales = dailyStockV2; // legacy alias, if referenced anywhere
+
+
+---
+
+2) Remove the duplicate method in server/storage.ts
+
+Open server/storage.ts and search for:
+
+updateDailyStockSales(
+
+You will find it twice inside the same class. Delete one of them — keep the implementation that writes to the v2 table (usually referencing daily_stock_v2 or using Prisma dailyStock model mapped to v2). The older one often hit a legacy table or had slightly different parameters.
+
+Only one method with that exact name should remain.
+
+> If both bodies are identical, just keep the last one and delete the earlier duplicate.
+
+
+
+
+---
+
+3) Rebuild
+
+Run:
+
+npm run build
+
+If build succeeds, deploy.
+If it still fails, run:
+
+npm run build 2>&1 | tee build.log
+
+and check for any new missing export names from shared/schema.ts. If you see others (e.g., dailyStockV2), export them exactly as in step 1.
+
+
+---
+
+4) (If you haven’t yet) Apply the POS DB migration
+
+If the earlier “table public.PosBatch does not exist” returns during upload, finish the Prisma side:
+
+npx prisma generate
+npx prisma migrate dev -n add_pos_ingestion
+
+(You already have the models from our previous step: PosBatch, PosReceipt, PosShiftReport, PosSalesItem, PosSalesModifier, PosPaymentSummary.)
+
+
+---
+
+5) Smoke test (2 minutes)
+
+1. Build & Deploy → no errors.
+
+
+2. Analysis: drag & drop the 5 Loyverse CSVs → Upload & Process should say “Uploaded successfully”.
+
+
+3. Click Run Jussi Analysis → side-by-side appears.
+
+
+4. Click View Receipts → table populates.
+

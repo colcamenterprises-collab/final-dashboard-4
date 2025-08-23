@@ -1,0 +1,103 @@
+🔧 Patch — Prisma schema (add POS tables exactly as used by the code)
+
+Open prisma/schema.prisma and append the block below (do not rename any fields or models):
+
+// ==== POS INGESTION TABLES ====
+
+model PosBatch {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  title      String?
+  shiftStart DateTime?
+  shiftEnd   DateTime?
+
+  receipts   PosReceipt[]
+  shift      PosShiftReport?
+  items      PosSalesItem[]
+  modifiers  PosSalesModifier[]
+  payments   PosPaymentSummary[]
+}
+
+model PosReceipt {
+  id         String   @id @default(uuid())
+  batchId    String
+  batch      PosBatch @relation(fields: [batchId], references: [id])
+  receiptId  String
+  datetime   DateTime
+  total      Decimal  @db.Decimal(10,2)
+  itemsJson  Json
+  payment    String?
+}
+
+model PosShiftReport {
+  id                 String   @id @default(uuid())
+  batchId            String   @unique
+  batch              PosBatch @relation(fields: [batchId], references: [id])
+  grossSales         Decimal  @db.Decimal(10,2)
+  discounts          Decimal  @db.Decimal(10,2)
+  netSales           Decimal  @db.Decimal(10,2)
+  cashInDrawer       Decimal  @db.Decimal(10,2)
+  cashSales          Decimal  @db.Decimal(10,2)
+  qrSales            Decimal  @db.Decimal(10,2)
+  otherSales         Decimal  @db.Decimal(10,2)
+  receiptCount       Int
+}
+
+model PosSalesItem {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosSalesModifier {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosPaymentSummary {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  method    String
+  amount    Decimal  @db.Decimal(10,2)
+}
+
+
+These names/fields match the server code you already have:
+
+src/server/pos/uploadBundle.ts
+
+src/server/jussi/analysis.ts
+
+API routes calling Prisma on these models
+
+▶️ Migrate
+
+In the Replit shell (or wherever you run Prisma):
+
+npx prisma generate
+npx prisma migrate dev -n add_pos_ingestion
+
+
+Restart the app after the migration completes.
+
+✅ Smoke test (90 seconds)
+
+Go to Analysis (new drag & drop UI).
+
+Drop the 5 CSVs you uploaded earlier.
+
+Click Upload & Process → you should see: “Uploaded successfully. Batch created.”
+
+Click Run Jussi Analysis → side-by-side Staff vs POS + variances appear.
+
+Click View Receipts → receipts table populates.
+
+If anything errors, the page now shows the actual server message so we can squash it fast.
