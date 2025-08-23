@@ -1,3 +1,18 @@
+Quick Fix Plan (single pass, minimal changes)
+Step 1 — Convert cards to tabs (no navigation)
+
+Replace the Analysis page body with this component. It:
+
+adds tabs (Bank / POS Upload / Receipts / Shift Analysis / Jussi – Ops Review)
+
+includes a working POS Upload (paste your CSVs, set shift time, click Upload)
+
+pulls Receipts by batchId
+
+runs Jussi by batchId
+
+Drop this inside your existing Analysis page component file (whatever path your page uses). It doesn’t add new routes.
+
 import { useEffect, useState } from "react";
 
 const fmtTHB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(Number(n)||0);
@@ -6,7 +21,7 @@ function Tab({label,active,onClick}:{label:string;active:boolean;onClick:()=>voi
   return <button onClick={onClick} className={`px-3 py-2 rounded ${active?"bg-black text-white":"bg-gray-100"}`}>{label}</button>;
 }
 
-export default function AnalysisTabbed() {
+export default function AnalysisPage() {
   const [tab,setTab]=useState<"bank"|"pos"|"receipts"|"shift"|"jussi">("pos");
   const [batchId,setBatchId]=useState("");
   const [report,setReport]=useState<any>(null);
@@ -36,8 +51,6 @@ export default function AnalysisTabbed() {
 
   return (
     <div className="p-4 text-sm space-y-4">
-      <h1 className="text-3xl font-extrabold mb-6">Analysis</h1>
-      
       <div className="flex gap-2">
         <Tab label="Bank" active={tab==="bank"} onClick={()=>setTab("bank")} />
         <Tab label="POS Upload" active={tab==="pos"} onClick={()=>setTab("pos")} />
@@ -108,7 +121,7 @@ export default function AnalysisTabbed() {
 
       {tab==="jussi" && (
         <div className="space-y-4">
-          {!batchId && <div className="text-gray-500">Enter a Batch ID to run Jussi's analysis.</div>}
+          {!batchId && <div className="text-gray-500">Enter a Batch ID to run Jussi’s analysis.</div>}
           {!!batchId && !report?.ok && <div className="text-gray-500">No analysis yet or API error.</div>}
           {report?.ok && (
             <>
@@ -180,3 +193,17 @@ export default function AnalysisTabbed() {
     </div>
   );
 }
+
+Step 2 — Smoke-test the APIs (no guessing)
+
+Upload a POS bundle using the new POS Upload tab:
+
+Paste the CSV contents you gave me (as-is).
+
+Set shiftStartISO = YYYY-MM-DDT17:00:00+07:00 and shiftEndISO = YYYY-MM-DDT03:00:00+07:00 (next day).
+
+Click Upload → you should see Uploaded. batchId=....
+
+Switch to Receipts tab → should list the receipts for that batchId.
+
+Switch to Jussi – Ops Review → with the same batchId, you’ll get the side-by-side + variances.

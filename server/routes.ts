@@ -271,6 +271,17 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // POS Bundle Upload (Alternative endpoint)
+  app.post('/api/pos/upload-bundle', async (req: Request, res: Response) => {
+    try {
+      const { batchId } = await importPosBundle(req.body);
+      res.json({ ok: true, batchId });
+    } catch (error) {
+      console.error('POS upload failed:', error);
+      res.status(500).json({ error: 'Import failed' });
+    }
+  });
+
   // POS Batches List
   app.get('/api/pos/batches', async (req: Request, res: Response) => {
     try {
@@ -308,6 +319,18 @@ export function registerRoutes(app: express.Application): Server {
   app.get('/api/pos/:batchId/analyze', async (req: Request, res: Response) => {
     try {
       const analysis = await analyzeShift(req.params.batchId);
+      res.json({ ok: true, report: analysis });
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      res.status(500).json({ error: 'Analysis failed' });
+    }
+  });
+
+  // Jussi Analysis (Alternative endpoint)
+  app.get('/api/analysis/shift', async (req: Request, res: Response) => {
+    try {
+      const { batchId } = req.query;
+      const analysis = await analyzeShift(batchId as string);
       res.json({ ok: true, report: analysis });
     } catch (error) {
       console.error('Analysis failed:', error);
