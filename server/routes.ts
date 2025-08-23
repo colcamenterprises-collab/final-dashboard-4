@@ -39,11 +39,15 @@ import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shi
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { expenseTypeToPnLCategory, getExpenseMapping, ExpenseType, ShopName } from "../shared/expenseMappings";
 import { generateAndEmailDailyReport } from "../src/server/report";
+import { importPosBundle } from "../src/server/pos/uploadBundle";
+import { analyzeShift } from "../src/server/jussi/analysis";
+import { prisma } from "../lib/prisma";
 // Email functionality will be added when needed
 
 
 const upload = multer({ storage: multer.memoryStorage() });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 
 // Safe JSON for BigInt values
 function safeJson(res: any, data: any, status = 200) {
@@ -254,6 +258,46 @@ export function registerRoutes(app: express.Application): Server {
   app.post('/api/daily-stock', async (req: Request, res: Response) => {
     const { saveDailyStock } = await import('./api/daily-stock');
     return saveDailyStock(req, res);
+  });
+
+  // POS Bundle Upload
+  app.post('/api/pos/upload', async (req: Request, res: Response) => {
+    try {
+      const { batchId } = await importPosBundle(req.body);
+      res.json({ batchId });
+    } catch (error) {
+      console.error('POS upload failed:', error);
+      res.status(500).json({ error: 'Import failed' });
+    }
+  });
+
+  // POS Batches List
+  app.get('/api/pos/batches', async (req: Request, res: Response) => {
+    try {
+      const batches = await prisma.posBatch.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          shift: true,
+          receipts: { select: { id: true } },
+          items: { select: { id: true } }
+        }
+      });
+      res.json(batches);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+      res.status(500).json({ error: 'Failed to fetch batches' });
+    }
+  });
+
+  // Jussi Analysis
+  app.get('/api/pos/:batchId/analyze', async (req: Request, res: Response) => {
+    try {
+      const analysis = await analyzeShift(req.params.batchId);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      res.status(500).json({ error: 'Analysis failed' });
+    }
   });
   
 

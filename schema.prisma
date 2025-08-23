@@ -756,3 +756,68 @@ model StockRequest {
   @@map("stock_requests")
 }
 
+model PosBatch {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  title      String?
+  shiftStart DateTime?
+  shiftEnd   DateTime?
+
+  receipts   PosReceipt[]
+  shift      PosShiftReport?
+  items      PosSalesItem[]
+  modifiers  PosSalesModifier[]
+  payments   PosPaymentSummary[]
+}
+
+model PosReceipt {
+  id         String   @id @default(uuid())
+  batchId    String
+  batch      PosBatch @relation(fields: [batchId], references: [id])
+  receiptId  String
+  datetime   DateTime
+  total      Decimal  @db.Decimal(10,2)
+  itemsJson  Json
+  payment    String?
+}
+
+model PosShiftReport {
+  id                 String   @id @default(uuid())
+  batchId            String   @unique
+  batch              PosBatch @relation(fields: [batchId], references: [id])
+  grossSales         Decimal  @db.Decimal(10,2)
+  discounts          Decimal  @db.Decimal(10,2)
+  netSales           Decimal  @db.Decimal(10,2)
+  cashInDrawer       Decimal  @db.Decimal(10,2)
+  cashSales          Decimal  @db.Decimal(10,2)
+  qrSales            Decimal  @db.Decimal(10,2)
+  otherSales         Decimal  @db.Decimal(10,2)
+  receiptCount       Int
+}
+
+model PosSalesItem {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosSalesModifier {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosPaymentSummary {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  method    String
+  amount    Decimal  @db.Decimal(10,2)
+}
+

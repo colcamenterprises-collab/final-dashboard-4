@@ -1,0 +1,535 @@
+🔒 “DO NOT DO THIS” (Read to the Replit agent)
+
+DO NOT
+
+Do not rename files, folders, routes, or DB fields.
+
+Do not change timezones (must be Asia/Bangkok).
+
+Do not add POS content to the daily staff email/PDF.
+
+Do not touch any part of Section 1.
+
+Do not create extra pages; use the existing Analysis page.
+
+Do not auto-run POS analysis on submit; analysis runs on demand inside Analysis.
+
+ONLY DO
+
+Add exactly the files and route handlers below.
+
+Insert code only where the comments indicate in server/routes.ts.
+
+Stop after the Analysis page shows Jussi’s tab working.
+
+Section 2 — Analysis + Jussi (embedded)
+What this section adds
+
+POS bundle upload API (uses the CSV headers you uploaded).
+
+Receipts API (to list/click receipts by batch).
+
+Jussi analysis API (side-by-side Staff vs POS + variance flags).
+
+Analysis page: adds tabs (Bank | POS Upload | Receipts | Shift Analysis | Jussi – Ops Review) and embeds Jussi panel there.
+
+Tolerances (from your doc):
+
+Sales variances (Cash, Grab, QR, Aroi Dee): ±40 THB
+
+Banked Cash vs POS Cash: 0 THB allowed
+
+Banked QR vs POS QR/Card: 0 THB allowed
+
+Rolls delta: ±3 pcs
+
+Meat delta: ±200 g
+
+1) Prisma models (append; migrate once)
+
+Add to prisma/schema.prisma (append, don’t rename existing models):
+
+model PosBatch {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  title      String?
+  shiftStart DateTime?
+  shiftEnd   DateTime?
+
+  receipts   PosReceipt[]
+  shift      PosShiftReport?
+  items      PosSalesItem[]
+  modifiers  PosSalesModifier[]
+  payments   PosPaymentSummary[]
+}
+
+model PosReceipt {
+  id         String   @id @default(uuid())
+  batchId    String
+  batch      PosBatch @relation(fields: [batchId], references: [id])
+  receiptId  String
+  datetime   DateTime
+  total      Decimal  @db.Decimal(10,2)
+  itemsJson  Json
+  payment    String?
+}
+
+model PosShiftReport {
+  id                 String   @id @default(uuid())
+  batchId            String   @unique
+  batch              PosBatch @relation(fields: [batchId], references: [id])
+  grossSales         Decimal  @db.Decimal(10,2)
+  discounts          Decimal  @db.Decimal(10,2)
+  netSales           Decimal  @db.Decimal(10,2)
+  cashInDrawer       Decimal  @db.Decimal(10,2)
+  cashSales          Decimal  @db.Decimal(10,2)
+  qrSales            Decimal  @db.Decimal(10,2)
+  otherSales         Decimal  @db.Decimal(10,2)
+  receiptCount       Int
+}
+
+model PosSalesItem {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosSalesModifier {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosPaymentSummary {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  method    String
+  amount    Decimal  @db.Decimal(10,2)
+}
+
+
+Run: npx prisma generate && npx prisma migrate dev -n s2_pos_models
+
+2) Server services (new files)
+src/server/jussi/analysis.ts (NEW)
+import { prisma } from "@/server/prisma";
+
+const THB = (n:number)=>Number.isFinite(Number(n)) ? Number(n) : 0;
+
+// tolerances
+const TOL = {
+  salesVariance: 40,     // THB
+  bankCash: 0,           // THB
+  bankQr: 0,             // THB
+  rolls: 3,              // pcs
+  meat: 200              // grams
+};
+
+export async function analyzeShift(batchId: string) {
+  const batch = await prisma.posBatch.findUnique({ where: { id: batchId } });
+  if (!batch) throw new Error("POS batch not found");
+
+  // POS side
+  const shift = await prisma.posShiftReport.findUnique({ where: { batchId } });
+  const pays  = await prisma.posPaymentSummary.findMany({ where: { batchId } });
+  const payMap = Object.fromEntries(pays.map(p => [p.method, Number(p.amount)]));
+
+  // Staff side: pick most recent DailySales inside window; fallback latest
+  const staff = await prisma.dailySales.findFirst({
+    where: batch.shiftStart && batch.shiftEnd ? {
+      createdAt: { gte: batch.shiftStart!, lte: batch.shiftEnd! }
+    } : {},
+    orderBy: { createdAt: "desc" }
+  });
+
+  const stock = staff
+    ? await prisma.dailyStock.findFirst({ where: { salesFormId: staff.id }, orderBy: { createdAt: "desc" }})
+    : null;
+
+  const staffData = {
+    salesId: staff?.id || null,
+    totalSales: THB(staff?.totalSales || 0),
+    totalExpenses: THB(staff?.totalExpenses || 0),
+    bankCash: THB(staff?.bankCash || 0),
+    bankQr: THB(staff?.bankQr || 0),
+    closingCash: THB(staff?.closingCash || 0),
+    rolls: stock?.rollsCount ?? null,
+    meat: stock?.meatWeightGrams ?? null
+  };
+
+  const posData = {
+    netSales: THB(shift?.netSales || 0),
+    receiptCount: shift?.receiptCount || 0,
+    cashSales: THB(shift?.cashSales ?? (payMap["Cash"] ?? 0)),
+    qrSales: THB(shift?.qrSales ?? (payMap["QR"] ?? payMap["Card"] ?? 0)),
+    methodBreakdown: payMap
+  };
+
+  const variances = {
+    totalSales: staffData.totalSales - posData.netSales,
+    bankCash: staffData.bankCash - posData.cashSales,
+    bankQr: staffData.bankQr - posData.qrSales
+  };
+
+  const flags:string[] = [];
+  if (Math.abs(variances.totalSales) > TOL.salesVariance)
+    flags.push(`Total Sales variance: staff ${staffData.totalSales} vs POS ${posData.netSales}`);
+  if (Math.abs(variances.bankCash) > TOL.bankCash)
+    flags.push(`Banked Cash mismatch: staff ${staffData.bankCash} vs POS Cash ${posData.cashSales}`);
+  if (Math.abs(variances.bankQr) > TOL.bankQr)
+    flags.push(`Banked QR mismatch: staff ${staffData.bankQr} vs POS QR/Card ${posData.qrSales}`);
+
+  return {
+    batch: {
+      id: batch.id,
+      window: { start: batch.shiftStart?.toISOString(), end: batch.shiftEnd?.toISOString() }
+    },
+    staff: staffData,
+    pos: posData,
+    variances,
+    flags
+  };
+}
+
+src/server/pos/uploadBundle.ts (NEW — exact headers locked)
+import { prisma } from "@/server/prisma";
+import { parse } from "csv-parse/sync";
+
+const num = (v:any)=> Number(String(v||"").replace(/[^\d.-]/g,"")) || 0;
+const toDate = (v:any)=> { const d=new Date(v); return isNaN(+d)? new Date(): d; };
+
+type Body = {
+  title?: string;
+  shiftStartISO?: string;
+  shiftEndISO?: string;
+  receiptsCsv?: string;
+  shiftReportCsv?: string;
+  itemSalesCsv?: string;
+  modifierSalesCsv?: string;
+  paymentTypeSalesCsv?: string;
+};
+
+export async function importPosBundle(body: Body) {
+  const batch = await prisma.posBatch.create({
+    data: {
+      title: body.title ?? null,
+      shiftStart: body.shiftStartISO ? new Date(body.shiftStartISO) : null,
+      shiftEnd: body.shiftEndISO ? new Date(body.shiftEndISO) : null
+    }
+  });
+
+  // Receipts (receipts-YYYY.csv)
+  if (body.receiptsCsv) {
+    const rows = parse(body.receiptsCsv, { columns: true, skip_empty_lines: true }) as any[];
+    await prisma.posReceipt.createMany({
+      data: rows.map(r => ({
+        batchId: batch.id,
+        receiptId: r["Receipt #"],
+        datetime: toDate(r["Date/time"]),
+        total: num(r["Total"]),
+        itemsJson: [],
+        payment: r["Payment method"] || r["Payment Method"] || null
+      }))
+    });
+  }
+
+  // Shift Report (shifts-YYYY.csv)
+  if (body.shiftReportCsv) {
+    const r = parse(body.shiftReportCsv, { columns: true, skip_empty_lines: true }) as any[];
+    const row = r[0] || {};
+    await prisma.posShiftReport.create({
+      data: {
+        batchId: batch.id,
+        grossSales: num(row["Gross sales"]),
+        discounts: num(row["Discounts"]),
+        netSales: num(row["Net sales"]),
+        cashInDrawer: num(row["Actual cash amount"]),
+        cashSales: num(row["Cash payments"]),
+        qrSales: num(row["Card payments"] || row["QR payments"] || 0),
+        otherSales: num(row["Other payments"] || 0),
+        receiptCount: Number(row["Receipts"] || 0)
+      }
+    });
+  }
+
+  // Item Sales (item-sales-summary-YYYY.csv)
+  if (body.itemSalesCsv) {
+    const rows = parse(body.itemSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+    await prisma.posSalesItem.createMany({
+      data: rows.map(r => ({
+        batchId: batch.id,
+        name: String(r["Item"] ?? r["Name"] ?? ""),
+        qty: Number(r["Qty"] ?? r["Quantity"] ?? 0),
+        net: num(r["Net sales"])
+      }))
+    });
+  }
+
+  // Modifier Sales (modifier-sales-YYYY.csv)
+  if (body.modifierSalesCsv) {
+    const rows = parse(body.modifierSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+    await prisma.posSalesModifier.createMany({
+      data: rows.map(r => ({
+        batchId: batch.id,
+        name: String(r["Modifier"] ?? r["Name"] ?? ""),
+        qty: Number(r["Qty"] ?? r["Quantity"] ?? 0),
+        net: num(r["Net sales"])
+      }))
+    });
+  }
+
+  // Payment Type Sales (payment-type-sales-YYYY.csv)
+  if (body.paymentTypeSalesCsv) {
+    const rows = parse(body.paymentTypeSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+    await prisma.posPaymentSummary.createMany({
+      data: rows.map(r => ({
+        batchId: batch.id,
+        method: String(r["Payment method"] ?? r["Payment Method"] ?? ""),
+        amount: num(r["Total"])
+      }))
+    });
+  }
+
+  return { batchId: batch.id };
+}
+
+3) Routes (insert into server/routes.ts)
+
+Add imports at the top (keep existing imports):
+
+import { importPosBundle } from "@/server/pos/uploadBundle";
+import { analyzeShift } from "@/server/jussi/analysis";
+import { prisma } from "@/server/prisma";
+
+
+Add three handlers (place near other /api routes):
+
+// POST /api/pos/upload-bundle
+app.post("/api/pos/upload-bundle", async (req, res) => {
+  try {
+    const result = await importPosBundle(req.body); // body contains CSV strings + shiftStartISO/shiftEndISO
+    res.json({ ok: true, ...result });
+  } catch (e:any) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /api/pos/receipts?batchId=...
+app.get("/api/pos/receipts", async (req, res) => {
+  const batchId = String(req.query.batchId || "");
+  if (!batchId) return res.status(400).json({ ok:false, error:"batchId required" });
+  const rows = await prisma.posReceipt.findMany({
+    where: { batchId },
+    orderBy: { datetime: "asc" },
+    select: { id:true, receiptId:true, datetime:true, total:true, payment:true }
+  });
+  res.json({ ok: true, data: rows });
+});
+
+// GET /api/analysis/shift?batchId=...
+app.get("/api/analysis/shift", async (req, res) => {
+  const batchId = String(req.query.batchId || "");
+  if (!batchId) return res.status(400).json({ ok:false, error:"batchId required" });
+  try {
+    const report = await analyzeShift(batchId);
+    res.json({ ok: true, report });
+  } catch (e:any) {
+    res.status(400).json({ ok:false, error: e.message });
+  }
+});
+
+
+Restart the server after saving.
+
+4) Analysis page UI (embed Jussi, add tabs)
+
+Goal: Keep your existing Analysis page route, add a tabbed header, and render Jussi in a tab called “Jussi – Ops Review”. The fetches use the new APIs.
+
+Replace the content of your Analysis page component with this markup (adjust the file where your Analysis page lives; e.g., src/web/pages/Analysis.tsx or similar):
+
+import { useEffect, useState } from "react";
+
+const fmtTHB = (n:number)=> new Intl.NumberFormat("th-TH", { style:"currency", currency:"THB", maximumFractionDigits:0 }).format(Number(n)||0);
+
+function TabButton({label, active, onClick}:{label:string, active:boolean, onClick:()=>void}) {
+  return (
+    <button onClick={onClick} className={`px-3 py-2 rounded ${active?"bg-black text-white":"bg-gray-100"}`}>
+      {label}
+    </button>
+  );
+}
+
+export default function AnalysisPage() {
+  const [tab, setTab] = useState<"bank"|"pos"|"receipts"|"shift"|"jussi">("jussi");
+  const [batchId, setBatchId] = useState<string>("");
+  const [report, setReport] = useState<any>(null);
+  const [receipts, setReceipts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (tab === "jussi" && batchId) {
+      fetch(`/api/analysis/shift?batchId=${batchId}`).then(r=>r.json()).then(setReport);
+    }
+    if ((tab === "receipts") && batchId) {
+      fetch(`/api/pos/receipts?batchId=${batchId}`).then(r=>r.json()).then(d=>setReceipts(d?.data||[]));
+    }
+  }, [tab, batchId]);
+
+  return (
+    <div className="p-4 text-sm space-y-4">
+      <div className="flex gap-2">
+        <TabButton label="Bank" active={tab==="bank"} onClick={()=>setTab("bank")} />
+        <TabButton label="POS Upload" active={tab==="pos"} onClick={()=>setTab("pos")} />
+        <TabButton label="Receipts" active={tab==="receipts"} onClick={()=>setTab("receipts")} />
+        <TabButton label="Shift Analysis" active={tab==="shift"} onClick={()=>setTab("shift")} />
+        <TabButton label="Jussi – Ops Review" active={tab==="jussi"} onClick={()=>setTab("jussi")} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input className="border px-2 py-1 rounded" placeholder="POS Batch ID" value={batchId} onChange={e=>setBatchId(e.target.value)} />
+        <span className="text-gray-500">Paste the POS batchId after uploading bundle</span>
+      </div>
+
+      {tab==="jussi" && (
+        <div className="space-y-4">
+          {!report?.ok && <div className="text-gray-500">Enter a Batch ID to run Jussi’s analysis.</div>}
+          {report?.ok && (
+            <>
+              <div className="border rounded p-3">
+                <div className="font-semibold mb-2">Window</div>
+                <div>{report.report.batch.window.start || "-"} → {report.report.batch.window.end || "-"}</div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="border rounded p-3">
+                  <div className="font-semibold mb-2">Staff (Daily Sales)</div>
+                  <table className="w-full">
+                    <tbody>
+                      <tr><td>Total Sales</td><td className="text-right">{fmtTHB(report.report.staff.totalSales)}</td></tr>
+                      <tr><td>Total Expenses</td><td className="text-right">{fmtTHB(report.report.staff.totalExpenses)}</td></tr>
+                      <tr><td>Banked Cash</td><td className="text-right">{fmtTHB(report.report.staff.bankCash)}</td></tr>
+                      <tr><td>Banked QR</td><td className="text-right">{fmtTHB(report.report.staff.bankQr)}</td></tr>
+                      <tr><td>Closing Cash</td><td className="text-right">{fmtTHB(report.report.staff.closingCash)}</td></tr>
+                      <tr><td>Rolls</td><td className="text-right">{report.report.staff.rolls ?? "-"}</td></tr>
+                      <tr><td>Meat (g)</td><td className="text-right">{report.report.staff.meat ?? "-"}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="border rounded p-3">
+                  <div className="font-semibold mb-2">POS (Shift Report)</div>
+                  <table className="w-full">
+                    <tbody>
+                      <tr><td>Net Sales</td><td className="text-right">{fmtTHB(report.report.pos.netSales)}</td></tr>
+                      <tr><td>Receipts</td><td className="text-right">{report.report.pos.receiptCount}</td></tr>
+                      <tr><td>Cash Sales</td><td className="text-right">{fmtTHB(report.report.pos.cashSales)}</td></tr>
+                      <tr><td>QR/Card Sales</td><td className="text-right">{fmtTHB(report.report.pos.qrSales)}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="border rounded p-3">
+                <div className="font-semibold mb-2">Variances</div>
+                <table className="w-full">
+                  <tbody>
+                    <tr className={Math.abs(report.report.variances.totalSales)>40 ? "bg-red-50":""}>
+                      <td>Total Sales (Staff - POS)</td>
+                      <td className="text-right">{fmtTHB(report.report.variances.totalSales)}</td>
+                    </tr>
+                    <tr className={Math.abs(report.report.variances.bankCash)>0 ? "bg-red-50":""}>
+                      <td>Banked Cash - POS Cash</td>
+                      <td className="text-right">{fmtTHB(report.report.variances.bankCash)}</td>
+                    </tr>
+                    <tr className={Math.abs(report.report.variances.bankQr)>0 ? "bg-red-50":""}>
+                      <td>Banked QR - POS QR/Card</td>
+                      <td className="text-right">{fmtTHB(report.report.variances.bankQr)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {!!report.report.flags?.length && (
+                <div className="border rounded p-3 bg-yellow-50">
+                  <div className="font-semibold mb-2">Flags</div>
+                  <ul className="list-disc ml-5">
+                    {report.report.flags.map((f:string,i:number)=><li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {tab==="receipts" && (
+        <div className="border rounded p-3">
+          {!batchId && <div className="text-gray-500">Enter a Batch ID to view receipts.</div>}
+          {!!batchId && (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2">Receipt ID</th>
+                  <th className="text-left">Date/Time</th>
+                  <th className="text-right">Total</th>
+                  <th className="text-left">Payment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receipts.map((r:any)=>(
+                  <tr key={r.id} className="border-b">
+                    <td className="py-2">{r.receiptId}</td>
+                    <td>{new Date(r.datetime).toLocaleString()}</td>
+                    <td className="text-right">{fmtTHB(r.total)}</td>
+                    <td>{r.payment || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {tab==="pos" && (
+        <div className="text-gray-500">POS Upload UI will live here (drag/drop CSVs → POST /api/pos/upload-bundle).</div>
+      )}
+      {tab==="shift" && (
+        <div className="text-gray-500">Shift Analysis helpers can go here (e.g., select latest window).</div>
+      )}
+      {tab==="bank" && (
+        <div className="text-gray-500">Bank statement upload/mapping (to be built in Expenses section).</div>
+      )}
+    </div>
+  );
+}
+
+
+(If your Analysis component sits elsewhere, paste this inside the existing file and wire to your router. Keep route name the same.)
+
+5) Quick test
+
+Migrate Prisma (step 1).
+
+Restart server.
+
+Upload POS bundle by POSTing JSON to /api/pos/upload-bundle with your CSV strings and shiftStartISO/shiftEndISO.
+
+Open Analysis page → paste returned batchId → select Jussi – Ops Review tab.
+
+You should see:
+
+Shift window
+
+Staff vs POS tables
+
+Variances (red when out of tolerance)
+
+Flags list
+
+Switch to Receipts tab → list of receipts for that batch.

@@ -11,7 +11,7 @@ export default function PosUpload() {
   const handleUpload = async (formData: FormData) => {
     try {
       setUploading(true);
-      const response = await fetch('/api/pos/upload-bundle', {
+      const response = await fetch('/api/pos/upload', {
         method: 'POST',
         body: formData,
       });

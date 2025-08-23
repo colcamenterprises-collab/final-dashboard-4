@@ -7,27 +7,31 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle, Search } from 'lucide-react';
 
 type ShiftAnalysis = {
-  batchId: string;
-  window: { start?: string; end?: string };
-  staffForm: {
+  batch: {
+    id: string;
+    window: { start?: string; end?: string };
+  };
+  staff: {
     salesId?: string;
     totalSales: number;
     totalExpenses: number;
     bankCash: number;
     bankQr: number;
     closingCash: number;
+    rolls?: number;
+    meat?: number;
   };
   pos: {
     netSales: number;
     receiptCount: number;
-    payments: Record<string, number>;
+    methodBreakdown: Record<string, number>;
     cashSales: number;
     qrSales: number;
   };
   variances: {
-    totalSalesDiff: number;
-    bankCashVsCashSales: number;
-    bankQrVsQrSales: number;
+    totalSales: number;
+    bankCash: number;
+    bankQr: number;
   };
   flags: string[];
 };
@@ -44,11 +48,11 @@ export default function ShiftAnalysis() {
   
   const { data: analysisData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/pos/analysis/shift', batchId],
-    queryFn: () => fetch(`/api/pos/analysis/shift?batchId=${batchId}`).then(res => res.json()),
+    queryFn: () => fetch(`/api/pos/${batchId}/analyze`).then(res => res.json()),
     enabled: false, // Manual trigger
   });
 
-  const analysis: ShiftAnalysis | null = analysisData?.report || null;
+  const analysis: ShiftAnalysis | null = analysisData || null;
 
   const handleAnalyze = () => {
     if (batchId) {
@@ -110,8 +114,8 @@ export default function ShiftAnalysis() {
                 </Badge>
               </div>
               <CardDescription>
-                Batch: {analysis.batchId} | Window: {analysis.window.start ? 
-                  `${new Date(analysis.window.start).toLocaleString()} - ${new Date(analysis.window.end || '').toLocaleString()}` : 
+                Batch: {analysis.batch.id} | Window: {analysis.batch.window.start ? 
+                  `${new Date(analysis.batch.window.start).toLocaleString()} - ${new Date(analysis.batch.window.end || '').toLocaleString()}` : 
                   'No window specified'
                 }
               </CardDescription>
@@ -143,23 +147,23 @@ export default function ShiftAnalysis() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span>Total Sales:</span>
-                  <span className="font-mono">{formatTHB(analysis.staffForm.totalSales)}</span>
+                  <span className="font-mono">{formatTHB(analysis.staff.totalSales)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Expenses:</span>
-                  <span className="font-mono">{formatTHB(analysis.staffForm.totalExpenses)}</span>
+                  <span className="font-mono">{formatTHB(analysis.staff.totalExpenses)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Cash Banked:</span>
-                  <span className="font-mono">{formatTHB(analysis.staffForm.bankCash)}</span>
+                  <span className="font-mono">{formatTHB(analysis.staff.bankCash)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>QR Banked:</span>
-                  <span className="font-mono">{formatTHB(analysis.staffForm.bankQr)}</span>
+                  <span className="font-mono">{formatTHB(analysis.staff.bankQr)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Closing Cash:</span>
-                  <span className="font-mono">{formatTHB(analysis.staffForm.closingCash)}</span>
+                  <span className="font-mono">{formatTHB(analysis.staff.closingCash)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -184,10 +188,10 @@ export default function ShiftAnalysis() {
                 </div>
                 <div className="space-y-1">
                   <span className="text-sm font-medium">Payment Breakdown:</span>
-                  {Object.entries(analysis.pos.payments).map(([method, amount]) => (
+                  {Object.entries(analysis.pos.methodBreakdown).map(([method, amount]) => (
                     <div key={method} className="flex justify-between text-sm pl-4">
                       <span>{method}:</span>
-                      <span className="font-mono">{formatTHB(amount)}</span>
+                      <span className="font-mono">{formatTHB(Number(amount))}</span>
                     </div>
                   ))}
                 </div>
