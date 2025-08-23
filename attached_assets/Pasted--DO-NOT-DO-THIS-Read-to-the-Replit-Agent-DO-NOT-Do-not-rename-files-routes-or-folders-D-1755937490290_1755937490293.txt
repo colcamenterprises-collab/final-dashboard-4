@@ -1,0 +1,264 @@
+🔒 “DO NOT DO THIS” — Read to the Replit Agent
+
+DO NOT:
+
+Do not rename files, routes, or folders.
+
+Do not change database model names or field names.
+
+Do not add libraries or upgrade dependencies.
+
+Do not change timezones (must be Asia/Bangkok).
+
+Do not include POS data in the daily email/PDF.
+
+Do not create new pages outside the paths listed below.
+
+Do not touch Form 1 logic other than noted.
+
+Do not auto-trigger any POS analysis; Jussi lives only inside Analysis.
+
+ONLY DO:
+
+Exactly the file edits below, line-for-line.
+
+Verify build, then stop.
+
+Section 1 — Staff-Only Daily Email/PDF (no POS)
+What this section does
+
+Refactors report generator to use only Daily Sales (Form 1), Daily Stock (Form 2), and Shopping List.
+
+Sends email immediately on Form 2 submit.
+
+Keeps PDF link in Library.
+
+Files to edit/create (exact paths)
+1) src/server/report.ts (REPLACE ENTIRE FILE)
+import { prisma } from "@/server/prisma";
+import { generateDailyReportPDF } from "@/server/pdf";
+import { sendReportEmail } from "@/server/email";
+
+const currency = (n: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(n) || 0);
+
+export async function generateAndEmailDailyReport(salesId: string) {
+  // Pull staff forms only
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+  if (!sales) throw new Error("DailySales not found");
+
+  const stock = await prisma.dailyStock.findFirst({
+    where: { salesFormId: salesId },
+    orderBy: { createdAt: "desc" }
+  });
+
+  const list = await prisma.shoppingList.findFirst({
+    where: { salesFormId: salesId },
+    orderBy: { createdAt: "desc" }
+  });
+
+  // Build staff-only HTML
+  const dateStr = new Date(sales.createdAt).toLocaleString("en-GB", { timeZone: "Asia/Bangkok" });
+  const expenses = await prisma.expense?.findMany?.({ where: { salesFormId: salesId } }).catch(() => null) || [];
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height:1.6">
+      <h2>Smash Brothers Burgers – Daily Report</h2>
+      <p><strong>Date/Time (BKK):</strong> ${dateStr}</p>
+      <p><strong>Staff:</strong> ${sales.completedBy || "-"}</p>
+
+      <h3>Sales & Banking</h3>
+      <ul>
+        <li>Starting Cash: ${currency(sales.startingCash)}</li>
+        <li>Closing Cash: ${currency(sales.closingCash)}</li>
+        <li>Total Sales (net): ${currency(sales.totalSales)}</li>
+        <li>Total Expenses: ${currency(sales.totalExpenses)}</li>
+        <li>Banked – Cash: ${currency(sales.bankCash)}</li>
+        <li>Banked – QR: ${currency(sales.bankQr)}</li>
+      </ul>
+
+      <h3>Expenses</h3>
+      ${expenses.length ? `
+        <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;">
+          <thead><tr><th>Vendor</th><th>Category</th><th>Amount</th><th>Notes</th></tr></thead>
+          <tbody>
+            ${expenses.map((e:any)=>`
+              <tr>
+                <td>${e.vendor||"-"}</td>
+                <td>${e.category||"-"}</td>
+                <td>${currency(e.amount)}</td>
+                <td>${e.notes||""}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      ` : `<p>No expenses recorded.</p>`}
+
+      <h3>Stock Snapshot</h3>
+      ${stock ? `
+        <ul>
+          <li>Rolls (pcs): ${stock.rollsCount}</li>
+          <li>Meat (grams): ${stock.meatWeightGrams}</li>
+        </ul>
+      ` : `<p>No stock form found for this shift.</p>`}
+
+      <h3>Shopping List</h3>
+      ${list ? `
+        <ul>
+          <li>Rolls: ${list.rollsCount}</li>
+          <li>Meat (grams): ${list.meatWeightGrams}</li>
+        </ul>
+        ${Array.isArray(list.drinksCounts) && list.drinksCounts.length ? `
+          <p><strong>Drinks</strong></p>
+          <ul>${(list.drinksCounts as any[]).map(d=>`<li>${d.name}: ${d.qty}</li>`).join("")}</ul>` : "" }
+        ${Array.isArray(list.items) && list.items.length ? `
+          <p><strong>Requested Items</strong></p>
+          <ul>${(list.items as any[]).map((it:any)=>`<li>${it.name} (${it.unit}) × ${it.qty}</li>`).join("")}</ul>` : "<p>No requested items.</p>"}
+      ` : "<p>No shopping list generated.</p>"}
+
+      <p style="margin-top:16px">
+        <a href="${sales.pdfPath || "#"}" target="_blank">View Daily Report (PDF)</a> &nbsp;|&nbsp;
+        <a href="/shopping-list" target="_blank">View Shopping List</a>
+      </p>
+    </div>
+  `;
+
+  // Generate PDF and email
+  const pdfPath = await generateDailyReportPDF(salesId); // staff-only PDF
+  const to = (process.env.REPORT_TO || `${process.env.GMAIL_USER||""}`).split(",").map(s=>s.trim()).filter(Boolean);
+  if (!to.length) throw new Error("No REPORT_TO or GMAIL_USER configured.");
+
+  await sendReportEmail({
+    to,
+    subject: `SBB Daily Report – ${new Date(sales.createdAt).toLocaleDateString("en-GB", { timeZone: "Asia/Bangkok" })}`,
+    html,
+    attachments: [{ path: `.${pdfPath}`, filename: pdfPath.split("/").pop() }]
+  });
+
+  return pdfPath;
+}
+
+2) src/server/pdf.ts (REPLACE ENTIRE FILE)
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
+import { prisma } from "@/server/prisma";
+
+const currency = (n: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(n) || 0);
+
+export async function generateDailyReportPDF(salesId: string) {
+  const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
+  if (!sales) throw new Error("DailySales not found");
+
+  const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+  const list  = await prisma.shoppingList.findFirst({ where: { salesFormId: salesId }, orderBy: { createdAt: "desc" }});
+  const expenses = await prisma.expense?.findMany?.({ where: { salesFormId: salesId } }).catch(() => null) || [];
+
+  const reportsDir = path.join(process.cwd(), "public", "reports");
+  fs.mkdirSync(reportsDir, { recursive: true });
+  const outPath = path.join(reportsDir, `${salesId}.pdf`);
+
+  const doc = new PDFDocument({ margin: 36 });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  // Header
+  doc.fontSize(18).text("Smash Brothers Burgers – Daily Report", { align: "center" });
+  doc.moveDown(0.5);
+  doc.fontSize(10).text(`Date/Time (BKK): ${new Date(sales.createdAt).toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}`);
+  doc.text(`Staff: ${sales.completedBy || "-"}`);
+  doc.moveDown();
+
+  // Sales & Banking
+  doc.fontSize(14).text("Sales & Banking");
+  doc.fontSize(10);
+  doc.text(`Starting Cash: ${currency(sales.startingCash)}`);
+  doc.text(`Closing Cash: ${currency(sales.closingCash)}`);
+  doc.text(`Total Sales (net): ${currency(sales.totalSales)}`);
+  doc.text(`Total Expenses: ${currency(sales.totalExpenses)}`);
+  doc.text(`Banked – Cash: ${currency(sales.bankCash)}`);
+  doc.text(`Banked – QR: ${currency(sales.bankQr)}`);
+  doc.moveDown();
+
+  // Expenses
+  doc.fontSize(14).text("Expenses");
+  if (expenses.length) {
+    expenses.forEach((e:any) => {
+      doc.fontSize(10).text(`• ${e.vendor||"-"} | ${e.category||"-"} | ${currency(e.amount)}${e.notes?` | ${e.notes}`:""}`);
+    });
+  } else {
+    doc.fontSize(10).text("No expenses recorded.");
+  }
+  doc.moveDown();
+
+  // Stock Snapshot
+  doc.fontSize(14).text("Stock Snapshot");
+  if (stock) {
+    doc.fontSize(10).text(`Rolls (pcs): ${stock.rollsCount}`);
+    doc.text(`Meat (grams): ${stock.meatWeightGrams}`);
+  } else {
+    doc.fontSize(10).text("No stock form found for this shift.");
+  }
+  doc.moveDown();
+
+  // Shopping List
+  doc.fontSize(14).text("Shopping List");
+  if (list) {
+    doc.fontSize(10).text(`Rolls: ${list.rollsCount}`);
+    doc.text(`Meat (grams): ${list.meatWeightGrams}`);
+    const drinks = (list.drinksCounts as any[]) || [];
+    if (drinks.length) {
+      doc.text("Drinks:");
+      drinks.forEach(d => doc.text(`  - ${d.name}: ${d.qty}`));
+    }
+    const items = (list.items as any[]) || [];
+    if (items.length) {
+      doc.text("Requested Items:");
+      items.forEach((it:any)=> doc.text(`  - ${it.name} (${it.unit}) × ${it.qty}`));
+    } else {
+      doc.text("No requested items.");
+    }
+  } else {
+    doc.fontSize(10).text("No shopping list generated.");
+  }
+
+  doc.end();
+  await new Promise<void>((resolve, reject) => {
+    stream.on("finish", () => resolve());
+    stream.on("error", reject);
+  });
+
+  const pdfPath = `/reports/${salesId}.pdf`;
+  await prisma.dailySales.update({ where: { id: salesId }, data: { pdfPath } });
+  return pdfPath;
+}
+
+3) src/pages/api/daily-stock.ts (EDIT: call the report after save)
+
+Find the handler where stock is created and add the call (keep everything else as-is):
+
+// after creating stock + shopping list
+if (parsed.salesFormId) {
+  try {
+    await generateAndEmailDailyReport(parsed.salesFormId); // staff-only report
+  } catch (e) {
+    console.error("Daily email/PDF failed:", e);
+  }
+}
+
+
+(Ensure it already imports:)
+
+import { generateAndEmailDailyReport } from "@/server/report";
+
+After applying Section 1
+
+Submit Form 1 ➜ Form 2.
+
+You should receive the daily email (no POS data) with PDF attached.
+
+Library row should show View PDF and open the same content.
+
+Reply “OK—apply Section 2” when you’re ready, and I’ll deliver the next slice:
+
+Analysis page tabs with Jussi embedded (single page), plus the “run analysis on selected batch” UI — no email/PDF involved yet (that stays manual inside Analysis).

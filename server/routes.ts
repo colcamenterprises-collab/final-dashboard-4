@@ -38,6 +38,7 @@ import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { expenseTypeToPnLCategory, getExpenseMapping, ExpenseType, ShopName } from "../shared/expenseMappings";
+import { generateAndEmailDailyReport } from "../src/server/report";
 // Email functionality will be added when needed
 
 
@@ -1167,6 +1168,15 @@ export function registerRoutes(app: express.Application): Server {
       
       const [result] = await db.insert(dailyStockSales).values(formData).returning();
       console.log("✅ Validated Fort Knox form saved with ID:", result.id);
+      
+      // after creating stock + shopping list
+      if (result.id) {
+        try {
+          await generateAndEmailDailyReport(result.id.toString()); // staff-only report
+        } catch (e) {
+          console.error("Daily email/PDF failed:", e);
+        }
+      }
       
       // Email notification will be added when email service is configured
       console.log("✅ Form validation passed - data integrity confirmed");
