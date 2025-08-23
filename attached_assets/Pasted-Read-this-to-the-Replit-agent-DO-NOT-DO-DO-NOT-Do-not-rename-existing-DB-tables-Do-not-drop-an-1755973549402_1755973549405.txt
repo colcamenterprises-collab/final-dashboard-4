@@ -1,0 +1,198 @@
+Read this to the Replit agent (DO-NOT-DO)
+
+DO NOT
+
+Do not rename existing DB tables.
+
+Do not drop any tables or data.
+
+Do not change timezone settings.
+
+Do not modify Form 1/2 logic beyond noted migrations.
+
+Do not “auto-fix” by creating new v3 tables.
+
+
+ONLY DO
+
+Map Prisma models to existing tables via @@map/@map.
+
+Add missing columns via migration (e.g., wages).
+
+Create the POS ingestion tables exactly as listed.
+
+Run the exact commands below.
+
+
+
+---
+
+1) Align Prisma models to existing tables
+
+Open prisma/schema.prisma and ensure the app models map to your v2 tables.
+
+model DailySales {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  completedBy    String?
+  startingCash   Decimal  @db.Decimal(10,2)
+  closingCash    Decimal  @db.Decimal(10,2)
+  totalSales     Decimal  @db.Decimal(10,2)
+  totalExpenses  Decimal  @db.Decimal(10,2)
+  bankCash       Decimal  @db.Decimal(10,2)
+  bankQr         Decimal  @db.Decimal(10,2)
+  wages          Decimal? @db.Decimal(10,2) // we will add if missing
+
+  pdfPath        String?
+
+  @@map("daily_sales_v2")
+}
+
+model DailyStock {
+  id               String   @id @default(uuid())
+  createdAt        DateTime @default(now())
+  salesFormId      String?
+  rollsCount       Int?
+  meatWeightGrams  Int?
+  // other stock fields ok
+
+  @@map("daily_stock_v2")
+}
+
+> This keeps your code calling prisma.dailySales and prisma.dailyStock, but writes to daily_sales_v2 and daily_stock_v2.
+
+
+
+If your local schema already defines these models but without the @@map, add it. If fields are named slightly differently in DB, use @map("db_column") on the field.
+
+
+---
+
+2) Add missing wages column (if not in DB)
+
+If the DB is missing wages in daily_sales_v2, add it via migration:
+
+Create a migration SQL file (or run as a one-off):
+
+ALTER TABLE daily_sales_v2
+ADD COLUMN IF NOT EXISTS wages numeric(10,2) DEFAULT 0;
+
+And keep the Prisma field wages Decimal? @db.Decimal(10,2).
+
+
+---
+
+3) Create the POS ingestion tables
+
+Append these to schema.prisma (if you haven’t already):
+
+model PosBatch {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  title      String?
+  shiftStart DateTime?
+  shiftEnd   DateTime?
+
+  receipts   PosReceipt[]
+  shift      PosShiftReport?
+  items      PosSalesItem[]
+  modifiers  PosSalesModifier[]
+  payments   PosPaymentSummary[]
+}
+
+model PosReceipt {
+  id         String   @id @default(uuid())
+  batchId    String
+  batch      PosBatch @relation(fields: [batchId], references: [id])
+  receiptId  String
+  datetime   DateTime
+  total      Decimal  @db.Decimal(10,2)
+  itemsJson  Json
+  payment    String?
+}
+
+model PosShiftReport {
+  id                 String   @id @default(uuid())
+  batchId            String   @unique
+  batch              PosBatch @relation(fields: [batchId], references: [id])
+  grossSales         Decimal  @db.Decimal(10,2)
+  discounts          Decimal  @db.Decimal(10,2)
+  netSales           Decimal  @db.Decimal(10,2)
+  cashInDrawer       Decimal  @db.Decimal(10,2)
+  cashSales          Decimal  @db.Decimal(10,2)
+  qrSales            Decimal  @db.Decimal(10,2)
+  otherSales         Decimal  @db.Decimal(10,2)
+  receiptCount       Int
+}
+
+model PosSalesItem {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosSalesModifier {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  name      String
+  qty       Int
+  net       Decimal  @db.Decimal(10,2)
+}
+
+model PosPaymentSummary {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+  method    String
+  amount    Decimal  @db.Decimal(10,2)
+}
+
+
+---
+
+4) Run the right Prisma commands
+
+In the shell:
+
+# See current state
+npx prisma migrate status
+
+# Generate client
+npx prisma generate
+
+# Apply schema to DB (creates POS tables and adds wages if included as SQL in migration)
+npx prisma migrate dev -n align_core_and_add_pos
+
+# If your environment prefers push (no migrations), then instead:
+# npx prisma db push
+
+> If db push is used, still run the SQL for wages separately (step 2), because db push won’t create a data-bearing migration.
+
+
+
+Restart app.
+
+
+---
+
+5) Quick verification (2 minutes)
+
+1. Open Prisma Studio (if available) or psql:
+
+Tables exist: daily_sales_v2, daily_stock_v2, PosBatch, PosReceipt, PosShiftReport, PosSalesItem, PosSalesModifier, PosPaymentSummary.
+
+Column exists: daily_sales_v2.wages.
+
+
+
+2. Submit Form 1 + Form 2:
+
+Should persist without DB errors.
+
+Daily email/PDF should send (staff-only).
+
+
