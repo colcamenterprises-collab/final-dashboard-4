@@ -1,0 +1,83 @@
+✅ Fix Path
+
+We need to normalize header names in the import. Here’s how:
+
+In src/server/pos/uploadBundle.ts
+
+Replace the little helpers with these:
+
+// Utility: get field by tolerant matching
+function pick(row: any, keys: string[], def: any = null) {
+  for (const k of keys) {
+    if (row[k] !== undefined) return row[k];
+    const found = Object.keys(row).find(h => h.toLowerCase().includes(k.toLowerCase()));
+    if (found) return row[found];
+  }
+  return def;
+}
+
+function num(val: any) {
+  if (val === null || val === undefined) return 0;
+  const cleaned = String(val).replace(/[^\d\.\-]/g, ""); // strip currency symbols, commas, ฿
+  const f = parseFloat(cleaned);
+  return isNaN(f) ? 0 : f;
+}
+
+
+Then, for each section:
+
+Item Sales
+// Item Sales
+if (body.itemSalesCsv) {
+  const rows = parse(body.itemSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+  await prisma.posSalesItem.createMany({
+    data: rows.map(r => ({
+      batchId: batch.id,
+      name: pick(r, ["Item","Name"]) || "Unknown",
+      qty: num(pick(r, ["Qty","Quantity","Sold qty"])),
+      net: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)","Net amount"]))
+    }))
+  });
+}
+
+Modifier Sales
+if (body.modifierSalesCsv) {
+  const rows = parse(body.modifierSalesCsv, { columns: true, skip_empty_lines: true }) as any[];
+  await prisma.posSalesModifier.createMany({
+    data: rows.map(r => ({
+      batchId: batch.id,
+      name: pick(r, ["Modifier","Name"]) || "Unknown",
+      qty: num(pick(r, ["Qty","Quantity","Sold qty"])),
+      net: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)","Net amount"]))
+    }))
+  });
+}
+
+Shift Report
+if (body.shiftReportCsv) {
+  const rows = parse(body.shiftReportCsv, { columns: true, skip_empty_lines: true }) as any[];
+  const r = rows[0] || {};
+  await prisma.posShiftReport.create({
+    data: {
+      batchId: batch.id,
+      grossSales: num(pick(r, ["Gross sales","Gross Sales"])),
+      discounts: num(pick(r, ["Discounts"])),
+      netSales: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)"])),
+      cashInDrawer: num(pick(r, ["Cash in drawer","Cash in Drawer","Cash Drawer"])),
+      cashSales: num(pick(r, ["Cash sales","Cash Sales"])),
+      qrSales: num(pick(r, ["Card","QR","QR sales","QR Sales","Credit Card","POS Card"])),
+      otherSales: num(pick(r, ["Other sales","Others"])),
+      receiptCount: num(pick(r, ["Receipts","Receipt Count"]))
+    }
+  });
+}
+
+Next Step for You
+
+Apply the tolerant header-mapping changes above.
+
+Restart app.
+
+Drop the same CSV bundle.
+
+Hit Run Jussi Analysis again → you should now see real sales, receipts, variances instead of all zeros.

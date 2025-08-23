@@ -1,6 +1,22 @@
 import { prisma } from "../../../lib/prisma";
 import { parse } from "csv-parse/sync";
-const num = (v:any)=> Number(String(v||"").replace(/[^\d.-]/g,"")) || 0;
+// Utility: get field by tolerant matching
+function pick(row: any, keys: string[], def: any = null) {
+  for (const k of keys) {
+    if (row[k] !== undefined) return row[k];
+    const found = Object.keys(row).find(h => h.toLowerCase().includes(k.toLowerCase()));
+    if (found) return row[found];
+  }
+  return def;
+}
+
+function num(val: any) {
+  if (val === null || val === undefined) return 0;
+  const cleaned = String(val).replace(/[^\d\.\-]/g, ""); // strip currency symbols, commas, ฿
+  const f = parseFloat(cleaned);
+  return isNaN(f) ? 0 : f;
+}
+
 const toDate = (v:any)=> { const d=new Date(v); return isNaN(+d)? new Date(): d; };
 
 type Body = {
@@ -60,19 +76,19 @@ export async function importPosBundle(body: Body) {
 
   // Shift Report (shifts-YYYY.csv)
   if (body.shiftReportCsv) {
-    const r = parse(body.shiftReportCsv, { columns: true, skip_empty_lines: true }) as any[];
-    const row = r[0] || {};
+    const rows = parse(body.shiftReportCsv, { columns: true, skip_empty_lines: true }) as any[];
+    const r = rows[0] || {};
     await prisma.posShiftReport.create({
       data: {
         batchId: batch.id,
-        grossSales: num(row["Gross sales"]),
-        discounts: num(row["Discounts"]),
-        netSales: num(row["Net sales"]),
-        cashInDrawer: num(row["Actual cash amount"]),
-        cashSales: num(row["Cash payments"]),
-        qrSales: num(row["Card payments"] || row["QR payments"] || 0),
-        otherSales: num(row["Other payments"] || 0),
-        receiptCount: Number(row["Receipts"] || 0)
+        grossSales: num(pick(r, ["Gross sales","Gross Sales"])),
+        discounts: num(pick(r, ["Discounts"])),
+        netSales: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)"])),
+        cashInDrawer: num(pick(r, ["Cash in drawer","Cash in Drawer","Cash Drawer"])),
+        cashSales: num(pick(r, ["Cash sales","Cash Sales"])),
+        qrSales: num(pick(r, ["Card","QR","QR sales","QR Sales","Credit Card","POS Card"])),
+        otherSales: num(pick(r, ["Other sales","Others"])),
+        receiptCount: num(pick(r, ["Receipts","Receipt Count"]))
       }
     });
   }
@@ -83,9 +99,9 @@ export async function importPosBundle(body: Body) {
     await prisma.posSalesItem.createMany({
       data: rows.map(r => ({
         batchId: batch.id,
-        name: String(r["Item"] ?? r["Name"] ?? ""),
-        qty: Number(r["Qty"] ?? r["Quantity"] ?? 0),
-        net: num(r["Net sales"])
+        name: pick(r, ["Item","Name"]) || "Unknown",
+        qty: num(pick(r, ["Qty","Quantity","Sold qty"])),
+        net: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)","Net amount"]))
       }))
     });
   }
@@ -96,9 +112,9 @@ export async function importPosBundle(body: Body) {
     await prisma.posSalesModifier.createMany({
       data: rows.map(r => ({
         batchId: batch.id,
-        name: String(r["Modifier"] ?? r["Name"] ?? ""),
-        qty: Number(r["Qty"] ?? r["Quantity"] ?? 0),
-        net: num(r["Net sales"])
+        name: pick(r, ["Modifier","Name"]) || "Unknown",
+        qty: num(pick(r, ["Qty","Quantity","Sold qty"])),
+        net: num(pick(r, ["Net sales","Net Sales","Net Sales (฿)","Net amount"]))
       }))
     });
   }
