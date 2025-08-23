@@ -1,3 +1,7 @@
+Replace your Analysis page component with this
+
+Path: use the same file your current Analysis route renders (replace its content with the code below).
+
 import { useCallback, useMemo, useState } from "react";
 
 type Detected = {
@@ -270,3 +274,25 @@ export default function AnalysisPage() {
     </div>
   );
 }
+
+What this does now
+
+One upload area (drag/drop or choose) for all CSVs.
+
+One description (optional).
+
+Detects file types automatically by headers.
+
+Reads shift open/close directly from the Shift Report CSV and includes them in the upload payload.
+
+Calls existing /api/pos/upload-bundle.
+
+After upload, presents two buttons:
+
+View Receipts (lists them below)
+
+Run Jussi Analysis (shows side-by-side & variances below)
+
+No tabs, no Batch ID in your face, no ISO inputs.
+
+If the page already imports other stuff, keep those imports; the component above is self-contained and will work with the backend you’ve got from Section 2.

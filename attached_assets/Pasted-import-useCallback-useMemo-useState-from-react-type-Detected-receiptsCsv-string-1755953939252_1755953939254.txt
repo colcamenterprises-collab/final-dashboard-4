@@ -1,0 +1,272 @@
+import { useCallback, useMemo, useState } from "react";
+
+type Detected = {
+  receiptsCsv?: string;
+  shiftReportCsv?: string;
+  itemSalesCsv?: string;
+  modifierSalesCsv?: string;
+  paymentTypeSalesCsv?: string;
+  shiftStartISO?: string;
+  shiftEndISO?: string;
+};
+
+const fmtTHB = (n:number)=>new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(Number(n)||0);
+
+function detectFileKind(text: string) {
+  const header = text.split(/\r?\n/,1)[0].toLowerCase();
+  if (header.includes("receipt #") && header.includes("date/time")) return "receiptsCsv";
+  if (header.includes("shift opening time") && header.includes("actual cash amount")) return "shiftReportCsv";
+  if (header.includes("payment method") && header.includes("total")) return "paymentTypeSalesCsv";
+  if (header.includes("modifier") && header.includes("net sales")) return "modifierSalesCsv";
+  if (header.includes("item") && header.includes("net sales")) return "itemSalesCsv";
+  return "unknown";
+}
+
+function parseShiftTimesFromShiftReport(csv: string): { start?: string; end?: string } {
+  // very tolerant parse: assume first data row after header
+  const lines = csv.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return {};
+  const headers = lines[0].split(",").map(h=>h.trim().toLowerCase());
+  const row = lines[1].split(",");
+  const h = (name:string)=>headers.findIndex(x=>x.includes(name));
+  const idxOpen  = h("shift opening time");
+  const idxClose = h("shift closing time");
+  const open  = idxOpen>=0 ? row[idxOpen]  : undefined;
+  const close = idxClose>=0 ? row[idxClose] : undefined;
+  const toISO = (v?:string)=> {
+    if (!v) return undefined;
+    const d = new Date(v);
+    return isNaN(+d) ? undefined : d.toISOString();
+  };
+  return { start: toISO(open), end: toISO(close) };
+}
+
+export default function AnalysisPage() {
+  const [dragOver,setDragOver]=useState(false);
+  const [desc,setDesc]=useState("");
+  const [detected,setDetected]=useState<Detected>({});
+  const [detectedList,setDetectedList]=useState<{label:string;ok:boolean}[]>([]);
+  const [batchId,setBatchId]=useState<string>("");
+  const [uploadMsg,setUploadMsg]=useState<string>("");
+  const [report,setReport]=useState<any>(null);
+  const [receipts,setReceipts]=useState<any[]>([]);
+  const hasAny = useMemo(()=>Object.values(detected).some(Boolean),[detected]);
+
+  const onFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length===0) return;
+    const next: Detected = {};
+    const checks: {label:string;ok:boolean}[] = [];
+    let shiftCsv = "";
+
+    for (const f of Array.from(files)) {
+      const text = await f.text();
+      const kind = detectFileKind(text);
+      if (kind === "unknown") {
+        checks.push({label:`Ignored: ${f.name}`, ok:false});
+        continue;
+      }
+      (next as any)[kind] = text;
+      checks.push({label:`${f.name} → ${kind.replace("Csv","").replace(/([A-Z])/g," $1").trim()}`, ok:true});
+      if (kind === "shiftReportCsv") shiftCsv = text;
+    }
+
+    if (shiftCsv) {
+      const st = parseShiftTimesFromShiftReport(shiftCsv);
+      next.shiftStartISO = st.start;
+      next.shiftEndISO = st.end;
+    }
+
+    setDetected(next);
+    setDetectedList(checks);
+    setBatchId("");
+    setReport(null);
+    setReceipts([]);
+    setUploadMsg(checks.length ? "Files detected. Ready to upload." : "No known POS CSVs detected.");
+  },[]);
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); setDragOver(false);
+    onFiles(e.dataTransfer.files);
+  };
+
+  async function uploadBundle() {
+    setUploadMsg("Uploading…");
+    const body = {
+      title: desc || undefined,
+      ...detected
+    };
+    const res = await fetch("/api/pos/upload-bundle", {
+      method:"POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data?.ok) {
+      setBatchId(data.batchId);
+      setUploadMsg(`Uploaded successfully. Batch created.`);
+    } else {
+      setUploadMsg(`Upload failed: ${data?.error||"unknown error"}`);
+    }
+  }
+
+  async function loadReceipts() {
+    if (!batchId) return;
+    const r = await fetch(`/api/pos/receipts?batchId=${batchId}`).then(r=>r.json());
+    setReceipts(r?.data || []);
+  }
+
+  async function runJussi() {
+    if (!batchId) return;
+    const r = await fetch(`/api/analysis/shift?batchId=${batchId}`).then(r=>r.json());
+    setReport(r?.ok ? r : null);
+  }
+
+  return (
+    <div className="p-6 text-sm space-y-6">
+      <h1 className="text-2xl font-bold">Analysis</h1>
+
+      {/* Upload Zone */}
+      <div
+        className={`border-2 ${dragOver?"border-black bg-gray-50":"border-dashed border-gray-300"} rounded-xl p-8 flex flex-col items-center justify-center text-center`}
+        onDragOver={(e)=>{e.preventDefault(); setDragOver(true);}}
+        onDragLeave={()=>setDragOver(false)}
+        onDrop={onDrop}
+      >
+        <div className="text-lg font-medium mb-2">Drag & drop Loyverse CSVs here</div>
+        <div className="text-gray-500 mb-4">Receipts, Shift Report, Item Sales, Modifier Sales, Payment Types</div>
+        <input
+          type="file" multiple accept=".csv"
+          onChange={(e)=>onFiles(e.target.files)}
+          className="mb-4"
+        />
+        <input
+          className="border px-3 py-2 rounded w-full max-w-xl"
+          placeholder="Description (e.g., Thursday Dinner Shift)"
+          value={desc} onChange={e=>setDesc(e.target.value)}
+        />
+        <button
+          onClick={uploadBundle}
+          disabled={!hasAny}
+          className={`mt-4 px-4 py-2 rounded ${hasAny?"bg-black text-white":"bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+        >
+          Upload & Process
+        </button>
+        <div className="text-xs text-gray-600 mt-2">{uploadMsg}</div>
+
+        {/* Detected results */}
+        {!!detectedList.length && (
+          <div className="mt-4 text-left w-full max-w-xl">
+            <div className="font-semibold mb-1">Files detected:</div>
+            <ul className="list-disc ml-5">
+              {detectedList.map((d,i)=><li key={i} className={d.ok?"text-green-700":"text-gray-500"}>{d.label}</li>)}
+            </ul>
+            {detected.shiftStartISO && detected.shiftEndISO && (
+              <div className="text-xs text-gray-600 mt-2">
+                Shift window (from Shift Report): {detected.shiftStartISO} → {detected.shiftEndISO}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions once batch exists */}
+      {batchId && (
+        <div className="flex gap-3">
+          <button onClick={loadReceipts} className="px-3 py-2 rounded bg-gray-100">View Receipts</button>
+          <button onClick={runJussi} className="px-3 py-2 rounded bg-black text-white">Run Jussi Analysis</button>
+        </div>
+      )}
+
+      {/* Receipts */}
+      {!!receipts.length && (
+        <div className="border rounded-lg p-4">
+          <div className="font-semibold mb-2">Receipts</div>
+          <table className="w-full">
+            <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">Receipt ID</th>
+              <th className="text-left">Date/Time</th>
+              <th className="text-right">Total</th>
+              <th className="text-left">Payment</th>
+            </tr>
+            </thead>
+            <tbody>
+            {receipts.map((r:any)=>(
+              <tr key={r.id} className="border-b">
+                <td className="py-2">{r.receiptId}</td>
+                <td>{new Date(r.datetime).toLocaleString()}</td>
+                <td className="text-right">{fmtTHB(r.total)}</td>
+                <td>{r.payment || "-"}</td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Jussi */}
+      {report?.ok && (
+        <div className="space-y-4">
+          <div className="border rounded-lg p-4">
+            <div className="font-semibold mb-2">Shift Window</div>
+            <div>{report.report.batch.window.start || "-"} → {report.report.batch.window.end || "-"}</div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="border rounded-lg p-4">
+              <div className="font-semibold mb-2">Staff (Daily Sales)</div>
+              <table className="w-full">
+                <tbody>
+                <tr><td>Total Sales</td><td className="text-right">{fmtTHB(report.report.staff.totalSales)}</td></tr>
+                <tr><td>Total Expenses</td><td className="text-right">{fmtTHB(report.report.staff.totalExpenses)}</td></tr>
+                <tr><td>Banked Cash</td><td className="text-right">{fmtTHB(report.report.staff.bankCash)}</td></tr>
+                <tr><td>Banked QR</td><td className="text-right">{fmtTHB(report.report.staff.bankQr)}</td></tr>
+                <tr><td>Closing Cash</td><td className="text-right">{fmtTHB(report.report.staff.closingCash)}</td></tr>
+                <tr><td>Rolls</td><td className="text-right">{report.report.staff.rolls ?? "-"}</td></tr>
+                <tr><td>Meat (g)</td><td className="text-right">{report.report.staff.meat ?? "-"}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="border rounded-lg p-4">
+              <div className="font-semibold mb-2">POS (Shift Report)</div>
+              <table className="w-full">
+                <tbody>
+                <tr><td>Net Sales</td><td className="text-right">{fmtTHB(report.report.pos.netSales)}</td></tr>
+                <tr><td>Receipts</td><td className="text-right">{report.report.pos.receiptCount}</td></tr>
+                <tr><td>Cash Sales</td><td className="text-right">{fmtTHB(report.report.pos.cashSales)}</td></tr>
+                <tr><td>QR/Card Sales</td><td className="text-right">{fmtTHB(report.report.pos.qrSales)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="border rounded-lg p-4">
+            <div className="font-semibold mb-2">Variances</div>
+            <table className="w-full">
+              <tbody>
+              <tr className={Math.abs(report.report.variances.totalSales)>40 ? "bg-red-50":""}>
+                <td>Total Sales (Staff - POS)</td>
+                <td className="text-right">{fmtTHB(report.report.variances.totalSales)}</td>
+              </tr>
+              <tr className={Math.abs(report.report.variances.bankCash)>0 ? "bg-red-50":""}>
+                <td>Banked Cash - POS Cash</td>
+                <td className="text-right">{fmtTHB(report.report.variances.bankCash)}</td>
+              </tr>
+              <tr className={Math.abs(report.report.variances.bankQr)>0 ? "bg-red-50":""}>
+                <td>Banked QR - POS QR/Card</td>
+                <td className="text-right">{fmtTHB(report.report.variances.bankQr)}</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          {!!report.report.flags?.length && (
+            <div className="border rounded-lg p-4 bg-yellow-50">
+              <div className="font-semibold mb-2">Flags</div>
+              <ul className="list-disc ml-5">
+                {report.report.flags.map((f:string,i:number)=><li key={i}>{f}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
