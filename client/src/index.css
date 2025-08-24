@@ -5,20 +5,57 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Base Typography === */
-html { font-size: 14px; } /* sets 1rem = 14px for consistent sizing */
+/* === Responsive Typography === */
+/* Ensure correct viewport on mobile/tablet */
+@media (max-width: 1024px) {
+  html { -webkit-text-size-adjust: 100%; }
+}
 
-/* Ensure buttons and paragraph text are 14px */
-button, .btn, p, .prose p { font-size: 14px !important; }
+/* 14px base, smoothly scales up to 16px on wide screens */
+html {
+  font-size: clamp(14px, 1.6vw, 16px);
+}
 
-/* Optional: inputs and selects */
-input, select, textarea { font-size: 14px; }
+/* Ensure buttons and paragraph text use responsive base */
+button, .btn, p, .prose p { 
+  font-size: 1rem; /* Uses the clamp base size */
+}
 
-/* Typography helpers */
-.h1 { @apply text-3xl font-extrabold; }
-.h2 { @apply text-xl md:text-2xl font-bold; }
-.h3 { @apply text-lg font-semibold; }
+/* Touch-safe form inputs */
+input, select, textarea { 
+  font-size: 1rem; /* Prevents zoom on iOS */
+  min-height: 40px; /* Touch-friendly */
+}
+
+/* Responsive Typography helpers */
+.h1 { @apply text-xl lg:text-2xl font-extrabold; }
+.h2 { @apply text-lg lg:text-xl font-bold; }
+.h3 { @apply text-base lg:text-lg font-semibold; }
 .text-body { @apply text-sm; }
+
+/* Numeric alignment for tables */
+.num { text-align: right; }
+
+/* Touch-safe tap targets */
+button, .btn {
+  min-height: 40px;
+  min-width: 40px;
+}
+
+/* Cards with better mobile spacing */
+.card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+}
 
 /* Global responsive guards */
 html, body { 
@@ -98,16 +135,31 @@ html, body {
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
+/* Mobile grid responsiveness for forms */
+.responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* Mobile and Tablet Responsive Styles */
 @media (max-width: 768px) {
   /* Mobile viewport optimizations */
   * {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
-  }
-  
-  body {
-    font-size: 16px; /* Prevent zoom on iOS */
   }
   
   /* Form containers - full width on mobile */
@@ -117,21 +169,85 @@ html, body {
     padding-right: 1rem !important;
   }
   
-  /* Cards - stack vertically and reduce padding */
-  .card {
-    margin-bottom: 1rem !important;
+  /* Sticky action bars for forms */
+  .sticky-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid #e5e7eb;
+    padding: 0.5rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
   }
+  
+  /* Spacer to prevent content being hidden */
+  .sticky-spacer {
+    height: 4rem;
+  }
+  
+  /* Headings more compact on mobile */
+  .h1 { @apply text-lg font-bold; }
+  .h2 { @apply text-base font-semibold; }
   
   .card-content {
     padding: 1rem !important;
   }
   
   /* Form grids - single column on mobile */
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Tables - stack cells on mobile */
+  .table-responsive th, .table-responsive td {
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+  }
+  
+  /* Better button spacing on mobile */
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .btn-group button {
+    width: 100%;
+  }
   .grid {
     grid-template-columns: 1fr !important;
     gap: 0.75rem !important;
   }
-  
+}
+
+/* Currency formatting for consistent alignment */
+.currency, .thb, .num {
+  font-family: ui-monospace, SFMono-Regular, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Analysis page: responsive comparison layout */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .comparison-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Additional mobile styles for forms and interactions */
+@media (max-width: 768px) {
   /* Input fields - larger touch targets */
   input, select, textarea, button {
     min-height: 44px !important;

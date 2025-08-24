@@ -1,0 +1,256 @@
+Let’s lock mobile + tablet UX properly and kill the caching weirdness. Below are drop-in patches (small, surgical) plus a fast QA checklist.
+
+1) Collapse the sidebar on mobile/tablet
+
+Goal: sidebar is closed by default on <1024px, opens via hamburger. Content fills width.
+
+Patch — AppLayout.tsx (or your main shell component)
+
+import { useState } from "react";
+import { Menu } from "lucide-react";
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top bar (mobile-first) */}
+      <header className="sticky top-0 z-40 bg-white border-b">
+        <div className="h-12 flex items-center px-3 gap-3">
+          {/* Hamburger only on <lg */}
+          <button
+            className="lg:hidden p-2 rounded hover:bg-gray-100"
+            aria-label="Toggle menu"
+            onClick={() => setOpen(v => !v)}
+          >
+            <Menu size={20} />
+          </button>
+          <div className="font-semibold">Hi Cam</div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <aside
+          className={[
+            "fixed top-12 bottom-0 w-72 bg-white border-r z-40 transform transition-transform duration-200",
+            open ? "translate-x-0" : "-translate-x-full",
+            "lg:static lg:translate-x-0 lg:w-64"
+          ].join(" ")}
+        >
+          {/* your existing sidebar list here */}
+        </aside>
+
+        {/* Page overlay when menu open on mobile */}
+        {open && (
+          <div
+            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            onClick={() => setOpen(false)}
+          />
+        )}
+
+        {/* Main content */}
+        <main className="flex-1 lg:ml-64 p-4 lg:p-6">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+
+lg:hidden keeps the hamburger only on mobile/tablet.
+
+Sidebar slides in on mobile and is always visible on desktop.
+
+Main content gets lg:ml-64 so it isn’t hidden under the sidebar on desktop.
+
+2) Responsive typography (14px base, scales up slightly)
+
+Goal: your requirement is a 14px base; use a modern scale so it’s readable without breaking layouts.
+
+Patch — global CSS (e.g., src/web/styles/globals.css)
+
+/* Ensure correct viewport */
+@media (max-width: 1024px) {
+  html { -webkit-text-size-adjust: 100%; }
+}
+
+/* 14px base, smoothly scales up to 16px on wide screens */
+html {
+  font-size: clamp(14px, 1.6vw, 16px);
+}
+
+/* Ensure numbers align right by default in numeric cells */
+.num { text-align: right; }
+
+/* Touch-safe tap targets */
+button, .btn {
+  min-height: 40px;
+  min-width: 40px;
+}
+
+/* Cards */
+.card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+
+If you’re using Tailwind, this plays nicely—no Tailwind change needed. (You can also add text-sm as your default on body elements.)
+
+3) Mobile forms: inputs, grids, sticky actions
+
+Goal: Forms are usable with thumbs. Buttons stick to the bottom. Numeric inputs use the numeric keypad.
+
+A) Number inputs (Form 1 & 2)
+<input
+  type="number"
+  inputMode="decimal"
+  step="0.01"
+  className="w-full border rounded-lg px-3 py-2 text-base"
+/>
+
+
+inputMode="decimal" triggers numeric keypad on iOS/Android.
+
+Use text-base (14–16px) for readability.
+
+B) Requisition grid (Form 2)
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+  {/* item cards… */}
+</div>
+
+
+This matches your “4 per row desktop / 2 tablet / 1 mobile” requirement.
+
+C) Sticky footer actions (Save Draft / Next / Submit)
+
+Place at the bottom of each form step:
+
+<div className="h-16" /> {/* spacer so content isn’t hidden by the sticky bar */}
+<div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t px-4 py-2 flex gap-2 justify-end">
+  <button className="btn bg-gray-100 rounded-xl px-4">Save draft</button>
+  <button className="btn bg-black text-white rounded-xl px-5">Next</button>
+</div>
+
+4) Compact, readable headings on mobile
+
+Use utility classes directly on titles:
+
+<h1 className="text-xl lg:text-2xl font-bold">Daily Sales & Expenses</h1>
+
+5) Jussi / Analysis page: tighten layout on small screens
+
+Wrap the two-column compare in a responsive grid:
+
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div className="card">
+    <div className="font-semibold mb-2">Staff (Daily Sales)</div>
+    {/* table */}
+  </div>
+  <div className="card">
+    <div className="font-semibold mb-2">POS (Shift Report)</div>
+    {/* table */}
+  </div>
+</div>
+
+
+Tables: apply .num to numeric <td> so they right-align on all breakpoints.
+
+6) Kill stale UI on phones/tablets (cache busting)
+
+You likely have an old service worker / cached index lingering.
+
+A) If you have a service worker, add force update
+
+public/service-worker.js (or wherever your SW lives)
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+  );
+  self.clients.claim();
+});
+
+
+Register with update prompt (optional):
+
+navigator.serviceWorker?.register('/service-worker.js').then(reg => {
+  reg.onupdatefound = () => {
+    const worker = reg.installing;
+    worker && (worker.onstatechange = () => {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        // show toast "Updated. Tap to refresh."
+        location.reload();
+      }
+    });
+  };
+});
+
+B) If you don’t use a SW, still bust HTML cache
+
+Serve index.html with Cache-Control: no-store.
+
+Append a build version to static assets (vite/next does this automatically). If not, add:
+
+?v=BUILD_ID to your bundle URLs.
+
+For Replit/Node static middleware:
+
+app.get('/', (req,res)=> {
+  res.set('Cache-Control','no-store');
+  res.sendFile(path.join(__dirname,'index.html'));
+});
+
+
+After deploying, hard-refresh on devices:
+
+iOS Safari: tap address bar → pull down to refresh.
+
+Android Chrome: Settings → Site settings → Storage → Clear for your domain (one-time if SW existed).
+
+7) Tiny UI polish from your screenshots
+
+Menu: on mobile, keep only icons or collapsed drawer (patch #1 does that).
+
+Font: your current giant “Good morning Cam” will wrap better with text-2xl md:text-3xl.
+
+Totals: add font-mono tabular-nums (Tailwind) on THB totals to keep digits aligned:
+
+<div className="font-mono tabular-nums text-xl lg:text-2xl">{fmtTHB(total)}</div>
+
+8) Quick QA checklist (5 mins)
+
+Phone portrait (360–430px):
+
+Sidebar hidden by default; hamburger opens drawer.
+
+Sticky actions visible; Save/Next tap targets ≥40px.
+
+Grid collapses to single column.
+
+Tablet portrait (768px):
+
+Sidebar hidden by default; drawer works.
+
+Grids show 2 columns.
+
+Desktop:
+
+Sidebar fixed; content has lg:ml-64.
+
+Cache:
+
+Load on phone after deploy shows new Analysis drag/drop (no tabs).
+
+If not, SW/Cache patch above + hard refresh.
+
+What I still need from you (only if anything feels off)
+
+If the service worker lives at a different path/file, tell me the filename so I can tailor the exact snippet.
+
+If the app shell file is named differently than AppLayout.tsx, paste the filename—I’ll rewrite the patch to match.

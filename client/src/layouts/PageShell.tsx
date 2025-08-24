@@ -3,10 +3,13 @@ import Topbar from "../components/Topbar";
 export default function PageShell({ children }:{children: React.ReactNode}) {
   return (
     <div className="flex-1 flex flex-col min-h-screen">
-      <Topbar />
+      {/* Only show Topbar on desktop, mobile has header in App.tsx */}
+      <div className="hidden lg:block">
+        <Topbar />
+      </div>
       <main className="flex-1">
-        {/* global layout container + vertical spacing */}
-        <div className="mx-auto max-w-[1400px] px-6 py-6 space-y-6">
+        {/* Responsive layout container */}
+        <div className="mx-auto max-w-[1400px] px-3 lg:px-6 py-3 lg:py-6 space-y-4 lg:space-y-6">
           {children}
         </div>
       </main>

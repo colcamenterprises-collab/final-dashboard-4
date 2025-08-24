@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import PageShell from "./layouts/PageShell";
 import Sidebar from "./components/Sidebar";
 import NotFound from "./pages/NotFound";
+import { Menu } from "lucide-react";
 
 // Pages
 import Home from "./pages/Home";
@@ -42,14 +43,50 @@ function Guard({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>
-          <div className="min-h-screen w-full flex bg-neutral-50">
-            <Sidebar />
-            <PageShell>
-              <Suspense fallback={<div className="p-6">Loading…</div>}>
+          <div className="min-h-screen bg-neutral-50">
+            {/* Mobile/Tablet Header Bar */}
+            <header className="sticky top-0 z-40 bg-white border-b lg:hidden">
+              <div className="h-12 flex items-center px-3 gap-3">
+                <button
+                  className="p-2 rounded hover:bg-gray-100"
+                  aria-label="Toggle menu"
+                  onClick={() => setSidebarOpen(v => !v)}
+                >
+                  <Menu size={20} />
+                </button>
+                <div className="font-semibold">Hi Cam</div>
+              </div>
+            </header>
+
+            <div className="flex">
+              {/* Sidebar */}
+              <Sidebar 
+                className={[
+                  "fixed top-12 bottom-0 w-72 z-40 transform transition-transform duration-200",
+                  sidebarOpen ? "translate-x-0" : "-translate-x-full",
+                  "lg:static lg:top-0 lg:translate-x-0 lg:w-64"
+                ].join(" ")}
+                onClose={() => setSidebarOpen(false)}
+              />
+
+              {/* Mobile overlay */}
+              {sidebarOpen && (
+                <div
+                  className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+                  onClick={() => setSidebarOpen(false)}
+                />
+              )}
+
+              {/* Main content */}
+              <div className="flex-1 lg:ml-0">
+                <PageShell>
+                  <Suspense fallback={<div className="p-6">Loading…</div>}>
                 <Routes>
                   {/* Home */}
                   <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
@@ -103,7 +140,9 @@ export default function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
-            </PageShell>
+              </PageShell>
+              </div>
+            </div>
           </div>
           <Toaster />
         </BrowserRouter>

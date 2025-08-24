@@ -19,13 +19,14 @@ const baseItem =
 const activeItem =
   "bg-emerald-600 text-white hover:bg-emerald-600";
 
-function SLink({ to, label, Icon, collapsed }: LinkProps) {
+function SLink({ to, label, Icon, collapsed, onClose }: LinkProps & { onClose?: () => void }) {
   return (
     <NavLink
       to={to}
       className={({ isActive }) =>
         `${baseItem} ${isActive ? activeItem : ""} text-[12px] text-black`
       }
+      onClick={onClose}
     >
       <Icon className="h-5 w-5 shrink-0" />
       {!collapsed && <span className="leading-none">{label}</span>}
@@ -33,13 +34,18 @@ function SLink({ to, label, Icon, collapsed }: LinkProps) {
   );
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  className?: string;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ className = "", onClose }: SidebarProps = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const width = collapsed ? "w-[84px]" : "w-72";
 
   return (
     <aside
-      className={`${width} border-r bg-white min-h-screen transition-[width] duration-200`}
+      className={`${className} ${width} border-r bg-white min-h-screen transition-[width] duration-200`}
     >
       {/* top row with collapse toggle */}
       <div className="px-3 py-3 border-b flex items-center justify-end">
@@ -70,6 +76,7 @@ export default function Sidebar() {
           Icon={LayoutGrid}
           label="Home"
           collapsed={collapsed}
+          onClose={onClose}
         />
 
         {/* Operations */}
@@ -85,42 +92,49 @@ export default function Sidebar() {
           Icon={CalendarCheck}
           label="Daily Sales & Stock"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.DAILY_SALES_LIBRARY}
           Icon={Library}
           label="Daily Sales Library"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.ANALYSIS}
           Icon={LineChart}
           label="Analysis"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.EXPENSES}
           Icon={FileSpreadsheet}
           label="Expenses"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.SHIFT_REPORTS}
           Icon={ClipboardCheck}
           label="Shift Reports"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.NIGHTLY_CHECKLIST}
           Icon={ClipboardCheck}
           label="Nightly Checklist"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.JUSSI_AI}
           Icon={Bot}
           label="Jussi (Ops AI)"
           collapsed={collapsed}
+          onClose={onClose}
         />
 
         {/* Finance */}
@@ -136,12 +150,14 @@ export default function Sidebar() {
           Icon={TrendingUp}
           label="Profit & Loss"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.JANE_ACCOUNTS}
           Icon={FileSpreadsheet}
           label="Jane (Accounting)"
           collapsed={collapsed}
+          onClose={onClose}
         />
 
         {/* Menu Mgmt */}
@@ -157,30 +173,35 @@ export default function Sidebar() {
           Icon={Calculator}
           label="Cost Calculator"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.INGREDIENTS}
           Icon={Sandwich}
           label="Ingredients"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.MENU_MGR}
           Icon={LayoutGrid}
           label="Menu Manager"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.MENU_IMPORT}
           Icon={Upload}
           label="Import Menu"
           collapsed={collapsed}
+          onClose={onClose}
         />
         <SLink
           to={ROUTES.MENU_DESC_TOOL}
           Icon={FileText}
           label="Description Tool"
           collapsed={collapsed}
+          onClose={onClose}
         />
 
         {/* Deep analysis links stay nested under Analysis (kept routable but hidden here) */}
