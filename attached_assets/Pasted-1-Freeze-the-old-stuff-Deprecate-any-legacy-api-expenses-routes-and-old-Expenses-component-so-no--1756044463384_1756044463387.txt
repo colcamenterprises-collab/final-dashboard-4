@@ -1,0 +1,120 @@
+1) Freeze the old stuff
+
+Deprecate any legacy /api/expenses routes and old Expenses component so no one accidentally routes to it again.
+
+Add a tiny middleware guard that logs if /api/expenses is called (so we notice any stragglers), then returns 410.
+
+// server/routes.ts
+app.all("/api/expenses*", (_req,res) => res.status(410).json({ok:false,error:"expenses v1 removed; use /api/expensesV2"}));
+
+2) Keep “Business Expenses” only (for now)
+
+Hide/remove the Shift Purchasing tab so it doesn’t confuse staff.
+
+We’ll bring back a tiny “Purchase Tally” pop-up next (below) that’s totally separate from Daily Sales/Stock.
+
+3) Add the “Drinks / Meat / Rolls” purchase pop-up (standalone tally)
+
+Purpose: let staff log purchases during the day (not stock counts, not form expenses). This data lives by itself and will feed analytics later.
+
+DB (new small table)
+model PurchaseTally {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  date      DateTime
+  staff     String?     // optional
+  supplier  String?     // optional free text
+  amountTHB Decimal?  @db.Decimal(10,2) // optional (can be 0)
+  notes     String?
+
+  rollsPcs  Int?
+  meatGrams Int?
+  drinksPcs Int?
+}
+
+API (3 endpoints)
+POST   /api/purchase-tally        // create
+GET    /api/purchase-tally?month&search&type
+PATCH  /api/purchase-tally/:id    // edit (also soft delete with {deleted:true} if you prefer)
+
+UI (one modal, from the yellow “+” FAB)
+
+Fields:
+
+Date (defaults to today)
+
+Supplier (text)
+
+Amount (฿, optional)
+
+Rolls (pcs), Meat (grams), Drinks (pcs)
+
+Notes (optional)
+
+List below shows a separate table: Date | Supplier | Rolls | Meat (g) | Drinks | Amount | Notes | Edit/Delete.
+
+This pop-up and table must not touch Daily Sales or Expenses totals. It’s its own thing.
+
+4) Business Expenses CRUD must be complete
+
+Checklist for the existing page:
+
+Add | Edit | Delete entries (soft delete is fine).
+
+Filters: Month, Type, Search (description/supplier).
+
+MTD cards at top (Total, Count, Average) reflect filters.
+
+All currency right-aligned; use 14px base; mobile collapses to 1-column list.
+
+5) Home dashboard MTD tiles (hook to expensesV2)
+
+Add “MTD Expenses” tile sourcing /api/expensesV2/summary?month=current.
+
+Add “MTD Purchases (Drinks/Meat/Rolls)” tile summing PurchaseTally for the month (three subtotals shown in the tile’s tooltip or expansion).
+
+Acceptance Criteria (Expenses module)
+
+Isolation
+
+Hitting /api/expensesV2/* never writes to DailySales*, DailyStock*, Pos*.
+
+Attempting /api/expenses* (old) returns 410.
+
+Business Expenses
+
+Create/Edit/Delete works.
+
+Filters work together (month + type + search).
+
+Cards show MTD totals consistent with list.
+
+Purchase Tally
+
+Modal logs Rolls/Meat/Drinks (+ optional supplier/amount/notes) to PurchaseTally.
+
+List shows entries with edit/delete.
+
+No linkage to Daily Sales/Stock yet.
+
+UX
+
+Mobile: sidebar collapsed by default, font 14px base, numbers right-aligned.
+
+Buttons ≥40px high; modal fits small screens.
+
+Home
+
+Adds “MTD Expenses” + “MTD Purchases” tiles pulling from the two sources above.
+
+Quick “Do this now” list for your agent
+
+Route guard: add the 410 response for /api/expenses* (old) so no regressions.
+
+Hide Shift Purchasing tab until we wire the tally (or rename the tab to “Purchase Tally” and point it to the new modal).
+
+Create PurchaseTally model and 3 endpoints exactly as above.
+
+Add the modal + list on the Expenses page (right column under a divider, separate from Business Expenses list).
+
+Add MTD tiles on Home for Expenses + Purchase Tally sums.

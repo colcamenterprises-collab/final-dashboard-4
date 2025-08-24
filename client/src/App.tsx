@@ -50,25 +50,22 @@ export default function App() {
       <TooltipProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-neutral-50">
-            {/* Mobile/Tablet Header Bar */}
-            <header className="sticky top-0 z-40 bg-white border-b lg:hidden">
-              <div className="h-12 flex items-center px-3 gap-3">
-                <button
-                  className="p-2 rounded hover:bg-gray-100"
-                  aria-label="Toggle menu"
-                  onClick={() => setSidebarOpen(v => !v)}
-                >
-                  <Menu size={20} />
-                </button>
-                <div className="font-semibold">Hi Cam</div>
-              </div>
-            </header>
+            {/* Mobile/Tablet Header Bar - REMOVED */}
+
+            {/* Floating Menu Button for Mobile */}
+            <button
+              className="fixed top-4 left-4 z-50 p-3 bg-emerald-600 text-white rounded-full shadow-lg lg:hidden"
+              aria-label="Toggle menu"
+              onClick={() => setSidebarOpen(v => !v)}
+            >
+              <Menu size={20} />
+            </button>
 
             <div className="flex">
               {/* Sidebar */}
               <Sidebar 
                 className={[
-                  "fixed top-12 bottom-0 w-72 z-40 transform transition-transform duration-200",
+                  "fixed top-0 bottom-0 w-72 z-40 transform transition-transform duration-200",
                   sidebarOpen ? "translate-x-0" : "-translate-x-full",
                   "lg:static lg:top-0 lg:translate-x-0 lg:w-64"
                 ].join(" ")}

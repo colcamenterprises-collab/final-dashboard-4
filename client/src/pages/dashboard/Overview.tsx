@@ -67,24 +67,6 @@ export default function Overview() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Good morning Cam 👋</h1>
-          <p className="text-sm text-gray-500 mt-1">Here's what's happening with your restaurant today</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-lg px-4 py-2 text-sm bg-white">
-            <option>This year</option><option>This month</option><option>Last 7 days</option><option>Yesterday</option>
-          </select>
-          <button className="rounded-lg bg-emerald-600 text-white text-sm px-4 py-2 font-medium">Download report</button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Your balance</span>
-            <span className="text-emerald-700 font-semibold">฿566.55</span>
-            <div className="w-8 h-8 rounded-full bg-gray-200" />
-          </div>
-        </div>
-      </div>
 
       {/* Main KPI Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
