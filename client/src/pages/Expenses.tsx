@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import PageShell from "@/layouts/PageShell";
@@ -10,12 +10,30 @@ export default function Expenses() {
   const [showDrinksModal, setShowDrinksModal] = useState(false);
   
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Data fetching queries
+  const rollsQuery = useQuery({
+    queryKey: ['/api/expenses/rolls'],
+    queryFn: () => apiRequest('/api/expenses/rolls', 'GET')
+  });
+
+  const meatQuery = useQuery({
+    queryKey: ['/api/expenses/meat'],
+    queryFn: () => apiRequest('/api/expenses/meat', 'GET')
+  });
+
+  const drinksQuery = useQuery({
+    queryKey: ['/api/expenses/drinks'],
+    queryFn: () => apiRequest('/api/expenses/drinks', 'GET')
+  });
 
   const rollsMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/expenses/rolls", "POST", data),
     onSuccess: () => {
       toast({ title: "Success", description: "Rolls expense recorded" });
       setShowRollsModal(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/rolls'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -27,6 +45,7 @@ export default function Expenses() {
     onSuccess: () => {
       toast({ title: "Success", description: "Meat expense recorded" });
       setShowMeatModal(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/meat'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -38,11 +57,25 @@ export default function Expenses() {
     onSuccess: () => {
       toast({ title: "Success", description: "Drinks expense recorded" });
       setShowDrinksModal(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/drinks'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   });
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `฿${amount.toFixed(2)}`;
+  };
 
   return (
     <PageShell>
@@ -56,10 +89,35 @@ export default function Expenses() {
             <p className="text-sm text-gray-600 mb-4">Record roll purchases and status</p>
             <button
               onClick={() => setShowRollsModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700"
+              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
             >
               Add Roll Purchase
             </button>
+
+            {/* Rolls Data Display */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-2">Recent Entries</h3>
+              {rollsQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
+              {rollsQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
+              {rollsQuery.data && Array.isArray(rollsQuery.data) && rollsQuery.data.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {rollsQuery.data.slice(0, 5).map((entry: any, index: number) => (
+                    <div key={index} className="text-sm border rounded p-2">
+                      <div className="flex justify-between">
+                        <span>{entry.amount || 'N/A'} rolls</span>
+                        <span className="text-gray-600">{entry.cost ? formatCurrency(Number(entry.cost)) : 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>{entry.status || 'N/A'}</span>
+                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : rollsQuery.data && !rollsQuery.isLoading ? (
+                <p className="text-sm text-gray-500">No entries yet</p>
+              ) : null}
+            </div>
           </div>
 
           {/* Meat */}
@@ -68,10 +126,34 @@ export default function Expenses() {
             <p className="text-sm text-gray-600 mb-4">Track meat weight and type</p>
             <button
               onClick={() => setShowMeatModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700"
+              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
             >
               Add Meat Entry
             </button>
+
+            {/* Meat Data Display */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-2">Recent Entries</h3>
+              {meatQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
+              {meatQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
+              {meatQuery.data && Array.isArray(meatQuery.data) && meatQuery.data.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {meatQuery.data.slice(0, 5).map((entry: any, index: number) => (
+                    <div key={index} className="text-sm border rounded p-2">
+                      <div className="flex justify-between">
+                        <span>{entry.weightG || 'N/A'}g</span>
+                        <span className="text-gray-600 capitalize">{entry.meatType || 'N/A'}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : meatQuery.data && !meatQuery.isLoading ? (
+                <p className="text-sm text-gray-500">No entries yet</p>
+              ) : null}
+            </div>
           </div>
 
           {/* Drinks */}
@@ -80,10 +162,34 @@ export default function Expenses() {
             <p className="text-sm text-gray-600 mb-4">Log drink quantities</p>
             <button
               onClick={() => setShowDrinksModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700"
+              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
             >
               Add Drinks Entry
             </button>
+
+            {/* Drinks Data Display */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-2">Recent Entries</h3>
+              {drinksQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
+              {drinksQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
+              {drinksQuery.data && Array.isArray(drinksQuery.data) && drinksQuery.data.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {drinksQuery.data.slice(0, 5).map((entry: any, index: number) => (
+                    <div key={index} className="text-sm border rounded p-2">
+                      <div className="flex justify-between">
+                        <span className="capitalize">{entry.drink || 'N/A'}</span>
+                        <span className="text-gray-600">{entry.qty || 'N/A'} qty</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : drinksQuery.data && !drinksQuery.isLoading ? (
+                <p className="text-sm text-gray-500">No entries yet</p>
+              ) : null}
+            </div>
           </div>
         </div>
 
