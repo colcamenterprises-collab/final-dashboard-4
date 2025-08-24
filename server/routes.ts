@@ -20,6 +20,7 @@ import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
 import { expensesV2Router } from "./routes/expensesV2";
 import { purchaseTallyRouter } from "./routes/purchaseTally";
+import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
 
 import { managerChecklistStore } from "./managerChecklist";
@@ -2309,6 +2310,9 @@ export function registerRoutes(app: express.Application): Server {
   
   // Purchase Tally router
   app.use('/api/purchase-tally', purchaseTallyRouter);
+  
+  // Bank Import router (CSV bank statement processing)
+  app.use('/api/bank-imports', bankImportRouter);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);

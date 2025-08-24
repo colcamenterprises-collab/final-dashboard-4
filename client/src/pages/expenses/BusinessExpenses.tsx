@@ -6,6 +6,8 @@ import { format } from "date-fns";
 import { Plus, DollarSign, Receipt, Search, Filter, TrendingUp } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BankStatementUpload } from "@/components/BankStatementUpload";
+import { BankTransactionReview } from "@/components/BankTransactionReview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +46,8 @@ export function BusinessExpenses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showBankReview, setShowBankReview] = useState(false);
+  const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
 
   // Fetch business expenses only (DIRECT source)
   const { data: expenses = [], isLoading } = useQuery({
@@ -114,23 +118,46 @@ export function BusinessExpenses() {
 
   const totalAmount = filteredExpenses.reduce((sum: number, expense: any) => sum + (expense.amount || 0), 0);
 
+  const handleUploadComplete = (result: any) => {
+    setCurrentBatchId(result.batchId);
+    setShowBankReview(true);
+  };
+
+  if (showBankReview && currentBatchId) {
+    return (
+      <BankTransactionReview 
+        batchId={currentBatchId} 
+        onClose={() => {
+          setShowBankReview(false);
+          setCurrentBatchId(null);
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-start gap-6 mb-6">
         <div>
           <h2 className="text-[18px] font-semibold text-[var(--heading)]">Business Expenses</h2>
           <p className="text-xs text-[var(--muted)] mt-1">
             Out-of-shift business expenses (Makro, fuel, director costs)
           </p>
         </div>
-        <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Business Expense
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-4 items-start">
+          {/* Bank Upload Card */}
+          <div className="w-80">
+            <BankStatementUpload onUploadComplete={handleUploadComplete} />
+          </div>
+          
+          <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Business Expense
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Add Business Expense</DialogTitle>
@@ -263,7 +290,8 @@ export function BusinessExpenses() {
               </form>
             </Form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}

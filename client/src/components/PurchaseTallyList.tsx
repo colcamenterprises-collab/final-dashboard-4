@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Edit, Trash2, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -185,8 +185,8 @@ export function PurchaseTallyList() {
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry: any) => (
-                    <>
-                      <TableRow key={entry.id}>
+                    <React.Fragment key={entry.id}>
+                      <TableRow>
                         <TableCell>
                           {new Date(entry.date).toLocaleDateString()}
                         </TableCell>
@@ -271,7 +271,7 @@ export function PurchaseTallyList() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

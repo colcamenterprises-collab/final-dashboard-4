@@ -1,0 +1,207 @@
+What you’ll get
+
+Upload a CSV bank statement on Expenses.
+
+Auto-parse → create a Pending batch of transactions.
+
+Review table with Approve / Edit / Delete (bulk & single).
+
+On Approve, we create a Business Expense entry (expensesV2) from the txn.
+
+Smart helpers: vendor/category memory, duplicate guard, personal-expense exclude.
+
+Full audit trail; nothing touches Daily Sales/Stock/Jussi.
+
+1) Data model (Prisma)
+model BankImportBatch {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  source    String   // e.g., "KBank", "SCB", "CSV"
+  filename  String
+  status    String   @default("pending") // pending|partially_approved|approved
+  txns      BankTxn[]
+}
+
+model BankTxn {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  // normalized
+  postedAt  DateTime
+  description String
+  amountTHB Decimal   @db.Decimal(12,2)  // + = outflow (expense), - = refund/inflow
+  ref       String?   // bank reference / check no.
+  raw       Json      // original row for audit
+
+  // review fields
+  status    String    @default("pending")  // pending|approved|rejected|deleted
+  category  String?   // guessed or edited
+  supplier  String?   // guessed or edited
+  notes     String?
+  expenseId String?   // link to expensesV2 entry once approved
+
+  // dedupe key: source + date + abs(amount) + first 32 chars description
+  dedupeKey String    @unique
+}
+
+model VendorRule {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  // simple contains match; can extend to regex later
+  matchText String   // e.g., "MAKRO", "7-Eleven", "LOTUS"
+  category  String   // e.g., "Supplies"
+  supplier  String   // e.g., "Makro"
+}
+
+2) API (Express)
+Upload & parse
+
+POST /api/bank-imports (multipart or CSV text)
+
+Accept CSV; detect header schema (KBank, SCB, generic).
+
+Normalize: postedAt, description, amountTHB, ref, raw.
+
+Build dedupeKey = ${source}|${YYYY-MM-DD}|${abs(amount)}|${desc.slice(0,32).toUpperCase()} to prevent repeats across uploads.
+
+Apply VendorRule suggestions (category/supplier) as defaults (not locked).
+
+Insert pending txns (skip duplicates, count them).
+
+Response: { batchId, inserted, skippedDupes }.
+
+List txns (paged/filtered)
+
+GET /api/bank-imports/:batchId/txns?status=pending&search=&min=&max=&month=YYYY-MM
+
+Approve one / bulk
+
+POST /api/bank-imports/:batchId/approve
+
+{
+  "ids": ["txn1","txn2"],
+  "defaults": { "category": "Supplies" } // optional bulk set
+}
+
+
+Server creates expensesV2 entries:
+
+description ← txn.description
+
+amount ← positive amountTHB (ignore negatives by default or let user approve refunds)
+
+supplier/category/notes ← txn edited values
+
+date ← txn.postedAt
+
+Link back: expenseId set on BankTxn.
+
+Set txn status="approved".
+
+Edit txn (inline save)
+
+PATCH /api/bank-imports/txns/:id (mutates supplier, category, notes, status)
+
+Delete/Reject
+
+DELETE /api/bank-imports/txns/:id → status="deleted"
+
+Or PATCH ... {status:"rejected"} to keep in batch but excluded.
+
+Vendor rules (optional quick create)
+
+POST /api/bank-imports/rules → { matchText, category, supplier }
+
+3) Frontend (Expenses page)
+A) “Bank Statement Upload” card (top-right of Business Expenses)
+
+Button Upload Statement → dropzone (CSV).
+
+After upload, auto-navigate to Review panel for the new batch.
+
+B) Review panel (for a batch)
+
+Filters: Status (pending/approved/rejected), Month, Search, Amount range.
+
+Table (mobile-friendly, 1-column stack):
+
+Date • Description • Amount • Category • Supplier • Notes
+
+Right-aligned numbers; color red for expenses (>0), green for negatives.
+
+Duplicate badge if skippedDupes > 0 during upload.
+
+Row actions: Approve, Edit, Delete/Reject.
+
+Bulk actions: checkbox select → Approve / Delete.
+Bulk set Category/Supplier/Notes with a small toolbar.
+
+Smart hints under description:
+
+“Suggested: Makro • Supplies (from rules)” → one-click apply.
+
+C) After Approve
+
+Toast: “Approved → added as Business Expense”.
+
+Badge on row: Approved with link icon to the expense entry.
+
+Top cards (Total / Count / Average) auto-update (current month).
+
+4) Parsing rules (CSV tolerance)
+
+Support these patterns out of the box:
+
+Bank	Date column	Description column	Amount column	Extra
+KBank	Date or Posting Date	Description or Details	Amount or Amount (THB)	Reference optional
+SCB	Date	Description	Withdrawal/Deposit	use sign based on column
+Generic	Date, Narrative	Narrative	Amount	
+
+Amount normalization: strip commas/฿; parse decimals; expenses positive.
+
+Date parsing: try DD/MM/YYYY, YYYY-MM-DD, DD-MMM-YY.
+
+Reject/skip empty or zero rows.
+
+5) Duplicate guard
+
+On insert, compute dedupeKey; unique will block dupes.
+
+Report skippedDupes in the upload response.
+
+UI shows a small info chip: “12 duplicates ignored”.
+
+6) Mapping memory (quality-of-life)
+
+When user edits a row’s category/supplier and ticks “Remember vendor”, create VendorRule.
+
+Next uploads auto-apply that suggestion (still editable).
+
+7) Acceptance criteria
+
+Upload a bank CSV → new Pending batch appears with parsed rows.
+
+I can Approve, Edit, Delete individual txns, and bulk approve.
+
+Approved txns appear in Business Expenses list/cards immediately.
+
+Duplicates are ignored safely; count is shown.
+
+Nothing touches Daily Sales/Stock/Jussi/Pos tables.
+
+Mobile: table stacks, actions accessible (≥40px).
+
+8) “Do this now” (copy to agent)
+
+Add models BankImportBatch, BankTxn, VendorRule; run migration.
+
+Implement endpoints exactly as in §2.
+
+Expenses page: add Upload card + Review panel UI with bulk actions.
+
+Tie Approve to existing expensesV2 create; link expenseId on BankTxn.
+
+Add Vendor rules quick-create on inline edit.
+
+Update Home MTD expenses tile (no change required to source).

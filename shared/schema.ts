@@ -7,6 +7,10 @@ import { z } from "zod";
 export const shiftTimeEnum = pgEnum('shift_time', ['MORNING', 'EVENING', 'LATE']);
 export const salesFormStatusEnum = pgEnum('sales_form_status', ['DRAFT', 'SUBMITTED', 'LOCKED']);
 
+// Enums for Bank Import System
+export const bankImportStatusEnum = pgEnum('bank_import_status', ['pending', 'partially_approved', 'approved']);
+export const bankTxnStatusEnum = pgEnum('bank_txn_status', ['pending', 'approved', 'rejected', 'deleted']);
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -1154,5 +1158,73 @@ export const purchaseTallyDrinkRelations = relations(purchaseTallyDrink, ({ one 
   tally: one(purchaseTally, {
     fields: [purchaseTallyDrink.tallyId],
     references: [purchaseTally.id],
+  }),
+}));
+
+// === Bank Import System (CSV bank statement upload & processing) ===
+
+// Bank import batch (one CSV upload creates one batch)
+export const bankImportBatch = pgTable("bank_import_batch", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  source: text("source").notNull(), // "KBank", "SCB", "CSV", etc.
+  filename: text("filename").notNull(),
+  status: bankImportStatusEnum("status").notNull().default('pending'),
+});
+
+// Individual bank transactions from CSV
+export const bankTxn = pgTable("bank_txn", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => bankImportBatch.id, { onDelete: 'cascade' }),
+  
+  // Normalized transaction data
+  postedAt: timestamp("posted_at").notNull(),
+  description: text("description").notNull(),
+  amountTHB: decimal("amount_thb", { precision: 12, scale: 2 }).notNull(), // + = outflow (expense), - = inflow/refund
+  ref: text("ref"), // bank reference / check number
+  raw: jsonb("raw").notNull(), // original CSV row for audit trail
+  
+  // Review/editing fields
+  status: bankTxnStatusEnum("status").notNull().default('pending'),
+  category: text("category"), // guessed or user-edited
+  supplier: text("supplier"), // guessed or user-edited  
+  notes: text("notes"),
+  expenseId: varchar("expense_id"), // link to expensesV2 entry once approved
+  
+  // Deduplication key: source|date|amount|description_prefix
+  dedupeKey: text("dedupe_key").notNull().unique(),
+});
+
+// Vendor matching rules for smart suggestions
+export const vendorRule = pgTable("vendor_rule", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  matchText: text("match_text").notNull(), // e.g., "MAKRO", "7-Eleven", "LOTUS" 
+  category: text("category").notNull(), // e.g., "Supplies"
+  supplier: text("supplier").notNull(), // e.g., "Makro"
+});
+
+// Bank Import Insert Schemas
+export const insertBankImportBatchSchema = createInsertSchema(bankImportBatch);
+export const insertBankTxnSchema = createInsertSchema(bankTxn);
+export const insertVendorRuleSchema = createInsertSchema(vendorRule);
+
+// Bank Import Types
+export type InsertBankImportBatch = typeof bankImportBatch.$inferInsert;
+export type SelectBankImportBatch = typeof bankImportBatch.$inferSelect;
+export type InsertBankTxn = typeof bankTxn.$inferInsert;
+export type SelectBankTxn = typeof bankTxn.$inferSelect;
+export type InsertVendorRule = typeof vendorRule.$inferInsert;
+export type SelectVendorRule = typeof vendorRule.$inferSelect;
+
+// Bank Import Relations
+export const bankImportBatchRelations = relations(bankImportBatch, ({ many }) => ({
+  txns: many(bankTxn),
+}));
+
+export const bankTxnRelations = relations(bankTxn, ({ one }) => ({
+  batch: one(bankImportBatch, {
+    fields: [bankTxn.batchId],
+    references: [bankImportBatch.id],
   }),
 }));
