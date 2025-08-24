@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PurchaseTallyModal } from "./PurchaseTallyModal";
@@ -15,6 +16,7 @@ export function PurchaseTallyList() {
   const [editingEntry, setEditingEntry] = useState(null);
   const [search, setSearch] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,6 +67,16 @@ export function PurchaseTallyList() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingEntry(null);
+  };
+
+  const toggleRowExpansion = (entryId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(entryId)) {
+      newExpanded.delete(entryId);
+    } else {
+      newExpanded.add(entryId);
+    }
+    setExpandedRows(newExpanded);
   };
 
   const entries = entriesData?.entries || [];
@@ -173,55 +185,93 @@ export function PurchaseTallyList() {
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry: any) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        {new Date(entry.date).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {entry.supplier ? (
-                          <Badge variant="outline">{entry.supplier}</Badge>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right num">
-                        {entry.rollsPcs || "-"}
-                      </TableCell>
-                      <TableCell className="text-right num">
-                        {entry.meatGrams ? Number(entry.meatGrams).toLocaleString() : "-"}
-                      </TableCell>
-                      <TableCell className="text-right num">
-                        {entry.drinksPcs || "-"}
-                      </TableCell>
-                      <TableCell className="text-right currency">
-                        {entry.amountTHB ? 
-                          `฿${Number(entry.amountTHB).toLocaleString('en-US', { minimumFractionDigits: 2 })}` 
-                          : "-"
-                        }
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {entry.notes || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEdit(entry)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(entry.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow key={entry.id}>
+                        <TableCell>
+                          {new Date(entry.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {entry.supplier ? (
+                            <Badge variant="outline">{entry.supplier}</Badge>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right num">
+                          {entry.rollsPcs || "-"}
+                        </TableCell>
+                        <TableCell className="text-right num">
+                          {entry.meatGrams ? Number(entry.meatGrams).toLocaleString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {entry.drinks && entry.drinks.length > 0 ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="num">{entry.drinks.reduce((sum: number, d: any) => sum + d.qty, 0)} pcs</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => toggleRowExpansion(entry.id)}
+                                className="h-6 w-6 p-0"
+                              >
+                                {expandedRows.has(entry.id) ? 
+                                  <ChevronDown className="h-3 w-3" /> : 
+                                  <ChevronRight className="h-3 w-3" />
+                                }
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right currency">
+                          {entry.amountTHB ? 
+                            `฿${Number(entry.amountTHB).toLocaleString('en-US', { minimumFractionDigits: 2 })}` 
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {entry.notes || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(entry)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(entry.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* Expanded drinks details row */}
+                      {expandedRows.has(entry.id) && entry.drinks && entry.drinks.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30 p-0">
+                            <div className="px-6 py-3">
+                              <div className="text-sm font-medium mb-2">Drinks breakdown:</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {entry.drinks.map((drink: any, idx: number) => (
+                                  <div key={idx} className="flex justify-between text-sm">
+                                    <span>{drink.itemName}</span>
+                                    <span className="font-medium">{drink.qty} {drink.unit || 'pcs'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))}
                 </TableBody>
               </Table>

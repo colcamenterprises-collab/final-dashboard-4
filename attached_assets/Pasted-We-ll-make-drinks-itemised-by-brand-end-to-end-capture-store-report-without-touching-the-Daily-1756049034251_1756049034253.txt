@@ -1,0 +1,253 @@
+We’ll make drinks itemised by brand end-to-end (capture → store → report) without touching the Daily Sales/Stock forms.
+
+Below is a clean, minimal patch you/agent can drop in.
+
+🔧 What changes (summary)
+
+DB: replace single drinksPcs count with line items.
+
+API: create/update/delete purchase tallies with an array of drink rows.
+
+UI: modal supports add rows (Item + Qty) with autocomplete from Ingredients where Category = “Drinks”.
+
+Reports: Expenses page & Home tile show per-brand totals (plus an overall sum).
+
+1) Prisma schema (migration)
+
+Add a child table for drink lines; keep the rest as-is.
+
+model PurchaseTally {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  date      DateTime
+  staff     String?
+  supplier  String?
+  amountTHB Decimal? @db.Decimal(10,2)
+  notes     String?
+
+  rollsPcs  Int?
+  meatGrams Int?
+
+  drinks    PurchaseTallyDrink[]
+}
+
+model PurchaseTallyDrink {
+  id        String   @id @default(uuid())
+  tallyId   String
+  tally     PurchaseTally @relation(fields: [tallyId], references: [id], onDelete: Cascade)
+
+  itemName  String   // e.g., "Coke 325ml"
+  qty       Int      // pcs
+  unit      String   @default("pcs")
+
+  @@index([tallyId])
+  @@index([itemName])
+}
+
+
+Migration note: if you already created drinksPcs on PurchaseTally, leave it (unused) or drop it in the same migration—up to you.
+
+Run:
+
+npx prisma generate
+npx prisma migrate dev -n add_purchase_tally_drinks
+
+2) API (Express) — endpoints
+Create
+
+POST /api/purchase-tally
+
+// body example
+{
+  "date": "2025-08-24",
+  "supplier": "Makro",
+  "amountTHB": 650.00,
+  "staff": "Som",
+  "rollsPcs": 40,
+  "meatGrams": 2000,
+  "notes": "Makro run",
+  "drinks": [
+    { "itemName": "Coke 325ml", "qty": 6 },
+    { "itemName": "Fanta Orange 325ml", "qty": 12 }
+  ]
+}
+
+
+Handler (core logic):
+
+app.post("/api/purchase-tally", async (req, res) => {
+  const b = req.body;
+  const drinks = Array.isArray(b.drinks) ? b.drinks : [];
+
+  const tally = await prisma.purchaseTally.create({
+    data: {
+      date: new Date(b.date),
+      supplier: b.supplier ?? null,
+      amountTHB: b.amountTHB ?? null,
+      staff: b.staff ?? null,
+      notes: b.notes ?? null,
+      rollsPcs: b.rollsPcs ?? null,
+      meatGrams: b.meatGrams ?? null,
+      drinks: {
+        createMany: {
+          data: drinks
+            .filter(d => d?.itemName && Number(d?.qty) > 0)
+            .map(d => ({ itemName: String(d.itemName), qty: Number(d.qty) }))
+        }
+      }
+    },
+    include: { drinks: true }
+  });
+  res.json({ ok: true, tally });
+});
+
+Update (replace drink lines)
+
+PATCH /api/purchase-tally/:id
+
+app.patch("/api/purchase-tally/:id", async (req, res) => {
+  const id = req.params.id;
+  const b = req.body;
+  const drinks = Array.isArray(b.drinks) ? b.drinks : [];
+
+  // replace drink rows atomically
+  await prisma.$transaction([
+    prisma.purchaseTally.update({
+      where: { id },
+      data: {
+        date: b.date ? new Date(b.date) : undefined,
+        supplier: b.supplier,
+        amountTHB: b.amountTHB,
+        staff: b.staff,
+        notes: b.notes,
+        rollsPcs: b.rollsPcs,
+        meatGrams: b.meatGrams
+      }
+    }),
+    prisma.purchaseTallyDrink.deleteMany({ where: { tallyId: id } }),
+    prisma.purchaseTallyDrink.createMany({
+      data: drinks
+        .filter(d => d?.itemName && Number(d?.qty) > 0)
+        .map(d => ({ tallyId: id, itemName: String(d.itemName), qty: Number(d.qty) }))
+    })
+  ]);
+
+  const tally = await prisma.purchaseTally.findUnique({ where: { id }, include: { drinks: true } });
+  res.json({ ok: true, tally });
+});
+
+List + brand summary
+
+GET /api/purchase-tally?month=2025-08&search= returns tallies with drink lines.
+GET /api/purchase-tally/drinks/summary?month=2025-08 returns per-brand totals:
+
+app.get("/api/purchase-tally/drinks/summary", async (req,res) => {
+  const month = String(req.query.month); // "YYYY-MM"
+  const start = new Date(month + "-01T00:00:00");
+  const end = new Date(start); end.setMonth(end.getMonth()+1);
+
+  const rows = await prisma.purchaseTallyDrink.groupBy({
+    by: ["itemName"],
+    where: { tally: { date: { gte: start, lt: end } } },
+    _sum: { qty: true }
+  });
+
+  res.json({ ok:true, items: rows.map(r => ({ itemName: r.itemName, qty: r._sum.qty ?? 0 }))});
+});
+
+
+(Optional) validate against Ingredients: if you want hard validation, fetch Ingredients where category='Drinks' and reject names not in the catalog; or just warn and accept.
+
+3) UI changes
+Modal
+
+Replace the single Drinks input with dynamic rows:
+
+Item (autocomplete):
+
+source = Ingredients where Category = “Drinks”
+
+free-text allowed (tag “(custom)”)
+
+Qty (pcs)
+
++ Add Drink row
+
+Pseudo JSX:
+
+<div className="mt-4">
+  <label className="font-medium">Drinks (itemised)</label>
+  {drinks.map((row, i) => (
+    <div key={i} className="grid grid-cols-12 gap-2 mt-2">
+      <Autocomplete
+        className="col-span-8"
+        value={row.itemName}
+        onChange={v => updateDrink(i, { ...row, itemName: v })}
+        options={drinkOptions} // from Ingredients CSV (Category=Drinks)
+        placeholder="e.g., Coke 325ml"
+      />
+      <input
+        type="number" inputMode="numeric" className="col-span-3"
+        value={row.qty ?? 0}
+        onChange={e => updateDrink(i, { ...row, qty: Number(e.target.value) })}
+        min={0}
+      />
+      <button className="col-span-1 text-red-600" onClick={() => removeDrink(i)}>✕</button>
+    </div>
+  ))}
+  <button className="mt-2 btn" onClick={addDrink}>+ Add Drink</button>
+</div>
+
+
+Submit payload includes drinks: [{itemName, qty}].
+
+Expenses → Purchase Tally cards
+
+Total Amount (฿)
+
+Rolls pcs
+
+Meat g
+
+Drinks ➜ show overall pcs + small “Top 3” chips underneath, e.g.
+
+Coke 18 • Fanta 12 • Sprite 6
+(click → opens a drawer with full per-brand table using /drinks/summary)
+
+List view
+
+Each row shows Date | Supplier | Rolls | Meat (g) | Drinks (sum) and a “View items” toggle that expands to brand lines, e.g.
+
+Coke 6, Fanta 12, Sprite 0…
+
+Home tile (MTD Purchases)
+
+Keep the total ฿.
+
+Subtitle: X rolls • Y g meat • Z drinks
+
+Tooltip (or click) shows the top brands (from summary endpoint).
+
+4) Acceptance criteria
+
+Modal lets me enter 6 Coke, 12 Fanta in one purchase.
+
+List shows aggregate Drinks = 18, and details when expanded.
+
+/drinks/summary returns per-brand totals for the selected month.
+
+Home tile shows MTD totals and top 3 brands.
+
+No linkage to Daily Sales/Stock totals (kept separate, as requested).
+
+5) Quick QA
+
+Add a tally: Rolls 20, Meat 2000, Drinks rows: Coke 6, Fanta 12.
+
+Cards update: Rolls 20, Meat 2000g, Drinks 18; top brands Coke 6, Fanta 12.
+
+Edit tally: change Fanta 12 → 10 → totals/summary update.
+
+Delete tally → totals drop accordingly.
+
+Mobile: rows are full-width, add/remove taps are easy.

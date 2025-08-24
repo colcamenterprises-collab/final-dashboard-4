@@ -16,9 +16,16 @@ export default function Home() {
     queryFn: () => apiRequest("/api/purchase-tally/summary?" + new URLSearchParams({ month: currentMonth })),
   });
 
+  // Get MTD Purchase Tally Drinks Summary
+  const { data: drinksSummaryData } = useQuery({
+    queryKey: ["/api/purchase-tally/drinks/summary", { month: currentMonth }],
+    queryFn: () => apiRequest("/api/purchase-tally/drinks/summary?" + new URLSearchParams({ month: currentMonth })),
+  });
+
   const mtdExpenses = expensesData?.summary?.totalAmount || 0;
   const mtdPurchases = purchasesData?.summary?.totalAmount || 0;
   const purchasesSummary = purchasesData?.summary || {};
+  const topDrinks = drinksSummaryData?.items?.slice(0, 3) || [];
 
   return (
     <div className="space-y-6">
@@ -61,6 +68,11 @@ export default function Home() {
           <div className="text-xs opacity-75 mt-1">
             {purchasesSummary.totalRolls || 0} rolls • {Number(purchasesSummary.totalMeat || 0).toLocaleString()}g meat • {purchasesSummary.totalDrinks || 0} drinks
           </div>
+          {topDrinks.length > 0 && (
+            <div className="text-xs opacity-60 mt-1">
+              Top drinks: {topDrinks.map((drink: any) => `${drink.itemName.split(' ')[0]} ${drink.qty}`).join(' • ')}
+            </div>
+          )}
         </div>
       </div>
 

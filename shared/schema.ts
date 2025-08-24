@@ -1119,12 +1119,40 @@ export const purchaseTally = pgTable("purchase_tally", {
   // Purchase quantities
   rollsPcs: integer("rolls_pcs"),
   meatGrams: integer("meat_grams"), 
-  drinksPcs: integer("drinks_pcs"),
+  // drinksPcs removed - replaced with itemized drinks
 });
+
+// Purchase Tally Drinks (itemized by brand)
+export const purchaseTallyDrink = pgTable("purchase_tally_drink", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tallyId: varchar("tally_id").notNull().references(() => purchaseTally.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(), // e.g., "Coke 325ml"
+  qty: integer("qty").notNull(), // pieces
+  unit: text("unit").default("pcs").notNull(),
+}, (table) => ({
+  tallyIdIdx: index("purchase_tally_drink_tally_id_idx").on(table.tallyId),
+  itemNameIdx: index("purchase_tally_drink_item_name_idx").on(table.itemName),
+}));
 
 // Purchase Tally insert schema and types
 export const insertPurchaseTallySchema = createInsertSchema(purchaseTally);
+export const insertPurchaseTallyDrinkSchema = createInsertSchema(purchaseTallyDrink);
+
 export type PurchaseTally = typeof purchaseTally.$inferSelect;
 export type PurchaseTallyInsert = typeof purchaseTally.$inferInsert;
+export type PurchaseTallyDrink = typeof purchaseTallyDrink.$inferSelect;
+export type PurchaseTallyDrinkInsert = typeof purchaseTallyDrink.$inferInsert;
 
+// Drizzle relations for purchase tally
+import { relations } from "drizzle-orm";
 
+export const purchaseTallyRelations = relations(purchaseTally, ({ many }) => ({
+  drinks: many(purchaseTallyDrink),
+}));
+
+export const purchaseTallyDrinkRelations = relations(purchaseTallyDrink, ({ one }) => ({
+  tally: one(purchaseTally, {
+    fields: [purchaseTallyDrink.tallyId],
+    references: [purchaseTally.id],
+  }),
+}));
