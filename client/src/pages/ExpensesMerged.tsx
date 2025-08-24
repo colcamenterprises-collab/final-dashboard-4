@@ -1,10 +1,7 @@
-import { useState } from "react";
-import { ShoppingCart, Building2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { JussiChatBubble } from "@/components/JussiChatBubble";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessExpenses } from "@/pages/expenses/BusinessExpenses";
-import { ShiftPurchasing } from "@/pages/expenses/ShiftPurchasing";
+import { PurchaseTallyList } from "@/components/PurchaseTallyList";
 
 function ExpensesMerged() {
   return (
@@ -19,29 +16,20 @@ function ExpensesMerged() {
         </div>
       </div>
 
-      {/* Tabbed Interface */}
+      {/* Business Expenses Only - Shift Purchasing hidden per requirements */}
       <div className="card">
         <div className="card-inner">
-          <Tabs defaultValue="business" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="business" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Business Expenses
-              </TabsTrigger>
-              <TabsTrigger value="purchasing" className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Shift Purchasing
-              </TabsTrigger>
-            </TabsList>
+          <BusinessExpenses />
+        </div>
+      </div>
 
-            <TabsContent value="business" className="mt-6">
-              <BusinessExpenses />
-            </TabsContent>
+      {/* Separator */}
+      <Separator className="my-8" />
 
-            <TabsContent value="purchasing" className="mt-6">
-              <ShiftPurchasing />
-            </TabsContent>
-          </Tabs>
+      {/* Purchase Tally Section */}
+      <div className="card">
+        <div className="card-inner">
+          <PurchaseTallyList />
         </div>
       </div>
 

@@ -1106,4 +1106,25 @@ export type SelectPosSalesModifier = typeof posSalesModifier.$inferSelect;
 export type InsertPosPaymentSummary = typeof posPaymentSummary.$inferInsert;
 export type SelectPosPaymentSummary = typeof posPaymentSummary.$inferSelect;
 
+// === Purchase Tally Table (Standalone purchase tracking) ===
+export const purchaseTally = pgTable("purchase_tally", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  date: date("date").notNull(),
+  staff: text("staff"),
+  supplier: text("supplier"),
+  amountTHB: decimal("amount_thb", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+
+  // Purchase quantities
+  rollsPcs: integer("rolls_pcs"),
+  meatGrams: integer("meat_grams"), 
+  drinksPcs: integer("drinks_pcs"),
+});
+
+// Purchase Tally insert schema and types
+export const insertPurchaseTallySchema = createInsertSchema(purchaseTally);
+export type PurchaseTally = typeof purchaseTally.$inferSelect;
+export type PurchaseTallyInsert = typeof purchaseTally.$inferInsert;
+
 

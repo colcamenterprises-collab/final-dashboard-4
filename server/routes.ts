@@ -19,6 +19,7 @@ import formsRouter from "./routes/forms";
 import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
 import { expensesV2Router } from "./routes/expensesV2";
+import { purchaseTallyRouter } from "./routes/purchaseTally";
 import { menuRouter } from "./routes/menu";
 
 import { managerChecklistStore } from "./managerChecklist";
@@ -2297,8 +2298,17 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
-  app.use('/api/expenses', expensesRouter);
-  // app.use('/api/expenses-v2', expensesV2Router); // Parked until end-of-day per Cam's request
+  // Route guard: deprecate old /api/expenses routes
+  app.all("/api/expenses*", (req, res) => {
+    console.warn(`⚠️  Deprecated route accessed: ${req.method} ${req.path} - Use /api/expensesV2 instead`);
+    res.status(410).json({ok: false, error: "expenses v1 removed; use /api/expensesV2"});
+  });
+
+  // Use the new expenses V2 router
+  app.use('/api/expensesV2', expensesV2Router);
+  
+  // Purchase Tally router
+  app.use('/api/purchase-tally', purchaseTallyRouter);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);

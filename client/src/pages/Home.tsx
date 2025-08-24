@@ -1,4 +1,25 @@
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+
 export default function Home() {
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+  // Get MTD Expenses
+  const { data: expensesData } = useQuery({
+    queryKey: ["/api/expensesV2/summary", { month: currentMonth }],
+    queryFn: () => apiRequest("/api/expensesV2/summary?" + new URLSearchParams({ month: currentMonth })),
+  });
+
+  // Get MTD Purchase Tally
+  const { data: purchasesData } = useQuery({
+    queryKey: ["/api/purchase-tally/summary", { month: currentMonth }],
+    queryFn: () => apiRequest("/api/purchase-tally/summary?" + new URLSearchParams({ month: currentMonth })),
+  });
+
+  const mtdExpenses = expensesData?.summary?.totalAmount || 0;
+  const mtdPurchases = purchasesData?.summary?.totalAmount || 0;
+  const purchasesSummary = purchasesData?.summary || {};
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-extrabold">Good morning Cam 👋</h1>
@@ -16,6 +37,31 @@ export default function Home() {
             <div className="text-2xl font-extrabold mt-1">{k.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* MTD Tiles */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* MTD Expenses */}
+        <div className="rounded-2xl border bg-blue-600 text-white p-5 shadow-sm">
+          <div className="text-sm opacity-90">MTD Expenses</div>
+          <div className="text-2xl font-extrabold mt-1 currency">
+            ฿{Number(mtdExpenses).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs opacity-75 mt-1">
+            {expensesData?.summary?.entryCount || 0} entries this month
+          </div>
+        </div>
+
+        {/* MTD Purchases */}
+        <div className="rounded-2xl border bg-orange-600 text-white p-5 shadow-sm">
+          <div className="text-sm opacity-90">MTD Purchases</div>
+          <div className="text-2xl font-extrabold mt-1 currency">
+            ฿{Number(mtdPurchases).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs opacity-75 mt-1">
+            {purchasesSummary.totalRolls || 0} rolls • {Number(purchasesSummary.totalMeat || 0).toLocaleString()}g meat • {purchasesSummary.totalDrinks || 0} drinks
+          </div>
+        </div>
       </div>
 
       {/* two columns */}
