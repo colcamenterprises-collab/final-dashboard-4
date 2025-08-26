@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { Plus, DollarSign, Receipt, Search, Filter, TrendingUp } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BankStatementUpload } from "@/components/BankStatementUpload";
+import BankUploadCard from "@/components/BankUploadCard";
 import { BankTransactionReview } from "@/components/BankTransactionReview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,7 +148,12 @@ export function BusinessExpenses() {
         <div className="flex gap-4 items-start">
           {/* Bank Upload Card */}
           <div className="w-80">
-            <BankStatementUpload onUploadComplete={handleUploadComplete} />
+            <BankUploadCard 
+              onImported={() => {
+                setShowBankReview(true);
+                queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+              }}
+            />
           </div>
           
           <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>

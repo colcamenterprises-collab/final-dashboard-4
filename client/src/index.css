@@ -5,6 +5,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Typography & spacing for small screens */
+@media (max-width: 1024px) {
+  html { font-size: 15px; }
+  .card { padding: 14px; }
+}
+
+@media (max-width: 640px) {
+  html { font-size: 14px; }
+  .card { padding: 12px; }
+}
+
 /* === Responsive Typography === */
 /* Ensure correct viewport on mobile/tablet */
 @media (max-width: 1024px) {

@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Plus, X } from "lucide-react";
 
+type DrinkLine = { name: string; qty: number };
+
 const drinkItemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
   qty: z.number().min(1, "Quantity must be at least 1"),
@@ -41,7 +43,13 @@ interface PurchaseTallyModalProps {
 export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [drinks, setDrinks] = useState<DrinkItem[]>([]);
+  const [drinks, setDrinks] = useState<DrinkLine[]>([{ name: "", qty: 0 }]);
+
+  const addDrinkItem = () => setDrinks((d) => [...d, { name: "", qty: 0 }]);
+  const removeDrinkItem = (idx: number) =>
+    setDrinks((d) => d.filter((_, i) => i !== idx));
+  const setDrinkItem = (idx: number, key: keyof DrinkLine, val: string | number) =>
+    setDrinks((d) => d.map((r, i) => (i === idx ? { ...r, [key]: val } : r)));
 
   // Get drinks from ingredient catalog
   const { data: ingredientsData } = useQuery({
@@ -65,81 +73,97 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
     },
   });
 
-  // Initialize drinks when entry changes
+  // Parse drinks from notes (DRINKS:JSON format)
+  function parseDrinkItems(notes?: string | null): DrinkLine[] {
+    if (!notes) return [{ name: "", qty: 0 }];
+    const tag = "DRINKS:";
+    const at = notes.indexOf(tag);
+    if (at < 0) return [{ name: "", qty: 0 }];
+    try {
+      const json = notes.substring(at + tag.length).split('\n')[0].trim();
+      return JSON.parse(json);
+    } catch {
+      return [{ name: "", qty: 0 }];
+    }
+  }
+
+  // Initialize drinks when entry changes or modal opens
   useEffect(() => {
-    if (entry?.drinks) {
-      setDrinks(entry.drinks.map((d: any) => ({
-        itemName: d.itemName,
-        qty: d.qty,
-        unit: d.unit || "pcs"
-      })));
+    if (entry?.notes) {
+      const parsedDrinks = parseDrinkItems(entry.notes);
+      setDrinks(parsedDrinks.length > 0 ? parsedDrinks : [{ name: "", qty: 0 }]);
     } else {
-      setDrinks([]);
+      setDrinks([{ name: "", qty: 0 }]);
     }
   }, [entry]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/purchase-tally", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: async (data: any) => {
+      return apiRequest("/api/purchase-tally", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/summary"] });
-      toast({ title: "Purchase tally created successfully" });
+      toast({
+        title: "Success",
+        description: "Purchase tally created successfully",
+      });
       onClose();
       form.reset();
+      setDrinks([{ name: "", qty: 0 }]);
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Error creating purchase tally", 
-        description: error.message,
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create purchase tally",
+        variant: "destructive",
       });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/purchase-tally/${entry.id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: async (data: any) => {
+      return apiRequest(`/api/purchase-tally/${entry.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/summary"] });
-      toast({ title: "Purchase tally updated successfully" });
+      toast({
+        title: "Success",
+        description: "Purchase tally updated successfully",
+      });
       onClose();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Error updating purchase tally", 
-        description: error.message,
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update purchase tally",
+        variant: "destructive",
       });
     },
   });
 
-  const addDrink = () => {
-    setDrinks([...drinks, { itemName: "", qty: 0, unit: "pcs" }]);
-  };
-
-  const removeDrink = (index: number) => {
-    setDrinks(drinks.filter((_, i) => i !== index));
-  };
-
-  const updateDrink = (index: number, drink: DrinkItem) => {
-    const newDrinks = [...drinks];
-    newDrinks[index] = drink;
-    setDrinks(newDrinks);
-  };
-
   const onSubmit = (data: PurchaseTallyForm) => {
+    // Filter out empty drinks
+    const cleanDrinks = drinks.filter(d => d.name && d.qty > 0);
+    
+    // Embed drinks into notes as JSON
+    const drinksTag = cleanDrinks.length ? `DRINKS:${JSON.stringify(cleanDrinks)}` : "";
+    const notesWithDrinks = data.notes ? `${data.notes}\n${drinksTag}` : drinksTag;
+    
+    // Prepare the payload
     const payload = {
       ...data,
-      amountTHB: data.amountTHB || null,
-      rollsPcs: data.rollsPcs ? parseInt(data.rollsPcs) : null,
-      meatGrams: data.meatGrams ? parseInt(data.meatGrams) : null,
-      drinks: drinks.filter(d => d.itemName && d.qty > 0),
+      notes: notesWithDrinks,
+      // Keep legacy total for backwards compatibility
+      drinks: cleanDrinks.reduce((sum, d) => sum + d.qty, 0),
+      amountTHB: data.amountTHB ? parseFloat(data.amountTHB) : undefined,
+      rollsPcs: data.rollsPcs ? parseInt(data.rollsPcs) : undefined,
+      meatGrams: data.meatGrams ? parseInt(data.meatGrams) : undefined,
     };
 
     if (entry) {
@@ -160,14 +184,13 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Date and Basic Info */}
-            <div className="responsive-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date *</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -175,7 +198,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="supplier"
@@ -183,43 +206,63 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Makro, Local Market" {...field} />
+                      <Input placeholder="e.g., Makro, 7-Eleven" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Amount and Staff */}
-            <div className="responsive-grid">
               <FormField
                 control={form.control}
                 name="amountTHB"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount (฿)</FormLabel>
+                    <FormLabel>Amount (THB)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                      />
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="staff"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Staff Member</FormLabel>
+                    <FormLabel>Staff</FormLabel>
                     <FormControl>
-                      <Input placeholder="Optional" {...field} />
+                      <Input placeholder="Staff member name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="rollsPcs"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rolls (pcs)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="meatGrams"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meat (grams)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -227,107 +270,58 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
               />
             </div>
 
-            {/* Purchase Quantities */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Purchase Quantities</h4>
-              <div className="responsive-grid">
-                <FormField
-                  control={form.control}
-                  name="rollsPcs"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rolls (pcs)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="meatGrams"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Meat (grams)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-              </div>
-            </div>
-
-            {/* Itemized Drinks */}
+            {/* Itemized Drinks Section */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">Drinks (itemized)</h4>
-                <Button type="button" onClick={addDrink} variant="outline" size="sm">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Drink
-                </Button>
-              </div>
-              
-              {drinks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No drinks added yet. Click "Add Drink" to start.</p>
-              ) : (
-                <div className="space-y-2">
-                  {drinks.map((drink, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                      {/* Item Name with Autocomplete */}
-                      <div className="col-span-7">
-                        <label className="text-xs text-muted-foreground">Item</label>
-                        <input
-                          type="text"
-                          value={drink.itemName}
-                          onChange={(e) => updateDrink(index, { ...drink, itemName: e.target.value })}
-                          placeholder="e.g., Coke 325ml"
-                          list={`drinks-list-${index}`}
-                          className="w-full px-3 py-2 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <datalist id={`drinks-list-${index}`}>
-                          {drinkOptions.map((item: any) => (
-                            <option key={item.name} value={item.name} />
-                          ))}
-                        </datalist>
-                      </div>
+              <label className="block text-sm font-medium">
+                Drinks (itemized)
+              </label>
 
-                      {/* Quantity */}
-                      <div className="col-span-3">
-                        <label className="text-xs text-muted-foreground">Qty</label>
-                        <input
-                          type="number"
-                          value={drink.qty || ""}
-                          onChange={(e) => updateDrink(index, { ...drink, qty: Number(e.target.value) || 0 })}
-                          placeholder="0"
-                          min="0"
-                          className="w-full px-3 py-2 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                      </div>
-
-                      {/* Remove Button */}
-                      <div className="col-span-2 flex justify-end">
-                        <Button 
-                          type="button" 
-                          onClick={() => removeDrink(index)} 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              {drinks.map((row, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <Input
+                    className="flex-1"
+                    placeholder="e.g., Coke"
+                    value={row.name}
+                    onChange={(e) => setDrinkItem(i, "name", e.target.value)}
+                    list={`drink-options-${i}`}
+                  />
+                  <datalist id={`drink-options-${i}`}>
+                    {drinkOptions.map((drink: any) => (
+                      <option key={drink.id} value={drink.name} />
+                    ))}
+                  </datalist>
+                  <Input
+                    type="number"
+                    className="w-24"
+                    placeholder="0"
+                    value={row.qty || ''}
+                    onChange={(e) => setDrinkItem(i, "qty", Number(e.target.value || 0))}
+                    min={0}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeDrinkItem(i)}
+                    disabled={drinks.length === 1}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
+              ))}
+
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                onClick={addDrinkItem}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add drink
+              </Button>
             </div>
 
-            {/* Notes */}
             <FormField
               control={form.control}
               name="notes"
@@ -336,8 +330,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Optional notes about this purchase..." 
-                      rows={3}
+                      placeholder="Additional notes..." 
                       {...field} 
                     />
                   </FormControl>
@@ -346,20 +339,16 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
               )}
             />
 
-            {/* Actions */}
-            <div className="flex gap-2 pt-4">
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
               <Button 
                 type="submit" 
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="flex-1"
               >
-                {createMutation.isPending || updateMutation.isPending 
-                  ? "Saving..." 
-                  : entry ? "Update" : "Save"
-                }
-              </Button>
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-                Cancel
+                {createMutation.isPending || updateMutation.isPending ? "Saving..." : 
+                 entry ? "Update" : "Create"}
               </Button>
             </div>
           </form>
