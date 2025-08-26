@@ -138,7 +138,7 @@ export function BusinessExpenses() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center gap-6 mb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-6 mb-6">
         <div>
           <h2 className="text-lg font-semibold text-[var(--heading)]">Expense Management</h2>
           <p className="text-sm text-[var(--muted)] mt-1">
@@ -148,9 +148,9 @@ export function BusinessExpenses() {
         
         <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full md:w-auto">
               <Plus className="mr-2 h-4 w-4" />
-              Add Business Expense
+              <span className="hidden sm:inline">Add Business </span>Expense
             </Button>
           </DialogTrigger>
         <DialogContent className="sm:max-w-[500px]">
@@ -173,7 +173,7 @@ export function BusinessExpenses() {
                   )}
                 />
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="amount"
@@ -299,7 +299,7 @@ export function BusinessExpenses() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         <div className="card">
           <div className="card-inner">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -337,7 +337,7 @@ export function BusinessExpenses() {
       <div className="card mt-6">
         <div className="card-inner">
           <h3 className="text-[18px] font-semibold text-[var(--heading)] mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -392,8 +392,9 @@ export function BusinessExpenses() {
           <p className="text-xs text-[var(--muted)] mb-4">
             Showing {filteredExpenses.length} business expenses
           </p>
-          <Table>
-            <TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
@@ -431,7 +432,8 @@ export function BusinessExpenses() {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </div>
       </div>
     </div>
