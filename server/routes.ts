@@ -44,8 +44,6 @@ import { generateAndEmailDailyReport } from "../src/server/report";
 import { importPosBundle } from "../src/server/pos/uploadBundle";
 import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
-import bankUploadRouter from "@/server/bank/upload";
-import bankImportRouter from "@/server/bank/router";
 // Email functionality will be added when needed
 
 
@@ -2316,7 +2314,6 @@ app.use("/api/bank-imports", bankImportRouter);
   
   // Bank Import router (CSV bank statement processing)
   app.use('/api/bank-imports', bankImportRouter);
-  app.use("/api", bankUploadRouter);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
