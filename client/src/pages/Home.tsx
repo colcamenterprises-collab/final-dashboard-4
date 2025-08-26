@@ -6,8 +6,8 @@ export default function Home() {
 
   // Get MTD Expenses
   const { data: expensesData } = useQuery({
-    queryKey: ["/api/expensesV2/summary", { month: currentMonth }],
-    queryFn: () => apiRequest("/api/expensesV2/summary?" + new URLSearchParams({ month: currentMonth })),
+    queryKey: ["/api/expensesV2V2/summary", { month: currentMonth }],
+    queryFn: () => apiRequest("/api/expensesV2V2/summary?" + new URLSearchParams({ month: currentMonth })),
   });
 
   // Get MTD Purchase Tally
