@@ -2299,8 +2299,8 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
-  // Route guard: deprecate old /api/expensesV2 routes
-  app.all("/api/expensesV2*", (req, res) => {
+  // Route guard: deprecate old /api/expensesV2 routes (but not /api/expensesV2V2)
+  app.all(/^\/api\/expensesV2(?!V2).*/, (req, res) => {
     console.warn(`⚠️  Deprecated route accessed: ${req.method} ${req.path} - Use /api/expensesV2V2 instead`);
     res.status(410).json({ok: false, error: "expenses v1 removed; use /api/expensesV2V2"});
   });

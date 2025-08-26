@@ -4,10 +4,10 @@ import { apiRequest } from "@/lib/queryClient";
 export default function Home() {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-  // Get MTD Expenses
-  const { data: expensesData } = useQuery({
-    queryKey: ["/api/expensesV2V2/summary", { month: currentMonth }],
-    queryFn: () => apiRequest("/api/expensesV2V2/summary?" + new URLSearchParams({ month: currentMonth })),
+  // Get MTD Expenses - calculate from month-to-date endpoint
+  const { data: mtdData } = useQuery({
+    queryKey: ["/api/expensesV2V2/month-to-date", { month: currentMonth }],
+    queryFn: () => apiRequest("/api/expensesV2V2/month-to-date"),
   });
 
   // Get MTD Purchase Tally
@@ -22,7 +22,10 @@ export default function Home() {
     queryFn: () => apiRequest("/api/purchase-tally/drinks/summary?" + new URLSearchParams({ month: currentMonth })),
   });
 
-  const mtdExpenses = expensesData?.summary?.totalAmount || 0;
+  // Use MTD data from endpoint
+  const mtdExpenses = mtdData?.total || 0;
+  const mtdEntriesCount = mtdData?.count || 0;
+  
   const mtdPurchases = purchasesData?.summary?.totalAmount || 0;
   const purchasesSummary = purchasesData?.summary || {};
   const topDrinks = drinksSummaryData?.items?.slice(0, 3) || [];
@@ -55,7 +58,7 @@ export default function Home() {
             ฿{Number(mtdExpenses).toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
           <div className="text-xs opacity-75 mt-1">
-            {expensesData?.summary?.entryCount || 0} entries this month
+            {mtdEntriesCount} entries this month
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db";
-import { expenseTypeLkp, supplierLkp, expenseEntry } from "../../shared/schema";
+import { expenseTypeLkp, supplierLkp, expenses } from "../../shared/schema";
 import { eq, desc, and, or, like, ilike, gte, lte } from "drizzle-orm";
 
 export const expensesV2Router = Router();
@@ -62,7 +62,7 @@ expensesV2Router.post("/", async (req, res) => {
     }
 
     // Create expense entry
-    const [entry] = await db.insert(expenseEntry).values({
+    const [entry] = await db.insert(expenses).values({
       date: new Date(date),
       typeId: type[0].id,
       supplierId,
@@ -259,5 +259,31 @@ expensesV2Router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting expense:", error);
     res.status(500).json({ error: "Failed to delete expense" });
+  }
+});
+
+// Get month-to-date expenses summary
+expensesV2Router.get("/month-to-date", async (_req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const expenseData = await db.select()
+      .from(expenses)
+      .where(
+        and(
+          gte(expenses.shiftDate, startOfMonth),
+          lte(expenses.shiftDate, endOfMonth)
+        )
+      );
+
+    const total = expenseData.reduce((sum, expense) => sum + (expense.costCents / 100), 0);
+    const count = expenseData.length;
+
+    res.json({ total, count });
+  } catch (error) {
+    console.error("Error fetching month-to-date expenses:", error);
+    res.status(500).json({ error: "Failed to fetch month-to-date expenses" });
   }
 });
