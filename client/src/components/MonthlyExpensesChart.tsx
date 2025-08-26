@@ -3,7 +3,7 @@ import { TrendingDown, CreditCard } from "lucide-react";
 
 export default function MonthlyExpensesChart() {
   const { data: mtdExpenses } = useQuery<{ total: number }>({
-    queryKey: ["/api/expenses/month-to-date"],
+    queryKey: ["/api/expensesV2/month-to-date"],
   });
 
   // Generate sample daily data for the chart (like the sample design)

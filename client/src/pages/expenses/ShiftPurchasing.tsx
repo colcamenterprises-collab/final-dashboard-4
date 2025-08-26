@@ -41,8 +41,8 @@ export function ShiftPurchasing() {
 
   // Fetch shift purchases only (SHIFT_FORM source)
   const { data: purchases = [], isLoading } = useQuery({
-    queryKey: ['/api/expenses', { source: 'SHIFT_FORM' }],
-    queryFn: () => apiRequest('/api/expenses?source=SHIFT_FORM'),
+    queryKey: ['/api/expensesV2', { source: 'SHIFT_FORM' }],
+    queryFn: () => apiRequest('/api/expensesV2?source=SHIFT_FORM'),
   });
 
   const form = useForm<PurchaseFormData>({
@@ -60,7 +60,7 @@ export function ShiftPurchasing() {
 
   const createPurchase = useMutation({
     mutationFn: (data: PurchaseFormData) => 
-      apiRequest('/api/expenses', {
+      apiRequest('/api/expensesV2', {
         method: 'POST',
         body: JSON.stringify({
           ...data,
@@ -70,7 +70,7 @@ export function ShiftPurchasing() {
         }),
       }),
     onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
       
       // Trigger snapshot recompute for latest shift
       try {

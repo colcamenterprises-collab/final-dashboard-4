@@ -135,17 +135,17 @@ export const api = {
 
   // Expenses
   getExpenses: (): Promise<Expense[]> =>
-    fetch("/api/expenses").then(res => res.json()),
+    fetch("/api/expensesV2").then(res => res.json()),
   
   createExpense: (expense: Omit<Expense, "id">) =>
-    fetch("/api/expenses", {
+    fetch("/api/expensesV2", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(expense)
     }).then(res => res.json()),
   
   getExpensesByCategory: (): Promise<Record<string, number>> =>
-    fetch("/api/expenses/by-category").then(res => res.json()),
+    fetch("/api/expensesV2/by-category").then(res => res.json()),
 
   // Suppliers
   getSuppliers: (): Promise<Supplier[]> =>
@@ -181,8 +181,8 @@ export const mutations = {
 
   createExpense: async (expense: Omit<Expense, "id">) => {
     const result = await api.createExpense(expense);
-    queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/expenses/by-category"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/expensesV2/by-category"] });
     return result;
   },
 

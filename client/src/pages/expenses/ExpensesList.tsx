@@ -16,7 +16,7 @@ export default function ExpensesList() {
   useEffect(()=>{(async()=>{
     try{
       setErr(null); setLoading(true);
-      const res = await fetch('/api/expenses', { headers: {Accept:'application/json'} });
+      const res = await fetch('/api/expensesV2', { headers: {Accept:'application/json'} });
       if(!res.ok) throw new Error('Failed to load expenses');
       setRows(await res.json());
     }catch(e:any){setErr(e.message)}finally{setLoading(false)}

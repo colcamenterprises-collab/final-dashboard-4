@@ -31,7 +31,7 @@ export default function ExpenseEditor() {
         lineTotalTHB: l.lineTotalTHB!=null? Number(l.lineTotalTHB): null,
       })),
     };
-    const res = await fetch('/api/expenses', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const res = await fetch('/api/expensesV2', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!res.ok) { alert('Save failed'); return; }
     const out = await res.json();
     window.location.href = '/finance/expenses';

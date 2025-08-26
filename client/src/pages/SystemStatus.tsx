@@ -41,7 +41,7 @@ export default function SystemStatus() {
 
     try {
       // Test HTTP method blocking
-      const httpTest = await fetch('/api/expenses', {
+      const httpTest = await fetch('/api/expensesV2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ test: 'data' })

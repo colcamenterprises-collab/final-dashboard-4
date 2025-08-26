@@ -82,15 +82,15 @@ export default function EnhancedExpenses() {
   const queryClient = useQueryClient();
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery({
-    queryKey: ["/api/expenses"],
+    queryKey: ["/api/expensesV2"],
   });
 
   const { data: monthToDateTotal = { total: "0" } } = useQuery({
-    queryKey: ["/api/expenses/month-to-date"],
+    queryKey: ["/api/expensesV2/month-to-date"],
   });
 
   const { data: expensesByCategory = {} } = useQuery({
-    queryKey: ["/api/expenses/by-category"],
+    queryKey: ["/api/expensesV2/by-category"],
   });
 
   const { data: categories = [] } = useQuery({
@@ -127,15 +127,15 @@ export default function EnhancedExpenses() {
         month: data.date.getMonth() + 1,
         year: data.date.getFullYear(),
       };
-      return apiRequest("/api/expenses", {
+      return apiRequest("/api/expensesV2", {
         method: "POST",
         body: JSON.stringify(expenseData),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses/month-to-date"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses/by-category"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expensesV2/month-to-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expensesV2/by-category"] });
       form.reset();
       toast({
         title: "Success",

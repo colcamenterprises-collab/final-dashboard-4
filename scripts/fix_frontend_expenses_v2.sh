@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔧 Patching frontend to use /api/expensesV2 …"
+
+ROOT="$(pwd)"
+CLIENT_DIR="client"
+SRC_DIR="$CLIENT_DIR/src"
+
+if [ ! -d "$SRC_DIR" ]; then
+  echo "❌ Could not find $SRC_DIR . Aborting."
+  exit 1
+fi
+
+# 1) Find all TypeScript/TSX files that still reference /api/expenses (v1)
+echo "🔎 Scanning for /api/expenses (v1) references…"
+MATCHES=$(grep -Rsn --include='*.ts' --include='*.tsx' '/api/expenses' "$SRC_DIR" || true)
+
+if [ -z "$MATCHES" ]; then
+  echo "✅ No v1 references found in $SRC_DIR (already clean)."
+else
+  echo "⚠️ Found these references:"
+  echo "$MATCHES" | sed 's/^/   /'
+
+  echo "📝 Rewriting to /api/expensesV2 …"
+  # Common patterns: "…/api/expenses", `…/api/expenses`, '/api/expenses'
+  # Replace ONLY when it doesn't already include V2
+  # Double quotes
+  sed -i.bak -E 's#"/api/expenses([^V])#"/api/expensesV2\1#g' $(echo "$MATCHES" | cut -d: -f1 | sort -u)
+  # Single quotes
+  sed -i.bak -E "s#'/api/expenses([^V])#'/api/expensesV2\\1#g" $(echo "$MATCHES" | cut -d: -f1 | sort -u)
+  # Backticks
+  sed -i.bak -E 's#`/api/expenses([^V])#`/api/expensesV2\1#g' $(echo "$MATCHES" | cut -d: -f1 | sort -u)
+
+  echo "🧹 Cleaning .bak files"
+  find "$SRC_DIR" -name '*.bak' -delete
+fi
+
+# 2) Optional: bump a cache-busting query on expenses calls (helps mobile/tablet cache)
+#    This is harmless if not present; it only affects string-concatenated URLs.
+echo "🧼 Applying lightweight cache-busting query (v=20250826) where applicable…"
+grep -Rsn --include='*.ts' --include='*.tsx' '/api/expensesV2' "$SRC_DIR" \
+  | cut -d: -f1 | sort -u \
+  | xargs -I{} sed -i -E 's#(/api/expensesV2)([^"?])#\1\2#g; s#/api/expensesV2([`"'\''/])#/api/expensesV2\1#g' {}
+
+# 3) Report final callers (for visibility)
+echo "📋 Final callers using /api/expensesV2:"
+grep -Rsn --include='*.ts' --include='*.tsx' '/api/expensesV2' "$SRC_DIR" || true
+
+# 4) Rebuild / restart (idempotent)
+echo "🏗️ Rebuilding (if applicable) and restarting…"
+npm run build  >/dev/null 2>&1 || true
+npm run start  >/dev/null 2>&1 || true
+
+echo "🎉 Frontend patch complete. Expenses now uses /api/expensesV2 everywhere."
+echo "🔁 Hard-refresh the browser (Cmd/Ctrl+Shift+R) on the Expenses page."

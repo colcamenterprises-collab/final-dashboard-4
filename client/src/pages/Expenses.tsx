@@ -14,26 +14,26 @@ export default function Expenses() {
 
   // Data fetching queries
   const rollsQuery = useQuery({
-    queryKey: ['/api/expenses/rolls'],
-    queryFn: () => apiRequest('/api/expenses/rolls', 'GET')
+    queryKey: ['/api/expensesV2/rolls'],
+    queryFn: () => apiRequest('/api/expensesV2/rolls', 'GET')
   });
 
   const meatQuery = useQuery({
-    queryKey: ['/api/expenses/meat'],
-    queryFn: () => apiRequest('/api/expenses/meat', 'GET')
+    queryKey: ['/api/expensesV2/meat'],
+    queryFn: () => apiRequest('/api/expensesV2/meat', 'GET')
   });
 
   const drinksQuery = useQuery({
-    queryKey: ['/api/expenses/drinks'],
-    queryFn: () => apiRequest('/api/expenses/drinks', 'GET')
+    queryKey: ['/api/expensesV2/drinks'],
+    queryFn: () => apiRequest('/api/expensesV2/drinks', 'GET')
   });
 
   const rollsMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expenses/rolls", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expensesV2/rolls", "POST", data),
     onSuccess: () => {
       toast({ title: "Success", description: "Rolls expense recorded" });
       setShowRollsModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/rolls'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/rolls'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -41,11 +41,11 @@ export default function Expenses() {
   });
 
   const meatMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expenses/meat", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expensesV2/meat", "POST", data),
     onSuccess: () => {
       toast({ title: "Success", description: "Meat expense recorded" });
       setShowMeatModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/meat'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/meat'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -53,11 +53,11 @@ export default function Expenses() {
   });
 
   const drinksMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expenses/drinks", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/expensesV2/drinks", "POST", data),
     onSuccess: () => {
       toast({ title: "Success", description: "Drinks expense recorded" });
       setShowDrinksModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/drinks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/drinks'] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

@@ -66,29 +66,29 @@ export default function ExpenseUpload() {
 
   // Fetch import batches
   const { data: batches = [] } = useQuery<ImportBatch[]>({
-    queryKey: ['/api/expenses/imports'],
+    queryKey: ['/api/expensesV2/imports'],
   });
 
   // Fetch vendors for dropdown
   const { data: vendors = [] } = useQuery<Vendor[]>({
-    queryKey: ['/api/expenses/imports/vendors'],
+    queryKey: ['/api/expensesV2/imports/vendors'],
   });
 
   // Fetch categories for dropdown
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['/api/expenses/imports/categories'],
+    queryKey: ['/api/expensesV2/imports/categories'],
   });
 
   // Fetch import lines for review
   const { data: importLines = [] } = useQuery<ImportLine[]>({
-    queryKey: ['/api/expenses/imports', currentBatchId, 'lines'],
+    queryKey: ['/api/expensesV2/imports', currentBatchId, 'lines'],
     enabled: !!currentBatchId && uploadStep === 'review',
   });
 
   // Create import batch mutation
   const createBatchMutation = useMutation({
     mutationFn: async (data: { type: string; filename: string; mime: string; contentBase64: string }) => {
-      return apiRequest('/api/expenses/imports', {
+      return apiRequest('/api/expensesV2/imports', {
         method: 'POST',
         body: JSON.stringify(data),
         headers: {
@@ -99,7 +99,7 @@ export default function ExpenseUpload() {
     onSuccess: (data) => {
       setCurrentBatchId(data.batchId);
       setUploadStep('mapping');
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/imports'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/imports'] });
     },
     onError: (error) => {
       toast({
@@ -113,7 +113,7 @@ export default function ExpenseUpload() {
   // Parse content mutation
   const parseContentMutation = useMutation({
     mutationFn: async (data: { batchId: number; mapping: Record<string, string>; contentBase64: string }) => {
-      return apiRequest(`/api/expenses/imports/${data.batchId}/parse`, {
+      return apiRequest(`/api/expensesV2/imports/${data.batchId}/parse`, {
         method: 'POST',
         body: JSON.stringify({ mapping: data.mapping, contentBase64: data.contentBase64 }),
         headers: {
@@ -123,7 +123,7 @@ export default function ExpenseUpload() {
     },
     onSuccess: () => {
       setUploadStep('review');
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/imports', currentBatchId, 'lines'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/imports', currentBatchId, 'lines'] });
     },
     onError: (error) => {
       toast({
@@ -137,7 +137,7 @@ export default function ExpenseUpload() {
   // Update line mutation
   const updateLineMutation = useMutation({
     mutationFn: async (data: { batchId: number; lineId: number; vendorId?: number; categoryId?: number }) => {
-      return apiRequest(`/api/expenses/imports/${data.batchId}/lines/${data.lineId}`, {
+      return apiRequest(`/api/expensesV2/imports/${data.batchId}/lines/${data.lineId}`, {
         method: 'PATCH',
         body: JSON.stringify({ vendorId: data.vendorId, categoryId: data.categoryId }),
         headers: {
@@ -146,14 +146,14 @@ export default function ExpenseUpload() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/imports', currentBatchId, 'lines'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/imports', currentBatchId, 'lines'] });
     },
   });
 
   // Commit batch mutation
   const commitBatchMutation = useMutation({
     mutationFn: async (batchId: number) => {
-      return apiRequest(`/api/expenses/imports/${batchId}/commit`, {
+      return apiRequest(`/api/expensesV2/imports/${batchId}/commit`, {
         method: 'POST',
       });
     },
@@ -163,7 +163,7 @@ export default function ExpenseUpload() {
         title: 'Import Complete',
         description: `${data.committed} expenses imported, ${data.skipped} skipped`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses/imports'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/imports'] });
     },
     onError: (error) => {
       toast({

@@ -51,8 +51,8 @@ export function BusinessExpenses() {
 
   // Fetch business expenses only (DIRECT source)
   const { data: expenses = [], isLoading } = useQuery({
-    queryKey: ['/api/expenses', { source: 'DIRECT' }],
-    queryFn: () => apiRequest('/api/expenses?source=DIRECT'),
+    queryKey: ['/api/expensesV2', { source: 'DIRECT' }],
+    queryFn: () => apiRequest('/api/expensesV2?source=DIRECT'),
   });
 
   const { data: categories = [] } = useQuery({
@@ -82,7 +82,7 @@ export function BusinessExpenses() {
 
   const createExpense = useMutation({
     mutationFn: (data: ExpenseFormData) => 
-      apiRequest('/api/expenses', {
+      apiRequest('/api/expensesV2', {
         method: 'POST',
         body: JSON.stringify({
           ...data,
@@ -93,7 +93,7 @@ export function BusinessExpenses() {
         }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
       toast({ title: "Success", description: "Business expense added successfully" });
       setIsAddExpenseOpen(false);
       form.reset();
