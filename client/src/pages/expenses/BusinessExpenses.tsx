@@ -139,28 +139,21 @@ export function BusinessExpenses() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center gap-6 mb-6">
-        <p className="text-sm text-[var(--muted)]">
-          Out-of-shift expenses (Makro, fuel, director costs)
-        </p>
-        <div className="flex gap-4 items-center">
-          {/* Bank Upload Card */}
-          <div className="w-80">
-            <BankUploadCard 
-              onImported={() => {
-                setShowBankReview(true);
-                queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
-              }}
-            />
-          </div>
-          
-          <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Business Expense
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--heading)]">Expense Management</h2>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            Out-of-shift expenses (Makro, fuel, director costs)
+          </p>
+        </div>
+        
+        <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Business Expense
+            </Button>
+          </DialogTrigger>
+        <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Add Business Expense</DialogTitle>
             </DialogHeader>
@@ -292,8 +285,17 @@ export function BusinessExpenses() {
               </form>
             </Form>
           </DialogContent>
-          </Dialog>
-        </div>
+        </Dialog>
+      </div>
+
+      {/* Bank Upload - Full Width */}
+      <div className="w-full">
+        <BankUploadCard 
+          onImported={() => {
+            setShowBankReview(true);
+            queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+          }}
+        />
       </div>
 
       {/* Summary Cards */}
