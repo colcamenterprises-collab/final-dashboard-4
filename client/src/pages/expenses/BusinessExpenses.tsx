@@ -138,14 +138,11 @@ export function BusinessExpenses() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start gap-6 mb-6">
-        <div>
-          <h2 className="text-[18px] font-semibold text-[var(--heading)]">Business Expenses</h2>
-          <p className="text-xs text-[var(--muted)] mt-1">
-            Out-of-shift business expenses (Makro, fuel, director costs)
-          </p>
-        </div>
-        <div className="flex gap-4 items-start">
+      <div className="flex justify-between items-center gap-6 mb-6">
+        <p className="text-sm text-[var(--muted)]">
+          Out-of-shift expenses (Makro, fuel, director costs)
+        </p>
+        <div className="flex gap-4 items-center">
           {/* Bank Upload Card */}
           <div className="w-80">
             <BankUploadCard 
