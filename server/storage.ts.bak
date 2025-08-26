@@ -124,69 +124,69 @@ export interface IStorage {
   updateDailyStockSales(id: number, data: Partial<DailyStockSales>): Promise<DailyStockSales>;
   deleteDailyStockSales(id: number): Promise<boolean>;
   softDeleteDailyStockSales(id: number): Promise<boolean>;
-//   
-//   // Ingredients
-//   getIngredients(): Promise<Ingredient[]>;
-//   createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
-//   updateIngredient(id: number, updates: Partial<Ingredient>): Promise<Ingredient>;
-//   deleteIngredient(id: number): Promise<void>;
-//   getIngredientsByCategory(category: string): Promise<Ingredient[]>;
-//   
-//   // Recipes
-//   getRecipes(): Promise<Recipe[]>;
-//   createRecipe(recipe: InsertRecipe): Promise<Recipe>;
-//   updateRecipe(id: number, updates: Partial<Recipe>): Promise<Recipe>;
-//   deleteRecipe(id: number): Promise<void>;
-//   getRecipeById(id: number): Promise<Recipe | undefined>;
-//   
-//   // Recipe Ingredients
-//   getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]>;
-//   createRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient>;
-//   updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient>;
-//   deleteRecipeIngredient(id: number): Promise<void>;
-//   calculateRecipeCost(recipeId: number): Promise<number>;
-//   
-//   // Quick Notes
-//   getQuickNotes(): Promise<QuickNote[]>;
-//   createQuickNote(note: InsertQuickNote): Promise<QuickNote>;
-//   updateQuickNote(id: number, updates: Partial<QuickNote>): Promise<QuickNote>;
-//   deleteQuickNote(id: number): Promise<void>;
-//   getQuickNotesByPriority(priority: string): Promise<QuickNote[]>;
-//   
-//   // Marketing Calendar
-//   getMarketingCalendar(): Promise<MarketingCalendar[]>;
-//   createMarketingCalendarEvent(event: InsertMarketingCalendar): Promise<MarketingCalendar>;
-//   updateMarketingCalendarEvent(id: number, updates: Partial<MarketingCalendar>): Promise<MarketingCalendar>;
-//   deleteMarketingCalendarEvent(id: number): Promise<void>;
-//   getMarketingCalendarByMonth(month: number, year: number): Promise<MarketingCalendar[]>;
-//   
-//   // Stock Purchase Tracking
-//   getStockPurchaseRolls(expenseId: number): Promise<StockPurchaseRolls[]>;
-//   createStockPurchaseRolls(data: InsertStockPurchaseRolls): Promise<StockPurchaseRolls>;
-//   getStockPurchaseDrinks(expenseId: number): Promise<StockPurchaseDrinks[]>;
-//   createStockPurchaseDrinks(data: InsertStockPurchaseDrinks): Promise<StockPurchaseDrinks>;
-//   getStockPurchaseMeat(expenseId: number): Promise<StockPurchaseMeat[]>;
-//   createStockPurchaseMeat(data: InsertStockPurchaseMeat): Promise<StockPurchaseMeat>;
-//   getMonthlyStockPurchaseSummary(): Promise<{
-//     rolls: Array<{ quantity: number; totalCost: string; date: string }>;
-//     drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
-//     meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
-//   }>;
-// 
-//   // Shift Sales (Sales Form)
-//   createShiftSales(data: InsertShiftSales & { shiftPurchases?: InsertShiftPurchase[] }): Promise<ShiftSales>;
-//   getShiftSales(id: number): Promise<ShiftSales | undefined>;
-//   getShiftSalesByDate(date: string): Promise<ShiftSales[]>;
-//   updateShiftSalesStatus(id: number, status: 'DRAFT' | 'SUBMITTED' | 'LOCKED'): Promise<ShiftSales>;
-//   
-//   // Shift Reports
-//   getShiftReports(): Promise<ShiftReport[]>;
-//   getShiftReportById(id: string): Promise<ShiftReport | undefined>;
-//   getShiftReportByDate(date: string): Promise<ShiftReport | undefined>;
-//   createShiftReport(report: InsertShiftReport): Promise<ShiftReport>;
-//   updateShiftReport(id: string, updates: Partial<ShiftReport>): Promise<ShiftReport>;
-//   deleteShiftReport(id: string): Promise<boolean>;
-//   searchShiftReports(query?: string, status?: string): Promise<ShiftReport[]>;
+  
+  // Ingredients
+  getIngredients(): Promise<Ingredient[]>;
+  createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
+  updateIngredient(id: number, updates: Partial<Ingredient>): Promise<Ingredient>;
+  deleteIngredient(id: number): Promise<void>;
+  getIngredientsByCategory(category: string): Promise<Ingredient[]>;
+  
+  // Recipes
+  getRecipes(): Promise<Recipe[]>;
+  createRecipe(recipe: InsertRecipe): Promise<Recipe>;
+  updateRecipe(id: number, updates: Partial<Recipe>): Promise<Recipe>;
+  deleteRecipe(id: number): Promise<void>;
+  getRecipeById(id: number): Promise<Recipe | undefined>;
+  
+  // Recipe Ingredients
+  getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]>;
+  createRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient>;
+  updateRecipeIngredient(id: number, updates: Partial<RecipeIngredient>): Promise<RecipeIngredient>;
+  deleteRecipeIngredient(id: number): Promise<void>;
+  calculateRecipeCost(recipeId: number): Promise<number>;
+  
+  // Quick Notes
+  getQuickNotes(): Promise<QuickNote[]>;
+  createQuickNote(note: InsertQuickNote): Promise<QuickNote>;
+  updateQuickNote(id: number, updates: Partial<QuickNote>): Promise<QuickNote>;
+  deleteQuickNote(id: number): Promise<void>;
+  getQuickNotesByPriority(priority: string): Promise<QuickNote[]>;
+  
+  // Marketing Calendar
+  getMarketingCalendar(): Promise<MarketingCalendar[]>;
+  createMarketingCalendarEvent(event: InsertMarketingCalendar): Promise<MarketingCalendar>;
+  updateMarketingCalendarEvent(id: number, updates: Partial<MarketingCalendar>): Promise<MarketingCalendar>;
+  deleteMarketingCalendarEvent(id: number): Promise<void>;
+  getMarketingCalendarByMonth(month: number, year: number): Promise<MarketingCalendar[]>;
+  
+  // Stock Purchase Tracking
+  getStockPurchaseRolls(expenseId: number): Promise<StockPurchaseRolls[]>;
+  createStockPurchaseRolls(data: InsertStockPurchaseRolls): Promise<StockPurchaseRolls>;
+  getStockPurchaseDrinks(expenseId: number): Promise<StockPurchaseDrinks[]>;
+  createStockPurchaseDrinks(data: InsertStockPurchaseDrinks): Promise<StockPurchaseDrinks>;
+  getStockPurchaseMeat(expenseId: number): Promise<StockPurchaseMeat[]>;
+  createStockPurchaseMeat(data: InsertStockPurchaseMeat): Promise<StockPurchaseMeat>;
+  getMonthlyStockPurchaseSummary(): Promise<{
+    rolls: Array<{ quantity: number; totalCost: string; date: string }>;
+    drinks: Array<{ drinkName: string; quantity: number; totalCost: string; date: string }>;
+    meat: Array<{ meatType: string; weight: string; totalCost: string; date: string }>;
+  }>;
+
+  // Shift Sales (Sales Form)
+  createShiftSales(data: InsertShiftSales & { shiftPurchases?: InsertShiftPurchase[] }): Promise<ShiftSales>;
+  getShiftSales(id: number): Promise<ShiftSales | undefined>;
+  getShiftSalesByDate(date: string): Promise<ShiftSales[]>;
+  updateShiftSalesStatus(id: number, status: 'DRAFT' | 'SUBMITTED' | 'LOCKED'): Promise<ShiftSales>;
+  
+  // Shift Reports
+  getShiftReports(): Promise<ShiftReport[]>;
+  getShiftReportById(id: string): Promise<ShiftReport | undefined>;
+  getShiftReportByDate(date: string): Promise<ShiftReport | undefined>;
+  createShiftReport(report: InsertShiftReport): Promise<ShiftReport>;
+  updateShiftReport(id: string, updates: Partial<ShiftReport>): Promise<ShiftReport>;
+  deleteShiftReport(id: string): Promise<boolean>;
+  searchShiftReports(query?: string, status?: string): Promise<ShiftReport[]>;
 }
 
 export class MemStorage implements IStorage {
