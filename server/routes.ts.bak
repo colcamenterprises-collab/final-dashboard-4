@@ -693,7 +693,7 @@ export function registerRoutes(app: express.Application): Server {
   // ===== Purchasing (Expenses) API =====
 
   // Create/Update Expense with lines
-  app.post('/api/expensesV2', async (req: Request, res: Response) => {
+  app.post('/api/expenses', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     try {
@@ -758,7 +758,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   /* DISABLED: This route conflicts with recovered expenses data route below
-  app.get('/api/expensesV2', async (req: Request, res: Response) => {
+  app.get('/api/expenses', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     try {
@@ -1412,7 +1412,7 @@ export function registerRoutes(app: express.Application): Server {
   // ===== EXPENSE MANAGEMENT API ROUTES =====
   
   // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM
-  app.get("/api/expensesV2", async (req: Request, res: Response) => {
+  app.get("/api/expenses", async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
@@ -1501,7 +1501,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Create new expense with enum validation and P&L mapping
-  app.post("/api/expensesV2", async (req: Request, res: Response) => {
+  app.post("/api/expenses", async (req: Request, res: Response) => {
     try {
       const expenseData = req.body;
       
@@ -1527,7 +1527,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Delete expense
-  app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
+  app.delete("/api/expenses/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteExpense(id);
@@ -1543,7 +1543,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Get month-to-date expenses total
-  app.get("/api/expensesV2/month-to-date", async (req: Request, res: Response) => {
+  app.get("/api/expenses/month-to-date", async (req: Request, res: Response) => {
     try {
       const total = await storage.getMonthToDateExpenses();
       res.json({ total });
@@ -1554,7 +1554,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Get expenses by category
-  app.get("/api/expensesV2/by-category", async (req: Request, res: Response) => {
+  app.get("/api/expenses/by-category", async (req: Request, res: Response) => {
     try {
       const categories = await storage.getExpensesByCategory();
       res.json(categories);
@@ -1902,7 +1902,7 @@ export function registerRoutes(app: express.Application): Server {
 
   // Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
-    app.use('/api/expensesV2/imports', expenseModule.default);
+    app.use('/api/expenses/imports', expenseModule.default);
     
     // Import and register finance router
     const { financeRouter } = await import('./api/finance');
@@ -2299,15 +2299,15 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
-  // Route guard: deprecate old /api/expensesV2 routes
-  app.all("/api/expensesV2*", (req, res) => {
-    console.warn(`⚠️  Deprecated route accessed: ${req.method} ${req.path} - Use /api/expensesV2V2 instead`);
-    res.status(410).json({ok: false, error: "expenses v1 removed; use /api/expensesV2V2"});
+  // Route guard: deprecate old /api/expenses routes
+  app.all("/api/expenses*", (req, res) => {
+    console.warn(`⚠️  Deprecated route accessed: ${req.method} ${req.path} - Use /api/expensesV2 instead`);
+    res.status(410).json({ok: false, error: "expenses v1 removed; use /api/expensesV2"});
   });
 
   // Use the new expenses V2 router
 app.use("/api/bank-imports", bankImportRouter);
-  app.use('/api/expensesV2V2', expensesV2Router);
+  app.use('/api/expensesV2', expensesV2Router);
   
   // Purchase Tally router
   app.use('/api/purchase-tally', purchaseTallyRouter);
