@@ -266,20 +266,25 @@ expensesV2Router.delete("/:id", async (req, res) => {
 expensesV2Router.get("/month-to-date", async (_req, res) => {
   try {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-    const expenseData = await db.select()
-      .from(expenses)
-      .where(
-        and(
-          gte(expenses.shiftDate, startOfMonth),
-          lte(expenses.shiftDate, endOfMonth)
-        )
-      );
-
-    const total = expenseData.reduce((sum, expense) => sum + (expense.costCents / 100), 0);
-    const count = expenseData.length;
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    
+    // Use direct SQL to avoid Drizzle schema issues
+    const result = await db.execute(`
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(cost_cents), 0) as total_cents
+      FROM expenses 
+      WHERE 
+        EXTRACT(YEAR FROM shift_date) = ${year}
+        AND EXTRACT(MONTH FROM shift_date) = ${month}
+        AND source = 'DIRECT'
+    `);
+    
+    const row = result.rows[0] as any;
+    const count = parseInt(row.count || 0);
+    const totalCents = parseInt(row.total_cents || 0);
+    const total = totalCents / 100; // Convert cents to dollars
 
     res.json({ total, count });
   } catch (error) {

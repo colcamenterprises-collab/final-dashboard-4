@@ -4,10 +4,10 @@ import { apiRequest } from "@/lib/queryClient";
 export default function Home() {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-  // Get MTD Expenses - calculate from month-to-date endpoint
-  const { data: mtdData } = useQuery({
-    queryKey: ["/api/expensesV2V2/month-to-date", { month: currentMonth }],
-    queryFn: () => apiRequest("/api/expensesV2V2/month-to-date"),
+  // Get all DIRECT expenses and calculate MTD on client side
+  const { data: allExpenses = [] } = useQuery({
+    queryKey: ["/api/expensesV2", { source: 'DIRECT', month: currentMonth }],
+    queryFn: () => apiRequest("/api/expensesV2?source=DIRECT"),
   });
 
   // Get MTD Purchase Tally
@@ -22,9 +22,20 @@ export default function Home() {
     queryFn: () => apiRequest("/api/purchase-tally/drinks/summary?" + new URLSearchParams({ month: currentMonth })),
   });
 
-  // Use MTD data from endpoint
-  const mtdExpenses = mtdData?.total || 0;
-  const mtdEntriesCount = mtdData?.count || 0;
+  // Calculate MTD from client side
+  const now = new Date();
+  const currentMonthExpenses = allExpenses.filter((expense: any) => {
+    const expenseDate = new Date(expense.shiftDate || expense.date);
+    return expenseDate.getFullYear() === now.getFullYear() && 
+           expenseDate.getMonth() === now.getMonth();
+  });
+  
+  const mtdExpenses = currentMonthExpenses.reduce((sum: number, expense: any) => {
+    const amount = expense.costCents ? expense.costCents / 100 : parseFloat(expense.amount || 0);
+    return sum + amount;
+  }, 0);
+  
+  const mtdEntriesCount = currentMonthExpenses.length;
   
   const mtdPurchases = purchasesData?.summary?.totalAmount || 0;
   const purchasesSummary = purchasesData?.summary || {};
