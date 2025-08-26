@@ -1,0 +1,97 @@
+import express from "express";
+import multer from "multer";
+import pdf from "pdf-parse";
+import { prisma } from "@/server/prisma";
+
+const router = express.Router();
+const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // 15MB
+
+// --- helpers ---
+const clean = (s:string)=>s.replace(/\u00a0/g," ").trim();
+const parseTHB = (s?:string|null)=>{
+  if (!s) return null;
+  const t = s.replace(/[฿,]/g,"").trim();
+  if (!t) return null;
+  const m = t.match(/^\((.*)\)$/);
+  const n = Number(m ? `-${m[1]}` : t);
+  return Number.isFinite(n) ? n : null;
+};
+const ymd = (d:Date)=>d.toISOString().slice(0,10);
+function dedupeKey(source:string, postedAt:Date, amount:number, desc:string){
+  return `${source}|${ymd(postedAt)}|${Math.abs(amount)}|${desc.slice(0,32).toUpperCase()}`;
+}
+
+// Insert normalized rows
+async function insertPendingBatch(source:string, filename:string, rows:{
+  postedAt: Date; description: string; amountTHB: number; ref?: string|null; raw?: any
+}[]){
+  const batch = await prisma.bankImportBatch.create({
+    data: { source, filename, status: "pending" }
+  });
+  let inserted=0, skippedDupes=0;
+  for (const r of rows){
+    try {
+      await prisma.bankTxn.create({
+        data: {
+          batchId: batch.id,
+          postedAt: r.postedAt,
+          description: r.description,
+          amountTHB: r.amountTHB,
+          ref: r.ref ?? null,
+          raw: r.raw ?? {},
+          status: "pending",
+          dedupeKey: dedupeKey(source, r.postedAt, r.amountTHB, r.description)
+        }
+      });
+      inserted++;
+    } catch (e:any){
+      if (String(e?.code)==="P2002") skippedDupes++; else throw e;
+    }
+  }
+  return { batch, inserted, skippedDupes };
+}
+
+// --- PDF parsing (tolerant) ---
+function parsePdfLoose(text:string){
+  // Match: DD/MM/YYYY  ...description...  amount
+  const rows:any[]=[];
+  const lines = text.split("\n").map(l=>clean(l)).filter(Boolean);
+  for (const ln of lines){
+    const m = ln.match(/^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(.+?)\s+([\-()0-9,\.]+)$/);
+    if (!m) continue;
+    const [_, d, desc, amtStr] = m;
+    const [dd,mm,yy] = d.split("/").map(Number);
+    const year = yy < 100 ? 2000 + yy : yy;
+    const postedAt = new Date(year, mm-1, dd);
+    const amt = parseTHB(amtStr);
+    if (amt === null) continue;
+    rows.push({
+      postedAt,
+      description: desc,
+      amountTHB: amt, // convention: positive = outflow (expense)
+      raw: { line: ln }
+    });
+  }
+  return rows;
+}
+
+// --- Upload route ---
+router.post("/bank-imports", upload.single("file"), async (req,res,next)=>{
+  try {
+    if (!req.file) return res.status(400).json({ ok:false, error:"No file" });
+    const { buffer, originalname, mimetype } = req.file;
+
+    if (mimetype === "application/pdf" || /\.pdf$/i.test(originalname)) {
+      const parsed = await pdf(buffer);
+      const rows = parsePdfLoose(parsed.text || "");
+      if (!rows.length) return res.status(422).json({ ok:false, error:"Could not parse any transactions from PDF (is it a scanned image?)." });
+      const { batch, inserted, skippedDupes } = await insertPendingBatch("PDF", originalname, rows);
+      return res.json({ ok:true, batchId: batch.id, inserted, skippedDupes });
+    }
+
+    // For CSV you can add later or route to your existing CSV handler
+    return res.status(415).json({ ok:false, error:`Unsupported file: ${mimetype}` });
+  } catch (err){ next(err); }
+});
+
+export default router;

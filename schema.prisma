@@ -820,4 +820,40 @@ model PosPaymentSummary {
   method    String
   amount    Decimal  @db.Decimal(10,2)
 }
+model BankImportBatch {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  source    String
+  filename  String
+  status    String   @default("pending") // pending | partially_approved | approved
+  txns      BankTxn[]
+}
+
+model BankTxn {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  postedAt  DateTime
+  description String
+  amountTHB Decimal   @db.Decimal(12,2) // POSITIVE = expense/outflow
+  ref       String?
+  raw       Json
+
+  status    String    @default("pending") // pending | approved | rejected | deleted
+  category  String?
+  supplier  String?
+  notes     String?
+  expenseId String?
+
+  dedupeKey String    @unique
+}
+
+model VendorRule {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  matchText String   // e.g., "MAKRO"
+  category  String   // e.g., "Supplies"
+  supplier  String   // e.g., "Makro"
+}
 
