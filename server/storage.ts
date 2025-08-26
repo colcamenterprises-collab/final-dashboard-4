@@ -1241,24 +1241,6 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async updateDailyStockSales(id: number, updates: { deletedAt?: Date | null }): Promise<boolean> {
-    try {
-      const { db } = await import("./db");
-      
-      // Restore form by setting deleted_at to NULL
-      const result = await db.execute(`
-        UPDATE daily_stock_sales 
-        SET deleted_at = NULL, updated_at = NOW()
-        WHERE id = ${id} 
-        RETURNING id
-      `);
-      
-      return result.rows.length > 0;
-    } catch (error) {
-      console.error("Error updating daily stock sales:", error);
-      return false;
-    }
-  }
 
   private seedDailyStockSalesData() {
     // Create sample daily stock sales forms

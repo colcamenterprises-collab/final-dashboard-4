@@ -1228,3 +1228,6 @@ export const bankTxnRelations = relations(bankTxn, ({ one }) => ({
     references: [bankImportBatch.id],
   }),
 }));
+
+// --- compat alias for older imports ---
+export const dailySalesV2 = dailySales;
