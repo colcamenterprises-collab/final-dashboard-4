@@ -1,3 +1,5 @@
+import { dailySalesV2Router } from "./forms/dailySalesV2";
+import { bankUploadRouter } from "../src/server/bank/upload";
 import express, { Request, Response } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
@@ -1903,6 +1905,7 @@ export function registerRoutes(app: express.Application): Server {
   // Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
     app.use('/api/expensesV2/imports', expenseModule.default);
+app.use("/api/bank-imports", bankUploadRouter);
     
     // Import and register finance router
     const { financeRouter } = await import('./api/finance');
@@ -2308,6 +2311,7 @@ export function registerRoutes(app: express.Application): Server {
   // Use the new expenses V2 router
 app.use("/api/bank-imports", bankImportRouter);
   app.use('/api/expensesV2V2', expensesV2Router);
+app.use("/api/bank-imports", bankUploadRouter);
   
   // Purchase Tally router
   app.use('/api/purchase-tally', purchaseTallyRouter);
@@ -2319,6 +2323,7 @@ app.use("/api/bank-imports", bankImportRouter);
   app.use('/api/menus', menuRouter);
   
   // Register Forms routes
+  app.use("/api/forms", dailySalesV2Router);
   app.use('/api/forms', formsRouter);
   
   // Register Manager Checklist routes

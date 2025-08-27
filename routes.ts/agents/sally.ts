@@ -1,0 +1,67 @@
+import { askGPT } from "../utils/gptUtils";
+import { db } from "../db";
+import { expenses, dailyStockSales } from "../../shared/schema";
+import { desc, sql } from "drizzle-orm";
+
+export class SallyAgent {
+  name = "Sally";
+  specialty = "Finance & Expenses";
+
+  async handleMessage(message: string): Promise<string> {
+    // Get recent financial data for context
+    const financialContext = await this.getFinancialContext();
+
+    const prompt = `You are Sally, a restaurant finance and expense management specialist. You help with:
+    - Expense tracking and categorization
+    - Financial reporting and analysis
+    - Budget planning and cost control
+    - Payment processing and reconciliation
+    - Profitability analysis
+    - Tax preparation support
+    
+    Current financial context:
+    ${financialContext}
+    
+    User question: "${message}"
+    
+    Provide helpful financial advice and analysis. Include specific numbers when available and actionable recommendations for cost optimization.`;
+
+    return await askGPT(prompt, this.name);
+  }
+
+  private async getFinancialContext(): Promise<string> {
+    try {
+      // Get recent expenses
+      const recentExpenses = await db
+        .select()
+        .from(expenses)
+        .orderBy(desc(expenses.createdAt))
+        .limit(10);
+
+      // Get expense summary for current month
+      const monthlyExpenses = await db
+        .select({
+          category: expenses.category,
+          total: sql<number>`sum(${expenses.amount})`
+        })
+        .from(expenses)
+        .where(sql`extract(month from ${expenses.date}) = extract(month from current_date)`)
+        .groupBy(expenses.category);
+
+      // Get recent sales data
+      const [recentSales] = await db
+        .select()
+        .from(dailyStockSales)
+        .orderBy(desc(dailyStockSales.createdAt))
+        .limit(1);
+
+      return `Recent expenses: ${JSON.stringify(recentExpenses.slice(0, 5))}
+Monthly expense summary: ${JSON.stringify(monthlyExpenses)}
+Recent sales data: ${recentSales ? JSON.stringify(recentSales.totalSales) : 'No recent sales data'}`;
+
+    } catch (error) {
+      console.error("Error fetching financial data:", error);
+      return "Financial data currently unavailable.";
+    }
+  }
+}
