@@ -30,6 +30,8 @@ export default function ViewDailySales() {
         const salesRes = await fetch(`/api/forms/daily-sales/v2/${salesId}`);
         if (salesRes.ok) {
           const sales = await salesRes.json();
+          console.log('[View] Sales data received:', sales);
+          console.log('[View] startingCash type:', typeof sales.startingCash, sales.startingCash);
           setSalesData(sales);
           
           // Try to fetch corresponding stock data
@@ -147,12 +149,10 @@ export default function ViewDailySales() {
                 </p>
               </div>
 
-              {salesData.aroiDeeSales && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.aroiDeeSales)}</p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
+                <p className="text-lg font-semibold text-gray-900">{THB(salesData.aroiDeeSales || 0)}</p>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
