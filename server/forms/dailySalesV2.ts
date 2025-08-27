@@ -1,12 +1,7 @@
 import express from "express";
 import type { Request, Response } from "express";
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
-import { dailyStockSales } from "../../shared/schema";
-import { desc } from "drizzle-orm";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
+import { pool } from "../db";
+import crypto from "crypto";
 
 // Using existing Drizzle schema - no table setup needed
 
@@ -19,26 +14,39 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
   try {
     const body = req.body || {};
     const staffName = body?.staffName || body?.staff || body?.completedBy || 'Unknown';
-    const shiftDate = new Date(body?.shiftDate || body?.date || new Date());
+    const shiftDate = body?.shiftDate || body?.date || new Date().toISOString().split('T')[0];
 
-    // Insert using Drizzle ORM
-    const [created] = await db.insert(dailyStockSales).values({
-      completedBy: staffName,
-      shiftType: 'EVENING', // Default to evening shift
-      shiftDate: shiftDate,
-      startingCash: body?.cashStart || body?.startingCash || 0,
-      endingCash: body?.cashEnd || body?.endingCash || 0,
-      totalSales: body?.totalSales || 0,
-      totalExpenses: body?.totalExpenses || 0,
-      cashSales: body?.cashSales || 0,
-      qrScanSales: body?.qrSales || 0,
-      grabSales: body?.grabSales || 0,
-      aroiDeeSales: body?.aroiSales || 0,
-      wageEntries: body?.wages || null,
-      shoppingEntries: body?.shopping || null,
-      notes: body?.notes || null,
-      isDraft: false
-    }).returning();
+    // Generate UUID for ID  
+    const id = crypto.randomUUID();
+    
+    // Insert using raw SQL to match existing daily_sales_v2 table structure
+    const query = `
+      INSERT INTO daily_sales_v2 (
+        id, "createdAt", "shiftDate", "submittedAtISO", "completedBy", 
+        "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales",
+        "grabSales", "aroiSales", "totalSales"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *
+    `;
+    
+    const values = [
+      id,
+      new Date(),
+      shiftDate,
+      new Date(),
+      staffName,
+      parseInt(body?.cashStart || body?.startingCash || '0'),
+      parseInt(body?.cashEnd || body?.endingCash || '0'),
+      parseInt(body?.cashBanked || '0'),
+      parseInt(body?.cashSales || '0'),
+      parseInt(body?.qrSales || '0'),
+      parseInt(body?.grabSales || '0'),
+      parseInt(body?.aroiSales || body?.aroiDeeSales || '0'),
+      parseInt(body?.totalSales || '0')
+    ];
+
+    const result = await pool.query(query, values);
+    const created = result.rows[0];
 
     queueHooksSafely(created);
     return res.json({ ok: true, id: created.id, record: created });
@@ -53,17 +61,17 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
  */
 dailySalesV2Router.get("/daily-sales/v2", async (_req: Request, res: Response) => {
   try {
-    if (prisma?.dailySales) {
-      const rows = await prisma.dailySales.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
-      return res.json({ ok: true, rows });
-    } else {
-      const r = await pool.query(
-        `SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", "endingCash", 
-         "totalSales", "totalExpenses", payload
-         FROM daily_sales_v2 ORDER BY "createdAt" DESC LIMIT 100`
-      );
-      return res.json({ ok: true, rows: r.rows });
-    }
+    // Get latest 100 records using raw SQL
+    const query = `
+      SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", 
+             "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", "aroiSales"
+      FROM daily_sales_v2 
+      ORDER BY "createdAt" DESC 
+      LIMIT 100
+    `;
+    
+    const result = await pool.query(query);
+    return res.json({ ok: true, rows: result.rows });
   } catch (err:any) {
     console.error("Daily Sales List Error:", err);
     return res.status(500).json({ ok:false, error: err?.message || "list_failed" });
