@@ -90,6 +90,50 @@ dailySalesV2Router.get("/daily-sales/v2", async (_req: Request, res: Response) =
   }
 });
 
+/** GET /api/forms/daily-sales/v2/:id
+ *  Returns individual record for View/Modal components.
+ */
+dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const query = `
+      SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", 
+             "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", 
+             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer"
+      FROM daily_sales_v2 
+      WHERE id = $1
+    `;
+    
+    const result = await pool.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+    
+    const row = result.rows[0];
+    
+    // Map fields to match View component expectations
+    // Note: View component multiplies by 100 in THB formatter, so we multiply here
+    const record = {
+      ...row,
+      startingCash: (row.startingCash || 0) * 100,
+      closingCash: (row.endingCash || 0) * 100,
+      cashBanked: (row.cashBanked || 0) * 100,
+      qrTransferred: (row.qrTransfer || row.qrSales || 0) * 100,
+      totalSales: (row.totalSales || 0) * 100,
+      totalExpenses: (row.totalExpenses || 0) * 100,
+      aroiDeeSales: (row.aroiSales || 0) * 100,
+      variance: ((row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0)) * 100
+    };
+    
+    return res.json(record);
+  } catch (err: any) {
+    console.error("Daily Sales Get Error:", err);
+    return res.status(500).json({ ok: false, error: err?.message || "fetch_failed" });
+  }
+});
+
 /** Fire-and-forget hooks: email + shopping list.
  *  We do not throw if these fail; persistence already succeeded.
  */
