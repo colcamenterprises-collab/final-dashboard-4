@@ -1,0 +1,181 @@
+Agent Directive — Option B (Drizzle only, zero schema changes)
+
+Read first, then execute. Do not deviate.
+
+Hard Rules
+
+Do NOT change the database schema (no CREATE/ALTER, no new tables, no migrations).
+
+Do NOT switch ORM (stay on Drizzle; no Prisma).
+
+Do NOT create “V2 tables” or “JSON bucket” tables.
+
+Use existing Drizzle models in shared/schema.ts.
+
+Minimal code edits only in the named files below.
+
+After each step, run the provided smoke tests.
+
+Target Outcome
+
+Submitting Form 1 + Form 2 persists using Drizzle to the existing table the Library reads from (see below), without schema changes.
+
+Library shows the new record immediately.
+
+After successful insert: non-blocking hooks run:
+
+sendDailySalesSummary(record)
+
+generateShoppingListFromDailySales(record)
+
+Expenses PDF upload endpoints keep working (no changes here in this task).
+
+Step 1 — Identify the actual Drizzle table the Library uses
+
+Open shared/schema.ts. Find the table used by the Daily Sales Library. It’s likely one of:
+
+dailyStockSales (camelCase Drizzle name)
+
+or similar (search for “Daily Sales” comments / columns like submittedAtISO, shiftDate, completedBy, cashStart, cashEnd, totalSales).
+
+Do not create daily_sales_v2 or any new table. Use the existing Drizzle table the Library queries.
+
+✔️ Deliverable: the table const you will use, e.g. schema.dailyStockSales.
+
+Step 2 — Implement POST/GET using Drizzle (no raw DDL)
+
+Create or refactor src/server/forms/dailySalesV2.ts to the following shape (keep to Drizzle):
+
+POST /api/forms/daily-sales/v2
+
+Parse JSON body from Form 1+2.
+
+Construct an insert object using the existing table’s required columns:
+
+Ensure all NOT NULL fields are set.
+
+submittedAtISO: new Date().toISOString()
+
+shiftDate: body.shiftDate (fallback: today ISO date if missing)
+
+completedBy/staff/staffName: map from form payload
+
+Numeric fields (cashStart, cashEnd, totalSales, etc): default to 0 if absent
+
+Any other NOT NULL fields in the table: supply safe defaults
+
+Insert with Drizzle (db.insert(schema.theTable).values({...}).returning()).
+
+On success:
+
+try { sendDailySalesSummary(record) } catch {}
+
+try { generateShoppingListFromDailySales(record) } catch {}
+(Use existing services if present; non-blocking)
+
+Respond { ok: true, record }.
+
+GET /api/forms/daily-sales/v2
+
+Return the latest 100 records ordered by submittedAtISO (or equivalent timestamp column).
+
+Select the fields the Library needs: id, date, staff, totals, etc.
+
+Respond { ok: true, rows }.
+
+Use Drizzle imports: import { db } from '@/server/db' (or current db path) and import * as schema from '@/shared/schema'. No raw pg Pool for this task.
+
+✔️ Deliverable: src/server/forms/dailySalesV2.ts using only Drizzle inserts/selects against the existing table.
+
+Step 3 — Register router (no duplicates)
+
+In src/server/routes.ts:
+
+Add: import { dailySalesV2Router } from "./forms/dailySalesV2";
+
+Mount once: app.use("/api/forms", dailySalesV2Router);
+
+Do not add any new app.use that registers unknown routes or new routers.
+
+Step 4 — Point the frontend to the V2 endpoints
+
+Replace any remaining calls to old endpoints (e.g., /api/daily-sales) with:
+
+POST /api/forms/daily-sales/v2 for submit
+
+GET /api/forms/daily-sales/v2 for the Library listing
+
+Only touch the minimum files required (form submit handler component + library fetcher).
+
+Step 5 — Smoke Tests (run exactly)
+
+A) Create submission
+
+curl -s -X POST http://localhost:5000/api/forms/daily-sales/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shiftDate":"2025-08-27",
+    "staffName":"Cam",
+    "cashStart":1000,
+    "cashEnd":1200,
+    "totalSales":750,
+    "notes":"BOT TEST"
+  }' | jq .
+
+
+Expect: { ok: true, record: { … } }
+
+B) List in Library API
+
+curl -s http://localhost:5000/api/forms/daily-sales/v2 | jq '.rows[0]'
+
+
+Expect: The top row matches the submission (correct date/staff/totals).
+
+C) UI
+
+Hard-refresh the Daily Sales Library page (Cmd/Ctrl+Shift+R).
+
+New record is visible with correct date (DD/MM/YYYY HH:mm) and formatted amounts (฿#,###).
+
+Step 6 — Hooks (non-blocking)
+
+Confirm that after a successful insert the server calls (if they exist):
+
+services/mailer.sendDailySalesSummary(record)
+
+services/purchasing.generateShoppingListFromDailySales(record)
+
+These must be wrapped in try/catch and must not prevent the response.
+
+Step 7 — What you must NOT do
+
+❌ No Prisma.
+
+❌ No CREATE TABLE, ALTER TABLE, or adding columns.
+
+❌ No new “V2” tables.
+
+❌ No raw SQL DDL.
+
+❌ No migration files.
+
+❌ No deletion of existing tables or routes.
+
+❌ No moving the Library to read a different table.
+
+Step 8 — Done Criteria
+
+Submit Form 1+2 → row saved via Drizzle to the existing Library table.
+
+Library (UI) shows it immediately with correct date/currency formatting.
+
+Email + shopping list hooks attempt to run (non-blocking).
+
+No schema changes anywhere.
+
+No Prisma introduced.
+
+All smoke tests above pass.
+
+If any NOT NULL constraint still fails, map the required fields correctly from the payload and supply sensible defaults — do not change the schema.
