@@ -114,7 +114,7 @@ dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response
     const row = result.rows[0];
     
     // Map fields to match View component expectations
-    // Note: View component multiplies by 100 in THB formatter, so we multiply here
+    // Note: View component divides by 100 in THB formatter, so we multiply here
     const record = {
       ...row,
       startingCash: (row.startingCash || 0) * 100,
@@ -124,7 +124,10 @@ dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response
       totalSales: (row.totalSales || 0) * 100,
       totalExpenses: (row.totalExpenses || 0) * 100,
       aroiDeeSales: (row.aroiSales || 0) * 100,
-      variance: ((row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0)) * 100
+      variance: ((row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0)) * 100,
+      // Set default values since these columns don't exist in daily_sales_v2 table
+      burgerBunsCount: 0,
+      meatCount: 0
     };
     
     return res.json(record);

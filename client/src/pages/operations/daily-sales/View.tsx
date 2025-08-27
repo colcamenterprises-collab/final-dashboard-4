@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 
 // Currency formatter
-const THB = (amount: number) => {
-  if (amount === 0) return '฿0.00';
+const THB = (amount: number | null | undefined) => {
+  const numAmount = Number(amount) || 0;
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
     currency: 'THB',
     minimumFractionDigits: 2
-  }).format(amount / 100);
+  }).format(numAmount / 100);
 };
 
 export default function ViewDailySales() {
@@ -154,18 +154,16 @@ export default function ViewDailySales() {
                 </div>
               )}
 
-              {(salesData.burgerBunsCount || salesData.meatCount) && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Burger Buns Count</label>
-                    <p className="text-lg font-semibold text-gray-900">{salesData.burgerBunsCount || 0}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Meat Count</label>
-                    <p className="text-lg font-semibold text-gray-900">{salesData.meatCount || 0}</p>
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Burger Buns (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">{salesData.burgerBunsCount || 0}</p>
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Meat Count (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">{salesData.meatCount || 0}g</p>
+                </div>
+              </div>
             </div>
           </div>
 
