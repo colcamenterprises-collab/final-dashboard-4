@@ -61,17 +61,29 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
  */
 dailySalesV2Router.get("/daily-sales/v2", async (_req: Request, res: Response) => {
   try {
-    // Get latest 100 records using raw SQL
+    // Get latest 100 records using raw SQL with all available fields
     const query = `
       SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", 
-             "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", "aroiSales"
+             "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", 
+             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer"
       FROM daily_sales_v2 
       ORDER BY "createdAt" DESC 
       LIMIT 100
     `;
     
     const result = await pool.query(query);
-    return res.json({ ok: true, rows: result.rows });
+    
+    // Map fields to match frontend expectations with proper defaults
+    const rows = result.rows.map(row => ({
+      ...row,
+      closingCash: row.endingCash || 0, // Frontend expects closingCash
+      qrTransferred: row.qrTransfer || row.qrSales || 0,  // Use qrTransfer field if available
+      totalExpenses: row.totalExpenses || 0, // Use actual field
+      cashBanked: row.cashBanked || 0,
+      variance: (row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0) // Fixed variance calc
+    }));
+    
+    return res.json({ ok: true, rows });
   } catch (err:any) {
     console.error("Daily Sales List Error:", err);
     return res.status(500).json({ ok:false, error: err?.message || "list_failed" });
