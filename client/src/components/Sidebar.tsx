@@ -15,7 +15,7 @@ type LinkProps = {
 };
 
 const baseItem =
-  "flex items-center gap-3 px-4 py-2 rounded-xl transition-colors hover:bg-emerald-600/15 hover:text-emerald-700";
+  "flex items-center gap-3 px-4 py-2 rounded-2xl transition-colors hover:bg-black hover:text-white";
 const activeItem =
   "bg-emerald-600 text-white hover:bg-emerald-600";
 
