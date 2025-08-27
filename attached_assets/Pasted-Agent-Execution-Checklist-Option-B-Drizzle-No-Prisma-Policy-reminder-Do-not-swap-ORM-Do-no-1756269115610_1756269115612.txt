@@ -1,0 +1,135 @@
+Agent Execution Checklist — Option B (Drizzle, No Prisma)
+
+Policy reminder:
+
+Do not swap ORM.
+
+Do not introduce Prisma.
+
+Implement functionality strictly on top of existing Drizzle schema and services.
+
+No new architectures. Only adapt + extend.
+
+1. Daily Sales → Library Persistence
+
+ Submissions from Form 1 + Form 2 save into Drizzle DB tables.
+
+ Records appear in Daily Sales Library immediately after submit.
+
+ Dates show correctly (no Invalid Date).
+
+ Sales, expenses, banking values display correctly (no NaN).
+
+Test:
+
+Submit a test form.
+
+Refresh Library page → record visible.
+
+Values formatted (date in DD/MM/YYYY HH:mm, amounts in ฿#,###).
+
+2. Email Notification
+
+ On Form 2 submit, system sends email.
+
+ Email contains:
+
+Summary of sales & expenses (from Form 1).
+
+Shopping list (from Form 2).
+
+Attached PDF of completed form.
+
+ Email styling matches the previous working template.
+
+Test:
+
+Submit form with expenses + stock.
+
+Check inbox → receive styled email with PDF + shopping list.
+
+3. Shopping List Generation
+
+ Shopping list auto-generated from Form 2.
+
+ Rolls, Meat, Drinks = stock counts.
+
+ All other items = requisition items.
+
+ Zero/blank entries are excluded.
+
+ Shopping list visible in Purchasing page.
+
+Test:
+
+Submit Form 2 with Rolls=120, Meat=15, Coke=6, Fanta=12, Lettuce=2.
+
+Shopping list shows only those items (no 0’s).
+
+4. Expenses PDF Upload
+
+ /api/bank-imports/pdf working with multer + pdf-parse.
+
+ Upload a bank statement PDF → returns parsed content (date, desc, amount).
+
+ Approve/Edit/Delete available on Expenses page before saving into DB.
+
+ CSV upload still works.
+
+Test:
+
+Drag CSV → parsed rows show.
+
+Drag PDF → preview shows parsed text or staged rows.
+
+Approve → entries written into Expenses DB.
+
+5. Jussi Automation Hook
+
+ After form submit or bank import, Jussi runs analysis automatically.
+
+ Compares staff-submitted Daily Sales vs POS Shift Report when uploaded.
+
+ Flags anomalies (sales mismatch, stock discrepancy).
+
+ Results shown under Analysis → Jussi tab (no standalone page).
+
+Test:
+
+Submit Form + upload POS Shift Report.
+
+Open Analysis → Jussi → see side-by-side staff vs POS, with flags.
+
+6. Mobile/Tablet Responsiveness
+
+ Sidebar collapses by default on <1024px screens.
+
+ Font scales down (clamp(14px, 1.8vw, 16px)).
+
+ Cards have tidy spacing.
+
+ No “expanded forever” menu on mobile.
+
+Test:
+
+Open on phone/tablet.
+
+Sidebar collapsed.
+
+Fonts readable, no overflow.
+
+🎯 Acceptance
+
+Patch is done only when:
+
+Form submissions show in Library.
+
+Email fires with PDF + shopping list.
+
+Shopping list updates Purchasing page.
+
+Expenses accepts both CSV and PDF.
+
+Jussi auto-triggers analysis.
+
+All works on desktop + mobile.
