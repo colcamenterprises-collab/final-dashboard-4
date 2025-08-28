@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 
-// A) Safe THB helper
-const thb = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
-};
+// Safe THB formatter
+const thb = (n: number | null | undefined) =>
+  typeof n === "number" && Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
 
 export default function DailySalesLibrary() {
   const [from, setFrom] = useState<string>("");

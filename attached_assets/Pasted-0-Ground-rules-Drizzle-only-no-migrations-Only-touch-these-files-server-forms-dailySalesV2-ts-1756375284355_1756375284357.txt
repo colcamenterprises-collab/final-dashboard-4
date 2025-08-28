@@ -1,0 +1,208 @@
+0) Ground rules
+
+Drizzle only, no migrations.
+
+Only touch these files:
+
+server/forms/dailySalesV2.ts
+
+client/src/pages/operations/daily-sales/Library.tsx
+
+client/src/pages/operations/daily-sales/View.tsx
+
+(one client submit handler in the Step-2 stock page — whatever file currently posts Step-2)
+
+Make backups before edits.
+
+1) Backend: accept both old/new field names + normalize
+
+File: server/forms/dailySalesV2.ts
+
+A) Add helpers (top of file)
+const toCents = (n: unknown) => {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.round(x * 100) : null;
+};
+const fromCents = (n: number | null | undefined) =>
+  typeof n === "number" && Number.isFinite(n) ? n / 100 : 0;
+const num = (v: unknown, d = 0) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : d;
+};
+
+B) POST /api/forms/daily-sales/v2 (map legacy keys → DB)
+
+Replace your insert payload with this normalizer so we accept both older and newer client keys:
+
+const b = req.body ?? {};
+
+// Accept both variants from UI
+const shiftDate     = b.shiftDate ?? b.date;
+const staffName     = b.staffName ?? b.completedBy;
+const startingCash  = b.startingCash ?? b.cashStart;
+const closingCash   = b.closingCash  ?? b.cashEnd ?? b.endingCash;
+const cashSales     = b.cashSales;
+const qrSales       = b.qrSales ?? b.qrTransferred;      // legacy->new
+const grabSales     = b.grabSales;
+const aroiSales     = b.aroiSales ?? b.aroiDeeSales;      // legacy->new
+const cashBanked    = b.cashBanked;
+const qrTransfer    = b.qrTransfer ?? b.qrTransferred;    // legacy->new
+const totalSales    = b.totalSales;
+const totalExpenses = b.totalExpenses;
+
+// Step-2 additions (optional on first submit)
+const rollsEnd      = b.rollsEnd ?? b.burgerBunsEnd;
+const meatEndGrams  = b.meatEndGrams ?? b.meatEnd;
+
+// Optional shopping list (can arrive later)
+const shoppingList  = Array.isArray(b.shoppingList) ? b.shoppingList : [];
+
+const row = {
+  shiftDate: String(shiftDate ?? ""),
+  completedBy: String(staffName ?? ""),
+  startingCash:  toCents(startingCash),
+  endingCash:    toCents(closingCash),
+  cashSales:     toCents(cashSales),
+  qrSales:       toCents(qrSales),
+  grabSales:     toCents(grabSales),
+  aroiSales:     toCents(aroiSales),
+  cashBanked:    toCents(cashBanked),
+  qrTransfer:    toCents(qrTransfer),
+  totalSales:    toCents(totalSales),
+  totalExpenses: toCents(totalExpenses),
+  payload: {
+    rollsEnd:     num(rollsEnd, 0),
+    meatEndGrams: num(meatEndGrams, 0),
+    shoppingList,
+  },
+};
+
+const [inserted] = await db.insert(dailySalesV2).values(row).returning();
+res.json({ ok: true, id: inserted.id });
+
+C) PATCH stock data after Step-2 (no schema change)
+
+Add a new route to attach stock/shopping data when Step-2 is submitted:
+
+import { eq } from "drizzle-orm";
+app.patch("/api/forms/daily-sales/v2/:id/stock", async (req, res) => {
+  const { id } = req.params;
+  const b = req.body ?? {};
+  const rollsEnd     = num(b.rollsEnd ?? b.burgerBunsEnd, 0);
+  const meatEndGrams = num(b.meatEndGrams ?? b.meatEnd, 0);
+  const shoppingList = Array.isArray(b.shoppingList) ? b.shoppingList : [];
+
+  const [row] = await db.select().from(dailySalesV2).where(eq(dailySalesV2.id, id));
+  if (!row) return res.status(404).json({ ok:false, error:"not_found" });
+
+  const payload = { ...(row.payload ?? {}), rollsEnd, meatEndGrams, shoppingList };
+  await db.update(dailySalesV2).set({ payload }).where(eq(dailySalesV2.id, id));
+  res.json({ ok: true });
+});
+
+D) GET list → return display-ready numbers and stock
+
+Ensure your GET maps names the UI will use and never returns undefined:
+
+const rows = await db.select().from(dailySalesV2).orderBy(desc(dailySalesV2.createdAt));
+res.json({
+  ok: true,
+  rows: rows.map(r => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    shiftDate: r.shiftDate,
+    completedBy: r.completedBy,
+    cashStart:  fromCents(r.startingCash),
+    cashEnd:    fromCents(r.endingCash),
+    totalSales: fromCents(r.totalSales),
+    cashBanked: fromCents(r.cashBanked),
+    qrTransfer: fromCents(r.qrTransfer),
+    grabSales:  fromCents(r.grabSales),
+    aroiSales:  fromCents(r.aroiSales),
+    rollsEnd:   r.payload?.rollsEnd ?? 0,
+    meatEndGrams: r.payload?.meatEndGrams ?? 0,
+    shoppingList: r.payload?.shoppingList ?? [],
+  })),
+});
+
+
+Hooks: keep them as console logs for now so we can verify trigger:
+
+console.log("HOOK: summary email, shopping list, jussi", { id: inserted.id });
+
+2) Frontend: no NaN, show rolls/meat, send Step-2
+A) Safe THB helper (use in both files)
+const thb = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+};
+
+B) Library table & modal
+
+File: client/src/pages/operations/daily-sales/Library.tsx
+
+Replace any raw math or /100 with thb(row.cashStart), thb(row.cashEnd), thb(row.totalSales), thb(row.cashBanked), thb(row.grabSales), thb(row.aroiSales), thb(row.qrTransfer).
+
+In the details modal:
+
+Burger Buns (Start/End): show / and row.rollsEnd ?? 0
+
+Meat Count (Start/End): show / and (row.meatEndGrams ?? 0) + " g"
+
+C) Detail View
+
+File: client/src/pages/operations/daily-sales/View.tsx
+
+Same THB usage everywhere; no /100.
+
+Show row.rollsEnd and row.meatEndGrams as above.
+
+D) Step-2 submit handler (stock page)
+
+(Whichever file handles Step-2 form submit; look for the code that currently navigates “Next/Finish”.)
+
+Add after Step-2 complete:
+
+// you already have the v2 id; if not, store it after step-1 POST response.
+const shoppingList = Object.entries(requisitionValues) // your map of SKU->qty
+  .filter(([,qty]) => Number(qty) > 0)
+  .map(([sku, qty]) => ({ sku, qty: Number(qty) }));
+
+await fetch(`/api/forms/daily-sales/v2/${dailySalesId}/stock`, {
+  method: "PATCH",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    rollsEnd: Number(rollsEndInput) || 0,
+    meatEndGrams: Number(meatEndInput) || 0,
+    shoppingList,
+  }),
+});
+
+3) Quick verification
+
+Create a record (step-1)
+
+curl -s -X POST http://localhost:5000/api/forms/daily-sales/v2 \
+ -H "Content-Type: application/json" \
+ -d '{"shiftDate":"2025-08-28","staffName":"Cam","startingCash":0,"closingCash":2,"grabSales":1,"cashBanked":21,"aroiDeeSales":0}'
+
+
+Attach stock + shopping (step-2)
+
+curl -s -X PATCH http://localhost:5000/api/forms/daily-sales/v2/<ID_RETURNED_ABOVE>/stock \
+ -H "Content-Type: application/json" \
+ -d '{"rollsEnd":18, "meatEndGrams":3200, "shoppingList":[{"sku":"Coke","qty":24}]}'
+
+
+List
+
+curl -s http://localhost:5000/api/forms/daily-sales/v2 | jq '.rows[0]'
+
+
+Expected in UI
+
+No NaN. THB values render (฿0.00/฿1.00/฿2.00/฿21.00 exactly per inputs).
+
+Details modal shows Burger Buns (End): 18, Meat (End): 3200 g.
+
+After submit, server logs: HOOK: summary email, shopping list, jussi { id: ... }.
