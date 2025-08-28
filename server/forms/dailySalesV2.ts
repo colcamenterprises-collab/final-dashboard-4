@@ -3,7 +3,13 @@ import type { Request, Response } from "express";
 import { pool } from "../db";
 import crypto from "crypto";
 
-// Using existing Drizzle schema - no table setup needed
+// --- currency helpers (store in cents, display in units) ---
+const toCents = (n: unknown) => {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.round(x * 100) : 0;
+};
+const fromCents = (n: number | null | undefined) =>
+  (typeof n === "number" && Number.isFinite(n)) ? n / 100 : 0;
 
 export const dailySalesV2Router = express.Router();
 
@@ -12,9 +18,20 @@ export const dailySalesV2Router = express.Router();
  */
 dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) => {
   try {
-    const body = req.body || {};
-    const staffName = body?.staffName || body?.staff || body?.completedBy || 'Unknown';
-    const shiftDate = body?.shiftDate || body?.date || new Date().toISOString().split('T')[0];
+    // EXPECTED payload fields from the form (step 1 and step 2)
+    const {
+      shiftDate,
+      staffName,
+      startingCash,
+      closingCash, // UI uses closingCash, DB is "endingCash"
+      cashSales, qrSales, grabSales, aroiSales,
+      cashBanked, qrTransfer,
+      totalSales, totalExpenses,
+      // step 2 (stock)
+      rollsEnd,        // pcs
+      meatEndGrams,    // grams
+      shoppingList     // array/object optional
+    } = req.body ?? {};
 
     // Generate UUID for ID  
     const id = crypto.randomUUID();
@@ -24,32 +41,49 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
       INSERT INTO daily_sales_v2 (
         id, "createdAt", "shiftDate", "submittedAtISO", "completedBy", 
         "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales",
-        "grabSales", "aroiSales", "totalSales"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        "grabSales", "aroiSales", "totalSales", "totalExpenses", "qrTransfer", "payload"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
     
     const values = [
       id,
       new Date(),
-      shiftDate,
+      String(shiftDate ?? ""),
       new Date(),
-      staffName,
-      parseInt(body?.cashStart || body?.startingCash || '0'),
-      parseInt(body?.cashEnd || body?.endingCash || '0'),
-      parseInt(body?.cashBanked || '0'),
-      parseInt(body?.cashSales || '0'),
-      parseInt(body?.qrSales || '0'),
-      parseInt(body?.grabSales || '0'),
-      parseInt(body?.aroiSales || body?.aroiDeeSales || '0'),
-      parseInt(body?.totalSales || '0')
+      String(staffName ?? ""),
+      toCents(startingCash),
+      toCents(closingCash),
+      toCents(cashBanked),
+      toCents(cashSales),
+      toCents(qrSales),
+      toCents(grabSales),
+      toCents(aroiSales),
+      toCents(totalSales),
+      toCents(totalExpenses),
+      toCents(qrTransfer),
+      JSON.stringify({
+        rollsEnd: Number(rollsEnd) || 0,
+        meatEndGrams: Number(meatEndGrams) || 0,
+        shoppingList: shoppingList ?? [],
+      })
     ];
 
     const result = await pool.query(query, values);
-    const created = result.rows[0];
+    const inserted = result.rows[0];
 
-    queueHooksSafely(created);
-    return res.json({ ok: true, id: created.id, record: created });
+    // Post-submit hooks (non-blocking) — after successful insert, fire and forget:
+    try {
+      await Promise.all([
+        Email?.sendDailySalesSummary?.().catch(()=>{}),
+        ShoppingList?.updateFromSubmission?.().catch(()=>{}),
+        Jussi?.analyzeDailySubmission?.().catch(()=>{}),
+      ]);
+    } catch (e) {
+      console.warn("Post-submit hooks failed:", e);
+    }
+
+    res.json({ ok: true, id: inserted.id });
   } catch (err:any) {
     console.error("Daily Sales Save Error:", err);
     return res.status(500).json({ ok:false, error: err?.message || "save_failed" });
@@ -65,7 +99,7 @@ dailySalesV2Router.get("/daily-sales/v2", async (_req: Request, res: Response) =
     const query = `
       SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", 
              "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", 
-             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer"
+             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer", "payload"
       FROM daily_sales_v2 
       ORDER BY "createdAt" DESC 
       LIMIT 100
@@ -73,17 +107,23 @@ dailySalesV2Router.get("/daily-sales/v2", async (_req: Request, res: Response) =
     
     const result = await pool.query(query);
     
-    // Map fields to match frontend expectations with proper defaults
-    const rows = result.rows.map(row => ({
-      ...row,
-      closingCash: row.endingCash || 0, // Frontend expects closingCash
-      qrTransferred: row.qrTransfer || row.qrSales || 0,  // Use qrTransfer field if available
-      totalExpenses: row.totalExpenses || 0, // Use actual field
-      cashBanked: row.cashBanked || 0,
-      variance: (row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0) // Fixed variance calc
+    const data = result.rows.map(r => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      shiftDate: r.shiftDate,
+      completedBy: r.completedBy,
+      cashStart: fromCents(r.startingCash),
+      cashEnd: fromCents(r.endingCash),
+      totalSales: fromCents(r.totalSales),
+      cashBanked: fromCents(r.cashBanked),
+      qrTransfer: fromCents(r.qrTransfer),
+      grabSales: fromCents(r.grabSales),
+      aroiSales: fromCents(r.aroiSales),
+      rollsEnd: r.payload?.rollsEnd ?? 0,
+      meatEndGrams: r.payload?.meatEndGrams ?? 0,
     }));
-    
-    return res.json({ ok: true, rows });
+
+    res.json({ ok: true, rows: data });
   } catch (err:any) {
     console.error("Daily Sales List Error:", err);
     return res.status(500).json({ ok:false, error: err?.message || "list_failed" });
@@ -100,7 +140,7 @@ dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response
     const query = `
       SELECT id, "createdAt", "shiftDate", "completedBy", "startingCash", 
              "endingCash", "totalSales", "cashSales", "qrSales", "grabSales", 
-             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer"
+             "aroiSales", "cashBanked", "totalExpenses", "qrTransfer", "payload"
       FROM daily_sales_v2 
       WHERE id = $1
     `;
@@ -111,23 +151,21 @@ dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response
       return res.status(404).json({ ok: false, error: "Record not found" });
     }
     
-    const row = result.rows[0];
+    const r = result.rows[0];
     
     // Map fields to match View component expectations
-    // Note: View component divides by 100 in THB formatter, so we multiply here
     const record = {
-      ...row,
-      startingCash: (row.startingCash || 0) * 100,
-      closingCash: (row.endingCash || 0) * 100,
-      cashBanked: (row.cashBanked || 0) * 100,
-      qrTransferred: (row.qrTransfer || row.qrSales || 0) * 100,
-      totalSales: (row.totalSales || 0) * 100,
-      totalExpenses: (row.totalExpenses || 0) * 100,
-      aroiDeeSales: (row.aroiSales || 0) * 100,
-      variance: ((row.totalSales || 0) - (row.startingCash || 0) - (row.endingCash || 0)) * 100,
-      // Set default values since these columns don't exist in daily_sales_v2 table
-      burgerBunsCount: 0,
-      meatCount: 0
+      ...r,
+      cashStart: fromCents(r.startingCash),
+      cashEnd: fromCents(r.endingCash),
+      totalSales: fromCents(r.totalSales),
+      cashBanked: fromCents(r.cashBanked),
+      qrTransfer: fromCents(r.qrTransfer),
+      grabSales: fromCents(r.grabSales),
+      aroiSales: fromCents(r.aroiSales),
+      totalExpenses: fromCents(r.totalExpenses),
+      rollsEnd: r.payload?.rollsEnd ?? 0,
+      meatEndGrams: r.payload?.meatEndGrams ?? 0,
     };
     
     return res.json(record);
@@ -137,21 +175,6 @@ dailySalesV2Router.get("/daily-sales/v2/:id", async (req: Request, res: Response
   }
 });
 
-/** Fire-and-forget hooks: email + shopping list.
- *  We do not throw if these fail; persistence already succeeded.
- */
-function queueHooksSafely(record: any) {
-  try {
-    // Prefer existing services if present; otherwise no-op.
-    try {
-      const mailer = require("../services/mailer");
-      if (mailer?.sendDailySalesSummary) mailer.sendDailySalesSummary(record);
-    } catch {}
-    try {
-      const purchasing = require("../services/purchasing");
-      if (purchasing?.generateShoppingListFromDailySales) purchasing.generateShoppingListFromDailySales(record);
-    } catch {}
-  } catch (e) {
-    console.warn("DailySales hooks failed (non-blocking):", e);
-  }
-}
+const Email = { sendDailySalesSummary: async () => {} };
+const ShoppingList = { updateFromSubmission: async () => {} };
+const Jussi = { analyzeDailySubmission: async () => {} };

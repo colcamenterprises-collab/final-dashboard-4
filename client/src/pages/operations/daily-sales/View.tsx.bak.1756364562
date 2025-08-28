@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 
-// Safe THB formatter
-const thb = (n: number | null | undefined) =>
-  typeof n === "number" && Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+// Currency formatter
+const THB = (amount: number | null | undefined) => {
+  const numAmount = Number(amount) || 0;
+  return new Intl.NumberFormat('th-TH', {
+    style: 'currency',
+    currency: 'THB',
+    minimumFractionDigits: 2
+  }).format(numAmount / 100);
+};
 
 export default function ViewDailySales() {
   const [location] = useLocation();
@@ -106,56 +112,56 @@ export default function ViewDailySales() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Starting Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashStart)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.startingCash || 0)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Closing Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashEnd)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.closingCash || 0)}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Cash Banked</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashBanked)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.cashBanked || 0)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">QR Transferred</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.qrTransfer)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.qrTransferred || 0)}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Sales</label>
-                  <p className="text-lg font-semibold text-green-600">{thb(salesData.totalSales)}</p>
+                  <p className="text-lg font-semibold text-green-600">{THB(salesData.totalSales || 0)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Expenses</label>
-                  <p className="text-lg font-semibold text-red-600">{thb(salesData.totalExpenses)}</p>
+                  <p className="text-lg font-semibold text-red-600">{THB(salesData.totalExpenses || 0)}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Variance</label>
                 <p className={`text-lg font-semibold ${Math.abs(salesData.variance || 0) > 20 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {thb(salesData.variance)}
+                  {THB(salesData.variance || 0)}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
-                <p className="text-lg font-semibold text-gray-900">{thb(salesData.aroiSales)}</p>
+                <p className="text-lg font-semibold text-gray-900">{THB(salesData.aroiDeeSales || 0)}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Burger Buns (pcs)</label>
-                  <p className="text-lg font-semibold text-gray-900">{salesData.rollsEnd || 0}</p>
+                  <label className="block text-sm font-medium text-gray-700">Burger Buns (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">{salesData.burgerBunsCount || 0}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Meat Count (grams)</label>
-                  <p className="text-lg font-semibold text-gray-900">{salesData.meatEndGrams || 0}</p>
+                  <label className="block text-sm font-medium text-gray-700">Meat Count (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">{salesData.meatCount || 0}g</p>
                 </div>
               </div>
             </div>

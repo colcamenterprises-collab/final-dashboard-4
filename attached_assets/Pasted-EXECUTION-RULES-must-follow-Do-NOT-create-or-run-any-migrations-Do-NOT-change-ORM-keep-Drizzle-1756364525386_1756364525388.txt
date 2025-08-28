@@ -1,0 +1,237 @@
+EXECUTION RULES (must follow)
+
+Do NOT create or run any migrations.
+
+Do NOT change ORM (keep Drizzle).
+
+Only modify the files listed below.
+
+If a file path differs, search and open the closest match, but keep the same logic.
+
+Make backups before you edit (.bak files).
+
+0) Pre-flight
+
+Confirm server boots:
+
+npm run start
+
+
+Create timestamped backups before editing:
+
+cp -f server/forms/dailySalesV2.ts server/forms/dailySalesV2.ts.bak.$(date +%s) || true
+cp -f client/src/pages/operations/daily-sales/Library.tsx client/src/pages/operations/daily-sales/Library.tsx.bak.$(date +%s) || true
+cp -f client/src/pages/operations/daily-sales/View.tsx client/src/pages/operations/daily-sales/View.tsx.bak.$(date +%s) || true
+
+1) Backend (Drizzle): normalize save + list
+
+File: server/forms/dailySalesV2.ts
+
+At the top (after imports), add helpers:
+
+// --- currency helpers (store in cents, display in units) ---
+const toCents = (n: unknown) => {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.round(x * 100) : null;
+};
+const fromCents = (n: number | null | undefined) =>
+  (typeof n === "number" && Number.isFinite(n)) ? n / 100 : 0;
+
+
+Ensure you’re using Drizzle models:
+
+import { db } from "../../shared/db";
+import { dailySalesV2 } from "../../shared/schema";
+import { desc } from "drizzle-orm"; // if not present
+
+
+POST /api/forms/daily-sales/v2 — normalize payload and insert with Drizzle.
+Inside the POST handler, replace the existing insert logic with:
+
+// EXPECTED payload fields from the form (step 1 and step 2)
+const {
+  shiftDate,
+  staffName,
+  startingCash,
+  closingCash, // UI uses closingCash, DB is "endingCash"
+  cashSales, qrSales, grabSales, aroiSales,
+  cashBanked, qrTransfer,
+  totalSales, totalExpenses,
+  // step 2 (stock)
+  rollsEnd,        // pcs
+  meatEndGrams,    // grams
+  shoppingList     // array/object optional
+} = req.body ?? {};
+
+const row = {
+  shiftDate: String(shiftDate ?? ""),
+  completedBy: String(staffName ?? ""),
+  startingCash: toCents(startingCash),
+  endingCash: toCents(closingCash),
+  cashSales: toCents(cashSales),
+  qrSales: toCents(qrSales),
+  grabSales: toCents(grabSales),
+  aroiSales: toCents(aroiSales),
+  cashBanked: toCents(cashBanked),
+  qrTransfer: toCents(qrTransfer),
+  totalSales: toCents(totalSales),
+  totalExpenses: toCents(totalExpenses),
+  payload: {
+    rollsEnd: Number(rollsEnd) || 0,
+    meatEndGrams: Number(meatEndGrams) || 0,
+    shoppingList: shoppingList ?? [],
+  },
+};
+
+const [inserted] = await db.insert(dailySalesV2).values(row).returning();
+res.json({ ok: true, id: inserted.id });
+
+
+GET /api/forms/daily-sales/v2 — return display-ready values and surface rolls/meat.
+Inside the GET list handler, replace the response mapping with:
+
+const rows = await db.select().from(dailySalesV2).orderBy(desc(dailySalesV2.createdAt));
+
+const data = rows.map(r => ({
+  id: r.id,
+  createdAt: r.createdAt,
+  shiftDate: r.shiftDate,
+  completedBy: r.completedBy,
+  cashStart: fromCents(r.startingCash),
+  cashEnd: fromCents(r.endingCash),
+  totalSales: fromCents(r.totalSales),
+  cashBanked: fromCents(r.cashBanked),
+  qrTransfer: fromCents(r.qrTransfer),
+  grabSales: fromCents(r.grabSales),
+  aroiSales: fromCents(r.aroiSales),
+  rollsEnd: r.payload?.rollsEnd ?? 0,
+  meatEndGrams: r.payload?.meatEndGrams ?? 0,
+}));
+
+res.json({ ok: true, rows: data });
+
+
+Post-submit hooks (non-blocking) — after successful insert, fire and forget:
+
+try {
+  // If these helpers don’t exist, create minimal stubs that log and resolve.
+  await Promise.all([
+    Email?.sendDailySalesSummary?.(inserted.id).catch(()=>{}),
+    ShoppingList?.updateFromSubmission?.(inserted).catch(()=>{}),
+    Jussi?.analyzeDailySubmission?.(inserted.id).catch(()=>{}),
+  ]);
+} catch (e) {
+  console.warn("Post-submit hooks failed:", e);
+}
+
+
+If Email, ShoppingList, or Jussi are not imported anywhere, either import existing utilities or add tiny stubs in this file:
+
+const Email = { sendDailySalesSummary: async () => {} };
+const ShoppingList = { updateFromSubmission: async () => {} };
+const Jussi = { analyzeDailySubmission: async () => {} };
+
+
+Restart server after saving.
+
+2) Frontend: remove NaN + show rolls/meat
+
+Safe THB formatter (use locally in both files or a shared util):
+
+const thb = (n: number | null | undefined) =>
+  typeof n === "number" && Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+
+A) Library Table
+
+File: client/src/pages/operations/daily-sales/Library.tsx
+
+Wherever currency is rendered, replace direct math with thb(row.cashStart), thb(row.cashEnd), thb(row.totalSales), etc.
+
+In the details modal row object, also render:
+
+Burger Buns (End): row.rollsEnd ?? 0
+
+Meat (End g): row.meatEndGrams ?? 0
+
+B) Detail View
+
+File: client/src/pages/operations/daily-sales/View.tsx
+
+Replace any amount/100 or raw arithmetic with thb(value).
+
+Ensure the component reads and shows:
+
+Burger Buns (Start/End) — if start isn’t stored, show / for start and row.rollsEnd for end.
+
+Meat Count (Start/End) — show / for start and row.meatEndGrams for end.
+
+Save files; the preview reload should show formatted values (no NaN).
+
+3) Smoke tests (must pass)
+
+Create one record
+
+curl -s -X POST http://localhost:5000/api/forms/daily-sales/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shiftDate":"2025-08-27",
+    "staffName":"Cam",
+    "startingCash": 1000,
+    "closingCash": 2000,
+    "cashSales": 500,
+    "qrSales": 250,
+    "grabSales": 300,
+    "aroiSales": 200,
+    "cashBanked": 1500,
+    "qrTransfer": 250,
+    "totalSales": 1250,
+    "totalExpenses": 400,
+    "rollsEnd": 18,
+    "meatEndGrams": 3200,
+    "shoppingList": [{"sku":"Coke","qty":24}]
+  }' | jq .
+
+
+List and inspect the latest
+
+curl -s http://localhost:5000/api/forms/daily-sales/v2 | jq '.rows[0]'
+
+
+Expected (example):
+
+{
+  "cashStart": 1000,
+  "cashEnd": 2000,
+  "totalSales": 1250,
+  "rollsEnd": 18,
+  "meatEndGrams": 3200,
+  ...
+}
+
+
+No NaN anywhere.
+
+Then open Daily Sales Library in the UI and confirm:
+
+Cash Start/End/Total show as ฿1,000, ฿2,000, etc.
+
+Details modal shows Burger Buns (End): 18 and Meat (End): 3200 g.
+
+4) PDF upload (optional quick unblock)
+
+Keep CSV upload working as-is today.
+
+Only enable PDF UI when POST /api/bank-imports/pdf is verified alive (no test file reads).
+Ensure server/routes.ts registers the bank import router and doesn’t reference any ./test/data/*.pdf.
+
+✅ Done criteria
+
+Submissions appear in Library within seconds.
+
+Currency columns show real values (no NaN).
+
+Rolls (pcs) and Meat (grams) displayed in Library + Details.
+
+Post-submit hooks called (even if stubbed).
+
+No migrations. No Prisma. Drizzle only.
