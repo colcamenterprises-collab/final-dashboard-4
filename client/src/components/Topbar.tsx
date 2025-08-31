@@ -10,10 +10,8 @@ export default function Topbar() {
           {/* Keep logo only per request; no title here */}
         </div>
 
-        {/* Greeting row — aligns horizontally with logo */}
-        <div className="flex-1 flex items-center">
-          <div className="text-xl font-extrabold">Hi Cam</div>
-        </div>
+        {/* Spacer */}
+        <div className="flex-1"></div>
 
         {/* Right actions (optional) */}
         <button className="hidden md:inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm">
