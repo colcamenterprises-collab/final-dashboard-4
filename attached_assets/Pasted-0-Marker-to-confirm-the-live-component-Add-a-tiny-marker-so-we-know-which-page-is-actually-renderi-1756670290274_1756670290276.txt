@@ -1,0 +1,179 @@
+0) Marker to confirm the live component
+
+Add a tiny marker so we know which page is actually rendering.
+
+A) Add to the legacy file
+
+client/src/pages/operations/DailySalesLibrary.tsx
+
+// add just under imports
+const __LIB_ID__ = "LIBRARY: LEGACY (DailySalesLibrary.tsx)";
+
+// inside the main render/container near the top
+<div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
+
+B) Add to the new file
+
+client/src/pages/operations/daily-sales/Library.tsx
+
+const __LIB_ID__ = "LIBRARY: NEW (operations/daily-sales/Library.tsx)";
+<div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
+
+
+Reload the page. Whatever label you see tells us which file is live.
+
+1) Patch the legacy Library file (this is likely the one in use)
+
+Backup
+
+cp client/src/pages/operations/DailySalesLibrary.tsx client/src/pages/operations/DailySalesLibrary.tsx.bak
+
+
+Edit client/src/pages/operations/DailySalesLibrary.tsx
+Add these helpers under the imports:
+
+// ---------- SAFE HELPERS ----------
+const toBahtNumber = (v: unknown): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v / 100;
+  if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v) / 100;
+  return 0;
+};
+
+const THB = (v: unknown): string =>
+  "฿" + toBahtNumber(v).toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fromRow = (row: any, key: string, fallback: any = 0) =>
+  row?.[key] ?? row?.payload?.[key] ?? fallback;
+
+const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
+const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
+const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
+const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
+
+const getStaff = (row: any) =>
+  row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";
+// ----------------------------------
+
+
+Replace the cell renderers (wherever you render these columns) with the safe reads:
+
+// Staff
+{getStaff(row)}
+
+// Cash Start / End / Total
+{THB(fromRow(row, "startingCash"))}
+{THB(fromRow(row, "endingCash"))}
+{THB(fromRow(row, "totalSales"))}
+
+// Other amounts (if present)
+{THB(fromRow(row, "cashBanked"))}
+{THB(fromRow(row, "qrTransfer"))}
+{THB(fromRow(row, "grabSales"))}
+{THB(fromRow(row, "aroiSales"))}
+
+// Burger Buns (Start/End)
+{(() => {
+  const s = getBunsStart(row);
+  const e = getBunsEnd(row);
+  return (s ?? "/") + " / " + (e ?? "/");
+})()}
+
+// Meat (Start/End)
+{(() => {
+  const s = getMeatStart(row);
+  const e = getMeatEnd(row);
+  return (s ?? "/") + " / " + (e ?? "/") + " g";
+})()}
+
+
+Optional debug (temporary): after fetching rows, log the first one so we can see actual keys:
+
+useEffect(() => {
+  // @ts-ignore
+  if (data?.rows?.length) console.log("LIB data[0]:", data.rows[0]);
+}, [data]);
+
+2) Patch the detail View (used by both routes)
+
+Backup
+
+cp client/src/pages/operations/daily-sales/View.tsx client/src/pages/operations/daily-sales/View.tsx.bak
+
+
+Edit client/src/pages/operations/daily-sales/View.tsx
+Add the same helper block under the imports.
+
+Then update the value reads:
+
+{/* Completed By */}
+{getStaff(row)}
+
+{/* Cash Start / End */}
+{THB(fromRow(row, "startingCash"))}
+{THB(fromRow(row, "endingCash"))}
+
+{/* Cash Banked / Grab / Aroi */}
+{THB(fromRow(row, "cashBanked"))}
+{THB(fromRow(row, "grabSales"))}
+{THB(fromRow(row, "aroiSales"))}
+
+{/* Burger Buns (Start/End) */}
+{(() => {
+  const s = getBunsStart(row);
+  const e = getBunsEnd(row);
+  return (s ?? "/") + " / " + (e ?? "/");
+})()}
+
+{/* Meat (Start/End) */}
+{(() => {
+  const s = getMeatStart(row);
+  const e = getMeatEnd(row);
+  return (s ?? "/") + " / " + (e ?? "/") + " g";
+})()}
+
+{/* Shopping List */}
+<div className="mt-4">
+  <div className="font-semibold">Shopping List</div>
+  {(() => {
+    const list = fromRow(row, "shoppingList", fromRow(row, "shopping", [])) as Array<{ sku?: string; qty?: number }>;
+    if (!Array.isArray(list) || list.length === 0) return <div className="text-sm text-gray-500">No items</div>;
+    return (
+      <ul className="list-disc pl-5 text-sm">
+        {list.map((it, idx) => (
+          <li key={idx}>
+            {(it?.sku ?? "Item")} — {it?.qty ?? 0}
+          </li>
+        ))}
+      </ul>
+    );
+  })()}
+</div>
+
+3) Quick verification
+
+Restart
+
+npm run start
+
+
+Confirm which file renders (look for the tiny label at the top of the Library page).
+
+If it shows LEGACY, you’ve patched the right file.
+
+If it shows NEW, repeat step #1 patch in client/src/pages/operations/daily-sales/Library.tsx (same helpers and renders).
+
+(Optional) attach stock+shopping to a known row (replace <ID>):
+
+curl -s -X PATCH http://localhost:5000/api/forms/daily-sales/v2/<ID>/stock \
+  -H "Content-Type: application/json" \
+  -d '{"rollsStart":10,"rollsEnd":18,"meatStartGrams":2800,"meatEndGrams":3200,"shoppingList":[{"sku":"Coke","qty":24},{"sku":"Sprite","qty":12}]}'
+
+
+Refresh the Library and open the View modal:
+
+NaN is gone (all THB formatted).
+
+Buns/meat show “start / end”.
+
+Shopping list shows items.

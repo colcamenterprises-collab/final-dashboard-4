@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 
+const __LIB_ID__ = "LIBRARY: NEW (operations/daily-sales/Library.tsx)";
+
 // ---------- SAFE HELPERS ----------
 const toBahtNumber = (v: unknown): number => {
   if (v === null || v === undefined) return 0;
@@ -51,6 +53,7 @@ export default function DailySalesLibrary() {
   return (
     <div className="min-h-screen bg-[#f5f7f8]" style={{ fontFamily: "Poppins, sans-serif" }}>
       <div className="px-8 py-6">
+        <div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
         {/* Header Section */}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Daily Sales Library</h1>

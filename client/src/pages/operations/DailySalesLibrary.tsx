@@ -13,6 +13,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { Search, Eye, Trash2, Download } from "lucide-react";
 
+const __LIB_ID__ = "LIBRARY: LEGACY (DailySalesLibrary.tsx)";
+
+// ---------- SAFE HELPERS ----------
+const toBahtNumber = (v: unknown): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v / 100;
+  if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v) / 100;
+  return 0;
+};
+
+const THB = (v: unknown): string =>
+  "฿" + toBahtNumber(v).toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fromRow = (row: any, key: string, fallback: any = 0) =>
+  row?.[key] ?? row?.payload?.[key] ?? fallback;
+
+const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
+const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
+const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
+const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
+
+const getStaff = (row: any) =>
+  row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";
+// ----------------------------------
+
 interface DailySalesRecord {
   id: string;
   shiftDate: string;
@@ -42,6 +67,11 @@ export default function DailySalesLibrary() {
   useEffect(() => {
     fetchRecords();
   }, []);
+
+  useEffect(() => {
+    // @ts-ignore
+    if (records?.length) console.log("LIB data[0]:", records[0]);
+  }, [records]);
 
   useEffect(() => {
     const filtered = records.filter(record => 
@@ -145,6 +175,7 @@ export default function DailySalesLibrary() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Daily Sales Library</h1>
         <p className="text-gray-600">View and manage all daily sales submissions</p>
@@ -178,6 +209,8 @@ export default function DailySalesLibrary() {
               <TableHead>Cash Start</TableHead>
               <TableHead>Cash End</TableHead>
               <TableHead>Total Sales</TableHead>
+              <TableHead>Buns (Start/End)</TableHead>
+              <TableHead>Meat (Start/End)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -185,7 +218,7 @@ export default function DailySalesLibrary() {
           <TableBody>
             {filteredRecords.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                   No records found
                 </TableCell>
               </TableRow>
@@ -195,10 +228,20 @@ export default function DailySalesLibrary() {
                   <TableCell className="font-medium">
                     {new Date(record.shiftDate).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>{record.completedBy}</TableCell>
-                  <TableCell>{formatCurrency(record.cashStart)}</TableCell>
-                  <TableCell>{formatCurrency(record.cashEnd)}</TableCell>
-                  <TableCell>{formatCurrency(record.grabSales + record.aroiDeeSales)}</TableCell>
+                  <TableCell>{getStaff(record)}</TableCell>
+                  <TableCell>{THB(fromRow(record, "startingCash"))}</TableCell>
+                  <TableCell>{THB(fromRow(record, "endingCash"))}</TableCell>
+                  <TableCell>{THB(fromRow(record, "totalSales"))}</TableCell>
+                  <TableCell>{(() => {
+                    const s = getBunsStart(record);
+                    const e = getBunsEnd(record);
+                    return (s ?? "/") + " / " + (e ?? "/");
+                  })()}</TableCell>
+                  <TableCell>{(() => {
+                    const s = getMeatStart(record);
+                    const e = getMeatEnd(record);
+                    return (s ?? "/") + " / " + (e ?? "/") + " g";
+                  })()}</TableCell>
                   <TableCell>
                     <Badge variant={record.status === 'submitted' ? 'default' : 'secondary'}>
                       {record.status}
@@ -229,35 +272,59 @@ export default function DailySalesLibrary() {
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Completed By:</label>
-                                  <p>{selectedRecord.completedBy}</p>
+                                  <p>{getStaff(selectedRecord)}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Cash Start:</label>
-                                  <p>{formatCurrency(selectedRecord.cashStart)}</p>
+                                  <p>{THB(fromRow(selectedRecord, "startingCash"))}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Cash End:</label>
-                                  <p>{formatCurrency(selectedRecord.cashEnd)}</p>
+                                  <p>{THB(fromRow(selectedRecord, "endingCash"))}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Cash Banked:</label>
-                                  <p>{formatCurrency(selectedRecord.cashBanked)}</p>
+                                  <p>{THB(fromRow(selectedRecord, "cashBanked"))}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Grab Sales:</label>
-                                  <p>{formatCurrency(selectedRecord.grabSales)}</p>
+                                  <p>{THB(fromRow(selectedRecord, "grabSales"))}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Aroi Dee Sales:</label>
-                                  <p>{formatCurrency(selectedRecord.aroiDeeSales)}</p>
+                                  <p>{THB(fromRow(selectedRecord, "aroiSales"))}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Burger Buns (Start/End):</label>
-                                  <p>{selectedRecord.burgerBunsStart} / {selectedRecord.burgerBunsEnd}</p>
+                                  <p>{(() => {
+                                    const s = getBunsStart(selectedRecord);
+                                    const e = getBunsEnd(selectedRecord);
+                                    return (s ?? "/") + " / " + (e ?? "/");
+                                  })()}</p>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Meat Count (Start/End):</label>
-                                  <p>{selectedRecord.meatCountStart} / {selectedRecord.meatCountEnd}</p>
+                                  <p>{(() => {
+                                    const s = getMeatStart(selectedRecord);
+                                    const e = getMeatEnd(selectedRecord);
+                                    return (s ?? "/") + " / " + (e ?? "/") + " g";
+                                  })()}</p>
+                                </div>
+                                <div className="mt-4">
+                                  <div className="font-semibold">Shopping List</div>
+                                  {(() => {
+                                    const list = fromRow(selectedRecord, "shoppingList", fromRow(selectedRecord, "shopping", [])) as Array<{ sku?: string; qty?: number }>;
+                                    if (!Array.isArray(list) || list.length === 0) return <div className="text-sm text-gray-500">No items</div>;
+                                    return (
+                                      <ul className="list-disc pl-5 text-sm">
+                                        {list.map((it, idx) => (
+                                          <li key={idx}>
+                                            {(it?.sku ?? "Item")} — {it?.qty ?? 0}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                               {selectedRecord.notes && (
