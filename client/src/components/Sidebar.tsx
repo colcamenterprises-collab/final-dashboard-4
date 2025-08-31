@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ROUTES } from "../router/RouteRegistry";
+import logoImg from "@assets/Yellow Circle - Black Logo_1756650531149.png";
 
 type LinkProps = {
   to: string;
@@ -47,7 +48,16 @@ export default function Sidebar({ className = "", onClose }: SidebarProps = {}) 
     <aside
       className={`${className} ${width} border-r bg-white min-h-screen transition-[width] duration-200`}
     >
-      {/* top row with collapse toggle */}
+      {/* Logo at top-left */}
+      <div className="p-3 border-b">
+        <img 
+          src={logoImg} 
+          alt="Smash Brothers Burgers" 
+          className="w-[60px] h-[60px] object-contain"
+        />
+      </div>
+      
+      {/* Collapse toggle */}
       <div className="px-3 py-3 border-b flex items-center justify-end">
         <button
           aria-label="Toggle sidebar"
