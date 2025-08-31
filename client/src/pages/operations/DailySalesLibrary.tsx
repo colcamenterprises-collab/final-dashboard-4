@@ -68,12 +68,9 @@ export default function DailySalesLibrary() {
     fetchRecords();
   }, []);
 
+  // Debug: Confirm LEGACY file is being used
   useEffect(() => {
-    // @ts-ignore
-    if (records?.length) {
-      console.log("LIB data[0]:", records[0]);
-      console.log("LIB payload:", records[0]?.payload);
-    }
+    if (records?.length) console.log("LIB data[0]:", records[0]);
   }, [records]);
 
   useEffect(() => {
@@ -178,7 +175,7 @@ export default function DailySalesLibrary() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="text-lg font-bold bg-yellow-200 p-2 mb-4 border border-red-500">{__LIB_ID__}</div>
+      <div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Daily Sales Library</h1>
         <p className="text-gray-600">View and manage all daily sales submissions</p>

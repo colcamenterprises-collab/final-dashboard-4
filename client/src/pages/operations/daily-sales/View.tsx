@@ -83,7 +83,7 @@ export default function ViewDailySales() {
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-lg border p-8 text-center">
             <p className="text-red-600">Sales form not found</p>
-            <a href="/operations/daily-sales/library" className="text-teal-600 hover:underline mt-2 inline-block">
+            <a href="/operations/daily-sales-library" className="text-teal-600 hover:underline mt-2 inline-block">
               Return to Library
             </a>
           </div>
@@ -107,7 +107,7 @@ export default function ViewDailySales() {
               </p>
             </div>
             <a 
-              href="/operations/daily-sales/library" 
+              href="/operations/daily-sales-library" 
               className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-200 transition-colors"
             >
               Back to Library
