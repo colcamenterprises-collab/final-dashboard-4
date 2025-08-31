@@ -68,10 +68,6 @@ export default function DailySalesLibrary() {
     fetchRecords();
   }, []);
 
-  // Debug: Confirm LEGACY file is being used
-  useEffect(() => {
-    if (records?.length) console.log("LIB data[0]:", records[0]);
-  }, [records]);
 
   useEffect(() => {
     const filtered = records.filter(record => 

@@ -73,34 +73,6 @@ export default function DailySales() {
   
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  
-  // ---------- Banking auto-calculation helpers ----------
-  const num = (v: unknown) => {
-    const n = typeof v === "string" ? v.trim() : v;
-    const f = Number(n);
-    return Number.isFinite(f) ? f : 0;
-  };
-
-  // Calculate totals for auto-computation
-  const startingCash = num(cashStart);
-  const cashSales = num(cash);
-  const qrSales = num(qr);
-  const totalExpenses = shiftExpenses.reduce((acc: number, row: any) => acc + num(row?.cost), 0) + 
-                       staffWages.reduce((acc: number, row: any) => acc + num(row?.amount), 0);
-
-  // Robust formula that respects float maintenance and shortfalls:
-  //   banked = (startingCash + cashSales) - totalExpenses - closingCash
-  const computedCashBanked = Math.max(0, (startingCash + cashSales) - totalExpenses - closingCash);
-
-  // QR transfer is simply the total QR sales (money never in drawer)
-  const computedQrTransfer = Math.max(0, qrSales);
-
-  // Auto-update computed values when dependencies change
-  useEffect(() => {
-    setCashBanked(Number(computedCashBanked.toFixed(2)));
-    setQrTransfer(Number(computedQrTransfer.toFixed(2)));
-  }, [computedCashBanked, computedQrTransfer]);
-  // ------------------------------------------------------
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(4);
   const [error, setError] = useState<string | null>(null);
@@ -468,7 +440,6 @@ export default function DailySales() {
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Banking</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Closing Cash (staff enters) */}
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
                 <input 
@@ -478,35 +449,23 @@ export default function DailySales() {
                   className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
               </div>
-              
-              {/* Cash Banked (computed) */}
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Cash Banked (฿)</label>
-                <input
-                  type="number"
-                  value={computedCashBanked.toFixed(2)}
-                  readOnly
-                  className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50"
-                  aria-label="Cash Banked (computed)"
+                <input 
+                  type="number" 
+                  value={cashBanked} 
+                  onChange={e=>setCashBanked(+e.target.value||0)} 
+                  className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Auto-calculated as (Starting Cash + Cash Sales) − Total Expenses − Closing Cash.
-                </p>
               </div>
-
-              {/* QR Transfer (computed) */}
               <div>
                 <label className="text-sm text-gray-600 block mb-1">QR Transfer Amount (฿)</label>
-                <input
-                  type="number"
-                  value={computedQrTransfer.toFixed(2)}
-                  readOnly
-                  className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50"
-                  aria-label="QR Transfer Amount (computed)"
+                <input 
+                  type="number" 
+                  value={qrTransfer} 
+                  onChange={e=>setQrTransfer(+e.target.value||0)} 
+                  className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Auto-calculated from QR Sales. Funds go straight to bank.
-                </p>
               </div>
             </div>
           </section>

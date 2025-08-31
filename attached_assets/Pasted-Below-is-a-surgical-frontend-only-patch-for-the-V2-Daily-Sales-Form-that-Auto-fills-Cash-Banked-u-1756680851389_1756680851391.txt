@@ -1,0 +1,159 @@
+Below is a surgical, frontend-only patch for the V2 Daily Sales Form that:
+
+Auto-fills Cash Banked using the robust formula
+cashBanked = (startingCash + cashSales) − totalExpenses − closingCash
+(This handles float shortfalls/overages correctly. If you really want the simple version cashSales − totalExpenses, uncomment the note in the patch.)
+
+Auto-fills QR Transfer Amount directly from qrSales
+
+Keeps both fields read-only (staff can’t type into them)
+
+Continuously updates as staff enter other fields
+
+No backend/schema changes. Your existing POST already accepts cashBanked and qrTransfer.
+
+1) Patch the Daily Sales Form (frontend only)
+
+File: client/src/pages/operations/daily-sales/Form.tsx
+(If your file is in a slightly different path, use the one where the Banking section lives.)
+
+A) Backup
+cp client/src/pages/operations/daily-sales/Form.tsx client/src/pages/operations/daily-sales/Form.tsx.bak.$(date +%s)
+
+B) Add these helpers and computed values near the top of the component (after your imports and inside the component that uses useForm / useFormContext)
+// ---------- Banking auto-calculation helpers ----------
+const num = (v: unknown) => {
+  const n = typeof v === "string" ? v.trim() : v;
+  const f = Number(n);
+  return Number.isFinite(f) ? f : 0;
+};
+
+// If you store expenses as rows in the form, we sum them here.
+// Adjust the key ('expenses') and cost field if your names differ.
+const watchAll = watch(); // if you're already watching specific fields, you can keep it
+const startingCash    = num(watch("startingCash"));
+const cashSales       = num(watch("cashSales"));
+const qrSales         = num(watch("qrSales"));
+const closingCash     = num(watch("closingCash"));
+const expenseRows     = Array.isArray(watch("expenses")) ? watch("expenses") : []; // <- adjust if your array name differs
+const totalExpenses   = expenseRows.reduce((acc: number, row: any) => acc + num(row?.cost), 0);
+
+// Robust formula that respects float maintenance and shortfalls:
+//   banked = (startingCash + cashSales) - totalExpenses - closingCash
+// If you want the simple version instead (cashSales - totalExpenses),
+// replace the next line with: const computedCashBanked = Math.max(0, cashSales - totalExpenses);
+const computedCashBanked = Math.max(0, (startingCash + cashSales) - totalExpenses - closingCash);
+
+// QR transfer is simply the total QR sales (money never in drawer)
+const computedQrTransfer = Math.max(0, qrSales);
+
+// Push computed values back into the form so they submit correctly
+useEffect(() => {
+  setValue("cashBanked", Number(computedCashBanked.toFixed(2)), { shouldValidate: true, shouldDirty: true });
+  setValue("qrTransfer", Number(computedQrTransfer.toFixed(2)),   { shouldValidate: true, shouldDirty: true });
+}, [computedCashBanked, computedQrTransfer, setValue]);
+// ------------------------------------------------------
+
+
+If your form component doesn’t already have them, ensure you have:
+
+const { watch, setValue } = useFormContext(); // or useForm()
+
+
+(Use whichever you’re already using in this file.)
+
+C) Replace the Banking inputs so they’re read-only and display computed values
+
+Find the Banking section and replace just the two input fields for Cash Banked (฿) and QR Transfer Amount (฿) with this:
+
+{/* Banking */}
+<div className="grid gap-6">
+  <div className="text-xl font-semibold">Banking</div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {/* Closing Cash (staff enters) — leave your existing input as-is */}
+    <div>
+      <label className="block text-sm font-medium mb-1">Closing Cash (฿)</label>
+      {/* Keep your existing controlled input for closingCash here */}
+      {/* Example: */}
+      {/* <input type="number" step="0.01" {...register("closingCash")} className="input" /> */}
+    </div>
+
+    {/* Cash Banked (computed) */}
+    <div>
+      <label className="block text-sm font-medium mb-1">Cash Banked (฿)</label>
+      <input
+        type="number"
+        value={computedCashBanked.toFixed(2)}
+        readOnly
+        className="input bg-gray-50"
+        aria-label="Cash Banked (computed)"
+      />
+      {/* Keep a hidden input bound to the form so value goes to backend */}
+      <input type="hidden" {...register("cashBanked")} />
+      <p className="text-xs text-gray-500 mt-1">
+        Auto-calculated as (Starting Cash + Cash Sales) − Total Expenses − Closing Cash.
+      </p>
+    </div>
+
+    {/* QR Transfer (computed) */}
+    <div>
+      <label className="block text-sm font-medium mb-1">QR Transfer Amount (฿)</label>
+      <input
+        type="number"
+        value={computedQrTransfer.toFixed(2)}
+        readOnly
+        className="input bg-gray-50"
+        aria-label="QR Transfer Amount (computed)"
+      />
+      <input type="hidden" {...register("qrTransfer")} />
+      <p className="text-xs text-gray-500 mt-1">
+        Auto-calculated from QR Sales. Funds go straight to bank.
+      </p>
+    </div>
+  </div>
+</div>
+
+
+Notes:
+
+Keep your original Closing Cash input so staff still enter the end-of-day drawer float.
+
+If your Tailwind/input classes differ, keep your styling; the key is readOnly + the two hidden register(...) inputs so values submit.
+
+2) What the backend sees (no changes required)
+
+Your existing V2 POST already maps:
+
+cashBanked → stored as integer cents server-side
+
+qrTransfer → stored as integer cents server-side
+
+We’re simply making sure those fields are always populated from the form with the computed values.
+
+3) Quick sanity test
+
+Start a new Daily Sales form:
+
+Starting Cash: 2000
+
+Cash Sales: 1000
+
+Add some expenses rows totaling 4000
+
+Closing Cash: 2000
+
+QR Sales: 300
+
+As you type, you should see:
+
+Cash Banked → (2000 + 1000) - 4000 - 2000 = -3000 → 0.00 (floored at 0)
+(shows float shortfall—good for catching issues)
+
+QR Transfer → 300.00
+
+Submit.
+
+Library should show no NaN.
+
+Cash Banked and QR Transfer should match the computed values.
