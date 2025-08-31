@@ -48,17 +48,13 @@ export default function Sidebar({ className = "", onClose }: SidebarProps = {}) 
     <aside
       className={`${className} ${width} border-r bg-white min-h-screen transition-[width] duration-200`}
     >
-      {/* Logo at top-left */}
-      <div className="p-3 border-b">
+      {/* Logo and collapse toggle in one section */}
+      <div className="p-3 flex items-center justify-between">
         <img 
           src={logoImg} 
           alt="Smash Brothers Burgers" 
-          className="w-[60px] h-[60px] object-contain"
+          className="w-[40px] h-[40px] object-contain"
         />
-      </div>
-      
-      {/* Collapse toggle */}
-      <div className="px-3 py-3 border-b flex items-center justify-end">
         <button
           aria-label="Toggle sidebar"
           className="rounded-xl border p-2"
@@ -72,7 +68,7 @@ export default function Sidebar({ className = "", onClose }: SidebarProps = {}) 
         </button>
       </div>
 
-      <nav className="p-3">
+      <nav className="px-3 pt-1.5 pb-3">
         {/* Dashboard */}
         <div className={!collapsed ? "px-4 pt-4 pb-2" : "px-3 pt-4 pb-2"}>
           {!collapsed && (
