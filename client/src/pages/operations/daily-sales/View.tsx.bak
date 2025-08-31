@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 
-// Currency formatter
-const THB = (amount: number) => {
-  if (amount === 0) return '฿0.00';
-  return new Intl.NumberFormat('th-TH', {
-    style: 'currency',
-    currency: 'THB',
-    minimumFractionDigits: 2
-  }).format(amount / 100);
+// A) Safe THB helper
+const thb = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
 };
 
 export default function ViewDailySales() {
@@ -30,6 +26,8 @@ export default function ViewDailySales() {
         const salesRes = await fetch(`/api/forms/daily-sales/v2/${salesId}`);
         if (salesRes.ok) {
           const sales = await salesRes.json();
+          console.log('[View] Sales data received:', sales);
+          console.log('[View] startingCash type:', typeof sales.startingCash, sales.startingCash);
           setSalesData(sales);
           
           // Try to fetch corresponding stock data
@@ -110,62 +108,58 @@ export default function ViewDailySales() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Starting Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.startingCash || 0)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashStart)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Closing Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.closingCash || 0)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashEnd)}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Cash Banked</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.cashBanked || 0)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashBanked)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">QR Transferred</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.qrTransferred || 0)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.qrTransfer)}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Sales</label>
-                  <p className="text-lg font-semibold text-green-600">{THB(salesData.totalSales || 0)}</p>
+                  <p className="text-lg font-semibold text-green-600">{thb(salesData.totalSales)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Expenses</label>
-                  <p className="text-lg font-semibold text-red-600">{THB(salesData.totalExpenses || 0)}</p>
+                  <p className="text-lg font-semibold text-red-600">{thb(salesData.totalExpenses)}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Variance</label>
                 <p className={`text-lg font-semibold ${Math.abs(salesData.variance || 0) > 20 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {THB(salesData.variance || 0)}
+                  {thb(salesData.variance)}
                 </p>
               </div>
 
-              {salesData.aroiDeeSales && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
-                  <p className="text-lg font-semibold text-gray-900">{THB(salesData.aroiDeeSales)}</p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
+                <p className="text-lg font-semibold text-gray-900">{thb(salesData.aroiSales)}</p>
+              </div>
 
-              {(salesData.burgerBunsCount || salesData.meatCount) && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Burger Buns Count</label>
-                    <p className="text-lg font-semibold text-gray-900">{salesData.burgerBunsCount || 0}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Meat Count</label>
-                    <p className="text-lg font-semibold text-gray-900">{salesData.meatCount || 0}</p>
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Burger Buns (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">/ {salesData.rollsEnd ?? 0}</p>
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Meat Count (Start/End)</label>
+                  <p className="text-lg font-semibold text-gray-900">/ {(salesData.meatEndGrams ?? 0)} g</p>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 
-const THB = (n: number) => new Intl.NumberFormat("th-TH", {style: "currency", currency: "THB", maximumFractionDigits: 0}).format(n || 0);
+// A) Safe THB helper
+const thb = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+};
 
 export default function DailySalesLibrary() {
   const [from, setFrom] = useState<string>("");
@@ -110,7 +114,7 @@ export default function DailySalesLibrary() {
             <table className="min-w-[1100px] w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {["Date", "Completed By", "Cash Start", "Total Sales", "Total Expenses", "Ending Cash", "Cash Banked", "QR Transferred", "Variance", "Email", "Actions"].map(h => (
+                  {["Date", "Completed By", "Cash Start", "Total Sales", "Total Expenses", "Ending Cash", "Cash Banked", "QR Transferred", "Variance", "Rolls (pcs)", "Meat (g)", "Email", "Actions"].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -120,17 +124,19 @@ export default function DailySalesLibrary() {
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-900">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{r.completedBy}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.startingCash)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.totalSales)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.totalExpenses)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.closingCash)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.cashBanked)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(r.qrTransferred)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashStart)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.totalSales)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.totalExpenses)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashEnd)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashBanked)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.qrTransfer)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Math.abs(r.variance) > 20 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
-                        {THB(r.variance)}
+                        {thb(r.variance)}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{r.rollsEnd || 0}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{r.meatEndGrams || 0}</td>
                     <td className="px-4 py-3">
                       <button 
                         className="text-sm text-teal-600 hover:text-teal-900 font-medium" 

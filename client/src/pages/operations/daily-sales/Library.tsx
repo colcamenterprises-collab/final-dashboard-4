@@ -1,10 +1,27 @@
 import React, { useEffect, useState } from "react";
 
-// A) Safe THB helper
-const thb = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+// ---------- SAFE HELPERS ----------
+const toBahtNumber = (v: unknown): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v / 100;
+  if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v) / 100;
+  return 0;
 };
+
+const THB = (v: unknown): string =>
+  "฿" + toBahtNumber(v).toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fromRow = (row: any, key: string, fallback: any = 0) =>
+  row?.[key] ?? row?.payload?.[key] ?? fallback;
+
+const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
+const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
+const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
+const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
+
+const getStaff = (row: any) =>
+  row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";
+// ----------------------------------
 
 export default function DailySalesLibrary() {
   const [from, setFrom] = useState<string>("");
@@ -123,20 +140,28 @@ export default function DailySalesLibrary() {
                 {rows.map((r: any) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-900">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{r.completedBy}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashStart)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.totalSales)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.totalExpenses)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashEnd)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.cashBanked)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{thb(r.qrTransfer)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{getStaff(r)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "startingCash"))}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "totalSales"))}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "totalExpenses"))}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "endingCash"))}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "cashBanked"))}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "qrTransfer"))}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Math.abs(r.variance) > 20 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
-                        {thb(r.variance)}
+                        {THB(r.variance)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{r.rollsEnd || 0}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{r.meatEndGrams || 0}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{(() => {
+                      const s = getBunsStart(r);
+                      const e = getBunsEnd(r);
+                      return (s ?? "/") + " / " + (e ?? "/");
+                    })()}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{(() => {
+                      const s = getMeatStart(r);
+                      const e = getMeatEnd(r);
+                      return (s ?? "/") + " / " + (e ?? "/") + " g";
+                    })()}</td>
                     <td className="px-4 py-3">
                       <button 
                         className="text-sm text-teal-600 hover:text-teal-900 font-medium" 

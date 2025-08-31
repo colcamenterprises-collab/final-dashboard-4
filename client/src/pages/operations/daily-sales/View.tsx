@@ -1,11 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 
-// A) Safe THB helper
-const thb = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? `฿${n.toLocaleString()}` : "฿0";
+// ---------- SAFE HELPERS ----------
+const toBahtNumber = (v: unknown): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v / 100;
+  if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v) / 100;
+  return 0;
 };
+
+const THB = (v: unknown): string =>
+  "฿" + toBahtNumber(v).toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fromRow = (row: any, key: string, fallback: any = 0) =>
+  row?.[key] ?? row?.payload?.[key] ?? fallback;
+
+const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
+const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
+const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
+const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
+
+const getStaff = (row: any) =>
+  row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";
+// ----------------------------------
 
 export default function ViewDailySales() {
   const [location] = useLocation();
@@ -85,8 +102,8 @@ export default function ViewDailySales() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 font-['Poppins']">Daily Sales & Stock Form</h1>
               <p className="text-gray-600 mt-1">
-                Date: {salesData.createdAt ? new Date(salesData.createdAt).toLocaleDateString() : 'N/A'} | 
-                Completed by: {salesData.completedBy || 'N/A'}
+                Date: {salesData.shiftDate} | 
+                Completed by: {getStaff(salesData)}
               </p>
             </div>
             <a 
@@ -108,57 +125,87 @@ export default function ViewDailySales() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Starting Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashStart)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "startingCash"))}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Closing Cash</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashEnd)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "endingCash"))}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Cash Banked</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.cashBanked)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "cashBanked"))}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">QR Transferred</label>
-                  <p className="text-lg font-semibold text-gray-900">{thb(salesData.qrTransfer)}</p>
+                  <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "qrTransfer"))}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Sales</label>
-                  <p className="text-lg font-semibold text-green-600">{thb(salesData.totalSales)}</p>
+                  <p className="text-lg font-semibold text-green-600">{THB(fromRow(salesData, "totalSales"))}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Total Expenses</label>
-                  <p className="text-lg font-semibold text-red-600">{thb(salesData.totalExpenses)}</p>
+                  <p className="text-lg font-semibold text-red-600">{THB(fromRow(salesData, "totalExpenses"))}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Variance</label>
                 <p className={`text-lg font-semibold ${Math.abs(salesData.variance || 0) > 20 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {thb(salesData.variance)}
+                  {THB(salesData.variance)}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Aroi Dee Sales</label>
-                <p className="text-lg font-semibold text-gray-900">{thb(salesData.aroiSales)}</p>
+                <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "aroiSales"))}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Grab Sales</label>
+                <p className="text-lg font-semibold text-gray-900">{THB(fromRow(salesData, "grabSales"))}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Burger Buns (Start/End)</label>
-                  <p className="text-lg font-semibold text-gray-900">/ {salesData.rollsEnd ?? 0}</p>
+                  <p className="text-lg font-semibold text-gray-900">{(() => {
+                    const s = getBunsStart(salesData);
+                    const e = getBunsEnd(salesData);
+                    return (s ?? "/") + " / " + (e ?? "/");
+                  })()}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Meat Count (Start/End)</label>
-                  <p className="text-lg font-semibold text-gray-900">/ {(salesData.meatEndGrams ?? 0)} g</p>
+                  <p className="text-lg font-semibold text-gray-900">{(() => {
+                    const s = getMeatStart(salesData);
+                    const e = getMeatEnd(salesData);
+                    return (s ?? "/") + " / " + (e ?? "/") + " g";
+                  })()}</p>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="font-semibold">Shopping List</div>
+                {(() => {
+                  const list = fromRow(salesData, "shoppingList", fromRow(salesData, "shopping", [])) as Array<{ sku?: string; qty?: number }>;
+                  if (!Array.isArray(list) || list.length === 0) return <div className="text-sm text-gray-500">No items</div>;
+                  return (
+                    <ul className="list-disc pl-5 text-sm">
+                      {list.map((it, idx) => (
+                        <li key={idx}>
+                          {(it?.sku ?? "Item")} — {it?.qty ?? 0}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
               </div>
             </div>
           </div>
