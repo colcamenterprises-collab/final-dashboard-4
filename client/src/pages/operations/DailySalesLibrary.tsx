@@ -70,7 +70,10 @@ export default function DailySalesLibrary() {
 
   useEffect(() => {
     // @ts-ignore
-    if (records?.length) console.log("LIB data[0]:", records[0]);
+    if (records?.length) {
+      console.log("LIB data[0]:", records[0]);
+      console.log("LIB payload:", records[0]?.payload);
+    }
   }, [records]);
 
   useEffect(() => {
