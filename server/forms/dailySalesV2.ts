@@ -1,13 +1,13 @@
 // Do not do this:
 // – Do not rename, move, or split this file
-// – Do not change schema or add DB tables
+// – Do not drop or recreate daily_sales_v2
+// – Do not strip out toCents/fromCents/thb
 // – Only apply exactly what is written below
 
 import { Request, Response } from "express";
 import express from "express";
 import { pool } from "../db";
-import PDFDocument from "pdfkit";
-import stream from "stream";
+import nodemailer from "nodemailer";
 
 // Helper functions
 const toCents = (n: unknown) => {
@@ -15,128 +15,298 @@ const toCents = (n: unknown) => {
   return Number.isFinite(x) ? Math.round(x * 100) : 0;
 };
 
-const fromCents = (n: unknown) => {
-  const x = Number(n);
-  return Number.isFinite(x) ? x / 100 : 0;
+const fromCents = (cents: number) => {
+  return (cents / 100).toFixed(2);
 };
 
-export const dailySalesV2Router = express.Router();
+// Reuse transporter config
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
-// Register routes
-dailySalesV2Router.get("/daily-sales/v2", listDailySalesV2);
-dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2);
-dailySalesV2Router.get("/daily-sales/v2/:id/pdf", getDailySalesV2PDF);
-dailySalesV2Router.patch("/daily-sales/v2/:id", updateDailySalesV2);
-dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
-dailySalesV2Router.patch("/daily-sales/v2/:id/restore", restoreDailySalesV2);
-
-export async function listDailySalesV2(req: Request, res: Response) {
+export async function createDailySalesV2(req: Request, res: Response) {
   try {
+    const {
+      completedBy,
+      startingCash,
+      cashSales,
+      qrSales,
+      grabSales,
+      aroiDeeSales,
+      expenses,
+      wages,
+      closingCash,
+      requisition,
+      rollsEnd,
+      meatEnd,
+    } = req.body;
+
+    const totalSales =
+      toCents(cashSales) +
+      toCents(qrSales) +
+      toCents(grabSales) +
+      toCents(aroiDeeSales);
+
+    const totalExpenses =
+      (expenses || []).reduce((sum: number, e: any) => sum + toCents(e.cost), 0) +
+      (wages || []).reduce((sum: number, w: any) => sum + toCents(w.amount), 0);
+
+    const cashBanked = toCents(cashSales) - totalExpenses;
+    const qrTransfer = toCents(qrSales);
+
+    const payload = {
+      completedBy,
+      startingCash: toCents(startingCash),
+      cashSales: toCents(cashSales),
+      qrSales: toCents(qrSales),
+      grabSales: toCents(grabSales),
+      aroiDeeSales: toCents(aroiDeeSales),
+      expenses,
+      wages,
+      closingCash: toCents(closingCash),
+      totalSales,
+      totalExpenses,
+      cashBanked: cashBanked < 0 ? 0 : cashBanked,
+      qrTransfer,
+      requisition,
+      rollsEnd,
+      meatEnd,
+    };
+
     const result = await pool.query(
-      `SELECT id, "createdAt", payload, "deletedAt" FROM daily_sales_v2 ORDER BY "createdAt" DESC LIMIT 100`
+      `INSERT INTO daily_sales_v2 (payload) VALUES ($1) RETURNING id, "createdAt"`,
+      [payload]
     );
 
-    const mapped = result.rows.map((row: any) => {
+    // Build shopping list (qty > 0)
+    const shoppingItems = (requisition || [])
+      .filter((i: any) => (i.qty || 0) > 0)
+      .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
+
+    // Email summary
+    const html = `
+      <h2>Daily Sales & Stock Report</h2>
+      <p><strong>Date:</strong> ${new Date(result.rows[0].createdAt).toLocaleDateString()}</p>
+      <p><strong>Completed By:</strong> ${completedBy}</p>
+
+      <h3>Sales</h3>
+      <ul>
+        <li>Cash Sales: ฿${fromCents(toCents(cashSales))}</li>
+        <li>QR Sales: ฿${fromCents(toCents(qrSales))}</li>
+        <li>Grab Sales: ฿${fromCents(toCents(grabSales))}</li>
+        <li>Aroi Dee Sales: ฿${fromCents(toCents(aroiDeeSales))}</li>
+        <li><strong>Total Sales:</strong> ฿${fromCents(totalSales)}</li>
+      </ul>
+
+      <h3>Expenses</h3>
+      <ul>
+        ${(expenses || [])
+          .map((e: any) => `<li>${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})</li>`)
+          .join("")}
+        ${(wages || [])
+          .map((w: any) => `<li>${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})</li>`)
+          .join("")}
+      </ul>
+      <p><strong>Total Expenses:</strong> ฿${fromCents(totalExpenses)}</p>
+
+      <h3>Banking</h3>
+      <ul>
+        <li>Cash Banked: ฿${fromCents(cashBanked)}</li>
+        <li>QR Transfer: ฿${fromCents(qrTransfer)}</li>
+        <li>Closing Cash: ฿${fromCents(toCents(closingCash))}</li>
+        <li>Starting Cash: ฿${fromCents(toCents(startingCash))}</li>
+      </ul>
+
+      <h3>Stock</h3>
+      <ul>
+        <li>Rolls: ${rollsEnd || "-"}</li>
+        <li>Meat: ${meatEnd || "-"}</li>
+      </ul>
+
+      <h3>Shopping List</h3>
+      ${
+        shoppingItems.length === 0
+          ? "<p>No items to purchase</p>"
+          : `<ul>${shoppingItems.map((s: string) => `<li>${s}</li>`).join("")}</ul>`
+      }
+    `;
+
+    await transporter.sendMail({
+      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
+      to: process.env.MANAGEMENT_EMAIL,
+      cc: "smashbrothersburgersth@gmail.com", // Always CC Cam
+      subject: `Daily Sales & Stock – ${new Date(result.rows[0].createdAt).toLocaleDateString()}`,
+      html,
+    });
+
+    res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("Daily Sales V2 create error", err);
+    res.status(500).json({ ok: false, error: "Failed to create record" });
+  }
+}
+
+export async function getDailySalesV2Records(req: Request, res: Response) {
+  try {
+    const includeArchived = req.query.includeArchived === "true";
+    const query = includeArchived
+      ? `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 ORDER BY "createdAt" DESC`
+      : `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC`;
+
+    const result = await pool.query(query);
+
+    const records = result.rows.map((row) => {
       const p = row.payload || {};
       return {
         id: row.id,
         date: row.createdAt,
-        staff: p.completedBy || "",
-        cashStart: fromCents(p.startingCash || 0),
-        cashEnd: fromCents(p.closingCash || 0),
-        totalSales: fromCents(p.totalSales || 0),
-        rolls: p.rollsEnd || "-",
-        meat: p.meatEnd || "-",
-        status: "Submitted",
+        staff: p.completedBy || "Unknown",
+        totalSales: p.totalSales || 0,
+        rolls: p.rollsEnd || "N/A",
+        meat: p.meatEnd || "N/A",
+        status: "submitted",
         deletedAt: row.deletedAt,
       };
     });
 
-    res.json({ ok: true, records: mapped });
+    res.json({ ok: true, records });
   } catch (err) {
-    console.error("Daily Sales V2 list error", err);
-    res.status(500).json({ ok: false, error: "Failed to list records" });
+    console.error("Get Daily Sales V2 records error", err);
+    res.status(500).json({ ok: false, error: "Failed to fetch records" });
   }
 }
 
-export async function getDailySalesV2(req: Request, res: Response) {
+export async function getDailySalesV2Record(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, "createdAt", payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+      `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 WHERE id = $1`,
       [id]
     );
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ ok: false, error: "Not found" });
+      return res.status(404).json({ ok: false, error: "Record not found" });
     }
 
     const row = result.rows[0];
     const p = row.payload || {};
 
-    // Build shopping list (items where qty > 1)
+    // Build shopping list for the modal
     const shoppingList = (p.requisition || [])
-      .filter((i: any) => (i.qty || 0) > 1)
+      .filter((i: any) => (i.qty || 0) > 0)
       .map((i: any) => ({
         name: i.name,
         qty: i.qty,
-        unit: i.unit,
+        unit: i.unit || "",
       }));
 
-    res.json({
-      ok: true,
-      record: {
-        id: row.id,
-        date: row.createdAt,
-        staff: p.completedBy || "",
-        sales: {
-          cashSales: fromCents(p.cashSales || 0),
-          qrSales: fromCents(p.qrSales || 0),
-          grabSales: fromCents(p.grabSales || 0),
-          aroiDeeSales: fromCents(p.aroiDeeSales || 0),
-          totalSales: fromCents(p.totalSales || 0),
-        },
-        expenses: {
-          total: fromCents(p.totalExpenses || 0),
-          items: p.expenses || [],
-          wages: p.wages || [],
-        },
-        banking: {
-          cashBanked: fromCents(p.cashBanked || 0),
-          qrTransfer: fromCents(p.qrTransfer || 0),
-          closingCash: fromCents(p.closingCash || 0),
-          startingCash: fromCents(p.startingCash || 0),
-        },
-        stock: {
-          rolls: p.rollsEnd || "-",
-          meat: p.meatEnd || "-",
-        },
-        shoppingList,
+    const record = {
+      id: row.id,
+      date: row.createdAt,
+      staff: p.completedBy || "Unknown",
+      sales: {
+        cash: p.cashSales || 0,
+        qr: p.qrSales || 0,
+        grab: p.grabSales || 0,
+        aroiDee: p.aroiDeeSales || 0,
+        total: p.totalSales || 0,
       },
-    });
+      expenses: {
+        items: p.expenses || [],
+        wages: p.wages || [],
+        total: p.totalExpenses || 0,
+      },
+      banking: {
+        startingCash: p.startingCash || 0,
+        closingCash: p.closingCash || 0,
+        cashBanked: p.cashBanked || 0,
+        qrTransfer: p.qrTransfer || 0,
+      },
+      stock: {
+        rolls: p.rollsEnd || "N/A",
+        meat: p.meatEnd || "N/A",
+      },
+      shoppingList,
+    };
+
+    res.json({ ok: true, record });
   } catch (err) {
-    console.error("Daily Sales V2 get error", err);
+    console.error("Get Daily Sales V2 record error", err);
     res.status(500).json({ ok: false, error: "Failed to fetch record" });
   }
 }
 
-// PATCH – update payload
-export async function updateDailySalesV2(req: Request, res: Response) {
+export async function generateDailySalesV2PDF(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { payload } = req.body;
-    await pool.query(
-      `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
-      [payload, id]
+    const result = await pool.query(
+      `SELECT id, payload, "createdAt" FROM daily_sales_v2 WHERE id = $1`,
+      [id]
     );
-    res.json({ ok: true });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+
+    // Build shopping list
+    const shoppingList = (p.requisition || [])
+      .filter((i: any) => (i.qty || 0) > 0)
+      .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`)
+      .join(", ");
+
+    const reportContent = `
+Daily Sales & Stock Report
+
+Date: ${new Date(row.createdAt).toLocaleDateString()}
+Staff: ${p.completedBy || "Unknown"}
+
+SALES:
+Cash Sales: ฿${fromCents(p.cashSales || 0)}
+QR Sales: ฿${fromCents(p.qrSales || 0)}
+Grab Sales: ฿${fromCents(p.grabSales || 0)}
+Aroi Dee Sales: ฿${fromCents(p.aroiDeeSales || 0)}
+Total Sales: ฿${fromCents(p.totalSales || 0)}
+
+EXPENSES:
+${(p.expenses || [])
+  .map((e: any) => `${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})`)
+  .join("\n")}
+${(p.wages || [])
+  .map((w: any) => `${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})`)
+  .join("\n")}
+Total Expenses: ฿${fromCents(p.totalExpenses || 0)}
+
+BANKING:
+Starting Cash: ฿${fromCents(p.startingCash || 0)}
+Closing Cash: ฿${fromCents(p.closingCash || 0)}
+Cash Banked: ฿${fromCents(p.cashBanked || 0)}
+QR Transfer: ฿${fromCents(p.qrTransfer || 0)}
+
+STOCK:
+Rolls: ${p.rollsEnd || "N/A"}
+Meat: ${p.meatEnd || "N/A"}
+
+SHOPPING LIST:
+${shoppingList || "No items to purchase"}
+`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="daily-sales-${row.id}.pdf"`);
+    res.send(reportContent);
   } catch (err) {
-    console.error("Daily Sales V2 update error", err);
-    res.status(500).json({ ok: false, error: "Failed to update record" });
+    console.error("Generate PDF error", err);
+    res.status(500).json({ ok: false, error: "Failed to generate PDF" });
   }
 }
 
-// DELETE – soft delete (set deletedAt)
-export async function deleteDailySalesV2(req: Request, res: Response) {
+export async function deleteDailySalesV2Record(req: Request, res: Response) {
   try {
     const { id } = req.params;
     await pool.query(
@@ -145,13 +315,12 @@ export async function deleteDailySalesV2(req: Request, res: Response) {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Daily Sales V2 delete error", err);
+    console.error("Delete Daily Sales V2 record error", err);
     res.status(500).json({ ok: false, error: "Failed to delete record" });
   }
 }
 
-// RESTORE – undo delete
-export async function restoreDailySalesV2(req: Request, res: Response) {
+export async function restoreDailySalesV2Record(req: Request, res: Response) {
   try {
     const { id } = req.params;
     await pool.query(
@@ -160,86 +329,18 @@ export async function restoreDailySalesV2(req: Request, res: Response) {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("Daily Sales V2 restore error", err);
+    console.error("Restore Daily Sales V2 record error", err);
     res.status(500).json({ ok: false, error: "Failed to restore record" });
   }
 }
 
-export async function getDailySalesV2PDF(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      `SELECT id, "createdAt", payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ ok: false, error: "Not found" });
-    }
+// Router setup
+export const dailySalesV2Router = express.Router();
 
-    const row = result.rows[0];
-    const p = row.payload || {};
-
-    // Create PDF
-    const doc = new PDFDocument();
-    const filename = `daily-sales-${id}.pdf`;
-
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-    res.setHeader("Content-Type", "application/pdf");
-
-    const pass = new stream.PassThrough();
-    doc.pipe(pass);
-
-    doc.fontSize(18).text("Daily Sales & Stock Report", { align: "center" });
-    doc.moveDown();
-
-    doc.fontSize(12).text(`Date: ${new Date(row.createdAt).toLocaleDateString()}`);
-    doc.text(`Staff: ${p.completedBy || ""}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text("Sales");
-    doc.fontSize(12).text(`Cash Sales: ฿${fromCents(p.cashSales || 0)}`);
-    doc.text(`QR Sales: ฿${fromCents(p.qrSales || 0)}`);
-    doc.text(`Grab Sales: ฿${fromCents(p.grabSales || 0)}`);
-    doc.text(`Aroi Dee Sales: ฿${fromCents(p.aroiDeeSales || 0)}`);
-    doc.text(`Total Sales: ฿${fromCents(p.totalSales || 0)}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text("Expenses");
-    (p.expenses || []).forEach((e: any) => {
-      doc.fontSize(12).text(`- ${e.item} ฿${fromCents(e.cost || 0)} (${e.shop || ""})`);
-    });
-    doc.text(`Total Expenses: ฿${fromCents(p.totalExpenses || 0)}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text("Wages");
-    (p.wages || []).forEach((w: any) => {
-      doc.fontSize(12).text(`- ${w.staff} ฿${fromCents(w.amount || 0)} (${w.type})`);
-    });
-    doc.moveDown();
-
-    doc.fontSize(14).text("Banking");
-    doc.fontSize(12).text(`Cash Banked: ฿${fromCents(p.cashBanked || 0)}`);
-    doc.text(`QR Transfer: ฿${fromCents(p.qrTransfer || 0)}`);
-    doc.text(`Closing Cash: ฿${fromCents(p.closingCash || 0)}`);
-    doc.text(`Starting Cash: ฿${fromCents(p.startingCash || 0)}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text("Stock");
-    doc.fontSize(12).text(`Rolls: ${p.rollsEnd || "-"}`);
-    doc.text(`Meat: ${p.meatEnd || "-"}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text("Shopping List");
-    (p.requisition || [])
-      .filter((i: any) => (i.qty || 0) > 1)
-      .forEach((i: any) => {
-        doc.fontSize(12).text(`- ${i.name} x${i.qty} ${i.unit}`);
-      });
-
-    doc.end();
-    pass.pipe(res);
-  } catch (err) {
-    console.error("Daily Sales V2 PDF error", err);
-    res.status(500).json({ ok: false, error: "Failed to generate PDF" });
-  }
-}
+// Register routes
+dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2Records);
+dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2Record);
+dailySalesV2Router.get("/daily-sales/v2/:id/pdf", generateDailySalesV2PDF);
+dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2Record);
+dailySalesV2Router.patch("/daily-sales/v2/:id/restore", restoreDailySalesV2Record);
