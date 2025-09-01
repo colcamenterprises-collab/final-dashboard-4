@@ -120,13 +120,13 @@ export default function DailySalesV2Library() {
                   {!rec.deletedAt && (
                     <>
                       <button
-                        className="px-2 py-1 bg-black text-white rounded"
+                        className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded-lg text-sm"
                         onClick={() => editRecord(rec.id)}
                       >
                         Edit
                       </button>
                       <button
-                        className="px-2 py-1 bg-red-500 text-white rounded"
+                        className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-[Poppins] rounded-lg text-sm"
                         onClick={() => deleteRecord(rec.id)}
                       >
                         Delete
@@ -135,7 +135,7 @@ export default function DailySalesV2Library() {
                   )}
                   {rec.deletedAt && (
                     <button
-                      className="px-2 py-1 bg-green-500 text-white rounded"
+                      className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded-lg text-sm"
                       onClick={() => restoreRecord(rec.id)}
                     >
                       Restore
