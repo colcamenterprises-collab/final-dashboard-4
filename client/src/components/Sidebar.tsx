@@ -1,220 +1,235 @@
 import { NavLink } from "react-router-dom";
-import {
-  LayoutGrid, CalendarCheck, Library, LineChart, TrendingUp,
-  Calculator, Sandwich, ClipboardCheck, Bot, FileSpreadsheet,
-  Upload, FileText, ChevronLeft, ChevronRight, Database
-} from "lucide-react";
-import { useState } from "react";
-import { ROUTES } from "../router/RouteRegistry";
-import logoImg from "@assets/Yellow Circle - Black Logo_1756650531149.png";
+import { useState, useEffect } from "react";
 
-type LinkProps = {
-  to: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
-  collapsed: boolean;
+type Group = {
+  title: string;
+  items: { to: string; icon?: JSX.Element; label: string }[];
 };
 
-const baseItem =
-  "flex items-center gap-3 px-4 py-2 rounded-lg transition-colors hover:bg-black hover:text-white";
-const activeItem =
-  "bg-emerald-600 text-white hover:bg-emerald-600";
+const groups: Group[] = [
+  {
+    title: "Operations",
+    items: [
+      { to: "/operations/daily-sales", label: "Daily Sales & Stock" },
+      { to: "/operations/daily-sales-v2/library", label: "Daily Sales Library" },
+      { to: "/operations/shopping-list", label: "Shopping List" },
+      { to: "/operations/expenses", label: "Expenses" },
+      { to: "/operations/analysis/upload", label: "Upload Statements" },
+      { to: "/operations/analysis/receipts", label: "Receipts" },
+      { to: "/operations/shift-summary", label: "Shift Summary" },
+      { to: "/operations/shift-reports", label: "Shift Reports" },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { to: "/finance/profit-loss", label: "Profit & Loss" },
+      { to: "/operations/analysis", label: "Analysis" },
+    ],
+  },
+  {
+    title: "Menu Mgmt",
+    items: [
+      { to: "/menu/cost-calculator", label: "Cost Calculator" },
+      { to: "/menu/ingredients", label: "Ingredient Mgmt" },
+      { to: "/menu/manager", label: "Menu Manager" },
+      { to: "/menu/import", label: "Menu Import" },
+      { to: "/menu/description-tool", label: "Description Tool" },
+    ],
+  },
+  {
+    title: "AI Assistants",
+    items: [
+      { to: "/managers/nightly-checklist", label: "Nightly Checklist" },
+      { to: "/ai/jussi-ops", label: "Jussi (Ops AI)" },
+      { to: "/ai/jane-accounts", label: "Jane (Accounting)" },
+    ],
+  },
+];
 
-function SLink({ to, label, Icon, collapsed, onClose }: LinkProps & { onClose?: () => void }) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `${baseItem} ${isActive ? activeItem : ""} text-[12px] text-black`
-      }
-      onClick={onClose}
+function useLockBody(lock: boolean) {
+  useEffect(() => {
+    if (!lock) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [lock]);
+}
+
+export default function Sidebar({
+  open,
+  onClose,
+  onNavigate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onNavigate?: () => void;
+}) {
+  // lock scroll when mobile drawer open
+  useLockBody(open);
+
+  // ESC to close
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // collapsible groups (desktop + mobile)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (t: string) =>
+    setExpanded((p) => ({ ...p, [t]: p[t] ? false : true }));
+
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <aside
+      className="h-full w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col"
+      aria-label="Main menu"
     >
-      <Icon className="h-5 w-5 shrink-0" />
-      {!collapsed && <span className="leading-none">{label}</span>}
-    </NavLink>
+      {children}
+    </aside>
+  );
+
+  // Desktop (md+): always visible
+  // Mobile (<md): overlay drawer
+  return (
+    <>
+      {/* Mobile overlay */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px] transition-opacity md:hidden ${
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+        aria-hidden={open ? "false" : "true"}
+      />
+
+      {/* Mobile drawer */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform md:hidden ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+        role="dialog"
+        aria-modal="true"
+      >
+        <Wrapper>
+          <Header onClose={onClose} />
+          <NavSections
+            expanded={expanded}
+            toggle={toggle}
+            onNavigate={() => {
+              onNavigate?.();
+              onClose();
+            }}
+          />
+        </Wrapper>
+      </div>
+
+      {/* Desktop static sidebar */}
+      <div className="hidden md:flex">
+        <Wrapper>
+          <Header />
+          <NavSections
+            expanded={expanded}
+            toggle={toggle}
+            onNavigate={onNavigate}
+          />
+        </Wrapper>
+      </div>
+    </>
   );
 }
 
-interface SidebarProps {
-  className?: string;
-  onClose?: () => void;
+function Header({ onClose }: { onClose?: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-4">
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-md bg-emerald-600 text-white grid place-items-center font-bold">
+          S
+        </div>
+        <div>
+          <div className="font-semibold text-gray-900">Smash Brothers</div>
+          <div className="text-xs text-gray-500">Restaurant Hub</div>
+        </div>
+      </div>
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 md:hidden"
+          aria-label="Close menu"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
 }
 
-export default function Sidebar({ className = "", onClose }: SidebarProps = {}) {
-  const [collapsed, setCollapsed] = useState(false);
-  const width = collapsed ? "w-[84px]" : "w-72";
-
+function NavSections({
+  expanded,
+  toggle,
+  onNavigate,
+}: {
+  expanded: Record<string, boolean>;
+  toggle: (t: string) => void;
+  onNavigate?: () => void;
+}) {
   return (
-    <aside
-      className={`${className} ${width} border-r bg-white min-h-screen transition-[width] duration-200`}
-    >
-      {/* Logo and collapse toggle in one section */}
-      <div className="p-3 flex items-center justify-between">
-        <img 
-          src={logoImg} 
-          alt="Smash Brothers Burgers" 
-          className="w-[40px] h-[40px] object-contain"
-        />
-        <button
-          aria-label="Toggle sidebar"
-          className="rounded-xl border p-2"
-          onClick={() => setCollapsed((v) => !v)}
+    <nav className="px-3 pb-6 overflow-y-auto">
+      {/* Home */}
+      <div className="mb-1">
+        <NavLink
+          to="/"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-semibold ${
+              isActive ? "bg-emerald-50 text-emerald-700" : "text-gray-800 hover:bg-gray-50"
+            }`
+          }
+          onClick={onNavigate}
         >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
+          <span>Home</span>
+        </NavLink>
       </div>
 
-      <nav className="px-3 pt-1.5 pb-3">
-        {/* Dashboard */}
-        <div className={!collapsed ? "px-4 pt-4 pb-2" : "px-3 pt-4 pb-2"}>
-          {!collapsed && (
-            <div className="text-[14px] font-semibold text-black leading-none">
-              Dashboard
+      {groups.map((g) => {
+        const isOpen = expanded[g.title] ?? true;
+        return (
+          <div key={g.title} className="mt-4">
+            <button
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold tracking-wide uppercase text-gray-700"
+              onClick={() => toggle(g.title)}
+              aria-expanded={isOpen}
+              aria-controls={`group-${g.title}`}
+            >
+              <span>{g.title}</span>
+              <span className={`transition-transform ${isOpen ? "rotate-90" : ""}`}>
+                ▸
+              </span>
+            </button>
+            <div id={`group-${g.title}`} hidden={!isOpen} className="mt-1 space-y-1">
+              {g.items.map((it) => (
+                <NavLink
+                  key={it.to}
+                  to={it.to}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 rounded-md text-sm ${
+                      isActive
+                        ? "bg-emerald-50 text-emerald-700 font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`
+                  }
+                >
+                  <span className="truncate">{it.label}</span>
+                </NavLink>
+              ))}
             </div>
-          )}
-        </div>
-        <SLink
-          to={ROUTES.HOME}
-          Icon={LayoutGrid}
-          label="Home"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-
-        {/* Operations */}
-        <div className={!collapsed ? "px-4 pt-4 pb-2" : "px-3 pt-4 pb-2"}>
-          {!collapsed && (
-            <div className="text-[14px] font-semibold text-black leading-none">
-              Operations
-            </div>
-          )}
-        </div>
-        <SLink
-          to="/operations/daily-sales"
-          Icon={CalendarCheck}
-          label="Daily Sales & Stock"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.DAILY_SALES_LIBRARY}
-          Icon={Library}
-          label="Daily Sales Library"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.ANALYSIS}
-          Icon={LineChart}
-          label="Analysis"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.EXPENSES}
-          Icon={FileSpreadsheet}
-          label="Expenses"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.SHIFT_REPORTS}
-          Icon={ClipboardCheck}
-          label="Shift Reports"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.NIGHTLY_CHECKLIST}
-          Icon={ClipboardCheck}
-          label="Nightly Checklist"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.JUSSI_AI}
-          Icon={Bot}
-          label="Jussi (Ops AI)"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-
-        {/* Finance */}
-        <div className={!collapsed ? "px-4 pt-4 pb-2" : "px-3 pt-4 pb-2"}>
-          {!collapsed && (
-            <div className="text-[14px] font-semibold text-black leading-none">
-              Finance
-            </div>
-          )}
-        </div>
-        <SLink
-          to={ROUTES.PROFIT_LOSS}
-          Icon={TrendingUp}
-          label="Profit & Loss"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.JANE_ACCOUNTS}
-          Icon={FileSpreadsheet}
-          label="Jane (Accounting)"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-
-        {/* Menu Mgmt */}
-        <div className={!collapsed ? "px-4 pt-4 pb-2" : "px-3 pt-4 pb-2"}>
-          {!collapsed && (
-            <div className="text-[14px] font-semibold text-black leading-none">
-              Menu Mgmt
-            </div>
-          )}
-        </div>
-        <SLink
-          to={ROUTES.COST_CALCULATOR}
-          Icon={Calculator}
-          label="Cost Calculator"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.INGREDIENTS}
-          Icon={Sandwich}
-          label="Ingredients"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.MENU_MGR}
-          Icon={LayoutGrid}
-          label="Menu Manager"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.MENU_IMPORT}
-          Icon={Upload}
-          label="Import Menu"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-        <SLink
-          to={ROUTES.MENU_DESC_TOOL}
-          Icon={FileText}
-          label="Description Tool"
-          collapsed={collapsed}
-          onClose={onClose}
-        />
-
-        {/* Deep analysis links stay nested under Analysis (kept routable but hidden here) */}
-        <div className="hidden">
-          {/* keep for direct routing if someone pastes a URL */}
-        </div>
-      </nav>
-    </aside>
+          </div>
+        );
+      })}
+    </nav>
   );
 }
