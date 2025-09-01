@@ -6,7 +6,7 @@
 
 import express from "express";
 import { Request, Response } from "express";
-import { db } from "../db";
+import { pool } from "../db";
 
 // Helper functions
 const toCents = (n: unknown) => {
@@ -65,7 +65,7 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
       qrTransfer,
     };
 
-    const result = await db.query(
+    const result = await pool.query(
       `INSERT INTO daily_sales_v2 (payload) VALUES ($1) RETURNING id, created_at`,
       [payload]
     );
@@ -80,7 +80,7 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
 // New GET handler for the Library
 dailySalesV2Router.get("/daily-sales/v2", async (req: Request, res: Response) => {
   try {
-    const result = await db.query(
+    const result = await pool.query(
       `SELECT id, created_at, payload FROM daily_sales_v2 ORDER BY created_at DESC LIMIT 100`
     );
 
