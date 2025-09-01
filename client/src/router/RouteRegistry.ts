@@ -24,6 +24,7 @@ export const ROUTES = {
   MENU_MGR: "/menu/manager",
   MENU_IMPORT: "/menu/import",
   MENU_DESC_TOOL: "/menu/description-tool",
+  SHOPPING_LIST: "/operations/shopping-list",
 
   // Managers
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",

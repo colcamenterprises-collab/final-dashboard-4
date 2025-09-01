@@ -15,6 +15,7 @@ import Analysis from "./pages/Analysis";
 import Overview from "./pages/dashboard/Overview";
 import DailySalesStock from "./pages/operations/DailySalesStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
+import ShoppingListPage from "./pages/operations/shopping-list";
 import Receipts from "./pages/Receipts";
 import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
 import UploadStatements from "./pages/UploadStatements";
@@ -93,6 +94,7 @@ export default function App() {
 
                   {/* Operations */}
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
+                  <Route path={ROUTES.SHOPPING_LIST} element={<Guard><ShoppingListPage /></Guard>} />
                   
                   {/* ---- FORM 1: canonical + aliases ---- */}
                   <Route path="/operations/daily-sales" element={<DailySales />} />

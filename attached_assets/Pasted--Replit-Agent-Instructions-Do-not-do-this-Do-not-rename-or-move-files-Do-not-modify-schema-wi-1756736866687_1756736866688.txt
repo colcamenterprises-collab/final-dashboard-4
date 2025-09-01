@@ -1,0 +1,205 @@
+🛑 Replit Agent Instructions
+
+Do not do this:
+
+Do not rename or move files.
+
+Do not modify schema without approval.
+
+Do not overwrite Ingredients table; only update/insert.
+
+Do not strip out existing Ingredients editor.
+
+Only apply exactly what is written below.
+
+1. server/forms/ingredients.ts
+
+New server handler for CSV upload + shopping list fetch.
+
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not drop or recreate the ingredients table
+// – Only apply exactly what is written below
+
+import { Request, Response } from "express";
+import pool from "@/server/db";
+import csvParser from "csv-parser";
+import { toCents } from "@/lib/utils";
+import fs from "fs";
+
+// CSV Upload → bulk update Ingredients
+export async function uploadIngredientsCSV(req: Request, res: Response) {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: "No file uploaded" });
+
+    const rows: any[] = [];
+    fs.createReadStream(req.file.path)
+      .pipe(csvParser())
+      .on("data", (row) => rows.push(row))
+      .on("end", async () => {
+        for (const r of rows) {
+          const name = r["Item"]?.trim();
+          const category = r["Category"]?.trim() || "Uncategorized";
+          const unit = r["Unit"]?.trim() || "";
+          const packageCost = toCents(parseFloat(r["Package Price"] || "0"));
+
+          if (!name) continue;
+
+          await pool.query(
+            `INSERT INTO ingredients (name, category, unit, package_cost)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (name) DO UPDATE SET
+               category = EXCLUDED.category,
+               unit = EXCLUDED.unit,
+               package_cost = EXCLUDED.package_cost`,
+            [name, category, unit, packageCost]
+          );
+        }
+        res.json({ ok: true, updated: rows.length });
+      });
+  } catch (err) {
+    console.error("CSV upload error", err);
+    res.status(500).json({ ok: false, error: "Failed to upload CSV" });
+  }
+}
+
+// Shopping List by Date
+export async function getShoppingListByDate(req: Request, res: Response) {
+  try {
+    const { date } = req.params;
+    const result = await pool.query(
+      `SELECT payload FROM daily_sales_v2 WHERE DATE(created_at) = $1 LIMIT 1`,
+      [date]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, items: [] });
+    }
+
+    const p = result.rows[0].payload || {};
+    const requisition = (p.requisition || []).filter((i: any) => (i.qty || 0) > 0);
+
+    const items: any[] = [];
+    for (const r of requisition) {
+      const ingredientRes = await pool.query(
+        `SELECT package_cost, category, unit FROM ingredients WHERE name = $1 LIMIT 1`,
+        [r.name]
+      );
+      const ingredient = ingredientRes.rows[0] || {};
+      const cost = (ingredient.package_cost || 0) * (r.qty || 0);
+      items.push({
+        name: r.name,
+        qty: r.qty,
+        unit: r.unit || ingredient.unit || "",
+        category: ingredient.category || "Uncategorized",
+        cost,
+      });
+    }
+
+    res.json({ ok: true, items });
+  } catch (err) {
+    console.error("Shopping list fetch error", err);
+    res.status(500).json({ ok: false, error: "Failed to fetch shopping list" });
+  }
+}
+
+2. client/src/pages/operations/shopping-list/index.tsx
+
+New Shopping List page.
+
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not remove existing pages
+// – Only apply exactly what is written below
+
+import React, { useEffect, useState } from "react";
+import { thb } from "@/lib/utils";
+
+type Item = {
+  name: string;
+  qty: number;
+  unit: string;
+  category: string;
+  cost: number;
+};
+
+export default function ShoppingListPage() {
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function fetchList(d: string) {
+    setLoading(true);
+    const res = await fetch(`/api/ingredients/shopping-list/${d}`);
+    const data = await res.json();
+    if (data.ok) setItems(data.items);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchList(date);
+  }, [date]);
+
+  const total = items.reduce((sum, i) => sum + i.cost, 0);
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-extrabold font-[Poppins] mb-4">Shopping List</h1>
+      <div className="mb-4">
+        <label className="mr-2">Select Date:</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="border p-2 rounded"
+        />
+      </div>
+
+      {loading && <p>Loading...</p>}
+
+      {items.length === 0 ? (
+        <p>No shopping list found for this date.</p>
+      ) : (
+        <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+          <thead>
+            <tr className="bg-gray-100 text-left text-sm font-semibold font-[Poppins]">
+              <th className="p-2 border-b">Category</th>
+              <th className="p-2 border-b">Item</th>
+              <th className="p-2 border-b">Qty</th>
+              <th className="p-2 border-b">Unit</th>
+              <th className="p-2 border-b">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((i, idx) => (
+              <tr key={idx} className="text-sm font-[Poppins]">
+                <td className="p-2 border-b">{i.category}</td>
+                <td className="p-2 border-b">{i.name}</td>
+                <td className="p-2 border-b">{i.qty}</td>
+                <td className="p-2 border-b">{i.unit}</td>
+                <td className="p-2 border-b">{thb(i.cost)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={4} className="p-2 text-right font-bold">
+                Total
+              </td>
+              <td className="p-2 font-bold">{thb(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+
+✅ With this patch:
+
+Ingredients stay fully editable in-app.
+
+CSV Upload → updates Ingredients DB with new prices.
+
+Shopping List page → shows requisitions × costs per day.
+
+All costs formatted in baht, no NaN.

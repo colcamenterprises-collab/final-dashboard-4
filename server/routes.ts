@@ -1,4 +1,5 @@
 import { dailySalesV2Router } from "./forms/dailySalesV2";
+import { uploadIngredientsCSV, getShoppingListByDate } from "./forms/ingredients";
 import { bankUploadRouter } from "../src/server/bank/upload";
 import express, { Request, Response } from "express";
 import { createServer } from "http";
@@ -2325,6 +2326,10 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);
   app.use('/api/forms', formsRouter);
+  
+  // Register Ingredients routes
+  app.post("/api/ingredients/upload-csv", upload.single("file"), uploadIngredientsCSV);
+  app.get("/api/ingredients/shopping-list/:date", getShoppingListByDate);
   
   // Register Manager Checklist routes
   // Enhanced Manager Checklist endpoints
