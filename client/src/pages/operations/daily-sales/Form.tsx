@@ -1,6 +1,6 @@
 // Do not do this:
 // – Do not rename, move, or split this file
-// – Do not drop fields from Form 1 or Form 2
+// – Do not drop fields
 // – Only apply exactly what is written below
 
 import React, { useState } from "react";
@@ -107,7 +107,7 @@ export default function DailySalesForm() {
         />
       </div>
 
-      {/* Expenses & Closing Cash */}
+      {/* Expenses */}
       <div className="md:col-span-2">
         <h2 className="text-lg font-bold mb-2">Expenses</h2>
         <input
@@ -117,6 +117,7 @@ export default function DailySalesForm() {
           onChange={handleChange}
           className="w-full border p-2 mb-2 rounded"
         />
+        {/* TODO: dynamic expense rows here */}
       </div>
 
       {/* Submit */}

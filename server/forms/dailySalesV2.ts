@@ -8,6 +8,9 @@ import { Request, Response } from "express";
 import express from "express";
 import { pool } from "../db";
 import nodemailer from "nodemailer";
+import pdfParse from "pdf-parse";
+import csvParser from "csv-parser";
+import fs from "fs";
 
 // Helper functions
 const toCents = (n: unknown) => {
@@ -28,6 +31,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ---- Daily Sales & Stock Submit ----
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const {
@@ -138,7 +142,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     await transporter.sendMail({
       from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
       to: process.env.MANAGEMENT_EMAIL,
-      cc: "smashbrothersburgersth@gmail.com", // Always CC Cam
+      cc: "smashbrothersburgersth@gmail.com",
       subject: `Daily Sales & Stock – ${new Date(result.rows[0].createdAt).toLocaleDateString()}`,
       html,
     });
@@ -147,6 +151,50 @@ export async function createDailySalesV2(req: Request, res: Response) {
   } catch (err) {
     console.error("Daily Sales V2 create error", err);
     res.status(500).json({ ok: false, error: "Failed to create record" });
+  }
+}
+
+// ---- Expenses: Upload CSV ----
+export async function uploadExpensesCSV(req: Request, res: Response) {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: "No file uploaded" });
+
+    const rows: any[] = [];
+    fs.createReadStream(req.file.path)
+      .pipe(csvParser())
+      .on("data", (row) => rows.push(row))
+      .on("end", async () => {
+        for (const r of rows) {
+          const supplier = r["Supplier"]?.trim();
+          const category = r["Category"]?.trim() || "General";
+          const amount = toCents(parseFloat(r["Amount"] || "0"));
+
+          await pool.query(
+            `INSERT INTO expenses (supplier, category, amount, raw) VALUES ($1, $2, $3, $4)`,
+            [supplier, category, amount, JSON.stringify(r)]
+          );
+        }
+        res.json({ ok: true, updated: rows.length });
+      });
+  } catch (err) {
+    console.error("Expenses CSV error", err);
+    res.status(500).json({ ok: false, error: "Failed to upload CSV" });
+  }
+}
+
+// ---- Expenses: Upload PDF ----
+export async function uploadExpensesPDF(req: Request, res: Response) {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: "No file uploaded" });
+    const data = await pdfParse(fs.readFileSync(req.file.path));
+    await pool.query(
+      `INSERT INTO expenses (supplier, category, amount, raw) VALUES ($1, $2, $3, $4)`,
+      ["Bank", "Bank Statement", 0, JSON.stringify({ text: data.text })]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Expenses PDF error", err);
+    res.status(500).json({ ok: false, error: "Failed to upload PDF" });
   }
 }
 
