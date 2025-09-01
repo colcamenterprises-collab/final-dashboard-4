@@ -1,222 +1,98 @@
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change API routes
+// – Do not add dependencies
+// – Only apply exactly what is written below
+
 import React, { useEffect, useState } from "react";
 
-const __LIB_ID__ = "LIBRARY: NEW (operations/daily-sales/Library.tsx)";
-
-// ---------- SAFE HELPERS ----------
-const toBahtNumber = (v: unknown): number => {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number" && Number.isFinite(v)) return v / 100;
-  if (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v))) return Number(v) / 100;
-  return 0;
+// THB formatting helper
+const thb = (v: unknown): string => {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
+  return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const THB = (v: unknown): string =>
-  "฿" + toBahtNumber(v).toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const fromRow = (row: any, key: string, fallback: any = 0) =>
-  row?.[key] ?? row?.payload?.[key] ?? fallback;
-
-const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
-const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
-const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
-const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
-
-const getStaff = (row: any) =>
-  row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";
-// ----------------------------------
+type RecordType = {
+  id: string;
+  date: string;
+  staff: string;
+  cashStart: number;
+  cashEnd: number;
+  totalSales: number;
+  buns: string;
+  meat: string;
+  status: string;
+};
 
 export default function DailySalesLibrary() {
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
-  const [staff, setStaff] = useState<string>("");
-  const [varianceOnly, setVarianceOnly] = useState(false);
-  const [hasAttach, setHasAttach] = useState(false);
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [records, setRecords] = useState<RecordType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const fetchRows = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (from) params.append("from", from);
-    if (to) params.append("to", to);
-    if (staff) params.append("staff", staff);
-    if (varianceOnly) params.append("variance", "only");
-    if (hasAttach) params.append("hasAttach", "1");
-    const r = await fetch(`/api/forms/daily-sales/v2?${params.toString()}`);
-    const j = await r.json();
-    setRows(j.rows || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchRows(); }, []);
+  useEffect(() => {
+    async function fetchRecords() {
+      try {
+        const res = await fetch("/api/forms/daily-sales/v2");
+        const data = await res.json();
+        if (data.ok) {
+          setRecords(data.records);
+        } else {
+          setError("Failed to load records");
+        }
+      } catch (err) {
+        setError("Network error");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchRecords();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#f5f7f8]" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <div className="px-8 py-6">
-        <div className="text-[10px] opacity-60 mb-1">{__LIB_ID__}</div>
-        {/* Header Section */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Daily Sales Library</h1>
-          <p className="text-sm text-gray-600">Comprehensive management of all daily sales submissions</p>
-        </div>
-
-        {/* Filters Section */}
-        <div className="mb-6 bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Date Range:</label>
-              <input 
-                type="date" 
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
-                value={from} 
-                onChange={e => setFrom(e.target.value)} 
-              />
-              <span className="text-sm text-gray-500">to</span>
-              <input 
-                type="date" 
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
-                value={to} 
-                onChange={e => setTo(e.target.value)} 
-              />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Staff:</label>
-              <input 
-                type="text" 
-                placeholder="Search by staff name..." 
-                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-teal-500 focus:border-teal-500" 
-                value={staff} 
-                onChange={e => setStaff(e.target.value)} 
-              />
-            </div>
-
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input 
-                  type="checkbox" 
-                  checked={varianceOnly} 
-                  onChange={e => setVarianceOnly(e.target.checked)}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                /> 
-                <span className="text-gray-700">Variance only</span>
-              </label>
-              
-              <label className="flex items-center gap-2 text-sm">
-                <input 
-                  type="checkbox" 
-                  checked={hasAttach} 
-                  onChange={e => setHasAttach(e.target.checked)}
-                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                /> 
-                <span className="text-gray-700">With attachments</span>
-              </label>
-            </div>
-
-            <button 
-              className="bg-teal-600 text-white rounded-lg px-4 py-2 text-sm hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors" 
-              onClick={fetchRows}
-            >
-              {loading ? "Loading..." : "Apply Filters"}
-            </button>
-            
-            <a 
-              className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-200 transition-colors text-gray-700" 
-              href={`/api/forms/daily-sales/v2/export.csv?from=${from}&to=${to}`}
-            >
-              Export CSV
-            </a>
-          </div>
-        </div>
-
-        {/* Table Section */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="min-w-[1100px] w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  {["Date", "Completed By", "Cash Start", "Total Sales", "Total Expenses", "Ending Cash", "Cash Banked", "QR Transferred", "Variance", "Rolls (pcs)", "Meat (g)", "Email", "Actions"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {rows.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-900">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{getStaff(r)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "startingCash"))}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "totalSales"))}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "totalExpenses"))}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "endingCash"))}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "cashBanked"))}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{THB(fromRow(r, "qrTransfer"))}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Math.abs(r.variance) > 20 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
-                        {THB(r.variance)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{(() => {
-                      const s = getBunsStart(r);
-                      const e = getBunsEnd(r);
-                      return (s ?? "/") + " / " + (e ?? "/");
-                    })()}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-center">{(() => {
-                      const s = getMeatStart(r);
-                      const e = getMeatEnd(r);
-                      return (s ?? "/") + " / " + (e ?? "/") + " g";
-                    })()}</td>
-                    <td className="px-4 py-3">
-                      <button 
-                        className="text-sm text-teal-600 hover:text-teal-900 font-medium" 
-                        onClick={async () => {
-                          await fetch(`/api/forms/daily-sales/v2/${r.id}/resend-email`, {method: "POST"});
-                          alert("Email sent");
-                        }}
-                      >
-                        Resend
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex space-x-2">
-                        <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/daily-sales/view?id=${r.id}`}>View</a>
-                        <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/analysis/shift-summary?date=${r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : ''}`}>Shift Summary</a>
-                        <a className="text-sm text-teal-600 hover:text-teal-900 font-medium" href={`/operations/stock?shiftId=${r.id}`}>Stock</a>
-                        <button 
-                          className="text-sm text-red-600 hover:text-red-900 font-medium" 
-                          onClick={async () => {
-                            if (confirm(`Are you sure you want to delete this daily sales record from ${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Unknown Date'}?`)) {
-                              try {
-                                const response = await fetch(`/api/forms/daily-sales/v2/${r.id}`, {method: "DELETE"});
-                                if (response.ok) {
-                                  alert("Record deleted successfully");
-                                  fetchRows(); // Refresh the list
-                                } else {
-                                  alert("Failed to delete record");
-                                }
-                              } catch (error) {
-                                console.error('Delete error:', error);
-                                alert("Error deleting record");
-                              }
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!rows.length && (
-                  <tr>
-                    <td className="px-4 py-8 text-center text-sm text-gray-500" colSpan={11}>
-                      No daily sales records found. Try adjusting your filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-        </div>
-      </div>
+    <div className="p-6">
+      <h1 className="text-2xl font-extrabold font-[Poppins] mb-4">
+        Daily Sales Library
+      </h1>
+      {loading && <p>Loading...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+      <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+        <thead>
+          <tr className="bg-gray-100 text-left text-sm font-semibold font-[Poppins]">
+            <th className="p-2 border-b">Date</th>
+            <th className="p-2 border-b">Staff</th>
+            <th className="p-2 border-b">Cash Start</th>
+            <th className="p-2 border-b">Cash End</th>
+            <th className="p-2 border-b">Total Sales</th>
+            <th className="p-2 border-b">Buns (Start/End)</th>
+            <th className="p-2 border-b">Meat (Start/End)</th>
+            <th className="p-2 border-b">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="p-4 text-center text-gray-500">
+                No records found
+              </td>
+            </tr>
+          ) : (
+            records.map((rec) => (
+              <tr key={rec.id} className="text-sm font-[Poppins]">
+                <td className="p-2 border-b">
+                  {new Date(rec.date).toLocaleDateString()}
+                </td>
+                <td className="p-2 border-b">{rec.staff}</td>
+                <td className="p-2 border-b">{thb(rec.cashStart)}</td>
+                <td className="p-2 border-b">{thb(rec.cashEnd)}</td>
+                <td className="p-2 border-b">{thb(rec.totalSales)}</td>
+                <td className="p-2 border-b">{rec.buns}</td>
+                <td className="p-2 border-b">{rec.meat}</td>
+                <td className="p-2 border-b">{rec.status}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

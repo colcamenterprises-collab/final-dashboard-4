@@ -1,0 +1,206 @@
+Replit Agent Instructions
+
+Do not do this:
+
+Do not rename, move, or split files.
+
+Do not change schema, DB, or table names.
+
+Do not remove or alter JSON structure.
+
+Do not add dependencies.
+
+Do not improvise beyond what is written.
+
+Only replace the files below exactly as written.
+
+1. server/forms/dailySalesV2.ts (add GET handler)
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change schema, DB, or table names
+// – Do not add dependencies
+// – Only apply exactly what is written below
+
+import { Request, Response } from "express";
+import db from "@/server/db";
+import { toCents, fromCents } from "@/lib/utils";
+
+// Existing createDailySalesV2 stays unchanged
+export async function createDailySalesV2(req: Request, res: Response) {
+  try {
+    const {
+      completedBy,
+      startingCash,
+      cashSales,
+      qrSales,
+      grabSales,
+      aroiDeeSales,
+      expenses,
+      wages,
+      closingCash,
+    } = req.body;
+
+    const totalSales =
+      toCents(cashSales) +
+      toCents(qrSales) +
+      toCents(grabSales) +
+      toCents(aroiDeeSales);
+
+    const totalExpenses =
+      (expenses || []).reduce((sum: number, e: any) => sum + toCents(e.cost), 0) +
+      (wages || []).reduce((sum: number, w: any) => sum + toCents(w.amount), 0);
+
+    const cashBanked = toCents(cashSales) - totalExpenses;
+    const qrTransfer = toCents(qrSales);
+
+    const payload = {
+      completedBy,
+      startingCash: toCents(startingCash),
+      cashSales: toCents(cashSales),
+      qrSales: toCents(qrSales),
+      grabSales: toCents(grabSales),
+      aroiDeeSales: toCents(aroiDeeSales),
+      expenses,
+      wages,
+      closingCash: toCents(closingCash),
+      totalSales,
+      totalExpenses,
+      cashBanked: cashBanked < 0 ? 0 : cashBanked,
+      qrTransfer,
+    };
+
+    const result = await db.query(
+      `INSERT INTO daily_sales_v2 (payload) VALUES ($1) RETURNING id, created_at`,
+      [payload]
+    );
+
+    res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("Daily Sales V2 create error", err);
+    res.status(500).json({ ok: false, error: "Failed to create record" });
+  }
+}
+
+// New GET handler for the Library
+export async function listDailySalesV2(req: Request, res: Response) {
+  try {
+    const result = await db.query(
+      `SELECT id, created_at, payload FROM daily_sales_v2 ORDER BY created_at DESC LIMIT 100`
+    );
+
+    const mapped = result.rows.map((row: any) => {
+      const p = row.payload || {};
+      return {
+        id: row.id,
+        date: row.created_at,
+        staff: p.completedBy || "",
+        cashStart: fromCents(p.startingCash) || 0,
+        cashEnd: fromCents(p.closingCash) || 0,
+        totalSales: fromCents(p.totalSales) || 0,
+        buns: p.buns || "-", // placeholder if not tracked
+        meat: p.meat || "-", // placeholder if not tracked
+        status: "Submitted",
+      };
+    });
+
+    res.json({ ok: true, records: mapped });
+  } catch (err) {
+    console.error("Daily Sales V2 list error", err);
+    res.status(500).json({ ok: false, error: "Failed to list records" });
+  }
+}
+
+2. client/src/pages/operations/daily-sales/Library.tsx
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change API routes
+// – Do not add dependencies
+// – Only apply exactly what is written below
+
+import React, { useEffect, useState } from "react";
+import { thb } from "@/lib/utils";
+
+type RecordType = {
+  id: string;
+  date: string;
+  staff: string;
+  cashStart: number;
+  cashEnd: number;
+  totalSales: number;
+  buns: string;
+  meat: string;
+  status: string;
+};
+
+export default function DailySalesLibrary() {
+  const [records, setRecords] = useState<RecordType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchRecords() {
+      try {
+        const res = await fetch("/api/forms/daily-sales/v2");
+        const data = await res.json();
+        if (data.ok) {
+          setRecords(data.records);
+        } else {
+          setError("Failed to load records");
+        }
+      } catch (err) {
+        setError("Network error");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchRecords();
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-extrabold font-[Poppins] mb-4">
+        Daily Sales Library
+      </h1>
+      {loading && <p>Loading...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+      <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+        <thead>
+          <tr className="bg-gray-100 text-left text-sm font-semibold font-[Poppins]">
+            <th className="p-2 border-b">Date</th>
+            <th className="p-2 border-b">Staff</th>
+            <th className="p-2 border-b">Cash Start</th>
+            <th className="p-2 border-b">Cash End</th>
+            <th className="p-2 border-b">Total Sales</th>
+            <th className="p-2 border-b">Buns (Start/End)</th>
+            <th className="p-2 border-b">Meat (Start/End)</th>
+            <th className="p-2 border-b">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="p-4 text-center text-gray-500">
+                No records found
+              </td>
+            </tr>
+          ) : (
+            records.map((rec) => (
+              <tr key={rec.id} className="text-sm font-[Poppins]">
+                <td className="p-2 border-b">
+                  {new Date(rec.date).toLocaleDateString()}
+                </td>
+                <td className="p-2 border-b">{rec.staff}</td>
+                <td className="p-2 border-b">{thb(rec.cashStart)}</td>
+                <td className="p-2 border-b">{thb(rec.cashEnd)}</td>
+                <td className="p-2 border-b">{thb(rec.totalSales)}</td>
+                <td className="p-2 border-b">{rec.buns}</td>
+                <td className="p-2 border-b">{rec.meat}</td>
+                <td className="p-2 border-b">{rec.status}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
