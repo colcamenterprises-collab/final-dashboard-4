@@ -4,7 +4,7 @@ export const ROUTES = {
 
   // Operations
   DAILY_SALES_STOCK: "/operations/stock",
-  DAILY_SALES_LIBRARY: "/operations/daily-sales-library",
+  DAILY_SALES_LIBRARY: "/operations/daily-sales-v2/library",
   ANALYSIS: "/operations/analysis",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
