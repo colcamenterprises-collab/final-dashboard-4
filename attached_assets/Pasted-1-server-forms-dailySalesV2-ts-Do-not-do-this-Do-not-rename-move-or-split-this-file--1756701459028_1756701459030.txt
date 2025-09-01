@@ -1,3 +1,45 @@
+1. server/forms/dailySalesV2.ts
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change schema, DB, or table names
+// – Do not add dependencies
+// – Only apply exactly what is written below
+
+import { Request, Response } from "express";
+import pool from "@/server/db"; // using pool.query after agent change
+import { toCents, fromCents } from "@/lib/utils";
+
+// Existing createDailySalesV2 stays unchanged
+
+export async function listDailySalesV2(req: Request, res: Response) {
+  try {
+    const result = await pool.query(
+      `SELECT id, created_at, payload FROM daily_sales_v2 ORDER BY created_at DESC LIMIT 100`
+    );
+
+    const mapped = result.rows.map((row: any) => {
+      const p = row.payload || {};
+      return {
+        id: row.id,
+        date: row.created_at,
+        staff: p.completedBy || "",
+        cashStart: fromCents(p.startingCash || 0),
+        cashEnd: fromCents(p.closingCash || 0),
+        totalSales: fromCents(p.totalSales || 0),
+        buns: p.bunsEnd || "-",  // expects Form 2 integration
+        meat: p.meatEnd || "-",  // expects Form 2 integration
+        status: "Submitted",
+      };
+    });
+
+    res.json({ ok: true, records: mapped });
+  } catch (err) {
+    console.error("Daily Sales V2 list error", err);
+    res.status(500).json({ ok: false, error: "Failed to list records" });
+  }
+}
+
+2. client/src/pages/operations/daily-sales/Library.tsx
 // Do not do this:
 // – Do not rename, move, or split this file
 // – Do not change API routes
@@ -5,12 +47,7 @@
 // – Only apply exactly what is written below
 
 import React, { useEffect, useState } from "react";
-
-// THB formatting helper
-const thb = (v: unknown): string => {
-  const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
-  return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+import { thb } from "@/lib/utils";
 
 type RecordType = {
   id: string;
