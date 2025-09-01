@@ -1,3 +1,80 @@
+Replit Agent Instructions
+
+Do not do this:
+
+Do not rename, move, or split files.
+
+Do not change schema or add DB tables.
+
+Do not permanently delete rows.
+
+Do not add dependencies.
+
+Only replace files as written.
+
+1. server/forms/dailySalesV2.ts
+
+Add PATCH, DELETE (soft delete), and RESTORE.
+
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change schema or add DB tables
+// – Only apply exactly what is written below
+
+import { Request, Response } from "express";
+import pool from "@/server/db";
+import { toCents } from "@/lib/utils";
+
+// PATCH – update payload
+export async function updateDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { payload } = req.body;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
+      [payload, id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 update error", err);
+    res.status(500).json({ ok: false, error: "Failed to update record" });
+  }
+}
+
+// DELETE – soft delete (set deletedAt)
+export async function deleteDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET deleted_at = NOW() WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 delete error", err);
+    res.status(500).json({ ok: false, error: "Failed to delete record" });
+  }
+}
+
+// RESTORE – undo delete
+export async function restoreDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET deleted_at = NULL WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 restore error", err);
+    res.status(500).json({ ok: false, error: "Failed to restore record" });
+  }
+}
+
+2. client/src/pages/operations/daily-sales-v2/Library.tsx
+
+Enhance with Edit, Delete, Archive toggle, Restore.
+
 // Do not do this:
 // – Do not rename, move, or split this file
 // – Do not change API routes
@@ -5,12 +82,7 @@
 // – Only apply exactly what is written below
 
 import React, { useEffect, useState } from "react";
-
-// THB formatting helper
-const thb = (v: unknown): string => {
-  const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
-  return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+import { thb } from "@/lib/utils";
 
 type RecordType = {
   id: string;

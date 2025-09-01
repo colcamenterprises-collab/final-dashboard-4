@@ -1,7 +1,6 @@
 // Do not do this:
 // – Do not rename, move, or split this file
-// – Do not change schema, DB, or table names
-// – Do not add dependencies
+// – Do not change schema or add DB tables
 // – Only apply exactly what is written below
 
 import { Request, Response } from "express";
@@ -21,23 +20,24 @@ const fromCents = (n: unknown) => {
 
 export const dailySalesV2Router = express.Router();
 
-// Existing createDailySalesV2 unchanged
-
 // Register routes
 dailySalesV2Router.get("/daily-sales/v2", listDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2);
+dailySalesV2Router.patch("/daily-sales/v2/:id", updateDailySalesV2);
+dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
+dailySalesV2Router.patch("/daily-sales/v2/:id/restore", restoreDailySalesV2);
 
 export async function listDailySalesV2(req: Request, res: Response) {
   try {
     const result = await pool.query(
-      `SELECT id, created_at, payload FROM daily_sales_v2 ORDER BY created_at DESC LIMIT 100`
+      `SELECT id, "createdAt", payload, "deletedAt" FROM daily_sales_v2 ORDER BY "createdAt" DESC LIMIT 100`
     );
 
     const mapped = result.rows.map((row: any) => {
       const p = row.payload || {};
       return {
         id: row.id,
-        date: row.created_at,
+        date: row.createdAt,
         staff: p.completedBy || "",
         cashStart: fromCents(p.startingCash || 0),
         cashEnd: fromCents(p.closingCash || 0),
@@ -45,6 +45,7 @@ export async function listDailySalesV2(req: Request, res: Response) {
         rolls: p.rollsEnd || "-",
         meat: p.meatEnd || "-",
         status: "Submitted",
+        deletedAt: row.deletedAt,
       };
     });
 
@@ -59,7 +60,7 @@ export async function getDailySalesV2(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, created_at, payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+      `SELECT id, "createdAt", payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
       [id]
     );
     if (result.rows.length === 0) {
@@ -82,7 +83,7 @@ export async function getDailySalesV2(req: Request, res: Response) {
       ok: true,
       record: {
         id: row.id,
-        date: row.created_at,
+        date: row.createdAt,
         staff: p.completedBy || "",
         sales: {
           cashSales: fromCents(p.cashSales || 0),
@@ -112,5 +113,51 @@ export async function getDailySalesV2(req: Request, res: Response) {
   } catch (err) {
     console.error("Daily Sales V2 get error", err);
     res.status(500).json({ ok: false, error: "Failed to fetch record" });
+  }
+}
+
+// PATCH – update payload
+export async function updateDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { payload } = req.body;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
+      [payload, id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 update error", err);
+    res.status(500).json({ ok: false, error: "Failed to update record" });
+  }
+}
+
+// DELETE – soft delete (set deletedAt)
+export async function deleteDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET "deletedAt" = NOW() WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 delete error", err);
+    res.status(500).json({ ok: false, error: "Failed to delete record" });
+  }
+}
+
+// RESTORE – undo delete
+export async function restoreDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      `UPDATE daily_sales_v2 SET "deletedAt" = NULL WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Daily Sales V2 restore error", err);
+    res.status(500).json({ ok: false, error: "Failed to restore record" });
   }
 }
