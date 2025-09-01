@@ -1,0 +1,174 @@
+🛑 Replit Agent Instructions
+
+Do not do this:
+
+Do not rename, move, or split files.
+
+Do not change schema, DB, or JSON structure.
+
+Do not add dependencies other than pdfkit (already allowed).
+
+Do not improvise features beyond what is written.
+
+Only replace file contents below exactly as written.
+
+1. server/forms/dailySalesV2.ts
+
+Add PDF generator endpoint.
+
+// Do not do this:
+// – Do not rename, move, or split this file
+// – Do not change schema, DB, or table names
+// – Only apply exactly what is written below
+
+import { Request, Response } from "express";
+import pool from "@/server/db";
+import { fromCents } from "@/lib/utils";
+import PDFDocument from "pdfkit";
+import stream from "stream";
+
+// Existing createDailySalesV2, listDailySalesV2, getDailySalesV2, etc. remain unchanged
+
+export async function getDailySalesV2PDF(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, created_at, payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+
+    // Create PDF
+    const doc = new PDFDocument();
+    const filename = `daily-sales-${id}.pdf`;
+
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/pdf");
+
+    const pass = new stream.PassThrough();
+    doc.pipe(pass);
+
+    doc.fontSize(18).text("Daily Sales & Stock Report", { align: "center" });
+    doc.moveDown();
+
+    doc.fontSize(12).text(`Date: ${new Date(row.created_at).toLocaleDateString()}`);
+    doc.text(`Staff: ${p.completedBy || ""}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Sales");
+    doc.fontSize(12).text(`Cash Sales: ฿${fromCents(p.cashSales || 0)}`);
+    doc.text(`QR Sales: ฿${fromCents(p.qrSales || 0)}`);
+    doc.text(`Grab Sales: ฿${fromCents(p.grabSales || 0)}`);
+    doc.text(`Aroi Dee Sales: ฿${fromCents(p.aroiDeeSales || 0)}`);
+    doc.text(`Total Sales: ฿${fromCents(p.totalSales || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Expenses");
+    (p.expenses || []).forEach((e: any) => {
+      doc.fontSize(12).text(`- ${e.item} ฿${fromCents(e.cost || 0)} (${e.shop || ""})`);
+    });
+    doc.text(`Total Expenses: ฿${fromCents(p.totalExpenses || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Wages");
+    (p.wages || []).forEach((w: any) => {
+      doc.fontSize(12).text(`- ${w.staff} ฿${fromCents(w.amount || 0)} (${w.type})`);
+    });
+    doc.moveDown();
+
+    doc.fontSize(14).text("Banking");
+    doc.fontSize(12).text(`Cash Banked: ฿${fromCents(p.cashBanked || 0)}`);
+    doc.text(`QR Transfer: ฿${fromCents(p.qrTransfer || 0)}`);
+    doc.text(`Closing Cash: ฿${fromCents(p.closingCash || 0)}`);
+    doc.text(`Starting Cash: ฿${fromCents(p.startingCash || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Stock");
+    doc.fontSize(12).text(`Rolls: ${p.rollsEnd || "-"}`);
+    doc.text(`Meat: ${p.meatEnd || "-"}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Shopping List");
+    (p.requisition || [])
+      .filter((i: any) => (i.qty || 0) > 1)
+      .forEach((i: any) => {
+        doc.fontSize(12).text(`- ${i.name} x${i.qty} ${i.unit}`);
+      });
+
+    doc.end();
+    pass.pipe(res);
+  } catch (err) {
+    console.error("Daily Sales V2 PDF error", err);
+    res.status(500).json({ ok: false, error: "Failed to generate PDF" });
+  }
+}
+
+2. client/src/pages/operations/daily-sales-v2/Library.tsx
+
+Add View, Print, Download buttons in the Actions column.
+
+<td className="p-2 border-b space-x-2">
+  <button
+    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded-lg text-sm"
+    onClick={() => viewRecord(rec.id)}
+  >
+    View
+  </button>
+  <button
+    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded-lg text-sm"
+    onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/pdf`, "_blank")}
+  >
+    Print
+  </button>
+  <button
+    className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded-lg text-sm"
+    onClick={() => {
+      const link = document.createElement("a");
+      link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
+      link.download = `daily-sales-${rec.id}.pdf`;
+      link.click();
+    }}
+  >
+    Download
+  </button>
+  {!rec.deletedAt && (
+    <>
+      <button
+        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-black font-[Poppins] rounded-lg text-sm"
+        onClick={() => editRecord(rec.id)}
+      >
+        Edit
+      </button>
+      <button
+        className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-[Poppins] rounded-lg text-sm"
+        onClick={() => deleteRecord(rec.id)}
+      >
+        Delete
+      </button>
+    </>
+  )}
+  {rec.deletedAt && (
+    <button
+      className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded-lg text-sm"
+      onClick={() => restoreRecord(rec.id)}
+    >
+      Restore
+    </button>
+  )}
+</td>
+
+
+✅ With this patch:
+
+You’ll now see View, Print, Download, Edit, Delete, Restore in Actions.
+
+View → opens modal (from Patch 1).
+
+Print → opens PDF in a new tab.
+
+Download → saves PDF file.

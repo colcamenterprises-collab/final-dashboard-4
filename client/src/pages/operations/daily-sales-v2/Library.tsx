@@ -23,11 +23,23 @@ type RecordType = {
   deletedAt?: string | null;
 };
 
+type FullRecord = {
+  id: string;
+  date: string;
+  staff: string;
+  sales: any;
+  expenses: any;
+  banking: any;
+  stock: any;
+  shoppingList: { name: string; qty: number; unit: string }[];
+};
+
 export default function DailySalesV2Library() {
   const [records, setRecords] = useState<RecordType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [selected, setSelected] = useState<FullRecord | null>(null);
 
   async function fetchRecords() {
     setLoading(true);
@@ -58,6 +70,14 @@ export default function DailySalesV2Library() {
   async function restoreRecord(id: string) {
     await fetch(`/api/forms/daily-sales/v2/${id}/restore`, { method: "PATCH" });
     fetchRecords();
+  }
+
+  async function viewRecord(id: string) {
+    const res = await fetch(`/api/forms/daily-sales/v2/${id}`);
+    const data = await res.json();
+    if (data.ok) {
+      setSelected(data.record);
+    }
   }
 
   function editRecord(id: string) {
@@ -117,10 +137,33 @@ export default function DailySalesV2Library() {
                   {rec.deletedAt ? "Archived" : rec.status}
                 </td>
                 <td className="p-2 border-b space-x-2">
+                  <button
+                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded-lg text-sm"
+                    onClick={() => viewRecord(rec.id)}
+                  >
+                    View
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded-lg text-sm"
+                    onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/pdf`, "_blank")}
+                  >
+                    Print
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded-lg text-sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
+                      link.download = `daily-sales-${rec.id}.pdf`;
+                      link.click();
+                    }}
+                  >
+                    Download
+                  </button>
                   {!rec.deletedAt && (
                     <>
                       <button
-                        className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded-lg text-sm"
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-black font-[Poppins] rounded-lg text-sm"
                         onClick={() => editRecord(rec.id)}
                       >
                         Edit
@@ -147,6 +190,58 @@ export default function DailySalesV2Library() {
           )}
         </tbody>
       </table>
+
+      {/* View Modal */}
+      {selected && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6 overflow-y-auto max-h-[90vh]">
+            <h2 className="text-xl font-bold mb-4">Form Details</h2>
+            <p className="mb-2"><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
+            <p className="mb-2"><strong>Staff:</strong> {selected.staff}</p>
+
+            <h3 className="font-semibold mt-4">Sales</h3>
+            <pre className="bg-gray-50 p-2 rounded text-sm">
+              {JSON.stringify(selected.sales, null, 2)}
+            </pre>
+
+            <h3 className="font-semibold mt-4">Expenses</h3>
+            <pre className="bg-gray-50 p-2 rounded text-sm">
+              {JSON.stringify(selected.expenses, null, 2)}
+            </pre>
+
+            <h3 className="font-semibold mt-4">Banking</h3>
+            <pre className="bg-gray-50 p-2 rounded text-sm">
+              {JSON.stringify(selected.banking, null, 2)}
+            </pre>
+
+            <h3 className="font-semibold mt-4">Stock</h3>
+            <p>Rolls: {selected.stock.rolls}</p>
+            <p>Meat: {selected.stock.meat}</p>
+
+            <h3 className="font-semibold mt-4">Shopping List</h3>
+            {selected.shoppingList.length === 0 ? (
+              <p>No items to purchase</p>
+            ) : (
+              <ul className="list-disc pl-6">
+                {selected.shoppingList.map((item, idx) => (
+                  <li key={idx}>
+                    {item.name} – {item.qty} {item.unit}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-6 flex justify-end space-x-2">
+              <button
+                className="px-3 py-1 bg-gray-300 rounded"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,8 @@
 import { Request, Response } from "express";
 import express from "express";
 import { pool } from "../db";
+import PDFDocument from "pdfkit";
+import stream from "stream";
 
 // Helper functions
 const toCents = (n: unknown) => {
@@ -23,6 +25,7 @@ export const dailySalesV2Router = express.Router();
 // Register routes
 dailySalesV2Router.get("/daily-sales/v2", listDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2/:id/pdf", getDailySalesV2PDF);
 dailySalesV2Router.patch("/daily-sales/v2/:id", updateDailySalesV2);
 dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.patch("/daily-sales/v2/:id/restore", restoreDailySalesV2);
@@ -159,5 +162,84 @@ export async function restoreDailySalesV2(req: Request, res: Response) {
   } catch (err) {
     console.error("Daily Sales V2 restore error", err);
     res.status(500).json({ ok: false, error: "Failed to restore record" });
+  }
+}
+
+export async function getDailySalesV2PDF(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, "createdAt", payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+
+    // Create PDF
+    const doc = new PDFDocument();
+    const filename = `daily-sales-${id}.pdf`;
+
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/pdf");
+
+    const pass = new stream.PassThrough();
+    doc.pipe(pass);
+
+    doc.fontSize(18).text("Daily Sales & Stock Report", { align: "center" });
+    doc.moveDown();
+
+    doc.fontSize(12).text(`Date: ${new Date(row.createdAt).toLocaleDateString()}`);
+    doc.text(`Staff: ${p.completedBy || ""}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Sales");
+    doc.fontSize(12).text(`Cash Sales: ฿${fromCents(p.cashSales || 0)}`);
+    doc.text(`QR Sales: ฿${fromCents(p.qrSales || 0)}`);
+    doc.text(`Grab Sales: ฿${fromCents(p.grabSales || 0)}`);
+    doc.text(`Aroi Dee Sales: ฿${fromCents(p.aroiDeeSales || 0)}`);
+    doc.text(`Total Sales: ฿${fromCents(p.totalSales || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Expenses");
+    (p.expenses || []).forEach((e: any) => {
+      doc.fontSize(12).text(`- ${e.item} ฿${fromCents(e.cost || 0)} (${e.shop || ""})`);
+    });
+    doc.text(`Total Expenses: ฿${fromCents(p.totalExpenses || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Wages");
+    (p.wages || []).forEach((w: any) => {
+      doc.fontSize(12).text(`- ${w.staff} ฿${fromCents(w.amount || 0)} (${w.type})`);
+    });
+    doc.moveDown();
+
+    doc.fontSize(14).text("Banking");
+    doc.fontSize(12).text(`Cash Banked: ฿${fromCents(p.cashBanked || 0)}`);
+    doc.text(`QR Transfer: ฿${fromCents(p.qrTransfer || 0)}`);
+    doc.text(`Closing Cash: ฿${fromCents(p.closingCash || 0)}`);
+    doc.text(`Starting Cash: ฿${fromCents(p.startingCash || 0)}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Stock");
+    doc.fontSize(12).text(`Rolls: ${p.rollsEnd || "-"}`);
+    doc.text(`Meat: ${p.meatEnd || "-"}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Shopping List");
+    (p.requisition || [])
+      .filter((i: any) => (i.qty || 0) > 1)
+      .forEach((i: any) => {
+        doc.fontSize(12).text(`- ${i.name} x${i.qty} ${i.unit}`);
+      });
+
+    doc.end();
+    pass.pipe(res);
+  } catch (err) {
+    console.error("Daily Sales V2 PDF error", err);
+    res.status(500).json({ ok: false, error: "Failed to generate PDF" });
   }
 }
