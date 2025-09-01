@@ -42,8 +42,8 @@ dailySalesV2Router.post("/daily-sales/v2", async (req: Request, res: Response) =
       (expenses || []).reduce((sum: number, e: any) => sum + toCents(e.cost), 0) +
       (wages || []).reduce((sum: number, w: any) => sum + toCents(w.amount), 0);
 
-    // Final formula: Cash Banked = Cash Sales - Expenses - Closing Cash
-    const cashBanked = toCents(cashSales) - totalExpenses - toCents(closingCash);
+    // Final formula: Cash Banked = Cash Sales - Expenses
+    const cashBanked = toCents(cashSales) - totalExpenses;
 
     const qrTransfer = toCents(qrSales);
 
