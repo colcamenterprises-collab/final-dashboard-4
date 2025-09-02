@@ -26,7 +26,7 @@ export default function DailySalesForm() {
 
     if (name === "closingCash") {
       const expected =
-        formData.startingCash + formData.cashSales - 0; // expenses hook later
+        formData.startingCash + formData.cashSales - 0; // expenses accounted in backend
       const diff = Math.abs(expected - parsed);
       setBalanced(diff <= 30);
     }
@@ -47,6 +47,7 @@ export default function DailySalesForm() {
       onSubmit={handleSubmit}
       className="p-4 space-y-6 grid grid-cols-1 md:grid-cols-2 gap-4 font-[Poppins]"
     >
+      {/* Sales Section */}
       <div>
         <h2 className="text-lg font-bold mb-2">Sales</h2>
         <input type="text" name="completedBy" placeholder="Completed By" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
@@ -57,15 +58,21 @@ export default function DailySalesForm() {
         <input type="number" name="otherSales" placeholder="Other Sales" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
       </div>
 
+      {/* Stock Section */}
       <div>
         <h2 className="text-lg font-bold mb-2">Stock</h2>
         <input type="number" name="rollsEnd" placeholder="Rolls Remaining" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
         <input type="number" name="meatEnd" placeholder="Meat Remaining (g)" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
       </div>
 
+      {/* Banking Section */}
       <div className="md:col-span-2">
         <h2 className="text-lg font-bold mb-2">Banking</h2>
+
+        {/* Input 1: Closing Cash */}
         <input type="number" name="closingCash" placeholder="Total Cash in Register at Close" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
+
+        {/* Input 2: Balanced Status */}
         {balanced !== null && (
           <div
             className={`p-2 mt-2 rounded ${
@@ -75,10 +82,15 @@ export default function DailySalesForm() {
             {balanced ? "Balanced ✅" : "Not Balanced ❌"}
           </div>
         )}
-        <input type="number" name="cashBanked" placeholder="Cash Banked (auto)" value={formData.closingCash - formData.startingCash} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
-        <input type="number" name="qrTransfer" placeholder="QR Banked (auto)" value={formData.qrSales} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
+
+        {/* Input 3: Cash to Bank */}
+        <input type="number" name="cashBanked" placeholder="Cash to Bank (auto)" value={formData.closingCash - formData.startingCash} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
+
+        {/* Input 4: QR to Bank */}
+        <input type="number" name="qrTransfer" placeholder="QR to Bank (auto)" value={formData.qrSales} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
       </div>
 
+      {/* Submit */}
       <div className="md:col-span-2 flex justify-end">
         <button type="submit" className="px-4 py-2 bg-black text-white rounded-lg">Submit</button>
       </div>

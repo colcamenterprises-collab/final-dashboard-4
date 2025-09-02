@@ -14,17 +14,13 @@ const fromCents = (n: number) => {
   return (n / 100).toFixed(2);
 };
 
-// Only create transporter if credentials exist
-let transporter: any = null;
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
@@ -34,10 +30,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       cashSales,
       qrSales,
       grabSales,
-      otherSales, // renamed
+      otherSales,
       expenses,
       wages,
-      closingCash,
+      closingCash, // staff entry
       requisition,
       rollsEnd,
       meatEnd,
@@ -46,7 +42,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const id = uuidv4();
     const shiftDate = new Date().toISOString().split("T")[0];
     const createdAt = new Date().toISOString();
-    const submittedAt = new Date().toISOString();
 
     // Totals
     const totalSales =
@@ -59,7 +54,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       (expenses || []).reduce((s: number, e: any) => s + toCents(e.cost), 0) +
       (wages || []).reduce((s: number, w: any) => s + toCents(w.amount), 0);
 
-    // Expected closing cash
+    // Expected register = Starting + Cash – Expenses
     const expectedClosingCash =
       toCents(startingCash) + toCents(cashSales) - totalExpenses;
 
@@ -69,7 +64,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const diff = Math.abs(expectedClosingCash - closingCashCents);
     const balanced = diff <= toCents(30);
 
-    // Banked amounts
+    // Banked = Closing – Starting
     const cashBanked = closingCashCents - toCents(startingCash);
     const qrTransfer = toCents(qrSales);
 
@@ -95,18 +90,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
     };
 
     await pool.query(
-      `INSERT INTO daily_sales_v2 (
-        id, "createdAt", "shiftDate", "completedBy", "submittedAtISO",
-        "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales", 
-        "grabSales", "aroiSales", "totalSales", "shoppingTotal", "wagesTotal", 
-        "othersTotal", "totalExpenses", "qrTransfer", payload
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
-      [
-        id, createdAt, shiftDate, completedBy, submittedAt,
-        toCents(startingCash), closingCashCents, (cashBanked < 0 ? 0 : cashBanked), 
-        toCents(cashSales), toCents(qrSales), toCents(grabSales), toCents(otherSales), 
-        totalSales, 0, 0, 0, totalExpenses, qrTransfer, JSON.stringify(payload)
-      ]
+      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", payload)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, shiftDate, completedBy, createdAt, JSON.stringify(payload)]
     );
 
     // Build shopping list
@@ -148,7 +134,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Banking</h3>
       <ul>
-        <li>Total Cash in Register: ฿${fromCents(closingCashCents)}</li>
+        <li>Total Cash in Register (Closing Cash): ฿${fromCents(closingCashCents)}</li>
         <li>Expected Register: ฿${fromCents(expectedClosingCash)}</li>
         <li>
           Balanced: ${
@@ -157,8 +143,8 @@ export async function createDailySalesV2(req: Request, res: Response) {
               : '<span style="color:red;font-weight:bold">NO ❌</span>'
           }
         </li>
-        <li>Cash Banked: ฿${fromCents(cashBanked)}</li>
-        <li>QR Banked: ฿${fromCents(qrTransfer)}</li>
+        <li>Cash to Bank: ฿${fromCents(cashBanked)}</li>
+        <li>QR to Bank: ฿${fromCents(qrTransfer)}</li>
       </ul>
 
       <h3>Stock</h3>
@@ -175,27 +161,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    res.json({ ok: true, id });
+    await transporter.sendMail({
+      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
+      to: process.env.MANAGEMENT_EMAIL,
+      cc: "smashbrothersburgersth@gmail.com",
+      subject: `Daily Sales & Stock – ${shiftDate}`,
+      html,
+    });
 
-    // Send email asynchronously (don't wait for it)
-    if (transporter && process.env.MANAGEMENT_EMAIL) {
-      setImmediate(async () => {
-        try {
-          await transporter.sendMail({
-            from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
-            to: process.env.MANAGEMENT_EMAIL,
-            cc: "smashbrothersburgersth@gmail.com",
-            subject: `Daily Sales & Stock – ${shiftDate}`,
-            html,
-          });
-          console.log("✅ Email sent successfully");
-        } catch (emailError) {
-          console.warn("⚠️ Email failed to send:", (emailError as Error).message);
-        }
-      });
-    } else {
-      console.log("ℹ️ Email skipped - credentials not configured");
-    }
+    res.json({ ok: true, id });
   } catch (err) {
     console.error("Daily Sales V2 error", err);
     res.status(500).json({ ok: false, error: "Failed to save record" });
