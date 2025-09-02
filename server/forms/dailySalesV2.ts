@@ -1,6 +1,7 @@
-// Fixed: Insert into daily_sales_v2 with proper ID + timestamps
 import { Request, Response } from "express";
 import { pool } from "../db.js";
+import nodemailer from "nodemailer";
+import { v4 as uuidv4 } from "uuid";
 
 // Utility functions (matching @/lib/utils interface)
 const toCents = (n: unknown) => {
@@ -12,8 +13,6 @@ const toCents = (n: unknown) => {
 const fromCents = (n: number) => {
   return (n / 100).toFixed(2);
 };
-import nodemailer from "nodemailer";
-import { v4 as uuidv4 } from "uuid";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -25,9 +24,6 @@ const transporter = nodemailer.createTransport({
 
 const FLOAT_AMOUNT = 2500;
 
-import express from "express";
-export const dailySalesV2Router = express.Router();
-
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const {
@@ -36,7 +32,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       cashSales,
       qrSales,
       grabSales,
-      otherSales, // renamed from aroiDee
+      otherSales, // renamed
       expenses,
       wages,
       closingCash,
@@ -50,14 +46,20 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const createdAt = new Date().toISOString();
 
     const totalSales =
-      toCents(cashSales) + toCents(qrSales) + toCents(grabSales) + toCents(otherSales);
+      toCents(cashSales) +
+      toCents(qrSales) +
+      toCents(grabSales) +
+      toCents(otherSales);
 
     const totalExpenses =
       (expenses || []).reduce((s: number, e: any) => s + toCents(e.cost), 0) +
       (wages || []).reduce((s: number, w: any) => s + toCents(w.amount), 0);
 
     const expectedClosingCash =
-      toCents(startingCash) + toCents(cashSales) + toCents(otherSales) - totalExpenses;
+      toCents(startingCash) +
+      toCents(cashSales) +
+      toCents(otherSales) -
+      totalExpenses;
 
     const closingCashCents = toCents(closingCash);
     const diff = Math.abs(expectedClosingCash - closingCashCents);
@@ -93,12 +95,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       [id, shiftDate, completedBy, createdAt, payload]
     );
 
-    // Build shopping list
     const shoppingItems = (requisition || [])
       .filter((i: any) => (i.qty || 0) > 0)
       .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
 
-    // Email
     const html = `
       <h2>Daily Sales & Stock Report</h2>
       <p><strong>Date:</strong> ${shiftDate}</p>
@@ -116,10 +116,16 @@ export async function createDailySalesV2(req: Request, res: Response) {
       <h3>Expenses</h3>
       <ul>
         ${(expenses || [])
-          .map((e: any) => `<li>${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})</li>`)
+          .map(
+            (e: any) =>
+              `<li>${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})</li>`
+          )
           .join("")}
         ${(wages || [])
-          .map((w: any) => `<li>${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})</li>`)
+          .map(
+            (w: any) =>
+              `<li>${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})</li>`
+          )
           .join("")}
       </ul>
       <p><strong>Total Expenses:</strong> ฿${fromCents(totalExpenses)}</p>
@@ -168,5 +174,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
   }
 }
 
-// Mount the route
+import express from "express";
+export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/", createDailySalesV2);

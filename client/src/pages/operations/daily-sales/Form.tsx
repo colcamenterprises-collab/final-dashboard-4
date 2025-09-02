@@ -1,4 +1,3 @@
-// Frontend: Fixed rename, balance check, auto banked, responsive UI
 import React, { useState } from "react";
 
 export default function DailySalesForm() {
@@ -27,7 +26,7 @@ export default function DailySalesForm() {
 
     if (name === "closingCash") {
       const expected =
-        formData.startingCash + formData.cashSales + formData.otherSales; // minus expenses later
+        formData.startingCash + formData.cashSales + formData.otherSales;
       const diff = Math.abs(expected - parsed);
       setBalanced(diff <= 30);
     }
@@ -68,7 +67,11 @@ export default function DailySalesForm() {
         <h2 className="text-lg font-bold mb-2">Banking</h2>
         <input type="number" name="closingCash" placeholder="Total Cash in Register at Close" onChange={handleChange} className="w-full border p-2 mb-2 rounded" />
         {balanced !== null && (
-          <div className={`p-2 mt-2 rounded ${balanced ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+          <div
+            className={`p-2 mt-2 rounded ${
+              balanced ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+            }`}
+          >
             {balanced ? "Balanced ✅" : "Not Balanced ❌"}
           </div>
         )}
