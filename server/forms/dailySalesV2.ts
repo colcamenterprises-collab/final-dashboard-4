@@ -94,9 +94,27 @@ export async function createDailySalesV2(req: Request, res: Response) {
       meatEnd,
     };
 
+    // Generate unique ID and populate required fields
+    const id = `ds_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    const shiftDate = new Date().toISOString().split('T')[0];
+    
     const result = await pool.query(
-      `INSERT INTO daily_sales_v2 (payload) VALUES ($1) RETURNING id, "createdAt"`,
-      [payload]
+      `INSERT INTO daily_sales_v2 (
+        id, "shiftDate", "submittedAtISO", "completedBy", 
+        "startingCash", "endingCash", "cashBanked", "cashSales", 
+        "qrSales", "grabSales", "aroiSales", "totalSales", 
+        "shoppingTotal", "wagesTotal", "othersTotal", "totalExpenses", 
+        "qrTransfer", payload
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+      RETURNING id, "createdAt"`,
+      [
+        id, shiftDate, now, completedBy,
+        toCents(startingCash), toCents(closingCash), payload.cashBanked, toCents(cashSales),
+        toCents(qrSales), toCents(grabSales), toCents(otherSales), totalSales,
+        0, 0, 0, totalExpenses,
+        qrTransfer, payload
+      ]
     );
 
     // Build shopping list (qty > 0)
