@@ -128,7 +128,13 @@ export async function createDailySalesV2(req: Request, res: Response) {
       <ul>
         <li>Total Cash in Register: ฿${fromCents(closingCashCents)}</li>
         <li>Expected Register: ฿${fromCents(expectedClosingCash)}</li>
-        <li>Balanced: ${balanced ? "✅ Yes" : "❌ No"}</li>
+        <li>
+          Balanced: ${
+            balanced
+              ? '<span style="color:green;font-weight:bold">YES ✅</span>'
+              : '<span style="color:red;font-weight:bold">NO ❌</span>'
+          }
+        </li>
         <li>Cash Banked: ฿${fromCents(cashBanked)}</li>
         <li>QR Banked: ฿${fromCents(qrTransfer)}</li>
       </ul>

@@ -22,6 +22,9 @@ type RecordType = {
   buns: string;
   meat: string;
   status: string;
+  payload: {
+    balanced: boolean;
+  };
 };
 
 export default function DailySalesLibrary() {
@@ -66,12 +69,13 @@ export default function DailySalesLibrary() {
             <th className="p-2 border-b">Buns (End)</th>
             <th className="p-2 border-b">Meat (End)</th>
             <th className="p-2 border-b">Status</th>
+            <th className="p-2 border-b">Balanced</th>
           </tr>
         </thead>
         <tbody>
           {records.length === 0 ? (
             <tr>
-              <td colSpan={8} className="p-4 text-center text-gray-500">
+              <td colSpan={9} className="p-4 text-center text-gray-500">
                 No records found
               </td>
             </tr>
@@ -88,6 +92,17 @@ export default function DailySalesLibrary() {
                 <td className="p-2 border-b">{rec.buns}</td>
                 <td className="p-2 border-b">{rec.meat}</td>
                 <td className="p-2 border-b">{rec.status}</td>
+                <td className="p-2 border-b">
+                  {rec.payload.balanced ? (
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">
+                      Balanced
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700">
+                      Not Balanced
+                    </span>
+                  )}
+                </td>
               </tr>
             ))
           )}
