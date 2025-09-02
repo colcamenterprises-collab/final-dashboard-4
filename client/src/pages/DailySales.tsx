@@ -223,7 +223,7 @@ export default function DailySales() {
 
   return (
     <>
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto p-6 font-[Poppins]">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">Daily Sales & Expenses</h1>
@@ -275,7 +275,7 @@ export default function DailySales() {
 
           <section className="rounded-2xl border bg-white p-5">
             <h2 className="text-lg font-bold mb-4">Sales Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Cash Sales</label>
                 <input 
@@ -304,7 +304,7 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Aroi Dee Sales</label>
+                <label className="text-sm text-gray-600 block mb-1">Other Sales</label>
                 <input 
                   type="number" 
                   value={aroi} 
