@@ -22,8 +22,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FLOAT_AMOUNT = 2500;
-
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const {
@@ -44,7 +42,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const id = uuidv4();
     const shiftDate = new Date().toISOString().split("T")[0];
     const createdAt = new Date().toISOString();
+    const submittedAt = new Date().toISOString();
 
+    // Totals
     const totalSales =
       toCents(cashSales) +
       toCents(qrSales) +
@@ -55,17 +55,18 @@ export async function createDailySalesV2(req: Request, res: Response) {
       (expenses || []).reduce((s: number, e: any) => s + toCents(e.cost), 0) +
       (wages || []).reduce((s: number, w: any) => s + toCents(w.amount), 0);
 
+    // Expected closing cash
     const expectedClosingCash =
-      toCents(startingCash) +
-      toCents(cashSales) +
-      toCents(otherSales) -
-      totalExpenses;
+      toCents(startingCash) + toCents(cashSales) - totalExpenses;
 
     const closingCashCents = toCents(closingCash);
+
+    // Balanced check ±30
     const diff = Math.abs(expectedClosingCash - closingCashCents);
     const balanced = diff <= toCents(30);
 
-    const cashBanked = closingCashCents - toCents(FLOAT_AMOUNT);
+    // Banked amounts
+    const cashBanked = closingCashCents - toCents(startingCash);
     const qrTransfer = toCents(qrSales);
 
     const payload = {
@@ -90,15 +91,26 @@ export async function createDailySalesV2(req: Request, res: Response) {
     };
 
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, shiftdate, completedby, created_at, payload)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, shiftDate, completedBy, createdAt, payload]
+      `INSERT INTO daily_sales_v2 (
+        id, "createdAt", "shiftDate", "completedBy", "submittedAtISO",
+        "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales", 
+        "grabSales", "aroiSales", "totalSales", "shoppingTotal", "wagesTotal", 
+        "othersTotal", "totalExpenses", "qrTransfer", payload
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+      [
+        id, createdAt, shiftDate, completedBy, submittedAt,
+        toCents(startingCash), closingCashCents, (cashBanked < 0 ? 0 : cashBanked), 
+        toCents(cashSales), toCents(qrSales), toCents(grabSales), toCents(otherSales), 
+        totalSales, 0, 0, 0, totalExpenses, qrTransfer, JSON.stringify(payload)
+      ]
     );
 
+    // Build shopping list
     const shoppingItems = (requisition || [])
       .filter((i: any) => (i.qty || 0) > 0)
       .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
 
+    // Email
     const html = `
       <h2>Daily Sales & Stock Report</h2>
       <p><strong>Date:</strong> ${shiftDate}</p>
@@ -155,7 +167,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       ${
         shoppingItems.length === 0
           ? "<p>No items to purchase</p>"
-          : `<ul>${shoppingItems.map((s) => `<li>${s}</li>`).join("")}</ul>`
+          : `<ul>${shoppingItems.map((s: string) => `<li>${s}</li>`).join("")}</ul>`
       }
     `;
 
@@ -176,4 +188,4 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
 import express from "express";
 export const dailySalesV2Router = express.Router();
-dailySalesV2Router.post("/", createDailySalesV2);
+dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);

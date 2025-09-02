@@ -3,7 +3,7 @@ import React, { useState } from "react";
 export default function DailySalesForm() {
   const [formData, setFormData] = useState<any>({
     completedBy: "",
-    startingCash: 2500,
+    startingCash: 2000,
     cashSales: 0,
     qrSales: 0,
     grabSales: 0,
@@ -26,7 +26,7 @@ export default function DailySalesForm() {
 
     if (name === "closingCash") {
       const expected =
-        formData.startingCash + formData.cashSales + formData.otherSales;
+        formData.startingCash + formData.cashSales - 0; // expenses hook later
       const diff = Math.abs(expected - parsed);
       setBalanced(diff <= 30);
     }
@@ -75,7 +75,7 @@ export default function DailySalesForm() {
             {balanced ? "Balanced ✅" : "Not Balanced ❌"}
           </div>
         )}
-        <input type="number" name="cashBanked" placeholder="Cash Banked (auto)" value={formData.closingCash - 2500} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
+        <input type="number" name="cashBanked" placeholder="Cash Banked (auto)" value={formData.closingCash - formData.startingCash} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
         <input type="number" name="qrTransfer" placeholder="QR Banked (auto)" value={formData.qrSales} readOnly className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600" />
       </div>
 
