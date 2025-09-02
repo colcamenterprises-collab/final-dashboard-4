@@ -1,16 +1,12 @@
 // Do not do this:
 // – Do not rename, move, or split this file
 // – Do not drop or recreate daily_sales_v2
-// – Do not strip out toCents/fromCents/thb
 // – Only apply exactly what is written below
 
 import { Request, Response } from "express";
 import express from "express";
 import { pool } from "../db";
 import nodemailer from "nodemailer";
-import pdfParse from "pdf-parse";
-import csvParser from "csv-parser";
-import fs from "fs";
 
 // Helper functions
 const toCents = (n: unknown) => {
@@ -31,7 +27,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ---- Daily Sales & Stock Submit ----
+const FLOAT_AMOUNT = 2500; // default float kept in till
+
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const {
@@ -40,10 +37,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       cashSales,
       qrSales,
       grabSales,
-      aroiDeeSales,
+      otherSales, // renamed from aroiDeeSales
       expenses,
       wages,
-      closingCash,
+      closingCash, // staff input
       requisition,
       rollsEnd,
       meatEnd,
@@ -53,13 +50,27 @@ export async function createDailySalesV2(req: Request, res: Response) {
       toCents(cashSales) +
       toCents(qrSales) +
       toCents(grabSales) +
-      toCents(aroiDeeSales);
+      toCents(otherSales);
 
     const totalExpenses =
       (expenses || []).reduce((sum: number, e: any) => sum + toCents(e.cost), 0) +
       (wages || []).reduce((sum: number, w: any) => sum + toCents(w.amount), 0);
 
-    const cashBanked = toCents(cashSales) - totalExpenses;
+    // Expected register = Start + Cash + Other − Expenses
+    const expectedClosingCash =
+      toCents(startingCash) +
+      toCents(cashSales) +
+      toCents(otherSales) -
+      totalExpenses;
+
+    const closingCashCents = toCents(closingCash);
+
+    // Balanced check with ±30 tolerance
+    const diff = Math.abs(expectedClosingCash - closingCashCents);
+    const balanced = diff <= toCents(30);
+
+    // Banked = Closing Cash − Float
+    const cashBanked = closingCashCents - toCents(FLOAT_AMOUNT);
     const qrTransfer = toCents(qrSales);
 
     const payload = {
@@ -68,12 +79,14 @@ export async function createDailySalesV2(req: Request, res: Response) {
       cashSales: toCents(cashSales),
       qrSales: toCents(qrSales),
       grabSales: toCents(grabSales),
-      aroiDeeSales: toCents(aroiDeeSales),
+      otherSales: toCents(otherSales),
       expenses,
       wages,
-      closingCash: toCents(closingCash),
+      closingCash: closingCashCents,
       totalSales,
       totalExpenses,
+      expectedClosingCash,
+      balanced,
       cashBanked: cashBanked < 0 ? 0 : cashBanked,
       qrTransfer,
       requisition,
@@ -102,7 +115,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
         <li>Cash Sales: ฿${fromCents(toCents(cashSales))}</li>
         <li>QR Sales: ฿${fromCents(toCents(qrSales))}</li>
         <li>Grab Sales: ฿${fromCents(toCents(grabSales))}</li>
-        <li>Aroi Dee Sales: ฿${fromCents(toCents(aroiDeeSales))}</li>
+        <li>Other Sales: ฿${fromCents(toCents(otherSales))}</li>
         <li><strong>Total Sales:</strong> ฿${fromCents(totalSales)}</li>
       </ul>
 
@@ -119,10 +132,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Banking</h3>
       <ul>
+        <li>Total Cash in Register: ฿${fromCents(closingCashCents)}</li>
+        <li>Expected Register: ฿${fromCents(expectedClosingCash)}</li>
+        <li>Balanced: ${balanced ? "✅ Yes" : "❌ No"}</li>
         <li>Cash Banked: ฿${fromCents(cashBanked)}</li>
-        <li>QR Transfer: ฿${fromCents(qrTransfer)}</li>
-        <li>Closing Cash: ฿${fromCents(toCents(closingCash))}</li>
-        <li>Starting Cash: ฿${fromCents(toCents(startingCash))}</li>
+        <li>QR Banked: ฿${fromCents(qrTransfer)}</li>
       </ul>
 
       <h3>Stock</h3>
@@ -151,50 +165,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
   } catch (err) {
     console.error("Daily Sales V2 create error", err);
     res.status(500).json({ ok: false, error: "Failed to create record" });
-  }
-}
-
-// ---- Expenses: Upload CSV ----
-export async function uploadExpensesCSV(req: Request, res: Response) {
-  try {
-    if (!req.file) return res.status(400).json({ ok: false, error: "No file uploaded" });
-
-    const rows: any[] = [];
-    fs.createReadStream(req.file.path)
-      .pipe(csvParser())
-      .on("data", (row) => rows.push(row))
-      .on("end", async () => {
-        for (const r of rows) {
-          const supplier = r["Supplier"]?.trim();
-          const category = r["Category"]?.trim() || "General";
-          const amount = toCents(parseFloat(r["Amount"] || "0"));
-
-          await pool.query(
-            `INSERT INTO expenses (supplier, category, amount, raw) VALUES ($1, $2, $3, $4)`,
-            [supplier, category, amount, JSON.stringify(r)]
-          );
-        }
-        res.json({ ok: true, updated: rows.length });
-      });
-  } catch (err) {
-    console.error("Expenses CSV error", err);
-    res.status(500).json({ ok: false, error: "Failed to upload CSV" });
-  }
-}
-
-// ---- Expenses: Upload PDF ----
-export async function uploadExpensesPDF(req: Request, res: Response) {
-  try {
-    if (!req.file) return res.status(400).json({ ok: false, error: "No file uploaded" });
-    const data = await pdfParse(fs.readFileSync(req.file.path));
-    await pool.query(
-      `INSERT INTO expenses (supplier, category, amount, raw) VALUES ($1, $2, $3, $4)`,
-      ["Bank", "Bank Statement", 0, JSON.stringify({ text: data.text })]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("Expenses PDF error", err);
-    res.status(500).json({ ok: false, error: "Failed to upload PDF" });
   }
 }
 
@@ -260,7 +230,7 @@ export async function getDailySalesV2Record(req: Request, res: Response) {
         cash: p.cashSales || 0,
         qr: p.qrSales || 0,
         grab: p.grabSales || 0,
-        aroiDee: p.aroiDeeSales || 0,
+        other: p.otherSales || 0,
         total: p.totalSales || 0,
       },
       expenses: {
@@ -271,6 +241,8 @@ export async function getDailySalesV2Record(req: Request, res: Response) {
       banking: {
         startingCash: p.startingCash || 0,
         closingCash: p.closingCash || 0,
+        expectedClosingCash: p.expectedClosingCash || 0,
+        balanced: p.balanced || false,
         cashBanked: p.cashBanked || 0,
         qrTransfer: p.qrTransfer || 0,
       },
@@ -319,7 +291,7 @@ SALES:
 Cash Sales: ฿${fromCents(p.cashSales || 0)}
 QR Sales: ฿${fromCents(p.qrSales || 0)}
 Grab Sales: ฿${fromCents(p.grabSales || 0)}
-Aroi Dee Sales: ฿${fromCents(p.aroiDeeSales || 0)}
+Other Sales: ฿${fromCents(p.otherSales || 0)}
 Total Sales: ฿${fromCents(p.totalSales || 0)}
 
 EXPENSES:
@@ -332,10 +304,11 @@ ${(p.wages || [])
 Total Expenses: ฿${fromCents(p.totalExpenses || 0)}
 
 BANKING:
-Starting Cash: ฿${fromCents(p.startingCash || 0)}
-Closing Cash: ฿${fromCents(p.closingCash || 0)}
+Total Cash in Register: ฿${fromCents(p.closingCash || 0)}
+Expected Register: ฿${fromCents(p.expectedClosingCash || 0)}
+Balanced: ${p.balanced ? "✅ Yes" : "❌ No"}
 Cash Banked: ฿${fromCents(p.cashBanked || 0)}
-QR Transfer: ฿${fromCents(p.qrTransfer || 0)}
+QR Banked: ฿${fromCents(p.qrTransfer || 0)}
 
 STOCK:
 Rolls: ${p.rollsEnd || "N/A"}

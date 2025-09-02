@@ -1,6 +1,6 @@
 // Do not do this:
 // – Do not rename, move, or split this file
-// – Do not drop fields
+// – Do not drop fields from Form 1 or Form 2
 // – Only apply exactly what is written below
 
 import React, { useState } from "react";
@@ -8,11 +8,11 @@ import React, { useState } from "react";
 export default function DailySalesForm() {
   const [formData, setFormData] = useState<any>({
     completedBy: "",
-    startingCash: 0,
+    startingCash: 2500,
     cashSales: 0,
     qrSales: 0,
     grabSales: 0,
-    aroiDeeSales: 0,
+    otherSales: 0, // renamed from aroiDeeSales
     expenses: [],
     wages: [],
     closingCash: 0,
@@ -21,9 +21,25 @@ export default function DailySalesForm() {
     meatEnd: 0,
   });
 
+  const [balanced, setBalanced] = useState<boolean | null>(null);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    if (name === "completedBy") {
+      setFormData((prev: any) => ({ ...prev, [name]: value }));
+      return;
+    }
+    
+    const parsed = parseInt(value) || 0;
+    const updated = { ...formData, [name]: parsed };
+    setFormData(updated);
+
+    if (name === "closingCash") {
+      const expected =
+        formData.startingCash + formData.cashSales + formData.otherSales - 0; // expenses added later
+      const diff = Math.abs(expected - parsed);
+      setBalanced(diff <= 30);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,6 +71,7 @@ export default function DailySalesForm() {
           type="number"
           name="startingCash"
           placeholder="Starting Cash"
+          value={formData.startingCash}
           onChange={handleChange}
           className="w-full border p-2 mb-2 rounded"
         />
@@ -81,8 +98,8 @@ export default function DailySalesForm() {
         />
         <input
           type="number"
-          name="aroiDeeSales"
-          placeholder="Aroi Dee Sales"
+          name="otherSales"
+          placeholder="Other Sales"
           onChange={handleChange}
           className="w-full border p-2 mb-2 rounded"
         />
@@ -107,17 +124,41 @@ export default function DailySalesForm() {
         />
       </div>
 
-      {/* Expenses */}
+      {/* Banking */}
       <div className="md:col-span-2">
-        <h2 className="text-lg font-bold mb-2">Expenses</h2>
+        <h2 className="text-lg font-bold mb-2">Banking</h2>
         <input
           type="number"
           name="closingCash"
-          placeholder="Closing Cash"
+          placeholder="Total Cash in Register at Close"
           onChange={handleChange}
           className="w-full border p-2 mb-2 rounded"
         />
-        {/* TODO: dynamic expense rows here */}
+        {balanced !== null && (
+          <div
+            className={`p-2 mt-2 rounded ${
+              balanced ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+            }`}
+          >
+            {balanced ? "Balanced ✅" : "Not Balanced ❌"}
+          </div>
+        )}
+        <input
+          type="number"
+          name="cashBanked"
+          placeholder="Cash Banked (auto)"
+          value={formData.closingCash - 2500}
+          readOnly
+          className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600"
+        />
+        <input
+          type="number"
+          name="qrTransfer"
+          placeholder="QR Banked (auto)"
+          value={formData.qrSales}
+          readOnly
+          className="w-full border p-2 mb-2 rounded bg-gray-100 text-gray-600"
+        />
       </div>
 
       {/* Submit */}
