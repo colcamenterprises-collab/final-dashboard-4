@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-export default function BusinessExpenses() {
+export function BusinessExpenses() {
   const [activeTab, setActiveTab] = useState<"stock" | "general">("stock");
   const [expenses, setExpenses] = useState([]);
   const [total, setTotal] = useState(0);
