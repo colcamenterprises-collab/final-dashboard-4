@@ -2303,15 +2303,11 @@ app.use("/api/bank-imports", bankUploadRouter);
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
-  // Route guard: deprecate old /api/expensesV2 routes (but not /api/expensesV2V2)
-  app.all(/^\/api\/expensesV2(?!V2).*/, (req, res) => {
-    console.warn(`⚠️  Deprecated route accessed: ${req.method} ${req.path} - Use /api/expensesV2V2 instead`);
-    res.status(410).json({ok: false, error: "expenses v1 removed; use /api/expensesV2V2"});
-  });
+  // ExpensesV2 router is now active
 
   // Use the new expenses V2 router
 app.use("/api/bank-imports", bankImportRouter);
-  app.use('/api/expensesV2V2', expensesV2Router);
+  app.use('/api/expensesV2', expensesV2Router);
 app.use("/api/bank-imports", bankUploadRouter);
   
   // Purchase Tally router

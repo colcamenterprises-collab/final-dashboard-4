@@ -3,7 +3,7 @@ import axios from "axios";
 
 export function BusinessExpenses() {
   const [activeTab, setActiveTab] = useState<"stock" | "general">("stock");
-  const [expenses, setExpenses] = useState([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [file, setFile] = useState<File | null>(null);
 
@@ -12,9 +12,21 @@ export function BusinessExpenses() {
   }, []);
 
   async function fetchExpenses() {
-    const { data } = await axios.get("/api/expensesV2");
-    setExpenses(data.expenses);
-    setTotal(data.total);
+    try {
+      const { data } = await axios.get("/api/expensesV2");
+      // Handle both array response and object response
+      if (Array.isArray(data)) {
+        setExpenses(data);
+        setTotal(0);
+      } else {
+        setExpenses(data.expenses || []);
+        setTotal(data.total || 0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
+      setExpenses([]);
+      setTotal(0);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,15 +124,19 @@ export function BusinessExpenses() {
           </tr>
         </thead>
         <tbody>
-          {expenses.map((exp: any) => (
+          {expenses && expenses.length > 0 ? expenses.map((exp: any) => (
             <tr key={exp.id}>
               <td className="p-2 border">{new Date(exp.date).toLocaleDateString()}</td>
-              <td className="p-2 border">{exp.typeOfExpense}</td>
+              <td className="p-2 border">{exp.typeOfExpense || exp.type}</td>
               <td className="p-2 border">{exp.supplier || "-"}</td>
               <td className="p-2 border">{exp.description || "-"}</td>
-              <td className="p-2 border">฿{(exp.amountMinor/100).toFixed(2)}</td>
+              <td className="p-2 border">฿{((exp.amountMinor || exp.amount || 0)/100).toFixed(2)}</td>
             </tr>
-          ))}
+          )) : (
+            <tr>
+              <td colSpan={5} className="p-4 text-center text-gray-500">No expenses found</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
