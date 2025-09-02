@@ -14,13 +14,17 @@ const fromCents = (n: number) => {
   return (n / 100).toFixed(2);
 };
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Only create transporter if credentials exist
+let transporter: any = null;
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
 
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
@@ -171,21 +175,64 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    await transporter.sendMail({
-      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
-      to: process.env.MANAGEMENT_EMAIL,
-      cc: "smashbrothersburgersth@gmail.com",
-      subject: `Daily Sales & Stock – ${shiftDate}`,
-      html,
-    });
-
     res.json({ ok: true, id });
+
+    // Send email asynchronously (don't wait for it)
+    if (transporter && process.env.MANAGEMENT_EMAIL) {
+      setImmediate(async () => {
+        try {
+          await transporter.sendMail({
+            from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
+            to: process.env.MANAGEMENT_EMAIL,
+            cc: "smashbrothersburgersth@gmail.com",
+            subject: `Daily Sales & Stock – ${shiftDate}`,
+            html,
+          });
+          console.log("✅ Email sent successfully");
+        } catch (emailError) {
+          console.warn("⚠️ Email failed to send:", (emailError as Error).message);
+        }
+      });
+    } else {
+      console.log("ℹ️ Email skipped - credentials not configured");
+    }
   } catch (err) {
     console.error("Daily Sales V2 error", err);
     res.status(500).json({ ok: false, error: "Failed to save record" });
   }
 }
 
+export async function getDailySalesV2(_req: Request, res: Response) {
+  try {
+    const result = await pool.query(
+      `SELECT id, "createdAt" as date, "completedBy" as staff, 
+       "startingCash", "endingCash", "totalSales", payload
+       FROM daily_sales_v2 
+       WHERE "deletedAt" IS NULL 
+       ORDER BY "createdAt" DESC`
+    );
+
+    const records = result.rows.map((row: any) => ({
+      id: row.id,
+      date: row.date,
+      staff: row.staff,
+      cashStart: row.startingCash / 100, // Convert from cents
+      cashEnd: row.endingCash / 100, // Convert from cents
+      totalSales: row.totalSales / 100, // Convert from cents
+      buns: row.payload?.rollsEnd || "-",
+      meat: row.payload?.meatEnd || "-",
+      status: "Submitted",
+      payload: row.payload || {}
+    }));
+
+    res.json({ ok: true, records });
+  } catch (err) {
+    console.error("Get Daily Sales V2 error", err);
+    res.status(500).json({ ok: false, error: "Failed to fetch records" });
+  }
+}
+
 import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
