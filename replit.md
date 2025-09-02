@@ -3,6 +3,13 @@
 ## Overview
 This comprehensive restaurant management dashboard streamlines operations with AI-powered analytics and real-time insights. It integrates with external POS systems, AI services, and provides automated sales analysis, inventory management, and marketing. The business vision is to enhance operational efficiency and profitability for restaurants by providing a centralized system for data-driven decision making.
 
+## Recent Changes (September 2025)
+- **Balanced Badge System**: Added visual balance indicators (green/red badges) to Library table and email templates for instant cash reconciliation status visibility
+- **Daily Sales V2 Enhancements**: Implemented proper UUID generation, banking calculations with ±30 THB tolerance, and "Other Sales" terminology update (renamed from "Aroi Dee Sales")  
+- **Mobile & Tablet Optimization**: Completed comprehensive responsive testing with enhanced touch interactions, auto-calculations, and navigation behavior across all devices
+- **Email Template Enhancement**: Added colored HTML badges in daily reports for balanced/unbalanced status with bold green/red styling for management visibility
+- **Form Banking Logic**: Real-time balance checking with visual feedback during data entry, auto-calculated cash/QR banking fields with proper float handling
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 Code isolation policy: Once functionality is working and tested, isolate it to prevent breaking when updating other sections.
@@ -13,7 +20,7 @@ Form 1 → Form 2 Navigation: RESOLVED (Aug 17, 2025) - Fixed Form 1 submit bug 
 Testing requirement: All enhancements must at all times be tested prior to advising a job as completed. Testing includes UI, system files, front end, mobile and tablet responsiveness. All tests must be completed prior to release.
 Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Always use authentic data from the database or authorized sources. Creating fake data for testing or demonstrations is strictly prohibited.
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
-Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Aroi Dee Sales field, implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
+Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Other Sales field (renamed from Aroi Dee Sales), implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
 Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
 Layout Protection: Clean app shell architecture (App.tsx + Sidebar.tsx) with automated prebuild validation preventing margin-left hacks. Layout uses proper flex-1 min-w-0 structure with 256px → 78px collapsible sidebar.
 Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashboard, Operations, Finance, Menu Management, Marketing) featuring emerald pill active states, monochrome SVG icons, and smooth expand/collapse animations with chevron indicators.
@@ -54,6 +61,8 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Data-Driven Dashboard**: Real-time analytics display showing snapshot data, purchases-aware variance, authentic payment data, and top-selling items.
 - **Purchases + Audit Fields System**: Full implementation with expense types and line items for comprehensive stock accountability and variance analysis.
 - **Restaurant Analytics & AI Summary System**: Integration with Loyverse POS for detailed analytics and automated daily operational reports.
+- **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual green/red badge indicators, and automated cash/QR banking calculations.
+- **Enhanced Email Reporting**: Daily management emails with colored balance status badges, comprehensive sales breakdowns, expense tracking, and shopping list generation.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
