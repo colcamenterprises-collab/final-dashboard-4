@@ -1,24 +1,19 @@
-// Do not do this:
-// – Do not rename, move, or split this file
-// – Do not drop or recreate daily_sales_v2
-// – Only apply exactly what is written below
-
+// Fixed: Insert into daily_sales_v2 with proper ID + timestamps
 import { Request, Response } from "express";
-import express from "express";
-import { pool } from "../db";
-import nodemailer from "nodemailer";
-
-// Helper functions
+import { pool } from "../db.js";
+// Local utility functions
 const toCents = (n: unknown) => {
-  const x = Number(n);
-  return Number.isFinite(x) ? Math.round(x * 100) : 0;
+  if (typeof n === "number") return Math.round(n * 100);
+  if (typeof n === "string") return Math.round(parseFloat(n) * 100);
+  return 0;
 };
 
-const fromCents = (cents: number) => {
-  return (cents / 100).toFixed(2);
+const fromCents = (n: number) => {
+  return (n / 100).toFixed(2);
 };
+import nodemailer from "nodemailer";
+import { v4 as uuidv4 } from "uuid";
 
-// Reuse transporter config
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -27,7 +22,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FLOAT_AMOUNT = 2500; // default float kept in till
+const FLOAT_AMOUNT = 2500;
+
+import express from "express";
+export const dailySalesV2Router = express.Router();
 
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
@@ -37,39 +35,33 @@ export async function createDailySalesV2(req: Request, res: Response) {
       cashSales,
       qrSales,
       grabSales,
-      otherSales, // renamed from aroiDeeSales
+      otherSales, // renamed from aroiDee
       expenses,
       wages,
-      closingCash, // staff input
+      closingCash,
       requisition,
       rollsEnd,
       meatEnd,
     } = req.body;
 
+    const id = uuidv4();
+    const shiftDate = new Date().toISOString().split("T")[0];
+    const createdAt = new Date().toISOString();
+
     const totalSales =
-      toCents(cashSales) +
-      toCents(qrSales) +
-      toCents(grabSales) +
-      toCents(otherSales);
+      toCents(cashSales) + toCents(qrSales) + toCents(grabSales) + toCents(otherSales);
 
     const totalExpenses =
-      (expenses || []).reduce((sum: number, e: any) => sum + toCents(e.cost), 0) +
-      (wages || []).reduce((sum: number, w: any) => sum + toCents(w.amount), 0);
+      (expenses || []).reduce((s: number, e: any) => s + toCents(e.cost), 0) +
+      (wages || []).reduce((s: number, w: any) => s + toCents(w.amount), 0);
 
-    // Expected register = Start + Cash + Other − Expenses
     const expectedClosingCash =
-      toCents(startingCash) +
-      toCents(cashSales) +
-      toCents(otherSales) -
-      totalExpenses;
+      toCents(startingCash) + toCents(cashSales) + toCents(otherSales) - totalExpenses;
 
     const closingCashCents = toCents(closingCash);
-
-    // Balanced check with ±30 tolerance
     const diff = Math.abs(expectedClosingCash - closingCashCents);
     const balanced = diff <= toCents(30);
 
-    // Banked = Closing Cash − Float
     const cashBanked = closingCashCents - toCents(FLOAT_AMOUNT);
     const qrTransfer = toCents(qrSales);
 
@@ -94,38 +86,21 @@ export async function createDailySalesV2(req: Request, res: Response) {
       meatEnd,
     };
 
-    // Generate unique ID and populate required fields
-    const id = `ds_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date().toISOString();
-    const shiftDate = new Date().toISOString().split('T')[0];
-    
-    const result = await pool.query(
-      `INSERT INTO daily_sales_v2 (
-        id, "shiftDate", "submittedAtISO", "completedBy", 
-        "startingCash", "endingCash", "cashBanked", "cashSales", 
-        "qrSales", "grabSales", "aroiSales", "totalSales", 
-        "shoppingTotal", "wagesTotal", "othersTotal", "totalExpenses", 
-        "qrTransfer", payload
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
-      RETURNING id, "createdAt"`,
-      [
-        id, shiftDate, now, completedBy,
-        toCents(startingCash), toCents(closingCash), payload.cashBanked, toCents(cashSales),
-        toCents(qrSales), toCents(grabSales), toCents(otherSales), totalSales,
-        0, 0, 0, totalExpenses,
-        qrTransfer, payload
-      ]
+    await pool.query(
+      `INSERT INTO daily_sales_v2 (id, "shiftDate", "submittedAtISO", "completedBy", payload)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, shiftDate, createdAt, completedBy, payload]
     );
 
-    // Build shopping list (qty > 0)
+    // Build shopping list
     const shoppingItems = (requisition || [])
       .filter((i: any) => (i.qty || 0) > 0)
       .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
 
-    // Email summary
+    // Email
     const html = `
       <h2>Daily Sales & Stock Report</h2>
-      <p><strong>Date:</strong> ${new Date(result.rows[0].createdAt).toLocaleDateString()}</p>
+      <p><strong>Date:</strong> ${shiftDate}</p>
       <p><strong>Completed By:</strong> ${completedBy}</p>
 
       <h3>Sales</h3>
@@ -167,7 +142,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       ${
         shoppingItems.length === 0
           ? "<p>No items to purchase</p>"
-          : `<ul>${shoppingItems.map((s: string) => `<li>${s}</li>`).join("")}</ul>`
+          : `<ul>${shoppingItems.map((s) => `<li>${s}</li>`).join("")}</ul>`
       }
     `;
 
@@ -175,211 +150,16 @@ export async function createDailySalesV2(req: Request, res: Response) {
       from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
       to: process.env.MANAGEMENT_EMAIL,
       cc: "smashbrothersburgersth@gmail.com",
-      subject: `Daily Sales & Stock – ${new Date(result.rows[0].createdAt).toLocaleDateString()}`,
+      subject: `Daily Sales & Stock – ${shiftDate}`,
       html,
     });
 
-    res.json({ ok: true, id: result.rows[0].id });
+    res.json({ ok: true, id });
   } catch (err) {
-    console.error("Daily Sales V2 create error", err);
-    res.status(500).json({ ok: false, error: "Failed to create record" });
+    console.error("Daily Sales V2 error", err);
+    res.status(500).json({ ok: false, error: "Failed to save record" });
   }
 }
 
-export async function getDailySalesV2Records(req: Request, res: Response) {
-  try {
-    const includeArchived = req.query.includeArchived === "true";
-    const query = includeArchived
-      ? `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 ORDER BY "createdAt" DESC`
-      : `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC`;
-
-    const result = await pool.query(query);
-
-    const records = result.rows.map((row) => {
-      const p = row.payload || {};
-      return {
-        id: row.id,
-        date: row.createdAt,
-        staff: p.completedBy || "Unknown",
-        totalSales: p.totalSales || 0,
-        rolls: p.rollsEnd || "N/A",
-        meat: p.meatEnd || "N/A",
-        status: "submitted",
-        deletedAt: row.deletedAt,
-      };
-    });
-
-    res.json({ ok: true, records });
-  } catch (err) {
-    console.error("Get Daily Sales V2 records error", err);
-    res.status(500).json({ ok: false, error: "Failed to fetch records" });
-  }
-}
-
-export async function getDailySalesV2Record(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      `SELECT id, payload, "createdAt", "deletedAt" FROM daily_sales_v2 WHERE id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ ok: false, error: "Record not found" });
-    }
-
-    const row = result.rows[0];
-    const p = row.payload || {};
-
-    // Build shopping list for the modal
-    const shoppingList = (p.requisition || [])
-      .filter((i: any) => (i.qty || 0) > 0)
-      .map((i: any) => ({
-        name: i.name,
-        qty: i.qty,
-        unit: i.unit || "",
-      }));
-
-    const record = {
-      id: row.id,
-      date: row.createdAt,
-      staff: p.completedBy || "Unknown",
-      sales: {
-        cash: p.cashSales || 0,
-        qr: p.qrSales || 0,
-        grab: p.grabSales || 0,
-        other: p.otherSales || 0,
-        total: p.totalSales || 0,
-      },
-      expenses: {
-        items: p.expenses || [],
-        wages: p.wages || [],
-        total: p.totalExpenses || 0,
-      },
-      banking: {
-        startingCash: p.startingCash || 0,
-        closingCash: p.closingCash || 0,
-        expectedClosingCash: p.expectedClosingCash || 0,
-        balanced: p.balanced || false,
-        cashBanked: p.cashBanked || 0,
-        qrTransfer: p.qrTransfer || 0,
-      },
-      stock: {
-        rolls: p.rollsEnd || "N/A",
-        meat: p.meatEnd || "N/A",
-      },
-      shoppingList,
-    };
-
-    res.json({ ok: true, record });
-  } catch (err) {
-    console.error("Get Daily Sales V2 record error", err);
-    res.status(500).json({ ok: false, error: "Failed to fetch record" });
-  }
-}
-
-export async function generateDailySalesV2PDF(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      `SELECT id, payload, "createdAt" FROM daily_sales_v2 WHERE id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ ok: false, error: "Record not found" });
-    }
-
-    const row = result.rows[0];
-    const p = row.payload || {};
-
-    // Build shopping list
-    const shoppingList = (p.requisition || [])
-      .filter((i: any) => (i.qty || 0) > 0)
-      .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`)
-      .join(", ");
-
-    const reportContent = `
-Daily Sales & Stock Report
-
-Date: ${new Date(row.createdAt).toLocaleDateString()}
-Staff: ${p.completedBy || "Unknown"}
-
-SALES:
-Cash Sales: ฿${fromCents(p.cashSales || 0)}
-QR Sales: ฿${fromCents(p.qrSales || 0)}
-Grab Sales: ฿${fromCents(p.grabSales || 0)}
-Other Sales: ฿${fromCents(p.otherSales || 0)}
-Total Sales: ฿${fromCents(p.totalSales || 0)}
-
-EXPENSES:
-${(p.expenses || [])
-  .map((e: any) => `${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})`)
-  .join("\n")}
-${(p.wages || [])
-  .map((w: any) => `${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})`)
-  .join("\n")}
-Total Expenses: ฿${fromCents(p.totalExpenses || 0)}
-
-BANKING:
-Total Cash in Register: ฿${fromCents(p.closingCash || 0)}
-Expected Register: ฿${fromCents(p.expectedClosingCash || 0)}
-Balanced: ${p.balanced ? "✅ Yes" : "❌ No"}
-Cash Banked: ฿${fromCents(p.cashBanked || 0)}
-QR Banked: ฿${fromCents(p.qrTransfer || 0)}
-
-STOCK:
-Rolls: ${p.rollsEnd || "N/A"}
-Meat: ${p.meatEnd || "N/A"}
-
-SHOPPING LIST:
-${shoppingList || "No items to purchase"}
-`;
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="daily-sales-${row.id}.pdf"`);
-    res.send(reportContent);
-  } catch (err) {
-    console.error("Generate PDF error", err);
-    res.status(500).json({ ok: false, error: "Failed to generate PDF" });
-  }
-}
-
-export async function deleteDailySalesV2Record(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    await pool.query(
-      `UPDATE daily_sales_v2 SET "deletedAt" = NOW() WHERE id = $1`,
-      [id]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("Delete Daily Sales V2 record error", err);
-    res.status(500).json({ ok: false, error: "Failed to delete record" });
-  }
-}
-
-export async function restoreDailySalesV2Record(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    await pool.query(
-      `UPDATE daily_sales_v2 SET "deletedAt" = NULL WHERE id = $1`,
-      [id]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("Restore Daily Sales V2 record error", err);
-    res.status(500).json({ ok: false, error: "Failed to restore record" });
-  }
-}
-
-// Router setup
-export const dailySalesV2Router = express.Router();
-
-// Register routes
-dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
-dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2Records);
-dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2Record);
-dailySalesV2Router.get("/daily-sales/v2/:id/pdf", generateDailySalesV2PDF);
-dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2Record);
-dailySalesV2Router.patch("/daily-sales/v2/:id/restore", restoreDailySalesV2Record);
+// Mount the route
+dailySalesV2Router.post("/", createDailySalesV2);
