@@ -1,0 +1,367 @@
+🚫 Replit Agent Patch Instructions
+
+Do Not change schema (no renaming shiftDate → date).
+Do Not remove legacy routes.
+Do Not bypass modals — all entries must be logged via popups.
+Do Not merge shift-expenses with business-expenses logic.
+Do Not auto-save PDF uploads — staff must review, edit, approve.
+
+📂 Files to Update / Add
+
+server/config/expenseMappings.ts → keyword → supplier/category rules.
+
+server/routes/expensesV2.ts → backend logic (alias shiftDate, upload, approve).
+
+client/src/pages/finance/Expenses.tsx → frontend (buttons, modals, upload, tables).
+
+1. Backend – server/config/expenseMappings.ts
+export const expenseMappings = [
+  { keywords: ["ซีพี แอ็กซ์ตร้า", "Makro"], supplier: "Makro", category: "Food & Beverage" },
+  { keywords: ["MR.D.I.Y."], supplier: "Mr DIY", category: "Kitchen Supplies & Packaging" },
+  { keywords: ["SUPPER CHEAP", "Super Cheap"], supplier: "Supercheap", category: "Food & Beverage" },
+  { keywords: ["Lazada"], supplier: "Lazada", category: "Food & Beverage" },
+  { keywords: ["Provincal Electricity Authority", "PROVINCAL ELECTRICITY", "PEA"], supplier: "PEA", category: "Utilities" },
+  { keywords: ["Rawai Power Oil"], supplier: "Rawai Power Oil", category: "Utilities" },
+  { keywords: ["Replit"], supplier: "Replit", category: "Administration" },
+  { keywords: ["Google", "Netflix", "Spotify"], supplier: "Subscriptions", category: "Marketing" },
+  { keywords: ["Grab"], supplier: "Grab", category: "Staff Expenses" },
+];
+
+2. Backend – server/routes/expensesV2.ts
+import express from "express";
+import multer from "multer";
+import pdfParse from "pdf-parse";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+import fs from "fs";
+import csvParse from "csv-parse/sync";
+import { expenseMappings } from "../config/expenseMappings";
+
+const router = express.Router();
+const upload = multer({ dest: "uploads/" });
+
+function mapExpense(description: string) {
+  for (const rule of expenseMappings) {
+    if (rule.keywords.some(k => description.includes(k))) {
+      return { supplier: rule.supplier, category: rule.category };
+    }
+  }
+  return { supplier: "Other", category: "Uncategorised" };
+}
+
+// Manual entry
+router.post("/", async (req, res) => {
+  try {
+    const { date, supplier, amount, category, items, notes } = req.body;
+    const inserted = await db.execute(sql`
+      INSERT INTO expenses (shiftDate, supplier, category, description, notes, amount)
+      VALUES (${date}, ${supplier}, ${category}, ${items}, ${notes}, ${Math.round(Number(amount) * 100)})
+      RETURNING id, shiftDate as date, supplier, category, description, notes, amount
+    `);
+    res.json({ ok: true, expense: inserted.rows[0] });
+  } catch (err) {
+    console.error("Create expense error:", err);
+    res.status(500).json({ error: "Failed to create expense" });
+  }
+});
+
+// Upload + parse
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    let lines: string[] = [];
+
+    if (req.file.mimetype === "application/pdf") {
+      const pdfData = await pdfParse(fs.readFileSync(req.file.path));
+      const regex = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2})\s+\S+\s+\S+\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(.+)$/;
+      lines = pdfData.text.split("\n").filter(l => regex.test(l));
+
+      const parsed = lines.map((line, idx) => {
+        const [, date, time, amountStr, , description] = line.match(regex)!;
+        const cleanAmount = parseFloat(amountStr.replace(/,/g, ""));
+        const { supplier, category } = mapExpense(description);
+        return { id: idx, date, time, supplier, category, description, amount: cleanAmount, notes: "", status: "pending" };
+      });
+
+      return res.json({ ok: true, parsed });
+    }
+
+    if (req.file.mimetype.includes("csv")) {
+      const content = fs.readFileSync(req.file.path, "utf8");
+      const records = csvParse.parse(content, { skip_empty_lines: true });
+      return res.json({ ok: true, parsed: records.map((r: string[], i: number) => ({ id: i, description: r.join(" "), status: "pending" })) });
+    }
+
+    res.json({ ok: false, error: "Unsupported file type" });
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Failed to process upload" });
+  }
+});
+
+// Approve
+router.post("/approve", async (req, res) => {
+  try {
+    const { date, supplier, amount, category, description, notes } = req.body;
+    const inserted = await db.execute(sql`
+      INSERT INTO expenses (shiftDate, supplier, category, description, notes, amount)
+      VALUES (${date}, ${supplier}, ${category}, ${description}, ${notes}, ${Math.round(Number(amount) * 100)})
+      RETURNING id, shiftDate as date, supplier, category, description, notes, amount
+    `);
+    res.json({ ok: true, expense: inserted.rows[0] });
+  } catch (err) {
+    console.error("Approve error:", err);
+    res.status(500).json({ error: "Failed to approve expense" });
+  }
+});
+
+// List
+router.get("/", async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const results = await db.execute(sql`
+      SELECT id, shiftDate as date, supplier, category, description, notes, amount
+      FROM expenses
+      WHERE EXTRACT(MONTH FROM shiftDate) = ${month}
+      AND EXTRACT(YEAR FROM shiftDate) = ${year}
+      ORDER BY shiftDate DESC
+    `);
+    const total = results.rows.reduce((sum, r) => sum + (r.amount || 0), 0);
+    res.json({ ok: true, expenses: results.rows, total });
+  } catch (err) {
+    console.error("List error:", err);
+    res.status(500).json({ error: "Failed to list expenses" });
+  }
+});
+
+export default router;
+
+3. Frontend – client/src/pages/finance/Expenses.tsx
+
+Two top buttons → open modals.
+
+Upload section fixed (preventDefault, multipart/form-data).
+
+Parsed transactions show in editable table with Approve / Delete.
+
+Main table shows all expenses.
+
+Extra tables for Rolls Purchases, Meat Purchases, Drink Purchases.
+
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+
+export default function Expenses() {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [showGeneralModal, setShowGeneralModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
+
+  useEffect(() => { fetchExpenses(); }, []);
+
+  async function fetchExpenses() {
+    const now = new Date();
+    const { data } = await axios.get("/api/expensesV2", { params: { month: now.getMonth()+1, year: now.getFullYear() }});
+    setExpenses(data.expenses);
+  }
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return alert("Select a file first");
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await axios.post("/api/expensesV2/upload", formData, { headers: { "Content-Type": "multipart/form-data" }});
+    setParsed(data.parsed);
+  }
+
+  async function approveLine(line: any) {
+    await axios.post("/api/expensesV2/approve", line);
+    setParsed(parsed.filter(l => l.id !== line.id));
+    fetchExpenses();
+  }
+
+  function deleteLine(id: number) { setParsed(parsed.filter(l => l.id !== id)); }
+
+  // Filter helpers
+  const rolls = expenses.filter(e => e.description?.includes("Rolls"));
+  const meat = expenses.filter(e => e.notes?.includes("Meat"));
+  const drinks = expenses.filter(e => e.notes?.includes("Drinks"));
+
+  return (
+    <div className="p-6 font-poppins text-gray-800">
+      <h1 className="text-xl font-bold mb-4">Expenses</h1>
+
+      {/* Buttons */}
+      <div className="flex space-x-4 mb-4">
+        <button onClick={() => setShowGeneralModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm">Lodge Business Expense</button>
+        <button onClick={() => setShowStockModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm">Lodge Stock Purchase</button>
+      </div>
+
+      {/* Upload */}
+      <form onSubmit={handleUpload} className="mb-6">
+        <input type="file" accept=".pdf,.csv,.png,.jpg" onChange={e => setFile(e.target.files?.[0] || null)} />
+        <button type="submit" className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-sm">Upload</button>
+      </form>
+
+      {/* Review Parsed */}
+      {parsed.length > 0 && (
+        <div className="bg-white rounded shadow p-4 mb-6">
+          <h3 className="font-semibold text-sm mb-2">Review Uploaded Transactions</h3>
+          <table className="w-full border text-sm">
+            <thead><tr className="bg-gray-100"><th>Date</th><th>Supplier</th><th>Category</th><th>Description</th><th>Amount</th><th>Action</th></tr></thead>
+            <tbody>
+              {parsed.map((line,i)=>(
+                <tr key={i}>
+                  <td><input defaultValue={line.date} className="border p-1 text-sm"/></td>
+                  <td><input defaultValue={line.supplier} className="border p-1 text-sm"/></td>
+                  <td><input defaultValue={line.category} className="border p-1 text-sm"/></td>
+                  <td><input defaultValue={line.description} className="border p-1 text-sm"/></td>
+                  <td><input defaultValue={line.amount} className="border p-1 text-sm"/></td>
+                  <td>
+                    <button onClick={()=>approveLine(line)} className="bg-green-600 text-white px-2 py-1 rounded text-xs">Approve</button>
+                    <button onClick={()=>deleteLine(line.id)} className="bg-red-600 text-white px-2 py-1 rounded text-xs ml-1">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Main Expense Table */}
+      <h2 className="text-lg font-semibold mb-2">This Month's Expenses</h2>
+      <table className="w-full border text-sm mb-6">
+        <thead><tr className="bg-gray-100"><th>Date</th><th>Supplier</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+        <tbody>
+          {expenses.map((exp,i)=>(
+            <tr key={i}>
+              <td>{new Date(exp.date).toLocaleDateString()}</td>
+              <td>{exp.supplier}</td>
+              <td>{exp.category}</td>
+              <td>{exp.description}</td>
+              <td>฿{(exp.amount/100).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Rolls Table */}
+      <h2 className="text-lg font-semibold mb-2">Rolls Purchases</h2>
+      <table className="w-full border text-sm mb-6">
+        <thead><tr className="bg-gray-100"><th>Date</th><th>Quantity</th><th>Paid</th><th>Amount</th></tr></thead>
+        <tbody>
+          {rolls.map((r,i)=>(
+            <tr key={i}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.notes}</td><td>{r.notes}</td><td>฿{(r.amount/100).toFixed(2)}</td></tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Meat Table */}
+      <h2 className="text-lg font-semibold mb-2">Meat Purchases</h2>
+      <table className="w-full border text-sm mb-6">
+        <thead><tr className="bg-gray-100"><th>Date</th><th>Type</th><th>Weight</th><th>Supplier</th></tr></thead>
+        <tbody>
+          {meat.map((m,i)=>(
+            <tr key={i}><td>{new Date(m.date).toLocaleDateString()}</td><td>{m.notes}</td><td>{m.notes}</td><td>{m.supplier}</td></tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Drinks Table */}
+      <h2 className="text-lg font-semibold mb-2">Drinks Purchases</h2>
+      <table className="w-full border text-sm mb-6">
+        <thead><tr className="bg-gray-100"><th>Date</th><th>Type</th><th>Quantity</th></tr></thead>
+        <tbody>
+          {drinks.map((d,i)=>(
+            <tr key={i}><td>{new Date(d.date).toLocaleDateString()}</td><td>{d.notes}</td><td>{d.notes}</td></tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Modals (Business + Stock) */}
+      {showGeneralModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded w-96">
+            <h3 className="font-bold mb-2">Business Expense</h3>
+            <form onSubmit={async e => {
+              e.preventDefault();
+              const data = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
+              await axios.post("/api/expensesV2", data);
+              setShowGeneralModal(false); fetchExpenses();
+            }} className="space-y-2">
+              <input type="date" name="date" className="border p-2 w-full" required />
+              <input type="text" name="supplier" placeholder="Supplier" className="border p-2 w-full" required />
+              <input type="number" step="0.01" name="amount" placeholder="Amount" className="border p-2 w-full" required />
+              <input type="text" name="category" placeholder="Category" className="border p-2 w-full" required />
+              <input type="text" name="items" placeholder="Items" className="border p-2 w-full" />
+              <textarea name="notes" placeholder="Notes" className="border p-2 w-full" />
+              <button type="submit" className="bg-black text-white px-4 py-2 rounded">Save</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showStockModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded w-96">
+            <h3 className="font-bold mb-2">Stock Purchase</h3>
+            <div className="flex mb-2">
+              <button onClick={()=>setActiveTab("rolls")} className={`flex-1 px-2 py-1 ${activeTab==="rolls"?"bg-black text-white":"bg-gray-200"}`}>Rolls</button>
+              <button onClick={()=>setActiveTab("meat")} className={`flex-1 px-2 py-1 ${activeTab==="meat"?"bg-black text-white":"bg-gray-200"}`}>Meat</button>
+              <button onClick={()=>setActiveTab("drinks")} className={`flex-1 px-2 py-1 ${activeTab==="drinks"?"bg-black text-white":"bg-gray-200"}`}>Drinks</button>
+            </div>
+            <form onSubmit={async e => {
+              e.preventDefault();
+              const data = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
+              data.type = activeTab;
+              await axios.post("/api/expensesV2", data);
+              setShowStockModal(false); fetchExpenses();
+            }} className="space-y-2">
+              {activeTab==="rolls" && (
+                <>
+                  <input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full" />
+                  <select name="paid" className="border p-2 w-full"><option>Paid</option><option>Unpaid</option></select>
+                  <input type="number" step="0.01" name="amount" placeholder="Amount" className="border p-2 w-full" />
+                </>
+              )}
+              {activeTab==="meat" && (
+                <>
+                  <select name="meatType" className="border p-2 w-full"><option>Topside</option><option>Chuck</option><option>Brisket</option><option>Other</option></select>
+                  <input type="number" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full" />
+                  <input type="number" name="weightG" placeholder="Weight (g)" className="border p-2 w-full" />
+                  <input type="text" name="supplier" placeholder="Supplier" className="border p-2 w-full" />
+                </>
+              )}
+              {activeTab==="drinks" && (
+                <>
+                  <select name="drinkType" className="border p-2 w-full">
+                    <option>Coke</option><option>Coke Zero</option><option>Sprite</option><option>Schweppes Manow</option>
+                    <option>Red Fanta</option><option>Orange Fanta</option><option>Red Singha</option><option>Yellow Singha</option>
+                    <option>Pink Singha</option><option>Soda Water</option>
+                  </select>
+                  <input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full" />
+                </>
+              )}
+              <button type="submit" className="bg-black text-white px-4 py-2 rounded">Save</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+✅ This patch:
+
+Safely aliases shiftDate → date without schema edits.
+
+Fixes upload form → review table works.
+
+Adds modals for Business + Stock purchases.
+
+Adds dedicated tables for Rolls, Meat, Drinks purchases.
+
+Auto-maps suppliers/categories on upload.
