@@ -21,10 +21,10 @@ export default function Expenses() {
       setExpenses(data.expenses || []);
       setTotals({
         mtd: data.total || 0,
-        ytd: (data.expenses || []).reduce((s: number, e: any) => s + (e.amountMinor || 0), 0),
+        ytd: (data.expenses || []).reduce((s: number, e: any) => s + (e.costCents || 0), 0),
         today: (data.expenses || [])
-          .filter((e: any) => new Date(e.date).toDateString() === now.toDateString())
-          .reduce((s: number, e: any) => s + (e.amountMinor || 0), 0),
+          .filter((e: any) => new Date(e.shiftDate || e.date).toDateString() === now.toDateString())
+          .reduce((s: number, e: any) => s + (e.costCents || 0), 0),
       });
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
@@ -61,7 +61,8 @@ export default function Expenses() {
   // Category summary
   const categoryData = Object.entries(
     expenses.reduce((acc: any, e: any) => {
-      acc[e.category] = (acc[e.category] || 0) + (e.amountMinor || 0);
+      const category = e.meta?.category || e.category || e.expenseType || 'Uncategorized';
+      acc[category] = (acc[category] || 0) + (e.costCents || 0);
       return acc;
     }, {})
   ).map(([name, value]) => ({ name, value: Number(value) / 100 })).filter(item => item.value > 0);
@@ -87,22 +88,44 @@ export default function Expenses() {
       </div>
 
       {/* Upload */}
-      <form onSubmit={handleUpload} className="mb-6">
-        <div className="flex gap-3">
-          <input 
-            type="file" 
-            accept=".pdf,.csv,.png,.jpg"
-            onChange={e => setFile(e.target.files?.[0] || null)}
-            className="text-sm flex-1"
-          />
-          <button 
-            type="submit" 
-            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-            disabled={!file}
-          >
-            Upload
-          </button>
-        </div>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!file) {
+            alert("Please select a file first.");
+            return;
+          }
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const { data } = await axios.post("/api/expensesV2/upload", formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+
+            if (data.ok) {
+              setParsed(data.parsed);
+            } else {
+              alert("Upload failed: " + (data.error || "Unknown error"));
+            }
+          } catch (err) {
+            console.error("Upload error:", err);
+            alert("Upload failed. Check console for details.");
+          }
+        }}
+        className="mb-6"
+      >
+        <input
+          type="file"
+          accept=".pdf,.csv,.png,.jpg"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+        />
+        <button
+          type="submit"
+          className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-sm"
+        >
+          Upload
+        </button>
       </form>
 
       {/* Parsed Transactions */}
@@ -204,11 +227,11 @@ export default function Expenses() {
             <tbody>
               {expenses.map((exp, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-1">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="border p-1">{new Date(exp.shiftDate || exp.date).toLocaleDateString()}</td>
                   <td className="border p-1">{exp.supplier}</td>
-                  <td className="border p-1">{exp.category}</td>
-                  <td className="border p-1">{exp.description}</td>
-                  <td className="border p-1 text-right">฿{((exp.amountMinor || 0)/100).toFixed(2)}</td>
+                  <td className="border p-1">{exp.meta?.category || exp.category || exp.expenseType}</td>
+                  <td className="border p-1">{exp.item || exp.description}</td>
+                  <td className="border p-1 text-right">฿{((exp.costCents || 0)/100).toFixed(2)}</td>
                 </tr>
               ))}
               {expenses.length === 0 && (

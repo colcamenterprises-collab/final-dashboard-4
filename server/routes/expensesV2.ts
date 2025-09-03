@@ -2,7 +2,6 @@ import express from "express";
 import multer from "multer";
 import pdfParse from "pdf-parse";
 import { db } from "../db";
-import { expenses } from "../../shared/schema";
 import { sql } from "drizzle-orm";
 import fs from "fs";
 import { parse as csvParse } from "csv-parse/sync";
@@ -26,20 +25,17 @@ router.post("/", async (req, res) => {
   try {
     const { date, supplier, amount, category, items, notes } = req.body;
 
-    const inserted = await db.insert(expenses).values({
-      date: new Date(date),
-      supplier,
-      category,
-      description: items,
-      amount: String(Number(amount)),
-      amountMinor: Math.round(Number(amount) * 100), // store in cents
-      currency: "THB",
-      source: "MANUAL",
-      descriptionRaw: items,
-      notes,
-    }).returning();
+    const result = await db.execute(sql`
+      INSERT INTO expenses (
+        "restaurantId", "shiftDate", "item", "costCents", 
+        "supplier", "expenseType", "source", "meta"
+      ) VALUES (
+        'restaurant-1', ${new Date(date)}, ${items}, ${Math.round(Number(amount) * 100)},
+        ${supplier}, 'MANUAL_ENTRY', 'MANUAL', ${JSON.stringify({ category, notes, originalAmount: amount })}
+      ) RETURNING *
+    `);
 
-    res.json({ ok: true, expense: inserted[0] });
+    res.json({ ok: true, expense: result.rows[0] });
   } catch (err) {
     console.error("Create expense error:", err);
     res.status(500).json({ error: "Failed to create expense" });
@@ -120,20 +116,17 @@ router.post("/approve", async (req, res) => {
   try {
     const { date, supplier, amount, category, description, notes } = req.body;
 
-    const inserted = await db.insert(expenses).values({
-      date: new Date(date),
-      supplier,
-      category,
-      description,
-      amount: String(Number(amount)),
-      amountMinor: Math.round(Number(amount) * 100),
-      currency: "THB",
-      source: "UPLOAD",
-      descriptionRaw: description,
-      notes,
-    }).returning();
+    const result = await db.execute(sql`
+      INSERT INTO expenses (
+        "restaurantId", "shiftDate", "item", "costCents", 
+        "supplier", "expenseType", "source", "meta"
+      ) VALUES (
+        'restaurant-1', ${new Date(date)}, ${description}, ${Math.round(Number(amount) * 100)},
+        ${supplier}, 'UPLOAD_APPROVAL', 'UPLOAD', ${JSON.stringify({ category, notes, originalAmount: amount })}
+      ) RETURNING *
+    `);
 
-    res.json({ ok: true, expense: inserted[0] });
+    res.json({ ok: true, expense: result.rows[0] });
   } catch (err) {
     console.error("Approve error:", err);
     res.status(500).json({ error: "Failed to approve expense" });
@@ -147,17 +140,24 @@ router.get("/", async (req, res) => {
     let results;
 
     if (month && year) {
-      results = await db.select().from(expenses).where(sql`
-        EXTRACT(MONTH FROM date) = ${month} 
-        AND EXTRACT(YEAR FROM date) = ${year}
+      results = await db.execute(sql`
+        SELECT * FROM expenses 
+        WHERE EXTRACT(MONTH FROM "shiftDate") = ${month} 
+        AND EXTRACT(YEAR FROM "shiftDate") = ${year}
+        ORDER BY "shiftDate" DESC
       `);
     } else {
-      results = await db.select().from(expenses);
+      results = await db.execute(sql`
+        SELECT * FROM expenses 
+        ORDER BY "shiftDate" DESC
+        LIMIT 100
+      `);
     }
 
-    const total = results.reduce((sum, r) => sum + (r.amountMinor || 0), 0);
+    const expenses = results.rows;
+    const total = expenses.reduce((sum: number, r: any) => sum + (r.costCents || 0), 0);
 
-    res.json({ ok: true, expenses: results, total });
+    res.json({ ok: true, expenses, total });
   } catch (err) {
     console.error("List error:", err);
     res.status(500).json({ error: "Failed to list expenses" });
