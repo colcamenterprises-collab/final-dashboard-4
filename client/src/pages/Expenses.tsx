@@ -333,14 +333,31 @@ export default function Expenses() {
               </button>
             </div>
 
-            <form onSubmit={async e => {
+            <form onSubmit={async (e) => {
               e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const data = Object.fromEntries(new FormData(form).entries());
+
+              let payload: any = { type: activeTab };
+
+              if (activeTab === "rolls") {
+                payload.qty = data.qty;
+                payload.amount = data.amount;
+              }
+
+              if (activeTab === "meat") {
+                payload.meatType = data.meatType;
+                payload.weightKg = data.weightKg;
+              }
+
+              if (activeTab === "drinks") {
+                payload.drinkType = data.drinkType;
+                payload.qty = data.qty;
+              }
+
               try {
-                const formData = new FormData(e.target as HTMLFormElement);
-                const data = Object.fromEntries(formData.entries());
-                data.type = activeTab;
-                await axios.post("/api/expensesV2/stock", data);
-                setShowStockModal(false); 
+                await axios.post("/api/expensesV2/stock", payload);
+                setShowStockModal(false);
                 fetchExpenses();
               } catch (error) {
                 console.error("Failed to create stock purchase:", error);
