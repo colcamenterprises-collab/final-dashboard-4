@@ -55,32 +55,60 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     if (req.file.mimetype === "application/pdf") {
       const pdfData = await pdfParse(fs.readFileSync(req.file.path));
-      lines = pdfData.text.split("\n").filter(l => l.match(/^\d{2}\/\d{2}\/\d{2}/)); // only rows with date
+      const regex = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2})\s+\S+\s+\S+\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(.+)$/;
+
+      lines = pdfData.text
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => regex.test(l));
+
+      const parsed = lines.map((line, idx) => {
+        const match = line.match(regex);
+        if (!match) return null;
+
+        const [, date, time, amountStr, , description] = match;
+        const cleanAmount = parseFloat(amountStr.replace(/,/g, ""));
+        const { supplier, category } = mapExpense(description);
+
+        return {
+          id: idx,
+          date,
+          time,
+          supplier,
+          category,
+          description,
+          amount: cleanAmount,
+          notes: "",
+          status: "pending",
+        };
+      }).filter(Boolean);
+
+      return res.json({ ok: true, parsed });
     } else if (req.file.mimetype.includes("csv")) {
       const content = fs.readFileSync(req.file.path, "utf8");
       const records = csvParse(content, { columns: false, skip_empty_lines: true });
       lines = records.map((r: string[]) => r.join(" "));
+      
+      const parsed = lines.map((line, idx) => {
+        const parts = line.split(" ");
+        const date = parts[0];
+        const amount = parts.find(p => /^\d+(\.\d{1,2})?$/.test(p)) || "0";
+        const description = parts.slice(4).join(" ");
+        const { supplier, category } = mapExpense(description);
+        return {
+          id: idx,
+          date,
+          supplier,
+          category,
+          description,
+          amount,
+          notes: "",
+          status: "pending",
+        };
+      });
+
+      res.json({ ok: true, parsed });
     }
-
-    const parsed = lines.map((line, idx) => {
-      const parts = line.split(" ");
-      const date = parts[0];
-      const amount = parts.find(p => /^\d+(\.\d{1,2})?$/.test(p)) || "0";
-      const description = parts.slice(4).join(" ");
-      const { supplier, category } = mapExpense(description);
-      return {
-        id: idx,
-        date,
-        supplier,
-        category,
-        description,
-        amount,
-        notes: "",
-        status: "pending",
-      };
-    });
-
-    res.json({ ok: true, parsed });
   } catch (err) {
     console.error("Upload error:", err);
     res.status(500).json({ error: "Failed to process upload" });
