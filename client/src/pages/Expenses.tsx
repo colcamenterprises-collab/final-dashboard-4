@@ -1,303 +1,250 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import PageShell from "@/layouts/PageShell";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import PageShell from "@/layouts/PageShell";
+
+const suppliers = ["Other", "Mr DIY", "Bakery", "Makro", "Supercheap", "Lazada", "Lotus", "Big C", "Landlord - Rent", "Printing Shop", "Company Expenses", "Wages", "Wages - Bonus", "GO Wholesale", "Director - Personal", "Utilities - GAS/Electric/Phone"];
+const categories = ["Food", "Beverage", "Wages", "Rent", "Utilities", "Kitchen Supplies & Packaging", "Administration", "Marketing", "Printing", "Staff Expenses (from account)", "Travel", "Personal (director)", "Maintenance", "Company Expense"];
 
 export default function Expenses() {
-  const [showRollsModal, setShowRollsModal] = useState(false);
-  const [showMeatModal, setShowMeatModal] = useState(false);
-  const [showDrinksModal, setShowDrinksModal] = useState(false);
+  const [expenses, setExpenses] = useState([]);
+  const [total, setTotal] = useState(0);
   const [file, setFile] = useState<File | null>(null);
-  const [parsed, setParsed] = useState<any>(null);
-  
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [showGeneralModal, setShowGeneralModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [activeStockTab, setActiveStockTab] = useState<"rolls"|"meat"|"drinks">("rolls");
 
-  // Data fetching queries
-  const rollsQuery = useQuery({
-    queryKey: ['/api/expensesV2/rolls'],
-    queryFn: () => apiRequest('/api/expensesV2/rolls', 'GET')
-  });
+  useEffect(() => { fetchExpenses(); }, []);
 
-  const meatQuery = useQuery({
-    queryKey: ['/api/expensesV2/meat'],
-    queryFn: () => apiRequest('/api/expensesV2/meat', 'GET')
-  });
-
-  const drinksQuery = useQuery({
-    queryKey: ['/api/expensesV2/drinks'],
-    queryFn: () => apiRequest('/api/expensesV2/drinks', 'GET')
-  });
-
-  const rollsMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expensesV2/rolls", "POST", data),
-    onSuccess: () => {
-      toast({ title: "Success", description: "Rolls expense recorded" });
-      setShowRollsModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/rolls'] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+  async function fetchExpenses() {
+    try {
+      const { data } = await axios.get("/api/expensesV2");
+      setExpenses(data.expenses || []);
+      setTotal(data.total || 0);
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
     }
-  });
+  }
 
-  const meatMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expensesV2/meat", "POST", data),
-    onSuccess: () => {
-      toast({ title: "Success", description: "Meat expense recorded" });
-      setShowMeatModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/meat'] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await axios.post("/api/expensesV2/upload", formData);
+      setParsed(data.parsed || []);
+    } catch (error) {
+      console.error("Upload failed:", error);
     }
-  });
+  }
 
-  const drinksMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/expensesV2/drinks", "POST", data),
-    onSuccess: () => {
-      toast({ title: "Success", description: "Drinks expense recorded" });
-      setShowDrinksModal(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2/drinks'] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+  async function approveLine(line: any) {
+    try {
+      await axios.post("/api/expensesV2/approve", line);
+      fetchExpenses();
+      // Remove from parsed list
+      setParsed(prev => prev.filter(p => p !== line));
+    } catch (error) {
+      console.error("Approve failed:", error);
     }
-  });
+  }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Prepare chart data
+  const chartData = categories.map(cat => ({
+    name: cat,
+    value: expenses.filter((e: any) => e.category === cat).reduce((s: number, e: any) => s + (e.amountMinor || 0), 0) / 100
+  })).filter(item => item.value > 0);
 
-  const formatCurrency = (amount: number) => {
-    return `฿${amount.toFixed(2)}`;
-  };
+  const colors = ["#00C49F", "#FF8042", "#0088FE", "#FFBB28", "#FF4444"];
 
   return (
     <PageShell>
-      <div className="space-y-6">
-        <h1 className="h1">Expenses</h1>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Expenses</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Rolls */}
-          <div className="rounded-2xl border bg-white p-6">
-            <h2 className="h2 mb-4">Rolls</h2>
-            <p className="text-sm text-gray-600 mb-4">Record roll purchases and status</p>
-            <button
-              onClick={() => setShowRollsModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
-            >
-              Add Roll Purchase
-            </button>
-
-            {/* Rolls Data Display */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-2">Recent Entries</h3>
-              {rollsQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
-              {rollsQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
-              {rollsQuery.data && Array.isArray(rollsQuery.data) && rollsQuery.data.length > 0 ? (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {rollsQuery.data.slice(0, 5).map((entry: any, index: number) => (
-                    <div key={index} className="text-sm border rounded p-2">
-                      <div className="flex justify-between">
-                        <span>{entry.amount || 'N/A'} rolls</span>
-                        <span className="text-gray-600">{entry.cost ? formatCurrency(Number(entry.cost)) : 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>{entry.status || 'N/A'}</span>
-                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : rollsQuery.data && !rollsQuery.isLoading ? (
-                <p className="text-sm text-gray-500">No entries yet</p>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Meat */}
-          <div className="rounded-2xl border bg-white p-6">
-            <h2 className="h2 mb-4">Meat</h2>
-            <p className="text-sm text-gray-600 mb-4">Track meat weight and type</p>
-            <button
-              onClick={() => setShowMeatModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
-            >
-              Add Meat Entry
-            </button>
-
-            {/* Meat Data Display */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-2">Recent Entries</h3>
-              {meatQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
-              {meatQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
-              {meatQuery.data && Array.isArray(meatQuery.data) && meatQuery.data.length > 0 ? (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {meatQuery.data.slice(0, 5).map((entry: any, index: number) => (
-                    <div key={index} className="text-sm border rounded p-2">
-                      <div className="flex justify-between">
-                        <span>{entry.weightG || 'N/A'}g</span>
-                        <span className="text-gray-600 capitalize">{entry.meatType || 'N/A'}</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : meatQuery.data && !meatQuery.isLoading ? (
-                <p className="text-sm text-gray-500">No entries yet</p>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Drinks */}
-          <div className="rounded-2xl border bg-white p-6">
-            <h2 className="h2 mb-4">Drinks</h2>
-            <p className="text-sm text-gray-600 mb-4">Log drink quantities</p>
-            <button
-              onClick={() => setShowDrinksModal(true)}
-              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 mb-4"
-            >
-              Add Drinks Entry
-            </button>
-
-            {/* Drinks Data Display */}
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-2">Recent Entries</h3>
-              {drinksQuery.isLoading && <p className="text-sm text-gray-500">Loading...</p>}
-              {drinksQuery.error && <p className="text-sm text-red-600">Error loading data</p>}
-              {drinksQuery.data && Array.isArray(drinksQuery.data) && drinksQuery.data.length > 0 ? (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {drinksQuery.data.slice(0, 5).map((entry: any, index: number) => (
-                    <div key={index} className="text-sm border rounded p-2">
-                      <div className="flex justify-between">
-                        <span className="capitalize">{entry.drink || 'N/A'}</span>
-                        <span className="text-gray-600">{entry.qty || 'N/A'} qty</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        <span>{entry.timestamp ? formatDate(entry.timestamp) : 'N/A'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : drinksQuery.data && !drinksQuery.isLoading ? (
-                <p className="text-sm text-gray-500">No entries yet</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {/* Upload Section */}
-        <div className="rounded-2xl border bg-white p-6">
-          <h2 className="h2 mb-4">Upload Expenses</h2>
-          <p className="text-sm text-gray-600 mb-4">Upload PDF, CSV, PNG, or JPG files to parse expense data</p>
-          
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!file) return;
-              const formData = new FormData();
-              formData.append("file", file);
-              try {
-                const { data } = await axios.post("/api/expensesV2/upload", formData);
-                console.log("Upload result:", data);
-                setParsed(data.parsed); // Show parsed lines in UI
-                toast({ title: "Success", description: `${data.type.toUpperCase()} file processed successfully` });
-              } catch (error: any) {
-                toast({ title: "Error", description: error.response?.data?.error || "Upload failed", variant: "destructive" });
-              }
-            }}
-            className="mb-4"
+        {/* Buttons */}
+        <div className="flex space-x-4 mb-4">
+          <button 
+            onClick={() => setShowGeneralModal(true)} 
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
           >
-            <div className="flex gap-3">
-              <input 
-                type="file" 
-                accept=".pdf,.csv,.png,.jpg" 
-                onChange={e => setFile(e.target.files?.[0] || null)}
-                className="flex-1 p-3 border rounded-xl"
-              />
-              <button 
-                type="submit" 
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50"
-                disabled={!file}
-              >
-                Upload
-              </button>
-            </div>
-          </form>
-
-          {/* Show parsed result */}
-          {parsed && (
-            <div className="mt-4 border rounded-xl p-4 bg-gray-50">
-              <h3 className="font-semibold mb-3">Parsed Items ({parsed.length})</h3>
-              <div className="max-h-60 overflow-y-auto">
-                <ul className="text-sm space-y-1">
-                  {parsed.map((line: any, i: number) => (
-                    <li key={i} className="p-2 bg-white rounded border">
-                      {typeof line === "string" ? line : JSON.stringify(line)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
+            Lodge Business Expense
+          </button>
+          <button 
+            onClick={() => setShowStockModal(true)} 
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+          >
+            Lodge Stock Purchase
+          </button>
         </div>
 
-        {/* Rolls Modal */}
-        {showRollsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-              <h3 className="h3 mb-4">Add Roll Purchase</h3>
-              <form onSubmit={(e) => {
+        {/* Upload */}
+        <form onSubmit={handleUpload} className="mb-6">
+          <div className="flex gap-3">
+            <input 
+              type="file" 
+              accept=".pdf,.csv,.png,.jpg" 
+              onChange={e => setFile(e.target.files?.[0] || null)}
+              className="flex-1 p-2 border rounded"
+            />
+            <button 
+              type="submit" 
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              disabled={!file}
+            >
+              Upload File
+            </button>
+          </div>
+        </form>
+
+        {parsed.length > 0 && (
+          <div className="mb-6 bg-gray-50 rounded-lg p-4">
+            <h3 className="font-semibold mb-2">Review Parsed Items ({parsed.length})</h3>
+            {parsed.map((line, i) => (
+              <div key={i} className="flex space-x-2 mb-2 p-2 bg-white rounded border">
+                <input 
+                  className="border p-1 flex-1" 
+                  value={line.raw || line.description || ""} 
+                  onChange={e => {
+                    const newParsed = [...parsed];
+                    newParsed[i] = { ...line, raw: e.target.value };
+                    setParsed(newParsed);
+                  }}
+                />
+                <button 
+                  onClick={() => approveLine({ 
+                    date: new Date().toISOString().split('T')[0], 
+                    supplier: "Other", 
+                    category: "Food", 
+                    items: line.raw || line.description || "", 
+                    amount: 0, 
+                    notes: "" 
+                  })} 
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                >
+                  Approve
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Expenses Table */}
+        <h2 className="text-lg font-semibold mb-2">Expenses This Month (Total: ฿{(total/100).toFixed(2)})</h2>
+        <div className="overflow-x-auto mb-6">
+          <table className="w-full border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-2 border text-left">Date</th>
+                <th className="p-2 border text-left">Supplier</th>
+                <th className="p-2 border text-left">Category</th>
+                <th className="p-2 border text-left">Items</th>
+                <th className="p-2 border text-left">Notes</th>
+                <th className="p-2 border text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map((exp: any) => (
+                <tr key={exp.id} className="hover:bg-gray-50">
+                  <td className="p-2 border">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="p-2 border">{exp.supplier}</td>
+                  <td className="p-2 border">{exp.category}</td>
+                  <td className="p-2 border">{exp.description}</td>
+                  <td className="p-2 border">{exp.notes}</td>
+                  <td className="p-2 border text-right">฿{((exp.amountMinor || 0)/100).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pie Chart */}
+        {chartData.length > 0 && (
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Category Summary</h2>
+            <PieChart width={400} height={300}>
+              <Pie 
+                data={chartData} 
+                dataKey="value" 
+                nameKey="name" 
+                cx="50%" 
+                cy="50%" 
+                outerRadius={100}
+              >
+                {chartData.map((_, idx) => (
+                  <Cell key={idx} fill={colors[idx % colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value: number) => `฿${value.toFixed(2)}`} />
+              <Legend />
+            </PieChart>
+          </div>
+        )}
+
+        {/* Business Expense Modal */}
+        {showGeneralModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded w-96 max-h-96 overflow-y-auto">
+              <h3 className="font-bold mb-4">Business Expense</h3>
+              <form onSubmit={async e => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                rollsMutation.mutate({
-                  amount: formData.get('amount'),
-                  timestamp: new Date().toISOString(),
-                  cost: formData.get('cost'),
-                  status: formData.get('status')
-                });
-              }}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Amount</label>
-                    <input name="amount" type="number" min="1" required className="w-full p-3 border rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Cost (฿)</label>
-                    <input name="cost" type="number" min="0" step="0.01" required className="w-full p-3 border rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Status</label>
-                    <select name="status" className="w-full p-3 border rounded-xl">
-                      <option value="unpaid">Unpaid</option>
-                      <option value="paid">Paid</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button
+                const form = e.target as HTMLFormElement;
+                const data = Object.fromEntries(new FormData(form).entries());
+                try {
+                  await axios.post("/api/expensesV2", data);
+                  setShowGeneralModal(false);
+                  fetchExpenses();
+                } catch (error) {
+                  console.error("Failed to save expense:", error);
+                }
+              }} className="space-y-3">
+                <input 
+                  type="date" 
+                  name="date" 
+                  className="border p-2 w-full rounded" 
+                  defaultValue={new Date().toISOString().split('T')[0]}
+                  required 
+                />
+                <select name="supplier" className="border p-2 w-full rounded" required>
+                  {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  name="amount" 
+                  placeholder="Amount (฿)" 
+                  className="border p-2 w-full rounded" 
+                  required 
+                />
+                <select name="category" className="border p-2 w-full rounded" required>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input 
+                  type="text" 
+                  name="items" 
+                  placeholder="Items/Description" 
+                  className="border p-2 w-full rounded" 
+                />
+                <textarea 
+                  name="notes" 
+                  placeholder="Notes" 
+                  className="border p-2 w-full rounded h-16" 
+                />
+                <div className="flex gap-2">
+                  <button 
                     type="button"
-                    onClick={() => setShowRollsModal(false)}
-                    className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50"
+                    onClick={() => setShowGeneralModal(false)}
+                    className="flex-1 px-4 py-2 border rounded hover:bg-gray-50"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={rollsMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
                   >
-                    {rollsMutation.isPending ? "Saving..." : "Save"}
+                    Save
                   </button>
                 </div>
               </form>
@@ -305,98 +252,145 @@ export default function Expenses() {
           </div>
         )}
 
-        {/* Meat Modal */}
-        {showMeatModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-              <h3 className="h3 mb-4">Add Meat Entry</h3>
-              <form onSubmit={(e) => {
+        {/* Stock Purchase Modal */}
+        {showStockModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded w-96">
+              <h3 className="font-bold mb-4">Stock Purchase</h3>
+              <div className="flex mb-4">
+                <button 
+                  onClick={() => setActiveStockTab("rolls")} 
+                  className={`flex-1 px-2 py-1 ${activeStockTab==="rolls"?"bg-black text-white":"bg-gray-200"}`}
+                >
+                  Rolls
+                </button>
+                <button 
+                  onClick={() => setActiveStockTab("meat")} 
+                  className={`flex-1 px-2 py-1 ${activeStockTab==="meat"?"bg-black text-white":"bg-gray-200"}`}
+                >
+                  Meat
+                </button>
+                <button 
+                  onClick={() => setActiveStockTab("drinks")} 
+                  className={`flex-1 px-2 py-1 ${activeStockTab==="drinks"?"bg-black text-white":"bg-gray-200"}`}
+                >
+                  Drinks
+                </button>
+              </div>
+              <form onSubmit={async e => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                meatMutation.mutate({
-                  weightG: formData.get('weightG'),
-                  meatType: formData.get('meatType'),
-                  timestamp: new Date().toISOString()
-                });
-              }}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Weight (grams)</label>
-                    <input name="weightG" type="number" min="1" required className="w-full p-3 border rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Meat Type</label>
-                    <select name="meatType" className="w-full p-3 border rounded-xl">
-                      <option value="beef">Beef</option>
-                      <option value="chicken">Chicken</option>
-                      <option value="pork">Pork</option>
+                const form = e.target as HTMLFormElement;
+                const data = Object.fromEntries(new FormData(form).entries());
+                data.type = activeStockTab==="rolls"?"Rolls":activeStockTab==="meat"?"Meat":"Drinks";
+                try {
+                  await axios.post("/api/expensesV2", data);
+                  setShowStockModal(false);
+                  fetchExpenses();
+                } catch (error) {
+                  console.error("Failed to save stock purchase:", error);
+                }
+              }} className="space-y-3">
+                {activeStockTab==="rolls" && (
+                  <>
+                    <input 
+                      type="number" 
+                      name="qty" 
+                      placeholder="Quantity" 
+                      className="border p-2 w-full rounded" 
+                      required
+                    />
+                    <select name="paid" className="border p-2 w-full rounded" required>
+                      <option value="Paid">Paid</option>
+                      <option value="Unpaid">Unpaid</option>
                     </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      name="amount" 
+                      placeholder="Amount (฿)" 
+                      className="border p-2 w-full rounded" 
+                      required
+                    />
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </>
+                )}
+                {activeStockTab==="meat" && (
+                  <>
+                    <select name="meatType" className="border p-2 w-full rounded" required>
+                      <option value="Topside">Topside</option>
+                      <option value="Chuck">Chuck</option>
+                      <option value="Brisket">Brisket</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <input 
+                      type="number" 
+                      name="weightKg" 
+                      placeholder="Weight (kg)" 
+                      className="border p-2 w-full rounded" 
+                    />
+                    <input 
+                      type="number" 
+                      name="weightG" 
+                      placeholder="Weight (g)" 
+                      className="border p-2 w-full rounded" 
+                    />
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      name="amount" 
+                      placeholder="Amount (฿)" 
+                      className="border p-2 w-full rounded" 
+                      required
+                    />
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </>
+                )}
+                {activeStockTab==="drinks" && (
+                  <>
+                    <select name="drinkType" className="border p-2 w-full rounded" required>
+                      <option value="Coke">Coke</option>
+                      <option value="Sprite">Sprite</option>
+                      <option value="Water">Water</option>
+                      <option value="Juice">Juice</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <input 
+                      type="number" 
+                      name="qty" 
+                      placeholder="Quantity" 
+                      className="border p-2 w-full rounded" 
+                      required
+                    />
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      name="amount" 
+                      placeholder="Amount (฿)" 
+                      className="border p-2 w-full rounded" 
+                      required
+                    />
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </>
+                )}
+                <div className="flex gap-2 mt-4">
+                  <button 
                     type="button"
-                    onClick={() => setShowMeatModal(false)}
-                    className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50"
+                    onClick={() => setShowStockModal(false)}
+                    className="flex-1 px-4 py-2 border rounded hover:bg-gray-50"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={meatMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
                   >
-                    {meatMutation.isPending ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Drinks Modal */}
-        {showDrinksModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-              <h3 className="h3 mb-4">Add Drinks Entry</h3>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                drinksMutation.mutate({
-                  drink: formData.get('drink'),
-                  qty: formData.get('qty'),
-                  timestamp: new Date().toISOString()
-                });
-              }}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Drink</label>
-                    <select name="drink" className="w-full p-3 border rounded-xl">
-                      <option value="coke">Coke</option>
-                      <option value="sprite">Sprite</option>
-                      <option value="water">Water</option>
-                      <option value="juice">Juice</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Quantity</label>
-                    <input name="qty" type="number" min="1" required className="w-full p-3 border rounded-xl" />
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowDrinksModal(false)}
-                    className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={drinksMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    {drinksMutation.isPending ? "Saving..." : "Save"}
+                    Save
                   </button>
                 </div>
               </form>

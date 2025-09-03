@@ -4,35 +4,41 @@ import pdfParse from "pdf-parse";
 import { db } from "../db";
 import { expenses } from "../../shared/schema";
 import { sql } from "drizzle-orm";
+import fs from "fs";
+import { parse as csvParse } from "csv-parse/sync";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
-// Manual entry: stock + general
+// Manual entry (Business + Stock)
 router.post("/", async (req, res) => {
   try {
-    const { date, type, supplier, description, amount, category } = req.body;
+    const { date, supplier, amount, category, items, notes, type, qty, paid, weightKg, weightG, drinkType, meatType } = req.body;
 
-    if (!amount || isNaN(Number(amount))) {
-      return res.status(400).json({ error: "Invalid amount" });
+    const values: any = {
+      date: new Date(date || new Date()),
+      supplier,
+      category,
+      description: items || type || "",
+      amount: String(Number(amount || 0)),
+      amountMinor: Math.round(Number(amount || 0) * 100), // THB → cents
+      currency: "THB",
+      source: "MANUAL",
+      descriptionRaw: items || type || "",
+    };
+
+    // Add stock-specific fields into notes for traceability
+    if (type === "Rolls") {
+      values.notes = `Qty: ${qty}, Paid: ${paid}, Amount: ${amount} ${notes || ""}`;
+    }
+    if (type === "Meat") {
+      values.notes = `Type: ${meatType}, ${weightKg}kg ${weightG}g, Supplier: ${supplier} ${notes || ""}`;
+    }
+    if (type === "Drinks") {
+      values.notes = `Type: ${drinkType}, Qty: ${qty} ${notes || ""}`;
     }
 
-    const inserted = await db
-      .insert(expenses)
-      .values({
-        date: new Date(date),
-        typeOfExpense: type,
-        supplier,
-        description,
-        amount: String(Number(amount)), // store as decimal string
-        category,
-        source: "MANUAL",
-        descriptionRaw: description || `${type} - ${supplier}`,
-        amountMinor: Math.round(Number(amount) * 100), // store in minor units
-        currency: "THB"
-      })
-      .returning();
-
+    const inserted = await db.insert(expenses).values(values).returning();
     res.json({ ok: true, expense: inserted[0] });
   } catch (err) {
     console.error("Create expense error:", err);
@@ -40,26 +46,22 @@ router.post("/", async (req, res) => {
   }
 });
 
-// File upload + parse (PDF, CSV, Images)
+// Upload + parse (PDF, CSV, Image)
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
     // PDF
     if (req.file.mimetype === "application/pdf") {
-      const fs = require('fs');
-      const pdfBuffer = fs.readFileSync(req.file.path);
-      const pdfData = await pdfParse(pdfBuffer);
+      const pdfData = await pdfParse(fs.readFileSync(req.file.path));
       const lines = pdfData.text.split("\n").filter(l => l.trim() !== "");
-      return res.json({ ok: true, type: "pdf", parsed: lines });
+      return res.json({ ok: true, type: "pdf", parsed: lines.map((l, i) => ({ id: i, raw: l })) });
     }
 
     // CSV
-    if (req.file.mimetype === "text/csv") {
-      const csv = require("csv-parse/sync");
-      const fs = require("fs");
+    if (req.file.mimetype.includes("csv")) {
       const content = fs.readFileSync(req.file.path, "utf8");
-      const records = csv.parse(content, { columns: true, skip_empty_lines: true });
+      const records = csvParse(content, { columns: true, skip_empty_lines: true });
       return res.json({ ok: true, type: "csv", parsed: records });
     }
 
@@ -75,14 +77,39 @@ router.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// List expenses with filters + totals
+// Approve parsed item → save to DB
+router.post("/approve", async (req, res) => {
+  try {
+    const { date, supplier, amount, category, items, notes } = req.body;
+
+    const inserted = await db.insert(expenses).values({
+      date: new Date(date),
+      supplier,
+      category,
+      description: items,
+      amount: String(Number(amount)),
+      amountMinor: Math.round(Number(amount) * 100),
+      currency: "THB",
+      source: "UPLOAD",
+      descriptionRaw: items,
+      notes,
+    }).returning();
+
+    res.json({ ok: true, expense: inserted[0] });
+  } catch (err) {
+    console.error("Approve error:", err);
+    res.status(500).json({ error: "Failed to approve expense" });
+  }
+});
+
+// List expenses with totals
 router.get("/", async (req, res) => {
   try {
-    const { start, end } = req.query;
-
+    const { month, year } = req.query;
     let results;
-    if (start && end) {
-      results = await db.select().from(expenses).where(sql`date BETWEEN ${start} AND ${end}`);
+
+    if (month && year) {
+      results = await db.select().from(expenses).where(sql`EXTRACT(MONTH FROM date) = ${month} AND EXTRACT(YEAR FROM date) = ${year}`);
     } else {
       results = await db.select().from(expenses);
     }
