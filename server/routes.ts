@@ -1531,6 +1531,91 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Upload and parse expense documents
+  app.post("/api/expensesV2/upload", upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const file = req.file;
+      let parsed: any[] = [];
+
+      // Handle different file types
+      if (file.mimetype === 'text/csv' || file.filename?.endsWith('.csv')) {
+        // Parse CSV file
+        const csvText = file.buffer.toString('utf8');
+        const lines = csvText.split('\n').filter(line => line.trim());
+        
+        for (let i = 1; i < lines.length; i++) { // Skip header
+          const cols = lines[i].split(',');
+          if (cols.length >= 4) {
+            parsed.push({
+              id: i,
+              date: cols[0]?.trim() || new Date().toISOString().split('T')[0],
+              supplier: cols[1]?.trim() || 'Unknown',
+              amount: parseFloat(cols[2]?.trim() || '0'),
+              description: cols[3]?.trim() || 'Imported expense',
+              category: cols[4]?.trim() || 'General',
+              notes: cols[5]?.trim() || ''
+            });
+          }
+        }
+      } else if (file.mimetype === 'application/pdf') {
+        // For PDF parsing, return placeholder data for now
+        parsed.push({
+          id: 1,
+          date: new Date().toISOString().split('T')[0],
+          supplier: file.originalname?.replace('.pdf', '') || 'PDF Upload',
+          amount: 0,
+          description: 'PDF upload - please verify details',
+          category: 'General',
+          notes: 'Uploaded from PDF'
+        });
+      } else if (file.mimetype.startsWith('image/')) {
+        // For image parsing, return placeholder data for now
+        parsed.push({
+          id: 1,
+          date: new Date().toISOString().split('T')[0],
+          supplier: file.originalname?.replace(/\.(jpg|jpeg|png)$/i, '') || 'Image Upload',
+          amount: 0,
+          description: 'Image upload - please verify details',
+          category: 'General',
+          notes: 'Uploaded from image'
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        parsed,
+        message: `Successfully parsed ${parsed.length} items from ${file.originalname}`
+      });
+
+    } catch (error) {
+      console.error("Error processing upload:", error);
+      res.status(500).json({ error: "Failed to process upload" });
+    }
+  });
+
+  // Approve parsed expense line
+  app.post("/api/expensesV2/approve", async (req: Request, res: Response) => {
+    try {
+      const approvedExpense = req.body;
+      const expense = await storage.createExpense({
+        date: approvedExpense.date,
+        supplier: approvedExpense.supplier,
+        amount: approvedExpense.amount,
+        category: approvedExpense.category,
+        description: approvedExpense.description,
+        notes: approvedExpense.notes
+      });
+      res.json(expense);
+    } catch (error) {
+      console.error("Error approving expense:", error);
+      res.status(500).json({ error: "Failed to approve expense" });
+    }
+  });
+
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
