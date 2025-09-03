@@ -1646,32 +1646,38 @@ export function registerRoutes(app: express.Application): Server {
       }
 
       if (type === "meat") {
-        // Meat goes to stock_entries
+        // Meat goes to purchase_tally
+        const weightGrams = Math.round(Number(weightKg) * 1000);
         const result = await db.execute(sql`
-          INSERT INTO stock_entries (meat, notes, entry_date, created_at)
+          INSERT INTO purchase_tally (id, created_at, date, supplier, amount_thb, notes, meat_grams)
           VALUES (
-            ${weightKg},
-            ${meatType},
+            gen_random_uuid(),
             NOW(),
-            NOW()
+            NOW(),
+            'Meat Supplier',
+            0,
+            ${meatType},
+            ${weightGrams}
           )
-          RETURNING id, entry_date as date, meat as qty, notes as item
+          RETURNING id, created_at as date, meat_grams as weight, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
       if (type === "drinks") {
-        // Drinks go to stock_entries
+        // Drinks go to purchase_tally 
         const result = await db.execute(sql`
-          INSERT INTO stock_entries (drinks, notes, entry_date, created_at)
+          INSERT INTO purchase_tally (id, created_at, date, supplier, amount_thb, notes)
           VALUES (
-            ${qty},
-            ${drinkType},
+            gen_random_uuid(),
             NOW(),
-            NOW()
+            NOW(),
+            'Drinks Supplier',
+            0,
+            ${drinkType + ' (' + qty + ' units)'}
           )
-          RETURNING id, entry_date as date, drinks as qty, notes as item
+          RETURNING id, created_at as date, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
