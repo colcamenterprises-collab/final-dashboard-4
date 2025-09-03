@@ -1,0 +1,103 @@
+🚫 Replit Agent Instructions
+
+Do Not leave duplicate weight fields.
+Do Not ask for Supplier or Description in stock purchase forms.
+Do Not add Meat/Drinks to main expenses table.
+Do Not force staff to pick a date — always auto timestamp.
+Do Not change schema — just use existing expenses + stock tables.
+
+🛠 Patch Snippet – Frontend (Expenses.tsx, Stock Modal)
+Rolls tab
+<input type="number" name="qty" placeholder="Quantity (Rolls)" className="border p-2 w-full" required />
+<input type="number" step="0.01" name="amount" placeholder="Amount (THB)" className="border p-2 w-full" required />
+
+Meat tab
+<select name="meatType" className="border p-2 w-full" required>
+  <option>Topside</option>
+  <option>Chuck</option>
+  <option>Brisket</option>
+  <option>Rump</option>
+  <option>Outside</option>
+  <option>Mixed</option>
+  <option>Other</option>
+</select>
+<input type="number" step="0.01" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full" required />
+
+Drinks tab
+<select name="drinkType" className="border p-2 w-full" required>
+  <option>Coke</option>
+  <option>Coke Zero</option>
+  <option>Sprite</option>
+  <option>Schweppes Manow</option>
+  <option>Red Fanta</option>
+  <option>Orange Fanta</option>
+  <option>Red Singha</option>
+  <option>Yellow Singha</option>
+  <option>Pink Singha</option>
+  <option>Soda Water</option>
+</select>
+<input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full" required />
+
+🛠 Patch Snippet – Backend (expensesV2.ts)
+
+For Rolls (inside POST /):
+
+if (type === "Rolls") {
+  await db.execute(sql`
+    INSERT INTO expenses (id, restaurantId, shiftDate, supplier, costCents, item, expenseType, meta, source, createdAt)
+    VALUES (
+      gen_random_uuid(),
+      'default',
+      NOW(),
+      'Bakery',
+      ${Math.round(Number(amount) * 100)},
+      'Rolls',
+      'Food',
+      jsonb_build_object('qty', ${qty}),
+      'business',
+      NOW()
+    )
+  `);
+}
+
+
+For Meat + Drinks (separate handler or /stock route):
+
+if (type === "Meat") {
+  await db.execute(sql`
+    INSERT INTO daily_stock_v2 (id, shiftDate, item, qty, unit, createdAt)
+    VALUES (
+      gen_random_uuid(),
+      NOW(),
+      ${meatType},
+      ${weightKg},
+      'kg',
+      NOW()
+    )
+  `);
+}
+
+if (type === "Drinks") {
+  await db.execute(sql`
+    INSERT INTO daily_stock_v2 (id, shiftDate, item, qty, unit, createdAt)
+    VALUES (
+      gen_random_uuid(),
+      NOW(),
+      ${drinkType},
+      ${qty},
+      'unit',
+      NOW()
+    )
+  `);
+}
+
+
+✅ With this patch:
+
+Rolls go to expenses (with Bakery + cost).
+
+Meat + Drinks go to daily_stock_v2 (with timestamp).
+
+No duplicate or useless fields.
+
+Auto timestamp on save.

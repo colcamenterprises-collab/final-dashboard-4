@@ -1616,6 +1616,65 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Stock purchase endpoint - handles rolls, meat, drinks  
+  app.post("/api/expensesV2/stock", async (req: Request, res: Response) => {
+    try {
+      const { type, qty, amount, meatType, weightKg, drinkType } = req.body;
+      const { db } = await import("./db");
+      const { sql } = await import("drizzle-orm");
+      
+      if (type === "rolls") {
+        // Rolls go to expenses table
+        await db.execute(sql`
+          INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
+          VALUES (
+            gen_random_uuid(),
+            ${'cmes916fj0000pio20tvofd44'},
+            NOW(),
+            ${'Bakery'},
+            ${Math.round(Number(amount) * 100)},
+            ${'Rolls'},
+            ${'Food'},
+            ${JSON.stringify({qty: qty})},
+            ${'DIRECT'},
+            NOW()
+          )
+        `);
+      } else if (type === "meat") {
+        // Meat goes to daily_stock_v2 table
+        await db.execute(sql`
+          INSERT INTO "dailyStockV2" (id, "shiftDate", item, qty, unit, "createdAt")
+          VALUES (
+            gen_random_uuid(),
+            NOW(),
+            ${meatType},
+            ${weightKg},
+            ${'kg'},
+            NOW()
+          )
+        `);
+      } else if (type === "drinks") {
+        // Drinks go to daily_stock_v2 table
+        await db.execute(sql`
+          INSERT INTO "dailyStockV2" (id, "shiftDate", item, qty, unit, "createdAt")
+          VALUES (
+            gen_random_uuid(),
+            NOW(),
+            ${drinkType},
+            ${qty},
+            ${'unit'},
+            NOW()
+          )
+        `);
+      }
+      
+      res.json({ success: true, message: `${type} purchase recorded successfully` });
+    } catch (error) {
+      console.error("Error creating stock purchase:", error);
+      res.status(500).json({ error: "Failed to create stock purchase" });
+    }
+  });
+
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {

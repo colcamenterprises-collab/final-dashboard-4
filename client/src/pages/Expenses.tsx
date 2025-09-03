@@ -338,8 +338,8 @@ export default function Expenses() {
               try {
                 const formData = new FormData(e.target as HTMLFormElement);
                 const data = Object.fromEntries(formData.entries());
-                data.notes = `${activeTab}: ${data.notes}`;
-                await axios.post("/api/expensesV2", data);
+                data.type = activeTab;
+                await axios.post("/api/expensesV2/stock", data);
                 setShowStockModal(false); 
                 fetchExpenses();
               } catch (error) {
@@ -347,12 +347,20 @@ export default function Expenses() {
                 alert("Failed to create stock purchase");
               }
             }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Date</label>
-                <input type="date" name="date" className="border p-2 w-full rounded" defaultValue={new Date().toISOString().split('T')[0]} />
-              </div>
+              {/* Tab-specific fields only */}
+              {activeTab === "rolls" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Quantity (Rolls)</label>
+                    <input type="number" name="qty" placeholder="Quantity (Rolls)" className="border p-2 w-full rounded" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Amount (THB)</label>
+                    <input type="number" step="0.01" name="amount" placeholder="Amount (THB)" className="border p-2 w-full rounded" required />
+                  </div>
+                </>
+              )}
               
-              {/* Tab-specific fields */}
               {activeTab === "meat" && (
                 <>
                   <div>
@@ -369,19 +377,7 @@ export default function Expenses() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Weight (kg)</label>
-                    <input type="number" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full rounded" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Weight (g)</label>
-                    <input type="number" name="weightG" placeholder="Weight (g)" className="border p-2 w-full rounded" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Supplier</label>
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    <input type="number" step="0.01" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full rounded" required />
                   </div>
                 </>
               )}
@@ -407,42 +403,8 @@ export default function Expenses() {
                     <label className="block text-sm font-medium mb-1">Quantity</label>
                     <input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full rounded" required />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Supplier</label>
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
                 </>
               )}
-              
-              {activeTab === "rolls" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Supplier</label>
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <input type="text" name="description" placeholder="Rolls purchase details" className="border p-2 w-full rounded" required />
-                  </div>
-                </>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Amount (THB)</label>
-                <input type="number" name="amount" placeholder="0.00" step="0.01" className="border p-2 w-full rounded" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
-                <input type="text" name="category" value="Stock Purchase" className="border p-2 w-full rounded bg-gray-100" readOnly />
-              </div>
               <div className="flex justify-end space-x-2">
                 <button type="button" onClick={() => setShowStockModal(false)} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save Purchase</button>
