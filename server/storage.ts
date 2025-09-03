@@ -765,19 +765,38 @@ export class MemStorage implements IStorage {
   }
 
   async createExpense(expense: InsertExpense): Promise<Expense> {
-    // Use database for expenses  
+    // Use direct SQL for reliable database interaction
     const { db } = await import("./db");
-    const { expenses } = await import("@shared/schema");
+    const { sql } = await import("drizzle-orm");
+    const crypto = await import("crypto");
     
+    const expenseId = crypto.randomUUID();
     const expenseDate = expense.date ? new Date(expense.date) : new Date();
-    const [result] = await db.insert(expenses).values({
-      ...expense,
-      date: expenseDate,
-      month: expense.month || expenseDate.getMonth() + 1,
-      year: expense.year || expenseDate.getFullYear(),
-    }).returning();
     
-    return result;
+    const result = await db.execute(sql`
+      INSERT INTO expenses (id, "restaurantId", "shiftDate", item, "costCents", supplier, "expenseType", meta, source)
+      VALUES (
+        ${expenseId},
+        ${'cmes916fj0000pio20tvofd44'},
+        ${expenseDate},
+        ${expense.description || expense.item || 'Unknown Item'},
+        ${Math.round((expense.amount || 0) * 100)},
+        ${expense.supplier || 'Unknown'},
+        ${expense.category || expense.expenseType || 'Shopping'},
+        ${JSON.stringify(expense.notes ? { notes: expense.notes } : {})},
+        ${'DIRECT'}
+      )
+      RETURNING 
+        id,
+        "shiftDate" as date,
+        supplier,
+        "costCents" as amount,
+        item as description,
+        "expenseType" as category,
+        meta->>'notes' as notes
+    `);
+    
+    return result.rows[0];
   }
 
   async deleteExpense(id: number): Promise<boolean> {

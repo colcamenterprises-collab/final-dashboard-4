@@ -14,8 +14,8 @@ export default function Expenses() {
   async function fetchExpenses() {
     try {
       const now = new Date();
-      const { data } = await axios.get("/api/expensesV2", { params: { month: now.getMonth()+1, year: now.getFullYear() }});
-      setExpenses(data.expenses || []);
+      const { data } = await axios.get("/api/expensesV2?source=DIRECT");
+      setExpenses(data || []);
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
     }

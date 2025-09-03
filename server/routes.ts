@@ -21,7 +21,7 @@ import { importRouter } from "./routes/imports";
 import formsRouter from "./routes/forms";
 import { costingRouter } from "./routes/costing";
 import { expensesRouter } from "./routes/expenses";
-import { expensesV2Router } from "./routes/expensesV2";
+// Removed conflicting expensesV2Router - using inline routes below
 import { purchaseTallyRouter } from "./routes/purchaseTally";
 import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
@@ -695,8 +695,7 @@ export function registerRoutes(app: express.Application): Server {
 
   // ===== Purchasing (Expenses) API =====
   
-  // Mount the new ExpensesV2 router first (handles upload, smart categorization, etc.)
-  app.use('/api/expensesV2', expensesV2Router);
+  // ExpensesV2 routes are defined inline below (lines 1421+) to avoid conflicts
 
   // Legacy Create/Update Expense with lines (fallback for existing functionality)
   app.post('/api/expensesV2/legacy', async (req: Request, res: Response) => {

@@ -178,39 +178,19 @@ export const stockEntries = pgTable("stock_entries", {
 
 
 
-// Enhanced Expenses table with source tracking
+// Enhanced Expenses table matching actual database structure
 export const expenses = pgTable("expenses", {
-  id: serial("id").primaryKey(),
-  date: timestamp("date").notNull(),
-  descriptionRaw: text("description_raw").notNull(),
-  amountMinor: integer("amount_minor").notNull(), // Amount in minor currency units (satang for THB)
-  currency: text("currency").notNull().default('THB'),
-  source: text("source").notNull(), // DIRECT_UPLOAD, MANUAL, SHIFT_FORM
-  vendorId: integer("vendor_id").references(() => vendors.id),
-  categoryId: integer("category_id").references(() => categories.id),
-  importBatchId: integer("import_batch_id").references(() => expenseImportBatch.id),
-  notes: text("notes"),
-  
-  // Legacy fields for backwards compatibility
-  description: text("description"),
-  amount: decimal("amount", { precision: 10, scale: 2 }),
-  category: text("category"),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).default('0'),
-  paymentMethod: text("payment_method"),
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurantId"),
+  shiftDate: timestamp("shiftDate").notNull(),
+  item: text("item").notNull(),
+  costCents: integer("costCents").notNull(),
   supplier: text("supplier"),
-  items: text("items"),
-  month: integer("month"),
-  year: integer("year"),
-  
-  // Expense type and shop name fields (enum-locked)
-  typeOfExpense: text("type_of_expense"),
-  shopName: text("shop_name"),
-  
-  // P&L category mapping (auto-populated from typeOfExpense)
-  pnlCategory: text("pnl_category"),
-  
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  expenseType: text("expenseType"),
+  meta: jsonb("meta"),
+  source: text("source"),
+  createdAt: timestamp("createdAt").defaultNow(),
+  wages: decimal("wages", { precision: 10, scale: 2 }),
 });
 
 // Expense Import Batch table
