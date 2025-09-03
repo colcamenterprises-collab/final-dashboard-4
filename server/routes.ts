@@ -1641,28 +1641,36 @@ export function registerRoutes(app: express.Application): Server {
           )
         `);
       } else if (type === "meat") {
-        // Meat goes to daily_stock_v2 table
+        // Meat goes to expenses table with stock category
         await db.execute(sql`
-          INSERT INTO "dailyStockV2" (id, "shiftDate", item, qty, unit, "createdAt")
+          INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
           VALUES (
             gen_random_uuid(),
+            ${'cmes916fj0000pio20tvofd44'},
             NOW(),
+            ${'Stock Purchase'},
+            ${0},
             ${meatType},
-            ${weightKg},
-            ${'kg'},
+            ${'Food'},
+            ${JSON.stringify({weightKg: weightKg, unit: 'kg'})},
+            ${'DIRECT'},
             NOW()
           )
         `);
       } else if (type === "drinks") {
-        // Drinks go to daily_stock_v2 table
+        // Drinks go to expenses table with stock category
         await db.execute(sql`
-          INSERT INTO "dailyStockV2" (id, "shiftDate", item, qty, unit, "createdAt")
+          INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
           VALUES (
             gen_random_uuid(),
+            ${'cmes916fj0000pio20tvofd44'},
             NOW(),
+            ${'Stock Purchase'},
+            ${0},
             ${drinkType},
-            ${qty},
-            ${'unit'},
+            ${'Beverage'},
+            ${JSON.stringify({qty: qty, unit: 'unit'})},
+            ${'DIRECT'},
             NOW()
           )
         `);
