@@ -1635,49 +1635,43 @@ export function registerRoutes(app: express.Application): Server {
             ${Math.round(Number(amount) * 100)},
             ${'Rolls'},
             ${'Food'},
-            jsonb_build_object('qty', ${qty}),
+            ${JSON.stringify({qty: qty})},
             ${'DIRECT'},
             NOW()
           )
-          RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category, meta->>'qty' as qty
+          RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category
         `);
 
         return res.json({ ok: true, expense: result.rows[0] });
       }
 
       if (type === "meat") {
-        // Meat goes to daily_stock_v2
+        // Meat goes to stock_entries
         const result = await db.execute(sql`
-          INSERT INTO daily_stock_v2 (id, "shiftDate", item, qty, unit, meta, "createdAt")
+          INSERT INTO stock_entries (meat, notes, entry_date, created_at)
           VALUES (
-            gen_random_uuid(),
-            NOW(),
-            ${meatType},
             ${weightKg},
-            ${'kg'},
-            jsonb_build_object('source','purchase'),
+            ${meatType},
+            NOW(),
             NOW()
           )
-          RETURNING id, "shiftDate" as date, item, qty, unit
+          RETURNING id, entry_date as date, meat as qty, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
       if (type === "drinks") {
-        // Drinks go to daily_stock_v2
+        // Drinks go to stock_entries
         const result = await db.execute(sql`
-          INSERT INTO daily_stock_v2 (id, "shiftDate", item, qty, unit, meta, "createdAt")
+          INSERT INTO stock_entries (drinks, notes, entry_date, created_at)
           VALUES (
-            gen_random_uuid(),
-            NOW(),
-            ${drinkType},
             ${qty},
-            ${'unit'},
-            jsonb_build_object('source','purchase'),
+            ${drinkType},
+            NOW(),
             NOW()
           )
-          RETURNING id, "shiftDate" as date, item, qty, unit
+          RETURNING id, entry_date as date, drinks as qty, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
