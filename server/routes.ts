@@ -1643,26 +1643,28 @@ export function registerRoutes(app: express.Application): Server {
       } else if (type === "meat") {
         // Meat goes to proper stock_purchase_meat table
         await db.execute(sql`
-          INSERT INTO stock_purchase_meat (id, "shiftDate", type, "weightKg", supplier, "createdAt")
+          INSERT INTO stock_purchase_meat (expense_id, meat_type, weight, price_per_kg, total_cost, date, created_at)
           VALUES (
-            gen_random_uuid(),
-            NOW(),
+            ${0},
             ${meatType},
             ${weightKg},
-            ${'Stock Purchase'},
+            ${0},
+            ${0},
+            NOW(),
             NOW()
           )
         `);
       } else if (type === "drinks") {
         // Drinks go to proper stock_purchase_drinks table
         await db.execute(sql`
-          INSERT INTO stock_purchase_drinks (id, "shiftDate", type, qty, supplier, "createdAt")
+          INSERT INTO stock_purchase_drinks (expense_id, drink_name, quantity, price_per_unit, total_cost, date, created_at)
           VALUES (
-            gen_random_uuid(),
-            NOW(),
+            ${0},
             ${drinkType},
             ${qty},
-            ${'Stock Purchase'},
+            ${0},
+            ${0},
+            NOW(),
             NOW()
           )
         `);
