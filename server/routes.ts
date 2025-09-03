@@ -1646,38 +1646,51 @@ export function registerRoutes(app: express.Application): Server {
       }
 
       if (type === "meat") {
-        // Meat goes to purchase_tally
+        // Get latest sales record for foreign key
+        const latestSales = await db.execute(sql`
+          SELECT id FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC LIMIT 1
+        `);
+        const salesId = latestSales.rows[0]?.id || 'e1431155-1818-45a0-9be0-b1e9bf89b58c';
+        
         const weightGrams = Math.round(Number(weightKg) * 1000);
         const result = await db.execute(sql`
-          INSERT INTO purchase_tally (id, created_at, date, supplier, amount_thb, notes, meat_grams)
+          INSERT INTO daily_stock_v2 (id, "createdAt", "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", notes)
           VALUES (
             gen_random_uuid(),
             NOW(),
-            NOW(),
-            'Meat Supplier',
+            ${salesId},
             0,
-            ${meatType},
-            ${weightGrams}
+            ${weightGrams},
+            '{}',
+            ${JSON.stringify({ source: 'purchase', type: meatType })},
+            ${meatType}
           )
-          RETURNING id, created_at as date, meat_grams as weight, notes as item
+          RETURNING id, "createdAt" as date, "meatWeightG" as weight, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
       if (type === "drinks") {
-        // Drinks go to purchase_tally 
+        // Get latest sales record for foreign key
+        const latestSales = await db.execute(sql`
+          SELECT id FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC LIMIT 1
+        `);
+        const salesId = latestSales.rows[0]?.id || 'e1431155-1818-45a0-9be0-b1e9bf89b58c';
+        
         const result = await db.execute(sql`
-          INSERT INTO purchase_tally (id, created_at, date, supplier, amount_thb, notes)
+          INSERT INTO daily_stock_v2 (id, "createdAt", "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", notes)
           VALUES (
             gen_random_uuid(),
             NOW(),
-            NOW(),
-            'Drinks Supplier',
+            ${salesId},
             0,
-            ${drinkType + ' (' + qty + ' units)'}
+            0,
+            ${JSON.stringify({ [drinkType]: parseInt(qty) })},
+            ${JSON.stringify({ source: 'purchase', type: drinkType })},
+            ${drinkType}
           )
-          RETURNING id, created_at as date, notes as item
+          RETURNING id, "createdAt" as date, "drinksJson" as drinks, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
