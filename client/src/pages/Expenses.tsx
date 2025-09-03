@@ -266,7 +266,13 @@ export default function Expenses() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Supplier</label>
-                <input type="text" name="supplier" placeholder="Supplier" className="border p-2 w-full rounded" required />
+                <select name="supplier" className="border p-2 w-full rounded" required>
+                  {[
+                    "Other","Mr DIY","Bakery","Makro","Supercheap","Lazada","Lotus","Big C","Landlord - Rent",
+                    "Printing Shop","Company Expenses","Wages","Wages - Bonus","GO Wholesale",
+                    "Director - Personal","Utilities - GAS/Electric/Phone"
+                  ].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Amount (THB)</label>
@@ -274,7 +280,13 @@ export default function Expenses() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Category</label>
-                <input type="text" name="category" placeholder="Category" className="border p-2 w-full rounded" required />
+                <select name="category" className="border p-2 w-full rounded" required>
+                  {[
+                    "Food","Beverage","Wages","Rent","Utilities","Kitchen Supplies & Packaging",
+                    "Administration","Marketing","Printing","Staff Expenses (from account)",
+                    "Travel","Personal (director)","Maintenance","Company Expense"
+                  ].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
