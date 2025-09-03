@@ -1,0 +1,367 @@
+🚫 Replit Agent Patch Instructions
+
+Do Not change schema or DB tables.
+Do Not delete legacy expense routes.
+Do Not leave parsed PDF lines as raw text.
+Do Not remove modal-based workflows.
+Do Not auto-save PDF uploads — require review & approve.
+
+📂 Files to Update / Add
+
+server/routes/expensesV2.ts → backend endpoints.
+
+server/config/expenseMappings.ts → keyword mapping rules.
+
+client/src/pages/finance/Expenses.tsx → frontend UI.
+
+1. Backend – server/config/expenseMappings.ts
+export const expenseMappings = [
+  {
+    keywords: ["ซีพี แอ็กซ์ตร้า", "Makro"],
+    supplier: "Makro",
+    category: "Food & Beverage",
+  },
+  {
+    keywords: ["MR.D.I.Y.", "MR.D.I.Y.(BANGKOK)"],
+    supplier: "Mr DIY",
+    category: "Kitchen Supplies & Packaging",
+  },
+  {
+    keywords: ["SUPPER CHEAP", "Super Cheap"],
+    supplier: "Supercheap",
+    category: "Food & Beverage",
+  },
+  {
+    keywords: ["Lazada", "Lazada Express"],
+    supplier: "Lazada",
+    category: "Food & Beverage",
+  },
+  {
+    keywords: ["Provincal Electricity Authority", "PROVINCAL ELECTRICITY", "PEA"],
+    supplier: "Provincial Electricity Authority",
+    category: "Utilities",
+  },
+  {
+    keywords: ["Rawai Power Oil"],
+    supplier: "Rawai Power Oil",
+    category: "Utilities",
+  },
+  {
+    keywords: ["Replit", "REPLIT, INC."],
+    supplier: "Replit",
+    category: "Administration",
+  },
+  {
+    keywords: ["Google", "Netflix", "Spotify"],
+    supplier: "Subscriptions",
+    category: "Marketing",
+  },
+  {
+    keywords: ["Grab", "WWW.GRAB.COM"],
+    supplier: "Grab",
+    category: "Staff Expenses",
+  },
+];
+
+2. Backend – server/routes/expensesV2.ts
+import express from "express";
+import multer from "multer";
+import pdfParse from "pdf-parse";
+import { db } from "../db";
+import { expenses } from "../db/schema";
+import { sql } from "drizzle-orm";
+import fs from "fs";
+import csvParse from "csv-parse/sync";
+import { expenseMappings } from "../config/expenseMappings";
+
+const router = express.Router();
+const upload = multer({ dest: "uploads/" });
+
+// Utility: map supplier + category
+function mapExpense(description: string) {
+  for (const rule of expenseMappings) {
+    if (rule.keywords.some(k => description.includes(k))) {
+      return { supplier: rule.supplier, category: rule.category };
+    }
+  }
+  return { supplier: "Other", category: "Uncategorised" };
+}
+
+// Manual entry
+router.post("/", async (req, res) => {
+  try {
+    const { date, supplier, amount, category, items, notes } = req.body;
+
+    const inserted = await db.insert(expenses).values({
+      date: new Date(date),
+      supplier,
+      category,
+      description: items,
+      notes,
+      amount: Math.round(Number(amount) * 100), // store in cents
+    }).returning();
+
+    res.json({ ok: true, expense: inserted[0] });
+  } catch (err) {
+    console.error("Create expense error:", err);
+    res.status(500).json({ error: "Failed to create expense" });
+  }
+});
+
+// Upload + parse
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    let lines: string[] = [];
+
+    if (req.file.mimetype === "application/pdf") {
+      const pdfData = await pdfParse(fs.readFileSync(req.file.path));
+      lines = pdfData.text.split("\n").filter(l => l.match(/^\d{2}\/\d{2}\/\d{2}/)); // only rows with date
+    } else if (req.file.mimetype.includes("csv")) {
+      const content = fs.readFileSync(req.file.path, "utf8");
+      const records = csvParse.parse(content, { columns: false, skip_empty_lines: true });
+      lines = records.map((r: string[]) => r.join(" "));
+    }
+
+    const parsed = lines.map((line, idx) => {
+      const parts = line.split(" ");
+      const date = parts[0];
+      const amount = parts.find(p => /^\d+(\.\d{1,2})?$/.test(p)) || "0";
+      const description = parts.slice(4).join(" ");
+      const { supplier, category } = mapExpense(description);
+      return {
+        id: idx,
+        date,
+        supplier,
+        category,
+        description,
+        amount,
+        notes: "",
+        status: "pending",
+      };
+    });
+
+    res.json({ ok: true, parsed });
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Failed to process upload" });
+  }
+});
+
+// Approve
+router.post("/approve", async (req, res) => {
+  try {
+    const { date, supplier, amount, category, description, notes } = req.body;
+
+    const inserted = await db.insert(expenses).values({
+      date: new Date(date),
+      supplier,
+      category,
+      description,
+      notes,
+      amount: Math.round(Number(amount) * 100),
+    }).returning();
+
+    res.json({ ok: true, expense: inserted[0] });
+  } catch (err) {
+    console.error("Approve error:", err);
+    res.status(500).json({ error: "Failed to approve expense" });
+  }
+});
+
+// List
+router.get("/", async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    let q = db.select().from(expenses);
+
+    if (month && year) {
+      q = db.select().from(expenses).where(sql`
+        EXTRACT(MONTH FROM date) = ${month} 
+        AND EXTRACT(YEAR FROM date) = ${year}
+      `);
+    }
+
+    const results = await q;
+    const total = results.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+    res.json({ ok: true, expenses: results, total });
+  } catch (err) {
+    console.error("List error:", err);
+    res.status(500).json({ error: "Failed to list expenses" });
+  }
+});
+
+export default router;
+
+3. Frontend – client/src/pages/finance/Expenses.tsx
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+
+const COLORS = ["#00C49F", "#FF8042", "#0088FE", "#FFBB28", "#FF4444"];
+
+export default function Expenses() {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [totals, setTotals] = useState({ mtd: 0, ytd: 0, today: 0 });
+
+  useEffect(() => { fetchExpenses(); }, []);
+
+  async function fetchExpenses() {
+    const now = new Date();
+    const { data } = await axios.get("/api/expensesV2", {
+      params: { month: now.getMonth() + 1, year: now.getFullYear() }
+    });
+    setExpenses(data.expenses);
+    setTotals({
+      mtd: data.total,
+      ytd: data.expenses.reduce((s: number, e: any) => s + e.amount, 0),
+      today: data.expenses
+        .filter((e: any) => new Date(e.date).toDateString() === now.toDateString())
+        .reduce((s: number, e: any) => s + e.amount, 0),
+    });
+  }
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await axios.post("/api/expensesV2/upload", formData);
+    setParsed(data.parsed);
+  }
+
+  async function approveLine(line: any) {
+    await axios.post("/api/expensesV2/approve", line);
+    setParsed(parsed.filter(l => l.id !== line.id));
+    fetchExpenses();
+  }
+
+  function deleteLine(id: number) {
+    setParsed(parsed.filter(l => l.id !== id));
+  }
+
+  // Category summary
+  const categoryData = Object.entries(
+    expenses.reduce((acc: any, e: any) => {
+      acc[e.category] = (acc[e.category] || 0) + e.amount;
+      return acc;
+    }, {})
+  ).map(([name, value]) => ({ name, value }));
+
+  return (
+    <div className="p-6 font-poppins text-gray-800">
+      <h1 className="text-xl font-bold mb-4">Expenses</h1>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Today</h4>
+          <p className="text-lg font-bold">฿{(totals.today/100).toFixed(2)}</p>
+        </div>
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Month-to-Date</h4>
+          <p className="text-lg font-bold">฿{(totals.mtd/100).toFixed(2)}</p>
+        </div>
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Year-to-Date</h4>
+          <p className="text-lg font-bold">฿{(totals.ytd/100).toFixed(2)}</p>
+        </div>
+      </div>
+
+      {/* Upload */}
+      <form onSubmit={handleUpload} className="mb-6">
+        <input type="file" accept=".pdf,.csv,.png,.jpg"
+          onChange={e => setFile(e.target.files?.[0] || null)}
+          className="text-sm" />
+        <button type="submit" className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-sm">Upload</button>
+      </form>
+
+      {/* Parsed Transactions */}
+      {parsed.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 className="font-semibold text-sm mb-2">Review Uploaded Transactions</h3>
+          <table className="w-full border text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-1 border">Date</th>
+                <th className="p-1 border">Supplier</th>
+                <th className="p-1 border">Category</th>
+                <th className="p-1 border">Description</th>
+                <th className="p-1 border">Amount</th>
+                <th className="p-1 border">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.map((line, i) => (
+                <tr key={i}>
+                  <td className="border p-1"><input type="text" defaultValue={line.date} className="border w-full text-sm" /></td>
+                  <td className="border p-1"><input type="text" defaultValue={line.supplier} className="border w-full text-sm" /></td>
+                  <td className="border p-1"><input type="text" defaultValue={line.category} className="border w-full text-sm" /></td>
+                  <td className="border p-1"><input type="text" defaultValue={line.description} className="border w-full text-sm" /></td>
+                  <td className="border p-1"><input type="number" defaultValue={line.amount} className="border w-full text-sm" /></td>
+                  <td className="border p-1 space-x-1">
+                    <button onClick={() => approveLine(line)} className="bg-green-600 text-white px-2 py-1 rounded text-xs">Approve</button>
+                    <button onClick={() => deleteLine(line.id)} className="bg-red-600 text-white px-2 py-1 rounded text-xs">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Expense Table */}
+      <h2 className="text-lg font-semibold mb-2">This Month's Expenses</h2>
+      <table className="w-full border text-sm mb-6">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-1 border">Date</th>
+            <th className="p-1 border">Supplier</th>
+            <th className="p-1 border">Category</th>
+            <th className="p-1 border">Description</th>
+            <th className="p-1 border">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {expenses.map((exp, i) => (
+            <tr key={i}>
+              <td className="border p-1">{new Date(exp.date).toLocaleDateString()}</td>
+              <td className="border p-1">{exp.supplier}</td>
+              <td className="border p-1">{exp.category}</td>
+              <td className="border p-1">{exp.description}</td>
+              <td className="border p-1">฿{(exp.amount/100).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Pie Chart */}
+      <h2 className="text-lg font-semibold mb-2">Category Summary</h2>
+      <PieChart width={400} height={300}>
+        <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}>
+          {categoryData.map((_, idx) => (
+            <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip /><Legend />
+      </PieChart>
+    </div>
+  );
+}
+
+
+✅ With this patch:
+
+PDF parsing only keeps transaction rows.
+
+Supplier + Category auto-filled via mapping rules.
+
+Review table allows edit / delete / approve.
+
+Clean styling with compact fonts.
+
+Summary cards + Pie chart bring the page in line with your dashboard.

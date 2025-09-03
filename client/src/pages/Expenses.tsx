@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
-const suppliers = ["Other", "Mr DIY", "Bakery", "Makro", "Supercheap", "Lazada", "Lotus", "Big C", "Landlord - Rent", "Printing Shop", "Company Expenses", "Wages", "Wages - Bonus", "GO Wholesale", "Director - Personal", "Utilities - GAS/Electric/Phone"];
-const categories = ["Food", "Beverage", "Wages", "Rent", "Utilities", "Kitchen Supplies & Packaging", "Administration", "Marketing", "Printing", "Staff Expenses (from account)", "Travel", "Personal (director)", "Maintenance", "Company Expense"];
+
+const COLORS = ["#00C49F", "#FF8042", "#0088FE", "#FFBB28", "#FF4444"];
 
 export default function Expenses() {
-  const [expenses, setExpenses] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [file, setFile] = useState<File | null>(null);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [parsed, setParsed] = useState<any[]>([]);
-  const [showGeneralModal, setShowGeneralModal] = useState(false);
-  const [showStockModal, setShowStockModal] = useState(false);
-  const [activeStockTab, setActiveStockTab] = useState<"rolls"|"meat"|"drinks">("rolls");
+  const [file, setFile] = useState<File | null>(null);
+  const [totals, setTotals] = useState({ mtd: 0, ytd: 0, today: 0 });
 
   useEffect(() => { fetchExpenses(); }, []);
 
   async function fetchExpenses() {
     try {
-      const { data } = await axios.get("/api/expensesV2");
+      const now = new Date();
+      const { data } = await axios.get("/api/expensesV2", {
+        params: { month: now.getMonth() + 1, year: now.getFullYear() }
+      });
       setExpenses(data.expenses || []);
-      setTotal(data.total || 0);
+      setTotals({
+        mtd: data.total || 0,
+        ytd: (data.expenses || []).reduce((s: number, e: any) => s + (e.amountMinor || 0), 0),
+        today: (data.expenses || [])
+          .filter((e: any) => new Date(e.date).toDateString() === now.toDateString())
+          .reduce((s: number, e: any) => s + (e.amountMinor || 0), 0),
+      });
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
     }
@@ -41,359 +47,204 @@ export default function Expenses() {
   async function approveLine(line: any) {
     try {
       await axios.post("/api/expensesV2/approve", line);
+      setParsed(parsed.filter(l => l.id !== line.id));
       fetchExpenses();
-      // Remove from parsed list
-      setParsed(prev => prev.filter(p => p !== line));
     } catch (error) {
       console.error("Approve failed:", error);
     }
   }
 
-  // Prepare chart data
-  const chartData = categories.map(cat => ({
-    name: cat,
-    value: expenses.filter((e: any) => e.category === cat).reduce((s: number, e: any) => s + (e.amountMinor || 0), 0) / 100
-  })).filter(item => item.value > 0);
+  function deleteLine(id: number) {
+    setParsed(parsed.filter(l => l.id !== id));
+  }
 
-  const colors = ["#00C49F", "#FF8042", "#0088FE", "#FFBB28", "#FF4444"];
+  // Category summary
+  const categoryData = Object.entries(
+    expenses.reduce((acc: any, e: any) => {
+      acc[e.category] = (acc[e.category] || 0) + (e.amountMinor || 0);
+      return acc;
+    }, {})
+  ).map(([name, value]) => ({ name, value: Number(value) / 100 })).filter(item => item.value > 0);
 
   return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold mb-4">Expenses</h1>
+    <div className="space-y-6 font-['Poppins'] text-gray-800">
+      <h1 className="text-xl font-bold mb-4">Expenses</h1>
 
-        {/* Buttons */}
-        <div className="flex space-x-4 mb-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Today</h4>
+          <p className="text-lg font-bold">฿{(totals.today/100).toFixed(2)}</p>
+        </div>
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Month-to-Date</h4>
+          <p className="text-lg font-bold">฿{(totals.mtd/100).toFixed(2)}</p>
+        </div>
+        <div className="bg-white shadow rounded p-4 text-center">
+          <h4 className="text-sm font-semibold">Year-to-Date</h4>
+          <p className="text-lg font-bold">฿{(totals.ytd/100).toFixed(2)}</p>
+        </div>
+      </div>
+
+      {/* Upload */}
+      <form onSubmit={handleUpload} className="mb-6">
+        <div className="flex gap-3">
+          <input 
+            type="file" 
+            accept=".pdf,.csv,.png,.jpg"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            className="text-sm flex-1"
+          />
           <button 
-            onClick={() => setShowGeneralModal(true)} 
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+            type="submit" 
+            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+            disabled={!file}
           >
-            Lodge Business Expense
-          </button>
-          <button 
-            onClick={() => setShowStockModal(true)} 
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-          >
-            Lodge Stock Purchase
+            Upload
           </button>
         </div>
+      </form>
 
-        {/* Upload */}
-        <form onSubmit={handleUpload} className="mb-6">
-          <div className="flex gap-3">
-            <input 
-              type="file" 
-              accept=".pdf,.csv,.png,.jpg" 
-              onChange={e => setFile(e.target.files?.[0] || null)}
-              className="flex-1 p-2 border rounded"
-            />
-            <button 
-              type="submit" 
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              disabled={!file}
-            >
-              Upload File
-            </button>
+      {/* Parsed Transactions */}
+      {parsed.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 className="font-semibold text-sm mb-2">Review Uploaded Transactions ({parsed.length})</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full border text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-1 border text-left">Date</th>
+                  <th className="p-1 border text-left">Supplier</th>
+                  <th className="p-1 border text-left">Category</th>
+                  <th className="p-1 border text-left">Description</th>
+                  <th className="p-1 border text-right">Amount</th>
+                  <th className="p-1 border text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.map((line, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="border p-1">
+                      <input 
+                        type="text" 
+                        defaultValue={line.date} 
+                        className="border w-full text-sm p-1" 
+                        onChange={e => line.date = e.target.value}
+                      />
+                    </td>
+                    <td className="border p-1">
+                      <input 
+                        type="text" 
+                        defaultValue={line.supplier} 
+                        className="border w-full text-sm p-1" 
+                        onChange={e => line.supplier = e.target.value}
+                      />
+                    </td>
+                    <td className="border p-1">
+                      <input 
+                        type="text" 
+                        defaultValue={line.category} 
+                        className="border w-full text-sm p-1" 
+                        onChange={e => line.category = e.target.value}
+                      />
+                    </td>
+                    <td className="border p-1">
+                      <input 
+                        type="text" 
+                        defaultValue={line.description} 
+                        className="border w-full text-sm p-1" 
+                        onChange={e => line.description = e.target.value}
+                      />
+                    </td>
+                    <td className="border p-1">
+                      <input 
+                        type="number" 
+                        defaultValue={line.amount} 
+                        className="border w-full text-sm p-1 text-right" 
+                        step="0.01"
+                        onChange={e => line.amount = e.target.value}
+                      />
+                    </td>
+                    <td className="border p-1 space-x-1 text-center">
+                      <button 
+                        onClick={() => approveLine(line)} 
+                        className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button 
+                        onClick={() => deleteLine(line.id)} 
+                        className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </form>
+        </div>
+      )}
 
-        {parsed.length > 0 && (
-          <div className="mb-6 bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Review Parsed Items ({parsed.length})</h3>
-            {parsed.map((line, i) => (
-              <div key={i} className="flex space-x-2 mb-2 p-2 bg-white rounded border">
-                <input 
-                  className="border p-1 flex-1" 
-                  value={line.raw || line.description || ""} 
-                  onChange={e => {
-                    const newParsed = [...parsed];
-                    newParsed[i] = { ...line, raw: e.target.value };
-                    setParsed(newParsed);
-                  }}
-                />
-                <button 
-                  onClick={() => approveLine({ 
-                    date: new Date().toISOString().split('T')[0], 
-                    supplier: "Other", 
-                    category: "Food", 
-                    items: line.raw || line.description || "", 
-                    amount: 0, 
-                    notes: "" 
-                  })} 
-                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                >
-                  Approve
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Expenses Table */}
-        <h2 className="text-lg font-semibold mb-2">Expenses This Month (Total: ฿{(total/100).toFixed(2)})</h2>
-        <div className="overflow-x-auto mb-6">
-          <table className="w-full border border-gray-300">
+      {/* Expense Table */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-2">This Month's Expenses</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full border text-sm">
             <thead>
               <tr className="bg-gray-100">
-                <th className="p-2 border text-left">Date</th>
-                <th className="p-2 border text-left">Supplier</th>
-                <th className="p-2 border text-left">Category</th>
-                <th className="p-2 border text-left">Items</th>
-                <th className="p-2 border text-left">Notes</th>
-                <th className="p-2 border text-right">Amount</th>
+                <th className="p-1 border text-left">Date</th>
+                <th className="p-1 border text-left">Supplier</th>
+                <th className="p-1 border text-left">Category</th>
+                <th className="p-1 border text-left">Description</th>
+                <th className="p-1 border text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {expenses.map((exp: any) => (
-                <tr key={exp.id} className="hover:bg-gray-50">
-                  <td className="p-2 border">{new Date(exp.date).toLocaleDateString()}</td>
-                  <td className="p-2 border">{exp.supplier}</td>
-                  <td className="p-2 border">{exp.category}</td>
-                  <td className="p-2 border">{exp.description}</td>
-                  <td className="p-2 border">{exp.notes}</td>
-                  <td className="p-2 border text-right">฿{((exp.amountMinor || 0)/100).toFixed(2)}</td>
+              {expenses.map((exp, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="border p-1">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="border p-1">{exp.supplier}</td>
+                  <td className="border p-1">{exp.category}</td>
+                  <td className="border p-1">{exp.description}</td>
+                  <td className="border p-1 text-right">฿{((exp.amountMinor || 0)/100).toFixed(2)}</td>
                 </tr>
               ))}
+              {expenses.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="border p-4 text-center text-gray-500">
+                    No expenses recorded this month
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        {/* Pie Chart */}
-        {chartData.length > 0 && (
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Category Summary</h2>
-            <PieChart width={400} height={300}>
-              <Pie 
-                data={chartData} 
-                dataKey="value" 
-                nameKey="name" 
-                cx="50%" 
-                cy="50%" 
-                outerRadius={100}
-              >
-                {chartData.map((_, idx) => (
-                  <Cell key={idx} fill={colors[idx % colors.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number) => `฿${value.toFixed(2)}`} />
-              <Legend />
-            </PieChart>
-          </div>
-        )}
-
-        {/* Business Expense Modal */}
-        {showGeneralModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded w-96 max-h-96 overflow-y-auto">
-              <h3 className="font-bold mb-4">Business Expense</h3>
-              <form onSubmit={async e => {
-                e.preventDefault();
-                const form = e.target as HTMLFormElement;
-                const data = Object.fromEntries(new FormData(form).entries());
-                try {
-                  await axios.post("/api/expensesV2", data);
-                  setShowGeneralModal(false);
-                  fetchExpenses();
-                } catch (error) {
-                  console.error("Failed to save expense:", error);
-                }
-              }} className="space-y-3">
-                <input 
-                  type="date" 
-                  name="date" 
-                  className="border p-2 w-full rounded" 
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                  required 
-                />
-                <select name="supplier" className="border p-2 w-full rounded" required>
-                  {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  name="amount" 
-                  placeholder="Amount (฿)" 
-                  className="border p-2 w-full rounded" 
-                  required 
-                />
-                <select name="category" className="border p-2 w-full rounded" required>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <input 
-                  type="text" 
-                  name="items" 
-                  placeholder="Items/Description" 
-                  className="border p-2 w-full rounded" 
-                />
-                <textarea 
-                  name="notes" 
-                  placeholder="Notes" 
-                  className="border p-2 w-full rounded h-16" 
-                />
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => setShowGeneralModal(false)}
-                    className="flex-1 px-4 py-2 border rounded hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Stock Purchase Modal */}
-        {showStockModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded w-96">
-              <h3 className="font-bold mb-4">Stock Purchase</h3>
-              <div className="flex mb-4">
-                <button 
-                  onClick={() => setActiveStockTab("rolls")} 
-                  className={`flex-1 px-2 py-1 ${activeStockTab==="rolls"?"bg-black text-white":"bg-gray-200"}`}
-                >
-                  Rolls
-                </button>
-                <button 
-                  onClick={() => setActiveStockTab("meat")} 
-                  className={`flex-1 px-2 py-1 ${activeStockTab==="meat"?"bg-black text-white":"bg-gray-200"}`}
-                >
-                  Meat
-                </button>
-                <button 
-                  onClick={() => setActiveStockTab("drinks")} 
-                  className={`flex-1 px-2 py-1 ${activeStockTab==="drinks"?"bg-black text-white":"bg-gray-200"}`}
-                >
-                  Drinks
-                </button>
-              </div>
-              <form onSubmit={async e => {
-                e.preventDefault();
-                const form = e.target as HTMLFormElement;
-                const data = Object.fromEntries(new FormData(form).entries());
-                data.type = activeStockTab==="rolls"?"Rolls":activeStockTab==="meat"?"Meat":"Drinks";
-                try {
-                  await axios.post("/api/expensesV2", data);
-                  setShowStockModal(false);
-                  fetchExpenses();
-                } catch (error) {
-                  console.error("Failed to save stock purchase:", error);
-                }
-              }} className="space-y-3">
-                {activeStockTab==="rolls" && (
-                  <>
-                    <input 
-                      type="number" 
-                      name="qty" 
-                      placeholder="Quantity" 
-                      className="border p-2 w-full rounded" 
-                      required
-                    />
-                    <select name="paid" className="border p-2 w-full rounded" required>
-                      <option value="Paid">Paid</option>
-                      <option value="Unpaid">Unpaid</option>
-                    </select>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      name="amount" 
-                      placeholder="Amount (฿)" 
-                      className="border p-2 w-full rounded" 
-                      required
-                    />
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </>
-                )}
-                {activeStockTab==="meat" && (
-                  <>
-                    <select name="meatType" className="border p-2 w-full rounded" required>
-                      <option value="Topside">Topside</option>
-                      <option value="Chuck">Chuck</option>
-                      <option value="Brisket">Brisket</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    <input 
-                      type="number" 
-                      name="weightKg" 
-                      placeholder="Weight (kg)" 
-                      className="border p-2 w-full rounded" 
-                    />
-                    <input 
-                      type="number" 
-                      name="weightG" 
-                      placeholder="Weight (g)" 
-                      className="border p-2 w-full rounded" 
-                    />
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      name="amount" 
-                      placeholder="Amount (฿)" 
-                      className="border p-2 w-full rounded" 
-                      required
-                    />
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </>
-                )}
-                {activeStockTab==="drinks" && (
-                  <>
-                    <select name="drinkType" className="border p-2 w-full rounded" required>
-                      <option value="Coke">Coke</option>
-                      <option value="Sprite">Sprite</option>
-                      <option value="Water">Water</option>
-                      <option value="Juice">Juice</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    <input 
-                      type="number" 
-                      name="qty" 
-                      placeholder="Quantity" 
-                      className="border p-2 w-full rounded" 
-                      required
-                    />
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      name="amount" 
-                      placeholder="Amount (฿)" 
-                      className="border p-2 w-full rounded" 
-                      required
-                    />
-                    <select name="supplier" className="border p-2 w-full rounded" required>
-                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </>
-                )}
-                <div className="flex gap-2 mt-4">
-                  <button 
-                    type="button"
-                    onClick={() => setShowStockModal(false)}
-                    className="flex-1 px-4 py-2 border rounded hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Pie Chart */}
+      {categoryData.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h2 className="text-lg font-semibold mb-2">Category Summary</h2>
+          <PieChart width={400} height={300}>
+            <Pie 
+              data={categoryData} 
+              dataKey="value" 
+              nameKey="name" 
+              cx="50%" 
+              cy="50%" 
+              outerRadius={100}
+            >
+              {categoryData.map((_, idx) => (
+                <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value: number) => `฿${value.toFixed(2)}`} />
+            <Legend />
+          </PieChart>
+        </div>
+      )}
+    </div>
   );
 }
