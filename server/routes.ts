@@ -694,9 +694,12 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // ===== Purchasing (Expenses) API =====
+  
+  // Mount the new ExpensesV2 router first (handles upload, smart categorization, etc.)
+  app.use('/api/expensesV2', expensesV2Router);
 
-  // Create/Update Expense with lines
-  app.post('/api/expensesV2', async (req: Request, res: Response) => {
+  // Legacy Create/Update Expense with lines (fallback for existing functionality)
+  app.post('/api/expensesV2/legacy', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     try {
@@ -2305,9 +2308,8 @@ app.use("/api/bank-imports", bankUploadRouter);
   app.use('/api/costing', costingRouter);
   // ExpensesV2 router is now active
 
-  // Use the new expenses V2 router
+  // Use the bank import routers
 app.use("/api/bank-imports", bankImportRouter);
-  app.use('/api/expensesV2', expensesV2Router);
 app.use("/api/bank-imports", bankUploadRouter);
   
   // Purchase Tally router
