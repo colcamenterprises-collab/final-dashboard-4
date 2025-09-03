@@ -1,0 +1,86 @@
+🚫 Replit Agent Patch Instructions
+
+Do Not remove or replace the existing expense modals in Expenses.tsx.
+Do Not delete or modify legacy API endpoints (/api/expenses/rolls|meat|drinks).
+Do Not touch Daily Sales & Stock forms.
+Do Not create new expense pages. Upload must be fixed inside Expenses.tsx.
+
+🔧 Backend – server/routes/expensesV2.ts
+
+Replace upload route with working version:
+
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    // PDF
+    if (req.file.mimetype === "application/pdf") {
+      const pdfData = await pdfParse(req.file.path);
+      const lines = pdfData.text.split("\n").filter(l => l.trim() !== "");
+      return res.json({ ok: true, type: "pdf", parsed: lines });
+    }
+
+    // CSV
+    if (req.file.mimetype === "text/csv") {
+      const csv = require("csv-parse/sync");
+      const fs = require("fs");
+      const content = fs.readFileSync(req.file.path, "utf8");
+      const records = csv.parse(content, { columns: true, skip_empty_lines: true });
+      return res.json({ ok: true, type: "csv", parsed: records });
+    }
+
+    // Images (PNG/JPG)
+    if (req.file.mimetype.startsWith("image/")) {
+      return res.json({ ok: true, type: "image", path: req.file.path });
+    }
+
+    res.json({ ok: false, error: "Unsupported file type" });
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Failed to process upload" });
+  }
+});
+
+🎨 Frontend – client/src/pages/finance/Expenses.tsx
+
+Inside the modals page, add upload section:
+
+// Upload form inside Expenses.tsx
+<form
+  onSubmit={async (e) => {
+    e.preventDefault();
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await axios.post("/api/expensesV2/upload", formData);
+    console.log("Upload result:", data);
+    setParsed(data.parsed); // Show parsed lines in UI
+  }}
+>
+  <input type="file" accept=".pdf,.csv,.png,.jpg" onChange={e => setFile(e.target.files?.[0] || null)} />
+  <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded ml-2">
+    Upload
+  </button>
+</form>
+
+// Show parsed result (basic list for now)
+{parsed && (
+  <div className="mt-4 border p-2">
+    <h3 className="font-semibold">Parsed Items</h3>
+    <ul className="text-sm">
+      {parsed.map((line: any, i: number) => (
+        <li key={i}>{typeof line === "string" ? line : JSON.stringify(line)}</li>
+      ))}
+    </ul>
+  </div>
+)}
+
+✅ End Result
+
+Staff can still use modals for fast Rolls/Meat/Drinks entry.
+
+A new upload box appears on the same Expenses page.
+
+You can upload PDF/CSV/PNG/JPG → parsed → preview shown in the page.
+
+Later step: categorisation + “Approve to Save” → goes into ExpensesV2 DB.

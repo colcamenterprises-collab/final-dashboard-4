@@ -3,11 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import PageShell from "@/layouts/PageShell";
+import axios from "axios";
 
 export default function Expenses() {
   const [showRollsModal, setShowRollsModal] = useState(false);
   const [showMeatModal, setShowMeatModal] = useState(false);
   const [showDrinksModal, setShowDrinksModal] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsed, setParsed] = useState<any>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -191,6 +194,62 @@ export default function Expenses() {
               ) : null}
             </div>
           </div>
+        </div>
+
+        {/* Upload Section */}
+        <div className="rounded-2xl border bg-white p-6">
+          <h2 className="h2 mb-4">Upload Expenses</h2>
+          <p className="text-sm text-gray-600 mb-4">Upload PDF, CSV, PNG, or JPG files to parse expense data</p>
+          
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!file) return;
+              const formData = new FormData();
+              formData.append("file", file);
+              try {
+                const { data } = await axios.post("/api/expensesV2/upload", formData);
+                console.log("Upload result:", data);
+                setParsed(data.parsed); // Show parsed lines in UI
+                toast({ title: "Success", description: `${data.type.toUpperCase()} file processed successfully` });
+              } catch (error: any) {
+                toast({ title: "Error", description: error.response?.data?.error || "Upload failed", variant: "destructive" });
+              }
+            }}
+            className="mb-4"
+          >
+            <div className="flex gap-3">
+              <input 
+                type="file" 
+                accept=".pdf,.csv,.png,.jpg" 
+                onChange={e => setFile(e.target.files?.[0] || null)}
+                className="flex-1 p-3 border rounded-xl"
+              />
+              <button 
+                type="submit" 
+                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                disabled={!file}
+              >
+                Upload
+              </button>
+            </div>
+          </form>
+
+          {/* Show parsed result */}
+          {parsed && (
+            <div className="mt-4 border rounded-xl p-4 bg-gray-50">
+              <h3 className="font-semibold mb-3">Parsed Items ({parsed.length})</h3>
+              <div className="max-h-60 overflow-y-auto">
+                <ul className="text-sm space-y-1">
+                  {parsed.map((line: any, i: number) => (
+                    <li key={i} className="p-2 bg-white rounded border">
+                      {typeof line === "string" ? line : JSON.stringify(line)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Rolls Modal */}

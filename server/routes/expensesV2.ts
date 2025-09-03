@@ -40,29 +40,38 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PDF upload + parse
+// File upload + parse (PDF, CSV, Images)
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    const fs = require('fs');
-    const pdfBuffer = fs.readFileSync(req.file.path);
-    const pdfData = await pdfParse(pdfBuffer);
+    // PDF
+    if (req.file.mimetype === "application/pdf") {
+      const fs = require('fs');
+      const pdfBuffer = fs.readFileSync(req.file.path);
+      const pdfData = await pdfParse(pdfBuffer);
+      const lines = pdfData.text.split("\n").filter(l => l.trim() !== "");
+      return res.json({ ok: true, type: "pdf", parsed: lines });
+    }
 
-    const lines = pdfData.text.split("\n").filter(l => l.trim() !== "");
+    // CSV
+    if (req.file.mimetype === "text/csv") {
+      const csv = require("csv-parse/sync");
+      const fs = require("fs");
+      const content = fs.readFileSync(req.file.path, "utf8");
+      const records = csv.parse(content, { columns: true, skip_empty_lines: true });
+      return res.json({ ok: true, type: "csv", parsed: records });
+    }
 
-    const parsedExpenses = lines.map((line, idx) => ({
-      id: idx,
-      raw: line,
-      amount: null,
-      supplier: null,
-      type: "Pending",
-    }));
+    // Images (PNG/JPG)
+    if (req.file.mimetype.startsWith("image/")) {
+      return res.json({ ok: true, type: "image", path: req.file.path });
+    }
 
-    res.json({ ok: true, parsed: parsedExpenses });
+    res.json({ ok: false, error: "Unsupported file type" });
   } catch (err) {
-    console.error("PDF parse error:", err);
-    res.status(500).json({ error: "Failed to parse PDF" });
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Failed to process upload" });
   }
 });
 
