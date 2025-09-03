@@ -349,12 +349,92 @@ export default function Expenses() {
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Date</label>
-                <input type="date" name="date" className="border p-2 w-full rounded" required />
+                <input type="date" name="date" className="border p-2 w-full rounded" defaultValue={new Date().toISOString().split('T')[0]} />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Supplier</label>
-                <input type="text" name="supplier" placeholder="Supplier" className="border p-2 w-full rounded" required />
-              </div>
+              
+              {/* Tab-specific fields */}
+              {activeTab === "meat" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Meat Type</label>
+                    <select name="meatType" className="border p-2 w-full rounded" required>
+                      <option value="Topside">Topside</option>
+                      <option value="Chuck">Chuck</option>
+                      <option value="Brisket">Brisket</option>
+                      <option value="Rump">Rump</option>
+                      <option value="Outside">Outside</option>
+                      <option value="Mixed">Mixed</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Weight (kg)</label>
+                    <input type="number" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full rounded" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Weight (g)</label>
+                    <input type="number" name="weightG" placeholder="Weight (g)" className="border p-2 w-full rounded" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Supplier</label>
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              
+              {activeTab === "drinks" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Drink Type</label>
+                    <select name="drinkType" className="border p-2 w-full rounded" required>
+                      <option value="Coke">Coke</option>
+                      <option value="Coke Zero">Coke Zero</option>
+                      <option value="Sprite">Sprite</option>
+                      <option value="Schweppes Manow">Schweppes Manow</option>
+                      <option value="Red Fanta">Red Fanta</option>
+                      <option value="Orange Fanta">Orange Fanta</option>
+                      <option value="Red Singha">Red Singha</option>
+                      <option value="Yellow Singha">Yellow Singha</option>
+                      <option value="Pink Singha">Pink Singha</option>
+                      <option value="Soda Water">Soda Water</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Quantity</label>
+                    <input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full rounded" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Supplier</label>
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              
+              {activeTab === "rolls" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Supplier</label>
+                    <select name="supplier" className="border p-2 w-full rounded" required>
+                      {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Description</label>
+                    <input type="text" name="description" placeholder="Rolls purchase details" className="border p-2 w-full rounded" required />
+                  </div>
+                </>
+              )}
+              
               <div>
                 <label className="block text-sm font-medium mb-1">Amount (THB)</label>
                 <input type="number" name="amount" placeholder="0.00" step="0.01" className="border p-2 w-full rounded" required />
@@ -362,14 +442,6 @@ export default function Expenses() {
               <div>
                 <label className="block text-sm font-medium mb-1">Category</label>
                 <input type="text" name="category" value="Stock Purchase" className="border p-2 w-full rounded bg-gray-100" readOnly />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <input type="text" name="description" placeholder={`${activeTab} purchase details`} className="border p-2 w-full rounded" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea name="notes" placeholder={`${activeTab} specific details (quantity, weight, etc.)`} className="border p-2 w-full rounded h-20"></textarea>
               </div>
               <div className="flex justify-end space-x-2">
                 <button type="button" onClick={() => setShowStockModal(false)} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>

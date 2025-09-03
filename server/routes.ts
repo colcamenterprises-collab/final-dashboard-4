@@ -1602,7 +1602,7 @@ export function registerRoutes(app: express.Application): Server {
     try {
       const approvedExpense = req.body;
       const expense = await storage.createExpense({
-        date: approvedExpense.date,
+        date: approvedExpense.date || new Date().toISOString().split('T')[0],
         supplier: approvedExpense.supplier,
         amount: approvedExpense.amount,
         category: approvedExpense.category,

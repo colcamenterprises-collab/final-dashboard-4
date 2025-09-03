@@ -778,7 +778,7 @@ export class MemStorage implements IStorage {
       VALUES (
         ${expenseId},
         ${'cmes916fj0000pio20tvofd44'},
-        ${expenseDate},
+        COALESCE(${expenseDate}::timestamp, NOW()),
         ${expense.description || expense.item || 'Unknown Item'},
         ${Math.round((expense.amount || 0) * 100)},
         ${expense.supplier || 'Unknown'},

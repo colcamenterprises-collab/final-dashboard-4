@@ -1,0 +1,94 @@
+🚫 Replit Agent Instructions
+
+Do Not leave supplier/meat/drink types as free-text.
+Do Not require manual date entry — default to NOW().
+Do Not change schema — use existing shiftDate column.
+Do Not overwrite valid manual dates on edit — only default when missing.
+
+🛠 Patch Snippet – client/src/pages/finance/Expenses.tsx
+
+For Meat tab:
+
+<select name="meatType" className="border p-2 w-full" required>
+  <option>Topside</option>
+  <option>Chuck</option>
+  <option>Brisket</option>
+  <option>Other</option>
+</select>
+<input type="number" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full" required />
+<input type="number" name="weightG" placeholder="Weight (g)" className="border p-2 w-full" />
+<select name="supplier" className="border p-2 w-full" required>
+  {["Bakery","Makro","Supercheap","Lazada","Lotus","Big C","GO Wholesale","Other"].map(s => (
+    <option key={s}>{s}</option>
+  ))}
+</select>
+
+
+For Drinks tab:
+
+<select name="drinkType" className="border p-2 w-full" required>
+  <option>Coke</option>
+  <option>Coke Zero</option>
+  <option>Sprite</option>
+  <option>Schweppes Manow</option>
+  <option>Red Fanta</option>
+  <option>Orange Fanta</option>
+  <option>Red Singha</option>
+  <option>Yellow Singha</option>
+  <option>Pink Singha</option>
+  <option>Soda Water</option>
+</select>
+<input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full" required />
+
+🛠 Patch Snippet – server/routes/expensesV2.ts
+
+In both POST / and POST /approve routes, replace:
+
+${date},
+
+
+with:
+
+COALESCE(${date}::timestamp, NOW()),
+
+
+So if no date is provided, it defaults to the current timestamp.
+
+✅ With this:
+
+Staff just select Meat/Drink type + qty/weight.
+
+Date/time stamps automatically when saving.
+
+Still flexible if later editing/back-dating.
+
+👉 Cam, do you also want me to add auto-supplier rules for Rolls and Meat?
+E.g. Rolls always from “Bakery”, Meat always from “Makro/Supercheap” — or keep supplier as a dropdown for staff to choose each time?
+
+You said:
+For meat please add - Outside / Rump / Mixed
+ChatGPT said:
+
+Got it, Cam ✅ — we’ll expand the Meat dropdown to cover your actual sourcing breakdown.
+
+🥩 Meat Types (Final Dropdown List)
+
+Topside
+
+Chuck
+
+Brisket
+
+Rump
+
+Outside
+
+Mixed
+
+Other
+
+🚫 Replit Agent Instructions
+
+Do Not leave meat type as free-text.
+Do Not shorten or remove options — use the exact list above.
+Do Not change schema — keep storing the chosen type in item or notes as designed.
