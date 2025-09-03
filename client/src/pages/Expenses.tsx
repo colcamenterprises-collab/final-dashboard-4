@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
-import PageShell from "@/layouts/PageShell";
-
 const suppliers = ["Other", "Mr DIY", "Bakery", "Makro", "Supercheap", "Lazada", "Lotus", "Big C", "Landlord - Rent", "Printing Shop", "Company Expenses", "Wages", "Wages - Bonus", "GO Wholesale", "Director - Personal", "Utilities - GAS/Electric/Phone"];
 const categories = ["Food", "Beverage", "Wages", "Rent", "Utilities", "Kitchen Supplies & Packaging", "Administration", "Marketing", "Printing", "Staff Expenses (from account)", "Travel", "Personal (director)", "Maintenance", "Company Expense"];
 
@@ -60,8 +58,7 @@ export default function Expenses() {
   const colors = ["#00C49F", "#FF8042", "#0088FE", "#FFBB28", "#FF4444"];
 
   return (
-    <PageShell>
-      <div className="p-6">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold mb-4">Expenses</h1>
 
         {/* Buttons */}
@@ -398,6 +395,5 @@ export default function Expenses() {
           </div>
         )}
       </div>
-    </PageShell>
   );
 }
