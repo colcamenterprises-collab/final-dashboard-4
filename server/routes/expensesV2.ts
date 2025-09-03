@@ -154,18 +154,18 @@ router.get("/", async (req, res) => {
 
     const results = await db.execute(sql`
       SELECT 
-        id,
-        shiftDate as date,
-        supplier,
-        costCents as amount,
-        item as description,
-        expenseType as category,
-        meta->>'notes' as notes
+        expenses.id,
+        expenses.shiftDate as date,
+        expenses.supplier,
+        expenses.costCents as amount,
+        expenses.item as description,
+        expenses.expenseType as category,
+        expenses.meta->>'notes' as notes
       FROM expenses
-      WHERE EXTRACT(MONTH FROM shiftDate) = ${month}
-      AND EXTRACT(YEAR FROM shiftDate) = ${year}
-      AND source = 'business'
-      ORDER BY shiftDate DESC
+      WHERE EXTRACT(MONTH FROM expenses.shiftDate) = ${month}
+      AND EXTRACT(YEAR FROM expenses.shiftDate) = ${year}
+      AND expenses.source = 'business'
+      ORDER BY expenses.shiftDate DESC
     `);
 
     const total = results.rows.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);

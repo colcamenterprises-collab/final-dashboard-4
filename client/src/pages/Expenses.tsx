@@ -278,7 +278,7 @@ export default function Expenses() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
-                <input type="text" name="items" placeholder="Description" className="border p-2 w-full rounded" required />
+                <input type="text" name="description" placeholder="Description" className="border p-2 w-full rounded" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
@@ -353,7 +353,7 @@ export default function Expenses() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
-                <input type="text" name="items" placeholder={`${activeTab} purchase details`} className="border p-2 w-full rounded" required />
+                <input type="text" name="description" placeholder={`${activeTab} purchase details`} className="border p-2 w-full rounded" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
