@@ -1622,10 +1622,10 @@ export function registerRoutes(app: express.Application): Server {
       const { type, qty, amount, meatType, weightKg, drinkType } = req.body;
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
-      
+
       if (type === "rolls") {
-        // Rolls go to expenses table
-        await db.execute(sql`
+        // Rolls go to expenses (Bakery)
+        const result = await db.execute(sql`
           INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
           VALUES (
             gen_random_uuid(),
@@ -1635,45 +1635,58 @@ export function registerRoutes(app: express.Application): Server {
             ${Math.round(Number(amount) * 100)},
             ${'Rolls'},
             ${'Food'},
-            ${JSON.stringify({qty: qty})},
+            jsonb_build_object('qty', ${qty}),
             ${'DIRECT'},
             NOW()
           )
+          RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category, meta->>'qty' as qty
         `);
-      } else if (type === "meat") {
-        // Meat goes to proper stock_purchase_meat table
-        await db.execute(sql`
-          INSERT INTO stock_purchase_meat (expense_id, meat_type, weight, price_per_kg, total_cost, date, created_at)
+
+        return res.json({ ok: true, expense: result.rows[0] });
+      }
+
+      if (type === "meat") {
+        // Meat goes to daily_stock_v2
+        const result = await db.execute(sql`
+          INSERT INTO daily_stock_v2 (id, "shiftDate", item, qty, unit, meta, "createdAt")
           VALUES (
-            ${0},
+            gen_random_uuid(),
+            NOW(),
             ${meatType},
             ${weightKg},
-            ${0},
-            ${0},
-            NOW(),
+            ${'kg'},
+            jsonb_build_object('source','purchase'),
             NOW()
           )
+          RETURNING id, "shiftDate" as date, item, qty, unit
         `);
-      } else if (type === "drinks") {
-        // Drinks go to proper stock_purchase_drinks table
-        await db.execute(sql`
-          INSERT INTO stock_purchase_drinks (expense_id, drink_name, quantity, price_per_unit, total_cost, date, created_at)
+
+        return res.json({ ok: true, stock: result.rows[0] });
+      }
+
+      if (type === "drinks") {
+        // Drinks go to daily_stock_v2
+        const result = await db.execute(sql`
+          INSERT INTO daily_stock_v2 (id, "shiftDate", item, qty, unit, meta, "createdAt")
           VALUES (
-            ${0},
+            gen_random_uuid(),
+            NOW(),
             ${drinkType},
             ${qty},
-            ${0},
-            ${0},
-            NOW(),
+            ${'unit'},
+            jsonb_build_object('source','purchase'),
             NOW()
           )
+          RETURNING id, "shiftDate" as date, item, qty, unit
         `);
+
+        return res.json({ ok: true, stock: result.rows[0] });
       }
-      
-      res.json({ success: true, message: `${type} purchase recorded successfully` });
-    } catch (error) {
-      console.error("Error creating stock purchase:", error);
-      res.status(500).json({ error: "Failed to create stock purchase" });
+
+      res.status(400).json({ ok: false, error: "Invalid stock type" });
+    } catch (err) {
+      console.error("Stock lodge error:", err);
+      res.status(500).json({ error: "Failed to lodge stock purchase" });
     }
   });
 

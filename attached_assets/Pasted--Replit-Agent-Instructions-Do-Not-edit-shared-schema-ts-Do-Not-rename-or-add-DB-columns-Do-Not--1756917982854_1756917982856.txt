@@ -1,0 +1,116 @@
+🚫 Replit Agent Instructions
+
+Do Not edit shared/schema.ts.
+Do Not rename or add DB columns.
+Do Not merge meat/drink into expenses.
+Do Not overwrite schema — use meta JSON if extra info is needed.
+
+🛠 Patch – server/routes/expensesV2.ts
+
+Add this block inside your router for handling stock purchases:
+
+// ---------- STOCK PURCHASE LODGE ----------
+router.post("/stock", async (req, res) => {
+  try {
+    const { type, qty, amount, meatType, weightKg, drinkType } = req.body;
+
+    if (type === "Rolls") {
+      // Rolls go to expenses (Bakery)
+      const result = await db.execute(sql`
+        INSERT INTO expenses (id, restaurantId, shiftDate, supplier, costCents, item, expenseType, meta, source, createdAt)
+        VALUES (
+          gen_random_uuid(),
+          'default',
+          NOW(),
+          'Bakery',
+          ${Math.round(Number(amount) * 100)},
+          'Rolls',
+          'Food',
+          jsonb_build_object('qty', ${qty}),
+          'business',
+          NOW()
+        )
+        RETURNING id, shiftDate as date, supplier, costCents as amount, item as description, expenseType as category, meta->>'qty' as qty
+      `);
+
+      return res.json({ ok: true, expense: result.rows[0] });
+    }
+
+    if (type === "Meat") {
+      // Meat goes to daily_stock_v2
+      const result = await db.execute(sql`
+        INSERT INTO daily_stock_v2 (id, shiftDate, item, qty, unit, meta, createdAt)
+        VALUES (
+          gen_random_uuid(),
+          NOW(),
+          ${meatType},
+          ${weightKg},
+          'kg',
+          jsonb_build_object('source','purchase'),
+          NOW()
+        )
+        RETURNING id, shiftDate as date, item, qty, unit
+      `);
+
+      return res.json({ ok: true, stock: result.rows[0] });
+    }
+
+    if (type === "Drinks") {
+      // Drinks go to daily_stock_v2
+      const result = await db.execute(sql`
+        INSERT INTO daily_stock_v2 (id, shiftDate, item, qty, unit, meta, createdAt)
+        VALUES (
+          gen_random_uuid(),
+          NOW(),
+          ${drinkType},
+          ${qty},
+          'unit',
+          jsonb_build_object('source','purchase'),
+          NOW()
+        )
+        RETURNING id, shiftDate as date, item, qty, unit
+      `);
+
+      return res.json({ ok: true, stock: result.rows[0] });
+    }
+
+    res.status(400).json({ ok: false, error: "Invalid stock type" });
+  } catch (err) {
+    console.error("Stock lodge error:", err);
+    res.status(500).json({ error: "Failed to lodge stock purchase" });
+  }
+});
+
+✅ What This Does
+
+Rolls: Insert into expenses with:
+
+Supplier = Bakery
+
+Category = Food
+
+Item = Rolls
+
+Amount = costCents
+
+Qty stored in meta JSON
+
+Meat: Insert into daily_stock_v2 with:
+
+Item = meatType (Topside, Chuck, Brisket, Rump, Outside, Mixed, Other)
+
+Qty = weightKg
+
+Unit = kg
+
+Auto timestamp
+
+Drinks: Insert into daily_stock_v2 with:
+
+Item = drinkType (Coke, Sprite, etc)
+
+Qty = number of bottles/cans
+
+Unit = unit
+
+Auto timestamp
