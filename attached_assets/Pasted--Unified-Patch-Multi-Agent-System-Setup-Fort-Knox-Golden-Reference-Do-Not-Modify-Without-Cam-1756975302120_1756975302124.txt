@@ -1,0 +1,292 @@
+🚨 Unified Patch – Multi-Agent System Setup
+
+(Fort Knox Golden Reference – Do Not Modify Without Cam’s Approval)
+
+1. server/db/schema.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Smash Brothers Burgers – Schema Additions for AI Agents
+ */
+
+import { pgTable, serial, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+
+// Stores Jussi’s generated daily summaries
+export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull(),               // Shift date (ISO string)
+  summary: jsonb("summary").notNull(),       // Full AI output JSON
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stores agent insights and analyses
+export const aiInsights = pgTable("aiInsights", {
+  id: serial("id").primaryKey(),
+  agent: text("agent").notNull(),            // e.g. "jussi", "sally"
+  content: jsonb("content").notNull(),       // Structured AI response
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stores chat conversation logs per agent
+export const chatLogs = pgTable("chatLogs", {
+  id: serial("id").primaryKey(),
+  agent: text("agent").notNull(),
+  message: text("message").notNull(),
+  role: text("role").notNull(),              // "user" or "agent"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+2. server/utils/gptUtils.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * GPT utility wrapper for all AI agents.
+ * Fort Knox file — Golden Reference.
+ */
+
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function askGPT(prompt: string, system: string = "You are a helpful assistant.") {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+  });
+  return response.choices[0]?.message?.content ?? "";
+}
+
+3. server/agents/jussi.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Jussi – Head of Operations
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function jussiHandler(message: string) {
+  const system = "You are Jussi, Head of Operations. Direct, no-nonsense. You analyze receipts, stock, and staff forms for anomalies.";
+  return await askGPT(message, system);
+}
+
+4. server/agents/ollie.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Ollie – Operations & Stock
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function ollieHandler(message: string) {
+  const system = "You are Ollie, friendly but focused on inventory, stock counts, and daily ops.";
+  return await askGPT(message, system);
+}
+
+5. server/agents/sally.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Sally – Finance & Expenses
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function sallyHandler(message: string) {
+  const system = "You are Sally. You track expenses, financial reports, and profitability. Professional, detailed.";
+  return await askGPT(message, system);
+}
+
+6. server/agents/marlo.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Marlo – Marketing & Content
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function marloHandler(message: string) {
+  const system = "You are Marlo. You write menu descriptions, campaigns, and social media posts. Creative and engaging.";
+  return await askGPT(message, system);
+}
+
+7. server/agents/bigboss.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Big Boss – Oversight & Strategy
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function bigbossHandler(message: string) {
+  const system = "You are Big Boss. You oversee the team, delegate tasks, and compile final reports. Strategic and authoritative.";
+  return await askGPT(message, system);
+}
+
+8. server/services/aiAnalysisService.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Central AI analysis service.
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function analyzeReceipts(receipts: string) {
+  const prompt = `Analyze the following receipts and flag anomalies:\n${receipts}`;
+  return await askGPT(prompt, "You are an expert in restaurant operations and financial reconciliation.");
+}
+
+9. server/services/jussiDailySummaryService.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Jussi’s daily summary service.
+ */
+
+import { analyzeReceipts } from "./aiAnalysisService";
+
+export async function generateJussiSummary(date: string, receipts: string) {
+  return await analyzeReceipts(receipts);
+}
+
+10. server/routes/agents.ts
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Routes for multi-agent chat + Jussi ops
+ */
+
+import express from "express";
+import { jussiHandler } from "../agents/jussi";
+import { ollieHandler } from "../agents/ollie";
+import { sallyHandler } from "../agents/sally";
+import { marloHandler } from "../agents/marlo";
+import { bigbossHandler } from "../agents/bigboss";
+import { generateJussiSummary } from "../services/jussiDailySummaryService";
+
+const router = express.Router();
+
+// Multi-agent chat
+router.post("/chat/:agent", async (req, res) => {
+  const { agent } = req.params;
+  const { message } = req.body;
+
+  try {
+    let reply;
+    switch (agent) {
+      case "jussi": reply = await jussiHandler(message); break;
+      case "ollie": reply = await ollieHandler(message); break;
+      case "sally": reply = await sallyHandler(message); break;
+      case "marlo": reply = await marloHandler(message); break;
+      case "bigboss": reply = await bigbossHandler(message); break;
+      default: reply = "Unknown agent.";
+    }
+    res.json({ reply });
+  } catch (e) {
+    res.status(500).json({ error: "Agent failed", details: e });
+  }
+});
+
+// Jussi endpoints
+router.get("/jussi/status", async (_req, res) => {
+  res.json({ status: "ok", lastRun: new Date().toISOString() });
+});
+
+router.post("/jussi/generate", async (req, res) => {
+  const { date, receipts } = req.body;
+  const summary = await generateJussiSummary(date, receipts);
+  res.json({ summary });
+});
+
+export default router;
+
+11. client/src/pages/ai/JussiOps.tsx
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * JussiOps – Dedicated Ops page
+ */
+
+import { useState } from "react";
+
+export default function JussiOps() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
+
+  async function sendMessage() {
+    const res = await fetch("/chat/jussi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input }),
+    });
+    const data = await res.json();
+    setMessages([...messages, "You: " + input, "Jussi: " + data.reply]);
+    setInput("");
+  }
+
+  return (
+    <div className="p-6">
+      <h1 className="text-xl font-bold">Jussi Operations Chat</h1>
+      <div className="mt-4 space-y-2">
+        {messages.map((msg, i) => <div key={i} className="text-sm">{msg}</div>)}
+      </div>
+      <div className="mt-4 flex space-x-2">
+        <input
+          className="border p-2 flex-1"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <button onClick={sendMessage} className="bg-yellow-400 px-4 py-2">Send</button>
+      </div>
+    </div>
+  );
+}
+
+12. client/src/components/JussiChatBubble.tsx
+/**
+ * 🚨 DO NOT MODIFY THIS FILE WITHOUT CAM'S APPROVAL 🚨
+ * Floating Jussi Chat Bubble
+ */
+
+import { useState } from "react";
+
+export default function JussiChatBubble() {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
+
+  async function sendMessage() {
+    const res = await fetch("/chat/jussi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input }),
+    });
+    const data = await res.json();
+    setMessages([...messages, "You: " + input, "Jussi: " + data.reply]);
+    setInput("");
+  }
+
+  return (
+    <div>
+      <button
+        className="fixed right-6 bottom-6 bg-yellow-400 rounded-full px-4 py-2 shadow-lg"
+        onClick={() => setOpen(!open)}
+      >
+        🤖
+      </button>
+      {open && (
+        <div className="fixed right-6 bottom-20 w-64 bg-white p-4 rounded-lg shadow-lg">
+          <div className="h-40 overflow-y-auto mb-2 text-sm">
+            {messages.map((msg, i) => <div key={i}>{msg}</div>)}
+          </div>
+          <div className="flex space-x-2">
+            <input
+              className="border p-1 flex-1"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <button onClick={sendMessage} className="bg-yellow-400 px-2">▶</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
