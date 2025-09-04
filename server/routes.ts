@@ -1646,51 +1646,40 @@ export function registerRoutes(app: express.Application): Server {
       }
 
       if (type === "meat") {
-        // Get latest sales record for foreign key
-        const latestSales = await db.execute(sql`
-          SELECT id FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC LIMIT 1
-        `);
-        const salesId = latestSales.rows[0]?.id || 'e1431155-1818-45a0-9be0-b1e9bf89b58c';
-        
+        // Meat → insert into purchase_tally
         const weightGrams = Math.round(Number(weightKg) * 1000);
         const result = await db.execute(sql`
-          INSERT INTO daily_stock_v2 (id, "createdAt", "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", notes)
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, meat_grams)
           VALUES (
             gen_random_uuid(),
             NOW(),
-            ${salesId},
+            NOW(),
+            NULL,
+            NULL,
             0,
-            ${weightGrams},
-            '{}',
-            ${JSON.stringify({ source: 'purchase', type: meatType })},
-            ${meatType}
+            ${meatType},
+            ${weightGrams}
           )
-          RETURNING id, "createdAt" as date, "meatWeightG" as weight, notes as item
+          RETURNING id, created_at as date, meat_grams as weight, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
       if (type === "drinks") {
-        // Get latest sales record for foreign key
-        const latestSales = await db.execute(sql`
-          SELECT id FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC LIMIT 1
-        `);
-        const salesId = latestSales.rows[0]?.id || 'e1431155-1818-45a0-9be0-b1e9bf89b58c';
-        
+        // Drinks → insert into purchase_tally with meta JSON
         const result = await db.execute(sql`
-          INSERT INTO daily_stock_v2 (id, "createdAt", "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", notes)
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
           VALUES (
             gen_random_uuid(),
             NOW(),
-            ${salesId},
+            NOW(),
+            NULL,
+            NULL,
             0,
-            0,
-            ${JSON.stringify({ [drinkType]: parseInt(qty) })},
-            ${JSON.stringify({ source: 'purchase', type: drinkType })},
-            ${drinkType}
+            ${JSON.stringify({ "drinkType": drinkType, "qty": parseInt(qty) })}
           )
-          RETURNING id, "createdAt" as date, "drinksJson" as drinks, notes as item
+          RETURNING id, created_at as date, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
