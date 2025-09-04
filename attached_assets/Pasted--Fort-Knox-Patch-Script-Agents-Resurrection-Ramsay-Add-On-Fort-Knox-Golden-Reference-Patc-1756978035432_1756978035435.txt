@@ -1,0 +1,162 @@
+🔒 Fort Knox Patch Script – Agents Resurrection + Ramsay Add-On
+# 🚨 Fort Knox Golden Reference Patch 🚨
+# Smash Brothers Burgers – AI Agents (Jussi, Jane, Ramsay)
+# Safe bundle: DO NOT MODIFY without Cam’s explicit approval.
+
+--- remove: client/src/pages/ai/JussiOps.tsx
++++ add: server/agents/jussi.ts
++ /**
++  * 🚨 DO NOT MODIFY 🚨
++  * Jussi – Head of Operations
++  * DB-aware: reconciles Daily Sales, Receipts, Stock.
++  */
++ import { askGPT } from "../utils/gptUtils";
++ export async function jussiHandler(message: string) {
++   const system = "You are Jussi, Head of Operations. Direct, no-nonsense. Use DB context to reconcile daily sales, receipts, stock, and highlight anomalies.";
++   return await askGPT(message, system);
++ }
+
++++ add: server/agents/jane.ts
++ /**
++  * 🚨 DO NOT MODIFY 🚨
++  * Jane from Accounting – Finance & P&L
++  * Connects to daily_sales_v2 + expenses.
++  */
++ import { askGPT } from "../utils/gptUtils";
++ export async function janeHandler(message: string) {
++   const system = "You are Jane from Accounting. Professional, detail-oriented. Pull raw data from sales + expenses, reconcile banking, and produce P&L summaries.";
++   return await askGPT(message, system);
++ }
+
++++ add: server/agents/ramsay.ts
++ /**
++  * 🚨 DO NOT MODIFY 🚨
++  * Ramsay – Kitchen QA
++  * Blunt, brutally honest. Menu + kitchen assistant.
++  */
++ import { askGPT } from "../utils/gptUtils";
++ export async function ramsayHandler(message: string) {
++   const system = "You are Chef Ramsay Gordon. You review recipes, kitchen processes, and food quality. Be blunt, brutally honest, raise standards, and assist with menu creation.";
++   return await askGPT(message, system);
++ }
+
+--- update: server/routes/agents.ts
++ import { jussiHandler } from "../agents/jussi";
++ import { janeHandler } from "../agents/jane";
++ import { ramsayHandler } from "../agents/ramsay";
++
++ router.post("/chat/:agent", async (req, res) => {
++   const { agent } = req.params;
++   const { message } = req.body;
++   try {
++     let reply;
++     switch (agent) {
++       case "jussi": reply = await jussiHandler(message); break;
++       case "jane": reply = await janeHandler(message); break;
++       case "ramsay": reply = await ramsayHandler(message); break;
++       default: reply = "Unknown agent.";
++     }
++     res.json({ reply });
++   } catch (e) {
++     res.status(500).json({ error: "Agent failed", details: e });
++   }
++ });
+
+--- update: server/db/schema.ts
++ // ✅ Ensure AI agent support tables exist
++ export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
++   id: serial("id").primaryKey(),
++   date: text("date").notNull(),
++   summary: jsonb("summary").notNull(),
++   createdAt: timestamp("created_at").defaultNow(),
++ });
++
++ export const aiInsights = pgTable("aiInsights", {
++   id: serial("id").primaryKey(),
++   agent: text("agent").notNull(),   // jussi, jane, ramsay
++   content: jsonb("content").notNull(),
++   createdAt: timestamp("created_at").defaultNow(),
++ });
++
++ export const chatLogs = pgTable("chatLogs", {
++   id: serial("id").primaryKey(),
++   agent: text("agent").notNull(),
++   message: text("message").notNull(),
++   role: text("role").notNull(),     // "user" or "agent"
++   createdAt: timestamp("created_at").defaultNow(),
++ });
+
++++ add: client/src/components/AgentChatBubble.tsx
++ /**
++  * 🚨 DO NOT MODIFY 🚨
++  * Shared chat bubble with agent selector (Jussi, Jane, Ramsay)
++  */
++ import { useState } from "react";
++ export default function AgentChatBubble() {
++   const [open, setOpen] = useState(false);
++   const [agent, setAgent] = useState("jussi");
++   const [input, setInput] = useState("");
++   const [messages, setMessages] = useState<string[]>([]);
++
++   async function sendMessage() {
++     const res = await fetch(`/chat/${agent}`, {
++       method: "POST",
++       headers: { "Content-Type": "application/json" },
++       body: JSON.stringify({ message: input }),
++     });
++     const data = await res.json();
++     setMessages([...messages, "You: " + input, agent + ": " + data.reply]);
++     setInput("");
++   }
++
++   return (
++     <div>
++       <button
++         className="fixed right-6 bottom-6 bg-yellow-400 rounded-full px-4 py-2 shadow-lg"
++         onClick={() => setOpen(!open)}
++       >
++         🤖
++       </button>
++       {open && (
++         <div className="fixed right-6 bottom-20 w-72 bg-white p-4 rounded-lg shadow-lg">
++           <div className="mb-2">
++             <select
++               value={agent}
++               onChange={(e) => setAgent(e.target.value)}
++               className="border p-1 rounded w-full"
++             >
++               <option value="jussi">Jussi (Ops)</option>
++               <option value="jane">Jane (Accounting)</option>
++               <option value="ramsay">Ramsay (Kitchen)</option>
++             </select>
++           </div>
++           <div className="h-40 overflow-y-auto mb-2 text-sm">
++             {messages.map((msg, i) => <div key={i}>{msg}</div>)}
++           </div>
++           <div className="flex space-x-2">
++             <input
++               className="border p-1 flex-1"
++               value={input}
++               onChange={(e) => setInput(e.target.value)}
++             />
++             <button onClick={sendMessage} className="bg-yellow-400 px-2">▶</button>
++           </div>
++         </div>
++       )}
++     </div>
++   );
++ }
+
+✅ What This Patch Delivers
+
+Jussi (Ops) resurrected.
+
+Jane from Accounting (Finance) resurrected, powering raw P&L.
+
+Ramsay safely added (Kitchen QA).
+
+Schema logging tables confirmed/added.
+
+Shared chat bubble with selector for all three agents.
+
+Dead JussiOps page removed.

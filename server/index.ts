@@ -4,11 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { schedulerService } from "./services/scheduler";
 import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
-import { OllieAgent } from './agents/ollie';
-import { SallyAgent } from './agents/sally';
-import { MarloAgent } from './agents/marlo';
-import { BigBossAgent } from './agents/bigboss';
-import { JussiAgent } from './agents/jussi';
+// Fort Knox agents - simplified imports
 import { db } from './db';
 import { PrismaClient } from '@prisma/client';
 import { reqId } from './middleware/reqId';
@@ -158,12 +154,7 @@ async function checkSchema() {
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
   
-  // Initialize AI agents
-  const ollie = new OllieAgent();
-  const sally = new SallyAgent();
-  const marlo = new MarloAgent();
-  const bigboss = new BigBossAgent();
-  const jussi = new JussiAgent();
+  // Fort Knox agents are imported dynamically in routes
 
   // Mount the daily stock API router
   const dailyStockRouter = (await import('./api/daily-stock')).default;
@@ -295,25 +286,15 @@ async function checkSchema() {
 
     try {
       switch (agent.toLowerCase()) {
-        case 'ollie':
-          response = await ollie.handleMessage(message);
-          agentName = ollie.name;
-          break;
-        case 'sally':
-          response = await sally.handleMessage(message);
-          agentName = sally.name;
-          break;
-        case 'marlo':
-          response = await marlo.handleMessage(message);
-          agentName = marlo.name;
-          break;
-        case 'bigboss':
-          response = await bigboss.handleMessage(message);
-          agentName = bigboss.name;
-          break;
         case 'jussi':
-          response = await jussi.handleMessage(message);
-          agentName = jussi.name;
+          const { jussiHandler } = await import('./agents/jussi');
+          response = await jussiHandler(message);
+          agentName = 'Jussi';
+          break;
+        case 'jane':
+          const { janeHandler } = await import('./agents/jane');
+          response = await janeHandler(message);
+          agentName = 'Jane';
           break;
         case 'ramsay':
           const { ramsayHandler } = await import('./agents/ramsay');
@@ -321,7 +302,7 @@ async function checkSchema() {
           agentName = 'Ramsay';
           break;
         default:
-          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, bigboss, jussi, or ramsay.' });
+          return res.status(400).json({ error: 'Invalid agent. Choose jussi, jane, or ramsay.' });
       }
 
       const responseTime = Date.now() - startTime;

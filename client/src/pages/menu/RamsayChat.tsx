@@ -15,7 +15,7 @@ export default function RamsayChat() {
             <p className="text-sm">Click the chef icon to start chatting about kitchen standards, recipes, and food quality!</p>
           </div>
         </div>
-        <AgentChatBubble agent="ramsay" />
+        <AgentChatBubble />
       </div>
     </PageShell>
   );
