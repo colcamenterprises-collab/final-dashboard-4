@@ -1,0 +1,182 @@
+🚨 Focused Patch – Jussi + Sally + Ramsay
+1. server/db/schema.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * AI Agent Tables – Jussi + Sally + Ramsay
+ */
+
+import { pgTable, serial, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+
+// Stores Jussi’s generated daily summaries
+export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull(),
+  summary: jsonb("summary").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stores AI insights (Jussi, Sally, Ramsay)
+export const aiInsights = pgTable("aiInsights", {
+  id: serial("id").primaryKey(),
+  agent: text("agent").notNull(),            // "jussi", "sally", "ramsay"
+  content: jsonb("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Chat logs (for all three agents)
+export const chatLogs = pgTable("chatLogs", {
+  id: serial("id").primaryKey(),
+  agent: text("agent").notNull(),            // "jussi", "sally", "ramsay"
+  message: text("message").notNull(),
+  role: text("role").notNull(),              // "user" or "agent"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+2. server/utils/gptUtils.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * GPT utility wrapper for Jussi, Sally, Ramsay.
+ */
+
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function askGPT(prompt: string, system: string) {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+  });
+  return response.choices[0]?.message?.content ?? "";
+}
+
+3. server/agents/jussi.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Jussi – Head of Operations
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function jussiHandler(message: string) {
+  const system = "You are Jussi, Head of Operations. Direct, no-nonsense. You analyze receipts, stock, and staff forms for anomalies.";
+  return await askGPT(message, system);
+}
+
+4. server/agents/sally.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Sally – Finance & Expenses
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function sallyHandler(message: string) {
+  const system = "You are Sally. You reconcile sales and expenses with banking, highlight discrepancies, and produce finance summaries. Professional and detail-oriented.";
+  return await askGPT(message, system);
+}
+
+5. server/agents/ramsay.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Ramsay – Kitchen QA & Culinary Oversight
+ */
+
+import { askGPT } from "../utils/gptUtils";
+
+export async function ramsayHandler(message: string) {
+  const system = "You are Chef Ramsay Gordon. You review recipes, kitchen processes, and food quality. Blunt, brutally honest, always raising standards. Call out waste, sloppy prep, or hygiene issues.";
+  return await askGPT(message, system);
+}
+
+6. server/routes/agents.ts
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Routes for Jussi + Sally + Ramsay
+ */
+
+import express from "express";
+import { jussiHandler } from "../agents/jussi";
+import { sallyHandler } from "../agents/sally";
+import { ramsayHandler } from "../agents/ramsay";
+
+const router = express.Router();
+
+// Multi-agent chat
+router.post("/chat/:agent", async (req, res) => {
+  const { agent } = req.params;
+  const { message } = req.body;
+
+  try {
+    let reply;
+    switch (agent) {
+      case "jussi": reply = await jussiHandler(message); break;
+      case "sally": reply = await sallyHandler(message); break;
+      case "ramsay": reply = await ramsayHandler(message); break;
+      default: reply = "Unknown agent.";
+    }
+    res.json({ reply });
+  } catch (e) {
+    res.status(500).json({ error: "Agent failed", details: e });
+  }
+});
+
+export default router;
+
+7. client/src/components/AgentChatBubble.tsx
+/**
+ * 🚨 DO NOT MODIFY WITHOUT CAM'S APPROVAL 🚨
+ * Floating Chat Bubble (supports Jussi, Sally, Ramsay)
+ */
+
+import { useState } from "react";
+
+type Agent = "jussi" | "sally" | "ramsay";
+
+export default function AgentChatBubble({ agent }: { agent: Agent }) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
+
+  async function sendMessage() {
+    const res = await fetch(`/chat/${agent}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input }),
+    });
+    const data = await res.json();
+    setMessages([...messages, "You: " + input, `${agent}: ${data.reply}`]);
+    setInput("");
+  }
+
+  return (
+    <div>
+      <button
+        className="fixed right-6 bottom-6 bg-yellow-400 rounded-full px-4 py-2 shadow-lg"
+        onClick={() => setOpen(!open)}
+      >
+        🤖
+      </button>
+      {open && (
+        <div className="fixed right-6 bottom-20 w-64 bg-white p-4 rounded-lg shadow-lg">
+          <div className="h-40 overflow-y-auto mb-2 text-sm">
+            {messages.map((msg, i) => <div key={i}>{msg}</div>)}
+          </div>
+          <div className="flex space-x-2">
+            <input
+              className="border p-1 flex-1"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <button onClick={sendMessage} className="bg-yellow-400 px-2">▶</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
