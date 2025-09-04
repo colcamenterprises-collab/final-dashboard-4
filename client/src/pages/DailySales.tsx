@@ -146,14 +146,14 @@ export default function DailySales() {
     try {
       const formData = {
         completedBy,
-        cashStart,
+        startingCash: cashStart,  // Backend expects startingCash
         cashSales: cash,
         qrSales: qr,
         grabSales: grab,
-        aroiDeeSales: aroi,
+        otherSales: aroi,         // Backend expects otherSales (not aroiDeeSales)
         totalSales: cash + qr + grab + aroi,
-        shiftExpenses,
-        staffWages,
+        expenses: shiftExpenses,  // Backend expects expenses
+        wages: staffWages,        // Backend expects wages
         closingCash,
         cashBanked,
         qrTransfer,
