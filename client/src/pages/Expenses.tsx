@@ -5,6 +5,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [parsed, setParsed] = useState<any[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [showGeneralModal, setShowGeneralModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
@@ -24,14 +25,18 @@ export default function Expenses() {
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return alert("Select a file first");
+    setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const { data } = await axios.post("/api/expensesV2/upload", formData, { headers: { "Content-Type": "multipart/form-data" }});
       setParsed(data.parsed || []);
+      setFile(null); // Clear file selection after successful upload
     } catch (error) {
       console.error("Upload failed:", error);
       alert("Upload failed. Check console for details.");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -68,7 +73,14 @@ export default function Expenses() {
       <form onSubmit={handleUpload} className="mb-6">
         <div className="flex gap-3">
           <input type="file" accept=".pdf,.csv,.png,.jpg" onChange={e => setFile(e.target.files?.[0] || null)} className="flex-1" />
-          <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700" disabled={!file}>Upload</button>
+          <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50" disabled={!file || uploading}>
+            {uploading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                Processing...
+              </span>
+            ) : 'Upload'}
+          </button>
         </div>
       </form>
 
