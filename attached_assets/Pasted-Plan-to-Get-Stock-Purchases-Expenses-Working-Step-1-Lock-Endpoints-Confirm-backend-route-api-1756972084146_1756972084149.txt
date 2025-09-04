@@ -1,0 +1,86 @@
+Plan to Get Stock Purchases + Expenses Working
+Step 1 — Lock Endpoints
+
+Confirm backend route:
+
+/api/expensesV2/stock → for Rolls, Meat, Drinks.
+
+/api/expensesV2 → for Business Expenses + PDF Upload/Approval.
+
+👉 Action: Agent verifies with curl -s http://localhost:5000/api/expensesV2/stock that the route exists and responds (even with a 400).
+
+Step 2 — Confirm Frontend Payloads
+
+Rolls form sends:
+
+{ "type": "rolls", "qty": 20, "amount": "75.50" }
+
+
+Meat form sends:
+
+{ "type": "meat", "meatType": "Chuck", "weightKg": "3.2" }
+
+
+Drinks form sends:
+
+{ "type": "drinks", "drinkType": "Coke", "qty": "12" }
+
+
+👉 Action: Agent tests from the browser console (console.log(payload)) before sending to ensure the modal builds payload correctly.
+
+Step 3 — Backend Insert Logic
+
+Rolls → expenses
+
+Insert into expenses with Bakery supplier, Food category, costCents in cents, qty in meta.
+
+Meat → purchase_tally
+
+Insert into purchase_tally with meat_grams = weightKg * 1000.
+
+Drinks → purchase_tally
+
+Insert into purchase_tally with meta = { "drinkType": "...", "qty": ... }.
+
+All records → shiftDate = NOW().
+
+👉 Action: Agent runs test inserts manually in psql to confirm columns are correct before wiring to code.
+
+Step 4 — Test Lodging
+
+Lodge Rolls via modal → check expenses table for new row.
+
+Lodge Meat via modal → check purchase_tally for new row.
+
+Lodge Drinks via modal → check purchase_tally for new row.
+
+👉 Action: Agent screenshots the rows in DB after each lodge.
+
+Step 5 — PDF Upload & Approval
+
+Upload SCB statement PDF.
+
+Regex parser must split into rows: date, supplier, amount, description.
+
+Review table allows Edit / Delete / Approve.
+
+Approve → row inserted into expenses with correct fields.
+
+👉 Action: Agent tests with your real PDF (the one you uploaded) and shows parsed rows.
+
+Step 6 — End-to-End Verification
+
+Lodge Rolls → expense visible in table.
+
+Lodge Meat/Drinks → visible in purchase_tally.
+
+Upload PDF → transactions parsed, editable, approvable.
+
+Approve line → visible in expenses list.
+
+Confirm timestamps are auto-applied (no manual date field).
+
+🚨 Final Rule
+
+If any step fails, agent must stop and fix that single step before moving on.
+No schema changes, no new tables, no improvisation.
