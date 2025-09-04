@@ -112,7 +112,7 @@ export default function DailySales() {
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(t);
-          if (shiftId) navigate(`/daily-stock?shift=${shiftId}`);
+          if (shiftId) navigate(`${FORM2_PATH}?shift=${shiftId}`);
           return 0;
         }
         return c - 1;
