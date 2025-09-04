@@ -315,8 +315,13 @@ async function checkSchema() {
           response = await jussi.handleMessage(message);
           agentName = jussi.name;
           break;
+        case 'ramsay':
+          const { ramsayHandler } = await import('./agents/ramsay');
+          response = await ramsayHandler(message);
+          agentName = 'Ramsay';
+          break;
         default:
-          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, bigboss, or jussi.' });
+          return res.status(400).json({ error: 'Invalid agent. Choose ollie, sally, marlo, bigboss, jussi, or ramsay.' });
       }
 
       const responseTime = Date.now() - startTime;
