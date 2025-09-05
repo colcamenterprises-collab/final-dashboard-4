@@ -20,6 +20,7 @@ type RecordType = {
   rolls: string;
   meat: string;
   status: string;
+  payload?: { balanced?: boolean };
   deletedAt?: string | null;
 };
 
@@ -116,6 +117,7 @@ export default function DailySalesV2Library() {
               <th className="p-2 border-b">Total Sales</th>
               <th className="p-2 border-b">Rolls</th>
               <th className="p-2 border-b">Meat</th>
+              <th className="p-2 border-b">Balanced</th>
               <th className="p-2 border-b">Status</th>
               <th className="p-2 border-b">Actions</th>
             </tr>
@@ -123,7 +125,7 @@ export default function DailySalesV2Library() {
           <tbody>
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-500">
+                <td colSpan={8} className="p-4 text-center text-gray-500">
                   No records found
                 </td>
               </tr>
@@ -137,6 +139,17 @@ export default function DailySalesV2Library() {
                   <td className="p-2 border-b">{thb(rec.totalSales)}</td>
                   <td className="p-2 border-b">{rec.rolls}</td>
                   <td className="p-2 border-b">{rec.meat}</td>
+                  <td className="p-2 border-b">
+                    {rec.payload?.balanced ? (
+                      <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">
+                        Balanced
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700">
+                        Not Balanced
+                      </span>
+                    )}
+                  </td>
                   <td className="p-2 border-b">
                     {rec.deletedAt ? (
                       <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
@@ -237,11 +250,29 @@ export default function DailySalesV2Library() {
               </div>
 
               {/* Sales Info */}
-              <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div>
                   <p className="text-gray-500 text-xs uppercase tracking-wide">Total Sales</p>
                   <p className="font-semibold">{thb(rec.totalSales)}</p>
                 </div>
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wide">Balanced</p>
+                  <div className="font-semibold">
+                    {rec.payload?.balanced ? (
+                      <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">
+                        Balanced
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700">
+                        Not Balanced
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Stock Info */}
+              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div>
                   <p className="text-gray-500 text-xs uppercase tracking-wide">Rolls</p>
                   <p className="font-semibold">{rec.rolls}</p>
