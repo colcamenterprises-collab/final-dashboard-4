@@ -1,3 +1,12 @@
+🛑 Replit Agent Instructions
+
+Only update client/src/pages/operations/daily-sales/Form.tsx.
+
+Do not add/remove other files.
+
+Do not add imports beyond React.
+
+client/src/pages/operations/daily-sales/Form.tsx
 import React, { useState } from "react";
 
 export default function DailySalesForm() {
@@ -124,3 +133,18 @@ export default function DailySalesForm() {
     </form>
   );
 }
+
+
+✅ After this patch:
+
+Only React + useState used.
+
+Closing Cash = manual input.
+
+Balanced badge (green/red) works, using expenses in calc.
+
+Cash to Bank = Closing − Starting.
+
+QR to Bank = QR Sales.
+
+No stray imports → no more ERR_MODULE_NOT_FOUND.
