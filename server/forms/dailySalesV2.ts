@@ -195,7 +195,45 @@ export async function getDailySalesV2(_req: Request, res: Response) {
   }
 }
 
+export async function getDailySalesV2ById(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, "shiftDate", "completedBy", "createdAt", "deletedAt", payload
+       FROM daily_sales_v2 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+    const record = {
+      id: row.id,
+      date: row.shiftDate?.split('T')[0] || row.createdAt?.split('T')[0] || '',
+      staff: row.completedBy || '',
+      cashStart: p.startingCash ? (p.startingCash / 100).toFixed(2) : '0.00',
+      cashEnd: p.closingCash ? (p.closingCash / 100).toFixed(2) : '0.00',
+      totalSales: p.totalSales ? (p.totalSales / 100).toFixed(2) : '0.00',
+      buns: p.rollsEnd?.toString() || '-',
+      meat: p.meatEnd?.toString() || '-',
+      status: 'Submitted',
+      payload: p,
+      deletedAt: row.deletedAt
+    };
+
+    res.json({ ok: true, record });
+  } catch (err) {
+    console.error("Error fetching daily sales V2 record:", err);
+    res.status(500).json({ ok: false, error: "Database error" });
+  }
+}
+
 import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
