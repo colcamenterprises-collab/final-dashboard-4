@@ -96,6 +96,7 @@ export default function DailySalesV2Library() {
           total: p.totalSales || 0
         },
         expenses: p.expenses || [],
+        wages: p.wages || [],
         banking: {
           startingCash: p.startingCash || 0,
           closingCash: p.closingCash || 0,
@@ -397,18 +398,46 @@ export default function DailySalesV2Library() {
                 </div>
 
                 <div className="bg-red-50 p-3 rounded">
-                  <h4 className="font-semibold mb-2">💸 Expenses</h4>
-                  {selected.expenses.length === 0 ? (
-                    <p>No expenses recorded</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {selected.expenses.map((expense, idx) => (
-                        <li key={idx} className="flex justify-between">
-                          <span>{expense.item} ({expense.shop})</span>
-                          <span>฿{(expense.cost / 100).toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  <h4 className="font-semibold mb-2">💸 Expenses & Wages</h4>
+                  
+                  {/* Regular Expenses */}
+                  {selected.expenses.length > 0 && (
+                    <div className="mb-3">
+                      <h5 className="font-medium text-sm mb-1">📦 Expenses</h5>
+                      <ul className="space-y-1">
+                        {selected.expenses.map((expense, idx) => (
+                          <li key={idx} className="flex justify-between">
+                            <span>{expense.item} ({expense.shop})</span>
+                            <span>฿{(expense.cost / 100).toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {/* Staff Wages */}
+                  {selected.wages && selected.wages.length > 0 && (
+                    <div>
+                      <h5 className="font-medium text-sm mb-1">👥 Staff Wages</h5>
+                      <ul className="space-y-1">
+                        {selected.wages.map((wage, idx) => (
+                          <li key={idx} className="flex justify-between">
+                            <span>{wage.staff} (Wages)</span>
+                            <span>฿{(wage.amount / 100).toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Wages:</span>
+                          <span>฿{(selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) / 100 : 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selected.expenses.length === 0 && (!selected.wages || selected.wages.length === 0) && (
+                    <p>No expenses or wages recorded</p>
                   )}
                 </div>
 
@@ -418,6 +447,34 @@ export default function DailySalesV2Library() {
                   <p><strong>Closing Cash:</strong> ฿{(selected.banking.closingCash / 100).toFixed(2)}</p>
                   <p><strong>Cash Banked:</strong> ฿{(selected.banking.cashBanked / 100).toFixed(2)}</p>
                   <p><strong>QR Transfer:</strong> ฿{(selected.banking.qrTransfer / 100).toFixed(2)}</p>
+                  
+                  {(() => {
+                    const startingCash = selected.banking.startingCash / 100;
+                    const cashSales = selected.sales.cash / 100;
+                    const totalExpenses = (selected.expenses.reduce((sum, e) => sum + e.cost, 0) / 100);
+                    const totalWages = (selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) : 0) / 100;
+                    const cashBanked = selected.banking.cashBanked / 100;
+                    const closingCash = selected.banking.closingCash / 100;
+                    
+                    const expectedClosing = startingCash + cashSales - totalExpenses - totalWages - cashBanked;
+                    const difference = closingCash - expectedClosing;
+                    const isBalanced = Math.abs(difference) <= 0.30; // ±30 THB tolerance
+                    
+                    return (
+                      <div className="border-t pt-2 mt-2">
+                        <h5 className="font-medium text-sm mb-2">⚖️ Balance Check</h5>
+                        <div className="text-xs space-y-1">
+                          <p>Expected: ฿{startingCash.toFixed(2)} + ฿{cashSales.toFixed(2)} - ฿{totalExpenses.toFixed(2)} - ฿{totalWages.toFixed(2)} - ฿{cashBanked.toFixed(2)}</p>
+                          <p><strong>Expected Closing:</strong> ฿{expectedClosing.toFixed(2)}</p>
+                          <p><strong>Actual Closing:</strong> ฿{closingCash.toFixed(2)}</p>
+                          <p className={`font-bold ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
+                            <strong>Difference:</strong> ฿{difference.toFixed(2)} 
+                            {isBalanced ? ' ✅ BALANCED' : ' ❌ NOT BALANCED'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
