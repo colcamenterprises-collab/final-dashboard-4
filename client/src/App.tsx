@@ -66,9 +66,10 @@ export default function App() {
                   <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
 
                   {/* ---- FORM 2: canonical + aliases ---- */}
-                  <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} />
                   <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
-                  <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} />
+                  {/* Comment out duplicates to avoid conflicts */}
+                  {/* <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} /> */}
+                  {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
                   
                   {/* Analysis with nested routes */}
                   <Route path={ROUTES.ANALYSIS} element={<Guard><Analysis /></Guard>}>

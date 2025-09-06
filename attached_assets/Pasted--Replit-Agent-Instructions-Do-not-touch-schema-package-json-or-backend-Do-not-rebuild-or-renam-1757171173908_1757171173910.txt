@@ -1,0 +1,105 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend.
+Do not rebuild or rename files.
+Only check the Daily Stock route in App.tsx / routes.tsx and align Form 1 redirect accordingly.
+If you find multiple route definitions, stop and ask Cam which one to keep.
+
+Task Overview
+
+Primary goal: Resolve remaining blockers—route conflicts for Daily Stock navigation and confirm end-to-end flow works post-fixes. Do NOT attempt backend changes (e.g., shiftDate in dailySalesV2.ts)—report that it requires manual update outside agent scope.
+Build on recent fixes: Frontend field mapping (aroiDeeSales → aroiSales), FORM2_PATH update, LSP type annotations.
+Focus: Align routes without backend touches; test submission (expect failure due to backend); normalize any frontend-only mappings if found.
+Proactive: After route fix, simulate/test full flow and suggest optimizations like adding console logs for debugging.
+
+Step-by-Step Actions for You (Replit Agent)
+
+Inspect and Resolve Route Conflicts:
+
+Open client/src/App.tsx.
+Confirm multiple definitions via rg search (as before): "/operations/stock", "/operations/daily-stock", "/operations/form2".
+Since previously detected, proceed with Cam's decision: Keep "/operations/daily-stock" (consistent with FORM2_PATH in Form.tsx); remove/comment out others to avoid loops/404s.
+Update App.tsx Routes block (frontend only—no backend):
+textimport { Routes, Route, Navigate } from 'react-router-dom';
+import DailyStock from './pages/operations/DailyStock.tsx';  // Adjust import if needed
+// Other imports...
+
+// Replace <Routes> with:
+<Routes>
+  {/* Keep this */}
+  <Route path="/operations/daily-stock" element={<DailyStock />} />
+
+  {/* Comment out duplicates */}
+  {/* <Route path="/operations/stock" element={<DailyStock />} /> */}
+  {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
+
+  {/* Other routes unchanged */}
+</Routes>
+
+Save and test: Navigate to "/operations/daily-stock" in browser—should load without errors.
+
+
+Align Form 1 Redirect to Form 2:
+
+Open client/src/pages/operations/daily-sales/Form.tsx.
+Verify onSuccess handler uses updated FORM2_PATH: "/operations/daily-stock?shift=${response.id}".
+If missing/mismatched, add/update (frontend only):
+textimport { useNavigate } from 'react-router-dom';
+
+// In mutation config (e.g., useMutation onSuccess):
+onSuccess: (data) => {
+  const navigate = useNavigate();
+  navigate(`/operations/daily-stock?shift=${data.id}`);
+  // Existing success logic...
+},
+
+Ensure ?shift= param pulls ID from API response (assume backend returns { id: uuid } on success).
+
+
+Frontend Field Normalization Check (Proactive):
+
+Scan Form.tsx for other mismatches (e.g., rg 'expenses|wages|sales').
+If found (e.g., shiftExpenses/staffWages), normalize in formData:
+textconst normalizedData = {
+  ...values,
+  expenses: values.shiftExpenses || values.expenses || 0,
+  wages: values.staffWages || values.wages || 0,
+  // Retain aroiSales: values.aroiSales,
+};
+// Submit normalizedData via mutate(normalizedData);
+
+This builds on your prior normalization without backend touches.
+
+
+Test End-to-End Flow:
+
+Attempt Form 1 submission (expect backend error due to shiftDate—note it).
+Use curl for API test (no changes):
+textcurl -X POST http://localhost:5000/api/forms/daily-sales/v2 -H "Content-Type: application/json" -d '{"completedBy":"test","startingCash":1000,"cashSales":500,"qrSales":200,"grabSales":100,"aroiSales":50,"totalSales":850,"shiftDate":"2025-09-06T12:00:00.000Z","status":"submitted"}' --max-time 10 -s
+
+If submission hypothetically succeeds (post-manual backend fix), verify:
+
+Redirect to /operations/daily-stock?shift={id}.
+Library (/operations/daily-sales-library): Fetches records, shows badges/summaries/rolls+meat/shopping list.
+Email: Triggers management report (check SMTP logs).
+Shopping: Generates from qty > 0.
+
+
+Add temp console logs in Form.tsx for debug (remove after):
+textconsole.log('Submitting payload:', formData);
+console.log('API Response:', response);
+
+
+
+Performance Observation (No Fixes):
+
+Test /api/expensesV2 load time.
+Report if >500ms; suggest manual index addition later (e.g., CREATE INDEX on date columns).
+
+
+Report Back:
+
+✅ Fixed: Route alignment, redirect logic.
+🔴 Persistent: Backend shiftDate mismatch—requires manual edit in dailySalesV2.ts:92 to use "shiftDate".
+Full status: Routes clean; flow ready for test once backend fixed.
+If new conflicts/mismatches found, stop and ask Cam.
