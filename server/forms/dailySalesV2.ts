@@ -154,11 +154,13 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    await workingEmailService.sendEmail(
+    const emailSent = await workingEmailService.sendEmail(
       "smashbrothersburgersth@gmail.com",
       `Daily Sales & Stock – ${shiftDate}`,
       html
     );
+    
+    console.log(`📧 Email sending result: ${emailSent ? 'SUCCESS' : 'FAILED'}`);
 
     res.json({ ok: true, id });
   } catch (err) {
