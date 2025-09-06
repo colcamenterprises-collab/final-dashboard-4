@@ -122,14 +122,14 @@ export default function DailySales() {
     try {
       const formData = {
         completedBy,
-        cashStart,
+        startingCash: cashStart,  // Fix field name mismatch
         cashSales: cash,
         qrSales: qr,
         grabSales: grab,
         aroiSales: aroi,
         totalSales: cash + qr + grab + aroi,
-        shiftExpenses,
-        staffWages,
+        expenses: shiftExpenses,  // Fix field name mismatch
+        wages: staffWages,        // Fix field name mismatch
         closingCash,
         cashBanked,
         qrTransfer,
