@@ -1,18 +1,15 @@
 import { Request, Response } from "express";
-import { pool } from "../db.js";
+import { pool } from "../db";
 import nodemailer from "nodemailer";
 import { v4 as uuidv4 } from "uuid";
 
-// Utility functions
-const toCents = (n: unknown) => {
-  if (typeof n === "number") return Math.round(n * 100);
-  if (typeof n === "string") return Math.round(parseFloat(n) * 100);
-  return 0;
-};
+function toCents(amount: number): number {
+  return Math.round((amount || 0) * 100);
+}
 
-const fromCents = (n: number) => {
-  return (n / 100).toFixed(2);
-};
+function fromCents(cents: number): number {
+  return (cents || 0) / 100;
+}
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -33,7 +30,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       otherSales,
       expenses,
       wages,
-      closingCash, // staff entry
+      closingCash,
       requisition,
       rollsEnd,
       meatEnd,
@@ -64,7 +61,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const diff = Math.abs(expectedClosingCash - closingCashCents);
     const balanced = diff <= toCents(30);
 
-    // Banked = Closing – Starting
+    // Banked amounts
     const cashBanked = closingCashCents - toCents(startingCash);
     const qrTransfer = toCents(qrSales);
 
@@ -89,11 +86,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       meatEnd,
     };
 
-    // Try different column name formats based on error hints
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", payload)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, shiftDate, completedBy, createdAt, JSON.stringify(payload)]
+      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, shiftDate, completedBy, createdAt, createdAt, JSON.stringify(payload)]
     );
 
     // Build shopping list
@@ -162,7 +158,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    // Try to send email (non-critical operation)
+    // Send email only if credentials are configured
     if (process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MANAGEMENT_EMAIL) {
       try {
         await transporter.sendMail({
@@ -172,12 +168,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
           subject: `Daily Sales & Stock – ${shiftDate}`,
           html,
         });
-        console.log("Email sent successfully");
       } catch (emailError) {
-        console.log("Email sending failed but record saved successfully:", emailError);
+        console.warn("Email sending failed:", emailError);
+        // Continue with success response even if email fails
       }
-    } else {
-      console.log("Email not sent - SMTP credentials not configured");
     }
 
     res.json({ ok: true, id });
