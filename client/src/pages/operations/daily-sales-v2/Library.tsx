@@ -423,14 +423,14 @@ export default function DailySalesV2Library() {
                         {selected.wages.map((wage, idx) => (
                           <li key={idx} className="flex justify-between">
                             <span>{wage.staff} (Wages)</span>
-                            <span>฿{(wage.amount / 100).toFixed(2)}</span>
+                            <span>฿{wage.amount.toFixed(2)}</span>
                           </li>
                         ))}
                       </ul>
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-semibold">
                           <span>Total Wages:</span>
-                          <span>฿{(selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) / 100 : 0).toFixed(2)}</span>
+                          <span>฿{(selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) : 0).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -452,7 +452,7 @@ export default function DailySalesV2Library() {
                     const startingCash = selected.banking.startingCash / 100;
                     const cashSales = selected.sales.cash / 100;
                     const totalExpenses = (selected.expenses.reduce((sum, e) => sum + e.cost, 0) / 100);
-                    const totalWages = (selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) : 0) / 100;
+                    const totalWages = selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) / 100 : 0;
                     const cashBanked = selected.banking.cashBanked / 100;
                     const closingCash = selected.banking.closingCash / 100;
                     
