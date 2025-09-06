@@ -80,7 +80,36 @@ export default function DailySalesV2Library() {
     const res = await fetch(`/api/forms/daily-sales/v2/${id}`);
     const data = await res.json();
     if (data.ok) {
-      setSelected(data.record);
+      const record = data.record;
+      const p = record.payload || {};
+      
+      // Transform the data to match expected structure
+      const transformedRecord = {
+        id: record.id,
+        date: record.date,
+        staff: record.staff,
+        sales: {
+          cash: p.cashSales || 0,
+          qr: p.qrSales || 0,
+          grab: p.grabSales || 0,
+          other: p.otherSales || 0,
+          total: p.totalSales || 0
+        },
+        expenses: p.expenses || [],
+        banking: {
+          startingCash: p.startingCash || 0,
+          closingCash: p.closingCash || 0,
+          cashBanked: p.cashBanked || 0,
+          qrTransfer: p.qrTransfer || 0
+        },
+        stock: {
+          rolls: p.rollsEnd || 0,
+          meat: p.meatEnd || 0
+        },
+        shoppingList: p.requisition || []
+      };
+      
+      setSelected(transformedRecord);
     }
   }
 
