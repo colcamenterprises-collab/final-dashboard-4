@@ -232,8 +232,35 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
   }
 }
 
+export async function updateDailySalesV2WithStock(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { rollsEnd, meatEnd, requisition } = req.body;
+
+    // Update the existing record with stock data
+    const result = await pool.query(
+      `UPDATE daily_sales_v2 
+       SET payload = payload || $1
+       WHERE id = $2
+       RETURNING id`,
+      [JSON.stringify({ rollsEnd, meatEnd, requisition }), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    console.log(`✅ Updated daily sales record ${id} with stock data`);
+    res.json({ ok: true, id });
+  } catch (err) {
+    console.error("Error updating daily sales with stock:", err);
+    res.status(500).json({ ok: false, error: "Failed to update with stock data" });
+  }
+}
+
 import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
+dailySalesV2Router.patch("/daily-sales/v2/:id/stock", updateDailySalesV2WithStock);

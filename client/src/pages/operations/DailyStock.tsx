@@ -110,17 +110,24 @@ const DailyStock: React.FC = () => {
     setSubmitting(true);
     setMessage(null);
 
-    // Build payload
+    // Build requisition array for shopping list generation
+    const requisition = buildItemsFromState().map(item => ({
+      name: item.name,
+      category: item.category,
+      qty: item.quantity,
+      unit: item.unit
+    }));
+
+    // Update the existing Form 1 record with stock data
     const payload = {
-      shiftId,
-      rolls,
-      meatGrams,
-      items: buildItemsFromState(), // [{ name, category, quantity, unit }]
+      rollsEnd: rolls,
+      meatEnd: meatGrams,
+      requisition
     };
 
     try {
-      const res = await fetch("/api/daily-stock", {
-        method: "POST",
+      const res = await fetch(`/api/forms/daily-sales/v2/${shiftId}/stock`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });

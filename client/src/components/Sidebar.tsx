@@ -11,7 +11,6 @@ const groups: Group[] = [
     title: "Operations",
     items: [
       { to: "/operations/daily-sales", label: "Daily Sales & Stock" },
-      { to: "/operations/daily-stock", label: "Daily Stock" },
       { to: "/operations/daily-sales-library", label: "Daily Sales Library" },
       { to: "/operations/shopping-list", label: "Shopping List" },
       { to: "/operations/expenses", label: "Expenses" },
