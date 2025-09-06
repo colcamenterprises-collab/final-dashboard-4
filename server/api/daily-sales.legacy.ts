@@ -1,3 +1,6 @@
+// 🚫 LEGACY ENDPOINT — DO NOT USE
+// Archived. Use server/forms/dailySalesV2.ts instead.
+
 import express from 'express';
 import { prisma } from '../../lib/prisma';
 

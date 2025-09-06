@@ -1,0 +1,84 @@
+🛑 Replit Agent Instructions
+
+Do not edit schema, database, or package.json.
+
+Do not rebuild or scaffold new forms.
+
+Do not touch .bak or backup files.
+
+Apply exactly the changes below.
+
+If you hit a blocking error (e.g. DB insert fails), STOP and ask Cam — do not improvise.
+
+1. Archive Legacy Files
+client/src/pages/DailySales.tsx
+
+Rename → client/src/pages/DailySales.legacy.tsx
+At the top of the file, add:
+
+// 🚫 LEGACY FILE — DO NOT USE
+// Archived. Use V2 Form.tsx at /operations/daily-sales instead.
+
+server/api/daily-sales.ts
+
+Rename → server/api/daily-sales.legacy.ts
+At the top of the file, add:
+
+// 🚫 LEGACY ENDPOINT — DO NOT USE
+// Archived. Use server/forms/dailySalesV2.ts instead.
+
+2. Lock Golden Files
+
+At the very top of each of these, add:
+
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM’S APPROVAL
+// Active Daily Sales & Stock system (V2).
+
+
+client/src/pages/operations/daily-sales/Form.tsx
+
+server/forms/dailySalesV2.ts
+
+client/src/pages/operations/daily-sales-v2/Library.tsx
+
+3. Fix Routing
+client/src/routes.tsx (or App.tsx depending on your setup)
+
+Replace the Daily Sales route section with:
+
+import DailySalesForm from "@/pages/operations/daily-sales/Form";
+import DailyStock from "@/pages/operations/DailyStock";
+import DailySalesLibrary from "@/pages/operations/daily-sales-v2/Library";
+
+export const routes = [
+  { path: "/operations/daily-sales", element: <DailySalesForm /> },
+  { path: "/operations/daily-stock", element: <DailyStock /> },
+  { path: "/operations/daily-sales-library", element: <DailySalesLibrary /> },
+  // …other routes unchanged
+];
+
+4. Sidebar Menu
+client/src/components/Sidebar.tsx
+
+Ensure only one entry for Daily Sales, and it points to the golden route:
+
+{ name: "Daily Sales & Stock", href: "/operations/daily-sales" },
+{ name: "Daily Stock", href: "/operations/daily-stock" },
+{ name: "Daily Sales Library", href: "/operations/daily-sales-library" },
+
+
+Delete any duplicate “Daily Sales” entries or legacy references.
+
+5. Expected Outcome
+
+/operations/daily-sales → loads your preserved rolled-back form (working version).
+
+Submission → saves into daily_sales_v2 (via server/forms/dailySalesV2.ts).
+
+/operations/daily-sales-library → shows new records with balanced badge.
+
+Email + shopping list fire correctly.
+
+Sidebar → always routes to golden files, never legacy.
+
+Legacy files are archived, marked with 🚫, and disconnected from routes.

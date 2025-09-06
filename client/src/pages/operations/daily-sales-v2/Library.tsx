@@ -1,3 +1,6 @@
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM'S APPROVAL
+// Active Daily Sales & Stock system (V2).
+
 // Do not do this:
 // – Do not rename, move, or split this file
 // – Do not change API routes

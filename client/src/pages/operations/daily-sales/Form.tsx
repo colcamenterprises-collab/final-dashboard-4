@@ -1,3 +1,6 @@
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM'S APPROVAL
+// Active Daily Sales & Stock system (V2).
+
 import React, { useState } from "react";
 
 export default function DailySalesForm() {

@@ -1,3 +1,6 @@
+// 🚫 LEGACY FILE — DO NOT USE
+// Archived. Use V2 Form.tsx at /operations/daily-sales instead.
+
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 

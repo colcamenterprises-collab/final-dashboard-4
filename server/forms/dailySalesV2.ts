@@ -1,3 +1,6 @@
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM'S APPROVAL
+// Active Daily Sales & Stock system (V2).
+
 import { Request, Response } from "express";
 import { pool } from "../db";
 import nodemailer from "nodemailer";
