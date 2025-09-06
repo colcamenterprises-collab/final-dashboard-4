@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
-import pool from "@/server/db";
-import { toCents, fromCents } from "@/lib/utils";
+import { pool } from "../db";
 import nodemailer from "nodemailer";
 import { v4 as uuidv4 } from "uuid";
+
+// Utility functions for cent conversion
+const toCents = (v: any) => Math.round((Number(String(v).replace(/[^\d.-]/g, '')) || 0) * 100);
+const fromCents = (cents: number) => (cents / 100).toFixed(2);
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
