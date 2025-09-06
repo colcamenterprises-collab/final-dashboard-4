@@ -3,20 +3,13 @@
 
 import { Request, Response } from "express";
 import { pool } from "../db";
-import nodemailer from "nodemailer";
+import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
 
 // Utility functions for cent conversion
 const toCents = (v: any) => Math.round((Number(String(v).replace(/[^\d.-]/g, '')) || 0) * 100);
 const fromCents = (cents: number) => (cents / 100).toFixed(2);
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
 
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
@@ -161,13 +154,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    await transporter.sendMail({
-      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
-      to: process.env.MANAGEMENT_EMAIL,
-      cc: "smashbrothersburgersth@gmail.com",
-      subject: `Daily Sales & Stock – ${shiftDate}`,
-      html,
-    });
+    await workingEmailService.sendEmail(
+      "smashbrothersburgersth@gmail.com",
+      `Daily Sales & Stock – ${shiftDate}`,
+      html
+    );
 
     res.json({ ok: true, id });
   } catch (err) {
