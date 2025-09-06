@@ -374,41 +374,93 @@ export default function DailySalesV2Library() {
       {selected && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6 overflow-y-auto max-h-[90vh]">
-            <h2 className="text-xl font-bold mb-4">Form Details</h2>
-            <p className="mb-2"><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
-            <p className="mb-2"><strong>Staff:</strong> {selected.staff}</p>
+            <h2 className="text-xl font-bold mb-4">Complete Daily Sales & Stock Form</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* FORM 1 - Daily Sales Data */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-emerald-700 border-b pb-2">📊 Daily Sales (Form 1)</h3>
+                
+                <div className="bg-gray-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">Basic Info</h4>
+                  <p><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
+                  <p><strong>Completed By:</strong> {selected.staff}</p>
+                </div>
 
-            <h3 className="font-semibold mt-4">Sales</h3>
-            <pre className="bg-gray-50 p-2 rounded text-sm">
-              {JSON.stringify(selected.sales, null, 2)}
-            </pre>
+                <div className="bg-blue-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">💰 Sales Breakdown</h4>
+                  <p><strong>Cash Sales:</strong> ฿{(selected.sales.cash / 100).toFixed(2)}</p>
+                  <p><strong>QR Sales:</strong> ฿{(selected.sales.qr / 100).toFixed(2)}</p>
+                  <p><strong>Grab Sales:</strong> ฿{(selected.sales.grab / 100).toFixed(2)}</p>
+                  <p><strong>Other Sales:</strong> ฿{(selected.sales.other / 100).toFixed(2)}</p>
+                  <p className="font-bold border-t pt-2"><strong>Total Sales:</strong> ฿{(selected.sales.total / 100).toFixed(2)}</p>
+                </div>
 
-            <h3 className="font-semibold mt-4">Expenses</h3>
-            <pre className="bg-gray-50 p-2 rounded text-sm">
-              {JSON.stringify(selected.expenses, null, 2)}
-            </pre>
+                <div className="bg-red-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">💸 Expenses</h4>
+                  {selected.expenses.length === 0 ? (
+                    <p>No expenses recorded</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {selected.expenses.map((expense, idx) => (
+                        <li key={idx} className="flex justify-between">
+                          <span>{expense.item} ({expense.shop})</span>
+                          <span>฿{(expense.cost / 100).toFixed(2)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
 
-            <h3 className="font-semibold mt-4">Banking</h3>
-            <pre className="bg-gray-50 p-2 rounded text-sm">
-              {JSON.stringify(selected.banking, null, 2)}
-            </pre>
+                <div className="bg-green-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">🏦 Banking & Cash</h4>
+                  <p><strong>Starting Cash:</strong> ฿{(selected.banking.startingCash / 100).toFixed(2)}</p>
+                  <p><strong>Closing Cash:</strong> ฿{(selected.banking.closingCash / 100).toFixed(2)}</p>
+                  <p><strong>Cash Banked:</strong> ฿{(selected.banking.cashBanked / 100).toFixed(2)}</p>
+                  <p><strong>QR Transfer:</strong> ฿{(selected.banking.qrTransfer / 100).toFixed(2)}</p>
+                </div>
+              </div>
 
-            <h3 className="font-semibold mt-4">Stock</h3>
-            <p>Rolls: {selected.stock.rolls}</p>
-            <p>Meat: {selected.stock.meat}</p>
+              {/* FORM 2 - Stock Data */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-purple-700 border-b pb-2">📦 Stock Management (Form 2)</h3>
+                
+                <div className="bg-purple-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">🍞 End Count</h4>
+                  <p><strong>Rolls:</strong> {selected.stock.rolls} pcs</p>
+                  <p><strong>Meat:</strong> {selected.stock.meat} grams</p>
+                </div>
 
-            <h3 className="font-semibold mt-4">Shopping List</h3>
-            {selected.shoppingList.length === 0 ? (
-              <p>No items to purchase</p>
-            ) : (
-              <ul className="list-disc pl-6">
-                {selected.shoppingList.map((item, idx) => (
-                  <li key={idx}>
-                    {item.name} – {item.qty} {item.unit}
-                  </li>
-                ))}
-              </ul>
-            )}
+                <div className="bg-orange-50 p-3 rounded">
+                  <h4 className="font-semibold mb-2">🛒 Shopping List / Requisition</h4>
+                  {selected.shoppingList.length === 0 ? (
+                    <p className="text-gray-500">No items to purchase</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selected.shoppingList.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border">
+                          <div>
+                            <span className="font-medium">{item.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({item.category})</span>
+                          </div>
+                          <span className="font-bold">{item.qty} {item.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Raw Data Section (for debugging) */}
+            <div className="mt-6 border-t pt-4">
+              <details className="cursor-pointer">
+                <summary className="font-semibold text-gray-600">🔍 Raw Data (Debug)</summary>
+                <div className="mt-2 bg-gray-100 p-3 rounded text-xs">
+                  <pre>{JSON.stringify(selected, null, 2)}</pre>
+                </div>
+              </details>
+            </div>
 
             <div className="mt-6 flex justify-end space-x-2">
               <button
