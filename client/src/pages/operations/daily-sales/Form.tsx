@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 
-const FORM2_PATH = "/operations/stock"; // Route to Form 2
+const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 
 // Success Modal Component
 function SuccessModal({
@@ -167,7 +167,7 @@ export default function DailySales() {
       }
       
       // on success -> hard navigation (no alert, no setTimeout)
-      const target = `/operations/stock?shift=${shiftId}`;
+      const target = `${FORM2_PATH}?shift=${shiftId}`;
       console.log('[Form1] will navigate:', target);
       window.location.assign(target);
     } catch (e: any) {

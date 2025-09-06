@@ -1,14 +1,26 @@
-// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM'S APPROVAL
+🛑 Replit Agent Instructions
+
+Replace files exactly as shown.
+
+Do not modify schema, package.json, or unrelated files.
+
+Do not use legacy backups.
+
+If you encounter an error → STOP and report it, do not improvise.
+
+After applying, run full end-to-end testing (Form 1, Form 2, Library, Email, Shopping list).
+
+Deliver only once all tests pass.
+
+1. server/forms/dailySalesV2.ts
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM’S APPROVAL
 // Smash Brothers Burgers — Daily Sales & Stock Backend (V2)
 
 import { Request, Response } from "express";
-import { pool } from "../db";
+import pool from "@/server/db";
+import { toCents, fromCents } from "@/lib/utils";
 import nodemailer from "nodemailer";
 import { v4 as uuidv4 } from "uuid";
-
-// Utility functions for cent conversion
-const toCents = (v: any) => Math.round((Number(String(v).replace(/[^\d.-]/g, '')) || 0) * 100);
-const fromCents = (cents: number) => (cents / 100).toFixed(2);
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -157,7 +169,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       ${
         shoppingItems.length === 0
           ? "<p>No items to purchase</p>"
-          : `<ul>${shoppingItems.map((s: string) => `<li>${s}</li>`).join("")}</ul>`
+          : `<ul>${shoppingItems.map((s) => `<li>${s}</li>`).join("")}</ul>`
       }
     `;
 
@@ -176,35 +188,35 @@ export async function createDailySalesV2(req: Request, res: Response) {
   }
 }
 
-export async function getDailySalesV2(_req: Request, res: Response) {
-  try {
-    const result = await pool.query(
-      `SELECT id, shiftdate, completedby, created_at, payload
-       FROM daily_sales_v2 
-       ORDER BY created_at DESC`
-    );
+2. client/src/pages/operations/daily-sales/Form.tsx
 
-    const records = result.rows.map((row: any) => ({
-      id: row.id,
-      date: row.created_at,
-      staff: row.completedby,
-      cashStart: row.payload?.startingCash ? row.payload.startingCash / 100 : 0,
-      cashEnd: row.payload?.closingCash ? row.payload.closingCash / 100 : 0,
-      totalSales: row.payload?.totalSales ? row.payload.totalSales / 100 : 0,
-      buns: row.payload?.rollsEnd || "-",
-      meat: row.payload?.meatEnd || "-",
-      status: "Submitted",
-      payload: row.payload || {}
-    }));
+Fix redirect path:
 
-    res.json({ ok: true, records });
-  } catch (err) {
-    console.error("Get Daily Sales V2 error", err);
-    res.status(500).json({ ok: false, error: "Failed to fetch records" });
-  }
-}
+// 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM’S APPROVAL
+// Smash Brothers Burgers — Daily Sales & Stock Frontend (V2)
 
-import express from "express";
-export const dailySalesV2Router = express.Router();
-dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
-dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
+// Fix FORM2_PATH
+const FORM2_PATH = "/operations/daily-stock";
+
+
+Ensure submit handler uses:
+
+navigate(`${FORM2_PATH}?shift=${id}`);
+
+3. client/src/pages/operations/daily-sales-v2/Library.tsx
+
+✅ Ensure it displays:
+
+Date
+
+Completed By
+
+Balanced badge (green/red)
+
+Sales summary
+
+Rolls + Meat
+
+Shopping list (items qty > 0 only)
+
+No other changes.
