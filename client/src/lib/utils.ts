@@ -19,11 +19,3 @@ export function formatDate(dateStr: string): string {
     year: 'numeric'
   });
 }
-
-export function toCents(amount: number): number {
-  return Math.round((amount || 0) * 100);
-}
-
-export function fromCents(cents: number): number {
-  return (cents || 0) / 100;
-}

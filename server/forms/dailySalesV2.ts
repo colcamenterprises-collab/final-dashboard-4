@@ -1,15 +1,8 @@
 import { Request, Response } from "express";
-import { pool } from "../db";
+import pool from "@/server/db";
+import { toCents, fromCents } from "@/lib/utils";
 import nodemailer from "nodemailer";
 import { v4 as uuidv4 } from "uuid";
-
-function toCents(amount: number): number {
-  return Math.round((amount || 0) * 100);
-}
-
-function fromCents(cents: number): number {
-  return (cents || 0) / 100;
-}
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -30,7 +23,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       otherSales,
       expenses,
       wages,
-      closingCash,
+      closingCash, // staff entry
       requisition,
       rollsEnd,
       meatEnd,
@@ -61,7 +54,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const diff = Math.abs(expectedClosingCash - closingCashCents);
     const balanced = diff <= toCents(30);
 
-    // Banked amounts
+    // Banked = Closing – Starting
     const cashBanked = closingCashCents - toCents(startingCash);
     const qrTransfer = toCents(qrSales);
 
@@ -87,9 +80,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
     };
 
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, shiftDate, completedBy, createdAt, createdAt, JSON.stringify(payload)]
+      `INSERT INTO daily_sales_v2 (id, shiftdate, completedby, created_at, payload)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, shiftDate, completedBy, createdAt, payload]
     );
 
     // Build shopping list
@@ -158,21 +151,13 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    // Send email only if credentials are configured
-    if (process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MANAGEMENT_EMAIL) {
-      try {
-        await transporter.sendMail({
-          from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
-          to: process.env.MANAGEMENT_EMAIL,
-          cc: "smashbrothersburgersth@gmail.com",
-          subject: `Daily Sales & Stock – ${shiftDate}`,
-          html,
-        });
-      } catch (emailError) {
-        console.warn("Email sending failed:", emailError);
-        // Continue with success response even if email fails
-      }
-    }
+    await transporter.sendMail({
+      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
+      to: process.env.MANAGEMENT_EMAIL,
+      cc: "smashbrothersburgersth@gmail.com",
+      subject: `Daily Sales & Stock – ${shiftDate}`,
+      html,
+    });
 
     res.json({ ok: true, id });
   } catch (err) {
@@ -184,15 +169,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
     const result = await pool.query(
-      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
+      `SELECT id, shiftdate, completedby, created_at, payload
        FROM daily_sales_v2 
-       ORDER BY "createdAt" DESC`
+       ORDER BY created_at DESC`
     );
 
     const records = result.rows.map((row: any) => ({
       id: row.id,
-      date: row.createdAt,
-      staff: row.completedBy,
+      date: row.created_at,
+      staff: row.completedby,
       cashStart: row.payload?.startingCash ? row.payload.startingCash / 100 : 0,
       cashEnd: row.payload?.closingCash ? row.payload.closingCash / 100 : 0,
       totalSales: row.payload?.totalSales ? row.payload.totalSales / 100 : 0,

@@ -467,62 +467,46 @@ export default function DailySales() {
           {/* Banking Section */}
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Banking</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Input 1: Total Cash in Register at Close */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Closing Cash (staff enters) */}
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Total Cash in Register at Close (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
                 <input 
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
                   className="w-full border rounded-xl px-3 py-2.5 h-10"
-                  placeholder="Enter closing cash amount"
                 />
               </div>
-
-              {/* Input 2: Balanced Status Indicator */}
+              
+              {/* Cash Banked (computed) */}
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Balance Status</label>
-                {closingCash > 0 ? (
-                  <div className={`p-3 rounded-xl h-10 flex items-center font-medium ${
-                    Math.abs((startingCash + cash - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))) - closingCash) <= 30 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {Math.abs((startingCash + cash - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))) - closingCash) <= 30 
-                      ? 'Balanced ✅' 
-                      : 'Not Balanced ❌'
-                    }
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl h-10 flex items-center bg-gray-100 text-gray-500">
-                    Enter closing cash to check balance
-                  </div>
-                )}
-              </div>
-
-              {/* Input 3: Cash to Bank */}
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Cash to Bank (auto)</label>
+                <label className="text-sm text-gray-600 block mb-1">Cash Banked (฿)</label>
                 <input
                   type="number"
-                  value={Math.max(0, closingCash - startingCash).toFixed(2)}
+                  value={computedCashBanked.toFixed(2)}
                   readOnly
                   className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50"
-                  aria-label="Cash to Bank (auto-calculated)"
+                  aria-label="Cash Banked (computed)"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Auto-calculated as (Starting Cash + Cash Sales) − Total Expenses − Closing Cash.
+                </p>
               </div>
 
-              {/* Input 4: QR to Bank */}
+              {/* QR Transfer (computed) */}
               <div>
-                <label className="text-sm text-gray-600 block mb-1">QR to Bank (auto)</label>
+                <label className="text-sm text-gray-600 block mb-1">QR Transfer Amount (฿)</label>
                 <input
                   type="number"
-                  value={qr.toFixed(2)}
+                  value={computedQrTransfer.toFixed(2)}
                   readOnly
                   className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50"
-                  aria-label="QR to Bank (auto-calculated)"
+                  aria-label="QR Transfer Amount (computed)"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Auto-calculated from QR Sales. Funds go straight to bank.
+                </p>
               </div>
             </div>
           </section>
