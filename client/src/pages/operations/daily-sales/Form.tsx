@@ -126,7 +126,7 @@ export default function DailySales() {
         cashSales: cash,
         qrSales: qr,
         grabSales: grab,
-        aroiDeeSales: aroi,
+        aroiSales: aroi,
         totalSales: cash + qr + grab + aroi,
         shiftExpenses,
         staffWages,

@@ -1,0 +1,99 @@
+Instructions for Replit Agent: Fix Database Column Mismatch in Daily Sales V2
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend.
+Do not rebuild or rename files.
+Only check the Daily Stock route in App.tsx / routes.tsx and align Form 1 redirect accordingly.
+If you find multiple route definitions, stop and ask Cam which one to keep.
+
+Task Overview
+
+Primary goal: Resolve the form submission error "column 'shiftdate' does not exist" in the Daily Sales Form (client/src/pages/operations/daily-sales/Form.tsx).
+This is caused by a mismatch between backend insert code and the actual DB column name (likely 'shiftDate' or 'shift_date' in the DB).
+Focus only on frontend-side checks or minor alignments if needed—do NOT modify backend files like server/forms/dailySalesV2.ts.
+After fix, ensure Form 1 (Daily Sales) redirects correctly to Form 2 (Daily Stock) via URL param like ?shift=uuid.
+
+Step-by-Step Actions for You (Replit Agent)
+
+Inspect DB Column Name (No Changes Allowed):
+
+Use the Neon console or a safe query tool to run this SQL (do NOT alter the DB):
+textSELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'daily_sales_v2'
+ORDER BY ordinal_position;
+
+Note the exact name for the shift date column (e.g., 'shiftDate', 'shiftdate', 'shift_date').
+Report back to Cam with the exact name before proceeding.
+
+
+Check Frontend Form Submission Logic:
+
+Open client/src/pages/operations/daily-sales/Form.tsx.
+Locate the form submission handler (likely using React Hook Form and TanStack Query).
+Verify the payload sent to POST /api/forms/daily-sales/v2 matches the expected DB columns.
+If the frontend is hardcoding 'shiftdate' in the payload, align it to the DB name from Step 1 (e.g., change to 'shiftDate').
+Example adjustment (if needed in the form data object):
+textconst formData = {
+  shiftDate: new Date(shiftDateValue),  // Use exact DB column name here (e.g., 'shiftDate')
+  // ... other fields remain unchanged
+};
+// Then in mutation: mutate(formData);
+
+Test submission after this—ensure no backend touches.
+
+
+Align Form 1 to Form 2 Redirect:
+
+Open client/src/App.tsx and server/routes.ts (read-only—do NOT edit server/routes.ts).
+Check Daily Stock route: Should be "/operations/daily-stock".
+In Form.tsx, ensure successful submission navigates like:
+textimport { useNavigate } from 'react-router-dom';
+
+// In onSuccess handler:
+const navigate = useNavigate();
+navigate(`/operations/daily-stock?shift=${response.id}`);
+
+If multiple definitions for "/operations/daily-stock" exist in App.tsx or routes.ts, STOP and ask Cam: "Found multiple Daily Stock route definitions— which one to keep? (List them here)."
+
+
+Handle Related Field Mappings (Frontend Only):
+
+In Form.tsx, if 'aroiDeeSales' is used, normalize to 'otherSales' in the form data:
+textconst normalizedData = {
+  ...values,
+  otherSales: values.aroiDeeSales || values.otherSales || 0,
+};
+// Submit normalizedData
+
+This prevents similar mismatches without backend changes.
+
+
+Test End-to-End (No Code Changes Here):
+
+Submit Daily Sales Form.
+Verify: Navigates to Daily Stock with ?shift= param.
+Check library fetch (pages/operations/daily-sales-v2/Library.tsx) works post-submission.
+If email or shopping list fails, note it but do NOT fix—report to Cam.
+
+
+Performance Check (Observation Only):
+
+Test /api/expensesV2 endpoint load time.
+If slow (>500ms), report to Cam without optimizations.
+
+
+
+Expected Output After Fix
+
+Form submits without error.
+Redirect works.
+Report any issues like "DB column is 'shift_date'—adjusted frontend payload accordingly."
+
+What NOT to Do (Reinforcing Your Instructions)
+
+No schema changes (shared/schema.ts untouchable).
+No package updates.
+No backend edits (e.g., dailySalesV2.ts).
+No file renames or rebuilds.
+If stuck on routes, ask Cam explicitly.
