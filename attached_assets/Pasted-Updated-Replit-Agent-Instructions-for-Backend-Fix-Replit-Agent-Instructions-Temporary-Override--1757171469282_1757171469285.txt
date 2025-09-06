@@ -1,0 +1,101 @@
+Updated Replit Agent Instructions for Backend Fix
+🛑 Replit Agent Instructions (Temporary Override for Specific Fix)
+
+Do not touch schema, package.json, or any backend files except server/forms/dailySalesV2.ts for this task only.
+Do not rebuild or rename files.
+Only check the Daily Stock route in App.tsx / routes.tsx and align Form 1 redirect accordingly (already done—verify only).
+If you find multiple route definitions, stop and ask Cam which one to keep (already resolved—skip unless new issues).
+Special Allowance: For this run only, edit server/forms/dailySalesV2.ts line ~92 to fix the "shiftdate" → "shiftDate" mismatch. Do NOT make any other backend changes.
+Task Overview
+Primary goal: Fix the persistent backend column mismatch to unblock form submission. Build on recent frontend fixes (routes cleaned, navigation aligned, field mappings corrected).
+After fix, test full end-to-end flow: Form 1 submit → redirect → Form 2 → library display → email trigger → shopping list.
+Proactive: Add temp debug logs in backend for insert success; clean up after tests. Observe performance and report.
+No 3rd party tools (e.g., no Zapier)—rely on existing Nodemailer for emails.
+Step-by-Step Actions for You (Replit Agent)
+Inspect Backend Insert Logic:
+Open server/forms/dailySalesV2.ts.
+Locate line ~92 (the db.insert block). Confirm it uses "shiftdate" (lowercase).
+Cross-check DB column: Run SQL (no changes):
+text
+SELECT column_name FROM information_schema.columns WHERE table_name = 'daily_sales_v2' AND column_name ILIKE '%shift%';
+Expected: Confirms "shiftDate" (camelCase, text type).
+Apply Backend Column Fix (Allowed for This Task):
+Update the insert.values object: Change "shiftdate" to "shiftDate".
+Full updated block template (replace the insert section; assume Drizzle ORM—adjust if slightly different):
+text
+// In createDailySalesV2 handler:
+try {
+  const parsedData = /* Existing Zod parse */;
+  const { completedBy, startingCash, cashSales, qrSales, grabSales, aroiSales, totalSales, shiftDate, status, expenses, wages /* add other fields */ } = parsedData;
+
+  // Normalize (build on your prior fixes)
+  const normalizedData = {
+    shiftDate: new Date(shiftDate).toISOString(),  // Match DB text type
+    completedBy,
+    startingCash,
+    cashSales,
+    qrSales,
+    grabSales,
+    aroiSales,
+    totalSales,
+    status,
+    expenses: expenses || parsedData.shiftExpenses || 0,
+    wages: wages || parsedData.staffWages || 0,
+    // Include all other required fields to fix "Missing wages" warning
+  };
+
+  await db.insert(dailySalesV2).values(normalizedData);
+  // If insert returns ID: const insertedId = /* get from returning() if used */;
+
+  return { ok: true, message: 'Saved successfully', id: insertedId };
+} catch (error) {
+  console.error('Insert error:', error);
+  return { ok: false, error: 'Failed to save' };
+}
+Save file. Restart server.
+Address Schema Warning (Frontend Alignment Only):
+Open client/src/pages/operations/daily-sales/Form.tsx.
+Scan for missing fields (e.g., rg 'wages|expenses').
+If "wages" missing in payload, add to formData:
+text
+const formData = {
+  ...values,
+  wages: values.staffWages || 0,  // Ensure included
+  // Other fields...
+};
+No backend/schema changes.
+Test End-to-End Flow:
+Use curl for submission (full payload to cover fields):
+text
+curl -X POST http://localhost:5000/api/forms/daily-sales/v2 -H "Content-Type: application/json" -d '{
+  "completedBy": "test",
+  "startingCash": 1000,
+  "cashSales": 500,
+  "qrSales": 200,
+  "grabSales": 100,
+  "aroiSales": 50,
+  "totalSales": 850,
+  "shiftDate": "2025-09-06T12:00:00.000Z",
+  "status": "submitted",
+  "expenses": 100,
+  "wages": 200
+}' --max-time 10 -s
+Expected: { ok: true, id: uuid }.
+Simulate full flow:
+Submit Form 1 in browser → Verify redirect to /operations/daily-stock?shift={id}.
+Submit Form 2 → Check console/logs for shopping list generation.
+Load /operations/daily-sales-library → Verify records, badges, summaries, rolls+meat, shopping list.
+Check email: Confirm management report sent (logs SMTP success).
+Add temp backend logs (in dailySalesV2.ts, remove after):
+text
+console.log('Inserting data:', normalizedData);
+console.log('Insert success - ID:', insertedId);
+Performance Check:
+Test /api/expensesV2: Time response (~544ms noted—report if improved).
+Test purchase tally (~295ms—confirm).
+Clean Up and Report Back:
+Remove temp logs from files.
+✅ Fixed: Backend mismatch, schema warning via fields.
+🔴 If issues: Detail errors (e.g., new mismatches).
+Full status: System 100% unblocked; end-to-end working.
+Optimization Suggestion: Add connection pooling in db.ts manually later (max:20) for perf.

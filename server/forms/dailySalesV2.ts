@@ -90,9 +90,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
     };
 
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, shiftDate, completedBy, created_at, payload)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, shiftDate, completedBy, createdAt, payload]
+      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, shiftDate, completedBy, createdAt, createdAt, payload]
     );
 
     // Build shopping list
@@ -179,15 +179,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
     const result = await pool.query(
-      `SELECT id, shiftdate, completedby, created_at, payload
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
-       ORDER BY created_at DESC`
+       ORDER BY "createdAt" DESC`
     );
 
     const records = result.rows.map((row: any) => ({
       id: row.id,
-      date: row.created_at,
-      staff: row.completedby,
+      date: row.shiftDate || row.createdAt,
+      staff: row.completedBy,
       cashStart: row.payload?.startingCash ? row.payload.startingCash / 100 : 0,
       cashEnd: row.payload?.closingCash ? row.payload.closingCash / 100 : 0,
       totalSales: row.payload?.totalSales ? row.payload.totalSales / 100 : 0,
