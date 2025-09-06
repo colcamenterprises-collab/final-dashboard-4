@@ -35,8 +35,14 @@ export class SchedulerService {
       this.generateJussiSummary();
     }, 8, 0); // 8:00 AM Bangkok time
 
+    // Schedule daily sales summary at 9:00 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.sendDailySalesSummary();
+    }, 9, 0); // 9:00 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
+    console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
   }
 
   stop() {
@@ -335,6 +341,84 @@ export class SchedulerService {
       });
     } catch (error) {
       console.error('❌ Scheduled Jussi summary failed:', error);
+    }
+  }
+
+  /**
+   * Send daily sales summary to management
+   */
+  private async sendDailySalesSummary() {
+    try {
+      console.log('📧 Starting daily sales summary generation...');
+      
+      const { pool } = await import('../db');
+      const { workingEmailService } = await import('./workingEmailService');
+      
+      // Get yesterday's sales data (for previous shift)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      
+      const result = await pool.query(
+        `SELECT * FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
+        [yesterdayStr]
+      );
+      
+      if (result.rows.length === 0) {
+        console.log('📧 No sales data found for yesterday, skipping summary');
+        return;
+      }
+      
+      const salesData = result.rows[0];
+      const payload = salesData.payload || {};
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">
+            🍔 Daily Sales Summary - ${salesData.shiftDate}
+          </h2>
+          
+          <div style="background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="color: #34495e; margin-top: 0;">Shift Details</h3>
+            <p><strong>Completed by:</strong> ${salesData.completedBy}</p>
+            <p><strong>Date:</strong> ${salesData.shiftDate}</p>
+            <p><strong>Submitted:</strong> ${new Date(salesData.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })}</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background-color: ${payload.balanced ? '#d5f4e6' : '#ffebee'}; padding: 15px; border-radius: 5px;">
+              <h4 style="color: ${payload.balanced ? '#27ae60' : '#e74c3c'}; margin-top: 0;">
+                💰 Cash Balance ${payload.balanced ? '✅' : '❌'}
+              </h4>
+              <p style="font-size: 18px; font-weight: bold; margin: 0;">
+                ${payload.balanced ? 'BALANCED' : 'UNBALANCED'}
+              </p>
+            </div>
+            
+            <div style="background-color: #d5f4e6; padding: 15px; border-radius: 5px;">
+              <h4 style="color: #27ae60; margin-top: 0;">💰 Total Sales</h4>
+              <p style="font-size: 24px; font-weight: bold; color: #27ae60; margin: 0;">
+                ฿${(payload.totalSales / 100).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <p style="color: #7f8c8d; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #bdc3c7; padding-top: 20px;">
+            Generated automatically by Smash Brothers Burgers Management System<br>
+            ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)
+          </p>
+        </div>
+      `;
+      
+      await workingEmailService.sendEmail(
+        'smashbrothersburgersth@gmail.com',
+        `Daily Sales Summary - ${salesData.shiftDate}`,
+        html
+      );
+      
+      console.log('✅ Daily sales summary sent successfully');
+    } catch (error) {
+      console.error('❌ Daily sales summary failed:', error);
     }
   }
 
