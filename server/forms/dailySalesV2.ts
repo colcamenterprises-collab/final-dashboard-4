@@ -1,8 +1,18 @@
 import { Request, Response } from "express";
-import pool from "@/server/db";
-import { toCents, fromCents } from "@/lib/utils";
+import { pool } from "../db.js";
 import nodemailer from "nodemailer";
 import { v4 as uuidv4 } from "uuid";
+
+// Utility functions
+const toCents = (n: unknown) => {
+  if (typeof n === "number") return Math.round(n * 100);
+  if (typeof n === "string") return Math.round(parseFloat(n) * 100);
+  return 0;
+};
+
+const fromCents = (n: number) => {
+  return (n / 100).toFixed(2);
+};
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -79,10 +89,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
       meatEnd,
     };
 
+    // Try different column name formats based on error hints
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, shiftdate, completedby, created_at, payload)
+      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", payload)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, shiftDate, completedBy, createdAt, payload]
+      [id, shiftDate, completedBy, createdAt, JSON.stringify(payload)]
     );
 
     // Build shopping list
@@ -151,13 +162,23 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    await transporter.sendMail({
-      from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
-      to: process.env.MANAGEMENT_EMAIL,
-      cc: "smashbrothersburgersth@gmail.com",
-      subject: `Daily Sales & Stock – ${shiftDate}`,
-      html,
-    });
+    // Try to send email (non-critical operation)
+    if (process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MANAGEMENT_EMAIL) {
+      try {
+        await transporter.sendMail({
+          from: `"SBB Dashboard" <${process.env.SMTP_USER}>`,
+          to: process.env.MANAGEMENT_EMAIL,
+          cc: "smashbrothersburgersth@gmail.com",
+          subject: `Daily Sales & Stock – ${shiftDate}`,
+          html,
+        });
+        console.log("Email sent successfully");
+      } catch (emailError) {
+        console.log("Email sending failed but record saved successfully:", emailError);
+      }
+    } else {
+      console.log("Email not sent - SMTP credentials not configured");
+    }
 
     res.json({ ok: true, id });
   } catch (err) {
@@ -169,15 +190,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
     const result = await pool.query(
-      `SELECT id, shiftdate, completedby, created_at, payload
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
-       ORDER BY created_at DESC`
+       ORDER BY "createdAt" DESC`
     );
 
     const records = result.rows.map((row: any) => ({
       id: row.id,
-      date: row.created_at,
-      staff: row.completedby,
+      date: row.createdAt,
+      staff: row.completedBy,
       cashStart: row.payload?.startingCash ? row.payload.startingCash / 100 : 0,
       cashEnd: row.payload?.closingCash ? row.payload.closingCash / 100 : 0,
       totalSales: row.payload?.totalSales ? row.payload.totalSales / 100 : 0,
