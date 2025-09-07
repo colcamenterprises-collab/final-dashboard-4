@@ -1,0 +1,108 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for minor adjustments (e.g., add totals endpoint, fix cents scaling in insert).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; align with existing.
+If multiple definitions found, stop and ask Cam.
+
+Task Overview
+
+Lock pop-ups as is (no changes).
+Add top displays: MTD/YTD/MoM trend badges, top 5 expense types summary (e.g., Food & Beverage total).
+Fix amounts: Save as full THB (adjust insert to multiply by 100 if cents, or change to decimal without scaling).
+Add edit/delete to table: Buttons per row, open edit modal (reuse lodgment), DELETE endpoint.
+Fix upload parsing: Integrate Jussi AI (OpenAI) for line extraction/categorization from PDF/CSV; add review/approval flow.
+Proactive: Ensure totals feed home stats; add table export CSV; optimize queries for speed.
+
+Step-by-Step Actions
+
+Add Top Displays (Frontend):
+
+Open client/src/pages/operations/Expenses.tsx.
+Add badges at top (use shadcn Card):
+textimport { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import { Card, CardContent } from '@/components/ui/card';
+
+// Add endpoint if missing (backend: server/routes/expensesV2.ts - GET /api/expensesV2/totals)
+const { data: totals } = useQuery({ queryKey: ['expenseTotals'], queryFn: () => axios.get('/api/expensesV2/totals') });
+// Assume response: { mtd, ytd, mom, top5: [{type: 'Food & Beverage', total: 5000}, ...] }
+
+<div className="grid grid-cols-4 gap-4 mb-4">
+  <Card><CardContent>MTD: {totals?.mtd} THB</CardContent></Card>
+  <Card><CardContent>YTD: {totals?.ytd} THB</CardContent></Card>
+  <Card><CardContent>MoM Trend: {totals?.mom}%</CardContent></Card>
+  <Card><CardContent>Top 5 Types: <ul>{totals?.top5.map(t => <li key={t.type}>{t.type}: {t.total} THB</li>)}</ul></CardContent></Card>
+</div>
+
+Backend totals (add to expensesV2.ts):
+textapp.get('/api/expensesV2/totals', async (req, res) => {
+  const mtd = await db.select({ sum: sql`sum(amount)` }).from(expenseEntry).where(sql`extract(month from date) = extract(month from current_date)`);
+  const ytd = await db.select({ sum: sql`sum(amount)` }).from(expenseEntry).where(sql`extract(year from date) = extract(year from current_date)`);
+  const mom = /* Calculate prev month vs current */;
+  const top5 = await db.select({ type: 'type_id', total: sql`sum(amount)` }).from(expenseEntry).groupBy('type_id').orderBy(sql`sum(amount) desc`).limit(5);
+  res.json({ mtd: mtd[0].sum, ytd: ytd[0].sum, mom, top5 });
+});
+
+Feed to Home.tsx: Add similar useQuery for badges.
+
+
+Fix Amounts as Cents (Backend):
+
+Open server/forms/expensesV2.ts or insert handler.
+Adjust insert: If costCents, use amount * 100; else change to full decimal.
+textconst { amount } = parsedData;
+const savedAmount = amount;  // If no cents, or amount * 100 if cents
+await db.insert(expenseEntry).values({ ...data, amount: savedAmount });
+
+Update queries/displays to divide by 100 if cents.
+
+
+Add Edit/Delete to Table (Frontend):
+
+In Expenses.tsx table:
+textcolumns.push({
+  id: 'actions',
+  cell: ({ row }) => (
+    <div>
+      <Button onClick={() => openEditModal(row.original.id)}>Edit</Button>
+      <Button variant="destructive" onClick={() => deleteMutation.mutate(row.original.id)}>Delete</Button>
+    </div>
+  ),
+});
+
+Edit modal: Reuse LodgmentModal with pre-filled data (add props: initialData, isEdit).
+Delete mutation: useMutation({ mutationFn: (id) => axios.delete(/api/expensesV2/${id}) }).
+
+
+Fix Upload Parsing with Jussi AI (Backend/Frontend):
+
+Frontend: On upload, POST file to /api/expenses/imports — show review table with AI guesses.
+Backend: In import handler, use Jussi (OpenAI) for parsing:
+text// Extract text from PDF (use pdf-parse lib if installed, or OpenAI vision if available)
+import pdfParse from 'pdf-parse';
+const text = await pdfParse(file.buffer).then(result => result.text);
+const lines = text.split('\n').filter(l => l.trim());  // Simple split, or regex for transactions
+
+// Call Jussi AI
+const response = await openaiClient.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'system', content: 'Extract transactions: date, supplier, category, description, amount from text. Categories: [list]. Suppliers: [list].' }, { role: 'user', content: text }],
+});
+const parsedLines = JSON.parse(response.choices[0].message.content);  // Assume array of {date, supplier, category, description, amount}
+// Save to import batch, show in review table for approval
+
+Review: Editable table, approve button inserts to expenseEntry.
+
+
+Test & Report:
+
+Submit expense → Table updates, visuals correct, home stats feed.
+Upload PDF/CSV → Parse with AI, review/approve.
+Edit/delete works, amounts full THB.
+
+
+Proactive:
+
+Add export: Button to download table CSV (use json2csv).
+Optimize: Cache totals query.

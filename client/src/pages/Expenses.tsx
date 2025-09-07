@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -9,6 +12,13 @@ export default function Expenses() {
   const [uploading, setUploading] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
+
+  // Fetch expense totals for top displays
+  const { data: totals } = useQuery({
+    queryKey: ['expenseTotals'],
+    queryFn: () => axios.get('/api/expensesV2/totals').then(res => res.data),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
 
   useEffect(() => { fetchExpenses(); }, []);
 
@@ -59,9 +69,85 @@ export default function Expenses() {
   const meat = expenses.filter(e => e.notes?.includes("Meat"));
   const drinks = expenses.filter(e => e.notes?.includes("Drinks"));
 
+  // Format currency helper
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  // Get trend icon based on MoM percentage
+  const getTrendIcon = (mom: number) => {
+    if (mom > 0) return <TrendingUp className="h-4 w-4 text-red-500" />;
+    if (mom < 0) return <TrendingDown className="h-4 w-4 text-green-500" />;
+    return <Minus className="h-4 w-4 text-gray-500" />;
+  };
+
   return (
     <div className="space-y-6 font-['Poppins'] text-gray-800">
       <h1 className="text-xl font-bold mb-4">Expenses</h1>
+
+      {/* Top Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Month to Date</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {totals?.mtd ? formatCurrency(totals.mtd) : '฿0'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Year to Date</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {totals?.ytd ? formatCurrency(totals.ytd) : '฿0'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              MoM Trend
+              {totals?.mom && getTrendIcon(totals.mom)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${
+              totals?.mom > 0 ? 'text-red-600' : 
+              totals?.mom < 0 ? 'text-green-600' : 
+              'text-gray-600'
+            }`}>
+              {totals?.mom ? `${totals.mom > 0 ? '+' : ''}${totals.mom}%` : '0%'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Top Expense Types</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {totals?.top5?.slice(0, 3).map((item: any, idx: number) => (
+                <div key={idx} className="text-xs flex justify-between">
+                  <span className="truncate">{item.type}</span>
+                  <span className="font-medium">{formatCurrency(item.total)}</span>
+                </div>
+              )) || <div className="text-xs text-gray-500">No data</div>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Buttons */}
       <div className="flex space-x-4 mb-4">

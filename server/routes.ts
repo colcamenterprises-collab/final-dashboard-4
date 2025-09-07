@@ -1730,6 +1730,67 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Get comprehensive expense totals for dashboard
+  app.get("/api/expensesV2/totals", async (req: Request, res: Response) => {
+    try {
+      // Get MTD (Month-to-Date) total
+      const mtdResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0) as total 
+        FROM expense_entry 
+        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+      `);
+      const mtd = Number(mtdResult.rows[0]?.total || 0);
+
+      // Get YTD (Year-to-Date) total
+      const ytdResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0) as total 
+        FROM expense_entry 
+        WHERE EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+      `);
+      const ytd = Number(ytdResult.rows[0]?.total || 0);
+
+      // Get previous month total for MoM calculation
+      const prevMonthResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0) as total 
+        FROM expense_entry 
+        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE) - 1
+        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+      `);
+      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0);
+      const mom = prevMonth > 0 ? ((mtd - prevMonth) / prevMonth * 100).toFixed(1) : '0.0';
+
+      // Get top 5 expense types by total amount
+      const top5Result = await db.execute(sql`
+        SELECT 
+          etl.name as type,
+          COALESCE(SUM(ee.amount), 0) as total
+        FROM expense_entry ee
+        LEFT JOIN expense_type_lkp etl ON ee.type_id = etl.id
+        WHERE EXTRACT(month FROM ee.date) = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM ee.date) = EXTRACT(year FROM CURRENT_DATE)
+        GROUP BY etl.name
+        ORDER BY total DESC
+        LIMIT 5
+      `);
+      
+      const top5 = top5Result.rows.map((row: any) => ({
+        type: row.type || 'Unknown',
+        total: Number(row.total || 0)
+      }));
+
+      res.json({
+        mtd: mtd,
+        ytd: ytd,
+        mom: Number(mom),
+        top5: top5
+      });
+    } catch (error) {
+      console.error("Error fetching expense totals:", error);
+      res.status(500).json({ error: "Failed to fetch expense totals" });
+    }
+  });
+
   // Get all expense suppliers
   app.get("/api/expense-suppliers", async (req: Request, res: Response) => {
     try {
