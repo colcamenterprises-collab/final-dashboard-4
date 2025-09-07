@@ -122,8 +122,8 @@ export default function Expenses() {
     <div className="space-y-6 font-['Poppins'] text-gray-800">
       <h1 className="text-xl font-bold mb-4">Expenses</h1>
 
-      {/* Top Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Top Statistics Cards - Mobile Optimized */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Month to Date</CardTitle>
@@ -181,16 +181,21 @@ export default function Expenses() {
         </Card>
       </div>
 
-      {/* Buttons */}
-      <div className="flex space-x-4 mb-4">
+      {/* Buttons - Mobile Optimized */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
         <ExpenseLodgmentModal 
           onSuccess={() => {
             fetchExpenses();
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
           }} 
-          triggerClassName="px-4 py-2 rounded text-sm" 
+          triggerClassName="px-6 py-3 rounded-lg text-sm sm:text-base font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
-        <button onClick={() => setShowStockModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800">Lodge Stock Purchase</button>
+        <button 
+          onClick={() => setShowStockModal(true)} 
+          className="bg-black text-white px-6 py-3 rounded-lg text-sm sm:text-base font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
+        >
+          Lodge Stock Purchase
+        </button>
       </div>
 
       {/* Edit Modal */}
@@ -214,17 +219,26 @@ export default function Expenses() {
         />
       )}
 
-      {/* Upload */}
+      {/* Upload - Mobile Optimized */}
       <form onSubmit={handleUpload} className="mb-6">
-        <div className="flex gap-3">
-          <input type="file" accept=".pdf,.csv,.png,.jpg" onChange={e => setFile(e.target.files?.[0] || null)} className="flex-1" />
-          <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50" disabled={!file || uploading}>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input 
+            type="file" 
+            accept=".pdf,.csv,.png,.jpg" 
+            onChange={e => setFile(e.target.files?.[0] || null)} 
+            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm sm:text-base" 
+          />
+          <button 
+            type="submit" 
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
+            disabled={!file || uploading}
+          >
             {uploading ? (
               <span className="flex items-center gap-2">
-                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 Processing...
               </span>
-            ) : 'Upload'}
+            ) : 'Upload Document'}
           </button>
         </div>
       </form>
@@ -275,48 +289,50 @@ export default function Expenses() {
         </div>
       )}
 
-      {/* Main Expense Table */}
+      {/* Main Expense Table/Cards - Mobile Responsive */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-2">This Month's Expenses</h2>
-        <div className="overflow-x-auto">
+        <h2 className="text-lg font-semibold mb-4">This Month's Expenses</h2>
+        
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full border text-sm">
             <thead>
               <tr className="bg-gray-100">
-                <th className="p-1 border text-left">Date</th>
-                <th className="p-1 border text-left">Supplier</th>
-                <th className="p-1 border text-left">Category</th>
-                <th className="p-1 border text-left">Description</th>
-                <th className="p-1 border text-right">Amount</th>
-                <th className="p-1 border text-center">Actions</th>
+                <th className="p-3 border text-left">Date</th>
+                <th className="p-3 border text-left">Supplier</th>
+                <th className="p-3 border text-left">Category</th>
+                <th className="p-3 border text-left">Description</th>
+                <th className="p-3 border text-right">Amount</th>
+                <th className="p-3 border text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {expenses.map((exp,i)=>(
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-1">{new Date(exp.date).toLocaleDateString()}</td>
-                  <td className="border p-1">{exp.supplier}</td>
-                  <td className="border p-1">{exp.category}</td>
-                  <td className="border p-1">{exp.description}</td>
-                  <td className="border p-1 text-right">{formatCurrency(exp.amount || 0)}</td>
-                  <td className="border p-1 text-center">
-                    <div className="flex justify-center gap-1">
+                  <td className="border p-3">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="border p-3">{exp.supplier}</td>
+                  <td className="border p-3">{exp.category}</td>
+                  <td className="border p-3">{exp.description}</td>
+                  <td className="border p-3 text-right">{formatCurrency(exp.amount || 0)}</td>
+                  <td className="border p-3 text-center">
+                    <div className="flex justify-center gap-2">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setEditingExpense(exp)}
-                        className="h-6 w-6 p-0"
+                        className="h-8 w-8 p-0"
                       >
-                        <Edit className="h-3 w-3" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             disabled={deleteMutation.isPending}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -341,15 +357,70 @@ export default function Expenses() {
                   </td>
                 </tr>
               ))}
-              {expenses.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="border p-4 text-center text-gray-500">
-                    No expenses recorded this month
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-4">
+          {expenses.map((exp,i)=>(
+            <div key={i} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                  <h3 className="font-medium text-base text-gray-900">{exp.description}</h3>
+                  <p className="text-sm text-gray-600">{exp.supplier} • {exp.category}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900">{formatCurrency(exp.amount || 0)}</div>
+                  <div className="text-sm text-gray-500">{new Date(exp.date).toLocaleDateString()}</div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingExpense(exp)}
+                  className="min-h-[44px] px-4 flex items-center gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="min-h-[44px] px-4 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 flex items-center gap-2"
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="mx-4">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{exp.description}"? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                      <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteMutation.mutate(exp.id)}
+                        className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ))}
+          {expenses.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No expenses recorded this month
+            </div>
+          )}
         </div>
       </div>
 
