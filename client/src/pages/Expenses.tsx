@@ -101,7 +101,7 @@ export default function Expenses() {
       style: 'currency',
       currency: 'THB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 2
     }).format(amount);
   };
 
@@ -291,7 +291,7 @@ export default function Expenses() {
                   <td className="border p-1">{exp.supplier}</td>
                   <td className="border p-1">{exp.category}</td>
                   <td className="border p-1">{exp.description}</td>
-                  <td className="border p-1 text-right">฿{(exp.amount || 0).toLocaleString()}</td>
+                  <td className="border p-1 text-right">{formatCurrency(exp.amount || 0)}</td>
                   <td className="border p-1 text-center">
                     <div className="flex justify-center gap-1">
                       <Button

@@ -753,7 +753,7 @@ export class MemStorage implements IStorage {
       id: expense.id,
       date: expense.shiftDate || expense.createdAt,
       description: expense.item || 'Unknown Item',
-      amount: (expense.costCents || 0) / 100, // Convert cents to THB
+      amount: parseFloat(expense.costCents) || 0, // Already in THB
       category: expense.expenseType || 'Shopping',
       supplier: expense.supplier || 'Unknown Supplier',
       paymentMethod: 'Cash',
@@ -780,7 +780,7 @@ export class MemStorage implements IStorage {
         ${'cmes916fj0000pio20tvofd44'},
         COALESCE(${expenseDate}::timestamp, NOW()),
         ${expense.description || expense.item || 'Unknown Item'},
-        ${Math.round(expense.amount || 0)},
+        ${parseFloat(expense.amount) || 0},
         ${expense.supplier || 'Unknown'},
         ${expense.category || expense.expenseType || 'Shopping'},
         ${JSON.stringify(expense.notes ? { notes: expense.notes } : {})},

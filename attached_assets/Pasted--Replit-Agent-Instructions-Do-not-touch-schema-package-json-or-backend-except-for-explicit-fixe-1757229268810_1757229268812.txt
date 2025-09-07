@@ -1,0 +1,91 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend except for explicit fixes to amount handling (remove all cents scaling; store as full THB decimal).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; no changes.
+If multiple definitions found, stop and ask Cam.
+
+Task Overview
+
+Fix amount handling permanently: No cents—store, send, display as full THB (e.g., user enters 4500 → stores 4500 → displays 4,500 THB). Remove all *100 / /100 conversions. If DB field is costCents, rename to costThb (decimal) or adjust type—allowed for this.
+Proactive: Clean up inconsistent data (SQL update existing cents to THB); add form validation for positive numbers; format displays with commas/THB symbol; test with samples (4500, 7,500); ensure totals/MTD/YTD/Top5 correct without scaling.
+
+Step-by-Step Actions
+
+Remove Cents Scaling in Frontend:
+
+Open client/src/components/operations/ExpenseLodgmentModal.tsx (or form file).
+Update form/onSubmit: Send amount as-is (no *100).
+textconst onSubmit = (data) => {
+  mutation.mutate({ ...data, amount: parseFloat(data.amount) });  // No *100
+};
+
+Add validation/display format: Use Input with step="0.01" for decimals; display with Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).
+
+
+Remove Cents Scaling in Backend:
+
+Open server/routes/expensesV2.ts (or insert handler).
+Update insert: Store amount directly (no *100).
+textconst { amount } = parsedData;
+await db.insert(expenseEntry).values({ ...data, amount });  // Direct, as decimal THB
+
+If field is costCents: Run SQL to rename/type change (allowed):
+textALTER TABLE expenses RENAME COLUMN "costCents" TO "costThb";
+ALTER TABLE expenses ALTER COLUMN "costThb" TYPE decimal(10,2);
+ALTER TABLE expense_entry RENAME COLUMN "amount" TO "amountThb";  // If needed
+ALTER TABLE expense_entry ALTER COLUMN "amountThb" TYPE decimal(10,2);
+
+Update queries/totals: No /100; sum(amount) as is.
+textconst mtd = await db.select({ sum: sql`sum(amount)` }).from(expenseEntry).where(/* month */);
+// Return sum as full THB
+
+
+
+Clean Up Inconsistent Data:
+
+Run SQL to fix existing (divide cents by 100 if >1000 likely cents):
+textUPDATE expenses SET "costThb" = "costThb" / 100 WHERE "costThb" > 1000;  // Assume >1000 are cents errors
+UPDATE expense_entry SET amount = amount / 100 WHERE amount > 1000;
+
+Verify: SELECT sum(amount) FROM expense_entry; —match expected THB.
+
+
+Update Displays/Table/Totals:
+
+Open Expenses.tsx.
+In table/cells: Display {new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(row.amount)} — no /100.
+Badges/totals: Same format, direct sum.
+
+
+Test Full Flow:
+
+Add expense 4500 THB → Verify stores 4500, displays ฿4,500.
+Add 7,500 → Displays ฿7,500; MTD updates correctly.
+Check totals/Top5 no scaling errors.
+
+
+Proactive:
+
+Add to form: Validation z.number().positive().min(0.01).
+Export table: Button <Button onClick={() => exportToCSV(data)}>Export CSV — use json2csv.
+textimport { Parser } from 'json2csv';
+const exportToCSV = (data) => {
+  const parser = new Parser();
+  const csv = parser.parse(data);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'expenses.csv';
+  a.click();
+};
+
+Optimize: Index on date for faster MTD queries: CREATE INDEX idx_expense_date ON expense_entry (date);
+
+
+Report Back:
+
+✅ Fixed: Amounts as full THB, no cents; data cleaned; displays correct.
+🔴 Issues: Detail.
+Test Samples: Added 4500/7500—confirmed.

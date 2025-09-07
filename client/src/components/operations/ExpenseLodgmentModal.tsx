@@ -129,7 +129,7 @@ export function ExpenseLodgmentModal({
         supplier: data.supplier,
         category: data.category,
         description: data.description,
-        amount: data.amount * 100, // Convert THB to cents - backend expects cents
+        amount: parseFloat(data.amount), // Send as full THB
         createdAt: new Date().toISOString(),
       };
 

@@ -1449,7 +1449,7 @@ export function registerRoutes(app: express.Application): Server {
         id: expense.id,
         date: expense.shiftDate || expense.createdAt,
         description: expense.item || 'Unknown Item',
-        amount: (expense.costCents || 0) / 100, // Convert cents to THB
+        amount: parseFloat(expense.costCents) || 0, // Already in THB
         category: expense.expenseType || 'Shopping',
         supplier: expense.supplier || 'Unknown',
         paymentMethod: 'Cash',
@@ -1705,7 +1705,7 @@ export function registerRoutes(app: express.Application): Server {
           supplier = ${supplier},
           "expenseType" = ${category},
           item = ${description},
-          "costCents" = ${Math.round(amount * 100)}
+          "costCents" = ${parseFloat(amount)}
         WHERE id = ${id}
         RETURNING *
       `);
@@ -1769,7 +1769,7 @@ export function registerRoutes(app: express.Application): Server {
         WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
         AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const mtd = Number(mtdResult.rows[0]?.total || 0) / 100; // Convert cents to THB
+      const mtd = Number(mtdResult.rows[0]?.total || 0); // Already in THB
 
       // Get YTD (Year-to-Date) total
       const ytdResult = await db.execute(sql`
@@ -1777,7 +1777,7 @@ export function registerRoutes(app: express.Application): Server {
         FROM expenses 
         WHERE EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const ytd = Number(ytdResult.rows[0]?.total || 0) / 100; // Convert cents to THB
+      const ytd = Number(ytdResult.rows[0]?.total || 0); // Already in THB
 
       // Get previous month total for MoM calculation
       const prevMonthResult = await db.execute(sql`
@@ -1786,7 +1786,7 @@ export function registerRoutes(app: express.Application): Server {
         WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE) - 1
         AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0) / 100; // Convert cents to THB
+      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // Already in THB
       const mom = prevMonth > 0 ? ((mtd - prevMonth) / prevMonth * 100).toFixed(1) : '0.0';
 
       // Get top 5 expense categories by total amount
@@ -1804,7 +1804,7 @@ export function registerRoutes(app: express.Application): Server {
       
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
-        total: Number(row.total || 0) / 100 // Convert cents to THB
+        total: Number(row.total || 0) // Already in THB
       }));
 
       res.json({
