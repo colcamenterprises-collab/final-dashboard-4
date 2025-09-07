@@ -1619,34 +1619,60 @@ export function registerRoutes(app: express.Application): Server {
   // Stock purchase endpoint - handles rolls, meat, drinks  
   app.post("/api/expensesV2/stock", async (req: Request, res: Response) => {
     try {
-      const { type, qty, amount, meatType, weightKg, drinkType } = req.body;
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
+      const crypto = await import("crypto");
 
-      if (type === "rolls") {
-        // Rolls go to expenses (Bakery)
-        const result = await db.execute(sql`
+      if (req.body.type === "rolls") {
+        const { quantity, cost, paid } = req.body;
+        
+        // Always create stock lodgment record
+        const stockLodgmentId = crypto.randomUUID();
+        await db.execute(sql`
           INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
           VALUES (
-            gen_random_uuid(),
+            ${stockLodgmentId},
             ${'cmes916fj0000pio20tvofd44'},
             NOW(),
             ${'Bakery'},
-            ${Math.round(Number(amount) * 100)},
-            ${'Rolls'},
-            ${'Food'},
-            ${JSON.stringify({qty: qty})},
-            ${'DIRECT'},
+            ${Math.round(Number(cost))},
+            ${'Rolls Stock Lodgment'},
+            ${'Stock'},
+            ${JSON.stringify({quantity: quantity, paid: paid, type: 'rolls'})},
+            ${'STOCK_LODGMENT'},
             NOW()
           )
-          RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category
         `);
 
-        return res.json({ ok: true, expense: result.rows[0] });
+        // Conditionally create expense if paid
+        if (paid) {
+          const expenseId = crypto.randomUUID();
+          const expenseResult = await db.execute(sql`
+            INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
+            VALUES (
+              ${expenseId},
+              ${'cmes916fj0000pio20tvofd44'},
+              NOW(),
+              ${'Bakery'},
+              ${Math.round(Number(cost))},
+              ${'Rolls'},
+              ${'Food & Beverage'},
+              ${JSON.stringify({quantity: quantity, relatedLodgment: stockLodgmentId})},
+              ${'DIRECT'},
+              NOW()
+            )
+            RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category
+          `);
+          return res.json({ ok: true, expense: expenseResult.rows[0] });
+        }
+        
+        return res.json({ ok: true, message: "Rolls lodgment recorded" });
       }
 
-      if (type === "meat") {
-        // Meat → insert into purchase_tally
+      if (req.body.type === "meat") {
+        const { meatType, weightKg } = req.body;
+        
+        // Meat → insert into purchase_tally (existing logic preserved)
         const weightGrams = Math.round(Number(weightKg) * 1000);
         const result = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, meat_grams)
@@ -1666,23 +1692,29 @@ export function registerRoutes(app: express.Application): Server {
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
-      if (type === "drinks") {
-        // Drinks → insert into purchase_tally with meta JSON
-        const result = await db.execute(sql`
-          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
-          VALUES (
-            gen_random_uuid(),
-            NOW(),
-            NOW(),
-            NULL,
-            NULL,
-            0,
-            ${JSON.stringify({ "drinkType": drinkType, "qty": parseInt(qty) })}
-          )
-          RETURNING id, created_at as date, notes as item
-        `);
+      if (req.body.type === "drinks") {
+        const { items } = req.body;
+        
+        // Handle multiple drink items - create separate records for each
+        const results = [];
+        for (const item of items) {
+          const result = await db.execute(sql`
+            INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
+            VALUES (
+              gen_random_uuid(),
+              NOW(),
+              NOW(),
+              NULL,
+              NULL,
+              0,
+              ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
+            )
+            RETURNING id, created_at as date, notes as item
+          `);
+          results.push(result.rows[0]);
+        }
 
-        return res.json({ ok: true, stock: result.rows[0] });
+        return res.json({ ok: true, stocks: results });
       }
 
       res.status(400).json({ ok: false, error: "Invalid stock type" });

@@ -1,0 +1,91 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding/updating fields (e.g., add 'paid' to stock_lodgment; conditional expense insert).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; no changes.
+If multiple definitions found, stop and ask Cam.
+
+Task Overview
+
+Update Stock Lodgment modal based on clarifications: Rolls auto-cost (qty * 8 THB), fixed supplier/category/description, Paid/Not Paid toggle (boolean; if Paid, add expense; add field to table). Drinks: Dynamic multiple items (add/remove rows for type/quantity per entry; not total count).
+Update tables in Expenses: Rolls table add 'Paid' column; Drinks table show 'Type' and 'Quantity'.
+Ensure backend conditional: For rolls, if paid, insert expense with auto-cost, supplier 'Bakery', category 'Food & Beverage', description 'Rolls'.
+Proactive: In daily stock form, use lodgments for calc (e.g., rolls_added = sum(qty) where date > last_shift and type='rolls'); add variance alert.
+
+Step-by-Step Actions
+
+Update Rolls Tab in Modal (Frontend):
+
+Open StockLodgmentModal.tsx.
+Add Paid toggle, auto-cost calc.
+text// In Rolls tab form:
+<Label>Quantity (rolls)</Label><Input type="number" {...rollForm.register('quantity', { valueAsNumber: true, onChange: (e) => rollForm.setValue('cost', e.target.value * 8) })} />
+<Label>Amount (THB)</Label><Input disabled value={rollForm.watch('cost')} />
+<Label>Paid?</Label><Switch {...rollForm.register('paid')} />  // Use shadcn Switch
+// On submit: Send {quantity, cost: qty*8, paid}
+
+
+
+Update Backend Lodgment (Allowed):
+
+Open /api/stock/lodgment handler.
+Add 'paid' to stockLodgment table (if missing: ALTER TABLE stock_lodgment ADD COLUMN paid boolean DEFAULT false;).
+Conditional expense:
+textif (type === 'rolls') {
+  await db.insert(stockLodgment).values({ ..., paid });
+  if (paid) {
+    const cost = quantity * 8;
+    await db.insert(expenses).values({
+      date: new Date(),
+      supplierId: /* Bakery ID from lkp */,
+      typeId: /* Food & Beverage ID */,
+      description: 'Rolls',
+      amount: cost,
+    });
+  }
+}
+
+For drinks: Handle array of {type, quantity} if multiple; insert multiple rows or jsonb.
+
+
+Update Drinks Tab for Multiple (Frontend):
+
+Add dynamic rows: Use array in form (useFieldArray from react-hook-form).
+textimport { useFieldArray } from 'react-hook-form';
+
+const { fields, append, remove } = useFieldArray({ control: drinkForm.control, name: 'items' });
+// In tab:
+{fields.map((field, index) => (
+  <div key={field.id}>
+    <Label>Drink Type</Label><Select onValueChange={(val) => drinkForm.setValue(`items.${index}.type`, val)}><SelectContent>{/* Coke, Coke Zero, Sprite, ... Soda Water */}</SelectContent></Select>
+    <Label>Quantity</Label><Input type="number" {...drinkForm.register(`items.${index}.quantity`, { valueAsNumber: true })} />
+    <Button type="button" onClick={() => remove(index)}>Remove</Button>
+  </div>
+))}
+<Button type="button" onClick={() => append({ type: '', quantity: 0 })}>Add Drink</Button>
+<Button type="submit">Lodge Drinks</Button>
+// On submit: Send {type: 'drinks', items: [{type, quantity}, ...]}
+
+Backend: Loop insert for each item as separate lodgment rows (type='drinks', quantity, meta: {drinkType} jsonb).
+
+
+Update Tables in Expenses (Frontend):
+
+Rolls table: Add 'Paid' column (yes/no).
+textcolumns.push({ accessorKey: 'paid', header: 'Paid', cell: ({ row }) => row.paid ? 'Yes' : 'No' });
+
+Drinks table: Columns 'Date', 'Type', 'Quantity' (group by type if multiple).
+
+
+Test & Report:
+
+Lodge rolls 100, paid=yes → Expense added (800 THB), table shows Paid 'Yes'.
+Lodge rolls 50, paid=no → No expense, Paid 'No'.
+Lodge drinks: Coke 6, Sprite 4 → Multiple rows, table shows per type/qty.
+Verify daily stock calc uses lodgments.
+
+
+Proactive:
+
+Auto-supplier ID: Hardcode Bakery ID or query lkp.
+Variance in daily form: Add alert if rolls variance >5.

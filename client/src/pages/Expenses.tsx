@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus, Edit, Trash2 } from "lucide-react";
@@ -13,8 +14,6 @@ export default function Expenses() {
   const [parsed, setParsed] = useState<any[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [showStockModal, setShowStockModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
@@ -131,12 +130,14 @@ export default function Expenses() {
           }} 
           triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
-        <button 
-          onClick={() => setShowStockModal(true)} 
-          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
-        >
-          Lodge Stock Purchase
-        </button>
+        <StockLodgmentModal 
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            fetchExpenses();
+          }} 
+          triggerClassName="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+        />
       </div>
 
       {/* Edit Modal */}
@@ -513,131 +514,6 @@ export default function Expenses() {
       </div>
 
 
-      {/* Stock Purchase Modal */}
-      {showStockModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96 max-w-full mx-4">
-            <h3 className="font-bold text-lg mb-4">Lodge Stock Purchase</h3>
-            
-            {/* Tab Navigation */}
-            <div className="flex border-b mb-4">
-              <button 
-                onClick={() => setActiveTab("rolls")} 
-                className={`px-4 py-2 ${activeTab === "rolls" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600"}`}
-              >
-                Rolls
-              </button>
-              <button 
-                onClick={() => setActiveTab("meat")} 
-                className={`px-4 py-2 ${activeTab === "meat" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600"}`}
-              >
-                Meat
-              </button>
-              <button 
-                onClick={() => setActiveTab("drinks")} 
-                className={`px-4 py-2 ${activeTab === "drinks" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600"}`}
-              >
-                Drinks
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const data = Object.fromEntries(new FormData(form).entries());
-
-              let payload: any = { type: activeTab };
-
-              if (activeTab === "rolls") {
-                payload.qty = data.qty;
-                payload.amount = data.amount;
-              }
-
-              if (activeTab === "meat") {
-                payload.meatType = data.meatType;
-                payload.weightKg = data.weightKg;
-              }
-
-              if (activeTab === "drinks") {
-                payload.drinkType = data.drinkType;
-                payload.qty = data.qty;
-              }
-
-              try {
-                await axios.post("/api/expensesV2/stock", payload);
-                setShowStockModal(false);
-                fetchExpenses();
-              } catch (error) {
-                console.error("Failed to create stock purchase:", error);
-                alert("Failed to create stock purchase");
-              }
-            }} className="space-y-4">
-              {/* Tab-specific fields only */}
-              {activeTab === "rolls" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Quantity (Rolls)</label>
-                    <input type="number" name="qty" placeholder="Quantity (Rolls)" className="border p-2 w-full rounded" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Amount (THB)</label>
-                    <input type="number" step="0.01" name="amount" placeholder="Amount (THB)" className="border p-2 w-full rounded" required />
-                  </div>
-                </>
-              )}
-              
-              {activeTab === "meat" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Meat Type</label>
-                    <select name="meatType" className="border p-2 w-full rounded" required>
-                      <option value="Topside">Topside</option>
-                      <option value="Chuck">Chuck</option>
-                      <option value="Brisket">Brisket</option>
-                      <option value="Rump">Rump</option>
-                      <option value="Outside">Outside</option>
-                      <option value="Mixed">Mixed</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Weight (kg)</label>
-                    <input type="number" step="0.01" name="weightKg" placeholder="Weight (kg)" className="border p-2 w-full rounded" required />
-                  </div>
-                </>
-              )}
-              
-              {activeTab === "drinks" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Drink Type</label>
-                    <select name="drinkType" className="border p-2 w-full rounded" required>
-                      <option value="Coke">Coke</option>
-                      <option value="Coke Zero">Coke Zero</option>
-                      <option value="Sprite">Sprite</option>
-                      <option value="Schweppes Manow">Schweppes Manow</option>
-                      <option value="Red Fanta">Red Fanta</option>
-                      <option value="Orange Fanta">Orange Fanta</option>
-                      <option value="Red Singha">Red Singha</option>
-                      <option value="Yellow Singha">Yellow Singha</option>
-                      <option value="Pink Singha">Pink Singha</option>
-                      <option value="Soda Water">Soda Water</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Quantity</label>
-                    <input type="number" name="qty" placeholder="Quantity" className="border p-2 w-full rounded" required />
-                  </div>
-                </>
-              )}
-              <div className="flex justify-end space-x-2">
-                <button type="button" onClick={() => setShowStockModal(false)} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save Purchase</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

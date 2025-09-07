@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 
 export default function Home() {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -55,12 +56,13 @@ export default function Home() {
           }} 
           triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto bg-emerald-600 text-white hover:bg-emerald-700" 
         />
-        <button 
-          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
-          onClick={() => window.location.href = '/expenses'}
-        >
-          Lodge Stock Purchase
-        </button>
+        <StockLodgmentModal 
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+          }} 
+          triggerClassName="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+        />
       </div>
 
       {/* KPI bar */}
