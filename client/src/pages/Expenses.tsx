@@ -122,7 +122,45 @@ export default function Expenses() {
     <div className="space-y-6 font-['Poppins'] text-gray-800">
       <h1 className="text-xl font-bold mb-4">Expenses</h1>
 
-      {/* Top Statistics Cards - Mobile Optimized */}
+      {/* Buttons - Mobile Optimized */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
+        <ExpenseLodgmentModal 
+          onSuccess={() => {
+            fetchExpenses();
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+          }} 
+          triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+        />
+        <button 
+          onClick={() => setShowStockModal(true)} 
+          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
+        >
+          Lodge Stock Purchase
+        </button>
+      </div>
+
+      {/* Edit Modal */}
+      {editingExpense && (
+        <ExpenseLodgmentModal 
+          isOpen={true}
+          onOpenChange={(open) => !open && setEditingExpense(null)}
+          initialData={{
+            date: editingExpense.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+            category: editingExpense.category || '',
+            supplier: editingExpense.supplier || '',
+            description: editingExpense.description || '',
+            amount: (editingExpense.amount || 0).toString() // Already in THB from backend
+          }}
+          expenseId={editingExpense.id}
+          onSuccess={() => {
+            fetchExpenses();
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            setEditingExpense(null);
+          }}
+        />
+      )}
+
+      {/* Statistics Cards - Mobile Optimized */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
@@ -180,44 +218,6 @@ export default function Expenses() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Buttons - Mobile Optimized */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
-        <ExpenseLodgmentModal 
-          onSuccess={() => {
-            fetchExpenses();
-            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-          }} 
-          triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
-        />
-        <button 
-          onClick={() => setShowStockModal(true)} 
-          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
-        >
-          Lodge Stock Purchase
-        </button>
-      </div>
-
-      {/* Edit Modal */}
-      {editingExpense && (
-        <ExpenseLodgmentModal 
-          isOpen={true}
-          onOpenChange={(open) => !open && setEditingExpense(null)}
-          initialData={{
-            date: editingExpense.date?.split('T')[0] || new Date().toISOString().split('T')[0],
-            category: editingExpense.category || '',
-            supplier: editingExpense.supplier || '',
-            description: editingExpense.description || '',
-            amount: (editingExpense.amount || 0).toString() // Already in THB from backend
-          }}
-          expenseId={editingExpense.id}
-          onSuccess={() => {
-            fetchExpenses();
-            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-            setEditingExpense(null);
-          }}
-        />
-      )}
 
       {/* Upload - Mobile Optimized */}
       <form onSubmit={handleUpload} className="mb-6">

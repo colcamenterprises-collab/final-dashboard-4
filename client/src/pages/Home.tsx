@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 
 export default function Home() {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const queryClient = useQueryClient();
 
   // Get all DIRECT expenses and calculate MTD on client side
   const { data: allExpenses = [] } = useQuery({
@@ -43,6 +45,23 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
+
+      {/* Quick Actions */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        <ExpenseLodgmentModal 
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+          }} 
+          triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto bg-emerald-600 text-white hover:bg-emerald-700" 
+        />
+        <button 
+          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
+          onClick={() => window.location.href = '/expenses'}
+        >
+          Lodge Stock Purchase
+        </button>
+      </div>
 
       {/* KPI bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
