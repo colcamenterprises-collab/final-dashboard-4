@@ -1724,7 +1724,7 @@ export function registerRoutes(app: express.Application): Server {
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id; // Keep as string UUID
       const success = await storage.deleteExpense(id);
       if (success) {
         res.json({ success: true });

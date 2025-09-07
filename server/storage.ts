@@ -77,7 +77,7 @@ export interface IStorage {
   // Expenses
   getExpenses(): Promise<Expense[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
-  deleteExpense(id: number): Promise<boolean>;
+  deleteExpense(id: string): Promise<boolean>;
   getExpensesByCategory(): Promise<Record<string, number>>;
   getExpensesByMonth(month: number, year: number): Promise<Expense[]>;
   getMonthToDateExpenses(): Promise<number>;
@@ -799,16 +799,17 @@ export class MemStorage implements IStorage {
     return result.rows[0];
   }
 
-  async deleteExpense(id: number): Promise<boolean> {
+  async deleteExpense(id: string): Promise<boolean> {
     const { db } = await import("./db");
-    const { expenses } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
+    const { sql } = await import("drizzle-orm");
     
-    const result = await db.delete(expenses)
-      .where(eq(expenses.id, id))
-      .returning();
+    const result = await db.execute(sql`
+      DELETE FROM expenses 
+      WHERE id = ${id}
+      RETURNING id
+    `);
     
-    return result.length > 0;
+    return result.rows.length > 0;
   }
 
   async getExpensesByCategory(): Promise<Record<string, number>> {
