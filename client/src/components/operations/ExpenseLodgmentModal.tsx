@@ -129,7 +129,7 @@ export function ExpenseLodgmentModal({
         supplier: data.supplier,
         category: data.category,
         description: data.description,
-        amount: data.amount,
+        amount: data.amount, // Store as THB
         createdAt: new Date().toISOString(),
       };
 

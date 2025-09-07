@@ -1701,12 +1701,11 @@ export function registerRoutes(app: express.Application): Server {
       const updatedExpense = await db.execute(sql`
         UPDATE expenses 
         SET 
-          date = ${date},
+          "shiftDate" = ${date},
           supplier = ${supplier},
-          category = ${category},
-          description = ${description},
-          amount = ${Math.round(amount * 100)},
-          updated_at = NOW()
+          "expenseType" = ${category},
+          item = ${description},
+          "costCents" = ${Math.round(amount)}
         WHERE id = ${id}
         RETURNING *
       `);
@@ -1765,47 +1764,47 @@ export function registerRoutes(app: express.Application): Server {
     try {
       // Get MTD (Month-to-Date) total
       const mtdResult = await db.execute(sql`
-        SELECT COALESCE(SUM(amount), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const mtd = Number(mtdResult.rows[0]?.total || 0);
+      const mtd = Number(mtdResult.rows[0]?.total || 0); // Already in THB
 
       // Get YTD (Year-to-Date) total
       const ytdResult = await db.execute(sql`
-        SELECT COALESCE(SUM(amount), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const ytd = Number(ytdResult.rows[0]?.total || 0);
+      const ytd = Number(ytdResult.rows[0]?.total || 0); // Already in THB
 
       // Get previous month total for MoM calculation
       const prevMonthResult = await db.execute(sql`
-        SELECT COALESCE(SUM(amount), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE) - 1
-        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE) - 1
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0);
+      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // Already in THB
       const mom = prevMonth > 0 ? ((mtd - prevMonth) / prevMonth * 100).toFixed(1) : '0.0';
 
       // Get top 5 expense categories by total amount
       const top5Result = await db.execute(sql`
         SELECT 
-          category as type,
-          COALESCE(SUM(amount), 0) as total
+          "expenseType" as type,
+          COALESCE(SUM("costCents"), 0) as total
         FROM expenses
-        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
-        GROUP BY category
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        GROUP BY "expenseType"
         ORDER BY total DESC
         LIMIT 5
       `);
       
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
-        total: Number(row.total || 0)
+        total: Number(row.total || 0) // Already in THB
       }));
 
       res.json({
