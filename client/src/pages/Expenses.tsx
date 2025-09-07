@@ -51,6 +51,29 @@ export default function Expenses() {
     },
   });
 
+  // Delete stock item mutation
+  const deleteStockMutation = useMutation({
+    mutationFn: (id: string) => {
+      console.log("Deleting stock item with ID:", id);
+      return axios.delete(`/api/purchase-tally/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Stock item deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['purchase-tally'] });
+    },
+    onError: (error: any) => {
+      console.error("Delete stock mutation error:", error);
+      toast({
+        title: "Error",
+        description: error?.response?.data?.error || "Failed to delete stock item",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => { fetchExpenses(); }, []);
 
   async function fetchExpenses() {
@@ -452,6 +475,7 @@ export default function Expenses() {
               <th className="p-1 border text-left">Quantity</th>
               <th className="p-1 border text-left">Paid</th>
               <th className="p-1 border text-right">Amount</th>
+              <th className="p-1 border text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -477,12 +501,53 @@ export default function Expenses() {
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1">{paid}</td>
                   <td className="border p-1 text-right">฿{(r.amount || 0).toLocaleString()}</td>
+                  <td className="border p-1 text-center">
+                    <div className="flex justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => console.log('Edit roll:', r)}
+                        className="h-7 w-7 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                            disabled={deleteStockMutation.isPending}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Roll Purchase</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this roll purchase? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteStockMutation.mutate(r.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
             {rolls.length === 0 && (
               <tr>
-                <td colSpan={4} className="border p-4 text-center text-gray-500">No rolls purchases this month</td>
+                <td colSpan={5} className="border p-4 text-center text-gray-500">No rolls purchases this month</td>
               </tr>
             )}
           </tbody>
@@ -499,6 +564,7 @@ export default function Expenses() {
               <th className="p-1 border text-left">Type</th>
               <th className="p-1 border text-left">Weight</th>
               <th className="p-1 border text-left">Supplier</th>
+              <th className="p-1 border text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -508,11 +574,52 @@ export default function Expenses() {
                 <td className="border p-1">{m.notes || m.meatType}</td>
                 <td className="border p-1">{m.meatGrams ? (m.meatGrams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
                 <td className="border p-1">{m.supplier || 'Meat Supplier'}</td>
+                <td className="border p-1 text-center">
+                  <div className="flex justify-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => console.log('Edit meat:', m)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                          disabled={deleteStockMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Meat Purchase</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this meat purchase ({m.notes || m.meatType})? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteStockMutation.mutate(m.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </td>
               </tr>
             ))}
             {meat.length === 0 && (
               <tr>
-                <td colSpan={4} className="border p-4 text-center text-gray-500">No meat purchases this month</td>
+                <td colSpan={5} className="border p-4 text-center text-gray-500">No meat purchases this month</td>
               </tr>
             )}
           </tbody>
@@ -528,6 +635,7 @@ export default function Expenses() {
               <th className="p-1 border text-left">Date</th>
               <th className="p-1 border text-left">Type</th>
               <th className="p-1 border text-left">Quantity</th>
+              <th className="p-1 border text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -549,12 +657,53 @@ export default function Expenses() {
                   <td className="border p-1">{new Date(d.date || d.created_at).toLocaleDateString()}</td>
                   <td className="border p-1">{drinkType}</td>
                   <td className="border p-1">{quantity}</td>
+                  <td className="border p-1 text-center">
+                    <div className="flex justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => console.log('Edit drink:', d)}
+                        className="h-7 w-7 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                            disabled={deleteStockMutation.isPending}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Drink Purchase</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this drink purchase ({drinkType})? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteStockMutation.mutate(d.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
             {drinks.length === 0 && (
               <tr>
-                <td colSpan={3} className="border p-4 text-center text-gray-500">No drinks purchases this month</td>
+                <td colSpan={4} className="border p-4 text-center text-gray-500">No drinks purchases this month</td>
               </tr>
             )}
           </tbody>
