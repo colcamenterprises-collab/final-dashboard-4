@@ -95,23 +95,26 @@ export default function Expenses() {
     setParsed(parsed.filter(l => l.id !== id)); 
   }
 
-  // Additional queries for meat and drinks from purchase_tally
-  const { data: meatResponse } = useQuery({
-    queryKey: ["/api/purchase-tally/summary"],
-    queryFn: () => axios.get("/api/purchase-tally/summary").then(res => res.data),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: drinksResponse } = useQuery({
-    queryKey: ["/api/purchase-tally/drinks/summary"], 
-    queryFn: () => axios.get("/api/purchase-tally/drinks/summary").then(res => res.data),
+  // Get purchase tally entries directly
+  const { data: purchaseTallyData } = useQuery({
+    queryKey: ["/api/purchase-tally"],
+    queryFn: () => axios.get("/api/purchase-tally").then(res => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
   // Filter helpers - ensure arrays are always defined
   const rolls = expenses ? expenses.filter(e => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
-  const meat = (meatResponse?.items && Array.isArray(meatResponse.items)) ? meatResponse.items.filter((item: any) => item.meat_grams > 0) : [];
-  const drinks = (drinksResponse?.items && Array.isArray(drinksResponse.items)) ? drinksResponse.items : [];
+  const meat = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
+    ? purchaseTallyData.entries.filter((item: any) => item.meat_grams > 0) : [];
+  const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
+    ? purchaseTallyData.entries.filter((item: any) => {
+        try {
+          const notes = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+          return notes?.type === 'drinks';
+        } catch (e) {
+          return false;
+        }
+      }) : [];
 
   // Format currency helper
   const formatCurrency = (amount: number) => {
@@ -147,8 +150,7 @@ export default function Expenses() {
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/summary"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/drinks/summary"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
             fetchExpenses();
           }} 
           triggerClassName="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
