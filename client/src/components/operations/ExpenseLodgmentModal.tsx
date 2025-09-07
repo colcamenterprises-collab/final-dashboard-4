@@ -25,6 +25,16 @@ type ExpenseLodgmentForm = z.infer<typeof expenseLodgmentSchema>;
 interface ExpenseLodgmentModalProps {
   onSuccess?: () => void;
   triggerClassName?: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialData?: {
+    date: string;
+    supplier: string;
+    category: string;
+    description: string;
+    amount: string;
+  };
+  expenseId?: string;
 }
 
 // Hardcoded categories and suppliers until lookup tables are seeded
@@ -68,24 +78,50 @@ const SUPPLIERS = [
   'Other'
 ];
 
-export function ExpenseLodgmentModal({ onSuccess, triggerClassName }: ExpenseLodgmentModalProps) {
+export function ExpenseLodgmentModal({ 
+  onSuccess, 
+  triggerClassName, 
+  isOpen: controlledOpen, 
+  onOpenChange: controlledOnOpenChange,
+  initialData,
+  expenseId 
+}: ExpenseLodgmentModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  
+  // Use controlled or internal state
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalIsOpen;
+  const setIsOpen = controlledOnOpenChange || setInternalIsOpen;
+  
+  const isEditMode = !!expenseId;
 
   const form = useForm<ExpenseLodgmentForm>({
     resolver: zodResolver(expenseLodgmentSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-      supplier: "",
-      category: "",
-      description: "",
-      amount: 0,
+      date: initialData?.date || new Date().toISOString().split('T')[0],
+      supplier: initialData?.supplier || "",
+      category: initialData?.category || "",
+      description: initialData?.description || "",
+      amount: initialData ? parseFloat(initialData.amount) : 0,
     },
   });
 
-  // Create expense mutation
-  const createExpenseMutation = useMutation({
+  // Reset form when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        date: initialData.date,
+        supplier: initialData.supplier,
+        category: initialData.category,
+        description: initialData.description,
+        amount: parseFloat(initialData.amount),
+      });
+    }
+  }, [initialData, form]);
+
+  // Create/Update expense mutation
+  const expenseMutation = useMutation({
     mutationFn: async (data: ExpenseLodgmentForm) => {
       // Transform data to match the backend API format
       const payload = {
@@ -97,8 +133,11 @@ export function ExpenseLodgmentModal({ onSuccess, triggerClassName }: ExpenseLod
         createdAt: new Date().toISOString(),
       };
 
-      return apiRequest("/api/expensesV2", {
-        method: "POST",
+      const url = isEditMode ? `/api/expensesV2/${expenseId}` : "/api/expensesV2";
+      const method = isEditMode ? "PUT" : "POST";
+
+      return apiRequest(url, {
+        method: method,
         body: JSON.stringify(payload),
       });
     },
@@ -106,24 +145,24 @@ export function ExpenseLodgmentModal({ onSuccess, triggerClassName }: ExpenseLod
       queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
       toast({
         title: "Success",
-        description: "Business expense logged successfully",
+        description: isEditMode ? "Expense updated successfully" : "Business expense logged successfully",
       });
       setIsOpen(false);
       form.reset();
       onSuccess?.();
     },
     onError: (error: any) => {
-      console.error("Failed to create expense:", error);
+      console.error(`Failed to ${isEditMode ? 'update' : 'create'} expense:`, error);
       toast({
         title: "Error",
-        description: error.message || "Failed to log expense",
+        description: error.message || `Failed to ${isEditMode ? 'update' : 'log'} expense`,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: ExpenseLodgmentForm) => {
-    createExpenseMutation.mutate(data);
+    expenseMutation.mutate(data);
   };
 
   // Reset form when modal closes
@@ -151,7 +190,7 @@ export function ExpenseLodgmentModal({ onSuccess, triggerClassName }: ExpenseLod
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Lodge Business Expense</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Business Expense" : "Lodge Business Expense"}</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
@@ -263,15 +302,15 @@ export function ExpenseLodgmentModal({ onSuccess, triggerClassName }: ExpenseLod
                 type="button" 
                 variant="outline" 
                 onClick={() => setIsOpen(false)}
-                disabled={createExpenseMutation.isPending}
+                disabled={expenseMutation.isPending}
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                disabled={createExpenseMutation.isPending}
+                disabled={expenseMutation.isPending}
               >
-                {createExpenseMutation.isPending ? "Saving..." : "Save Expense"}
+                {expenseMutation.isPending ? "Saving..." : isEditMode ? "Update Expense" : "Save Expense"}
               </Button>
             </div>
           </form>

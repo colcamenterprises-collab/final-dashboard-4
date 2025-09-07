@@ -1692,6 +1692,36 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Update expense
+  app.put("/api/expensesV2/:id", async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id;
+      const { date, supplier, category, description, amount } = req.body;
+      
+      const updatedExpense = await db.execute(sql`
+        UPDATE expenses 
+        SET 
+          date = ${date},
+          supplier = ${supplier},
+          category = ${category},
+          description = ${description},
+          amount = ${Math.round(amount * 100)},
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (updatedExpense.rows.length === 0) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+
+      res.json(updatedExpense.rows[0]);
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      res.status(500).json({ error: "Failed to update expense" });
+    }
+  });
+
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
@@ -1736,7 +1766,7 @@ export function registerRoutes(app: express.Application): Server {
       // Get MTD (Month-to-Date) total
       const mtdResult = await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0) as total 
-        FROM expense_entry 
+        FROM expenses 
         WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE)
         AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
       `);
@@ -1745,7 +1775,7 @@ export function registerRoutes(app: express.Application): Server {
       // Get YTD (Year-to-Date) total
       const ytdResult = await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0) as total 
-        FROM expense_entry 
+        FROM expenses 
         WHERE EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
       `);
       const ytd = Number(ytdResult.rows[0]?.total || 0);
@@ -1753,23 +1783,22 @@ export function registerRoutes(app: express.Application): Server {
       // Get previous month total for MoM calculation
       const prevMonthResult = await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0) as total 
-        FROM expense_entry 
+        FROM expenses 
         WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE) - 1
         AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
       `);
       const prevMonth = Number(prevMonthResult.rows[0]?.total || 0);
       const mom = prevMonth > 0 ? ((mtd - prevMonth) / prevMonth * 100).toFixed(1) : '0.0';
 
-      // Get top 5 expense types by total amount
+      // Get top 5 expense categories by total amount
       const top5Result = await db.execute(sql`
         SELECT 
-          etl.name as type,
-          COALESCE(SUM(ee.amount), 0) as total
-        FROM expense_entry ee
-        LEFT JOIN expense_type_lkp etl ON ee.type_id = etl.id
-        WHERE EXTRACT(month FROM ee.date) = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM ee.date) = EXTRACT(year FROM CURRENT_DATE)
-        GROUP BY etl.name
+          category as type,
+          COALESCE(SUM(amount), 0) as total
+        FROM expenses
+        WHERE EXTRACT(month FROM date) = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM date) = EXTRACT(year FROM CURRENT_DATE)
+        GROUP BY category
         ORDER BY total DESC
         LIMIT 5
       `);

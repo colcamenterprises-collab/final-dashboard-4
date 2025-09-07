@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, Minus, Edit, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -12,12 +14,36 @@ export default function Expenses() {
   const [uploading, setUploading] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch expense totals for top displays
   const { data: totals } = useQuery({
     queryKey: ['expenseTotals'],
     queryFn: () => axios.get('/api/expensesV2/totals').then(res => res.data),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Delete expense mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => axios.delete(`/api/expensesV2/${id}`),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Expense deleted successfully",
+      });
+      fetchExpenses();
+      queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete expense",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => { fetchExpenses(); }, []);
@@ -151,9 +177,36 @@ export default function Expenses() {
 
       {/* Buttons */}
       <div className="flex space-x-4 mb-4">
-        <ExpenseLodgmentModal onSuccess={fetchExpenses} triggerClassName="px-4 py-2 rounded text-sm" />
+        <ExpenseLodgmentModal 
+          onSuccess={() => {
+            fetchExpenses();
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+          }} 
+          triggerClassName="px-4 py-2 rounded text-sm" 
+        />
         <button onClick={() => setShowStockModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800">Lodge Stock Purchase</button>
       </div>
+
+      {/* Edit Modal */}
+      {editingExpense && (
+        <ExpenseLodgmentModal 
+          isOpen={true}
+          onOpenChange={(open) => !open && setEditingExpense(null)}
+          initialData={{
+            date: editingExpense.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+            category: editingExpense.category || '',
+            supplier: editingExpense.supplier || '',
+            description: editingExpense.description || '',
+            amount: ((editingExpense.amount || 0) / 100).toString() // Convert from cents to THB
+          }}
+          expenseId={editingExpense.id}
+          onSuccess={() => {
+            fetchExpenses();
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            setEditingExpense(null);
+          }}
+        />
+      )}
 
       {/* Upload */}
       <form onSubmit={handleUpload} className="mb-6">
@@ -228,6 +281,7 @@ export default function Expenses() {
                 <th className="p-1 border text-left">Category</th>
                 <th className="p-1 border text-left">Description</th>
                 <th className="p-1 border text-right">Amount</th>
+                <th className="p-1 border text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -238,11 +292,36 @@ export default function Expenses() {
                   <td className="border p-1">{exp.category}</td>
                   <td className="border p-1">{exp.description}</td>
                   <td className="border p-1 text-right">฿{((exp.amount || 0)/100).toFixed(2)}</td>
+                  <td className="border p-1 text-center">
+                    <div className="flex justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingExpense(exp)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this expense?')) {
+                            deleteMutation.mutate(exp.id);
+                          }
+                        }}
+                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {expenses.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="border p-4 text-center text-gray-500">
+                  <td colSpan={6} className="border p-4 text-center text-gray-500">
                     No expenses recorded this month
                   </td>
                 </tr>
