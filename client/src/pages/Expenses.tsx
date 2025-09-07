@@ -188,11 +188,11 @@ export default function Expenses() {
             fetchExpenses();
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
           }} 
-          triggerClassName="px-6 py-3 rounded-lg text-sm sm:text-base font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+          triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
         <button 
           onClick={() => setShowStockModal(true)} 
-          className="bg-black text-white px-6 py-3 rounded-lg text-sm sm:text-base font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
+          className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto"
         >
           Lodge Stock Purchase
         </button>
@@ -226,11 +226,11 @@ export default function Expenses() {
             type="file" 
             accept=".pdf,.csv,.png,.jpg" 
             onChange={e => setFile(e.target.files?.[0] || null)} 
-            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm sm:text-base" 
+            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm" 
           />
           <button 
             type="submit" 
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
             disabled={!file || uploading}
           >
             {uploading ? (
@@ -379,7 +379,7 @@ export default function Expenses() {
                 <Button
                   variant="outline"
                   onClick={() => setEditingExpense(exp)}
-                  className="min-h-[44px] px-4 flex items-center gap-2"
+                  className="min-h-[44px] px-4 flex items-center gap-2 text-sm"
                 >
                   <Edit className="h-4 w-4" />
                   Edit
@@ -388,7 +388,7 @@ export default function Expenses() {
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="outline"
-                      className="min-h-[44px] px-4 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 flex items-center gap-2"
+                      className="min-h-[44px] px-4 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 flex items-center gap-2 text-sm"
                       disabled={deleteMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4" />
