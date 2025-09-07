@@ -85,6 +85,7 @@ export default function App() {
                   <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
                   <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+                  <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
 
                   {/* Finance */}
