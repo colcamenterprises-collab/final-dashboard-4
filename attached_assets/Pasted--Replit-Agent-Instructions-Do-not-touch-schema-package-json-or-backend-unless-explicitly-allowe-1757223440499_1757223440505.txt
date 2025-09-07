@@ -1,0 +1,170 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless explicitly allowed for new endpoints/tables (add only if needed for new features; no changes to existing).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if adding new ones; align with existing structure.
+If you find multiple route definitions, stop and ask Cam which one to keep.
+
+Task Overview
+
+Primary goal: Complete the Expenses tab as per specs: Add lodgment pop-up for manual entries, bank statement upload (PDF/CSV) with review/create/approval flow, table with edit/delete, current month view with search, top visuals (MTD/YTD/MoM trend badges), categories/suppliers dropdowns. Feed data to home page stats.
+Build on current architecture: Use existing expenses tables (expenses, expenseEntry, lookup tables); extend if needed (e.g., add import batch if not present). Frontend: Enhance Expenses.tsx, add modals/components.
+Proactive: Add AI categorization using OpenAI (guess category/supplier from description); optimize for mobile; add export CSV for table; integrate with home page (e.g., query totals for badges).
+No notes field; use description. Timestamp entries, allow backdating. Categories/Suppliers as listed—seed if missing.
+Part 2 (Rolls/Drinks/Meat) deferred—focus Part 1.
+
+Step-by-Step Actions for You (Replit Agent)
+
+Seed Categories and Suppliers (Backend Allowed):
+
+Open server/db.seed.ts or new script server/scripts/seedExpenses.ts.
+Add seed function (run once: node server/scripts/seedExpenses.ts):
+textimport { db } from '../db';
+import { expenseTypeLkp, supplierLkp } from 'shared/schema';
+
+async function seed() {
+  const categories = ['Food & Beverage', 'Staff Expenses (from Account)', 'Rent', 'Administration', 'Advertising', 'Delivery Fee', 'Director Payment', 'Fittings & Fixtures', 'Kitchen Supplies', 'Office Supplies', 'Packaging', 'Fees', 'Subscriptions', 'Travel', 'Utilities', 'Other'];
+  for (const name of categories) {
+    await db.insert(expenseTypeLkp).values({ name }).onConflictDoNothing();
+  }
+
+  const suppliers = ['Makro', 'Mr DIY', 'Bakery', 'Big C', 'Printers', 'Supercheap', 'Loyverse', 'DTAC', 'AIS', 'Landlord', 'Gas', 'GO Wholesale', 'Grab Merchant', 'HomePro', 'Lawyer', 'Lazada', 'Tesco Lotus', 'Other'];
+  for (const name of suppliers) {
+    await db.insert(supplierLkp).values({ name }).onConflictDoNothing();
+  }
+  console.log('Seeded categories and suppliers');
+}
+seed();
+
+Run script, verify in DB via SQL: SELECT * FROM expense_type_lkp;.
+
+
+Add Lodgment Pop-up Modal (Frontend):
+
+Open client/src/pages/operations/Expenses.tsx (or BusinessExpenses.tsx if primary).
+Add modal using shadcn/ui (Dialog from @radix-ui/react-dialog).
+Full component template (add as new ExpenseLodgmentModal.tsx in components/operations/):
+textimport { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import axios from 'axios';
+
+const schema = z.object({
+  date: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid date' }),
+  supplier: z.string().min(1),
+  category: z.string().min(1),
+  description: z.string().min(1),
+  amount: z.number().positive(),
+});
+
+export function ExpenseLodgmentModal({ onSuccess }) {
+  const { register, handleSubmit, setValue } = useForm({ resolver: zodResolver(schema) });
+  const mutation = useMutation({
+    mutationFn: (data) => axios.post('/api/expensesV2/', { ...data, createdAt: new Date().toISOString() }),
+    onSuccess: () => { onSuccess(); /* Refresh table */ },
+  });
+
+  // Fetch dropdowns
+  // Use useQuery for suppliers/categories from /api/expensesV2/meta
+
+  const onSubmit = (data) => mutation.mutate(data);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild><Button>Lodge Business Expense</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Lodge Expense</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <Label>Date (dd/mm/yyyy)</Label><Input type="date" {...register('date')} />
+          <Label>Supplier</Label><Select onValueChange={(val) => setValue('supplier', val)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{/* Map suppliers */}</SelectContent></Select>
+          <Label>Category</Label><Select onValueChange={(val) => setValue('category', val)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{/* Map categories */}</SelectContent></Select>
+          <Label>Description</Label><Input {...register('description')} />
+          <Label>Amount (THB)</Label><Input type="number" {...register('amount', { valueAsNumber: true })} />
+          <Button type="submit">Save Expense</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+Integrate in Expenses.tsx: <expenselodgmentmodal onsuccess="{refetchExpenses}">.</expenselodgmentmodal>
+
+
+Add Bank Statement Upload & Review Flow (Frontend + Backend Allowed):
+
+Frontend: In Expenses.tsx, add upload button using input type="file" (PDF/CSV).
+On upload: POST to /api/expenses/imports — parse with PapaParse for CSV, use pdf.js or OpenAI for PDF text extraction.
+Add review table in modal: Show parsed lines, edit category/supplier, approve/commit.
+Backend: Extend /api/expenses/imports if needed; add AI guess:
+textimport openai from 'openai';
+const openaiClient = new openai.OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// In parse handler:
+async function categorize(description) {
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{ role: 'system', content: 'Categorize expense: categories [list]. Suppliers [list].' }, { role: 'user', content: description }],
+  });
+  return response.choices[0].message.content;  // Parse to {category, supplier, confidence}
+}
+
+Commit: POST /api/expenses/imports/:batchId/commit — insert to expenseEntry.
+
+
+Enhance Table with Edit/Delete/Search (Frontend):
+
+In Expenses.tsx: Use TanStack Table for table.
+Filter: Current month default; add search inputs for month/date/amount/supplier.
+Add columns: Date, Supplier, Category, Description, Amount, Edit/Delete buttons.
+Edit: Open modal similar to lodgment.
+Delete: Mutation DELETE /api/expensesV2/:id.
+Full table template:
+textimport { useTable } from '@tanstack/react-table';
+
+// In Expenses.tsx:
+const columns = [ /* Define: date, supplier, category, description, amount, actions */ ];
+const { data } = useQuery({ queryKey: ['expenses'], queryFn: () => axios.get('/api/expensesV2?month=current') });
+// Table with search filters
+
+
+
+Add Top Visuals (MTD/YTD/MoM Trend):
+
+In Expenses.tsx top: Add badges/cards using shadcn/ui.
+Query totals from /api/expensesV2/totals (add endpoint if needed: GET aggregate MTD/YTD/MoM).
+Template:
+text<div className="grid grid-cols-3 gap-4">
+  <Card>MTD: {mtd} THB</Card>
+  <Card>YTD: {ytd} THB</Card>
+  <Card>MoM Trend: {mom}%</Card>
+</div>
+
+Feed to home page: Add useQuery in Home.tsx for /api/expensesV2/home-stats.
+
+
+Integrate with Home Page Stats (Frontend):
+
+Open client/src/pages/Home.tsx.
+Add expense badges: Total Expenses, MTD, etc.
+Use useQuery for totals.
+
+
+Test End-to-End:
+
+Upload CSV/PDF → Review → Commit → Table updates.
+Lodge manual → Table/search works, edit/delete.
+Visuals update, home stats reflect.
+Mobile test: Responsive.
+
+
+Report Back:
+
+✅ Implemented: Lodgment, upload/review, table, visuals.
+🔴 Issues: Detail.
+Optimization: Added AI categorization.
