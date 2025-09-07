@@ -95,10 +95,23 @@ export default function Expenses() {
     setParsed(parsed.filter(l => l.id !== id)); 
   }
 
-  // Filter helpers
-  const rolls = expenses.filter(e => e.description?.includes("Rolls"));
-  const meat = expenses.filter(e => e.notes?.includes("Meat"));
-  const drinks = expenses.filter(e => e.notes?.includes("Drinks"));
+  // Additional queries for meat and drinks from purchase_tally
+  const { data: meatResponse } = useQuery({
+    queryKey: ["/api/purchase-tally/summary"],
+    queryFn: () => axios.get("/api/purchase-tally/summary").then(res => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: drinksResponse } = useQuery({
+    queryKey: ["/api/purchase-tally/drinks/summary"], 
+    queryFn: () => axios.get("/api/purchase-tally/drinks/summary").then(res => res.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Filter helpers - ensure arrays are always defined
+  const rolls = expenses ? expenses.filter(e => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
+  const meat = (meatResponse?.items && Array.isArray(meatResponse.items)) ? meatResponse.items.filter((item: any) => item.meat_grams > 0) : [];
+  const drinks = (drinksResponse?.items && Array.isArray(drinksResponse.items)) ? drinksResponse.items : [];
 
   // Format currency helper
   const formatCurrency = (amount: number) => {
@@ -134,6 +147,8 @@ export default function Expenses() {
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/summary"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally/drinks/summary"] });
             fetchExpenses();
           }} 
           triggerClassName="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
@@ -488,9 +503,9 @@ export default function Expenses() {
             {meat.map((m,i)=>(
               <tr key={i} className="hover:bg-gray-50">
                 <td className="border p-1">{new Date(m.date).toLocaleDateString()}</td>
-                <td className="border p-1">{m.notes}</td>
-                <td className="border p-1">{m.notes}</td>
-                <td className="border p-1">{m.supplier}</td>
+                <td className="border p-1">{m.notes || m.meatType}</td>
+                <td className="border p-1">{m.meat_grams ? (m.meat_grams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
+                <td className="border p-1">{m.supplier || 'Meat Supplier'}</td>
               </tr>
             ))}
             {meat.length === 0 && (
@@ -529,7 +544,7 @@ export default function Expenses() {
               
               return (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-1">{new Date(d.date).toLocaleDateString()}</td>
+                  <td className="border p-1">{new Date(d.date || d.created_at).toLocaleDateString()}</td>
                   <td className="border p-1">{drinkType}</td>
                   <td className="border p-1">{quantity}</td>
                 </tr>
