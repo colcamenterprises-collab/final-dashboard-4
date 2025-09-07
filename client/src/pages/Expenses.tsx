@@ -438,14 +438,31 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {rolls.map((r,i)=>(
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="border p-1">{new Date(r.date).toLocaleDateString()}</td>
-                <td className="border p-1">{r.notes}</td>
-                <td className="border p-1">{r.notes}</td>
-                <td className="border p-1 text-right">฿{(r.amount || 0).toLocaleString()}</td>
-              </tr>
-            ))}
+            {rolls.map((r,i)=>{
+              // Parse the meta JSON to get quantity and paid status
+              let quantity = "N/A";
+              let paid = "N/A";
+              try {
+                const meta = typeof r.notes === 'string' ? JSON.parse(r.notes) : r.notes;
+                quantity = meta.quantity || meta.qty || "N/A";
+                paid = meta.paid ? "Yes" : "No";
+              } catch (e) {
+                // If parsing fails, try to extract from the raw string
+                if (typeof r.notes === 'string' && r.notes.includes('qty')) {
+                  const qtyMatch = r.notes.match(/"qty":\s*(\d+)/);
+                  if (qtyMatch) quantity = qtyMatch[1];
+                }
+              }
+              
+              return (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="border p-1">{new Date(r.date).toLocaleDateString()}</td>
+                  <td className="border p-1">{quantity}</td>
+                  <td className="border p-1">{paid}</td>
+                  <td className="border p-1 text-right">฿{(r.amount || 0).toLocaleString()}</td>
+                </tr>
+              );
+            })}
             {rolls.length === 0 && (
               <tr>
                 <td colSpan={4} className="border p-4 text-center text-gray-500">No rolls purchases this month</td>
@@ -497,13 +514,27 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {drinks.map((d,i)=>(
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="border p-1">{new Date(d.date).toLocaleDateString()}</td>
-                <td className="border p-1">{d.notes}</td>
-                <td className="border p-1">{d.notes}</td>
-              </tr>
-            ))}
+            {drinks.map((d,i)=>{
+              // Parse the meta JSON to get drink type and quantity
+              let drinkType = "N/A";
+              let quantity = "N/A";
+              try {
+                const meta = typeof d.notes === 'string' ? JSON.parse(d.notes) : d.notes;
+                drinkType = meta.drinkType || "N/A";
+                quantity = meta.qty || meta.quantity || "N/A";
+              } catch (e) {
+                // If parsing fails, use raw notes as fallback
+                drinkType = d.notes || "N/A";
+              }
+              
+              return (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="border p-1">{new Date(d.date).toLocaleDateString()}</td>
+                  <td className="border p-1">{drinkType}</td>
+                  <td className="border p-1">{quantity}</td>
+                </tr>
+              );
+            })}
             {drinks.length === 0 && (
               <tr>
                 <td colSpan={3} className="border p-4 text-center text-gray-500">No drinks purchases this month</td>
