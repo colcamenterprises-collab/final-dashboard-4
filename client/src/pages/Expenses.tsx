@@ -5,6 +5,7 @@ import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentMod
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus, Edit, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Expenses() {
@@ -15,6 +16,7 @@ export default function Expenses() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -28,7 +30,10 @@ export default function Expenses() {
 
   // Delete expense mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => axios.delete(`/api/expensesV2/${id}`),
+    mutationFn: (id: string) => {
+      console.log("Deleting expense with ID:", id);
+      return axios.delete(`/api/expensesV2/${id}`);
+    },
     onSuccess: () => {
       toast({
         title: "Success",
@@ -37,10 +42,11 @@ export default function Expenses() {
       fetchExpenses();
       queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Delete mutation error:", error);
       toast({
         title: "Error",
-        description: "Failed to delete expense",
+        description: error?.response?.data?.error || "Failed to delete expense",
         variant: "destructive",
       });
     },
@@ -302,19 +308,35 @@ export default function Expenses() {
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this expense?')) {
-                            deleteMutation.mutate(exp.id);
-                          }
-                        }}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{exp.description}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(exp.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </td>
                 </tr>
