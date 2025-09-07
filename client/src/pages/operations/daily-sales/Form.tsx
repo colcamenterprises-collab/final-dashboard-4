@@ -166,10 +166,15 @@ export default function DailySales() {
         );
       }
       
-      // on success -> hard navigation (no alert, no setTimeout)
-      const target = `${FORM2_PATH}?shift=${shiftId}`;
-      console.log('[Form1] will navigate:', target);
-      window.location.assign(target);
+      // Show loading indicator before navigation
+      setSubmitting(true);
+      
+      // Brief delay to show loading state before navigation
+      setTimeout(() => {
+        const target = `${FORM2_PATH}?shift=${shiftId}`;
+        console.log('[Form1] will navigate:', target);
+        window.location.assign(target);
+      }, 500);
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
       setError(e?.message || "Failed to submit. Please try again.");
