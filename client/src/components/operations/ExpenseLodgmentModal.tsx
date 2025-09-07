@@ -129,7 +129,7 @@ export function ExpenseLodgmentModal({
         supplier: data.supplier,
         category: data.category,
         description: data.description,
-        amount: data.amount, // Store as THB
+        amount: data.amount * 100, // Convert THB to cents for storage
         createdAt: new Date().toISOString(),
       };
 

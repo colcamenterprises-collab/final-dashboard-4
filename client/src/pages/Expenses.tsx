@@ -197,7 +197,7 @@ export default function Expenses() {
             category: editingExpense.category || '',
             supplier: editingExpense.supplier || '',
             description: editingExpense.description || '',
-            amount: (editingExpense.amount || 0).toString() // Already in THB
+            amount: ((editingExpense.amount || 0) / 100).toString() // Convert cents to THB for form
           }}
           expenseId={editingExpense.id}
           onSuccess={() => {
@@ -291,7 +291,7 @@ export default function Expenses() {
                   <td className="border p-1">{exp.supplier}</td>
                   <td className="border p-1">{exp.category}</td>
                   <td className="border p-1">{exp.description}</td>
-                  <td className="border p-1 text-right">฿{(exp.amount || 0).toLocaleString()}</td>
+                  <td className="border p-1 text-right">฿{((exp.amount || 0)/100).toLocaleString()}</td>
                   <td className="border p-1 text-center">
                     <div className="flex justify-center gap-1">
                       <Button
