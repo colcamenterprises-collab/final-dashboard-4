@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [parsed, setParsed] = useState<any[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [showGeneralModal, setShowGeneralModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls"|"meat"|"drinks">("rolls");
 
@@ -65,7 +65,7 @@ export default function Expenses() {
 
       {/* Buttons */}
       <div className="flex space-x-4 mb-4">
-        <button onClick={() => setShowGeneralModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800">Lodge Business Expense</button>
+        <ExpenseLodgmentModal onSuccess={fetchExpenses} triggerClassName="px-4 py-2 rounded text-sm" />
         <button onClick={() => setShowStockModal(true)} className="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800">Lodge Stock Purchase</button>
       </div>
 
@@ -254,68 +254,6 @@ export default function Expenses() {
         </table>
       </div>
 
-      {/* Business Expense Modal */}
-      {showGeneralModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96 max-w-full mx-4">
-            <h3 className="font-bold text-lg mb-4">Lodge Business Expense</h3>
-            <form onSubmit={async e => {
-              e.preventDefault();
-              try {
-                const formData = new FormData(e.target as HTMLFormElement);
-                const data = Object.fromEntries(formData.entries());
-                await axios.post("/api/expensesV2", data);
-                setShowGeneralModal(false); 
-                fetchExpenses();
-              } catch (error) {
-                console.error("Failed to create expense:", error);
-                alert("Failed to create expense");
-              }
-            }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Date</label>
-                <input type="date" name="date" className="border p-2 w-full rounded" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Supplier</label>
-                <select name="supplier" className="border p-2 w-full rounded" required>
-                  {[
-                    "Other","Mr DIY","Bakery","Makro","Supercheap","Lazada","Lotus","Big C","Landlord - Rent",
-                    "Printing Shop","Company Expenses","Wages","Wages - Bonus","GO Wholesale",
-                    "Director - Personal","Utilities - GAS/Electric/Phone"
-                  ].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Amount (THB)</label>
-                <input type="number" name="amount" placeholder="0.00" step="0.01" className="border p-2 w-full rounded" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
-                <select name="category" className="border p-2 w-full rounded" required>
-                  {[
-                    "Food","Beverage","Wages","Rent","Utilities","Kitchen Supplies & Packaging",
-                    "Administration","Marketing","Printing","Staff Expenses (from account)",
-                    "Travel","Personal (director)","Maintenance","Company Expense"
-                  ].map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <input type="text" name="description" placeholder="Description" className="border p-2 w-full rounded" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea name="notes" placeholder="Additional notes..." className="border p-2 w-full rounded h-20"></textarea>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button type="button" onClick={() => setShowGeneralModal(false)} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save Expense</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Stock Purchase Modal */}
       {showStockModal && (
