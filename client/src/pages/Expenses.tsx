@@ -105,7 +105,7 @@ export default function Expenses() {
   // Filter helpers - ensure arrays are always defined
   const rolls = expenses ? expenses.filter(e => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
   const meat = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
-    ? purchaseTallyData.entries.filter((item: any) => item.meat_grams > 0) : [];
+    ? purchaseTallyData.entries.filter((item: any) => item.meatGrams != null && item.meatGrams > 0) : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
     ? purchaseTallyData.entries.filter((item: any) => {
         try {
@@ -506,7 +506,7 @@ export default function Expenses() {
               <tr key={i} className="hover:bg-gray-50">
                 <td className="border p-1">{new Date(m.date).toLocaleDateString()}</td>
                 <td className="border p-1">{m.notes || m.meatType}</td>
-                <td className="border p-1">{m.meat_grams ? (m.meat_grams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
+                <td className="border p-1">{m.meatGrams ? (m.meatGrams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
                 <td className="border p-1">{m.supplier || 'Meat Supplier'}</td>
               </tr>
             ))}

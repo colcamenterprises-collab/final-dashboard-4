@@ -1672,8 +1672,10 @@ export function registerRoutes(app: express.Application): Server {
       if (req.body.type === "meat") {
         const { meatType, weightKg } = req.body;
         
-        // Meat → insert into purchase_tally (existing logic preserved)
+        // Meat → insert into purchase_tally with proper weight handling
         const weightGrams = Math.round(Number(weightKg) * 1000);
+        console.log(`Inserting meat: ${meatType}, ${weightKg}kg (${weightGrams}g)`);
+        
         const result = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, meat_grams)
           VALUES (
@@ -1681,12 +1683,12 @@ export function registerRoutes(app: express.Application): Server {
             NOW(),
             NOW(),
             NULL,
-            NULL,
+            ${'Meat Supplier'},
             0,
             ${meatType},
             ${weightGrams}
           )
-          RETURNING id, created_at as date, meat_grams as weight, notes as item
+          RETURNING id, created_at as date, meat_grams, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
