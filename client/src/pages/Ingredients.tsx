@@ -101,7 +101,6 @@ export default function Ingredients() {
 
   const categories = [...new Set((ingredients || []).map((ing: any) => ing.category).filter(Boolean))];
 
-  const costingIngredients = costingIngredientsData?.list || [];
 
   return (
     <div className="container mx-auto p-6">
@@ -144,8 +143,46 @@ export default function Ingredients() {
         </Select>
       </div>
 
-      {/* Main Ingredients Table */}
+      {/* CSV Import Section */}
       <div className="border rounded-lg mb-8">
+        <div className="p-4 border-b bg-gray-50">
+          <h2 className="text-xl font-semibold">Import from CSV</h2>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Upload CSV (name, unit, unitCost, supplier)
+              </label>
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="block w-full"
+              />
+            </div>
+            {csvContent && (
+              <div>
+                <label className="block text-sm font-medium mb-2">CSV Preview:</label>
+                <textarea
+                  value={csvContent.substring(0, 500)}
+                  readOnly
+                  className="w-full h-32 p-3 border rounded-md text-sm font-mono"
+                />
+              </div>
+            )}
+            <Button
+              onClick={handleImport}
+              disabled={!csvContent.trim() || importMutation.isPending}
+            >
+              {importMutation.isPending ? "Importing..." : "Import Ingredients"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Ingredients Table */}
+      <div className="border rounded-lg">
         <div className="p-4 border-b bg-gray-50">
           <h2 className="text-xl font-semibold">Current Ingredients</h2>
         </div>
@@ -210,78 +247,6 @@ export default function Ingredients() {
             </table>
           </div>
         )}
-      </div>
-
-        {/* CSV Import Section */}
-        <div className="border rounded-lg">
-          <div className="p-4 border-b bg-gray-50">
-            <h2 className="text-xl font-semibold">Import from CSV</h2>
-          </div>
-          <div className="p-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Upload CSV (name, unit, unitCost, supplier)
-              </label>
-              <Input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="block w-full"
-              />
-            </div>
-            {csvContent && (
-              <div>
-                <label className="block text-sm font-medium mb-2">CSV Preview:</label>
-                <textarea
-                  value={csvContent.substring(0, 500)}
-                  readOnly
-                  className="w-full h-32 p-3 border rounded-md text-sm font-mono"
-                />
-              </div>
-            )}
-            <Button
-              onClick={handleImport}
-              disabled={!csvContent.trim() || importMutation.isPending}
-            >
-              {importMutation.isPending ? "Importing..." : "Import Ingredients"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Costing System Ingredients (for CSV import reference) */}
-        <div className="border rounded-lg">
-          <div className="p-4 border-b bg-gray-50">
-            <h2 className="text-xl font-semibold">Costing System Ingredients</h2>
-            <p className="text-sm text-gray-600">Basic ingredient data for costing calculations</p>
-          </div>
-          {costingIngredients.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No costing ingredients found</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left py-3 px-4 font-semibold">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold">Unit</th>
-                    <th className="text-left py-3 px-4 font-semibold">Unit Cost (฿)</th>
-                    <th className="text-left py-3 px-4 font-semibold">Supplier</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {costingIngredients.map((ingredient: any) => (
-                    <tr key={ingredient.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{ingredient.name}</td>
-                      <td className="py-3 px-4">{ingredient.unit}</td>
-                      <td className="py-3 px-4">{Number(ingredient.unitCost).toFixed(2)}</td>
-                      <td className="py-3 px-4">{ingredient.supplier || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
