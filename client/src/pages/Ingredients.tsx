@@ -2,14 +2,26 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import PageShell from "@/layouts/PageShell";
+import { Printer, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Ingredients() {
   const [csvContent, setCsvContent] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: ingredientsData, isLoading } = useQuery({
+  // Get ingredients from the actual ingredients API that has all the data
+  const { data: ingredients, isLoading } = useQuery({
+    queryKey: ["/api/ingredients"],
+  });
+
+  // Keep the CSV import functionality for the costing system
+  const { data: costingIngredientsData } = useQuery({
     queryKey: ["/api/costing/ingredients"],
   });
 
@@ -58,26 +70,145 @@ export default function Ingredients() {
     }
   };
 
-  const ingredients = ingredientsData?.list || [];
+  const handlePrint = () => {
+    window.open('/api/ingredients/print', '_blank');
+  };
+
+  const formatPrice = (price: string | undefined | null) => {
+    const numPrice = parseFloat(price || '0');
+    return `฿${isNaN(numPrice) ? '0.00' : numPrice.toFixed(2)}`;
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: { [key: string]: string } = {
+      'Fresh Food': 'bg-green-100 text-green-800',
+      'Frozen Food': 'bg-blue-100 text-blue-800',
+      'Drinks': 'bg-purple-100 text-purple-800',
+      'Kitchen Supplies': 'bg-orange-100 text-orange-800',
+      'Packaging': 'bg-gray-100 text-gray-800',
+      'Shelf Items': 'bg-yellow-100 text-yellow-800',
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
+  };
+
+  // Filter ingredients
+  const filteredIngredients = (ingredients || []).filter((ingredient: any) => {
+    const matchesSearch = ingredient.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ingredient.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || ingredient.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories = [...new Set((ingredients || []).map((ing: any) => ing.category).filter(Boolean))];
+
+  const costingIngredients = costingIngredientsData?.list || [];
 
   return (
-    <PageShell>
-      <div className="space-y-6">
-        <h1 className="h1">Ingredients</h1>
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Ingredient Management</h1>
+          <p className="text-gray-600 mt-2">Manage your restaurant's ingredient inventory and pricing</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search ingredients by name or supplier..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={selectedCategory || "all"} onValueChange={(value) => setSelectedCategory(value === "all" ? "" : value)}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Main Ingredients Table */}
+      <div className="border rounded-lg mb-8">
+        <div className="p-4 border-b bg-gray-50">
+          <h2 className="text-xl font-semibold">Current Ingredients</h2>
+        </div>
+        {isLoading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : filteredIngredients.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">No ingredients found</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left py-3 px-4 font-semibold">Item</th>
+                  <th className="text-left py-3 px-4 font-semibold">Category</th>
+                  <th className="text-left py-3 px-4 font-semibold">Supplier</th>
+                  <th className="text-left py-3 px-4 font-semibold">Brand</th>
+                  <th className="text-left py-3 px-4 font-semibold">Packaging Qty</th>
+                  <th className="text-left py-3 px-4 font-semibold">Cost</th>
+                  <th className="text-left py-3 px-4 font-semibold">Average Menu Portion</th>
+                  <th className="text-left py-3 px-4 font-semibold">Last Review Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredIngredients.map((ingredient: any) => (
+                  <tr key={ingredient.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4 font-medium">{ingredient.name}</td>
+                    <td className="py-3 px-4">
+                      <Badge className={getCategoryColor(ingredient.category)}>
+                        {ingredient.category}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">{ingredient.supplier}</td>
+                    <td className="py-3 px-4">{(ingredient as any).brand || '-'}</td>
+                    <td className="py-3 px-4">{ingredient.packageSize || '-'} {ingredient.unit}</td>
+                    <td className="py-3 px-4 font-semibold text-green-600">
+                      {formatPrice(ingredient.unitPrice)}
+                    </td>
+                    <td className="py-3 px-4">{(ingredient as any).portionSize || '-'}</td>
+                    <td className="py-3 px-4">{(ingredient as any).lastReview || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
         {/* CSV Import Section */}
-        <div className="rounded-2xl border bg-white p-6">
-          <h2 className="h2 mb-4">Import from CSV</h2>
+        <div className="border rounded-lg">
+          <div className="p-4 border-b bg-gray-50">
+            <h2 className="text-xl font-semibold">Import from CSV</h2>
+          </div>
+          <div className="p-6">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">
                 Upload CSV (name, unit, unitCost, supplier)
               </label>
-              <input
+              <Input
                 type="file"
                 accept=".csv"
                 onChange={handleFileUpload}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                className="block w-full"
               />
             </div>
             {csvContent && (
@@ -86,45 +217,45 @@ export default function Ingredients() {
                 <textarea
                   value={csvContent.substring(0, 500)}
                   readOnly
-                  className="w-full h-32 p-3 border rounded-xl text-sm font-mono"
+                  className="w-full h-32 p-3 border rounded-md text-sm font-mono"
                 />
               </div>
             )}
-            <button
+            <Button
               onClick={handleImport}
               disabled={!csvContent.trim() || importMutation.isPending}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
             >
               {importMutation.isPending ? "Importing..." : "Import Ingredients"}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Ingredients List */}
-        <div className="rounded-2xl border bg-white p-6">
-          <h2 className="h2 mb-4">Current Ingredients</h2>
-          {isLoading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : ingredients.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No ingredients found</div>
+        {/* Costing System Ingredients (for CSV import reference) */}
+        <div className="border rounded-lg">
+          <div className="p-4 border-b bg-gray-50">
+            <h2 className="text-xl font-semibold">Costing System Ingredients</h2>
+            <p className="text-sm text-gray-600">Basic ingredient data for costing calculations</p>
+          </div>
+          {costingIngredients.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No costing ingredients found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Name</th>
-                    <th className="text-left py-2">Unit</th>
-                    <th className="text-left py-2">Unit Cost (฿)</th>
-                    <th className="text-left py-2">Supplier</th>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left py-3 px-4 font-semibold">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold">Unit</th>
+                    <th className="text-left py-3 px-4 font-semibold">Unit Cost (฿)</th>
+                    <th className="text-left py-3 px-4 font-semibold">Supplier</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ingredients.map((ingredient: any) => (
-                    <tr key={ingredient.id} className="border-b">
-                      <td className="py-2">{ingredient.name}</td>
-                      <td className="py-2">{ingredient.unit}</td>
-                      <td className="py-2">{Number(ingredient.unitCost).toFixed(2)}</td>
-                      <td className="py-2">{ingredient.supplier || "-"}</td>
+                  {costingIngredients.map((ingredient: any) => (
+                    <tr key={ingredient.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-4">{ingredient.name}</td>
+                      <td className="py-3 px-4">{ingredient.unit}</td>
+                      <td className="py-3 px-4">{Number(ingredient.unitCost).toFixed(2)}</td>
+                      <td className="py-3 px-4">{ingredient.supplier || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -133,6 +264,6 @@ export default function Ingredients() {
           )}
         </div>
       </div>
-    </PageShell>
+    </div>
   );
 }
