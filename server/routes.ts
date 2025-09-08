@@ -2639,24 +2639,55 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Shopping List API endpoints
   app.get('/api/shopping-list/today', async (req: Request, res: Response) => {
     try {
-      // Return placeholder data for now
       const today = new Date().toISOString().split('T')[0];
+      
+      // Get actual requisition data from today's daily sales records - use the forms API directly
+      const response = await fetch('http://localhost:5000/api/forms/daily-sales/v2');
+      const data = await response.json();
+      
+      if (!data.ok || !data.records) {
+        return res.json({ ok: true, data: { items: [] } });
+      }
+      
+      const todayRecords = data.records.filter((record: any) => {
+        const recordDate = new Date(record.date).toISOString().split('T')[0];
+        return recordDate === today && record.payload?.requisition;
+      });
+      
+      // Aggregate actual requisition items
+      const allItems: any[] = [];
+      todayRecords.forEach(record => {
+        if (record.payload?.requisition) {
+          record.payload.requisition.forEach((item: any) => {
+            allItems.push({
+              name: item.name,
+              qty: item.qty,
+              unit: item.unit,
+              category: item.category || 'General'
+            });
+          });
+        }
+      });
+      
+      // Group and sum quantities for duplicate items
+      const groupedItems = allItems.reduce((acc: any, item) => {
+        const key = item.name;
+        if (acc[key]) {
+          acc[key].qty += item.qty;
+        } else {
+          acc[key] = { ...item };
+        }
+        return acc;
+      }, {});
+      
       res.json({
         ok: true,
         data: {
-          rollsCount: 50,
-          meatWeightGrams: 2000,
-          drinksCounts: [
-            { name: "Coke", qty: 12 },
-            { name: "Sprite", qty: 8 }
-          ],
-          items: [
-            { name: "Burger Buns", unit: "pcs", qty: 100, category: "Packaging" },
-            { name: "Ground Beef", unit: "kg", qty: 5, category: "Fresh Food" }
-          ]
+          items: Object.values(groupedItems)
         }
       });
     } catch (error) {
+      console.error('Error fetching today\'s shopping list:', error);
       res.status(500).json({ ok: false, error: 'Failed to get shopping list' });
     }
   });
