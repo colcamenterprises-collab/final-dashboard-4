@@ -1959,6 +1959,82 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Print ingredients endpoint
+  app.get("/api/ingredients/print", async (req: Request, res: Response) => {
+    try {
+      const ingredients = await storage.getIngredients();
+      
+      const printableData = ingredients.map(ingredient => ({
+        name: ingredient.name || 'N/A',
+        category: ingredient.category || 'N/A',
+        supplier: ingredient.supplier || 'N/A',
+        brand: (ingredient as any).brand || 'N/A',
+        packageSize: ingredient.packageSize || 'N/A',
+        unit: ingredient.unit || 'N/A',
+        cost: `฿${parseFloat(ingredient.unitPrice || '0').toFixed(2)}`,
+        portionSize: (ingredient as any).portionSize || 'N/A',
+        lastReview: (ingredient as any).lastReview || 'N/A'
+      }));
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Ingredient List - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .print-date { text-align: center; color: #666; margin-bottom: 20px; }
+            @media print { body { margin: 10px; } }
+          </style>
+        </head>
+        <body>
+          <h1>Ingredient Management List</h1>
+          <div class="print-date">Generated on: ${new Date().toLocaleString()}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Supplier</th>
+                <th>Brand</th>
+                <th>Packaging Qty</th>
+                <th>Cost</th>
+                <th>Average Menu Portion</th>
+                <th>Last Review Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${printableData.map(item => `
+                <tr>
+                  <td>${item.name}</td>
+                  <td>${item.category}</td>
+                  <td>${item.supplier}</td>
+                  <td>${item.brand}</td>
+                  <td>${item.packageSize} ${item.unit}</td>
+                  <td>${item.cost}</td>
+                  <td>${item.portionSize}</td>
+                  <td>${item.lastReview}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('Error generating printable ingredients:', error);
+      res.status(500).json({ error: 'Failed to generate printable report' });
+    }
+  });
+
   // Update individual ingredient
   app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
     try {
