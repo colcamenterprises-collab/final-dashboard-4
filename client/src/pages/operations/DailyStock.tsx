@@ -214,7 +214,7 @@ const DailyStock: React.FC = () => {
       <section className="space-y-6">
         <div className="rounded-xl border p-4">
           <h2 className="text-[14px] font-semibold mb-4">End-of-Shift Counts</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[14px] mb-1">Rolls (pcs)</label>
               <input
@@ -244,35 +244,39 @@ const DailyStock: React.FC = () => {
                 </div>
               )}
             </div>
-            <div>
-              <label className="block text-[14px] mb-1">Drinks Stock Count</label>
-              <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                {drinkItems.length === 0 ? (
-                  <div className="text-gray-500 text-xs">No drink items available</div>
-                ) : (
-                  drinkItems.map((drink) => (
-                    <div key={drink.name} className="flex items-center justify-between">
-                      <span className="text-[14px] truncate pr-3">{drink.name}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min="0"
-                        step="1"
-                        className="w-20 rounded border px-2 py-1 text-[14px] text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        value={drinkQuantities[drink.name] ?? 0}
-                        onChange={(e) => setDrinkQuantity(drink.name, safeInt(e.target.value))}
-                        aria-label={`${drink.name} quantity`}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-
+      {/* Drinks Stock Count Section */}
+      <section className="space-y-6">
+        <div className="rounded-xl border p-4">
+          <h2 className="text-[14px] font-semibold mb-4">Drinks Stock Count</h2>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {drinkItems.length === 0 ? (
+              <div className="text-gray-500 text-xs">No drink items available</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {drinkItems.map((drink) => (
+                  <div key={drink.name} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="text-[14px] font-medium truncate pr-3">{drink.name}</div>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="1"
+                      className="w-24 rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={drinkQuantities[drink.name] ?? 0}
+                      onChange={(e) => setDrinkQuantity(drink.name, safeInt(e.target.value))}
+                      aria-label={`${drink.name} quantity`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Requisition Grid */}
       <section className="space-y-6">
