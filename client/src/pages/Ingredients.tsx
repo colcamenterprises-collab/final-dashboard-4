@@ -166,6 +166,7 @@ export default function Ingredients() {
                   <th className="text-left py-3 px-4 font-semibold">Cost</th>
                   <th className="text-left py-3 px-4 font-semibold">Average Menu Portion</th>
                   <th className="text-left py-3 px-4 font-semibold">Last Review Date</th>
+                  <th className="text-left py-3 px-4 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,12 +180,30 @@ export default function Ingredients() {
                     </td>
                     <td className="py-3 px-4">{ingredient.supplier}</td>
                     <td className="py-3 px-4">{(ingredient as any).brand || '-'}</td>
-                    <td className="py-3 px-4">{ingredient.packageSize || '-'} {ingredient.unit}</td>
+                    <td className="py-3 px-4">{(ingredient as any).packagingQty || '-'}</td>
                     <td className="py-3 px-4 font-semibold text-green-600">
-                      {formatPrice(ingredient.unitPrice)}
+                      {(ingredient as any).cost || formatPrice(ingredient.unitPrice)}
                     </td>
-                    <td className="py-3 px-4">{(ingredient as any).portionSize || '-'}</td>
-                    <td className="py-3 px-4">{(ingredient as any).lastReview || '-'}</td>
+                    <td className="py-3 px-4">{(ingredient as any).averageMenuPortion || '-'}</td>
+                    <td className="py-3 px-4">{(ingredient as any).lastReviewDate || '-'}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Edit ingredient"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Delete ingredient"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

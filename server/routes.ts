@@ -1948,10 +1948,33 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get all ingredients
+  // Get all ingredients with full CSV data
   app.get("/api/ingredients", async (req: Request, res: Response) => {
     try {
-      const ingredients = await storage.getIngredients();
+      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
+      const catalogItems = loadCatalogFromCSV();
+      
+      const ingredients = catalogItems.map(item => {
+        const raw = item.raw || {};
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          supplier: raw['Supplier'] || 'N/A',
+          brand: raw['Brand'] || null,
+          packagingQty: raw['Packaging Qty'] || null,
+          cost: raw['Cost'] || null,
+          averageMenuPortion: raw['Average Menu Portion'] || null,
+          lastReviewDate: raw['Last Review Date'] || null,
+          unit: 'each', // Default unit
+          unitPrice: raw['Cost']?.replace('฿', '').replace(',', '') || '0',
+          packageSize: raw['Packaging Qty'] || null,
+          portionSize: raw['Average Menu Portion'] || null,
+          lastReview: raw['Last Review Date'] || null,
+          notes: null
+        };
+      });
+      
       res.json(ingredients);
     } catch (error) {
       console.error("Error fetching ingredients:", error);
@@ -1962,19 +1985,22 @@ export function registerRoutes(app: express.Application): Server {
   // Print ingredients endpoint
   app.get("/api/ingredients/print", async (req: Request, res: Response) => {
     try {
-      const ingredients = await storage.getIngredients();
+      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
+      const catalogItems = loadCatalogFromCSV();
       
-      const printableData = ingredients.map(ingredient => ({
-        name: ingredient.name || 'N/A',
-        category: ingredient.category || 'N/A',
-        supplier: ingredient.supplier || 'N/A',
-        brand: (ingredient as any).brand || 'N/A',
-        packageSize: ingredient.packageSize || 'N/A',
-        unit: ingredient.unit || 'N/A',
-        cost: `฿${parseFloat(ingredient.unitPrice || '0').toFixed(2)}`,
-        portionSize: (ingredient as any).portionSize || 'N/A',
-        lastReview: (ingredient as any).lastReview || 'N/A'
-      }));
+      const printableData = catalogItems.map(item => {
+        const raw = item.raw || {};
+        return {
+          name: item.name || 'N/A',
+          category: item.category || 'N/A',
+          supplier: raw['Supplier'] || 'N/A',
+          brand: raw['Brand'] || 'N/A',
+          packagingQty: raw['Packaging Qty'] || 'N/A',
+          cost: raw['Cost'] || 'N/A',
+          averageMenuPortion: raw['Average Menu Portion'] || 'N/A',
+          lastReviewDate: raw['Last Review Date'] || 'N/A'
+        };
+      });
 
       const html = `
         <!DOCTYPE html>
@@ -2015,10 +2041,10 @@ export function registerRoutes(app: express.Application): Server {
                   <td>${item.category}</td>
                   <td>${item.supplier}</td>
                   <td>${item.brand}</td>
-                  <td>${item.packageSize} ${item.unit}</td>
+                  <td>${item.packagingQty}</td>
                   <td>${item.cost}</td>
-                  <td>${item.portionSize}</td>
-                  <td>${item.lastReview}</td>
+                  <td>${item.averageMenuPortion}</td>
+                  <td>${item.lastReviewDate}</td>
                 </tr>
               `).join('')}
             </tbody>
