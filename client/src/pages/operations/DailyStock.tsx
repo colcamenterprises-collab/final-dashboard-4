@@ -179,7 +179,7 @@ const DailyStock: React.FC = () => {
       }
 
       // ✅ Dashboard-style success message
-      setMessage({ type: "success", text: "✅ Stock data saved successfully! Redirecting to library..." });
+      setMessage({ type: "success", text: "Stock data saved successfully! Redirecting to library..." });
 
       // ✅ Redirect to Daily Sales V2 Library 
       setTimeout(() => {
@@ -332,8 +332,8 @@ const DailyStock: React.FC = () => {
                 : "bg-red-50 text-red-800 border border-red-200"
             }`}>
               <div className="flex items-center gap-2">
-                {message.type === "success" && <span className="text-green-600">✓</span>}
-                {message.type === "error" && <span className="text-red-600">⚠</span>}
+                {message.type === "success" && <div className="w-2 h-2 bg-green-500 rounded-full"></div>}
+                {message.type === "error" && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
                 <span className="font-medium">{message.text}</span>
               </div>
             </div>

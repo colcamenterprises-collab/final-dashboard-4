@@ -257,7 +257,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       return res.status(404).json({ ok: false, error: "Record not found" });
     }
 
-    console.log(`✅ Updated daily sales record ${id} with stock data`);
+    console.log(`Updated daily sales record ${id} with stock data`);
     res.json({ ok: true, id });
   } catch (err) {
     console.error("Error updating daily sales with stock:", err);
