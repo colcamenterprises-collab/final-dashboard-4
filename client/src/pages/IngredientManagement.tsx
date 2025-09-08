@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, Trash2, Search, Package, DollarSign, Building2, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Package, DollarSign, Building2, FileText, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,6 +27,9 @@ const ingredientFormSchema = z.object({
   packageSize: z.string().min(1, "Package size is required"),
   unit: z.string().min(1, "Unit is required"),
   supplier: z.string().min(1, "Supplier is required"),
+  brand: z.string().optional(),
+  portionSize: z.string().optional(),
+  lastReview: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -125,10 +128,13 @@ export default function IngredientManagement() {
     defaultValues: {
       name: '',
       category: '',
-      unitPrice: '',
+      unitPrice: '0',
       packageSize: '',
       unit: '',
       supplier: '',
+      brand: '',
+      portionSize: '',
+      lastReview: '',
       notes: '',
     },
   });
@@ -138,10 +144,13 @@ export default function IngredientManagement() {
     defaultValues: {
       name: '',
       category: '',
-      unitPrice: '',
+      unitPrice: '0',
       packageSize: '',
       unit: '',
       supplier: '',
+      brand: '',
+      portionSize: '',
+      lastReview: '',
       notes: '',
     },
   });
@@ -156,20 +165,22 @@ export default function IngredientManagement() {
 
   // Form handlers
   const onCreateIngredient = (data: z.infer<typeof ingredientFormSchema>) => {
-    createIngredientMutation.mutate({
+    const submitData = {
       ...data,
-      unitPrice: parseFloat(data.unitPrice).toString(),
-    });
+      unitPrice: parseFloat(data.unitPrice || '0').toString(),
+    };
+    createIngredientMutation.mutate(submitData as InsertIngredient);
   };
 
   const onUpdateIngredient = (data: z.infer<typeof ingredientFormSchema>) => {
     if (!editingIngredient) return;
+    const submitData = {
+      ...data,
+      unitPrice: parseFloat(data.unitPrice || '0').toString(),
+    };
     updateIngredientMutation.mutate({
       id: editingIngredient.id,
-      data: {
-        ...data,
-        unitPrice: parseFloat(data.unitPrice).toString(),
-      },
+      data: submitData,
     });
   };
 
@@ -178,10 +189,13 @@ export default function IngredientManagement() {
     editForm.reset({
       name: ingredient.name,
       category: ingredient.category,
-      unitPrice: ingredient.unitPrice,
-      packageSize: ingredient.packageSize,
+      unitPrice: ingredient.unitPrice || '0',
+      packageSize: ingredient.packageSize || '',
       unit: ingredient.unit,
       supplier: ingredient.supplier,
+      brand: (ingredient as any).brand || '',
+      portionSize: (ingredient as any).portionSize || '',
+      lastReview: (ingredient as any).lastReview || '',
       notes: ingredient.notes || '',
     });
   };
@@ -206,8 +220,13 @@ export default function IngredientManagement() {
     }
   };
 
-  const formatPrice = (price: string) => {
-    return `฿${parseFloat(price).toFixed(2)}`;
+  const formatPrice = (price: string | undefined | null) => {
+    const numPrice = parseFloat(price || '0');
+    return `฿${isNaN(numPrice) ? '0.00' : numPrice.toFixed(2)}`;
+  };
+
+  const handlePrint = () => {
+    window.open('/api/ingredients/print', '_blank');
   };
 
   const getCategoryColor = (category: string) => {
@@ -243,13 +262,18 @@ export default function IngredientManagement() {
           <h1 className="text-3xl font-bold">Ingredient Management</h1>
           <p className="text-gray-600 mt-2">Manage your restaurant's ingredient inventory and pricing</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Ingredient
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Ingredient
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add New Ingredient</DialogTitle>
@@ -262,7 +286,7 @@ export default function IngredientManagement() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel>Item</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="e.g., Beef Patty" />
                         </FormControl>
@@ -295,13 +319,41 @@ export default function IngredientManagement() {
                     )}
                   />
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="supplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Supplier</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., Metro Cash & Carry" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="brand"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Brand</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., Harvey Beef" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={createForm.control}
                     name="unitPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Unit Price (฿)</FormLabel>
+                        <FormLabel>Cost (฿)</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="0.00" type="number" step="0.01" />
                         </FormControl>
@@ -314,9 +366,9 @@ export default function IngredientManagement() {
                     name="packageSize"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Package Size</FormLabel>
+                        <FormLabel>Packaging Qty</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="e.g., 1000" />
+                          <Input {...field} placeholder="e.g., Per kg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -347,19 +399,34 @@ export default function IngredientManagement() {
                     )}
                   />
                 </div>
-                <FormField
-                  control={createForm.control}
-                  name="supplier"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Supplier</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g., Metro Cash & Carry" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="portionSize"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Average Menu Portion</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., 95 gr" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="lastReview"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Review Date</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., 20.08.25" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={createForm.control}
                   name="notes"
@@ -413,74 +480,64 @@ export default function IngredientManagement() {
         </Select>
       </div>
 
-      {/* Ingredients Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredIngredients.map((ingredient: Ingredient) => (
-          <Card key={ingredient.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{ingredient.name}</CardTitle>
-                  <Badge className={`mt-2 ${getCategoryColor(ingredient.category)}`}>
+      {/* Ingredients Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Supplier</TableHead>
+              <TableHead>Brand</TableHead>
+              <TableHead>Packaging Qty</TableHead>
+              <TableHead>Cost</TableHead>
+              <TableHead>Average Menu Portion</TableHead>
+              <TableHead>Last Review Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredIngredients.map((ingredient: Ingredient) => (
+              <TableRow key={ingredient.id}>
+                <TableCell className="font-medium">{ingredient.name}</TableCell>
+                <TableCell>
+                  <Badge className={`${getCategoryColor(ingredient.category)}`}>
                     {ingredient.category}
                   </Badge>
-                </div>
-                <div className="flex space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(ingredient)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(ingredient)}
-                    disabled={deleteIngredientMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-gray-600">Unit Price:</span>
+                </TableCell>
+                <TableCell>{ingredient.supplier}</TableCell>
+                <TableCell>{(ingredient as any).brand || '-'}</TableCell>
+                <TableCell>{ingredient.packageSize || '-'} {ingredient.unit}</TableCell>
+                <TableCell className="font-semibold text-green-600">
+                  {formatPrice(ingredient.unitPrice)}
+                </TableCell>
+                <TableCell>{(ingredient as any).portionSize || '-'}</TableCell>
+                <TableCell>{(ingredient as any).lastReview || '-'}</TableCell>
+                <TableCell>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(ingredient)}
+                      title="Edit ingredient"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(ingredient)}
+                      disabled={deleteIngredientMutation.isPending}
+                      title="Delete ingredient"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <span className="font-semibold text-green-600">
-                    {formatPrice(ingredient.unitPrice)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Package className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm text-gray-600">Package:</span>
-                  </div>
-                  <span className="font-medium">
-                    {ingredient.packageSize} {ingredient.unit}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Building2 className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm text-gray-600">Supplier:</span>
-                  </div>
-                  <span className="font-medium text-sm">{ingredient.supplier}</span>
-                </div>
-                {ingredient.notes && (
-                  <div className="flex items-start space-x-2">
-                    <FileText className="h-4 w-4 text-gray-500 mt-0.5" />
-                    <span className="text-sm text-gray-600">{ingredient.notes}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       {filteredIngredients.length === 0 && (
