@@ -17,6 +17,8 @@ type Item = {
   unit: string;
   category: string;
   cost: number;
+  unitCost?: number;
+  supplier?: string;
 };
 
 export default function ShoppingListPage() {
@@ -27,41 +29,22 @@ export default function ShoppingListPage() {
   async function fetchList(d: string) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/forms/daily-sales/v2`);
+      // Use the enhanced shopping list API that includes cost calculations
+      const res = await fetch(`/api/shopping-list/today`);
       const data = await res.json();
       
-      if (data.ok && data.records) {
-        // Extract requisition items from records on the selected date
-        const selectedDate = new Date(d).toISOString().split('T')[0];
-        const allItems: Item[] = [];
+      if (data.ok && data.data?.items) {
+        const enhancedItems = data.data.items.map((item: any) => ({
+          name: item.name,
+          qty: item.qty,
+          unit: item.unit,
+          category: item.category || 'General',
+          cost: item.totalCost || 0,
+          unitCost: item.unitCost || 0,
+          supplier: item.supplier || 'Unknown'
+        }));
         
-        data.records.forEach((record: any) => {
-          const recordDate = new Date(record.date).toISOString().split('T')[0];
-          if (recordDate === selectedDate && record.payload?.requisition) {
-            record.payload.requisition.forEach((item: any) => {
-              allItems.push({
-                name: item.name,
-                qty: item.qty,
-                unit: item.unit,
-                category: item.category || 'General',
-                cost: 0 // Cost will be calculated if needed
-              });
-            });
-          }
-        });
-        
-        // Group and sum quantities for duplicate items
-        const groupedItems = allItems.reduce((acc: any, item) => {
-          const key = item.name;
-          if (acc[key]) {
-            acc[key].qty += item.qty;
-          } else {
-            acc[key] = { ...item };
-          }
-          return acc;
-        }, {});
-        
-        setItems(Object.values(groupedItems));
+        setItems(enhancedItems);
       } else {
         setItems([]);
       }
@@ -103,7 +86,9 @@ export default function ShoppingListPage() {
               <th className="p-2 border-b">Item</th>
               <th className="p-2 border-b">Qty</th>
               <th className="p-2 border-b">Unit</th>
-              <th className="p-2 border-b">Cost</th>
+              <th className="p-2 border-b">Unit Cost</th>
+              <th className="p-2 border-b">Total Cost</th>
+              <th className="p-2 border-b">Supplier</th>
             </tr>
           </thead>
           <tbody>
@@ -113,14 +98,17 @@ export default function ShoppingListPage() {
                 <td className="p-2 border-b">{i.name}</td>
                 <td className="p-2 border-b">{i.qty}</td>
                 <td className="p-2 border-b">{i.unit}</td>
-                <td className="p-2 border-b">{thb(i.cost)}</td>
+                <td className="p-2 border-b">{thb(i.unitCost || 0)}</td>
+                <td className="p-2 border-b font-semibold">{thb(i.cost)}</td>
+                <td className="p-2 border-b text-xs text-gray-600">{i.supplier}</td>
               </tr>
             ))}
-            <tr>
-              <td colSpan={4} className="p-2 text-right font-bold">
-                Total
+            <tr className="bg-green-50">
+              <td colSpan={5} className="p-2 text-right font-bold text-green-800">
+                Total Estimated Shopping Cost
               </td>
-              <td className="p-2 font-bold">{thb(total)}</td>
+              <td className="p-2 font-bold text-green-800 text-lg">{thb(total)}</td>
+              <td className="p-2"></td>
             </tr>
           </tbody>
         </table>

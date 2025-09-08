@@ -2654,16 +2654,41 @@ app.use("/api/bank-imports", bankUploadRouter);
         return recordDate === today && record.payload?.requisition;
       });
       
-      // Aggregate actual requisition items
+      // Get ingredient cost data from CSV
+      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
+      const catalogItems = loadCatalogFromCSV();
+      
+      // Create a lookup map for ingredient costs
+      const ingredientCosts = catalogItems.reduce((acc: any, item) => {
+        const raw = item.raw || {};
+        const costString = raw['Cost']?.replace('฿', '').replace(',', '') || '0';
+        const cost = parseFloat(costString) || 0;
+        acc[item.name.toLowerCase()] = {
+          cost: cost,
+          unit: raw['Packaging Qty'] || 'each',
+          supplier: raw['Supplier'] || 'Unknown'
+        };
+        return acc;
+      }, {});
+      
+      // Aggregate actual requisition items with cost calculations
       const allItems: any[] = [];
       todayRecords.forEach(record => {
         if (record.payload?.requisition) {
           record.payload.requisition.forEach((item: any) => {
+            const ingredientKey = item.name.toLowerCase();
+            const ingredientData = ingredientCosts[ingredientKey];
+            const unitCost = ingredientData?.cost || 0;
+            const estimatedTotalCost = unitCost * (item.qty || 1);
+            
             allItems.push({
               name: item.name,
               qty: item.qty,
               unit: item.unit,
-              category: item.category || 'General'
+              category: item.category || 'General',
+              unitCost: unitCost,
+              totalCost: estimatedTotalCost,
+              supplier: ingredientData?.supplier || 'Unknown'
             });
           });
         }
@@ -2674,16 +2699,24 @@ app.use("/api/bank-imports", bankUploadRouter);
         const key = item.name;
         if (acc[key]) {
           acc[key].qty += item.qty;
+          acc[key].totalCost += item.totalCost;
         } else {
           acc[key] = { ...item };
         }
         return acc;
       }, {});
       
+      const itemsWithCosts = Object.values(groupedItems);
+      const totalShoppingCost = itemsWithCosts.reduce((sum: number, item: any) => sum + (item.totalCost || 0), 0);
+      
       res.json({
         ok: true,
         data: {
-          items: Object.values(groupedItems)
+          items: itemsWithCosts,
+          summary: {
+            totalItems: itemsWithCosts.length,
+            estimatedTotalCost: totalShoppingCost
+          }
         }
       });
     } catch (error) {
