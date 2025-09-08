@@ -128,6 +128,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Banking</h3>
       <ul>
+        <li>Starting Cash: ฿${formatTHB(startingCash)}</li>
         <li>Total Cash in Register: ฿${formatTHB(closingCashTHB)}</li>
         <li>Expected Register: ฿${formatTHB(expectedClosingCash)}</li>
         <li>
@@ -290,6 +291,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
       <h3>Banking</h3>
       <ul>
+        <li>Starting Cash: ฿${formatTHB(payload.startingCash || 0)}</li>
         <li>Total Cash in Register: ฿${formatTHB(payload.closingCash || 0)}</li>
         <li>Expected Register: ฿${formatTHB(payload.expectedClosingCash || 0)}</li>
         <li>
