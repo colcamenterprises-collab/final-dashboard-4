@@ -260,9 +260,97 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   }
 }
 
+// DELETE endpoint for library
+export async function deleteDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    
+    await pool.query(
+      `UPDATE daily_sales_v2 SET "deletedAt" = $1 WHERE id = $2`,
+      [new Date().toISOString(), id]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Delete Daily Sales V2 error", err);
+    res.status(500).json({ ok: false, error: "Failed to delete record" });
+  }
+}
+
+// PRINT endpoint for library  
+export async function printDailySalesV2(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
+       FROM daily_sales_v2 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Daily Sales Report - ${row.shiftDate}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; }
+          table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .total { font-weight: bold; }
+          @media print { .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <h1>Daily Sales Report</h1>
+        <p><strong>Date:</strong> ${row.shiftDate}</p>
+        <p><strong>Completed By:</strong> ${row.completedBy}</p>
+        
+        <h2>Sales Breakdown</h2>
+        <table>
+          <tr><th>Type</th><th>Amount (฿)</th></tr>
+          <tr><td>Cash Sales</td><td>${formatTHB(p.cashSales || 0)}</td></tr>
+          <tr><td>QR Sales</td><td>${formatTHB(p.qrSales || 0)}</td></tr>
+          <tr><td>Grab Sales</td><td>${formatTHB(p.grabSales || 0)}</td></tr>
+          <tr><td>Other Sales</td><td>${formatTHB(p.otherSales || 0)}</td></tr>
+          <tr class="total"><td>Total Sales</td><td>${formatTHB(p.totalSales || 0)}</td></tr>
+        </table>
+        
+        <h2>Banking & Cash</h2>
+        <table>
+          <tr><th>Description</th><th>Amount (฿)</th></tr>
+          <tr><td>Starting Cash</td><td>${formatTHB(p.startingCash || 0)}</td></tr>
+          <tr><td>Closing Cash</td><td>${formatTHB(p.closingCash || 0)}</td></tr>
+          <tr><td>Expected Closing</td><td>${formatTHB(p.expectedClosingCash || 0)}</td></tr>
+          <tr><td>Balanced</td><td>${p.balanced ? 'YES ✅' : 'NO ❌'}</td></tr>
+        </table>
+        
+        <script>window.print();</script>
+      </body>
+      </html>
+    `;
+    
+    res.send(html);
+  } catch (err) {
+    console.error("Print Daily Sales V2 error", err);
+    res.status(500).json({ ok: false, error: "Failed to generate print view" });
+  }
+}
+
 import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
+dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);
 dailySalesV2Router.patch("/daily-sales/v2/:id/stock", updateDailySalesV2WithStock);

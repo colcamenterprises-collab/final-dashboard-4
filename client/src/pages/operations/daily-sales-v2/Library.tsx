@@ -67,8 +67,35 @@ export default function DailySalesV2Library() {
   }, []);
 
   async function deleteRecord(id: string) {
-    await fetch(`/api/forms/daily-sales/v2/${id}`, { method: "DELETE" });
-    fetchRecords();
+    if (window.confirm('Are you sure you want to delete this record?')) {
+      try {
+        await fetch(`/api/forms/daily-sales/v2/${id}`, { method: "DELETE" });
+        fetchRecords();
+        alert('Record deleted successfully');
+      } catch (err) {
+        alert('Failed to delete record');
+      }
+    }
+  }
+  
+  function printRecord(id: string) {
+    window.open(`/api/forms/daily-sales/v2/${id}/print`, '_blank');
+  }
+  
+  function downloadRecord(record: RecordType) {
+    try {
+      // Simple CSV download for now since jsPDF isn't imported yet
+      const csvContent = `Date,Staff,Total Sales,Rolls,Meat,Status\n${record.date},${record.staff},${record.totalSales},${record.rolls},${record.meat},${record.status}`;
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daily-sales-${record.date}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to download record');
+    }
   }
 
   async function restoreRecord(id: string) {
@@ -204,18 +231,13 @@ export default function DailySalesV2Library() {
                       </button>
                       <button
                         className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded text-xs"
-                        onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/pdf`, "_blank")}
+                        onClick={() => printRecord(rec.id)}
                       >
                         Print
                       </button>
                       <button
                         className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded text-xs"
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
-                          link.download = `daily-sales-${rec.id}.pdf`;
-                          link.click();
-                        }}
+                        onClick={() => downloadRecord(rec)}
                       >
                         Download
                       </button>
