@@ -7,13 +7,47 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+// Form schema for adding new ingredients
+const addIngredientSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  category: z.string().min(1, "Category is required"),
+  supplier: z.string().min(1, "Supplier is required"),
+  brand: z.string().optional(),
+  packagingQty: z.string().optional(),
+  cost: z.string().min(1, "Cost is required"),
+  averageMenuPortion: z.string().optional(),
+  lastReviewDate: z.string().optional(),
+});
+
+type AddIngredientForm = z.infer<typeof addIngredientSchema>;
 
 export default function Ingredients() {
   const [csvContent, setCsvContent] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const addForm = useForm<AddIngredientForm>({
+    resolver: zodResolver(addIngredientSchema),
+    defaultValues: {
+      name: "",
+      category: "",
+      supplier: "",
+      brand: "",
+      packagingQty: "",
+      cost: "",
+      averageMenuPortion: "",
+      lastReviewDate: "",
+    },
+  });
 
   // Get ingredients from the actual ingredients API that has all the data
   const { data: ingredients, isLoading } = useQuery({
@@ -23,6 +57,25 @@ export default function Ingredients() {
   // Keep the CSV import functionality for the costing system
   const { data: costingIngredientsData } = useQuery({
     queryKey: ["/api/costing/ingredients"],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: AddIngredientForm) => {
+      return apiRequest("/api/ingredients", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Ingredient added successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      addForm.reset();
+      setShowAddDialog(false);
+    },
+    onError: (error: any) => {
+      console.error(error);
+      toast({ title: "Error", description: error.message || "Failed to add ingredient", variant: "destructive" });
+    }
   });
 
   const importMutation = useMutation({
