@@ -79,7 +79,7 @@ export default function DailySalesV2Library() {
   }
   
   function printRecord(id: string) {
-    window.open(`/api/forms/daily-sales/v2/${id}/print`, '_blank');
+    window.open(`/api/forms/daily-sales/v2/${id}/print-full`, '_blank');
   }
   
   function downloadRecord(record: RecordType) {
@@ -348,7 +348,7 @@ export default function DailySalesV2Library() {
                 </button>
                 <button
                   className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded text-sm"
-                  onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/pdf`, "_blank")}
+                  onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/print-full`, "_blank")}
                 >
                   Print
                 </button>

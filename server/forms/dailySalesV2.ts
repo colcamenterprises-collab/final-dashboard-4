@@ -428,6 +428,111 @@ export async function printDailySalesV2(req: Request, res: Response) {
   }
 }
 
+// PRINT-FULL endpoint with complete data
+export async function printDailySalesV2Full(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
+       FROM daily_sales_v2 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    const row = result.rows[0];
+    const p = row.payload || {};
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Complete Daily Report - ${row.shiftDate}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; border-bottom: 2px solid #333; }
+          h2 { color: #666; margin-top: 25px; }
+          table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .total { font-weight: bold; background-color: #f9f9f9; }
+          @media print { .no-print { display: none; } body { margin: 10px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Complete Daily Sales & Stock Report</h1>
+        <p><strong>Date:</strong> ${row.shiftDate}</p>
+        <p><strong>Completed By:</strong> ${row.completedBy}</p>
+        
+        <h2>Sales Breakdown</h2>
+        <table>
+          <tr><th>Type</th><th>Amount (฿)</th></tr>
+          <tr><td>Cash Sales</td><td>${formatTHB(p.cashSales || 0)}</td></tr>
+          <tr><td>QR Sales</td><td>${formatTHB(p.qrSales || 0)}</td></tr>
+          <tr><td>Grab Sales</td><td>${formatTHB(p.grabSales || 0)}</td></tr>
+          <tr><td>Other Sales</td><td>${formatTHB(p.otherSales || 0)}</td></tr>
+          <tr class="total"><td>Total Sales</td><td>${formatTHB(p.totalSales || 0)}</td></tr>
+        </table>
+        
+        <h2>Expenses</h2>
+        <table>
+          <tr><th>Item</th><th>Shop</th><th>Cost (฿)</th></tr>
+          ${(p.expenses || []).map((e: any) => 
+            `<tr><td>${e.item}</td><td>${e.shop || 'N/A'}</td><td>${formatTHB(e.cost || 0)}</td></tr>`
+          ).join('')}
+          <tr class="total"><td colspan="2">Total Expenses</td><td>${formatTHB((p.expenses || []).reduce((s: number, e: any) => s + (e.cost || 0), 0))}</td></tr>
+        </table>
+        
+        <h2>Staff Wages</h2>
+        <table>
+          <tr><th>Staff</th><th>Type</th><th>Amount (฿)</th></tr>
+          ${(p.wages || []).map((w: any) => 
+            `<tr><td>${w.staff}</td><td>${w.type || 'WAGES'}</td><td>${formatTHB(w.amount || 0)}</td></tr>`
+          ).join('')}
+          <tr class="total"><td colspan="2">Total Wages</td><td>${formatTHB((p.wages || []).reduce((s: number, w: any) => s + (w.amount || 0), 0))}</td></tr>
+        </table>
+        
+        <h2>Banking & Cash Management</h2>
+        <table>
+          <tr><th>Description</th><th>Amount (฿)</th></tr>
+          <tr><td>Starting Cash</td><td>${formatTHB(p.startingCash || 0)}</td></tr>
+          <tr><td>Closing Cash</td><td>${formatTHB(p.closingCash || 0)}</td></tr>
+          <tr><td>Expected Closing</td><td>${formatTHB(p.expectedClosingCash || 0)}</td></tr>
+          <tr><td>Cash Banked</td><td>${formatTHB(p.cashBanked || 0)}</td></tr>
+          <tr><td>QR Transfer</td><td>${formatTHB(p.qrTransfer || 0)}</td></tr>
+          <tr class="total" style="${p.balanced ? 'color: green;' : 'color: red;'}"><td>Balanced</td><td>${p.balanced ? 'YES' : 'NO'}</td></tr>
+        </table>
+        
+        <h2>Stock Levels</h2>
+        <table>
+          <tr><th>Item</th><th>Count</th></tr>
+          <tr><td>Rolls End</td><td>${p.rollsEnd || 'Not specified'}</td></tr>
+          <tr><td>Meat End</td><td>${p.meatEnd ? `${p.meatEnd}g (${(p.meatEnd/1000).toFixed(1)}kg)` : 'Not specified'}</td></tr>
+        </table>
+        
+        <h2>Shopping List / Requisition</h2>
+        <table>
+          <tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Category</th></tr>
+          ${(p.requisition || []).map((item: any) => 
+            `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.unit}</td><td>${item.category || 'N/A'}</td></tr>`
+          ).join('')}
+        </table>
+        
+        <script>window.print();</script>
+      </body>
+      </html>
+    `;
+    
+    res.send(html);
+  } catch (err) {
+    console.error("Print Full Daily Sales V2 error", err);
+    res.status(500).json({ ok: false, error: "Failed to generate full print view" });
+  }
+}
+
 import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
@@ -435,4 +540,5 @@ dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
 dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);
+dailySalesV2Router.get("/daily-sales/v2/:id/print-full", printDailySalesV2Full);
 dailySalesV2Router.patch("/daily-sales/v2/:id/stock", updateDailySalesV2WithStock);
