@@ -153,17 +153,21 @@ export async function createDailySalesV2(req: Request, res: Response) {
           ? '<p style="color: #6c757d;">No shopping items required.</p>'
           : `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
                <ul style="margin: 0; padding-left: 20px;">
-                 ${shoppingList.map(item => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
+                 ${shoppingList.map((item: any) => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
                </ul>
              </div>`
       }
     `;
 
-    const emailSent = await workingEmailService.sendEmail(
+    // First send the immediate email with current data
+    let emailSent = await workingEmailService.sendEmail(
       "smashbrothersburgersth@gmail.com",
       `Daily Sales & Stock – ${shiftDate}`,
       html
     );
+    
+    // Store the ID for potential stock updates
+    res.locals.recordId = id;
     
     console.log(`📧 Email sending result: ${emailSent ? 'SUCCESS' : 'FAILED'}`);
 
@@ -249,7 +253,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       `UPDATE daily_sales_v2 
        SET payload = payload || $1
        WHERE id = $2
-       RETURNING id`,
+       RETURNING id, "shiftDate", "completedBy", payload`,
       [JSON.stringify({ rollsEnd, meatEnd, requisition }), id]
     );
 
@@ -258,6 +262,77 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     }
 
     console.log(`Updated daily sales record ${id} with stock data`);
+    console.log('About to send updated email with complete data...');
+    
+    // Send updated email with complete data
+    const record = result.rows[0];
+    const payload = record.payload;
+    const shiftDate = record.shiftDate;
+    const completedBy = record.completedBy;
+    
+    // Build shopping list
+    const shoppingList = (requisition || [])
+      .filter((i: any) => (i.qty || 0) > 0);
+    
+    const updatedHtml = `
+      <h2>Daily Sales & Stock Report - COMPLETE</h2>
+      <p><strong>Date:</strong> ${shiftDate}</p>
+      <p><strong>Completed By:</strong> ${completedBy}</p>
+
+      <h3>Sales</h3>
+      <ul>
+        <li>Cash Sales: ฿${formatTHB(payload.cashSales || 0)}</li>
+        <li>QR Sales: ฿${formatTHB(payload.qrSales || 0)}</li>
+        <li>Grab Sales: ฿${formatTHB(payload.grabSales || 0)}</li>
+        <li>Other Sales: ฿${formatTHB(payload.otherSales || 0)}</li>
+        <li><strong>Total Sales:</strong> ฿${formatTHB(payload.totalSales || 0)}</li>
+      </ul>
+
+      <h3>Banking</h3>
+      <ul>
+        <li>Total Cash in Register: ฿${formatTHB(payload.closingCash || 0)}</li>
+        <li>Expected Register: ฿${formatTHB(payload.expectedClosingCash || 0)}</li>
+        <li>
+          Balanced: ${
+            payload.balanced
+              ? '<span style="color:green;font-weight:bold">YES ✅</span>'
+              : '<span style="color:red;font-weight:bold">NO ❌</span>'
+          }
+        </li>
+        <li>Cash to Bank: ฿${formatTHB(payload.cashBanked || 0)}</li>
+        <li>QR to Bank: ฿${formatTHB(payload.qrTransfer || 0)}</li>
+      </ul>
+
+      <h3>Stock Levels</h3>
+      <ul>
+        <li>Rolls Remaining: ${rollsEnd || "Not specified"}</li>
+        <li>Meat Remaining: ${meatEnd ? `${meatEnd}g (${(meatEnd/1000).toFixed(1)}kg)` : "Not specified"}</li>
+      </ul>
+
+      <h3>Shopping List - Items to Purchase</h3>
+      ${
+        shoppingList.length === 0
+          ? '<p style="color: #6c757d;">No shopping items required.</p>'
+          : `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+               <ul style="margin: 0; padding-left: 20px;">
+                 ${shoppingList.map((item: any) => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
+               </ul>
+             </div>`
+      }
+    `;
+    
+    try {
+      console.log('Attempting to send updated email...');
+      const emailResult = await workingEmailService.sendEmail(
+        "smashbrothersburgersth@gmail.com",
+        `Daily Sales & Stock COMPLETE – ${shiftDate}`,
+        updatedHtml
+      );
+      console.log(`📧 Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
+    
     res.json({ ok: true, id });
   } catch (err) {
     console.error("Error updating daily sales with stock:", err);
