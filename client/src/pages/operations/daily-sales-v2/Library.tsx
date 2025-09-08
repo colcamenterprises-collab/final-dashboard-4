@@ -82,19 +82,61 @@ export default function DailySalesV2Library() {
     window.open(`/api/forms/daily-sales/v2/${id}/print-full`, '_blank');
   }
   
-  function downloadRecord(record: RecordType) {
+  async function downloadRecord(record: RecordType) {
     try {
-      // Simple CSV download for now since jsPDF isn't imported yet
-      const csvContent = `Date,Staff,Total Sales,Rolls,Meat,Status\n${record.date},${record.staff},${record.totalSales},${record.rolls},${record.meat},${record.status}`;
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `daily-sales-${record.date}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      // Fetch full record data for comprehensive PDF
+      const response = await fetch(`/api/forms/daily-sales/v2/${record.id}`);
+      const data = await response.json();
+      
+      if (!data.ok) {
+        alert('Failed to fetch record data');
+        return;
+      }
+      
+      const fullRecord = data.record;
+      const p = fullRecord.payload || {};
+      
+      // Import jsPDF dynamically
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Generate comprehensive PDF
+      doc.setFontSize(16);
+      doc.text('Daily Sales & Stock Report', 20, 20);
+      
+      doc.setFontSize(12);
+      doc.text(`Date: ${new Date(fullRecord.date).toLocaleDateString()}`, 20, 35);
+      doc.text(`Staff: ${fullRecord.staff}`, 20, 45);
+      
+      let yPos = 60;
+      
+      // Sales
+      doc.setFontSize(14); doc.text('Sales', 20, yPos); yPos += 10;
+      doc.setFontSize(10);
+      doc.text(`Cash: ฿${(p.cashSales || 0).toLocaleString()}`, 20, yPos); yPos += 6;
+      doc.text(`QR: ฿${(p.qrSales || 0).toLocaleString()}`, 20, yPos); yPos += 6;
+      doc.text(`Total: ฿${(p.totalSales || 0).toLocaleString()}`, 20, yPos); yPos += 15;
+      
+      // Banking
+      doc.setFontSize(14); doc.text('Banking', 20, yPos); yPos += 10;
+      doc.setFontSize(10);
+      doc.text(`Starting: ฿${(p.startingCash || 0).toLocaleString()}`, 20, yPos); yPos += 6;
+      doc.text(`Closing: ฿${(p.closingCash || 0).toLocaleString()}`, 20, yPos); yPos += 6;
+      doc.text(`Balanced: ${p.balanced ? 'YES' : 'NO'}`, 20, yPos); yPos += 15;
+      
+      // Stock
+      doc.setFontSize(14); doc.text('Stock', 20, yPos); yPos += 10;
+      doc.setFontSize(10);
+      doc.text(`Rolls: ${p.rollsEnd || 'Not specified'}`, 20, yPos); yPos += 6;
+      doc.text(`Meat: ${p.meatEnd ? `${p.meatEnd}g` : 'Not specified'}`, 20, yPos);
+      
+      // Save PDF
+      doc.save(`daily-sales-${record.date}-${record.id.substring(0, 8)}.pdf`);
+      
+      console.log(`PDF generated with content length: ${JSON.stringify(p).length}`);
     } catch (err) {
-      alert('Failed to download record');
+      console.error('PDF generation failed:', err);
+      alert('Failed to generate PDF');
     }
   }
 
