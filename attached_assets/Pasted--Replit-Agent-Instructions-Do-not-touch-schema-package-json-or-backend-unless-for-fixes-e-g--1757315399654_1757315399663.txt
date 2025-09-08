@@ -1,0 +1,134 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for fixes (e.g., update queries for cents, add endpoints for print/download).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for 404s; align/fix as needed.
+If multiple definitions found, stop and ask Cam.
+
+Task Overview
+
+Fix all listed issues: Cents rounding in form/library view, library functions (delete/edit/print/download), shopping list display/email, email content (add rolls/meat/drinks/shopping), expenses edit/delete in stock sections.
+Proactive: Clean all data inconsistencies (SQL divide by 100 for old cents); add PDF gen for download/print using jsPDF or backend; ensure no emojis (scan/replace); match shadcn/ui styling; auto-generate shopping list from stock form requisition; test end-to-end with samples.
+
+Step-by-Step Actions
+
+Fix Cents Rounding in Daily Sales/Stock Form & Library:
+
+Open server/forms/dailySalesV2.ts (queries/inserts).
+Update all amount fields: Store/display as full THB (decimal, no *100 /100). Run SQL cleanup:
+textUPDATE daily_sales_v2 SET cashSales = cashSales / 100, qrSales = qrSales / 100, grabSales = grabSales / 100, aroiSales = aroiSales / 100, totalSales = totalSales / 100, startingCash = startingCash / 100, shiftExpenses = shiftExpenses / 100, staffWages = staffWages / 100 WHERE cashSales > 1000 OR qrSales > 1000;  -- Adjust for affected fields
+
+In frontend Library.tsx & Form.tsx: Display direct (no /100), use Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).
+text// In table cells: {new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(row.cashSales)}
+
+Test: Submit 4500 → View library: Shows ฿4,500; totals correct (e.g., starting 36,700, closing 57,700, banked 21,000, QR 83,700, expected 286,576, diff -228,876).
+
+
+Fix Daily Sales Library Functions:
+
+Open client/src/pages/operations/daily-sales-v2/Library.tsx.
+Delete: Add mutation:
+textconst deleteMutation = useMutation({
+  mutationFn: (id) => axios.delete(`/api/forms/daily-sales/v2/${id}`),
+  onSuccess: () => refetch(),
+});
+// In table actions: <Button onClick={() => deleteMutation.mutate(row.id)}>Delete</Button>
+
+Backend DELETE /api/forms/daily-sales/v2/:id:
+textapp.delete('/api/forms/daily-sales/v2/:id', async (req, res) => {
+  await db.delete(dailySalesV2).where(eq(dailySalesV2.id, req.params.id));
+  res.json({ ok: true });
+});
+
+Remove Emojis/Styling: Scan/replace emojis (e.g., rg -l emoji Library.tsx); apply shadcn classes (e.g., className="bg-white p-4 rounded-md shadow-sm" for cards).
+Edit Button: Fix to navigate /operations/daily-sales/edit/${id} — add route in App.tsx:
+text<Route path="/operations/daily-sales/edit/:id" element={<DailySalesEdit />} />  // New component pre-fill form
+
+Create DailySalesEdit.tsx: Copy Form.tsx, useQuery fetch data by id, prefill.
+
+
+Print Button: Add /api/forms/daily-sales/v2/:id/print (backend: Generate HTML, res.send HTML for print window).
+text// Frontend: <Button onClick={() => window.open(`/api/forms/daily-sales/v2/${id}/print`)}>Print</Button>
+
+Backend:
+textapp.get('/api/forms/daily-sales/v2/:id/print', async (req, res) => {
+  const data = await db.select().from(dailySalesV2).where(eq(dailySalesV2.id, req.params.id));
+  res.send(`
+    <html><body><h1>Daily Sales Print</h1><pre>${JSON.stringify(data[0], null, 2)}</pre><script>window.print();</script></body></html>
+  `);
+});
+
+
+
+Download Button: Fix PDF error—use jsPDF in frontend:
+textimport jsPDF from 'jspdf';
+const generatePDF = (data) => {
+  const doc = new jsPDF();
+  doc.text(JSON.stringify(data, null, 2), 10, 10);
+  doc.save('daily-sales.pdf');
+};
+// Button: <Button onClick={() => generatePDF(row)}>Download PDF</Button>
+
+Install if needed (but no package.json touch—assume available or use html2pdf).
+
+
+
+
+Fix Shopping List Page & Email:
+
+Open client/src/pages/operations/shopping-list/ShoppingListPage.tsx.
+Add useQuery for requisition from dailyStockV2:
+textconst { data: shoppingList } = useQuery({ queryKey: ['shoppingList'], queryFn: () => axios.get('/api/shopping-list') });
+// Display table: Items from requisition (e.g., Milk 1L, Tomatoes 2kg)
+// Backend /api/shopping-list: Query daily_stock_v2 requisition jsonb, flatten to list.
+textapp.get('/api/shopping-list', async (req, res) => {
+  const stocks = await db.select().from(dailyStockV2).orderBy(desc(dailyStockV2.createdAt));
+  const list = stocks.flatMap(s => JSON.parse(s.requisition || '[]'));  // Assume json array
+  res.json(list);
+});
+
+Email: In dailySalesV2.ts post-submit, add shopping list to report:
+textconst shoppingItems = /* From dailyStock or requisition */;
+emailText += `\nShopping List:\n${shoppingItems.map(i => `${i.item} ${i.qty}`).join('\n')}`;
+
+
+
+Add Rolls/Meat/Drinks to Email:
+
+In email handler: Query stock_lodgment since shift date.
+textconst rolls = await db.select({ sum: sql`sum(quantity)` }).from(stockLodgment).where(and(eq(type, 'rolls'), gt(date, shiftDate)));
+const meat = await db.select({ sum: sql`sum(quantity)` }).from(stockLodgment).where(and(eq(type, 'meat'), gt(date, shiftDate)));
+const drinks = await db.select({ sum: sql`sum(quantity)` }).from(stockLodgment).where(and(eq(type, 'drinks'), gt(date, shiftDate)));
+emailText += `\nStock Added: Rolls ${rolls.sum}, Meat ${meat.sum}g, Drinks ${drinks.sum}`;
+
+
+
+Fix Expenses Edit/Delete in Stock Sections:
+
+Open Expenses.tsx (rolls/meat/drinks tables).
+Add mutations for each:
+text// For rolls table:
+const editMutation = useMutation({ mutationFn: (data) => axios.put(`/api/stock/lodgment/${id}`, data) });
+const deleteMutation = useMutation({ mutationFn: (id) => axios.delete(`/api/stock/lodgment/${id}`) });
+// Actions: <Button onClick={() => editMutation.mutate(updatedData)}>Edit</Button> <Button onClick={() => deleteMutation.mutate(row.id)}>Delete</Button>
+
+Backend PUT/DELETE /api/stock/lodgment/:id (update paid/quantity, delete row; if rolls paid=false on delete, no expense change).
+
+
+Test End-to-End:
+
+Submit form → Library view correct figures, no emojis, styling match.
+Library: Delete works, edit navigates, print opens, download PDF generates.
+Shopping page: Shows list, email includes it/rolls/meat/drinks.
+Expenses stock: Edit/delete works.
+
+
+Proactive:
+
+SQL clean: UPDATE all amount fields /100 where >1000.
+Add error handling: Toast for failures.
+Optimize: Index on date for queries.
+
+
+
+Run this—fixes all in ~5 mins. Test library/form/email/shopping/expenses, share output.
