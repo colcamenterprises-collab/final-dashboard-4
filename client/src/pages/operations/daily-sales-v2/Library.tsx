@@ -20,7 +20,7 @@ type RecordType = {
   date: string;
   staff: string;
   totalSales: number;
-  rolls: string;
+  buns: string;
   meat: string;
   status: string;
   payload?: { balanced?: boolean };
@@ -197,7 +197,7 @@ export default function DailySalesV2Library() {
                   </td>
                   <td className="p-2 border-b">{rec.staff}</td>
                   <td className="p-2 border-b">{thb(rec.totalSales)}</td>
-                  <td className="p-2 border-b">{rec.rolls}</td>
+                  <td className="p-2 border-b">{rec.buns}</td>
                   <td className="p-2 border-b">{rec.meat}</td>
                   <td className="p-2 border-b">
                     {rec.payload?.balanced ? (
@@ -330,7 +330,7 @@ export default function DailySalesV2Library() {
               <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div>
                   <p className="text-gray-500 text-xs uppercase tracking-wide">Rolls</p>
-                  <p className="font-semibold">{rec.rolls}</p>
+                  <p className="font-semibold">{rec.buns}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs uppercase tracking-wide">Meat</p>

@@ -1,0 +1,127 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., update queries for rolls display, cash calc logic, print/download endpoints).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for print/download 404s; fix if broken.
+If multiple definitions found, stop and ask Cam.
+New Rule: Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Submit sample form (use exact data: startingCash: 36700, cashSales: 273400, qrSales: 83700, grabSales: 548800, otherSales: 0, expenses: 480+29+15, wages: 600+600+800, closingCash: 57700, banked: 21000, qrTransfer: 83700, rollsEnd: 77).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: Library shows no rolls; After: Shows 'Rolls: 77 pcs' - curl GET /api/forms/daily-sales/v2/[id]: {..., rollsEnd: 77}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All fixes verified with tests: Yes/No" — if No, list failures and stop.
+
+
+
+Task Overview
+
+Fix ALL specified issues exactly: Rolls in library, remove emojis/icons, exclude banked from closing calc, full print content, useful PDF download (not CSV), working delete, add drinks to shopping list.
+Proactive: Add test script new file client/test/dailyFormTest.js (run node: simulate submit/view/delete/print/download, log results).
+
+Step-by-Step Actions
+
+Add Rolls to Library Display (Frontend):
+
+Open client/src/pages/operations/daily-sales-v2/Library.tsx.
+In table or view card: Add rollsEnd field.
+text// In columns or card: <div>Rolls End: {row.rollsEnd} pcs</div>
+
+Verify backend returns rollsEnd: Run SQL SELECT rollsEnd FROM daily_sales_v2 LIMIT 1; — if missing, add field ALTER TABLE daily_sales_v2 ADD COLUMN rollsEnd integer;
+Test: Submit form with rollsEnd:77 → Library shows "Rolls: 77 pcs". Evidence: Curl GET /api/forms/daily-sales/v2/[id] includes rollsEnd:77.
+
+
+Remove Emojis/Icons from Library (Frontend):
+
+Open Library.tsx.
+Scan/replace: rg -l 'emoji|icon|lucide' Library.tsx — remove all (e.g., replace <icon> with text labels).</icon>
+Style match app: Use className="p-4 bg-white rounded-md shadow-sm border" for cards/tables (shadcn standard).
+Test: Load library — no emojis/icons, styling clean. Evidence: Curl /operations/daily-sales-library | grep -v 'emoji|icon' (no matches).
+
+
+Exclude Banked from Closing Cash Calc (Backend/Frontend):
+
+Open server/forms/dailySalesV2.ts (calc logic).
+Update expectedClosing = startingCash + cashSales - expenses - wages; // No -banked (banked is post-closing)
+In Library.tsx & Form.tsx: Display "Expected Closing: [calc without banked]".
+Test: With data, expected = 36700 + 273400 - (480+29+15) - (600+600+800) = 305876 (adjust if other fields); diff = actual 57700 - expected = negative large? Fix formula to match. Evidence: Log calc steps in console.
+
+
+Fix Print to Show All Entries (Backend/Frontend):
+
+Open Library.tsx: Update print button to window.open(/api/forms/daily-sales/v2/${id}/print-full).
+Backend add GET /api/forms/daily-sales/v2/:id/print-full:
+textapp.get('/api/forms/daily-sales/v2/:id/print-full', async (req, res) => {
+  const data = await db.select().from(dailySalesV2).where(eq(id, req.params.id)).leftJoin(dailyStockV2, eq(dailyStockV2.shiftId, id));
+  const html = `<html><body><h1>Full Daily Report</h1><pre>Sales: ${JSON.stringify(data.sales, null, 2)}</pre><pre>Stock: ${JSON.stringify(data.stock, null, 2)}</pre><script>window.print();</script></body></html>`;
+  res.send(html);
+});
+
+Test: Print shows sales + stock + expenses/wages/rolls. Evidence: Curl endpoint, grep for all sections.
+
+
+Fix Download to Useful PDF (Frontend):
+
+Open Library.tsx: Change to PDF gen with jsPDF (not CSV).
+textimport jsPDF from 'jspdf';
+const downloadPDF = (data) => {
+  const doc = new jsPDF();
+  doc.text(`Daily Sales Report\n\n${JSON.stringify(data, null, 2)}`, 10, 10);
+  doc.save(`daily-sales-${data.id}.pdf`);
+};
+// Button: <Button onClick={() => downloadPDF(row)}>Download PDF</Button>
+
+Fix error: Ensure jsPDF installed (assume yes); test download opens PDF with full form data.
+Evidence: Run download, log "PDF generated with content length: X".
+
+
+Fix Delete Function (Backend/Frontend):
+
+Open Library.tsx: Confirm deleteMutation to DELETE /api/forms/daily-sales/v2/:id.
+Backend: Ensure delete cascades to dailyStockV2 if linked.
+textapp.delete('/api/forms/daily-sales/v2/:id', async (req, res) => {
+  await db.delete(dailyStockV2).where(eq(shiftId, req.params.id));
+  await db.delete(dailySalesV2).where(eq(id, req.params.id));
+  res.json({ ok: true });
+});
+
+Test: Delete entry — gone from list. Evidence: Before/after curl GET /api/forms/daily-sales/v2 count decreases.
+
+
+Add Drinks to Shopping List (Backend/Frontend):
+
+Open shopping list query: Add drinks from dailyStockV2 or lodgment.
+textconst drinks = await db.select().from(stockLodgment).where(eq(type, 'drinks'));
+list.push(...drinks.map(d => ({ item: d.meta.drinkType, qty: d.quantity })));
+
+In ShoppingListPage.tsx: Display drinks in table.
+Test: Lodge drinks → Shows in list. Evidence: Curl /api/shopping-list includes drinks.
+
+
+Add Test Script (Proactive):
+
+Create client/test/dailyFormTest.js:
+textconst axios = require('axios');
+
+async function test() {
+  // Submit sample
+  const response = await axios.post('/api/forms/daily-sales/v2', { /* sample data */ });
+  const id = response.data.id;
+  // View library: GET /api/forms/daily-sales/v2
+  // Delete: DELETE id
+  // Print: GET print-full
+  // Download: Simulate
+  console.log('Tests passed');
+}
+test();
+
+Run, report output.
+
+
+Report Back:
+
+List each fix with evidence.
+All fixes verified with tests: Yes/No.
+
+
+
+Run this—strict verification ensures completion. Test thoroughly, share report. Proactive: Backup DB pre-run.
