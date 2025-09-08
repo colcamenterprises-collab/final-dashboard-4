@@ -6,9 +6,9 @@ import { pool } from "../db";
 import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
 
-// Utility functions for cent conversion
-const toCents = (v: any) => Math.round((Number(String(v).replace(/[^\d.-]/g, '')) || 0) * 100);
-const fromCents = (cents: number) => (cents / 100).toFixed(2);
+// Utility functions for THB values (no cents conversion)
+const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
+const formatTHB = (thb: number) => thb.toLocaleString();
 
 
 export async function createDailySalesV2(req: Request, res: Response) {
@@ -36,41 +36,41 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const shiftDate = new Date().toISOString().split("T")[0];
     const createdAt = new Date().toISOString();
 
-    // Totals
+    // Totals (whole THB, no cents)
     const totalSales =
-      toCents(cashSales) +
-      toCents(qrSales) +
-      toCents(grabSales) +
-      toCents(otherSales);
+      toTHB(cashSales) +
+      toTHB(qrSales) +
+      toTHB(grabSales) +
+      toTHB(otherSales);
 
     const totalExpenses =
-      (expenses || []).reduce((s: number, e: any) => s + toCents(e.cost), 0) +
-      (wages || []).reduce((s: number, w: any) => s + toCents(w.amount), 0);
+      (expenses || []).reduce((s: number, e: any) => s + toTHB(e.cost), 0) +
+      (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
 
     // Expected closing = start + cash - expenses
     const expectedClosingCash =
-      toCents(startingCash) + toCents(cashSales) - totalExpenses;
+      toTHB(startingCash) + toTHB(cashSales) - totalExpenses;
 
-    const closingCashCents = toCents(closingCash);
+    const closingCashTHB = toTHB(closingCash);
 
-    // Balanced check ±30
-    const diff = Math.abs(expectedClosingCash - closingCashCents);
-    const balanced = diff <= toCents(30);
+    // Balanced check ±30 THB
+    const diff = Math.abs(expectedClosingCash - closingCashTHB);
+    const balanced = diff <= 30;
 
     // Banking
-    const cashBanked = closingCashCents - toCents(startingCash);
-    const qrTransfer = toCents(qrSales);
+    const cashBanked = closingCashTHB - toTHB(startingCash);
+    const qrTransfer = toTHB(qrSales);
 
     const payload = {
       completedBy,
-      startingCash: toCents(startingCash),
-      cashSales: toCents(cashSales),
-      qrSales: toCents(qrSales),
-      grabSales: toCents(grabSales),
-      otherSales: toCents(otherSales),
+      startingCash: toTHB(startingCash),
+      cashSales: toTHB(cashSales),
+      qrSales: toTHB(qrSales),
+      grabSales: toTHB(grabSales),
+      otherSales: toTHB(otherSales),
       expenses,
       wages,
-      closingCash: closingCashCents,
+      closingCash: closingCashTHB,
       totalSales,
       totalExpenses,
       expectedClosingCash,
@@ -101,11 +101,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Sales</h3>
       <ul>
-        <li>Cash Sales: ฿${fromCents(toCents(cashSales))}</li>
-        <li>QR Sales: ฿${fromCents(toCents(qrSales))}</li>
-        <li>Grab Sales: ฿${fromCents(toCents(grabSales))}</li>
-        <li>Other Sales: ฿${fromCents(toCents(otherSales))}</li>
-        <li><strong>Total Sales:</strong> ฿${fromCents(totalSales)}</li>
+        <li>Cash Sales: ฿${formatTHB(toTHB(cashSales))}</li>
+        <li>QR Sales: ฿${formatTHB(toTHB(qrSales))}</li>
+        <li>Grab Sales: ฿${formatTHB(toTHB(grabSales))}</li>
+        <li>Other Sales: ฿${formatTHB(toTHB(otherSales))}</li>
+        <li><strong>Total Sales:</strong> ฿${formatTHB(totalSales)}</li>
       </ul>
 
       <h3>Expenses</h3>
@@ -113,22 +113,22 @@ export async function createDailySalesV2(req: Request, res: Response) {
         ${(expenses || [])
           .map(
             (e: any) =>
-              `<li>${e.item} – ฿${fromCents(toCents(e.cost))} (${e.shop})</li>`
+              `<li>${e.item} – ฿${formatTHB(toTHB(e.cost))} (${e.shop})</li>`
           )
           .join("")}
         ${(wages || [])
           .map(
             (w: any) =>
-              `<li>${w.staff} – ฿${fromCents(toCents(w.amount))} (${w.type})</li>`
+              `<li>${w.staff} – ฿${formatTHB(toTHB(w.amount))} (${w.type})</li>`
           )
           .join("")}
       </ul>
-      <p><strong>Total Expenses:</strong> ฿${fromCents(totalExpenses)}</p>
+      <p><strong>Total Expenses:</strong> ฿${formatTHB(totalExpenses)}</p>
 
       <h3>Banking</h3>
       <ul>
-        <li>Total Cash in Register: ฿${fromCents(closingCashCents)}</li>
-        <li>Expected Register: ฿${fromCents(expectedClosingCash)}</li>
+        <li>Total Cash in Register: ฿${formatTHB(closingCashTHB)}</li>
+        <li>Expected Register: ฿${formatTHB(expectedClosingCash)}</li>
         <li>
           Balanced: ${
             balanced
@@ -136,8 +136,8 @@ export async function createDailySalesV2(req: Request, res: Response) {
               : '<span style="color:red;font-weight:bold">NO ❌</span>'
           }
         </li>
-        <li>Cash to Bank: ฿${fromCents(cashBanked)}</li>
-        <li>QR to Bank: ฿${fromCents(qrTransfer)}</li>
+        <li>Cash to Bank: ฿${formatTHB(cashBanked)}</li>
+        <li>QR to Bank: ฿${formatTHB(qrTransfer)}</li>
       </ul>
 
       <h3>Stock</h3>
@@ -181,9 +181,9 @@ export async function getDailySalesV2(_req: Request, res: Response) {
       id: row.id,
       date: row.shiftDate || row.createdAt,
       staff: row.completedBy,
-      cashStart: row.payload?.startingCash ? row.payload.startingCash / 100 : 0,
-      cashEnd: row.payload?.closingCash ? row.payload.closingCash / 100 : 0,
-      totalSales: row.payload?.totalSales ? row.payload.totalSales / 100 : 0,
+      cashStart: row.payload?.startingCash || 0,
+      cashEnd: row.payload?.closingCash || 0,
+      totalSales: row.payload?.totalSales || 0,
       buns: row.payload?.rollsEnd || "-",
       meat: row.payload?.meatEnd || "-",
       status: "Submitted",
@@ -217,9 +217,9 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
       id: row.id,
       date: row.shiftDate?.split('T')[0] || row.createdAt?.split('T')[0] || '',
       staff: row.completedBy || '',
-      cashStart: p.startingCash ? (p.startingCash / 100).toFixed(2) : '0.00',
-      cashEnd: p.closingCash ? (p.closingCash / 100).toFixed(2) : '0.00',
-      totalSales: p.totalSales ? (p.totalSales / 100).toFixed(2) : '0.00',
+      cashStart: p.startingCash || 0,
+      cashEnd: p.closingCash || 0,
+      totalSales: p.totalSales || 0,
       buns: p.rollsEnd?.toString() || '-',
       meat: p.meatEnd?.toString() || '-',
       status: 'Submitted',
