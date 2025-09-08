@@ -88,9 +88,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       [id, shiftDate, completedBy, createdAt, createdAt, payload]
     );
 
-    // Build shopping list
-    const shoppingItems = (requisition || [])
-      .filter((i: any) => (i.qty || 0) > 0)
+    // Build shopping list for email
+    const shoppingList = (requisition || [])
+      .filter((i: any) => (i.qty || 0) > 0);
+    const shoppingItems = shoppingList
       .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
 
     // Email
@@ -140,17 +141,21 @@ export async function createDailySalesV2(req: Request, res: Response) {
         <li>QR to Bank: ฿${formatTHB(qrTransfer)}</li>
       </ul>
 
-      <h3>Stock</h3>
+      <h3>Stock Levels</h3>
       <ul>
-        <li>Rolls: ${rollsEnd || "-"}</li>
-        <li>Meat: ${meatEnd || "-"}</li>
+        <li>Rolls Remaining: ${rollsEnd || "Not specified"}</li>
+        <li>Meat Remaining: ${meatEnd || "Not specified"}</li>
       </ul>
 
-      <h3>Shopping List</h3>
+      <h3>Shopping List - Items to Purchase</h3>
       ${
-        shoppingItems.length === 0
-          ? "<p>No items to purchase</p>"
-          : `<ul>${shoppingItems.map((s: string) => `<li>${s}</li>`).join("")}</ul>`
+        shoppingList.length === 0
+          ? '<p style="color: #6c757d;">No shopping items required.</p>'
+          : `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+               <ul style="margin: 0; padding-left: 20px;">
+                 ${shoppingList.map(item => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
+               </ul>
+             </div>`
       }
     `;
 

@@ -100,15 +100,25 @@ class EmailService {
           <li>Banked Amount: ${Number(reportData.bankedAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</li>
         </ul>
 
-        <h3>Stock Items Needed for Purchase</h3>
-        ${reportData.numberNeeded ? `
+        <h3>Stock Information</h3>
         <ul>
-          ${Object.entries(reportData.numberNeeded)
-            .filter(([key, value]) => value && parseInt(value as string) > 0)
-            .map(([item, quantity]) => `<li>${item}: ${quantity}</li>`)
-            .join('')}
+          <li>Rolls Remaining: ${reportData.rollsEnd || 'Not specified'}</li>
+          <li>Meat Remaining: ${reportData.meatEnd || 'Not specified'}</li>
         </ul>
-        ` : '<p>No stock items specified.</p>'}
+        
+        <h3>Shopping List - Required Items</h3>
+        ${reportData.shoppingList && reportData.shoppingList.length > 0 ? `
+        <ul style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745;">
+          ${reportData.shoppingList.map((item: any) => 
+            `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`
+          ).join('')}
+        </ul>
+        ` : '<p style="color: #6c757d;">No shopping items required.</p>'}
+        
+        <h3>Balance Status</h3>
+        <div style="padding: 10px; border-radius: 5px; ${reportData.balanced ? 'background-color: #d4edda; color: #155724;' : 'background-color: #f8d7da; color: #721c24;'}">
+          <strong>${reportData.balanced ? '✅ BALANCED' : '❌ NOT BALANCED'}</strong>
+        </div>
 
         <h3>Expenses Breakdown</h3>
         <p>${reportData.expenseDescription || 'No detailed expense breakdown provided.'}</p>

@@ -26,9 +26,49 @@ export default function ShoppingListPage() {
 
   async function fetchList(d: string) {
     setLoading(true);
-    const res = await fetch(`/api/ingredients/shopping-list/${d}`);
-    const data = await res.json();
-    if (data.ok) setItems(data.items);
+    try {
+      const res = await fetch(`/api/forms/daily-sales/v2`);
+      const data = await res.json();
+      
+      if (data.ok && data.records) {
+        // Extract requisition items from records on the selected date
+        const selectedDate = new Date(d).toISOString().split('T')[0];
+        const allItems: Item[] = [];
+        
+        data.records.forEach((record: any) => {
+          const recordDate = new Date(record.date).toISOString().split('T')[0];
+          if (recordDate === selectedDate && record.payload?.requisition) {
+            record.payload.requisition.forEach((item: any) => {
+              allItems.push({
+                name: item.name,
+                qty: item.qty,
+                unit: item.unit,
+                category: item.category || 'General',
+                cost: 0 // Cost will be calculated if needed
+              });
+            });
+          }
+        });
+        
+        // Group and sum quantities for duplicate items
+        const groupedItems = allItems.reduce((acc: any, item) => {
+          const key = item.name;
+          if (acc[key]) {
+            acc[key].qty += item.qty;
+          } else {
+            acc[key] = { ...item };
+          }
+          return acc;
+        }, {});
+        
+        setItems(Object.values(groupedItems));
+      } else {
+        setItems([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch shopping list:', err);
+      setItems([]);
+    }
     setLoading(false);
   }
 
