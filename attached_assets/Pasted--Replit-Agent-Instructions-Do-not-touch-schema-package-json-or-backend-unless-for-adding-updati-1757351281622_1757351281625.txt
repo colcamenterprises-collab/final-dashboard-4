@@ -1,0 +1,124 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding/updating fields/endpoints explicitly needed (e.g., add 'unitPrice' to ingredients if missing; add sync endpoint for forms).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if adding new (e.g., for manual sync button); align with existing.
+If multiple definitions found, stop and ask Cam.
+New Rule: Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Use sample data from CSV (e.g., add/edit 'Topside Beef', cost 319, unit 'Per kg').
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: No 'Topside Beef'; After: Added - SQL SELECT name FROM ingredients WHERE name='Topside Beef': {id: uuid, cost: 319}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Implement full Ingredient Management: CRUD (add/edit/delete/update pricing) via UI in /menu/ingredients (Ingredients.tsx); use CSV as initial seed.
+Select items in recipes: In CostCalculator.tsx, add ingredient search/select from DB.
+Flow to shopping list: Packaging size/quantity feeds requisition in DailyStock.tsx (form 2) — auto-populate dropdowns/options from ingredients table.
+Update Daily Sales/Stock forms: When ingredients change, add manual "Sync Ingredients to Forms" button in Ingredients.tsx — triggers backend sync to update form fields/options.
+Proactive: Seed from CSV on load if table empty; add import CSV button for updates; add search/filter in UI; integrate unit conversion (e.g., kg to g); add cost per portion calc.
+
+Step-by-Step Actions
+
+Seed Ingredients from CSV (Backend Allowed):
+
+Open server/scripts/seedIngredients.ts (new).
+Parse CSV (use Papa.parse if installed, or string split; CSV content: Item,Category,Supplier,Brand,Packaging Qty,Cost,Average Menu Portion,Last Review Date).
+textimport { db } from '../db';
+import { ingredients } from 'shared/schema';
+import fs from 'fs';
+const csv = fs.readFileSync('Food Costings - v2.2 08.09.25.csv', 'utf8');  // Assume path or hardcode content
+const rows = csv.split('\n').slice(1).map(r => r.split(','));
+async function seed() {
+  for (const row of rows) {
+    if (row[0]) {
+      await db.insert(ingredients).values({
+        name: row[0],
+        category: row[1],
+        supplier: row[2],
+        brand: row[3],
+        packageSize: row[4],
+        unitPrice: parseFloat(row[5].replace('฿', '')),
+        portionSize: row[6],
+        lastReview: row[7],
+        createdAt: new Date(),
+      }).onConflictDoUpdate({ target: ingredients.name, set: { unitPrice: parseFloat(row[5].replace('฿', '')) } });  // Update pricing
+    }
+  }
+  console.log('Seeded/updated ingredients');
+}
+seed();
+
+Run script; verify: SQL SELECT COUNT(*) FROM ingredients; = ~56.
+Evidence: Before count, after count; sample SELECT name, unitPrice FROM ingredients LIMIT 1: 'Topside Beef', 319.
+
+
+Implement CRUD in UI (Frontend):
+
+Open client/src/pages/menu/Ingredients.tsx.
+Use TanStack Table for list: Columns name, category, supplier, brand, packageSize, unitPrice, portionSize, actions (edit/delete).
+textimport { useQuery, useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+
+const { data } = useQuery({ queryKey: ['ingredients'], queryFn: () => axios.get('/api/ingredients') });
+const addMutation = useMutation({ mutationFn: (data) => axios.post('/api/ingredients', data), onSuccess: refetch });
+const editMutation = useMutation({ mutationFn: (data) => axios.put(`/api/ingredients/${data.id}`, data), onSuccess: refetch });
+const deleteMutation = useMutation({ mutationFn: (id) => axios.delete(`/api/ingredients/${id}`), onSuccess: refetch });
+
+// Add form for new/edit (modal with fields)
+// Table with actions: <Button onClick={() => openEdit(row)}>Edit</Button> <Button onClick={() => deleteMutation.mutate(row.id)}>Delete</Button>
+
+Backend endpoints (if missing, add to routes.ts):
+textapp.get('/api/ingredients', async (req, res) => res.json(await db.select().from(ingredients)));
+app.post('/api/ingredients', async (req, res) => { const id = await db.insert(ingredients).values(req.body).returning({ id }); res.json(id); });
+app.put('/api/ingredients/:id', async (req, res) => await db.update(ingredients).set(req.body).where(eq(id, req.params.id)));
+app.delete('/api/ingredients/:id', async (req, res) => await db.delete(ingredients).where(eq(id, req.params.id)));
+
+Test: Add 'Test Item', cost 100; edit cost 200; delete. Evidence: Curl POST/GET/PUT/DELETE, before/after SELECT.
+
+
+Select Items in Recipes (Frontend):
+
+Open client/src/pages/menu/CostCalculator.tsx.
+Add ingredient search: Use Select or autocomplete from /api/ingredients.
+text<Select onValueChange={(val) => addIngredient(val)}>
+  <SelectContent>{ingredients.map(i => <SelectItem value={i.id}>{i.name} ({i.unitPrice} THB/{i.packageSize})</SelectItem>)}</SelectContent>
+</Select>
+
+Test: Add to recipe, calc cost. Evidence: Console log selected, cost total.
+
+
+Flow to Shopping List (Backend/Frontend):
+
+Open server/api/shopping-list (or endpoint).
+Include ingredients packageSize/qty in requisition options.
+In DailyStock.tsx (form 2): Dropdowns pull from /api/ingredients, show packageSize for requisition.
+textconst { data: items } = useQuery({ queryKey: ['ingredients'], queryFn: () => axios.get('/api/ingredients') });
+// In requisition: Select item, auto-fill unit/packageSize for qty input.
+
+Test: Select 'Topside Beef' → Shows 'Per kg' for qty. Evidence: Curl /api/ingredients, form render log.
+
+
+Update Forms on Changes (Frontend/Backend):
+
+In Ingredients.tsx: Add button "Sync to Forms" — POST /api/ingredients/sync-forms.
+Backend: /api/ingredients/sync-forms: No-op or trigger cache invalidate; forms use query with no cache or manual refetch.
+textapp.post('/api/ingredients/sync-forms', (req, res) => { /* Optional DB trigger */ res.json({ ok: true }); });
+
+In DailyStock.tsx: Add refetch on sync (or poll).
+Test: Add new item → Sync → Form shows new. Evidence: Before curl /api/ingredients count, after sync, form query refetches.
+
+
+Report Back:
+
+List each addition/fix with evidence.
+All changes verified with tests: Yes/No.
+
+
+
+Run this—strict evidence prevents false claims. Test CRUD/sync/select, share report. Proactive: Add CSV import button in UI for updates (POST /api/ingredients/import-csv, parse/resee

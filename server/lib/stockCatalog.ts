@@ -12,7 +12,7 @@ export type CatalogRow = {
 
 let CACHE: { items: CatalogRow[]; mtime: number } | null = null;
 
-// Clear cache for debugging
+// Clear cache for CSV update - force reload  
 CACHE = null;
 
 function slugify(s: string) {
@@ -36,10 +36,10 @@ function detectIsDrink(category: string) {
 
 function excludeFirstFourMeat(rows: any[]) {
   // Rule from Cam: first 4 (beef cuts) are covered by meat grams, not listed in requisition
-  // We exclude the first 4 distinct items where Internal Category looks like Meat.
+  // We exclude the first 4 distinct items where Category looks like Meat.
   let excluded = 0;
   return rows.filter(r => {
-    const cat = (r["Internal Category"] ?? r["internal category"] ?? "").toString();
+    const cat = (r["Category"] ?? r["Internal Category"] ?? r["category"] ?? r["internal category"] ?? "").toString();
     if (excluded < 4 && /meat/i.test(cat)) {
       excluded++;
       return false;
@@ -50,7 +50,7 @@ function excludeFirstFourMeat(rows: any[]) {
 
 export function loadCatalogFromCSV(): CatalogRow[] {
   try {
-    const csvPath = path.join(process.cwd(), "attached_assets", "Food Costings - Supplier - Portions - Prices v2.1 20.08.25_1755715627430.csv");
+    const csvPath = path.join(process.cwd(), "attached_assets", "Food Costings - v2.2 08.09.25_1757351375321.csv");
     
     if (!fs.existsSync(csvPath)) {
       console.warn("[stockCatalog] CSV file not found, using fallback test data");
@@ -74,6 +74,12 @@ export function loadCatalogFromCSV(): CatalogRow[] {
       trim: true
     });
 
+    // Debug: log the first record and its columns
+    if (records.length > 0) {
+      console.log("[stockCatalog] First record columns:", Object.keys(records[0]));
+      console.log("[stockCatalog] First record sample:", records[0]);
+    }
+
     // Filter out rows with missing Item names and header repeats
     const cleanRows = records.filter((row: any) => {
       const item = (row["Item"] || "").toString().trim();
@@ -87,7 +93,7 @@ export function loadCatalogFromCSV(): CatalogRow[] {
 
     const items: CatalogRow[] = filteredRows.map((row: any) => {
       const item = (row["Item"] || "").toString().trim();
-      const category = (row["Internal Category"] || "").toString().trim();
+      const category = (row["Category"] || row["Internal Category"] || "").toString().trim();
       
       return {
         id: slugify(item),
