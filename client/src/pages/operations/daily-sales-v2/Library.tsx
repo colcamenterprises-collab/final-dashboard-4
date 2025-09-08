@@ -478,7 +478,7 @@ export default function DailySalesV2Library() {
                     const cashBanked = selected.banking.cashBanked;
                     const closingCash = selected.banking.closingCash;
                     
-                    const expectedClosing = startingCash + cashSales - totalExpenses - totalWages - cashBanked;
+                    const expectedClosing = startingCash + cashSales - totalExpenses - totalWages; // Exclude banked from calculation
                     const difference = closingCash - expectedClosing;
                     const isBalanced = Math.abs(difference) <= 0.30; // ±30 THB tolerance
                     
