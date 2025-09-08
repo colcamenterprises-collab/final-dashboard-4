@@ -184,6 +184,7 @@ export async function getDailySalesV2(_req: Request, res: Response) {
     const result = await pool.query(
       `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
+       WHERE "deletedAt" IS NULL
        ORDER BY "createdAt" DESC`
     );
 
