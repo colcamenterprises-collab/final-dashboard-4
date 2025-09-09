@@ -1,0 +1,97 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding/updating fields/endpoints to match foodCostings.ts (e.g., ensure ingredients table fields match .ts structure).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if adding new; align with existing.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Use sample from foodCostings.ts (e.g., 'Topside Beef', category 'Meat', cost 319).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: Table has 20 items; After: 62 from .ts - curl GET /api/ingredients: length 62, 'Topside Beef' cost 319".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+Source of Truth: Use foodCostings.ts as permanent seed; load it on app start/sync, upsert to DB (ingredients table). UI CRUD edits DB, not .ts; add "Sync from god file" button to re-seed from .ts if changed externally.
+
+Task Overview
+
+Make foodCostings.ts permanent source: Seed DB from it on load/sync, UI shows DB with CRUD (add/delete/edit/pricing); share updated list to shopping list/recipes/daily forms.
+Enhance page: Keep upload (merge to DB), add sync button from .ts, full CRUD with modals, search/filter, export CSV.
+Proactive: Auto-seed on server start; add lastUpdated from .ts; ensure no truncation issues (parse full .ts content).
+
+Step-by-Step Actions
+
+Seed from foodCostings.ts (Backend Allowed):
+
+Open server/db.ts or index.ts — add auto-seed on start:
+textimport { db } from './db';
+import { ingredients } from 'shared/schema';
+import { sql } from 'drizzle-orm';
+import foodCostings from '../foodCostings.ts';  // Assume path; adjust if in data/
+
+async function seedGodList() {
+  const rows = foodCostings;  // Assume .ts exports array of objects {item, category, supplier, brand, packagingQty, cost, portion, lastReview}
+  const newNames = rows.map(row => row.item);
+  await db.delete(ingredients).where(sql`name NOT IN (${newNames.join(',')})`);
+
+  for (const row of rows) {
+    const cost = parseFloat(row.cost.replace('฿', '').replace(',', ''));
+    await db.insert(ingredients).values({
+      name: row.item,
+      category: row.category,
+      supplier: row.supplier,
+      brand: row.brand,
+      packageSize: row.packagingQty,
+      unitPrice: isNaN(cost) ? 0 : cost,
+      portionSize: row.portion,
+      lastReview: row.lastReview,
+      createdAt: new Date(),
+    }).onConflictDoUpdate({
+      target: ingredients.name,
+      set: { category: row.category, supplier: row.supplier, brand: row.brand, packageSize: row.packagingQty, unitPrice: isNaN(cost) ? 0 : cost, portionSize: row.portion, lastReview: row.lastReview, updatedAt: new Date() },
+    });
+  }
+  console.log('Seeded from foodCostings.ts: ' + rows.length + ' items');
+}
+
+// Call on server start
+seedGodList();
+
+Test: Restart server, SQL SELECT COUNT(*) FROM ingredients; = 62. Evidence: Console log 'Seeded 62', curl GET /api/ingredients length 62.
+
+
+Enhance Ingredient Mgmt Page (Frontend):
+
+Open client/src/pages/menu/IngredientMgmt.tsx (or Ingredients.tsx).
+Table: Columns item, category, supplier, brand, packagingQty, cost, portion, lastReview, actions (edit/delete).
+CRUD: Modals for add/edit (fields match .ts), mutation POST/PUT/DELETE /api/ingredients.
+Search/Filter: Input for name/supplier, select for category.
+Upload CSV: Merge to DB (POST /api/ingredients/import, parse, upsert on name).
+Sync Button: <Button onClick={() => axios.post('/api/ingredients/sync-god')}>Sync from god file — backend: Re-run seedGodList().
+textapp.post('/api/ingredients/sync-god', async (req, res) => {
+  await seedGodList();
+  res.json({ ok: true, message: 'Synced from foodCostings.ts' });
+});
+
+Export: Button to download current DB as CSV (json2csv, fields match .ts).
+Test: Add 'New Item', edit 'Topside Beef' cost 320, delete 'Test'; sync — resets to .ts. Evidence: Curl POST new, list +1; PUT update, check cost 320; DELETE -1; sync, cost back 319.
+
+
+Share List to Shopping List/Recipes/Forms (Backend/Frontend):
+
+Shopping List: /api/shopping-list pull from /api/ingredients (packageQty for requisition options).
+Recipes: Select from /api/ingredients, portion based on averageMenuPortion.
+Daily Forms: Requisition dropdowns use /api/ingredients.
+Sync: On sync post, refetch in forms (add event or manual button in DailyStock).
+Test: Sync, load DailyStock — dropdown shows 62 items with packagingQty. Evidence: Curl /api/ingredients, grep 'Topside Beef' packaging 'Per kg'.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Run this—ensures .ts is permanent source, UI edits DB, sync resets to .ts. Test CRUD/sync, share report. Proactive: Add 'source' field 'god' for items from .ts; UI flag "God Item—Sync to reset".

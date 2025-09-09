@@ -7,6 +7,7 @@ import { setupWebhooks, registerWebhooks, listWebhooks } from "./webhooks";
 // Fort Knox agents - simplified imports
 import { db } from './db';
 import { PrismaClient } from '@prisma/client';
+import { autoSeedOnStartup } from './lib/seedIngredients';
 import { reqId } from './middleware/reqId';
 import { timing } from './middleware/timing';
 import { errorGuard } from './middleware/errorGuard';
@@ -366,7 +367,19 @@ async function checkSchema() {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Auto-seed ingredients from foodCostings.ts god file
+    try {
+      const seedResult = await autoSeedOnStartup();
+      if (seedResult.error) {
+        console.error('❌ Auto-seed failed:', seedResult.error);
+      } else if (seedResult.seeded > 0 || seedResult.updated > 0) {
+        console.log(`🌱 Auto-seeded ingredients: ${seedResult.seeded} new, ${seedResult.updated} updated`);
+      }
+    } catch (error) {
+      console.error('❌ Auto-seed error:', error);
+    }
   });
 })();

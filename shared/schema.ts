@@ -428,6 +428,11 @@ export const ingredients = pgTable("ingredients", {
   costPerPortion: decimal("cost_per_portion", { precision: 10, scale: 2 }), // Auto-calculated: price / (packageSize / portionSize)
   unit: text("unit").notNull(),
   notes: text("notes"),
+  // God file specific fields
+  brand: text("brand"), // Brand from foodCostings.ts
+  packagingQty: text("packaging_qty"), // Packaging quantity from foodCostings.ts  
+  lastReviewDate: text("last_review_date"), // Last review date from foodCostings.ts
+  source: text("source").default("manual"), // 'god' for foodCostings.ts, 'manual' for UI edits
   lastUpdated: timestamp("last_updated").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()), // Auto-timestamp on changes
   createdAt: timestamp("created_at").defaultNow(),

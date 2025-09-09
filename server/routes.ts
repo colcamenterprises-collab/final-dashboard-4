@@ -25,6 +25,7 @@ import { expensesRouter } from "./routes/expenses";
 import { purchaseTallyRouter } from "./routes/purchaseTally";
 import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
+import { seedGodList } from "./lib/seedIngredients";
 
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
