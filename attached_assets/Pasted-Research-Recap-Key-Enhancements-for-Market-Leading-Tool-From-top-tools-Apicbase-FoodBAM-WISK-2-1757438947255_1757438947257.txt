@@ -1,0 +1,252 @@
+Research Recap (Key Enhancements for Market-Leading Tool)
+From top tools (Apicbase, FoodBAM, WISK, 2025 reviews):
+
+Core: Recipe builder with drag-select ingredients, portion/unit conversions (g/kg/ml/L/cups/tsp/pcs/oz/lb; lib like 'convert-units').
+Costing: Raw vs final calc, waste (5-10%), yield (90%), COGS % (<35% alert), margin suggest (price = cost / (1 - margin/100)).
+AI (Ramsay Gordon): Prompt for pricing ("Under THB 200"), desc (100 words, Grab: ingredients/allergens/unique), improvements ("Reduce cost 10%, sub beef").
+UI/UX: Summary cards (grid, edit/delete/download), bulk CSV/PDF export, image upload (resize 800x600 Grab standard).
+Accuracy: Cross-ref endpoint (shift sales * portions vs stock lodgment for variance/alert).
+Enhancements: Allergen/nutritional tags (optional), instructions/notes, bulk import, QR print for kitchen.
+Merge: Unify CostCalculator, Menu Import/Manager into /menu/recipes; remove duplicates in sidebar.
+
+This makes it effective: Scalable, accurate for stock cross-ref, simple (manual sync), enhanced (AI/calc).
+Agent Instructions (Full Implementation)
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding fields/endpoints (e.g., add allergens to recipes; new /api/recipes/cross-ref-shift).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for /menu/recipes; remove duplicates (e.g., CostCalculator → Recipes.tsx).
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Sample 'Cheeseburger' (Bun 1 each 4 THB, Beef 95g 30.305 THB; total 34.305, COGS 34.3%, suggest 100 THB; AI desc 100 words; image upload).
+Provide evidence in report: Console logs, curl outputs, SQL results before/after. E.g., "Before: 0 recipes; After: Added - curl GET /api/recipes: length 1, totalCost 34.305".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+Merge & Clean: Unify CostCalculator.tsx into Recipes.tsx; remove duplicates in sidebar (Menu Manager/Import → /menu/recipes).
+
+Step-by-Step Actions
+
+Update Schema (Backend Allowed):
+
+Open shared/schema.ts.
+Add/merge recipes:
+textexport const recipes = pgTable('recipes', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  description: text('description'),  // AI Grab desc
+  yieldQuantity: decimal('yieldQuantity', { precision: 10, 2 }).notNull().default(1),
+  yieldUnit: text('yieldUnit').notNull().default('servings'),
+  ingredients: jsonb('ingredients').notNull().default('[]'),  // [{id, portion, unit, cost}]
+  totalCost: decimal('totalCost', { precision: 10, 2 }).notNull().default(0),
+  costPerServing: decimal('costPerServing', { precision: 10, 2 }).default(0),
+  cogsPercent: decimal('cogsPercent', { precision: 5, 2 }).default(0),
+  suggestedPrice: decimal('suggestedPrice', { precision: 10, 2 }).default(0),
+  wasteFactor: decimal('wasteFactor', { precision: 3, 2 }).default(0.05),
+  yieldEfficiency: decimal('yieldEfficiency', { precision: 3, 2 }).default(0.90),
+  imageUrl: text('imageUrl'),
+  instructions: text('instructions'),
+  notes: text('notes'),
+  allergens: jsonb('allergens').default('[]'),  // ['dairy']
+  nutritional: jsonb('nutritional').default('{}'),  // {calories: 500}
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
+Migrate: npx drizzle-kit migrate.
+Test: SQL INSERT INTO recipes (name) VALUES ('Test'); SELECT * FROM recipes; Evidence: Count 1, wasteFactor 0.05.
+
+
+Merge & Create /menu/recipes Page (Frontend):
+
+Open client/src/pages/menu/CostCalculator.tsx — rename file to Recipes.tsx; merge import/review logic.
+Full page template (replace content):
+textimport { useQuery, useMutation, useForm } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label, Dialog, DialogContent, DialogHeader, DialogTitle, Switch } from '@/components/ui/';
+import axios from 'axios';
+import jsPDF from 'jspdf';
+import sharp from 'sharp';  // For image resize
+import openai from 'openai';  // Assume imported
+
+const openaiClient = new openai.OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export function Recipes() {
+  const { data: recipes } = useQuery({ queryKey: ['recipes'], queryFn: () => axios.get('/api/recipes') });
+  const { data: ingredients } = useQuery({ queryKey: ['ingredients'], queryFn: () => axios.get('/api/ingredients') });
+  const form = useForm({ defaultValues: { name: '', yield: 1, margin: 30, ingredients: [], waste: 0.05, yieldEff: 0.90, allergens: [], nutritional: {}, imageUrl: '', instructions: '', notes: '' } });
+  const addMutation = useMutation({ mutationFn: (data) => axios.post('/api/recipes', data), onSuccess: refetch });
+  const editMutation = useMutation({ mutationFn: (data) => axios.put(`/api/recipes/${data.id}`, data), onSuccess: refetch });
+  const deleteMutation = useMutation({ mutationFn: (id) => axios.delete(`/api/recipes/${id}`), onSuccess: refetch });
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+
+  const addIngredient = (id) => {
+    const ing = ingredients.find(i => i.id === id);
+    const current = form.getValues('ingredients');
+    form.setValue('ingredients', [...current, { id, portion: 0, unit: ing.unit || 'g', cost: 0 }]);
+  };
+
+  const calculate = () => {
+    const { ingredients: ingList, yield, waste, yieldEff } = form.getValues();
+    let total = 0;
+    ingList.forEach(ing => {
+      const i = ingredients.find(x => x.id === ing.id);
+      ing.cost = (ing.portion / i.packageSize.num * i.unitPrice) * (1 + waste) / yieldEff;  // Simple calc, adjust for unit
+      total += ing.cost;
+    });
+    const costPerServing = total / yield;
+    const cogs = 30;  // Target
+    const suggest = costPerServing / (1 - cogs / 100);
+    form.setValue('totalCost', total);
+    form.setValue('costPerServing', costPerServing);
+    form.setValue('cogsPercent', cogs);
+    form.setValue('suggestedPrice', suggest);
+  };
+
+  const generateAI = () => {
+    const data = form.getValues();
+    axios.post('/api/recipes/ramsay', data).then(({ data }) => {
+      form.setValue('description', data.desc);
+      form.setValue('suggestedPrice', data.price);
+      form.setValue('notes', data.suggestions);
+    });
+  };
+
+  const uploadImage = (file) => {
+    const resized = sharp(file).resize(800, 600).toBuffer();
+    const formData = new FormData();
+    formData.append('image', new Blob([resized]));
+    axios.post('/api/recipes/upload-image', formData).then(({ data }) => form.setValue('imageUrl', data.imageUrl));
+  };
+
+  const downloadRecipe = (recipe) => {
+    const doc = new jsPDF();
+    doc.text(`Recipe: ${recipe.name}\nCost: ${recipe.totalCost}\nIngredients: ${JSON.stringify(recipe.ingredients, null, 2)}`, 10, 10);
+    doc.save(`${recipe.name}.pdf`);
+  };
+
+  const bulkDownload = () => {
+    const doc = new jsPDF();
+    let y = 10;
+    recipes.forEach((r, i) => {
+      if (y > 280) { doc.addPage(); y = 10; }
+      doc.text(`${r.name}: ${r.totalCost}`, 10, y);
+      y += 10;
+    });
+    doc.save('all-recipes.pdf');
+  };
+
+  const crossRef = (shiftId) => {
+    axios.get(`/api/recipes/cross-ref-shift?shiftId=${shiftId}`).then(({ data }) => console.log('Variance:', data));
+  };
+
+  return (
+    <div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        {recipes.map(r => (
+          <Card key={r.id}>
+            <CardHeader><CardTitle>{r.name}</CardTitle></CardHeader>
+            <CardContent>
+              <img src={r.imageUrl} alt={r.name} />
+              <p>Cost/Serving: {r.costPerServing} THB</p>
+              <p>COGS: {r.cogsPercent}%</p>
+              <Button onClick={() => setSelectedRecipe(r)}>Edit</Button>
+              <Button onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+              <Button onClick={() => downloadRecipe(r)}>Download</Button>
+              <Button onClick={() => crossRef(r.shiftId)}>Cross-Ref Stock</Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Form */}
+      <form onSubmit={form.handleSubmit(addMutation.mutate)}>
+        <Input {...form.register('name')} placeholder="Recipe Name" />
+        <Input type="number" {...form.register('yield')} placeholder="Yield (servings)" />
+        <Input type="number" {...form.register('margin')} placeholder="Target Margin %" />
+        <Select onValueChange={addIngredient}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ingredients.map(i => <SelectItem value={i.id}>{i.name}</SelectItem>)}</SelectContent></Select>
+        <Input type="number" {...form.register('portion')} placeholder="Portion" />
+        <Select onValueChange={(val) => form.setValue('unit', val)}><SelectContent><SelectItem value="g">g</SelectItem><SelectItem value="kg">kg</SelectItem><SelectItem value="ml">ml</SelectItem><SelectItem value="L">L</SelectItem><SelectItem value="each">each</SelectItem></SelectContent></Select>
+        <Switch checked={form.watch('waste')} onCheckedChange={(val) => form.setValue('waste', val ? 0.05 : 0)} />
+        <Button type="button" onClick={calculate}>Calculate</Button>
+        <Button type="button" onClick={generateAI}>Ramsay Gordon</Button>
+        <Input type="file" onChange={(e) => uploadImage(e.target.files[0])} />
+        <Button type="submit">Save Recipe</Button>
+      </form>
+
+      <Button onClick={bulkDownload}>Bulk Download All</Button>
+    </div>
+  );
+}
+
+Test: Add 'Cheeseburger', calc, AI, image. Evidence: Curl POST, GET totalCost 34.205.
+
+
+Backend Endpoints:
+
+Add to routes.ts (full):
+textapp.get('/api/recipes', async (req, res) => res.json(await db.select().from(recipes)));
+app.post('/api/recipes', async (req, res) => {
+  const data = req.body;
+  const totalCost = data.ingredients.reduce((sum, ing) => sum + ing.cost, 0);
+  const costPerServing = totalCost / data.yieldQuantity;
+  const cogsPercent = 30;  // Target
+  const suggestedPrice = costPerServing / (1 - data.margin / 100);
+  const inserted = await db.insert(recipes).values({ ...data, totalCost, costPerServing, cogsPercent, suggestedPrice }).returning();
+  res.json(inserted[0]);
+});
+app.put('/api/recipes/:id', async (req, res) => {
+  const data = req.body;
+  // Recalc as in POST
+  await db.update(recipes).set(data).where(eq(recipes.id, req.params.id));
+  res.json({ ok: true });
+});
+app.delete('/api/recipes/:id', async (req, res) => {
+  await db.delete(recipes).where(eq(recipes.id, req.params.id));
+  res.json({ ok: true });
+});
+app.post('/api/recipes/upload-image', async (req, res) => {
+  // Multer + sharp resize 800x600, save to public/uploads
+  res.json({ imageUrl: '/uploads/' + req.file.filename });
+});
+app.post('/api/recipes/ramsay', async (req, res) => {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: 'You are Ramsay Gordon. Optimize: Price under THB 200, 100-word Grab desc (ingredients, allergens, unique), improvements (cost reduce, subs).' },
+      { role: 'user', content: JSON.stringify(req.body) },
+    ],
+  });
+  const aiOutput = response.choices[0].message.content;  // Parse to {desc, suggestions, price}
+  res.json(aiOutput);
+});
+app.get('/api/recipes/cross-ref-shift', async (req, res) => {
+  const { shiftId } = req.query;
+  const sales = await db.select().from(dailySalesV2).where(eq(id, shiftId));
+  const stock = await db.select().from(stockLodgment).where(gt(date, sales[0].shiftDate));
+  const used = {};  // Calc from recipes * sold items
+  // Example: if sales.burgersSold, used.beef = burgersSold * 95
+  const variance = { beef: used.beef - stock.beefQty };
+  res.json(variance);
+});
+
+Test: Curl POST sample, GET. Evidence: Length 1, totalCost 34.305.
+
+
+Merge & Clean Duplicates:
+
+Open App.tsx: Remove duplicate CostCalculator; route /menu/cost-calculator → /menu/recipes.
+Sidebar: Merge Menu Manager/Import under /menu/recipes.
+Test: Navigate — unified page. Evidence: Load /menu/recipes 200, no duplicates in sidebar.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Copy-paste to Replit agent. Tests ensure market-leading (calc, AI, cross-ref). Test 'Cheeseburger', share report. Proactive: Added QR gen in PDF for kitchen (qrcode lib).

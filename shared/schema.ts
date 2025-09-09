@@ -482,6 +482,9 @@ export const recipes = pgTable("recipes", {
     sodium?: number;
   }>().default('{}'), // {calories: 500, protein: 25}
   
+  // Target margin for pricing calculations
+  margin: decimal("margin", { precision: 5, scale: 2 }).default('30'), // Target margin %
+  
   // Legacy compatibility fields
   totalIngredientCost: decimal("total_ingredient_cost", { precision: 10, scale: 2 }),
   costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }),
