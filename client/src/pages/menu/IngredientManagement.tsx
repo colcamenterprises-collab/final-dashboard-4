@@ -28,7 +28,7 @@ type Ingredient = {
 
 const THB = (n: number) => new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
 
-const categories = ["All", "Drinks", "Fresh Food", "Frozen Food", "Kitchen Supplies", "Packaging", "Shelf Items", "Meat"];
+const categories = ["All", "Meat", "Drinks", "Fresh Food", "Frozen Food", "Kitchen Supplies", "Packaging", "Shelf Items"];
 
 export default function IngredientManagement() {
   const { toast } = useToast();
