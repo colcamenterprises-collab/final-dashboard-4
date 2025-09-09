@@ -438,7 +438,7 @@ export const ingredients = pgTable("ingredients", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Recipes table - Enhanced comprehensive recipe management
+// Recipes table - Market-leading comprehensive recipe management
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(), // Recipe title (e.g., "Smash Burger", "BBQ Sauce")
