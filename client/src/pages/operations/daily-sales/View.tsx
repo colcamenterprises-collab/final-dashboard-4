@@ -192,15 +192,33 @@ export default function ViewDailySales() {
               </div>
 
               <div className="mt-4">
-                <div className="font-semibold">Shopping List</div>
+                <div className="font-semibold">Shopping List / Requisition</div>
                 {(() => {
-                  const list = fromRow(salesData, "shoppingList", fromRow(salesData, "shopping", [])) as Array<{ sku?: string; qty?: number }>;
+                  // Try both old and new format requisition data
+                  const oldList = fromRow(salesData, "shoppingList", fromRow(salesData, "shopping", [])) as Array<{ sku?: string; qty?: number }>;
+                  const newList = fromRow(salesData, "requisition", []) as Array<{ name?: string; qty?: number; unit?: string; category?: string }>;
+                  
+                  // Use new format if available, fall back to old format
+                  const list = Array.isArray(newList) && newList.length > 0 ? newList : oldList;
+                  
                   if (!Array.isArray(list) || list.length === 0) return <div className="text-sm text-gray-500">No items</div>;
+                  
+                  // Check if it's new format (has name property) or old format (has sku property)
+                  const isNewFormat = list.length > 0 && 'name' in (list[0] || {});
+                  
                   return (
-                    <ul className="list-disc pl-5 text-sm">
+                    <ul className="list-disc pl-5 text-sm space-y-1">
                       {list.map((it, idx) => (
-                        <li key={idx}>
-                          {(it?.sku ?? "Item")} — {it?.qty ?? 0}
+                        <li key={idx} className="flex justify-between items-center">
+                          <div>
+                            {isNewFormat 
+                              ? `${(it as any)?.name ?? "Item"} (${(it as any)?.category ?? ""})`
+                              : (it as any)?.sku ?? "Item"
+                            }
+                          </div>
+                          <div className="font-medium">
+                            {(it as any)?.qty ?? 0} {isNewFormat ? ((it as any)?.unit ?? "") : ""}
+                          </div>
                         </li>
                       ))}
                     </ul>
