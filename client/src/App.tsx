@@ -101,8 +101,8 @@ export default function App() {
                   <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
                   <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                   <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
-                  <Route path="/menu/recipes" element={<Guard><RecipesUnified /></Guard>} />
-                  <Route path="/menu/ingredient-management" element={<Guard><IngredientManagement /></Guard>} />
+                  <Route path={ROUTES.RECIPES} element={<Guard><RecipesUnified /></Guard>} />
+                  <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
 
                   {/* Managers */}
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
