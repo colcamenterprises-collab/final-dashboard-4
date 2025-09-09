@@ -42,11 +42,18 @@ export default function IngredientManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Data queries - Direct from foodCostings.ts god file
-  const { data: ingredients = [], isLoading, refetch } = useQuery({
+  const { data: ingredients = [], isLoading, refetch, error } = useQuery({
     queryKey: ['ingredients-god-file'],
     queryFn: async () => {
+      console.log('Fetching from god file endpoint...');
       const response = await fetch('/api/ingredients/god-file');
+      if (!response.ok) {
+        throw new Error('Failed to fetch god file data');
+      }
       const data = await response.json();
+      console.log('God file data received:', data.total, 'items');
+      console.log('First item:', data.list?.[0]);
+      
       return (data.list || []).map((x: any) => ({
         id: x.id,
         name: x.item || x.name,
@@ -63,6 +70,13 @@ export default function IngredientManagement() {
       }));
     }
   });
+
+  console.log('Ingredients loaded:', ingredients.length);
+  console.log('Loading state:', isLoading);
+  console.log('Error state:', error);
+  if (ingredients.length > 0) {
+    console.log('First ingredient:', ingredients[0]);
+  }
 
   // Mutations
   const syncMutation = useMutation({
@@ -138,7 +152,15 @@ export default function IngredientManagement() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading ingredients...</div>
+        <div className="text-lg">Loading foodCostings.ts data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">Error loading god file: {error.message}</div>
       </div>
     );
   }
@@ -173,7 +195,7 @@ export default function IngredientManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.godItems}</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.total}</div>
             <div className="text-sm text-gray-600">God File Items</div>
           </CardContent>
         </Card>
