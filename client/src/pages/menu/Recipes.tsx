@@ -68,10 +68,36 @@ const UNIT_CONVERSIONS: Record<UnitType, { toBase: number; baseUnit: string }> =
 
 const UNIT_OPTIONS: UnitType[] = ["g", "kg", "ml", "litre", "cup", "tbsp", "tsp", "pcs", "oz", "lb", "each"];
 
+function normalizeUnit(unit: string | null | undefined): string {
+  if (!unit) return "g";
+  const u = unit.toLowerCase().trim();
+  
+  // Normalize common variations
+  if (u.includes("kg") || u === "kg") return "kg";
+  if (u.includes("gram") || u === "g") return "g"; 
+  if (u.includes("ml") || u === "ml") return "ml";
+  if (u.includes("litre") || u.includes("liter") || u === "l") return "litre";
+  if (u.includes("piece") || u.includes("pcs") || u === "pc") return "pcs";
+  if (u.includes("each") || u === "each") return "each";
+  if (u.includes("cup")) return "cup";
+  if (u.includes("tbsp") || u.includes("tablespoon")) return "tbsp";
+  if (u.includes("tsp") || u.includes("teaspoon")) return "tsp";
+  if (u.includes("oz") || u.includes("ounce")) return "oz";
+  if (u.includes("lb") || u.includes("pound")) return "lb";
+  
+  // Default fallback for unknown units
+  return "g";
+}
+
 function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
   const fromConv = UNIT_CONVERSIONS[fromUnit];
   const toConv = UNIT_CONVERSIONS[toUnit];
-  if (fromConv.baseUnit !== toConv.baseUnit) return fromQty;
+  
+  // Safety check: if conversion data is missing, return original quantity
+  if (!fromConv || !toConv || fromConv.baseUnit !== toConv.baseUnit) {
+    return fromQty;
+  }
+  
   const baseQty = fromQty * fromConv.toBase;
   return baseQty / toConv.toBase;
 }
@@ -114,7 +140,7 @@ export default function RecipesUnified() {
       return (data.list || []).map((x: any) => ({
         id: x.id, // Already clean ID from API
         name: x.name, // Direct from foodCostings.ts
-        unit: (x.unit?.toLowerCase() === "each" ? "each" : x.unit || "g") as UnitType,
+        unit: normalizeUnit(x.unit) as UnitType,
         packageSize: x.portions || 1, // Use portions for calculation
         packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
         supplier: x.supplier || "",
