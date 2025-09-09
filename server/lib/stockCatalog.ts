@@ -49,16 +49,16 @@ function excludeFirstFourMeat(rows: any[]) {
   });
 }
 
-export function loadCatalogFromCSV(): CatalogRow[] {
-  return loadCatalogFromTypeScript();
+export function loadCatalogFromCSV(includeAllMeats = false): CatalogRow[] {
+  return loadCatalogFromTypeScript(includeAllMeats);
 }
 
-function loadCatalogFromTypeScript(): CatalogRow[] {
+function loadCatalogFromTypeScript(includeAllMeats = false): CatalogRow[] {
   try {
-    console.log("[stockCatalog] Loading from TypeScript data");
+    console.log(`[stockCatalog] Loading from TypeScript data${includeAllMeats ? ' (including all meats)' : ''}`);
     
-    // Apply business rule: exclude first 4 meat items
-    const filteredRows = excludeFirstFourMeat(foodCostings);
+    // Apply business rule: exclude first 4 meat items (unless includeAllMeats is true)
+    const filteredRows = includeAllMeats ? foodCostings : excludeFirstFourMeat(foodCostings);
 
     const items: CatalogRow[] = filteredRows.map((row: any) => {
       const item = (row.item || "").toString().trim();

@@ -127,7 +127,8 @@ costingRouter.post("/ingredients/import", async (req, res) => {
 // /api/costing/ingredients - TypeScript-driven ingredient data with proper format
 costingRouter.get("/ingredients", async (req: Request, res: Response) => {
   try {
-    const catalogItems = loadCatalogFromCSV();
+    // For recipe management, we need ALL ingredients including the first 4 meat cuts
+    const catalogItems = loadCatalogFromCSV(true); // Pass true to include ALL items
     
     // Transform catalog items to match frontend expectations
     const ingredients = catalogItems.map(item => ({
