@@ -1982,6 +1982,43 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Get single ingredient by ID
+  app.get("/api/ingredients/:id", async (req: Request, res: Response) => {
+    try {
+      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
+      const catalogItems = loadCatalogFromCSV();
+      
+      const item = catalogItems.find(item => item.id === req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: 'Ingredient not found' });
+      }
+      
+      const raw = item.raw || {};
+      const ingredient = {
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        supplier: raw['Supplier'] || 'N/A',
+        brand: raw['Brand'] || null,
+        packagingQty: raw['Packaging Qty'] || null,
+        cost: raw['Cost'] || null,
+        averageMenuPortion: raw['Average Menu Portion'] || null,
+        lastReviewDate: raw['Last Review Date'] || null,
+        unit: 'each',
+        unitPrice: raw['Cost']?.replace('฿', '').replace(',', '') || '0',
+        packageSize: raw['Packaging Qty'] || null,
+        portionSize: raw['Average Menu Portion'] || null,
+        lastReview: raw['Last Review Date'] || null,
+        notes: null
+      };
+      
+      res.json(ingredient);
+    } catch (error) {
+      console.error("Error fetching ingredient:", error);
+      res.status(500).json({ error: "Failed to fetch ingredient" });
+    }
+  });
+
   // Print ingredients endpoint
   app.get("/api/ingredients/print", async (req: Request, res: Response) => {
     try {

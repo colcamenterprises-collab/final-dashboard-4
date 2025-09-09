@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Printer, Plus, Edit2, Trash2, Search } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function Ingredients() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const addForm = useForm<AddIngredientForm>({
     resolver: zodResolver(addIngredientSchema),
@@ -283,6 +285,7 @@ export default function Ingredients() {
                           variant="ghost"
                           size="sm"
                           title="Edit ingredient"
+                          onClick={() => navigate(`/menu/ingredients/edit/${ingredient.id}`)}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>

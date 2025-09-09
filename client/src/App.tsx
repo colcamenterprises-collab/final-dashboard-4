@@ -24,6 +24,7 @@ import Expenses from "./pages/Expenses";
 import MenuManager from "./pages/menu/MenuManager";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
+import IngredientEdit from "./pages/menu/IngredientEdit";
 import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
@@ -94,6 +95,7 @@ export default function App() {
                   {/* Menu Mgmt */}
                   <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
                   <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
+                  <Route path="/menu/ingredients/edit/:id" element={<Guard><IngredientEdit /></Guard>} />
                   <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
                   <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                   <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
