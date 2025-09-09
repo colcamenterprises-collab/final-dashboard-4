@@ -1982,44 +1982,86 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get single ingredient by ID
-  app.get("/api/ingredients/:id", async (req: Request, res: Response) => {
+  // Print ingredients endpoint (MUST come before /:id route)
+  app.get("/api/ingredients/print", async (req: Request, res: Response) => {
     try {
       const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
       const catalogItems = loadCatalogFromCSV();
       
-      const item = catalogItems.find(item => item.id === req.params.id);
-      if (!item) {
-        return res.status(404).json({ error: 'Ingredient not found' });
-      }
-      
-      const raw = item.raw || {};
-      const ingredient = {
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        supplier: raw['Supplier'] || 'N/A',
-        brand: raw['Brand'] || null,
-        packagingQty: raw['Packaging Qty'] || null,
-        cost: raw['Cost'] || null,
-        averageMenuPortion: raw['Average Menu Portion'] || null,
-        lastReviewDate: raw['Last Review Date'] || null,
-        unit: 'each',
-        unitPrice: raw['Cost']?.replace('฿', '').replace(',', '') || '0',
-        packageSize: raw['Packaging Qty'] || null,
-        portionSize: raw['Average Menu Portion'] || null,
-        lastReview: raw['Last Review Date'] || null,
-        notes: null
-      };
-      
-      res.json(ingredient);
+      const printableData = catalogItems.map(item => {
+        const raw = item.raw || {};
+        return {
+          name: item.name || 'N/A',
+          category: item.category || 'N/A',
+          supplier: raw['Supplier'] || 'N/A',
+          brand: raw['Brand'] || 'N/A',
+          packagingQty: raw['Packaging Qty'] || 'N/A',
+          cost: raw['Cost'] || 'N/A',
+          averageMenuPortion: raw['Average Menu Portion'] || 'N/A',
+          lastReviewDate: raw['Last Review Date'] || 'N/A'
+        };
+      });
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Ingredient List - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .print-date { text-align: center; color: #666; margin-bottom: 20px; }
+            @media print { body { margin: 10px; } }
+          </style>
+        </head>
+        <body>
+          <h1>Ingredient Management List</h1>
+          <div class="print-date">Generated on: ${new Date().toLocaleString()}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Supplier</th>
+                <th>Brand</th>
+                <th>Packaging Qty</th>
+                <th>Cost</th>
+                <th>Average Menu Portion</th>
+                <th>Last Review Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${printableData.map(item => `
+                <tr>
+                  <td>${item.name}</td>
+                  <td>${item.category}</td>
+                  <td>${item.supplier}</td>
+                  <td>${item.brand}</td>
+                  <td>${item.packagingQty}</td>
+                  <td>${item.cost}</td>
+                  <td>${item.averageMenuPortion}</td>
+                  <td>${item.lastReviewDate}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
     } catch (error) {
-      console.error("Error fetching ingredient:", error);
-      res.status(500).json({ error: "Failed to fetch ingredient" });
+      console.error("Error generating print view:", error);
+      res.status(500).json({ error: "Failed to generate print view" });
     }
   });
 
-  // Print ingredients endpoint
+  // Get single ingredient by ID
   app.get("/api/ingredients/print", async (req: Request, res: Response) => {
     try {
       const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
