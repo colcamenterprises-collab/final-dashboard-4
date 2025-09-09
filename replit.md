@@ -4,6 +4,7 @@
 This comprehensive restaurant management dashboard streamlines operations with AI-powered analytics and real-time insights. It integrates with external POS systems, AI services, and provides automated sales analysis, inventory management, and marketing. The business vision is to enhance operational efficiency and profitability for restaurants by providing a centralized system for data-driven decision making.
 
 ## Recent Changes (September 2025)
+- **TypeScript Ingredient System**: Migrated from CSV to TypeScript data format with enhanced fields (brand, packageSize, portionSize, lastReview). Database sync endpoint created for seamless updates. 66 ingredients now available (upgraded from 59).
 - **Balanced Badge System**: Added visual balance indicators (green/red badges) to Library table and email templates for instant cash reconciliation status visibility
 - **Daily Sales V2 Enhancements**: Implemented proper UUID generation, banking calculations with ±30 THB tolerance, and "Other Sales" terminology update (renamed from "Aroi Dee Sales")  
 - **Mobile & Tablet Optimization**: Completed comprehensive responsive testing with enhanced touch interactions, auto-calculations, and navigation behavior across all devices
@@ -22,7 +23,7 @@ Testing requirement: All enhancements must at all times be tested prior to advis
 Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Always use authentic data from the database or authorized sources. Creating fake data for testing or demonstrations is strictly prohibited.
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
 Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Other Sales field (renamed from Aroi Dee Sales), implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
-Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and Food Costings - Supplier - Portions - Prices v1.0 05.08.25.csv (source of truth for all menu and stock items). CSV file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
+Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and server/data/foodCostings.ts (TypeScript source of truth for all menu and stock items, replacing CSV). TypeScript file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
 Layout Protection: Clean app shell architecture (App.tsx + Sidebar.tsx) with automated prebuild validation preventing margin-left hacks. Layout uses proper flex-1 min-w-0 structure with 256px → 78px collapsible sidebar.
 Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashboard, Operations, Finance, Menu Management, Marketing) featuring emerald pill active states, monochrome SVG icons, and smooth expand/collapse animations with chevron indicators.
 
@@ -53,7 +54,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Sales Heatmap**: Visual analytics for hourly sales patterns.
 - **Email Notifications**: Automated daily management reports.
 - **Form Management**: Soft delete, archived view, and robust validation.
-- **Database-Driven Ingredient System**: Dynamic ingredient management based on CSV sync.
+- **Database-Driven Ingredient System**: Dynamic ingredient management based on TypeScript data sync with enhanced fields and database integration.
 - **Comprehensive Daily Forms System**: Dual-form system (/daily-sales, /daily-stock) with draft/submit status.
 - **POS Ingestion & Analytics System**: Backend modules for POS data ingestion, normalization, analytics (sales, top sellers, stock variance), AI summaries, and scheduled tasks.
 - **Production-Grade Security**: Multi-layer security with HTTP method blocking, ORM write protection, database-level constraints, read-only database user, security middleware, and safety script detection.

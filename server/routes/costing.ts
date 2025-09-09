@@ -35,6 +35,46 @@ function pick(obj: any, keys: string[]) {
  *
  * Body: { csv: "raw text" }
  */
+// Sync TypeScript data to database - replaces CSV import
+costingRouter.post("/ingredients/sync", async (req, res) => {
+  try {
+    console.log("[ingredients/sync] Starting sync process...");
+    const catalogItems = loadCatalogFromCSV(); // This now loads from TypeScript
+    let imported = 0;
+    let updated = 0;
+
+    for (const item of catalogItems) {
+      const unitCost = cleanMoney(item.raw?.cost);
+      const supplier = item.raw?.supplier || null;
+      const unit = item.raw?.averageMenuPortion || "each";
+
+      // First check if item exists
+      const existing = await prisma.ingredientV2.findUnique({
+        where: { name: item.name }
+      });
+
+      await prisma.ingredientV2.upsert({
+        where: { name: item.name },
+        update: { unit, unitCost, supplier },
+        create: { name: item.name, unit, unitCost, supplier },
+      });
+      
+      if (existing) {
+        updated++;
+      } else {
+        imported++;
+      }
+    }
+
+    console.log(`[ingredients/sync] Synced ${catalogItems.length} items: ${imported} new, ${updated} updated`);
+    return res.json({ ok: true, total: catalogItems.length, imported, updated });
+  } catch (err: any) {
+    console.error("[ingredients/sync] failed:", err);
+    return res.status(500).json({ ok: false, error: "Sync failed", details: err.message });
+  }
+});
+
+// Legacy CSV import (deprecated in favor of TypeScript sync)
 costingRouter.post("/ingredients/import", async (req, res) => {
   try {
     const csv = req.body?.csv as string;
@@ -84,7 +124,7 @@ costingRouter.post("/ingredients/import", async (req, res) => {
   }
 });
 
-// /api/costing/ingredients - CSV-driven ingredient data with proper format
+// /api/costing/ingredients - TypeScript-driven ingredient data with proper format
 costingRouter.get("/ingredients", async (req: Request, res: Response) => {
   try {
     const catalogItems = loadCatalogFromCSV();
