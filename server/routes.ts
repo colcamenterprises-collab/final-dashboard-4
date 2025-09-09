@@ -2637,22 +2637,61 @@ app.use("/api/bank-imports", bankUploadRouter);
   });
   
   // Shopping List API endpoints
-  app.get('/api/shopping-list/today', async (req: Request, res: Response) => {
+  app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // Allow date parameter, default to today
+      const requestedDate = req.params.date || new Date().toISOString().split('T')[0];
+      console.log('[Shopping List] Looking for records from date:', requestedDate);
       
       // Get actual requisition data from today's daily sales records - use the forms API directly
       const response = await fetch('http://localhost:5000/api/forms/daily-sales/v2');
       const data = await response.json();
       
       if (!data.ok || !data.records) {
+        console.log('[Shopping List] No records found in API response');
         return res.json({ ok: true, data: { items: [] } });
       }
       
-      const todayRecords = data.records.filter((record: any) => {
-        const recordDate = new Date(record.date).toISOString().split('T')[0];
-        return recordDate === today && record.payload?.requisition;
+      console.log('[Shopping List] Total records found:', data.records.length);
+      
+      // Check all records with requisition data regardless of date first
+      const recordsWithRequisition = data.records.filter((record: any) => {
+        return record.payload?.requisition && record.payload.requisition.length > 0;
       });
+      
+      console.log('[Shopping List] Records with requisition:', recordsWithRequisition.length);
+      recordsWithRequisition.forEach((record: any) => {
+        const recordDate = new Date(record.date).toISOString().split('T')[0];
+        console.log(`[Shopping List] Record ${record.id}: date=${recordDate}, requisition items=${record.payload.requisition.length}`);
+      });
+      
+      const dateRecords = data.records.filter((record: any) => {
+        const recordDate = new Date(record.date).toISOString().split('T')[0];
+        const hasRequisition = record.payload?.requisition && record.payload.requisition.length > 0;
+        console.log(`[Shopping List] Checking record ${record.id}: date=${recordDate}, requested=${requestedDate}, hasRequisition=${hasRequisition}`);
+        return recordDate === requestedDate && hasRequisition;
+      });
+      
+      console.log('[Shopping List] Requested date records with requisition:', dateRecords.length);
+      
+      // If no data for requested date, find the most recent date with requisition data
+      if (dateRecords.length === 0 && !req.params.date) {
+        console.log('[Shopping List] No data for today, finding most recent date with data');
+        const datesWithData = recordsWithRequisition.map(record => new Date(record.date).toISOString().split('T')[0])
+          .sort().reverse();
+        
+        if (datesWithData.length > 0) {
+          const mostRecentDate = datesWithData[0];
+          console.log('[Shopping List] Using most recent date:', mostRecentDate);
+          const recentRecords = data.records.filter((record: any) => {
+            const recordDate = new Date(record.date).toISOString().split('T')[0];
+            return recordDate === mostRecentDate && record.payload?.requisition && record.payload.requisition.length > 0;
+          });
+          
+          // Use recent records instead
+          dateRecords.push(...recentRecords);
+        }
+      }
       
       // Get ingredient cost data from CSV
       const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
@@ -2673,7 +2712,7 @@ app.use("/api/bank-imports", bankUploadRouter);
       
       // Aggregate actual requisition items with cost calculations
       const allItems: any[] = [];
-      todayRecords.forEach(record => {
+      dateRecords.forEach(record => {
         if (record.payload?.requisition) {
           record.payload.requisition.forEach((item: any) => {
             const ingredientKey = item.name.toLowerCase();

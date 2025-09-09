@@ -30,7 +30,7 @@ export default function ShoppingListPage() {
     setLoading(true);
     try {
       // Use the enhanced shopping list API that includes cost calculations
-      const res = await fetch(`/api/shopping-list/today`);
+      const res = await fetch(`/api/shopping-list/${d}`);
       const data = await res.json();
       
       if (data.ok && data.data?.items) {
