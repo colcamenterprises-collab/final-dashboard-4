@@ -89,6 +89,23 @@ function normalizeUnit(unit: string | null | undefined): string {
   return "g";
 }
 
+// Parse package size to numeric value for calculations
+function parsePackage(packageSize: string | number | null | undefined): number {
+  if (!packageSize) return 1;
+  const size = String(packageSize).toLowerCase();
+  
+  // Extract numeric value
+  const numMatch = size.match(/(\d+(?:\.\d+)?)/);
+  const num = numMatch ? parseFloat(numMatch[1]) : 1;
+  
+  if (size.includes('kg') || size.includes('per kg')) return 1000; // Convert to grams
+  if (size.includes('litre') || size.includes('liter') || size.includes('per litre')) return 1000; // Convert to ml
+  if (size.includes('can')) return num; // Return number of cans
+  if (size.includes('piece') || size.includes('each')) return num; // Return number of pieces
+  
+  return num; // Default return extracted number or 1
+}
+
 function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
   const fromConv = UNIT_CONVERSIONS[fromUnit];
   const toConv = UNIT_CONVERSIONS[toUnit];
@@ -188,15 +205,27 @@ export default function RecipesUnified() {
     }
   });
 
-  // ---- Calculator Logic ----
+  // ---- Calculator Logic ---- Fixed per Cam's specifications
   const linesWithCosts = useMemo(() => {
-    const yieldFactor = (100 - Math.max(0, Math.min(100, wastePct))) / 100;
+    const yieldEff = Math.max(0.01, (100 - Math.max(0, Math.min(100, wastePct))) / 100);
+    const waste = Math.max(0, Math.min(100, wastePct)) / 100;
+    
     return lines.map(l => {
-      const unitCost = num(l.unitCostTHB);
-      const cost = num(l.qty) * unitCost / Math.max(0.0001, yieldFactor);
+      const ingredient = ingredients.find(ing => ing.id === l.ingredientId);
+      if (!ingredient) return { ...l, costTHB: 0 };
+      
+      const packageNum = parsePackage(ingredient.packageSize);
+      const unitPrice = ingredient.packageCostTHB;
+      const portion = num(l.qty);
+      
+      // Formula: (portion / packageSizeNum * unitPrice) * (1 + waste) / yieldEff
+      const cost = (portion / packageNum * unitPrice) * (1 + waste) / yieldEff;
+      
+      console.log(`Calculated cost: ${cost.toFixed(3)} for ${portion}g of ${ingredient.name} at ${unitPrice}/kg (packageNum: ${packageNum})`);
+      
       return { ...l, costTHB: cost };
     });
-  }, [lines, wastePct]);
+  }, [lines, wastePct, ingredients]);
 
   const recipeCostTHB = useMemo(() => linesWithCosts.reduce((a, l) => a + l.costTHB, 0), [linesWithCosts]);
   const costPerPortionTHB = useMemo(() => recipeCostTHB / Math.max(1, portions), [recipeCostTHB, portions]);
@@ -206,7 +235,10 @@ export default function RecipesUnified() {
 
   // ---- Actions ----
   function addIngredient(ing: Ingredient) {
-    const unitCost = ing.packageCostTHB / Math.max(1, ing.packageSize);
+    // Updated to use proper package parsing for cost calculation
+    const packageNum = parsePackage(ing.packageSize);
+    const unitCost = ing.packageCostTHB / packageNum;
+    
     setLines(prev => [...prev, {
       ingredientId: ing.id,
       name: ing.name,

@@ -1,0 +1,61 @@
+27s🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for fixing calc endpoint if needed (e.g., add portion calc in /api/recipes/calc).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; no changes.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Use sample 'Topside Beef' (95g, 319 THB per kg = 30.305 THB).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: Cost 31,900; After: 30.305 - console log 'Calculated portion cost: 30.305 for 95g at 319/kg'".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Fix cost calculator portion calc: Use portion / packageSize * unitPrice (e.g., 95g / 1000g * 319 = 30.305 THB; assume per kg = 1000g, add unit conversion if needed).
+Proactive: Ensure calc handles all units (g/kg/each/Cans); add waste/yield to portion cost; display with 2 decimals.
+
+Step-by-Step Actions
+
+Fix Portion Calc in Frontend:
+
+Open client/src/pages/menu/Recipes.tsx or CostCalculator.tsx.
+Update calculate function: For each ing, cost = (portion / packageSizeNum * unitPrice) * (1 + waste) / yieldEff; packageSizeNum = parse (e.g., 'Per kg' = 1000, '6 Cans' = 6).
+textconst calculate = () => {
+  const { ingredients: ingList, waste, yieldEff, yieldQuantity } = form.getValues();
+  let total = 0;
+  ingList.forEach(ing => {
+    const i = ingredients.find(x => x.id === ing.id);
+    const packageNum = parsePackage(i.packageSize);  // Function: 'Per kg' => 1000, '6 Cans' => 6, '1 Litre' => 1000 (ml)
+    ing.cost = (ing.portion / packageNum * i.unitPrice) * (1 + waste) / yieldEff;
+    total += ing.cost;
+  });
+  const costPerServing = total / yieldQuantity;
+  form.setValue('totalCost', total.toFixed(2));
+  form.setValue('costPerServing', costPerServing.toFixed(2));
+  // COGS etc.
+};
+
+const parsePackage = (size) => {
+  if (size.includes('kg')) return 1000;  // g
+  if (size.includes('Litre')) return 1000;  // ml
+  if (size.includes('Cans')) return parseFloat(size);
+  return 1;  // each
+};
+
+Test: Add 'Topside Beef' 95g, calc 30.305. Evidence: Console 'Calculated cost: 30.305 for 95g at 319/kg'.
+
+
+Proactive Enhancements:
+
+Add unit select in form with conversion (e.g., kg input convert to g for calc).
+Test: 0.095kg = 95g, same cost. Evidence: Log 'Converted 0.095kg to 95g, cost 30.305'.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
