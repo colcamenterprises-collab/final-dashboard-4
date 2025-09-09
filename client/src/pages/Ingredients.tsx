@@ -145,14 +145,15 @@ export default function Ingredients() {
   };
 
   // Filter ingredients
-  const filteredIngredients = (ingredients || []).filter((ingredient: any) => {
+  const ingredientList = Array.isArray(ingredients) ? ingredients : [];
+  const filteredIngredients = ingredientList.filter((ingredient: any) => {
     const matchesSearch = ingredient.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          ingredient.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || ingredient.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = [...new Set((ingredients || []).map((ing: any) => ing.category).filter(Boolean))];
+  const categories = Array.from(new Set(ingredientList.map((ing: any) => ing.category).filter(Boolean)));
 
 
   return (
@@ -272,7 +273,7 @@ export default function Ingredients() {
                     <td className="py-3 px-4">{(ingredient as any).brand || '-'}</td>
                     <td className="py-3 px-4">{(ingredient as any).packagingQty || '-'}</td>
                     <td className="py-3 px-4 font-semibold text-green-600">
-                      {(ingredient as any).cost || formatPrice(ingredient.unitPrice)}
+                      {(ingredient as any).cost || formatPrice((ingredient as any).unitPrice ?? 0)}
                     </td>
                     <td className="py-3 px-4">{(ingredient as any).averageMenuPortion || '-'}</td>
                     <td className="py-3 px-4">{(ingredient as any).lastReviewDate || '-'}</td>
