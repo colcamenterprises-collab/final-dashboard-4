@@ -41,24 +41,25 @@ export default function IngredientManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Data queries
+  // Data queries - Direct from foodCostings.ts god file
   const { data: ingredients = [], isLoading, refetch } = useQuery({
-    queryKey: ['ingredients-enhanced'],
+    queryKey: ['ingredients-god-file'],
     queryFn: async () => {
-      const response = await fetch('/api/costing/ingredients');
+      const response = await fetch('/api/ingredients/god-file');
       const data = await response.json();
       return (data.list || []).map((x: any) => ({
         id: x.id,
-        name: x.name,
+        name: x.item || x.name,
         category: x.category,
         supplier: x.supplier,
         brand: x.brand || '',
-        cost: Number(x.cost || 0),
-        unit: x.unit || 'g',
-        packageSize: x.packageSize || '',
-        portionSize: x.portionSize || '',
-        lastReview: x.lastReview || '',
-        source: x.source || 'god' // Default assume from god file
+        cost: x.costNumber || Number(x.cost?.replace(/[^\d.]/g, '') || 0),
+        costDisplay: x.cost || '',
+        unit: 'various',
+        packageSize: x.packagingQty || '',
+        portionSize: x.averageMenuPortion || '',
+        lastReview: x.lastReviewDate || '',
+        source: 'god' // All from god file
       }));
     }
   });
@@ -298,7 +299,7 @@ export default function IngredientManagement() {
                     </TableCell>
                     <TableCell>{item.supplier}</TableCell>
                     <TableCell>{item.brand || "-"}</TableCell>
-                    <TableCell className="text-right font-mono">{THB(item.cost)}</TableCell>
+                    <TableCell className="text-right font-mono">{item.costDisplay || THB(item.cost)}</TableCell>
                     <TableCell className="text-sm">{item.packageSize || "-"}</TableCell>
                     <TableCell className="text-sm">{item.portionSize || "-"}</TableCell>
                     <TableCell>

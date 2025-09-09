@@ -117,15 +117,47 @@ router.post('/import', upload.single('csvFile'), async (req, res) => {
   }
 });
 
+// Direct god file endpoint - returns raw foodCostings.ts data
+router.get('/god-file', async (req, res) => {
+  try {
+    console.log('[/api/ingredients/god-file] Returning direct foodCostings.ts data');
+    
+    // Return raw foodCostings.ts data with proper field mapping
+    const directData = foodCostings.map((item, index) => ({
+      id: `god-${index}`,
+      item: item.item,
+      name: item.item, // Alias for compatibility
+      category: item.category,
+      supplier: item.supplier,
+      brand: item.brand,
+      packagingQty: item.packagingQty,
+      cost: item.cost,
+      costNumber: parseFloat(item.cost.replace(/[^\d.]/g, '') || '0'),
+      averageMenuPortion: item.averageMenuPortion,
+      lastReviewDate: item.lastReviewDate,
+      source: 'god'
+    }));
+    
+    res.json({ 
+      ok: true, 
+      list: directData,
+      total: directData.length,
+      message: "Direct data from foodCostings.ts god file"
+    });
+  } catch (error: any) {
+    console.error('[/api/ingredients/god-file] Error:', error);
+    res.status(500).json({ ok: false, error: error.message || 'Failed to load god file' });
+  }
+});
+
 // God file sync endpoint
 router.post('/sync-god', async (req, res) => {
   try {
     console.log('[/api/ingredients/sync-god] Manual sync from foodCostings.ts triggered');
     
-    // Mock sync result for now since DB table doesn't exist yet
     const godFileCount = foodCostings.length;
     
-    console.log(`[sync-god] ✅ God file has ${godFileCount} items, syncing to catalog loader`);
+    console.log(`[sync-god] ✅ God file has ${godFileCount} items available`);
     
     res.json({ 
       ok: true, 
