@@ -179,7 +179,7 @@ export default function RecipesUnified() {
         id: x.id, // Already clean ID from API
         name: x.name, // Direct from foodCostings.ts
         unit: normalizeUnit(x.unit) as UnitType,
-        packageSize: x.portions || 1, // Use portions for calculation
+        packageSize: x.packageSize || 1, // FIXED: Use correct packageSize field ("Per kg")
         packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
         supplier: x.supplier || "",
         category: x.category || "Other",
