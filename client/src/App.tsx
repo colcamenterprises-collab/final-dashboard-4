@@ -25,6 +25,7 @@ import MenuManager from "./pages/menu/MenuManager";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
 import IngredientEdit from "./pages/menu/IngredientEdit";
+import RecipesUnified from "./pages/menu/Recipes";
 import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
@@ -99,6 +100,7 @@ export default function App() {
                   <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
                   <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                   <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
+                  <Route path="/menu/recipes" element={<Guard><RecipesUnified /></Guard>} />
 
                   {/* Managers */}
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
