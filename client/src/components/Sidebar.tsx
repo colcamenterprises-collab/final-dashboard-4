@@ -30,8 +30,8 @@ const groups: Group[] = [
   {
     title: "Menu Mgmt",
     items: [
-      { to: "/menu/cost-calculator", label: "Cost Calculator" },
-      { to: "/menu/ingredients", label: "Ingredient Mgmt" },
+      { to: "/menu/recipes", label: "Recipe Management" },
+      { to: "/menu/ingredient-management", label: "Ingredient Mgmt" },
       { to: "/menu/manager", label: "Menu Manager" },
       { to: "/menu/import", label: "Menu Import" },
       { to: "/menu/description-tool", label: "Description Tool" },
