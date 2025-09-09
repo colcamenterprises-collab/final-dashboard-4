@@ -175,18 +175,21 @@ export default function RecipesUnified() {
       const response = await fetch('/api/costing/ingredients');
       const data = await response.json();
       // ✅ Using TypeScript foodCostings.ts data (66 enhanced ingredients)
-      return (data.list || []).map((x: any) => ({
-        id: x.id, // Already clean ID from API
-        name: x.name, // Direct from foodCostings.ts
-        unit: normalizeUnit(x.unit) as UnitType,
-        packageSize: x.packageSize || 1, // FIXED: Use correct packageSize field ("Per kg")
-        packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
-        supplier: x.supplier || "",
-        category: x.category || "Other",
-        brand: x.brand || "",
-        portionSize: x.portionSize || null,
-        lastReview: x.lastReview || null
-      }));
+      return (data.list || []).map((x: any) => {
+        console.log(`[Ingredient Debug] ${x.name}:`, JSON.stringify(x, null, 2));
+        return {
+          id: x.id, // Already clean ID from API
+          name: x.name, // Direct from foodCostings.ts
+          unit: normalizeUnit(x.unit) as UnitType,
+          packageSize: x.packageSize || 1, // FIXED: Use correct packageSize field ("Per kg")
+          packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
+          supplier: x.supplier || "",
+          category: x.category || "Other",
+          brand: x.brand || "",
+          portionSize: x.portionSize || null,
+          lastReview: x.lastReview || null
+        };
+      });
     }
   });
 
