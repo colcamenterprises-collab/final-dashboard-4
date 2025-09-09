@@ -1,0 +1,261 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., add missing columns to ingredients table, fix edit/print endpoints).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for 404s (e.g., edit route); add/fix as needed.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Use sample from CSV (e.g., edit 'Coke', unitCost 84, check NaN gone; submit test form with drinks requisition).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: NaN in unitCost; After: Shows 84 - SQL SELECT unitCost FROM ingredients WHERE name='Coke': 84; curl GET /api/ingredients: no NaN".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Fix Ingredient Management page (/menu/ingredients): Match columns to CSV (Item=name, Category, Supplier, Brand, Packaging Qty=packageSize, Cost=unitPrice, Average Menu Portion=portionSize, Last Review Date=lastReview); remove NaN (default 0 or null); keep upload CSV (process to update DB).
+Fix edit button 404: Add/edit route, pre-fill form.
+Fix print button: Show full ingredient data in printable page.
+Add drinks stock display in daily sales library view (Library.tsx).
+Fix test form requisition: Show items even if only rolls/meat/drinks (ensure requisition json includes them).
+Proactive: Add search/filter to table; auto-update lastReview on edit; test with full CSV seed.
+
+Step-by-Step Actions
+
+Fix Columns & NaN in Ingredients Page (Frontend/Backend):
+
+Open client/src/pages/menu/Ingredients.tsx.
+Update table columns: name, category, supplier, brand, packageSize, unitPrice, portionSize, lastReview, actions.
+textconst columns = [
+  { accessorKey: 'name', header: 'Item' },
+  { accessorKey: 'category', header: 'Category' },
+  { accessorKey: 'supplier', header: 'Supplier' },
+  { accessorKey: 'brand', header: 'Brand' },
+  { accessorKey: 'packageSize', header: 'Packaging Qty' },
+  { accessorKey: 'unitPrice', header: 'Cost' },
+  { accessorKey: 'portionSize', header: 'Average Menu Portion' },
+  { accessorKey: 'lastReview', header: 'Last Review Date' },
+  { id: 'actions', cell: ({ row }) => <div>Edit/Delete</div> },
+];
+
+Fix NaN: In display, {row.unitPrice ?? 0}; in form, default 0.
+Backend /api/ingredients: Select all fields; if missing in schema, add:
+textALTER TABLE ingredients ADD COLUMN brand text, ADD COLUMN portionSize text, ADD COLUMN lastReview text;
+
+Update seed script to include all CSV fields.
+Keep upload: Confirm  — process to /api/ingredients/import-csv, parse/update DB.
+Test: Load page — columns match, no NaN. Add 'Test', cost 100 — shows correct. Evidence: Curl GET /api/ingredients: all fields present, no null/NaN; SQL SELECT * FROM ingredients LIMIT 1.
+
+
+Fix Edit Button 404 (Frontend/Backend):
+
+Open Ingredients.tsx: Edit button navigate /menu/ingredients/edit/${id}.
+Add route in App.tsx:
+text<Route path="/menu/ingredients/edit/:id" element={<IngredientEdit />} />  // New component: Copy form, useQuery fetch by id, prefill
+
+Create IngredientEdit.tsx: useForm prefill with data.
+Backend: Ensure GET /api/ingredients/:id works.
+Test: Click edit — loads form prefilled, save updates. Evidence: Curl GET /api/ingredients/[id], before/after unitPrice change.
+
+
+Fix Print Button (Frontend/Backend):
+
+Open Ingredients.tsx: Print button window.open('/api/ingredients/print').
+Backend add GET /api/ingredients/print:
+textapp.get('/api/ingredients/print', async (req, res) => {
+  const data = await db.select().from(ingredients);
+  let html = '<html><body><h1>Ingredients Print</h1><table><tr><th>Item</th><th>Category</th>...</tr>';
+  data.forEach(d => html += `<tr><td>${d.name}</td><td>${d.category}</td>...</tr>`);
+  html += '</table><script>window.print();</script></body></html>';
+  res.send(html);
+});
+
+Test: Print shows all data in table. Evidence: Curl endpoint, grep for sample 'Coke' row.
+
+
+Add Drinks Stock Display in Library (Frontend):
+
+Open Library.tsx.
+Add section: 'Drinks End Count: [from data.drinksEnd or jsonb]'.
+If missing field, add to dailySalesV2: ALTER TABLE daily_sales_v2 ADD COLUMN drinksEnd jsonb; // {type: qty}
+Test: Submit with drinks → Library shows. Evidence: Curl /api/forms/daily-sales/v2/[id] includes drinksEnd.
+
+
+Fix Test Form Requisition Display (Frontend):
+
+Open Library.tsx: In requisition section, show rolls/meat/drinks even if only those (check if requisition json includes them; if not, pull from lodgment/stock).
+Test: Submit test form (rolls/meat/drinks only) → View shows in requisition. Evidence: Curl id, grep for rolls/meat/drinks in requisition.
+
+
+Report Back:
+
+List each fix with evidence.
+All changes verified with tests: Yes/No.🛑 Replit Agent Instructions
+
+
+
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., add drinksEnd to daily_sales_v2, update print endpoint).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for 404s (e.g., edit); fix/add as needed.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Use sample CSV row (e.g., 'Coke', category 'Drinks', supplier 'Makro', cost 84).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: NaN in cost; After: 84 - curl GET /api/ingredients: {unitCost: 84}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All fixes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Fix Ingredient Management page: Match columns to CSV (add/edit Brand, Packaging Qty, Cost=unitPrice, Average Menu Portion=portionSize, Last Review Date; remove NaN—default 0; keep upload).
+Fix edit 404: Add route/component, pre-fill form.
+Fix print: Show full data.
+Add drinks stock to daily sales library view.
+Fix test form requisition: Show rolls/meat/drinks if completed.
+Proactive: Add search/filter; update lastReview on edit; test sync.
+
+Step-by-Step Actions
+
+Fix Columns & NaN in Ingredients Page:
+
+Open Ingredients.tsx.
+Update table: Add brand, packageSize ('Packaging Qty'), portionSize ('Average Menu Portion'), lastReview ('Last Review Date').
+textcolumns = [
+  { accessorKey: 'name', header: 'Item' },
+  { accessorKey: 'category', header: 'Category' },
+  { accessorKey: 'supplier', header: 'Supplier' },
+  { accessorKey: 'brand', header: 'Brand' },
+  { accessorKey: 'packageSize', header: 'Packaging Qty' },
+  { accessorKey: 'unitPrice', header: 'Cost' },
+  { accessorKey: 'portionSize', header: 'Average Menu Portion' },
+  { accessorKey: 'lastReview', header: 'Last Review Date' },
+  { id: 'actions' },
+];
+
+Fix NaN: In cell {row.unitPrice ?? 0}; form defaultValue={0}.
+Backend /api/ingredients: Select all.
+If missing fields: ALTER TABLE ingredients ADD COLUMN brand text, ADD COLUMN packageSize text, ADD COLUMN portionSize text, ADD COLUMN lastReview text;
+Keep upload: Confirm file input → POST /api/ingredients/import-csv, parse/update.
+Test: Load — columns match, no NaN. Evidence: Curl GET /api/ingredients, grep for 'Coke' all fields; SQL SELECT * FROM ingredients LIMIT 1.
+
+
+Fix Edit Button 404:
+
+Open App.tsx: Add <Route path="/menu/ingredients/edit/:id" element={<ingredientedit>} />.</ingredientedit>
+Create IngredientEdit.tsx: Copy form, useQuery({ queryFn: () => axios.get(/api/ingredients/${id}) }), prefill useForm({ defaultValues: data }).
+Test: Click edit — loads prefilled, save updates. Evidence: Curl GET /api/ingredients/[id]; before/after change cost 84 to 85.
+
+
+Fix Print Button:
+
+Open Ingredients.tsx: Button window.open('/api/ingredients/print').
+Backend GET /api/ingredients/print: Select data, generate HTML table with all columns, <script>window.print()</script>.
+Test: Print shows full. Evidence: Curl endpoint, grep for 'Coke' row.
+
+
+Add Drinks Stock to Library View:
+
+Open Library.tsx.
+Add 'Drinks End Count: [data.drinksEnd or json]'.
+If missing, ALTER TABLE daily_sales_v2 ADD COLUMN drinksEnd jsonb;
+Test: Submit with drinks → Shows. Evidence: Curl id, grep drinksEnd.
+
+
+Fix Test Form Requisition Display:
+
+Open Library.tsx: In requisition, check if rolls/meat/drinks in json; display even if only those.
+Test: Submit rolls/meat/drinks only → Shows. Evidence: Curl id, grep requisition includes them.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.🛑 Replit Agent Instructions
+
+
+
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., add drinksEnd to daily_sales_v2, update print endpoint).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for 404s (e.g., edit); fix/add as needed.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Use sample CSV row (e.g., 'Coke', category 'Drinks', supplier 'Makro', cost 84).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: NaN in cost; After: 84 - curl GET /api/ingredients: {unitCost: 84}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All fixes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Fix Ingredient Management page: Match columns to CSV (add/edit Brand, Packaging Qty, Cost=unitPrice, Average Menu Portion=portionSize, Last Review Date; remove NaN—default 0; keep upload).
+Fix edit 404: Add route/component, pre-fill form.
+Fix print: Show full data.
+Add drinks stock to daily sales library view.
+Fix test form requisition: Show rolls/meat/drinks if completed.
+Proactive: Add search/filter; update lastReview on edit; test sync.
+
+Step-by-Step Actions
+
+Fix Columns & NaN in Ingredients Page:
+
+Open Ingredients.tsx.
+Update table: Add brand, packageSize ('Packaging Qty'), portionSize ('Average Menu Portion'), lastReview ('Last Review Date').
+textcolumns = [
+  { accessorKey: 'name', header: 'Item' },
+  { accessorKey: 'category', header: 'Category' },
+  { accessorKey: 'supplier', header: 'Supplier' },
+  { accessorKey: 'brand', header: 'Brand' },
+  { accessorKey: 'packageSize', header: 'Packaging Qty' },
+  { accessorKey: 'unitPrice', header: 'Cost' },
+  { accessorKey: 'portionSize', header: 'Average Menu Portion' },
+  { accessorKey: 'lastReview', header: 'Last Review Date' },
+  { id: 'actions' },
+];
+
+Fix NaN: In cell {row.unitPrice ?? 0}; form defaultValue={0}.
+Backend /api/ingredients: Select all.
+If missing fields: ALTER TABLE ingredients ADD COLUMN brand text, ADD COLUMN packageSize text, ADD COLUMN portionSize text, ADD COLUMN lastReview text;
+Keep upload: Confirm file input → POST /api/ingredients/import-csv, parse/update.
+Test: Load — columns match, no NaN. Evidence: Curl GET /api/ingredients, grep for 'Coke' all fields; SQL SELECT * FROM ingredients LIMIT 1.
+
+
+Fix Edit Button 404:
+
+Open App.tsx: Add <Route path="/menu/ingredients/edit/:id" element={<ingredientedit>} />.</ingredientedit>
+Create IngredientEdit.tsx: Copy form, useQuery({ queryFn: () => axios.get(/api/ingredients/${id}) }), prefill useForm({ defaultValues: data }).
+Test: Click edit — loads prefilled, save updates. Evidence: Curl GET /api/ingredients/[id]; before/after change cost 84 to 85.
+
+
+Fix Print Button:
+
+Open Ingredients.tsx: Button window.open('/api/ingredients/print').
+Backend GET /api/ingredients/print: Select data, generate HTML table with all columns, <script>window.print();</script>.
+Test: Print shows full. Evidence: Curl endpoint, grep for 'Coke' row.
+
+
+Add Drinks Stock to Library View:
+
+Open Library.tsx.
+Add 'Drinks End Count: [data.drinksEnd or json]'.
+If missing, ALTER TABLE daily_sales_v2 ADD COLUMN drinksEnd jsonb;
+Test: Submit with drinks → Shows. Evidence: Curl id, grep drinksEnd.
+
+
+Fix Test Form Requisition Display:
+
+Open Library.tsx: In requisition, check if rolls/meat/drinks in json; display even if only those.
+Test: Submit rolls/meat/drinks only → Shows. Evidence: Curl id, grep requisition includes them.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
