@@ -94,10 +94,14 @@ costingRouter.get("/ingredients", async (req: Request, res: Response) => {
       id: item.id,
       name: item.name,
       category: item.category,
-      unit: item.raw?.["Unit Measurement"] || "each",
-      cost: parseFloat(item.raw?.["Cost"]?.replace(/[฿,]/g, '') || "0") || 0,
-      supplier: item.raw?.["Supplier"] || "Unknown",
-      portions: parseInt(item.raw?.["Portion Size"]?.replace(/[^\d]/g, '') || "1") || 1
+      unit: item.raw?.averageMenuPortion || "each",
+      cost: parseFloat(item.raw?.cost?.replace(/[฿,]/g, '') || "0") || 0,
+      supplier: item.raw?.supplier || "Unknown",
+      brand: item.raw?.brand || "",
+      packageSize: item.raw?.packagingQty || "",
+      portionSize: item.raw?.averageMenuPortion || "",
+      lastReview: item.raw?.lastReviewDate || "",
+      portions: 1  // Default portions for compatibility
     }));
 
     console.log(`[costing/ingredients] Returning ${ingredients.length} ingredients across categories:`,

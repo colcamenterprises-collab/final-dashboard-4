@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
+import { foodCostings } from "../data/foodCostings";
 
 export type CatalogRow = {
   id: string;           // slug of Item
@@ -39,7 +40,7 @@ function excludeFirstFourMeat(rows: any[]) {
   // We exclude the first 4 distinct items where Category looks like Meat.
   let excluded = 0;
   return rows.filter(r => {
-    const cat = (r["Category"] ?? r["Internal Category"] ?? r["category"] ?? r["internal category"] ?? "").toString();
+    const cat = (r["Category"] ?? r["Internal Category"] ?? r["category"] ?? r["internal category"] ?? r.category ?? "").toString();
     if (excluded < 4 && /meat/i.test(cat)) {
       excluded++;
       return false;
@@ -49,63 +50,30 @@ function excludeFirstFourMeat(rows: any[]) {
 }
 
 export function loadCatalogFromCSV(): CatalogRow[] {
+  return loadCatalogFromTypeScript();
+}
+
+function loadCatalogFromTypeScript(): CatalogRow[] {
   try {
-    const csvPath = path.join(process.cwd(), "attached_assets", "Food Costings - v2.2 08.09.25_1757351375321.csv");
+    console.log("[stockCatalog] Loading from TypeScript data");
     
-    if (!fs.existsSync(csvPath)) {
-      console.warn("[stockCatalog] CSV file not found, using fallback test data");
-      return getFallbackData();
-    }
-
-    const stat = fs.statSync(csvPath);
-    
-    // Use cache if file hasn't changed
-    if (CACHE && CACHE.mtime >= stat.mtimeMs) {
-      console.log("[stockCatalog] Using cached data");
-      return CACHE.items;
-    }
-
-    console.log("[stockCatalog] Loading from CSV:", csvPath);
-    const csvContent = fs.readFileSync(csvPath, "utf8");
-    
-    const records = parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true
-    });
-
-    // Debug: log the first record and its columns
-    if (records.length > 0) {
-      console.log("[stockCatalog] First record columns:", Object.keys(records[0]));
-      console.log("[stockCatalog] First record sample:", records[0]);
-    }
-
-    // Filter out rows with missing Item names and header repeats
-    const cleanRows = records.filter((row: any) => {
-      const item = (row["Item"] || "").toString().trim();
-      if (!item || item.toLowerCase() === "item") return false;
-      if (isHeaderRepeat(row)) return false;
-      return true;
-    });
-
     // Apply business rule: exclude first 4 meat items
-    const filteredRows = excludeFirstFourMeat(cleanRows);
+    const filteredRows = excludeFirstFourMeat(foodCostings);
 
     const items: CatalogRow[] = filteredRows.map((row: any) => {
-      const item = (row["Item"] || "").toString().trim();
-      const category = (row["Category"] || row["Internal Category"] || "").toString().trim();
+      const item = (row.item || "").toString().trim();
+      const category = (row.category || "").toString().trim();
       
       return {
         id: slugify(item),
         name: item,
         category: category,
         type: detectIsDrink(category) ? "drink" : "item",
-        raw: row
+        raw: row  // Pass the entire row instead of restructuring it
       };
     });
 
-    CACHE = { items, mtime: stat.mtimeMs };
-    console.log(`[stockCatalog] Loaded ${items.length} items from CSV`);
+    console.log(`[stockCatalog] Loaded ${items.length} items from TypeScript`);
     
     // Log category summary
     const categoryCount = items.reduce((acc, item) => {
@@ -117,7 +85,7 @@ export function loadCatalogFromCSV(): CatalogRow[] {
     
     return items;
   } catch (error) {
-    console.error("[stockCatalog] Error loading CSV:", error);
+    console.error("[stockCatalog] Error loading TypeScript data:", error);
     return getFallbackData();
   }
 }
