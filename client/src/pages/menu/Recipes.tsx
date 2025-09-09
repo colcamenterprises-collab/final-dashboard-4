@@ -89,20 +89,41 @@ function normalizeUnit(unit: string | null | undefined): string {
   return "g";
 }
 
-// Parse package size to numeric value for calculations
+// Parse package size to numeric value for calculations - Fixed for Cam's specifications
 function parsePackage(packageSize: string | number | null | undefined): number {
   if (!packageSize) return 1;
   const size = String(packageSize).toLowerCase();
+  
+  console.log(`[parsePackage] Input: "${packageSize}" -> Lowercase: "${size}"`);
   
   // Extract numeric value
   const numMatch = size.match(/(\d+(?:\.\d+)?)/);
   const num = numMatch ? parseFloat(numMatch[1]) : 1;
   
-  if (size.includes('kg') || size.includes('per kg')) return 1000; // Convert to grams
-  if (size.includes('litre') || size.includes('liter') || size.includes('per litre')) return 1000; // Convert to ml
-  if (size.includes('can')) return num; // Return number of cans
-  if (size.includes('piece') || size.includes('each')) return num; // Return number of pieces
+  // Handle kg conversions (Per kg, 1 kg, etc.)
+  if (size.includes('kg')) {
+    console.log(`[parsePackage] Found 'kg', returning 1000 (convert to grams)`);
+    return 1000; // Convert to grams  
+  }
   
+  // Handle litre conversions  
+  if (size.includes('litre') || size.includes('liter')) {
+    console.log(`[parsePackage] Found 'litre', returning 1000 (convert to ml)`);
+    return 1000; // Convert to ml
+  }
+  
+  // Handle countable items
+  if (size.includes('can')) {
+    console.log(`[parsePackage] Found 'can', returning ${num}`);
+    return num; // Return number of cans
+  }
+  
+  if (size.includes('piece') || size.includes('each')) {
+    console.log(`[parsePackage] Found 'piece/each', returning ${num}`);
+    return num; // Return number of pieces
+  }
+  
+  console.log(`[parsePackage] Default fallback, returning ${num}`);
   return num; // Default return extracted number or 1
 }
 
