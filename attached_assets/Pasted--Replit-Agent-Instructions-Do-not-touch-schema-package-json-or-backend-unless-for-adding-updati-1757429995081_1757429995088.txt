@@ -1,0 +1,158 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding/updating fields/endpoints explicitly needed (e.g., add 'imageUrl' to recipes; new endpoints for bulk download/cross-ref).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for /menu/recipes; add if missing (e.g., merge CostCalculator into Recipes.tsx).
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Use sample recipe (e.g., 'Cheeseburger': ingredients 'Burger Bun' 1 each cost 4 (80/20), 'Topside Beef' 95g cost 30.205 (319/1000*95), totalCost 34.205, COGS 34%, suggestedPrice 100).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: No recipes; After: Added 'Cheeseburger' - curl GET /api/recipes: {name: 'Cheeseburger', totalCost: 34.205}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+No Real-Time Sync: Exclude any real-time inventory; use daily lodgment/requisition for stock cross-ref (e.g., batch calc used ingredients vs stock at shift end).
+Source of Truth: Use items from uploaded .ts file (assume server/data/godItems.ts or similar; query DB from ingredients table, seeded from it).
+
+Task Overview
+
+Create unified /menu/recipes page (merge CostCalculator, Menu Import/Review into Recipes.tsx): Manual recipe CRUD, cost calc (raw vs final, ratios, COGS<35% alert, margin suggest), portion adjustments/conversions (g/kg/ml/L etc.), waste/yield (default 5%/90%), description gen (100 words, Grab-optimized), AI Ramsay Gordon for pricing/desc/suggestions, image upload (resize 800x600 for Grab).
+Summary cards: Grid view recipes (view/amend/edit/delete/download); bulk download (PDF/CSV all).
+Accuracy: Store in recipes table; cross-ref endpoint /api/recipes/cross-ref-shift: Calc used ingredients from sales receipts vs stock held (e.g., burgers sold * beef portion = used g vs lodgment added).
+Enhancements (from research—added without permission as they enhance/critical): Waste/yield calc, unit conversion lib, COGS/margin auto, nutritional/allergen tags (optional fields), bulk import CSV/JSON, print/export with QR for kitchen, SEO desc gen.
+Ramsay Gordon: AI for "Optimize price under THB 200", "100-word Grab desc (ingredients, allergens, unique)", "Improvements (cost reduce, subs)".
+
+Step-by-Step Actions
+
+Add/Update Recipes Table (Backend Allowed):
+
+Open shared/schema.ts.
+Add/merge:
+textexport const recipes = pgTable('recipes', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  description: text('description'),  // AI gen for Grab
+  yieldQuantity: decimal('yieldQuantity', { precision: 10, 2 }).notNull().default(1),  // servings
+  yieldUnit: text('yieldUnit').notNull().default('servings'),
+  ingredients: jsonb('ingredients').notNull().default('[]'),  // [{ingredientId, portion, unit, cost}]
+  totalCost: decimal('totalCost', { precision: 10, 2 }).notNull().default(0),
+  costPerServing: decimal('costPerServing', { precision: 10, 2 }).default(0),
+  cogsPercent: decimal('cogsPercent', { precision: 5, 2 }).default(0),
+  suggestedPrice: decimal('suggestedPrice', { precision: 10, 2 }).default(0),
+  wasteFactor: decimal('wasteFactor', { precision: 3, 2 }).default(0.05),
+  yieldEfficiency: decimal('yieldEfficiency', { precision: 3, 2 }).default(0.90),
+  imageUrl: text('imageUrl'),  // Uploaded for Grab
+  instructions: text('instructions'),
+  notes: text('notes'),
+  allergens: jsonb('allergens').default('[]'),  // Enhancement: ['dairy', 'gluten']
+  nutritional: jsonb('nutritional').default('{}'),  // Enhancement: {calories: 500, protein: 25}
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
+Migrate: npx drizzle-kit migrate.
+Test: SQL INSERT INTO recipes (name) VALUES ('Test'); SELECT * FROM recipes LIMIT 1; Evidence: Count 1, default wasteFactor 0.05.
+
+
+Implement /menu/recipes Page (Frontend):
+
+Open client/src/pages/menu/CostCalculator.tsx (rename to Recipes.tsx; merge import/review logic).
+Summary Cards: useQuery /api/recipes, grid <card> with name, totalCost, cogsPercent, image, buttons (view/edit/delete/download).
+<pre><code>import { useQuery, useMutation } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Select, Switch } from '@/components/ui/';
+import axios from 'axios';
+import jsPDF from 'jspdf';
+import sharp from 'sharp';  // Assume for image resize
+
+const { data: recipes } = useQuery({ queryKey: ['recipes'], queryFn: () => axios.get('/api/recipes') });
+const { data: ingredients } = useQuery({ queryKey: ['ingredients'], queryFn: () => axios.get('/api/ingredients') });
+const addMutation = useMutation({ mutationFn: (data) => axios.post('/api/recipes', data), onSuccess: refetch });
+// Similar for edit/delete
+
+// Cards
+&#x3C;div className="grid grid-cols-3 gap-4">
+  {recipes.map(r => (
+    &#x3C;Card key={r.id}>
+      &#x3C;CardHeader>&#x3C;CardTitle>{r.name}&#x3C;/CardTitle>&#x3C;/CardHeader>
+      &#x3C;CardContent>
+        &#x3C;img src={r.imageUrl} alt={r.name} width="200" />
+        &#x3C;p>Cost/Serving: {r.costPerServing}&#x3C;/p>
+        &#x3C;p>COGS: {r.cogsPercent}%&#x3C;/p>
+        &#x3C;Button onClick={() => editRecipe(r)}>Edit&#x3C;/Button>
+        &#x3C;Button onClick={() => deleteMutation.mutate(r.id)}>Delete&#x3C;/Button>
+        &#x3C;Button onClick={() => downloadPDF(r)}>Download&#x3C;/Button>
+      &#x3C;/CardContent>
+    &#x3C;/Card>
+  ))}
+&#x3C;/div>
+
+// Form for new/edit: Name, yield, margin, add ingredient (select from ingredients, portion, unit convert e.g. kg to g *1000, calc cost = portion / packageSize * unitPrice * (1 + waste) / yieldEfficiency)
+// Calc button: Sum costs, COGS = total / suggestedPrice *100, suggest price = total / (1 - margin/100)
+// Ramsay: Mutation call OpenAI with recipe data for desc/suggestions/price
+// Image: &#x3C;Input type="file" onChange={async (e) => {
+  const file = e.target.files[0];
+  const resized = await sharp(file.buffer).resize(800, 600).toBuffer();
+  const formData = new FormData();
+  formData.append('image', new Blob([resized]));
+  const { data: url } = await axios.post('/api/recipes/upload-image', formData);
+  setValue('imageUrl', url.imageUrl);
+}} />
+// Bulk download: Button generate jsPDF multi-page with all recipes
+// Import CSV/JSON: Input file, POST /api/recipes/import, parse to add recipes
+</code></pre>
+</card>
+Test: Add 'Cheeseburger', add 2 ingredients, calc, Ramsay gen, image upload. Evidence: Curl POST, GET list count +1; console calc log total 34.205, COGS 34%.
+
+
+Backend Endpoints:
+
+Add to routes.ts:
+textapp.get('/api/recipes', async (req, res) => res.json(await db.select().from(recipes)));
+app.post('/api/recipes', async (req, res) => await db.insert(recipes).values(req.body).returning());
+app.put('/api/recipes/:id', async (req, res) => await db.update(recipes).set(req.body).where(eq(id, req.params.id)));
+app.delete('/api/recipes/:id', async (req, res) => await db.delete(recipes).where(eq(id, req.params.id)));
+app.post('/api/recipes/import', async (req, res) => { /* Parse CSV/JSON, insert */ res.json({ ok: true }); });
+app.post('/api/recipes/upload-image', multer().single('image'), async (req, res) => {
+  // Resize with sharp, save to uploads, return URL
+  res.json({ imageUrl: `/uploads/${req.file.filename}` });
+});
+app.post('/api/recipes/ramsay', async (req, res) => {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{ role: 'system', content: 'You are Ramsay Gordon. Optimize recipe: Price under THB 200, 100-word Grab desc (ingredients, allergens, unique), improvements (cost reduce, subs).' }, { role: 'user', content: JSON.stringify(req.body) }],
+  });
+  res.json(response.choices[0].message.content);  // {desc, suggestions, price}
+});
+app.get('/api/recipes/cross-ref-shift', async (req, res) => {
+  const { shiftId } = req.query;
+  const sales = await db.select().from(dailySalesV2).where(eq(id, shiftId));
+  const used = {};  // Calc from recipes * sold (e.g., burgers * beef portion)
+  const stock = /* From lodgment */;
+  const variance = /* used - stock */;
+  res.json(variance);
+});
+
+Test: Curl POST sample, GET list. Evidence: Before/after count, variance log 0.
+
+
+Merge Architecture (Frontend):
+
+Redirect Menu Import/Review to /menu/recipes if separate; add import button.
+Test: Import sample CSV, adds recipes. Evidence: Count +1.
+
+
+Accuracy Cross-Ref (Backend):
+
+In /api/recipes/cross-ref-shift: Calc used from sales * recipe portions vs stock lodgment.
+Test: Sample shift, variance 0. Evidence: Curl endpoint, log 'Variance Beef: 0g'.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Run this—precision focus. Test full, share report. Proactive: Add recipe export button.

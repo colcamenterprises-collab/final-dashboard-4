@@ -433,32 +433,53 @@ export const ingredients = pgTable("ingredients", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Recipes table - Industry standard recipe management
+// Recipes table - Enhanced comprehensive recipe management
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(), // Recipe title (e.g., "Smash Burger", "BBQ Sauce")
-  description: text("description"),
+  description: text("description"), // AI generated for Grab
   category: text("category").notNull(), // Burgers, Side Orders, Sauce, Beverages, Other
   
   // Recipe yield information
-  yieldQuantity: decimal("yield_quantity", { precision: 10, scale: 2 }).notNull(), // How much this recipe makes
-  yieldUnit: text("yield_unit").notNull(), // kg, litres, pieces, portions, each, etc
+  yieldQuantity: decimal("yield_quantity", { precision: 10, scale: 2 }).notNull().default('1'), // How much this recipe makes
+  yieldUnit: text("yield_unit").notNull().default('servings'), // kg, litres, pieces, portions, each, etc
   
   // Recipe ingredients with proper measurements
   ingredients: jsonb("ingredients").$type<Array<{
-    ingredientName: string;
-    quantity: number;
-    unit: string; // kg, grams, mg, litres, ml, each, cups, tablespoons, etc
-    costPerUnit: number;
-    totalCost: number;
-  }>>().notNull(),
+    ingredientId: string;
+    portion: number;
+    unit: string;
+    cost: number;
+  }>>().notNull().default('[]'), // [{ingredientId, portion, unit, cost}]
   
-  // Costing information
+  // Enhanced costing information
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull().default('0'),
+  costPerServing: decimal("cost_per_serving", { precision: 10, scale: 2 }).default('0'),
+  cogsPercent: decimal("cogs_percent", { precision: 5, scale: 2 }).default('0'), // Cost of Goods Sold %
+  suggestedPrice: decimal("suggested_price", { precision: 10, scale: 2 }).default('0'),
+  
+  // Waste and yield factors
+  wasteFactor: decimal("waste_factor", { precision: 3, scale: 2 }).default('0.05'), // Default 5% waste
+  yieldEfficiency: decimal("yield_efficiency", { precision: 3, scale: 2 }).default('0.90'), // Default 90% efficiency
+  
+  // Enhanced recipe details
+  imageUrl: text("image_url"), // Uploaded for Grab (800x600)
+  instructions: text("instructions"), // Cooking instructions
+  notes: text("notes"), // Special instructions
+  
+  // Enhanced nutritional and allergen info
+  allergens: jsonb("allergens").$type<string[]>().default('[]'), // ['dairy', 'gluten', 'nuts']
+  nutritional: jsonb("nutritional").$type<{
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    sodium?: number;
+  }>().default('{}'), // {calories: 500, protein: 25}
+  
+  // Legacy compatibility fields
   totalIngredientCost: decimal("total_ingredient_cost", { precision: 10, scale: 2 }),
-  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }), // Cost per yield unit
-  costPerServing: decimal("cost_per_serving", { precision: 10, scale: 2 }), // If different from unit
-  
-  // Optional fields
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }),
   preparationTime: integer("preparation_time"), // in minutes
   servingSize: text("serving_size"), // Description of serving size
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // percentage
@@ -466,7 +487,6 @@ export const recipes = pgTable("recipes", {
   
   // Recipe management
   isActive: boolean("is_active").default(true),
-  notes: text("notes"), // Special instructions
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });
