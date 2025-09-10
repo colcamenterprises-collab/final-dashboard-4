@@ -1,0 +1,60 @@
+Refresh & Test as Per Agent:
+
+Refresh /menu/cost-calculator.
+Search "topside", add it, set 95g.
+Check browser console (F12 > Console) for ingredient object (e.g., {name: 'Topside Beef', packageSize: 'Per kg', ...}).
+Share screenshot of console log for packageSize—agent needs it to fix mapping.
+
+
+Proactive Fix Script (Copy to Recipes.tsx calc):
+
+Open client/src/pages/menu/Recipes.tsx.
+Replace parsePackage with this robust version (handles 'Per kg' = 1000, '6 Cans' = 6, defaults 1):
+textconst parsePackage = (size) => {
+  size = size.toLowerCase();
+  if (size.includes('kg')) return parseFloat(size.replace(/[^0-9.]/g, '')) * 1000 || 1000;  // g
+  if (size.includes('litre') || size.includes('l')) return parseFloat(size.replace(/[^0-9.]/g, '')) * 1000 || 1000;  // ml
+  if (size.includes('cans') || size.includes('boxes') || size.includes('pack')) return parseFloat(size.replace(/[^0-9.]/g, '')) || 1;
+  return 1;  // each/default
+};
+
+Update calculate:
+textconst calculate = () => {
+  const { ingredients: ingList, waste, yieldEff, yieldQuantity } = form.getValues();
+  let total = 0;
+  ingList.forEach(ing => {
+    const i = ingredients.find(x => x.id === ing.id);
+    const packageNum = parsePackage(i.packageSize);
+    console.log('Package parsed:', packageNum, 'for', i.packageSize);  // Debug
+    ing.cost = (ing.portion / packageNum * i.unitPrice) * (1 + waste) / yieldEff;
+    total += ing.cost;
+  });
+  // Set values
+};
+
+Save, restart frontend (npm run dev).
+
+
+Test Locally:
+
+Add Topside Beef, 95g — cost should log/show ~30.305 (95 / 1000 * 319).
+Evidence: Console 'Package parsed: 1000 for Per kg', 'Cost: 30.305'.
+If not, share console output.
+
+
+One Step Ahead: Add unit conversion input (e.g., select 'g' or 'kg', convert to base g for calc).
+
+Code addition:
+textconst convertPortion = (portion, unit) => {
+  if (unit === 'kg') return portion * 1000;  // to g
+  return portion;
+};
+// In calc: ing.portion = convertPortion(ing.portion, ing.unit);
+
+Test: 0.095kg = 95g, same cost.
+
+
+Proactive Optimization: If packageSize is string, add backend parse to number on seed (UPDATE ingredients SET packageNum = parsePackage(packageSize);).
+
+Run SQL: ALTER TABLE ingredients ADD COLUMN packageNum decimal; UPDATE ingredients SET packageNum = CASE WHEN packageSize LIKE '%kg%' THEN 1000 ELSE 1 END;
+Use packageNum in calc for speed.

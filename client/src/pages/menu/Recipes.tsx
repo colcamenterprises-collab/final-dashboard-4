@@ -89,27 +89,27 @@ function normalizeUnit(unit: string | null | undefined): string {
   return "g";
 }
 
-// Parse package size to numeric value for calculations - Final implementation per Cam's specs
+// Parse package size to numeric value - Robust version per Cam's specifications  
 function parsePackage(packageSize: string | number | null | undefined): number {
   if (!packageSize) return 1;
   const size = String(packageSize).toLowerCase();
   
-  // Extract numeric value
+  // Extract numeric value from string
   const numMatch = size.match(/(\d+(?:\.\d+)?)/);
-  const num = numMatch ? parseFloat(numMatch[1]) : 1;
+  const baseNum = numMatch ? parseFloat(numMatch[1]) : 1;
   
-  // Handle kg conversions (Per kg, 1 kg, etc.) - Convert to grams
-  if (size.includes('kg')) return 1000;
+  // Handle kg conversions - convert to grams
+  if (size.includes('kg')) return baseNum * 1000 || 1000;
   
-  // Handle litre conversions - Convert to ml
-  if (size.includes('litre') || size.includes('liter')) return 1000;
+  // Handle litre conversions - convert to ml  
+  if (size.includes('litre') || size.includes('liter') || size.includes(' l')) return baseNum * 1000 || 1000;
   
-  // Handle countable items
-  if (size.includes('can')) return num;
-  if (size.includes('piece') || size.includes('each')) return num;
+  // Handle countable items (cans, boxes, packs)
+  if (size.includes('can') || size.includes('box') || size.includes('pack')) return baseNum || 1;
+  if (size.includes('piece') || size.includes('each')) return baseNum || 1;
   
-  // Default: extract numeric value or fallback to 1
-  return num;
+  // Default: return extracted number or 1
+  return baseNum || 1;
 }
 
 function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
