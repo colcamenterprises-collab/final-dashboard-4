@@ -1,7 +1,7 @@
 import { dailySalesV2Router } from "./forms/dailySalesV2";
 import { uploadIngredientsCSV, getShoppingListByDate } from "./forms/ingredients";
 import { bankUploadRouter } from "../src/server/bank/upload";
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -2636,9 +2636,14 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
 
-  app.get("/api/recipes/:id", async (req: Request, res: Response) => {
+  app.get("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const recipe = await storage.getRecipeById(parseInt(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return next(); // Let router handle non-numeric IDs like 'cards'
+      }
+      
+      const recipe = await storage.getRecipeById(id);
       if (!recipe) {
         return res.status(404).json({ error: "Recipe not found" });
       }
@@ -2648,9 +2653,14 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
 
-  app.put("/api/recipes/:id", async (req: Request, res: Response) => {
+  app.put("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const recipe = await storage.updateRecipe(parseInt(req.params.id), req.body);
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return next(); // Let router handle non-numeric IDs
+      }
+      
+      const recipe = await storage.updateRecipe(id, req.body);
       if (!recipe) {
         return res.status(404).json({ error: "Recipe not found" });
       }
@@ -2660,9 +2670,14 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
 
-  app.delete("/api/recipes/:id", async (req: Request, res: Response) => {
+  app.delete("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await storage.deleteRecipe(parseInt(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return next(); // Let router handle non-numeric IDs
+      }
+      
+      await storage.deleteRecipe(id);
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: "Failed to delete recipe", details: (error as Error).message });

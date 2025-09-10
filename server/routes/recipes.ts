@@ -70,6 +70,62 @@ async function initTables() {
   `);
 }
 
+// Recipe Cards API endpoints (moved to top for proper routing)
+// GET /api/recipes/cards - Get all recipes for cards library  
+router.get('/cards', async (req, res) => {
+  try {
+    await initTables();
+    const { rows } = await pool.query(`
+      SELECT id, name, description, category, version, parent_id, image_url, 
+             total_cost, cost_per_serving, suggested_price, instructions, notes,
+             ingredients, created_at, updated_at
+      FROM recipes 
+      WHERE is_active = true 
+      ORDER BY updated_at DESC
+    `);
+    
+    console.log(`[/api/recipes/cards] Returning ${rows.length} recipe cards`);
+    res.json({ ok: true, recipes: rows });
+  } catch (error) {
+    console.error('[/api/recipes/cards] Error:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch recipe cards' });
+  }
+});
+
+// GET /api/recipes/card-generate/:id - Generate A4 PDF card for recipe
+router.get('/card-generate/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await initTables();
+    
+    const { rows } = await pool.query(`
+      SELECT id, name, description, category, version, image_url,
+             ingredients, instructions, notes, total_cost, cost_per_serving
+      FROM recipes 
+      WHERE id = $1 AND is_active = true
+    `, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Recipe not found' });
+    }
+    
+    const recipe = rows[0];
+    console.log(`[/api/recipes/card-generate] Generating card for recipe: ${recipe.name}`);
+    
+    // Return recipe data for frontend PDF generation
+    res.json({ 
+      ok: true, 
+      recipe: {
+        ...recipe,
+        ingredients: typeof recipe.ingredients === 'string' ? JSON.parse(recipe.ingredients) : recipe.ingredients
+      }
+    });
+  } catch (error) {
+    console.error('[/api/recipes/card-generate] Error:', error);
+    res.status(500).json({ ok: false, error: 'Failed to generate recipe card' });
+  }
+});
+
 // GET /api/recipes - List all recipes with enhanced data
 router.get('/', async (req, res) => {
   try {
