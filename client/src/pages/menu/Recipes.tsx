@@ -233,7 +233,16 @@ export default function RecipesUnified() {
       
       const packageNum = parsePackage(ingredient.packageSize);
       const unitPrice = ingredient.packageCostTHB;
-      const portion = num(l.qty);
+      let portion = num(l.qty);
+      
+      // Unit conversion: Convert user input to base units (grams)
+      if (l.unit === 'kg') {
+        portion = portion * 1000; // Convert kg to grams
+        console.log(`Unit conversion: ${l.qty}kg → ${portion}g`);
+      } else if (l.unit === 'litre') {
+        portion = portion * 1000; // Convert litres to ml
+        console.log(`Unit conversion: ${l.qty}L → ${portion}ml`);
+      }
       
       // Enhanced calculation with error handling and debugging
       const cost = (portion / packageNum * unitPrice) * (1 + waste) / yieldEff;
