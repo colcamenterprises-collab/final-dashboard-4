@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Download, Upload, Image, ChefHat, Calculator } from "lucide-react";
+import { Plus, Edit, Trash2, Upload, Image, ChefHat, Calculator, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ChefRamsayGordon from "@/components/ChefRamsayGordon";
+import { Link } from "wouter";
 
 // ---- Types ----
 type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb" | "each";
@@ -527,14 +528,16 @@ export default function RecipesUnified() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                     <Button 
-                      onClick={() => {
-                        // Download PDF logic would go here
-                        toast({ title: "Info", description: "PDF download feature coming soon" });
-                      }}
+                      asChild
                       variant="outline" 
                       size="sm"
+                      className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                      title="Generate professional A4 recipe card with QR code"
+                      data-testid={`button-generate-card-${recipe.id}`}
                     >
-                      <Download className="h-4 w-4" />
+                      <Link href="/menu/recipe-cards">
+                        <FileText className="h-4 w-4" />
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>
