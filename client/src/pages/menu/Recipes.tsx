@@ -148,7 +148,7 @@ export default function RecipesUnified() {
   // Calculator state
   const [search, setSearch] = useState("");
   const [lines, setLines] = useState<RecipeLine[]>([]);
-  const [wastePct, setWastePct] = useState(0);
+  const [wastePct, setWastePct] = useState(5); // Default 5% waste factor per specifications
   const [portions, setPortions] = useState(1);
   const [menuPrice, setMenuPrice] = useState(0);
   const [recipeName, setRecipeName] = useState("");
@@ -204,21 +204,54 @@ export default function RecipesUnified() {
 
   const saveMutation = useMutation({
     mutationFn: async (recipeData: any) => {
+      console.log('[Frontend] Sending save request:', recipeData);
+      
       const response = await fetch('/api/recipes/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(recipeData)
       });
-      if (!response.ok) throw new Error('Failed to save recipe');
-      return response.json();
+      
+      const result = await response.json();
+      console.log('[Frontend] Save response:', result);
+      
+      if (!response.ok) {
+        const errorMessage = result.details || result.error || 'Failed to save recipe';
+        throw new Error(errorMessage);
+      }
+      
+      return result;
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Recipe saved successfully" });
+    onSuccess: (data: any) => {
+      console.log('[Frontend] ✅ Recipe saved successfully:', data);
+      
+      // COGS Alert as specified
+      if (data.cogsAlert) {
+        toast({ 
+          title: "Recipe Saved", 
+          description: "⚠️ COGS high (>35%) - consider optimizing ingredients", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Success", 
+          description: `Recipe "${data.recipe?.name}" saved successfully` 
+        });
+      }
+      
       refetch();
       resetCalculator();
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save recipe", variant: "destructive" });
+    onError: (error: any) => {
+      console.error('[Frontend] ❌ Save Error:', error);
+      
+      const errorMessage = error.message || 'Failed to save recipe';
+      
+      toast({ 
+        title: "Recipe Save Failed", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   });
 
@@ -337,17 +370,34 @@ export default function RecipesUnified() {
       return;
     }
 
+    // Enhanced recipe data with all required fields and defaults per specifications
     const recipeData = {
-      recipeName,
-      description: recipeDesc,
-      category: recipeCategory,
-      lines: linesWithCosts,
-      totals: { recipeCostTHB, costPerPortionTHB, foodCostPct, gpTHB, marginPct },
-      wastePct,
-      portions,
-      menuPrice
+      recipeName: recipeName.trim(),
+      description: recipeDesc || '',
+      category: recipeCategory || 'Burgers',
+      lines: linesWithCosts || [],
+      totals: {
+        recipeCostTHB: recipeCostTHB || 0,
+        costPerPortionTHB: costPerPortionTHB || 0,
+        foodCostPct: foodCostPct || 0,
+        gpTHB: gpTHB || 0,
+        marginPct: marginPct || 0
+      },
+      note: "",
+      wastePct: wastePct || 0,
+      portions: portions || 1,
+      menuPrice: menuPrice || 0,
+      // Additional defaults per specifications
+      yieldQuantity: portions || 1,
+      margin: marginPct || 30,
+      ingredients: linesWithCosts || [],
+      wasteFactor: (wastePct || 0) / 100,
+      yieldEfficiency: 0.90,
+      allergens: [],
+      nutritional: {}
     };
 
+    console.log('[Frontend] Submitting recipe data:', recipeData);
     saveMutation.mutate(recipeData);
   }
 
