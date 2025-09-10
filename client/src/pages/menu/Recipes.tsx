@@ -89,26 +89,37 @@ function normalizeUnit(unit: string | null | undefined): string {
   return "g";
 }
 
-// Parse package size to numeric value - Robust version per Cam's specifications  
+// Enhanced parsePackage - Handles all packaging types per Cam's specifications
 function parsePackage(packageSize: string | number | null | undefined): number {
   if (!packageSize) return 1;
-  const size = String(packageSize).toLowerCase();
   
-  // Extract numeric value from string
+  // Clean the input - remove common words that don't affect calculation
+  let size = String(packageSize).toLowerCase()
+    .replace(' bag', '')
+    .replace(' per ', '')
+    .replace(' pack', '')
+    .trim();
+  
+  // Extract numeric value (handles decimals like 2.5)
   const numMatch = size.match(/(\d+(?:\.\d+)?)/);
   const baseNum = numMatch ? parseFloat(numMatch[1]) : 1;
   
-  // Handle kg conversions - convert to grams
-  if (size.includes('kg')) return baseNum * 1000 || 1000;
+  // Handle kg conversions - convert to grams (e.g., "10kg" → 10000g, "Per kg" → 1000g)
+  if (size.includes('kg')) {
+    return baseNum * 1000 || 1000;
+  }
   
-  // Handle litre conversions - convert to ml  
-  if (size.includes('litre') || size.includes('liter') || size.includes(' l')) return baseNum * 1000 || 1000;
+  // Handle litre conversions - convert to ml (e.g., "2 litre" → 2000ml)  
+  if (size.includes('litre') || size.includes('liter') || size.includes(' l')) {
+    return baseNum * 1000 || 1000;
+  }
   
-  // Handle countable items (cans, boxes, packs)
-  if (size.includes('can') || size.includes('box') || size.includes('pack')) return baseNum || 1;
-  if (size.includes('piece') || size.includes('each')) return baseNum || 1;
+  // Handle countable items (e.g., "6 Cans" → 6, "12 boxes" → 12)
+  if (size.includes('can') || size.includes('box') || size.includes('piece') || size.includes('each')) {
+    return baseNum || 1;
+  }
   
-  // Default: return extracted number or 1
+  // Default: return extracted number or 1 for "each"
   return baseNum || 1;
 }
 
@@ -224,8 +235,18 @@ export default function RecipesUnified() {
       const unitPrice = ingredient.packageCostTHB;
       const portion = num(l.qty);
       
-      // Final formula per Cam's specifications: (portion / packageSizeNum * unitPrice) * (1 + waste) / yieldEff
+      // Enhanced calculation with error handling and debugging
       const cost = (portion / packageNum * unitPrice) * (1 + waste) / yieldEff;
+      
+      // Debug logging for verification
+      console.log(`Parsed package for ${ingredient.name}: ${packageNum} (from "${ingredient.packageSize}")`);
+      console.log(`Cost calculation: (${portion} / ${packageNum} * ${unitPrice}) * (1 + ${waste}) / ${yieldEff} = ${cost.toFixed(3)}`);
+      
+      // Handle NaN cases
+      if (isNaN(cost)) {
+        console.log(`Missing packageSize for ${ingredient.name}`);
+        return { ...l, costTHB: 0 };
+      }
       
       return { ...l, costTHB: cost };
     });

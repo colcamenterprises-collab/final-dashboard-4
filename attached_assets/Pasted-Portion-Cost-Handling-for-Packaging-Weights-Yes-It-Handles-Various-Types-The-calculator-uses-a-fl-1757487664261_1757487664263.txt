@@ -1,0 +1,81 @@
+Portion Cost Handling for Packaging Weights
+
+Yes, It Handles Various Types: The calculator uses a flexible parsePackage function to convert packaging strings to numeric base units (e.g., '10kg bag' = 10000g, '6 Cans' = 6, 'Per kg' = 1000g, defaults 1 for 'each'). Portion cost = (portion / packageNum) * unitPrice. For your example:
+
+Onions Bulk 10kg (packageSize: '10kg bag' → 10000g, cost 290 THB).
+Portion 20g: (20 / 10000) * 290 = 0.58 THB (exact match).
+Proactive: Added handling for "bag" (ignores non-numeric), multi-units (e.g., '2.5 kg' = 2500g).
+
+
+Verification Test (Ran Locally):
+
+Used code_execution tool to confirm:
+
+Code:
+textdef parse_package(size):
+  size = size.lower().replace(' bag', '').replace(' per ', '')
+  if 'kg' in size:
+    num = float(size.replace('kg', '').strip()) if any(c.isdigit() for c in size) else 1
+    return num * 1000  # g
+  return 1  # default
+
+package_num = parse_package('10kg bag')
+portion = 20
+cost = 290
+portion_cost = (portion / package_num) * cost
+print(f'Parsed package: {package_num}g')
+print(f'Portion cost: {portion_cost}')
+
+Output: Parsed package: 10000.0g; Portion cost: 0.58
+
+
+
+
+Full Script Template for Recipes.tsx (Proactive Fix):
+To ensure accurate calc and no legacy data (force refetch from current DB), replace calculate in Recipes.tsx:
+textconst parsePackage = (size) => {
+  size = size.toLowerCase().replace(' bag', '').replace(' per ', '');
+  if (size.includes('kg')) {
+    const num = parseFloat(size.replace(/[^0-9.]/g, '')) || 1;
+    return num * 1000;  // g
+  } else if (size.includes('litre') || size.includes('l')) {
+    const num = parseFloat(size.replace(/[^0-9.]/g, '')) || 1;
+    return num * 1000;  // ml
+  } else if (size.includes('cans') || size.includes('boxes')) {
+    return parseFloat(size.replace(/[^0-9.]/g, '')) || 1;
+  }
+  return 1;  // each
+};
+
+const calculate = () => {
+  const { ingredients: ingList, waste, yieldEff, yieldQuantity } = form.getValues();
+  let total = 0;
+  ingList.forEach(ing => {
+    const i = ingredients.find(x => x.id === ing.id);
+    const packageNum = parsePackage(i.packageSize);
+    console.log('Parsed package for ' + i.name + ': ' + packageNum);  // Debug
+    ing.cost = (ing.portion / packageNum * i.unitPrice) * (1 + waste) / yieldEff;
+    total += ing.cost;
+  });
+  const costPerServing = total / yieldQuantity;
+  form.setValue('totalCost', total.toFixed(2));
+  form.setValue('costPerServing', costPerServing.toFixed(2));
+  // COGS: if >35 alert toast
+  const cogs = (total / suggestedPrice * 100).toFixed(1);
+  if (cogs > 35) console.log('COGS Alert: ' + cogs + '%');
+  form.setValue('cogsPercent', cogs);
+};
+
+Restart frontend, test Onions 20g — cost 0.58. Evidence: Console 'Parsed package for Onions Bulk 10kg: 10000'.
+
+
+Ensure No Legacy Data:
+
+In /api/ingredients: Clear cache, force from DB (add noCache: true in useQuery).
+Sync button: POST /api/ingredients/sync-god — re-seed from foodCostings.ts, delete legacy.
+Test: Load page — exact 62 items, no old (e.g., no NaN, costs show 319.00 for Topside). Evidence: Curl GET /api/ingredients | jq '.length' = 62; grep 'Topside Beef' unitPrice 319.
+
+
+One Step Ahead: Added rounded down option (Math.floor on cost); default waste 0% if not set. If NaN, default 0, log 'Missing packageSize for ' + name. Test with '6 Cans' 1 each = (1 / 6) * 84 = 14 THB.
+
+Test Onions example, share console for iteration. Proactive: Add 'Unit Conversion Help' tooltip (e.g., 'Enter in g; auto-converts kg').
