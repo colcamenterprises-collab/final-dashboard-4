@@ -21,6 +21,7 @@ export const ROUTES = {
 
   // Menu Mgmt
   RECIPES: "/menu/recipes",
+  RECIPE_CARDS: "/menu/recipe-cards",
   INGREDIENT_MANAGEMENT: "/menu/ingredient-management", 
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
