@@ -1,0 +1,120 @@
+Fix Drinks in Shopping List, Form Library, and Email
+Proactive: The issue is legacy data or missing mapping from ingredients DB (source of truth) to shopping/ stock / email. We'll fix by syncing ingredients to dailyStockV2 requisition (add drinks category), update library/email to pull/display drinks, add estimated cost calc (sum qty * unitPrice from ingredients).
+Step 1: Manual DB Clean (If Legacy Data)
+
+Run in Neon console to remove legacy non-ingredients data:
+textDELETE FROM daily_stock_v2 WHERE requisition NOT IN (SELECT id FROM ingredients);  // Assume requisition ids reference ingredients
+
+Verify: SELECT COUNT(*) FROM daily_stock_v2; — should match expected.
+
+Step 2: Send This to Replit Agent (Copy-Paste Full Block)
+This fixes drinks display, adds cost to shopping list.
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding fields/endpoints (e.g., add 'estimatedCost' to dailyStockV2).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; no changes.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Submit form with drinks (e.g., 'Coke' 6 cans).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: No drinks in shopping; After: Shows 'Coke 6 Cans 84 THB' - curl GET /api/shopping-list: {items: [{name: 'Coke', qty: 6, cost: 84}]}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+Source of Truth: Use ingredients table for all (sync drinks category to stock/shopping/email; no legacy).
+
+Task Overview
+
+Fix drinks in shopping list, form library completed view, email; use ingredients DB as truth (include drinks category, pricing for estimated cost in list).
+Add estimated cost to shopping list (qty * unitPrice, sum total).
+Proactive: Add 'Drinks' section in DailyStock.tsx requisition dropdown (filter category 'Drinks' from /api/ingredients); auto-sum cost in list/email.
+
+Step-by-Step Actions
+
+Sync Ingredients to Stock Forms (Backend):
+
+Open server/forms/dailyStock.ts or routes.ts — add GET /api/ingredients/drinks: Filter category 'Drinks'.
+textapp.get('/api/ingredients/drinks', async (req, res) => {
+  const drinks = await db.select().from(ingredients).where(eq(category, 'Drinks'));
+  res.json(drinks);
+});
+
+In dailyStock insert: Add drinks to requisition jsonb if selected.
+Test: Curl GET /api/ingredients/drinks — length ~10, 'Coke' 84. Evidence: Count 10, cost 84.
+
+
+Add Drinks to Shopping List (Frontend/Backend):
+
+Open client/src/pages/operations/shopping-list/ShoppingListPage.tsx.
+Add drinks section: useQuery /api/ingredients/drinks, show in table with qty (from requisition or lodgment), cost = qty * unitPrice, total sum.
+textconst { data: drinks } = useQuery({ queryKey: ['drinks'], queryFn: () => axios.get('/api/ingredients/drinks') });
+const requisition = useQuery({ queryKey: ['requisition'], queryFn: () => axios.get('/api/daily-stock/requisition') });  // Assume endpoint for latest
+let totalCost = 0;
+<table>
+  <tr><th>Item</th><th>Qty</th><th>Unit Cost</th><th>Cost</th></tr>
+  {drinks.map(d => {
+    const qty = requisition.data.find(r => r.id === d.id)?.qty || 0;
+    const cost = qty * d.unitPrice;
+    totalCost += cost;
+    return <tr key={d.id}><td>{d.name}</td><td>{qty}</td><td>{d.unitPrice}</td><td>{cost.toFixed(2)}</td></tr>;
+  })}
+  <tr><td>Total Estimated Cost</td><td colspan="3">{totalCost.toFixed(2)} THB</td></tr>
+</table>
+
+Backend add /api/daily-stock/requisition: Select requisition jsonb from dailyStockV2 latest.
+Test: Submit form with Coke 6 — shopping shows 6, cost 84, total 84. Evidence: Curl /api/ingredients/drinks length 10; shopping page log 'Total 84 THB'.
+
+
+Add Drinks to Form Library View (Frontend):
+
+Open client/src/pages/operations/daily-sales-v2/Library.tsx.
+Add 'Drinks Requisition' section: Parse requisition jsonb, filter drinks, show name, qty, cost = qty * unitPrice from /api/ingredients.
+textconst { data: ingredients } = useQuery({ queryKey: ['ingredients'], queryFn: () => axios.get('/api/ingredients') });
+<div>Drinks Requisition</div>
+<table>
+  {row.requisition.filter(r => ingredients.find(i => i.id === r.id)?.category === 'Drinks').map(r => {
+    const i = ingredients.find(i => i.id === r.id);
+    const cost = r.qty * i.unitPrice;
+    return <tr><td>{i.name}</td><td>{r.qty}</td><td>{cost.toFixed(2)}</td></tr>;
+  })}
+</table>
+
+Test: View completed form with Coke 6 — shows. Evidence: Curl id, grep requisition drinks, cost 84.
+
+
+Add Drinks to Email (Backend):
+
+Open server/forms/dailySalesV2.ts (email handler).
+Add drinks section: Pull requisition drinks, cost = qty * unitPrice from ingredients.
+textconst ingredients = await db.select().from(ingredients);
+const drinksRequisition = requisition.filter(r => ingredients.find(i => i.id === r.id)?.category === 'Drinks');
+let drinksText = '\nDrinks Requisition:\n';
+let drinksTotal = 0;
+drinksRequisition.forEach(r => {
+  const i = ingredients.find(i => i.id === r.id);
+  const cost = r.qty * i.unitPrice;
+  drinksText += `${i.name} ${r.qty} ${cost.toFixed(2)} THB\n`;
+  drinksTotal += cost;
+});
+drinksText += `Total Drinks Cost: ${drinksTotal.toFixed(2)} THB`;
+emailText += drinksText;
+
+Test: Submit form with drinks → email includes. Evidence: Log 'Drinks Total 84 THB'.
+
+
+Clear Legacy Data (Backend):
+
+In /api/ingredients, /api/daily-stock/requisition: Add WHERE category IN ('Drinks', 'Fresh Food', etc.) from god list categories.
+Test: Curl /api/ingredients length = 62. Evidence: No extra, only god list.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Copy-paste to Replit agent. Test shopping/form/email with Coke 6, share report. Proactive: Add 'Estimated Total Cost' in shopping/email.
