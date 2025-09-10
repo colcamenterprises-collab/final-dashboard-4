@@ -455,7 +455,7 @@ export const recipes = pgTable("recipes", {
     portion: number;
     unit: string;
     cost: number;
-  }>>().notNull().default('[]'), // [{ingredientId, portion, unit, cost}]
+  }>>().notNull().default(sql`'[]'::jsonb`), // [{ingredientId, portion, unit, cost}]
   
   // Enhanced costing information
   totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull().default('0'),
@@ -473,14 +473,14 @@ export const recipes = pgTable("recipes", {
   notes: text("notes"), // Special instructions
   
   // Enhanced nutritional and allergen info
-  allergens: jsonb("allergens").$type<string[]>().default('[]'), // ['dairy', 'gluten', 'nuts']
+  allergens: jsonb("allergens").$type<string[]>().default(sql`'[]'::jsonb`), // ['dairy', 'gluten', 'nuts']
   nutritional: jsonb("nutritional").$type<{
     calories?: number;
     protein?: number;
     carbs?: number;
     fat?: number;
     sodium?: number;
-  }>().default('{}'), // {calories: 500, protein: 25}
+  }>().default(sql`'{}'::jsonb`), // {calories: 500, protein: 25}
   
   // Target margin for pricing calculations
   margin: decimal("margin", { precision: 5, scale: 2 }).default('30'), // Target margin %
@@ -495,6 +495,11 @@ export const recipes = pgTable("recipes", {
   
   // Recipe management
   isActive: boolean("is_active").default(true),
+  
+  // Version management for recipe cards system
+  version: integer("version").default(1), // Recipe version (v1, v2, etc.)
+  parentId: integer("parent_id"), // For recipe iterations, references recipes.id
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });
