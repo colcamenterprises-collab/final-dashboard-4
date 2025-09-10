@@ -89,42 +89,27 @@ function normalizeUnit(unit: string | null | undefined): string {
   return "g";
 }
 
-// Parse package size to numeric value for calculations - Fixed for Cam's specifications
+// Parse package size to numeric value for calculations - Final implementation per Cam's specs
 function parsePackage(packageSize: string | number | null | undefined): number {
   if (!packageSize) return 1;
   const size = String(packageSize).toLowerCase();
-  
-  console.log(`[parsePackage] Input: "${packageSize}" -> Lowercase: "${size}"`);
   
   // Extract numeric value
   const numMatch = size.match(/(\d+(?:\.\d+)?)/);
   const num = numMatch ? parseFloat(numMatch[1]) : 1;
   
-  // Handle kg conversions (Per kg, 1 kg, etc.)
-  if (size.includes('kg')) {
-    console.log(`[parsePackage] Found 'kg', returning 1000 (convert to grams)`);
-    return 1000; // Convert to grams  
-  }
+  // Handle kg conversions (Per kg, 1 kg, etc.) - Convert to grams
+  if (size.includes('kg')) return 1000;
   
-  // Handle litre conversions  
-  if (size.includes('litre') || size.includes('liter')) {
-    console.log(`[parsePackage] Found 'litre', returning 1000 (convert to ml)`);
-    return 1000; // Convert to ml
-  }
+  // Handle litre conversions - Convert to ml
+  if (size.includes('litre') || size.includes('liter')) return 1000;
   
   // Handle countable items
-  if (size.includes('can')) {
-    console.log(`[parsePackage] Found 'can', returning ${num}`);
-    return num; // Return number of cans
-  }
+  if (size.includes('can')) return num;
+  if (size.includes('piece') || size.includes('each')) return num;
   
-  if (size.includes('piece') || size.includes('each')) {
-    console.log(`[parsePackage] Found 'piece/each', returning ${num}`);
-    return num; // Return number of pieces
-  }
-  
-  console.log(`[parsePackage] Default fallback, returning ${num}`);
-  return num; // Default return extracted number or 1
+  // Default: extract numeric value or fallback to 1
+  return num;
 }
 
 function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
@@ -174,22 +159,19 @@ export default function RecipesUnified() {
     queryFn: async () => {
       const response = await fetch('/api/costing/ingredients');
       const data = await response.json();
-      // ✅ Using TypeScript foodCostings.ts data (66 enhanced ingredients)
-      return (data.list || []).map((x: any) => {
-        console.log(`[Ingredient Debug] ${x.name}:`, JSON.stringify(x, null, 2));
-        return {
-          id: x.id, // Already clean ID from API
-          name: x.name, // Direct from foodCostings.ts
-          unit: normalizeUnit(x.unit) as UnitType,
-          packageSize: x.packageSize || 1, // FIXED: Use correct packageSize field ("Per kg")
-          packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
-          supplier: x.supplier || "",
-          category: x.category || "Other",
-          brand: x.brand || "",
-          portionSize: x.portionSize || null,
-          lastReview: x.lastReview || null
-        };
-      });
+      // ✅ Using TypeScript foodCostings.ts data with correct cost calculations
+      return (data.list || []).map((x: any) => ({
+        id: x.id, // Already clean ID from API
+        name: x.name, // Direct from foodCostings.ts
+        unit: normalizeUnit(x.unit) as UnitType,
+        packageSize: x.packageSize || 1, // FIXED: Use correct packageSize field ("Per kg")
+        packageCostTHB: num(x.cost), // Direct cost from foodCostings.ts
+        supplier: x.supplier || "",
+        category: x.category || "Other",
+        brand: x.brand || "",
+        portionSize: x.portionSize || null,
+        lastReview: x.lastReview || null
+      }));
     }
   });
 
@@ -242,10 +224,8 @@ export default function RecipesUnified() {
       const unitPrice = ingredient.packageCostTHB;
       const portion = num(l.qty);
       
-      // Formula: (portion / packageSizeNum * unitPrice) * (1 + waste) / yieldEff
+      // Final formula per Cam's specifications: (portion / packageSizeNum * unitPrice) * (1 + waste) / yieldEff
       const cost = (portion / packageNum * unitPrice) * (1 + waste) / yieldEff;
-      
-      console.log(`Calculated cost: ${cost.toFixed(3)} for ${portion}g of ${ingredient.name} at ${unitPrice}/kg (packageNum: ${packageNum})`);
       
       return { ...l, costTHB: cost };
     });
