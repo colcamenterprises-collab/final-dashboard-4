@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,13 @@ import {
   FileText, 
   Search, 
   Image as ImageIcon, 
+  Upload,
   DollarSign,
   Clock,
   Utensils,
   QrCode
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
 import { saveAs } from "file-saver";
@@ -50,10 +51,39 @@ export default function RecipeCards() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
 
   const { data: recipesData, isLoading } = useQuery({
     queryKey: ["/api/recipes/cards"],
     select: (data: any) => data.recipes as Recipe[]
+  });
+
+  // Image upload mutation
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/recipes/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+      
+      const data = await response.json();
+      return data.imageUrl;
+    },
+    onSuccess: (imageUrl, file, context) => {
+      console.log('Image uploaded successfully:', imageUrl);
+      // Refresh the recipes data to get updated image URLs
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes/cards"] });
+    },
+    onError: (error) => {
+      console.error('Image upload failed:', error);
+    }
   });
 
   const recipes = recipesData || [];
@@ -117,8 +147,39 @@ export default function RecipeCards() {
         pdf.text(descLines, 15, 65);
       }
       
-      // Cost information section
+      // Recipe Image
       let yPos = recipe.description ? 80 : 65;
+      if (recipe.image_url) {
+        try {
+          // Create a promise to load the image
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = recipe.image_url;
+          });
+          
+          // Add image to PDF (centered, max width 80mm, max height 60mm)
+          const maxWidth = 80;
+          const maxHeight = 60;
+          
+          // Calculate uniform scale to maintain aspect ratio
+          const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
+          const imgWidth = img.width * scale;
+          const imgHeight = img.height * scale;
+          const imgX = (pageWidth - imgWidth) / 2; // Center horizontally
+          
+          pdf.addImage(img, 'JPEG', imgX, yPos, imgWidth, imgHeight);
+          yPos += imgHeight + 10;
+        } catch (error) {
+          console.warn('Could not load recipe image for PDF:', error);
+          // Continue without image
+        }
+      }
+      
+      // Cost information section
       pdf.setFillColor(...primaryColor);
       pdf.rect(15, yPos, 180, 6, 'F');
       pdf.setTextColor(255, 255, 255);
@@ -261,6 +322,32 @@ export default function RecipeCards() {
       alert('Error generating PDF. Please try again.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Handle image upload for a recipe
+  const handleImageUpload = async (recipeId: string, file: File) => {
+    try {
+      setUploadingImages(prev => new Set(prev).add(recipeId));
+      const imageUrl = await uploadImageMutation.mutateAsync(file);
+      
+      // Update the recipe with the new image URL
+      await apiRequest(`/api/recipes/${recipeId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ image_url: imageUrl }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      // Refresh recipes to show updated image
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes/cards"] });
+    } catch (error) {
+      console.error('Failed to upload and assign image:', error);
+    } finally {
+      setUploadingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(recipeId);
+        return newSet;
+      });
     }
   };
 
@@ -494,6 +581,65 @@ export default function RecipeCards() {
                   {recipe.description}
                 </p>
               )}
+              
+              {/* Recipe Image */}
+              <div className="space-y-2">
+                {recipe.image_url ? (
+                  <div className="relative">
+                    <img
+                      src={recipe.image_url}
+                      alt={recipe.name}
+                      className="w-full h-32 object-cover rounded-lg"
+                      data-testid={`image-recipe-${recipe.id}`}
+                    />
+                    <div className="absolute top-2 right-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) handleImageUpload(recipe.id, file);
+                          };
+                          input.click();
+                        }}
+                        disabled={uploadingImages.has(recipe.id)}
+                        data-testid={`button-change-image-${recipe.id}`}
+                      >
+                        <Upload className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 mb-2">No image uploaded</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) handleImageUpload(recipe.id, file);
+                        };
+                        input.click();
+                      }}
+                      disabled={uploadingImages.has(recipe.id)}
+                      data-testid={`button-upload-image-${recipe.id}`}
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      {uploadingImages.has(recipe.id) ? 'Uploading...' : 'Upload Image'}
+                    </Button>
+                  </div>
+                )}
+              </div>
               
               {/* Cost Information */}
               <div className="bg-gray-50 p-3 rounded-lg space-y-1">

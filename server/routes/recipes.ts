@@ -9,7 +9,19 @@ import sharp from 'sharp';
 import { loadCatalogFromCSV } from "../lib/stockCatalog";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Helper functions
@@ -306,18 +318,33 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image uploaded' });
     }
     
+    // Validate file size (2MB limit)
+    if (req.file.size > 2 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 2MB.' });
+    }
+    
+    // Validate file is actually an image using sharp
+    try {
+      const metadata = await sharp(req.file.buffer).metadata();
+      if (!metadata.format || !['jpeg', 'jpg', 'png', 'webp'].includes(metadata.format)) {
+        return res.status(400).json({ error: 'Invalid image format. Use JPEG, PNG, or WebP.' });
+      }
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid image file.' });
+    }
+    
     // Ensure uploads directory exists
     const uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     
-    // Resize image to 800x600 for Grab compatibility
+    // Resize image to 800x800 for Recipe Cards compatibility
     const filename = `recipe-${Date.now()}.jpg`;
     const filepath = path.join(uploadsDir, filename);
     
     await sharp(req.file.buffer)
-      .resize(800, 600, { fit: 'cover' })
+      .resize(800, 800, { fit: 'cover' })
       .jpeg({ quality: 85 })
       .toFile(filepath);
     
