@@ -62,7 +62,7 @@ export default function RecipeCards() {
   // Filter recipes based on search and category
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         recipe.description.toLowerCase().includes(searchTerm.toLowerCase());
+                         (recipe.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || recipe.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -131,9 +131,9 @@ export default function RecipeCards() {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(11);
       
-      const totalCost = parseFloat(recipe.total_cost);
-      const costPerServing = parseFloat(recipe.cost_per_serving);
-      const suggestedPrice = parseFloat(recipe.suggested_price);
+      const totalCost = Number(recipe.total_cost ?? 0) || 0;
+      const costPerServing = Number(recipe.cost_per_serving ?? 0) || 0;
+      const suggestedPrice = Number(recipe.suggested_price ?? 0) || 0;
       const margin = suggestedPrice - costPerServing;
       const marginPercent = suggestedPrice > 0 ? ((margin / suggestedPrice) * 100).toFixed(1) : '0';
       
@@ -163,7 +163,9 @@ export default function RecipeCards() {
             yPos = 20;
           }
           
-          const line = `${ingredient.qty}${ingredient.unit} ${ingredient.name} - ฿${ingredient.costTHB.toFixed(2)} (${ingredient.supplier})`;
+          const qty = Number(ingredient.qty ?? 0) || 0;
+          const costTHB = Number(ingredient.costTHB ?? 0) || 0;
+          const line = `${qty}${ingredient.unit || ''} ${ingredient.name || ''} - ฿${costTHB.toFixed(2)} (${ingredient.supplier || 'Unknown'})`;
           pdf.text(line, 17, yPos);
           yPos += 5;
         });
@@ -327,8 +329,8 @@ export default function RecipeCards() {
         
         // Cost info
         let yPos = 75;
-        const totalCost = parseFloat(recipe.total_cost);
-        const costPerServing = parseFloat(recipe.cost_per_serving);
+        const totalCost = Number(recipe.total_cost ?? 0) || 0;
+        const costPerServing = Number(recipe.cost_per_serving ?? 0) || 0;
         
         pdf.text(`Total Cost: ฿${totalCost.toFixed(2)} | Per Serving: ฿${costPerServing.toFixed(2)}`, 15, yPos);
         
@@ -498,22 +500,22 @@ export default function RecipeCards() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Total Cost:</span>
                   <span className="font-medium" data-testid={`text-cost-${recipe.id}`}>
-                    ฿{parseFloat(recipe.total_cost).toFixed(2)}
+                    ฿{(Number(recipe.total_cost ?? 0) || 0).toFixed(2)}
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Per Serving:</span>
                   <span className="font-medium">
-                    ฿{parseFloat(recipe.cost_per_serving).toFixed(2)}
+                    ฿{(Number(recipe.cost_per_serving ?? 0) || 0).toFixed(2)}
                   </span>
                 </div>
                 
-                {parseFloat(recipe.suggested_price) > 0 && (
+                {(Number(recipe.suggested_price ?? 0) || 0) > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Suggested Price:</span>
                     <span className="font-medium text-emerald-600">
-                      ฿{parseFloat(recipe.suggested_price).toFixed(2)}
+                      ฿{(Number(recipe.suggested_price ?? 0) || 0).toFixed(2)}
                     </span>
                   </div>
                 )}

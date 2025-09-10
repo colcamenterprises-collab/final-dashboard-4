@@ -49,6 +49,8 @@ async function initTables() {
       notes TEXT,
       allergens JSONB DEFAULT '[]',
       nutritional JSONB DEFAULT '{}',
+      version INTEGER DEFAULT 1,
+      parent_id BIGINT REFERENCES recipes(id),
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
@@ -77,15 +79,23 @@ router.get('/cards', async (req, res) => {
     await initTables();
     const { rows } = await pool.query(`
       SELECT id, name, description, category, version, parent_id, image_url, 
-             total_cost, cost_per_serving, suggested_price, instructions, notes,
-             ingredients, created_at, updated_at
+             COALESCE(total_cost, 0)::float8 AS total_cost,
+             COALESCE(cost_per_serving, 0)::float8 AS cost_per_serving,
+             COALESCE(suggested_price, 0)::float8 AS suggested_price,
+             instructions, notes, ingredients, created_at, updated_at
       FROM recipes 
       WHERE is_active = true 
       ORDER BY updated_at DESC
     `);
     
+    // Ensure ingredients is always parsed as an array for consistency
+    const parsedRecipes = rows.map(recipe => ({
+      ...recipe,
+      ingredients: typeof recipe.ingredients === 'string' ? JSON.parse(recipe.ingredients) : recipe.ingredients
+    }));
+    
     console.log(`[/api/recipes/cards] Returning ${rows.length} recipe cards`);
-    res.json({ ok: true, recipes: rows });
+    res.json({ ok: true, recipes: parsedRecipes });
   } catch (error) {
     console.error('[/api/recipes/cards] Error:', error);
     res.status(500).json({ ok: false, error: 'Failed to fetch recipe cards' });
@@ -100,7 +110,9 @@ router.get('/card-generate/:id', async (req, res) => {
     
     const { rows } = await pool.query(`
       SELECT id, name, description, category, version, image_url,
-             ingredients, instructions, notes, total_cost, cost_per_serving
+             ingredients, instructions, notes, 
+             COALESCE(total_cost, 0)::float8 AS total_cost,
+             COALESCE(cost_per_serving, 0)::float8 AS cost_per_serving
       FROM recipes 
       WHERE id = $1 AND is_active = true
     `, [id]);
