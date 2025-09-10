@@ -1,0 +1,133 @@
+Agent Instructions for Implementation
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for adding fields/endpoints (e.g., add 'version' to recipes; new /api/recipes/card-generate).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx for /menu/recipe-cards; add if missing.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Create recipe 'Single Smash Burger', generate card, search, download.
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: No cards; After: Generated A4 PDF - curl GET /api/recipes/card/[id]: 200, size ~500KB".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+
+Task Overview
+
+Create /menu/recipe-cards page: Searchable library (grid cards with name, image, version, buttons view/amend/edit/delete/download); store iterations (v1/v2 on edit/save as new).
+Generate cards from recipes: A4 PDF (jsPDF, yellow background, bold title, ingredients list, notes, image 800x800 scaled, QR for app).
+Merge with /menu/recipes; add "Generate Card" button.
+Proactive: Bulk download ZIP; version history (recipes table add 'version' int, 'parentId' for iterations); search by name/ingredient.
+
+Step-by-Step Actions
+
+Update Schema for Versions (Backend Allowed):
+
+Open shared/schema.ts.
+Add to recipes:
+textversion: integer('version').default(1),
+parentId: text('parentId').references(recipes.id),  // For iterations
+
+Migrate: npx drizzle-kit migrate.
+Test: SQL UPDATE recipes SET version = 1; SELECT version FROM recipes LIMIT 1; Evidence: 1.
+
+
+Backend Endpoints:
+
+Add to routes.ts:
+textapp.get('/api/recipes/cards', async (req, res) => res.json(await db.select().from(recipes).orderBy(desc(updatedAt))));
+app.get('/api/recipes/card-generate/:id', async (req, res) => {
+  const recipe = await db.select().from(recipes).where(eq(id, req.params.id));
+  // Generate A4 PDF with jsPDF backend or send data for frontend gen
+  res.json({ pdfUrl: '/uploads/card-[id].pdf' });  // Assume gen/save
+});
+
+Test: Curl GET /api/recipes/cards length >0. Evidence: Count X.
+
+
+Frontend /menu/recipe-cards Page (New or Merge):
+
+Create client/src/pages/menu/RecipeCards.tsx.
+Full template:
+textimport { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui/';
+import axios from 'axios';
+import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
+
+export function RecipeCards() {
+  const { data: recipes } = useQuery({ queryKey: ['recipes'], queryFn: () => axios.get('/api/recipes') });
+  const [search, setSearch] = useState('');
+
+  const filtered = recipes.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
+
+  const generateCard = (r) => {
+    const doc = new jsPDF({ format: 'a4' });
+    doc.setFillColor(255, 255, 0);  // Yellow
+    doc.rect(0, 0, 210, 297, 'F');
+    doc.setFontSize(40);
+    doc.setTextColor(0, 0, 0);
+    doc.text(r.name.toUpperCase(), 105, 50, { align: 'center' });
+    doc.addImage(r.imageUrl, 'JPEG', 150, 60, 50, 50);  // Scaled 800x800
+    doc.setFontSize(20);
+    doc.text('Ingredients & Order:', 20, 100);
+    r.ingredients.forEach((ing, i) => doc.text(`- ${ing.portion} ${ing.unit} ${ing.name}`, 20, 120 + i*10));
+    doc.text('Notes:', 20, 120 + r.ingredients.length*10 + 20);
+    doc.text(r.notes, 20, 120 + r.ingredients.length*10 + 30, { maxWidth: 170 });
+    QRCode.toDataURL('/menu/recipes/' + r.id, (err, url) => {
+      doc.addImage(url, 'PNG', 20, 260, 30, 30);
+    });
+    doc.save(`${r.name}.pdf`);
+  };
+
+  const bulkDownload = () => {
+    const zip = new JSZip();
+    recipes.forEach(r => {
+      const doc = new jsPDF({ format: 'a4' });
+      // Gen as above
+      zip.file(`${r.name}.pdf`, doc.output('blob'));
+    });
+    zip.generateAsync({type: 'blob'}).then(content => saveAs(content, 'recipes.zip'));
+  };
+
+  return (
+    <div>
+      <Input placeholder="Search recipes..." onChange={(e) => setSearch(e.target.value)} />
+      <div className="grid grid-cols-3 gap-4">
+        {filtered.map(r => (
+          <Card key={r.id}>
+            <CardHeader><CardTitle>{r.name} v{r.version}</CardTitle></CardHeader>
+            <CardContent>
+              <Button onClick={() => setSelectedRecipe(r)}>Edit</Button>
+              <Button onClick={() => generateCard(r)}>Download Card</Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Button onClick={bulkDownload}>Bulk Download</Button>
+    </div>
+  );
+}
+
+Add route in App.tsx: <Route path="/menu/recipe-cards" element={<recipecards>} />.</recipecards>
+Test: Create recipe, generate card — A4 PDF with yellow, ingredients, notes, image 800x800 scaled, QR. Evidence: Console 'Generated card for ID X', PDF size ~100KB.
+
+
+Add Image Upload in Recipe Form (Frontend):
+
+Open Recipes.tsx.
+Add <Input type="file" onChange={(e) => uploadImage(e.target.files[0], setImageUrl)} />; resize to 800x800 with sharp.
+Backend /api/recipes/upload-image: Sharp resize 800x800, save.
+Test: Upload image — resizes, stores URL in recipe. Evidence: Curl POST file, return URL, image dims 800x800.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Run this—adds library, cards, image. Test generate/download, share PDF screenshot. Proactive: Add Thai/English toggle for notes.
