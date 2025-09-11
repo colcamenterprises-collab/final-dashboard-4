@@ -60,6 +60,11 @@ export class CronEmailService {
         .from(shoppingList)
         .where(eq(shoppingList.formId, formData.id));
 
+      // Get ingredients data for drinks cost calculation
+      const { pool } = await import('../db');
+      const ingredientsQuery = await pool.query('SELECT name, "unitCost", category FROM ingredient_v2');
+      const ingredients = ingredientsQuery.rows;
+
       // Get latest analysis insight
       const insight = await db
         .select()
@@ -71,7 +76,7 @@ export class CronEmailService {
       const analysisData = insight.length > 0 ? insight[0] : null;
 
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, shopping, analysisData);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, shopping, analysisData, ingredients);
 
       // Send email using Gmail API
       await this.sendEmail(htmlContent, lastShiftDate || '');
@@ -85,7 +90,7 @@ export class CronEmailService {
   /**
    * Generate HTML email content
    */
-  private generateEmailHTML(date: string, formData: any, shopping: any[], analysisData: any): string {
+  private generateEmailHTML(date: string, formData: any, shopping: any[], analysisData: any, ingredients: any[] = []): string {
     const balanceStatus = analysisData?.description?.includes('No anomalies') ? 'Yes' : 'No';
     const anomalies = analysisData?.description || 'No analysis available';
 
@@ -155,6 +160,48 @@ export class CronEmailService {
             : '<p>No shopping items generated from this form.</p>'
           }
         </div>
+
+        ${(() => {
+          // Filter drinks from shopping list with cost calculation
+          const drinksRequisition = shopping.filter(item => {
+            const ingredient = ingredients.find(i => 
+              i.name.toLowerCase() === item.itemName.toLowerCase()
+            );
+            return ingredient?.category === 'Drinks';
+          });
+          
+          if (drinksRequisition.length === 0) return '';
+          
+          return `
+            <div class="section">
+              <h2>🥤 Drinks Requisition (${drinksRequisition.length} items)</h2>
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="background-color: #f8f9fa;">
+                    <th style="padding: 8px; text-align: left; border: 1px solid #e0e0e0;">Item</th>
+                    <th style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">Qty</th>
+                    <th style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">Cost (THB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${drinksRequisition.map(item => {
+                    const ingredient = ingredients.find(i => 
+                      i.name.toLowerCase() === item.itemName.toLowerCase()
+                    );
+                    const cost = item.quantity * (parseFloat(ingredient?.unitCost) || 0);
+                    return `
+                      <tr>
+                        <td style="padding: 8px; border: 1px solid #e0e0e0;">${item.itemName}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">${item.quantity}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #e0e0e0; font-weight: bold;">฿${cost.toFixed(2)}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        })()}
 
         <div class="section">
           <h2>📝 Additional Notes</h2>

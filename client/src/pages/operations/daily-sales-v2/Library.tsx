@@ -8,6 +8,8 @@
 // – Only apply exactly what is written below
 
 import React, { useEffect, useState } from "react";
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 
 // THB formatting helper
 const thb = (v: unknown): string => {
@@ -37,6 +39,55 @@ type FullRecord = {
   stock: any;
   shoppingList: { name: string; qty: number; unit: string }[];
 };
+
+// Drinks Requisition Component with costs from ingredient_v2
+function DrinksRequisitionSection({ requisition }: { requisition: any[] }) {
+  const { data: ingredients } = useQuery({ 
+    queryKey: ['ingredients'], 
+    queryFn: () => axios.get('/api/ingredients') 
+  });
+  
+  if (!ingredients?.data?.length) {
+    return null;
+  }
+  
+  const drinksRequisition = requisition.filter(r => {
+    const ingredient = ingredients.data.find(i => i.id === r.id || i.name.toLowerCase() === r.name.toLowerCase());
+    return ingredient?.category === 'Drinks';
+  });
+  
+  if (drinksRequisition.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-blue-50 p-3 rounded">
+      <h4 className="font-semibold mb-2">Drinks Requisition</h4>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left p-1">Item</th>
+            <th className="text-right p-1">Qty</th>
+            <th className="text-right p-1">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {drinksRequisition.map((r, idx) => {
+            const ingredient = ingredients.data.find(i => i.id === r.id || i.name.toLowerCase() === r.name.toLowerCase());
+            const cost = r.qty * (ingredient?.unitCost || 0);
+            return (
+              <tr key={idx}>
+                <td className="p-1">{ingredient?.name || r.name}</td>
+                <td className="text-right p-1">{r.qty}</td>
+                <td className="text-right p-1 font-semibold">{thb(cost)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function DailySalesV2Library() {
   const [records, setRecords] = useState<RecordType[]>([]);
@@ -570,6 +621,9 @@ export default function DailySalesV2Library() {
                     </div>
                   )}
                 </div>
+
+                {/* Drinks Requisition Section */}
+                <DrinksRequisitionSection requisition={selected.shoppingList} />
               </div>
             </div>
 
