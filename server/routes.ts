@@ -2772,6 +2772,7 @@ app.use("/api/bank-imports", bankUploadRouter);
       }
       
       // Get ingredient cost data from database
+      const { pool } = await import('./db');
       const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand, packagesize, portionsize, lastreview FROM ingredient_v2');
       const ingredients = ingredientsQuery.rows;
       
