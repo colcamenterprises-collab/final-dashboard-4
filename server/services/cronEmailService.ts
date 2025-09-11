@@ -75,7 +75,7 @@ export class CronEmailService {
       const analysisData = insight.length > 0 ? insight[0] : null;
 
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, shopping, analysisData, ingredients);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients);
 
       // Send email using Gmail API
       await this.sendEmail(htmlContent, lastShiftDate || '');
@@ -89,7 +89,7 @@ export class CronEmailService {
   /**
    * Generate HTML email content
    */
-  private generateEmailHTML(date: string, formData: any, shopping: any[], analysisData: any, ingredients: any[] = []): string {
+  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = []): string {
     const balanceStatus = analysisData?.description?.includes('No anomalies') ? 'Yes' : 'No';
     const anomalies = analysisData?.description || 'No analysis available';
 
@@ -146,9 +146,9 @@ export class CronEmailService {
         </div>
 
         <div class="section">
-          <h2>🛒 Shopping List (${totalItems} items)</h2>
-          ${Object.keys(groupedList).length > 0 ? 
-            Object.entries(groupedList).map(([category, items]) => `
+          <h2>🛒 Shopping List (${shoppingData.totalItems} items)</h2>
+          ${Object.keys(shoppingData.groupedList).length > 0 ? 
+            Object.entries(shoppingData.groupedList).map(([category, items]) => `
               <div class="category-section" style="margin-bottom: 20px;">
                 <h3 style="color: #e74c3c; margin-bottom: 10px; border-bottom: 2px solid #e74c3c; padding-bottom: 5px;">
                   ${category} (${items.length} items)
@@ -177,9 +177,9 @@ export class CronEmailService {
 
         ${(() => {
           // Drinks are now properly categorized in the shopping list above
-          const drinksItems = groupedList['Drinks'] || [];
-          const meatItems = groupedList['Meat'] || [];
-          const bakeryItems = groupedList['Bakery'] || [];
+          const drinksItems = shoppingData.groupedList['Drinks'] || [];
+          const meatItems = shoppingData.groupedList['Meat'] || [];
+          const bakeryItems = shoppingData.groupedList['Bakery'] || [];
           
           let specialSections = '';
           

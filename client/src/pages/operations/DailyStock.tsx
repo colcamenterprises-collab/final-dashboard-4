@@ -120,9 +120,8 @@ const DailyStock: React.FC = () => {
   };
 
   const buildItemsFromState = () => {
-    // Only include non-drink ingredients (drinks are stock count, not requisition)
+    // Include ALL ingredients including drinks in requisition payload
     return ingredients
-      .filter(ingredient => ingredient.category !== 'Drinks')
       .map(ingredient => ({
         name: ingredient.name,
         category: ingredient.category,
