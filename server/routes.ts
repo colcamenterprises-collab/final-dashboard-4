@@ -2734,12 +2734,12 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Shopping List API endpoints
   app.post('/api/shopping-list/regenerate', async (req: Request, res: Response) => {
     try {
-      // Get the most recent daily sales form with requisition data
-      const response = await fetch('http://localhost:5000/api/forms/daily-sales/v2');
+      // Get the most recent daily stock form with requisition data
+      const response = await fetch('http://localhost:5000/api/forms/daily-stock/v2');
       const data = await response.json();
       
       if (!data.ok || !data.records) {
-        return res.json({ ok: true, message: "No forms found", itemsGenerated: 0 });
+        return res.json({ ok: true, message: "No stock forms found", itemsGenerated: 0 });
       }
 
       // Find the most recent record with requisition data
@@ -2748,7 +2748,7 @@ app.use("/api/bank-imports", bankUploadRouter);
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       if (recordsWithRequisition.length === 0) {
-        return res.json({ ok: true, message: "No requisition data found in recent forms", itemsGenerated: 0 });
+        return res.json({ ok: true, message: "No requisition data found in recent stock forms", itemsGenerated: 0 });
       }
 
       const lastForm = recordsWithRequisition[0];
@@ -2830,9 +2830,9 @@ app.use("/api/bank-imports", bankUploadRouter);
       const { pool } = await import('./db');
       const { foodCostings } = await import('./data/foodCostings');
       
-      // Get the most recent daily sales form requisition data
+      // Get the most recent daily stock form requisition data
       const latestStock = await pool.query(`
-        SELECT payload FROM daily_sales_v2 
+        SELECT payload FROM daily_stock_v2 
         WHERE payload->>'requisition' IS NOT NULL 
         ORDER BY "createdAt" DESC 
         LIMIT 1
