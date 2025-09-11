@@ -243,9 +243,9 @@ export default function ShoppingList() {
     return 0;
   };
 
-  const totalCost = shoppingList?.reduce((total, item) => 
+  const totalCost = Array.isArray(shoppingList) ? shoppingList.reduce((total: number, item: any) => 
     total + getEstimatedCost(item), 0
-  ) || 0;
+  ) : 0;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -348,7 +348,7 @@ export default function ShoppingList() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {shoppingList?.map((item) => (
+                    {Array.isArray(shoppingList) && shoppingList.map((item: any) => (
                       <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                         {/* Mobile-first layout */}
                         <div className="flex items-start justify-between">
@@ -393,7 +393,7 @@ export default function ShoppingList() {
                       </div>
                     ))}
                 
-                {(!shoppingList || shoppingList.length === 0) && (
+                {(!Array.isArray(shoppingList) || shoppingList.length === 0) && (
                   <div className="text-center py-8">
                     <p className="text-gray-500 mb-4">No items in your shopping list yet.</p>
                     <p className="text-sm text-gray-400">Add items manually or they'll be generated automatically from Daily Stock & Sales forms.</p>
@@ -504,7 +504,7 @@ export default function ShoppingList() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {suppliers?.map((supplier) => (
+                {Array.isArray(suppliers) && suppliers.map((supplier: any) => (
                   <div key={supplier.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
@@ -566,7 +566,7 @@ export default function ShoppingList() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {shoppingListHistory?.map((item) => (
+            {Array.isArray(shoppingListHistory) && shoppingListHistory.map((item: any) => (
               <div key={item.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
                 <div className="flex items-center space-x-3">
                   <CheckCircle className="h-5 w-5 text-green-500" />
@@ -591,7 +591,7 @@ export default function ShoppingList() {
               </div>
             ))}
             
-            {(!shoppingListHistory || shoppingListHistory.length === 0) && (
+            {(!Array.isArray(shoppingListHistory) || shoppingListHistory.length === 0) && (
               <div className="text-center py-8">
                 <p className="text-gray-500">No completed shopping lists yet.</p>
               </div>
@@ -622,7 +622,7 @@ export default function ShoppingList() {
           </div>
           
           <div className="space-y-4">
-            {shoppingListByDate?.map((item) => (
+            {Array.isArray(shoppingListByDate) && shoppingListByDate.map((item: any) => (
               <div key={item.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -647,7 +647,7 @@ export default function ShoppingList() {
               </div>
             ))}
             
-            {(!shoppingListByDate || shoppingListByDate.length === 0) && (
+            {(!Array.isArray(shoppingListByDate) || shoppingListByDate.length === 0) && (
               <div className="text-center py-8">
                 <p className="text-gray-500">No shopping lists found for {formatDate(selectedDate)}.</p>
               </div>
