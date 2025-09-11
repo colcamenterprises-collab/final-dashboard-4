@@ -2826,38 +2826,61 @@ app.use("/api/bank-imports", bankUploadRouter);
 
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
+      console.log('Shopping list pulling from: ingredients DB');
       const { pool } = await import('./db');
       
-      if (req.params.date) {
-        // Get shopping list for specific date
-        const requestedDate = req.params.date;
-        const result = await pool.query(`
-          SELECT items FROM shopping_list 
-          WHERE DATE(created_at) = $1 
-          ORDER BY created_at DESC 
-          LIMIT 1
-        `, [requestedDate]);
-        
-        if (result.rows.length > 0 && result.rows[0].items) {
-          return res.json(result.rows[0].items);
-        } else {
-          return res.json([]);
-        }
-      } else {
-        // Get current shopping list (most recent incomplete one)
-        const result = await pool.query(`
-          SELECT items FROM shopping_list 
-          WHERE is_completed = false OR is_completed IS NULL
-          ORDER BY created_at DESC 
-          LIMIT 1
-        `);
-        
-        if (result.rows.length > 0 && result.rows[0].items) {
-          return res.json(result.rows[0].items);
-        } else {
-          return res.json([]);
-        }
+      // Get the most recent daily sales form requisition data
+      const latestStock = await pool.query(`
+        SELECT payload FROM daily_sales_v2 
+        WHERE payload->>'requisition' IS NOT NULL 
+        ORDER BY "createdAt" DESC 
+        LIMIT 1
+      `);
+      
+      if (latestStock.rows.length === 0) {
+        console.log('No requisition data found');
+        return res.json({ groupedList: {}, source: 'ingredients DB', totalItems: 0 });
       }
+      
+      const requisition = latestStock.rows[0].payload?.requisition || [];
+      console.log('Requisition items found:', requisition.length);
+      
+      // Get ingredient data for matching items
+      const itemNames = requisition.map((r: any) => r.name.toLowerCase());
+      const ingredients = await pool.query(`
+        SELECT name, category FROM ingredient_v2 
+        WHERE LOWER(name) = ANY($1)
+      `, [itemNames]);
+      
+      // Group by category with only item name and quantity
+      const groupedList: any = {};
+      let totalItems = 0;
+      
+      for (const reqItem of requisition) {
+        const ingredient = ingredients.rows.find((i: any) => 
+          i.name.toLowerCase() === reqItem.name.toLowerCase()
+        );
+        
+        const category = ingredient?.category || 'Other';
+        if (!groupedList[category]) {
+          groupedList[category] = [];
+        }
+        
+        groupedList[category].push({
+          name: reqItem.name,
+          qty: reqItem.qty
+        });
+        totalItems++;
+      }
+      
+      console.log('Grouped categories:', Object.keys(groupedList));
+      console.log('Total items processed:', totalItems);
+      
+      res.json({ 
+        groupedList, 
+        source: 'ingredients DB',
+        totalItems 
+      });
     } catch (error) {
       console.error('Shopping list error:', error);
       res.status(500).json({ ok: false, error: 'Failed to retrieve shopping list' });

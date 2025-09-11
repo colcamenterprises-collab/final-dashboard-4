@@ -1,0 +1,131 @@
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., update shopping list endpoint to pull from ingredients table).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if needed; no changes.
+If multiple definitions found, stop and ask Cam.
+Mandatory Verification & Evidence: For EVERY fix, you MUST:
+
+Test locally: Submit form with sample (e.g., 'Coke' qty 6, category 'Drinks').
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: Shopping list shows portion; After: Only item/qty - curl GET /api/shopping-list: {list: [{name: 'Coke', qty: 6}], totalCost: 0 (no pricing needed)".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug and re-test in same run.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+God Data Training: Understand the ingredient table as source of truth:
+
+Name: Exact item name (e.g., 'Topside Beef' or 'Coke').
+Category: Grouping (e.g., 'Meat' for headings in forms, 'Drinks' for filtering).
+Supplier: Purchase source (e.g., 'Makro'—use for shopping supplier column if needed).
+Brand: Specific brand (e.g., 'Harvey Beef'—display in UI if relevant, not shopping).
+Cost: Supplier price (e.g., 319 THB—use for estimates if added, but not required here).
+Package: Packaging (e.g., 'Per kg'—use for unit in forms, not shopping).
+Portion: Menu portion (e.g., '95 gr'—irrelevant for shopping; exclude).
+Last Review: Date reviewed (e.g., '20.08.25'—use for UI sort/filter, not shopping).
+God table is Ingredient Management page/DB—CSV initial only; UI edits update DB, sync refreshes forms from DB.
+
+
+
+Task Overview
+
+Format shopping list: Only item, quantity (no portion, cost, etc.); group by category/headings from ingredients (e.g., 'Drinks' section with items).
+God data: Use Ingredient Management table/DB as truth (no .ts/CSV; sync updates forms from DB).
+Add ingredients: On add in Ingredient page, auto-update "Daily Sales & Stock" form headings/dropdowns (refetch on sync).
+Sync: "Sync from god file" → "Sync to Forms" (POST /api/ingredients/sync-forms, refetch in DailyStock.tsx).
+Proactive: Add 'Total Items: X' in list; export CSV (item, qty).
+
+Step-by-Step Actions
+
+Diagnose Data Source (Backend):
+
+Open server/api/shopping-list.ts (or routes.ts).
+Log source: console.log('Shopping list pulling from: ingredients DB');
+Curl GET /api/shopping-list | jq '.source'  // Add {source: 'ingredients'} in res.json.
+Test: Restart, curl — log 'ingredients DB', length matches requisition from DB. Evidence: Console 'Pulling from ingredients', curl length X.
+
+
+Update Shopping List Endpoint (Backend):
+
+Full code:
+textimport { db } from '../db';
+import { dailyStockV2, ingredients } from 'shared/schema';
+
+app.get('/api/shopping-list', async (req, res) => {
+  const latestStock = await db.select({ requisition: dailyStockV2.requisition }).from(dailyStockV2).orderBy(sql`createdAt DESC`).limit(1);
+  const requisition = latestStock[0]?.requisition || [];  // json [{id, qty}]
+  const itemIds = requisition.map(r => r.id);
+  const items = await db.select().from(ingredients).where(sql`id IN (${itemIds.join(',')})`);
+
+  const groupedList = {};
+  items.map(i => {
+    const r = requisition.find(x => x.id === i.id);
+    const cat = i.category || 'Other';
+    if (!groupedList[cat]) groupedList[cat] = [];
+    groupedList[cat].push({ name: i.name, qty: r.qty });
+  });
+  res.json({ groupedList, source: 'ingredients DB' });
+});
+
+Test: Submit form with 'Coke' 6 — curl GET grep 'Drinks': [{name: 'Coke', qty: 6}]. Evidence: Log grouped length, grep 'Coke'.
+
+
+Update Shopping Page UI (Frontend):
+
+Open client/src/pages/operations/shopping-list/ShoppingListPage.tsx.
+Full template:
+textimport { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+
+export function ShoppingListPage() {
+  const { data } = useQuery({ queryKey: ['shopping-list'], queryFn: () => axios.get('/api/shopping-list') });
+  const { groupedList } = data?.data || {};
+
+  return (
+    <div>
+      <h1>Shopping List</h1>
+      {Object.keys(groupedList).map(cat => (
+        <div key= {cat}>
+          <h2>{cat}</h2>
+          <table>
+            <tr><th>Item</th><th>Quantity</th></tr>
+            {groupedList[cat].map(i => <tr key={i.name}><td>{i.name}</td><td>{i.qty}</td></tr>)}
+          </table>
+        </div>
+      ))}
+      <p>Total Items: {Object.values(groupedList).reduce((sum, group) => sum + group.length, 0)}</p>
+      <Button onClick={() => exportCSV(groupedList)}>Export CSV</Button>
+    </div>
+  );
+}
+
+const exportCSV = (grouped) => {
+  let csv = 'Category,Item,Quantity\n';
+  for (const cat in grouped) {
+    grouped[cat].map(i => csv += `${cat},${i.name},${i.qty}\n`);
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'shopping-list.csv';
+  a.click();
+};
+
+Test: Load — Drinks section with items/qty only. Evidence: Console 'Grouped Drinks length Y', page grep 'Coke 6'.
+
+
+Update Form Library & Email (Frontend/Backend):
+
+Open Library.tsx: Add grouped requisition like above, with categories (Drinks included).
+Backend email: Add grouped list to text (item qty only, group by category).
+Test: View completed form — shows Drinks group. Evidence: Curl id, grep 'Drinks: Coke 6'.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Run this—fixes format, uses ingredients DB. Test with 'Coke' 6, share shopping screenshot. Proactive: Add sort by category, 'Print List' button (window.print).

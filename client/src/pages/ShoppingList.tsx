@@ -31,9 +31,11 @@ export default function ShoppingList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: shoppingList, isLoading } = useQuery({
+  const { data: shoppingListData, isLoading } = useQuery({
     queryKey: ["/api/shopping-list"],
   });
+
+  const { groupedList = {}, totalItems = 0 } = shoppingListData || {};
 
   const { data: shoppingListHistory } = useQuery({
     queryKey: ["/api/shopping-list/history"],
@@ -243,9 +245,24 @@ export default function ShoppingList() {
     return 0;
   };
 
-  const totalCost = Array.isArray(shoppingList) ? shoppingList.reduce((total: number, item: any) => 
-    total + getEstimatedCost(item), 0
-  ) : 0;
+  // CSV Export function
+  const exportCSV = () => {
+    let csv = 'Category,Item,Quantity\n';
+    for (const category in groupedList) {
+      groupedList[category].forEach((item: any) => {
+        csv += `${category},${item.name},${item.qty}\n`;
+      });
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'shopping-list.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const totalCost = 0; // Cost calculation removed as per requirements
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -261,6 +278,33 @@ export default function ShoppingList() {
       currency: 'THB'
     }).format(amount);
   };
+
+  // Helper function for rendering grouped shopping list
+  const renderGroupedList = () => (
+    Object.entries(groupedList || {}).map(([category, items]: [string, any[]]) => (
+      <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2 bg-gray-50 font-semibold text-gray-900">{category}</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {items.map((it: any, idx: number) => (
+                <tr key={idx}>
+                  <td className="px-4 py-2 text-sm text-gray-900">{it.name}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{it.qty}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ))
+  );
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -278,6 +322,15 @@ export default function ShoppingList() {
           >
             <Bot className="mr-2 h-4 w-4" />
             {regenerateShoppingListMutation.isPending ? "Regenerating..." : "Regenerate from Last Form"}
+          </Button>
+          <Button 
+            onClick={exportCSV}
+            variant="outline"
+            disabled={totalItems === 0}
+            className="w-full xs:w-auto"
+          >
+            <Package className="mr-2 h-4 w-4" />
+            Export CSV
           </Button>
           <Dialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
             <DialogTrigger asChild>
@@ -333,12 +386,10 @@ export default function ShoppingList() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg font-semibold text-gray-900">
-                      Current Shopping List 
-                      {totalCost > 0 && (
-                        <span className="ml-2 text-sm font-normal text-green-600">
-                          (Estimated: {formatCurrency(totalCost)})
-                        </span>
-                      )}
+                      Shopping List
+                      <span className="ml-2 text-sm font-normal text-blue-600">
+                        Total Items: {totalItems}
+                      </span>
                     </CardTitle>
                     <Button variant="ghost" className="text-primary hover:text-primary-dark text-sm font-medium">
                       <Plus className="mr-1 h-4 w-4" />
@@ -347,69 +398,17 @@ export default function ShoppingList() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {Array.isArray(shoppingList) && shoppingList.map((item: any) => (
-                      <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                        {/* Mobile-first layout */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3 flex-1">
-                            <Checkbox
-                              checked={item.selected || selectedItems.includes(item.id)}
-                              onCheckedChange={(checked) => handleCheckboxChange(item.id, checked as boolean)}
-                              className="mt-1"
-                            />
-                            <div className="flex items-center space-x-3 flex-1">
-                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                {getItemIcon(item)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-900 break-words">{item.itemName}</p>
-                                <p className="text-xs text-gray-500 mt-1">{item.supplier}</p>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mt-2">
-                                  <span className="text-sm font-medium text-gray-900">{item.quantity} {item.unit}</span>
-                                  {item.estimatedCost && parseFloat(item.estimatedCost) > 0 && (
-                                    <span className="text-sm text-green-600 font-medium">
-                                      Est: {formatCurrency(parseFloat(item.estimatedCost))}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2 ml-3">
-                            <Badge className={`${getPriorityColor(item.priority)} text-xs`}>
-                              {item.priority}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
+                  <div className="space-y-6">
+                    {Object.keys(groupedList || {}).length > 0 ? (
+                      renderGroupedList()
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 mb-4">No items in your shopping list yet.</p>
+                        <p className="text-sm text-gray-400">Click "Regenerate from Last Form" to generate items from your latest daily form.</p>
                       </div>
-                    ))}
-                
-                {(!Array.isArray(shoppingList) || shoppingList.length === 0) && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No items in your shopping list yet.</p>
-                    <p className="text-sm text-gray-400">Add items manually or they'll be generated automatically from Daily Stock & Sales forms.</p>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {totalCost > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">Total Estimated Cost</span>
-                    <span className="text-xl font-bold text-primary">{formatCurrency(totalCost)}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
+                </CardContent>
           </Card>
 
           {/* Add Item Form */}
