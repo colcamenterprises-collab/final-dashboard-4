@@ -2771,19 +2771,19 @@ app.use("/api/bank-imports", bankUploadRouter);
         }
       }
       
-      // Get ingredient cost data from CSV
-      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
-      const catalogItems = loadCatalogFromCSV();
+      // Get ingredient cost data from database
+      const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand, packagesize, portionsize, lastreview FROM ingredient_v2');
+      const ingredients = ingredientsQuery.rows;
       
       // Create a lookup map for ingredient costs
-      const ingredientCosts = catalogItems.reduce((acc: any, item) => {
-        const raw = item.raw || {};
-        const costString = raw['Cost']?.replace('฿', '').replace(',', '') || '0';
-        const cost = parseFloat(costString) || 0;
+      const ingredientCosts = ingredients.reduce((acc: any, item) => {
         acc[item.name.toLowerCase()] = {
-          cost: cost,
-          unit: raw['Packaging Qty'] || 'each',
-          supplier: raw['Supplier'] || 'Unknown'
+          cost: parseFloat(item.unitCost) || 0,
+          unit: item.packagesize || 'each',
+          supplier: item.supplier || 'Unknown',
+          brand: item.brand || '',
+          portion: item.portionsize || '',
+          lastReview: item.lastreview || ''
         };
         return acc;
       }, {});
