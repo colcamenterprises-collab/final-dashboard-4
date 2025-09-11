@@ -56,21 +56,21 @@ const DailyStock: React.FC = () => {
     return ingredients.filter(item => item.category === 'Drinks');
   }, [ingredients]);
 
-  // Group non-drink ingredients by category with custom order
+  // Group all ingredients by category with custom order (including drinks)
   const blocks: CategoryBlock[] = useMemo(() => {
     if (!Array.isArray(ingredients)) return [];
     const map = new Map<string, IngredientItem[]>();
     
-    // Filter out drinks as they're handled separately as stock count
-    const nonDrinkIngredients = ingredients.filter(item => item.category !== 'Drinks');
+    // Include ALL ingredients including drinks in requisition calculation
+    const allIngredients = ingredients;
     
-    for (const ingredient of nonDrinkIngredients) {
+    for (const ingredient of allIngredients) {
       if (!map.has(ingredient.category)) map.set(ingredient.category, []);
       map.get(ingredient.category)!.push(ingredient);
     }
     
-    // Custom category order: Fresh Food, Shelf Items, Frozen Food, others alphabetically
-    const categoryOrder = ['Fresh Food', 'Shelf Items', 'Frozen Food'];
+    // Custom category order: Drinks first, then Fresh Food, Shelf Items, Frozen Food, others alphabetically
+    const categoryOrder = ['Drinks', 'Fresh Food', 'Shelf Items', 'Frozen Food'];
     const orderedCategories = Array.from(map.keys()).sort((a, b) => {
       const aIndex = categoryOrder.indexOf(a);
       const bIndex = categoryOrder.indexOf(b);
