@@ -2826,8 +2826,9 @@ app.use("/api/bank-imports", bankUploadRouter);
 
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
-      console.log('Shopping list pulling from: ingredients DB');
+      console.log('Shopping list pulling from: TypeScript + DB');
       const { pool } = await import('./db');
+      const { foodCostings } = await import('./data/foodCostings');
       
       // Get the most recent daily sales form requisition data
       const latestStock = await pool.query(`
@@ -2839,29 +2840,47 @@ app.use("/api/bank-imports", bankUploadRouter);
       
       if (latestStock.rows.length === 0) {
         console.log('No requisition data found');
-        return res.json({ groupedList: {}, source: 'ingredients DB', totalItems: 0 });
+        return res.json({ groupedList: {}, source: 'TypeScript + DB', totalItems: 0 });
       }
       
       const requisition = latestStock.rows[0].payload?.requisition || [];
       console.log('Requisition items found:', requisition.length);
       
-      // Get ingredient data for matching items
-      const itemNames = requisition.map((r: any) => r.name.toLowerCase());
-      const ingredients = await pool.query(`
-        SELECT name, category FROM ingredient_v2 
-        WHERE LOWER(name) = ANY($1)
-      `, [itemNames]);
+      // Create lookup map from TypeScript data for categorization
+      const categoryLookup = new Map();
+      foodCostings.forEach(item => {
+        categoryLookup.set(item.item.toLowerCase(), item.category);
+      });
       
       // Group by category with only item name and quantity
       const groupedList: any = {};
       let totalItems = 0;
       
       for (const reqItem of requisition) {
-        const ingredient = ingredients.rows.find((i: any) => 
-          i.name.toLowerCase() === reqItem.name.toLowerCase()
-        );
+        // Try to find category from TypeScript data first
+        let category = categoryLookup.get(reqItem.name.toLowerCase());
         
-        const category = ingredient?.category || 'Other';
+        // Fallback categorization for common items
+        if (!category) {
+          const itemLower = reqItem.name.toLowerCase();
+          if (itemLower.includes('coke') || itemLower.includes('fanta') || itemLower.includes('sprite') || 
+              itemLower.includes('drink') || itemLower.includes('water') || itemLower.includes('juice')) {
+            category = 'Drinks';
+          } else if (itemLower.includes('beef') || itemLower.includes('meat') || 
+                     itemLower.includes('chicken') || itemLower.includes('pork')) {
+            category = 'Meat';
+          } else if (itemLower.includes('bun') || itemLower.includes('roll') || itemLower.includes('bread')) {
+            category = 'Bakery';
+          } else if (itemLower.includes('lettuce') || itemLower.includes('tomato') || 
+                     itemLower.includes('onion') || itemLower.includes('vegetable') || itemLower.includes('salad')) {
+            category = 'Fresh Food';
+          } else if (itemLower.includes('fries') || itemLower.includes('frozen')) {
+            category = 'Frozen Food';
+          } else {
+            category = 'Other';
+          }
+        }
+        
         if (!groupedList[category]) {
           groupedList[category] = [];
         }
@@ -2878,7 +2897,7 @@ app.use("/api/bank-imports", bankUploadRouter);
       
       res.json({ 
         groupedList, 
-        source: 'ingredients DB',
+        source: 'TypeScript + DB',
         totalItems 
       });
     } catch (error) {

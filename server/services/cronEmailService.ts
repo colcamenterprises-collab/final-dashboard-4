@@ -54,11 +54,10 @@ export class CronEmailService {
 
       const formData = form[0];
 
-      // Get shopping list for the form
-      const shopping = await db
-        .select()
-        .from(shoppingList)
-        .where(eq(shoppingList.formId, formData.id));
+      // Get shopping list from the new categorized endpoint
+      const shoppingResponse = await fetch('http://localhost:5000/api/shopping-list');
+      const shoppingData = await shoppingResponse.json();
+      const { groupedList = {}, totalItems = 0 } = shoppingData;
 
       // Get ingredients data for drinks cost calculation
       const { pool } = await import('../db');
@@ -147,60 +146,71 @@ export class CronEmailService {
         </div>
 
         <div class="section">
-          <h2>🛒 Shopping List (${shopping.length} items)</h2>
-          ${shopping.length > 0 ? 
-            `<ul>
-              ${shopping.map(item => `
-                <li class="shopping-item">
-                  <strong>${item.itemName}:</strong> ${item.quantity} ${item.unit || 'units'}
-                  ${item.category ? `<em>(${item.category})</em>` : ''}
-                </li>
-              `).join('')}
-            </ul>` 
+          <h2>🛒 Shopping List (${totalItems} items)</h2>
+          ${Object.keys(groupedList).length > 0 ? 
+            Object.entries(groupedList).map(([category, items]) => `
+              <div class="category-section" style="margin-bottom: 20px;">
+                <h3 style="color: #e74c3c; margin-bottom: 10px; border-bottom: 2px solid #e74c3c; padding-bottom: 5px;">
+                  ${category} (${items.length} items)
+                </h3>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                  <thead>
+                    <tr style="background-color: #f8f9fa;">
+                      <th style="padding: 8px; text-align: left; border: 1px solid #e0e0e0;">Item</th>
+                      <th style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${items.map(item => `
+                      <tr>
+                        <td style="padding: 8px; border: 1px solid #e0e0e0;">${item.name}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #e0e0e0; font-weight: bold;">${item.qty}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `).join('')
             : '<p>No shopping items generated from this form.</p>'
           }
         </div>
 
         ${(() => {
-          // Filter drinks from shopping list with cost calculation
-          const drinksRequisition = shopping.filter(item => {
-            const ingredient = ingredients.find(i => 
-              i.name.toLowerCase() === item.itemName.toLowerCase()
-            );
-            return ingredient?.category === 'Drinks';
-          });
+          // Drinks are now properly categorized in the shopping list above
+          const drinksItems = groupedList['Drinks'] || [];
+          const meatItems = groupedList['Meat'] || [];
+          const bakeryItems = groupedList['Bakery'] || [];
           
-          if (drinksRequisition.length === 0) return '';
+          let specialSections = '';
           
-          return `
-            <div class="section">
-              <h2>🥤 Drinks Requisition (${drinksRequisition.length} items)</h2>
-              <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                  <tr style="background-color: #f8f9fa;">
-                    <th style="padding: 8px; text-align: left; border: 1px solid #e0e0e0;">Item</th>
-                    <th style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">Qty</th>
-                    <th style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">Cost (THB)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${drinksRequisition.map(item => {
-                    const ingredient = ingredients.find(i => 
-                      i.name.toLowerCase() === item.itemName.toLowerCase()
-                    );
-                    const cost = item.quantity * (parseFloat(ingredient?.unitCost) || 0);
-                    return `
-                      <tr>
-                        <td style="padding: 8px; border: 1px solid #e0e0e0;">${item.itemName}</td>
-                        <td style="padding: 8px; text-align: right; border: 1px solid #e0e0e0;">${item.quantity}</td>
-                        <td style="padding: 8px; text-align: right; border: 1px solid #e0e0e0; font-weight: bold;">฿${cost.toFixed(2)}</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          `;
+          if (drinksItems.length > 0) {
+            specialSections += `
+              <div class="section">
+                <h2>🥤 Drinks Summary</h2>
+                <p><strong>${drinksItems.length} drinks items</strong> are included in the shopping list above with cost tracking.</p>
+              </div>
+            `;
+          }
+          
+          if (meatItems.length > 0) {
+            specialSections += `
+              <div class="section">
+                <h2>🥩 Meat Summary</h2>
+                <p><strong>${meatItems.length} meat items</strong> are included in the shopping list above.</p>
+              </div>
+            `;
+          }
+          
+          if (bakeryItems.length > 0) {
+            specialSections += `
+              <div class="section">
+                <h2>🍞 Bakery/Roll Summary</h2>
+                <p><strong>${bakeryItems.length} bakery items</strong> are included in the shopping list above.</p>
+              </div>
+            `;
+          }
+          
+          return specialSections;
         })()}
 
         <div class="section">
