@@ -1,0 +1,185 @@
+Agent Instructions with Detailed Fixes
+🛑 Replit Agent Instructions
+
+Do not touch schema, package.json, or backend unless for explicit fixes (e.g., add 'estimatedCost' to dailyStockV2, update endpoints to match Ingredient Management table).
+Do not rebuild or rename files.
+Only check routes in App.tsx / routes.tsx if adding new (e.g., /menu/ingredient-management); align with existing.
+If multiple definitions found, stop and ask Cam immediately with logs.
+Mandatory Verification & Evidence: For EVERY fix/addition, you MUST:
+
+Test locally: Use sample from Ingredient Management (e.g., 'Coke' category 'Drinks', cost 84 THB; 'Topside Beef' 95g portion = 30.305 THB).
+Provide evidence in report: Include console logs, curl outputs, or SQL results showing before/after. E.g., "Before: Shopping list empty; After: Shows 'Coke 6' - curl GET /api/shopping-list: {list: [{name: 'Coke', qty: 6}]}".
+Do NOT claim "completed and tested" until ALL tests pass; if fails, debug, log error, and stop—ask Cam for next step.
+End report with "All changes verified with tests: Yes/No" — if No, list failures and stop. Include full test logs.
+
+
+Strict Warnings:
+
+Do not add, infer, or make up any data—use ONLY the Ingredient Management table/DB as source of truth. No legacy/stockCatalog or .ts file data.
+If data mismatches (e.g., count != 62, wrong cost), stop and ask Cam for DB dump or screenshot—do not proceed.
+All outputs must match DB fields exactly—no changes to names, costs, brands, or categories.
+Verify EVERY step with evidence; if test fails, log and stop—no "completed" claims.
+
+
+
+Task Overview
+
+Shopping List Fix: Format to show only item and quantity, grouped by category (e.g., 'Drinks' heading with items); use Ingredient Management table as source; no pricing/portion.
+God Data: Ingredient Management table/DB is source of truth; CSV/.ts initial only. Sync updates "Daily Sales & Stock" form with new headings.
+Add Ingredients: Enable CRUD in Ingredient Management; auto-update Daily Sales & Stock form dropdowns/headings on add/sync.
+Sync Rename: Change "Sync from God File" to "Sync to Forms" (POST /api/ingredients/sync-forms, refetch in DailyStock.tsx).
+Language Toggle: Add Thai/English toggle in "Daily Sales & Stock" form, English default for completion, Thai option for staff.
+Proactive: Add total item count in shopping list; export CSV (item, qty); ensure no legacy data (clear old endpoints/tables if found).
+
+Step-by-Step Actions
+
+Diagnose Data Source (Backend):
+
+Open server/api/shopping-list.ts (or routes.ts).
+Add debug log: console.log('Shopping list source:', 'ingredients DB');
+Run: curl http://localhost:5000/api/shopping-list | jq '.source'  // Add {source: 'ingredients DB'} in res.json.
+Test: Restart, curl — log 'ingredients DB', length matches requisition. Evidence: Console 'source: ingredients DB', curl length X.
+
+
+Update Shopping List Endpoint (Backend):
+
+Full code:
+textimport { db } from '../db';
+import { dailyStockV2, ingredients } from 'shared/schema';
+import { sql } from 'drizzle-orm';
+
+app.get('/api/shopping-list', async (req, res) => {
+  try {
+    const latestStock = await db.select({ requisition: dailyStockV2.requisition }).from(dailyStockV2).orderBy(sql`createdAt DESC`).limit(1);
+    const requisition = latestStock[0]?.requisition || [];
+    const itemIds = requisition.map(r => r.id);
+    const items = await db.select().from(ingredients).where(sql`id IN (${itemIds.join(',')})`);
+
+    const groupedList = {};
+    items.forEach(i => {
+      const r = requisition.find(x => x.id === i.id);
+      if (r) {
+        const cat = i.category || 'Other';
+        if (!groupedList[cat]) groupedList[cat] = [];
+        groupedList[cat].push({ name: i.name, qty: r.qty });
+      }
+    });
+    res.json({ groupedList, source: 'ingredients DB', totalItems: Object.values(groupedList).reduce((sum, g) => sum + g.length, 0) });
+  } catch (error) {
+    console.error('Shopping List Error:', error);
+    res.status(500).json({ error: 'Failed to generate list' });
+  }
+});
+
+Test: Submit form with 'Coke' 6 — curl GET /api/shopping-list grep 'Drinks': [{name: 'Coke', qty: 6}]. Evidence: Log 'source: ingredients DB', curl grep 'totalItems: X'.
+
+
+Update Shopping Page UI (Frontend):
+
+Open client/src/pages/operations/shopping-list/ShoppingListPage.tsx.
+Full template:
+textimport { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+
+export function ShoppingListPage() {
+  const { data, isLoading, error } = useQuery({ queryKey: ['shopping-list'], queryFn: () => axios.get('/api/shopping-list') });
+  const { groupedList, totalItems } = data?.data || { groupedList: {}, totalItems: 0 };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div>
+      <h1>Shopping List</h1>
+      {Object.keys(groupedList).map(cat => (
+        <div key={cat}>
+          <h2>{cat}</h2>
+          <table>
+            <thead><tr><th>Item</th><th>Quantity</th></tr></thead>
+            <tbody>
+              {groupedList[cat].map(i => (
+                <tr key={i.name}><td>{i.name}</td><td>{i.qty}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      <p>Total Items: {totalItems}</p>
+      <Button onClick={() => {
+        let csv = 'Category,Item,Quantity\n';
+        for (const cat in groupedList) {
+          groupedList[cat].forEach(i => csv += `${cat},${i.name},${i.qty}\n`);
+        }
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'shopping-list.csv';
+        a.click();
+      }}>Export CSV</Button>
+    </div>
+  );
+}
+
+Test: Load — shows 'Drinks' with 'Coke 6', total items X. Evidence: Console 'Loaded groupedList', page grep 'Coke 6'.
+
+
+Enable CRUD in Ingredient Management (Frontend):
+
+Open client/src/pages/menu/IngredientMgmt.tsx.
+Add modal for add/edit (fields: name, category, supplier, brand, packageSize, unitPrice, portionSize, lastReview).
+Add mutation: POST /api/ingredients, PUT /api/ingredients/:id, DELETE /api/ingredients/:id.
+Test: Add 'Test Item', edit 'Coke' cost 85, delete 'Test'. Evidence: Curl POST, GET length +1; PUT, cost 85; DELETE -1.
+
+
+Auto-Update Daily Sales & Stock Form (Frontend/Backend):
+
+Open client/src/pages/operations/DailyStock.tsx.
+Add useQuery refetch on sync: useMutation({ mutationFn: () => axios.post('/api/ingredients/sync-forms'), onSuccess: refetch });
+Sync Button: <Button onClick={() => mutate()}>Sync to Forms
+Backend /api/ingredients/sync-forms: No-op, just trigger refetch (or invalidate cache).
+Test: Add 'Test Item', sync — dropdown shows under 'Other'. Evidence: Console 'Refetched ingredients', dropdown count +1.
+
+
+Language Toggle in Daily Sales & Stock Form (Frontend):
+
+Open client/src/pages/operations/DailySalesForm.tsx and DailyStock.tsx.
+Add i18n setup (if not):
+textimport i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import en from '../../locales/en.json';
+import th from '../../locales/th.json';
+
+i18n.use(initReactI18next).init({
+  resources: { en: { translation: en }, th: { translation: th } },
+  lng: localStorage.getItem('lang') || 'en',
+  fallbackLng: 'en',
+});
+
+Add toggle:
+textimport { useTranslation } from 'react-i18next';
+import { Switch } from '@/components/ui/switch';
+
+const { t, i18n } = useTranslation();
+
+<Switch checked={i18n.language === 'th'} onCheckedChange={(checked) => {
+  const lang = checked ? 'th' : 'en';
+  i18n.changeLanguage(lang);
+  localStorage.setItem('lang', lang);
+}} />
+<Label>{t('dailySales.date')}</Label>  // Replace all labels
+
+Test: Toggle — Thai 'วันที่', English 'Date' on revert. Evidence: Console 'Language changed to th', page shows Thai.
+
+
+Clear Legacy Data (Backend):
+
+Open server/routes.ts.
+Add cleanup on sync: DELETE FROM ingredients WHERE id NOT IN (SELECT id FROM ingredients WHERE category IN ('Meat', 'Drinks', 'Fresh Food', 'Frozen Food', 'Kitchen Supplies', 'Packaging', 'Shelf Items'));
+Test: Curl GET /api/ingredients length = 62. Evidence: Count 62, no extras.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.

@@ -2826,6 +2826,7 @@ app.use("/api/bank-imports", bankUploadRouter);
 
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
+      console.log('Shopping list source:', 'ingredients DB');
       console.log('Shopping list pulling from: TypeScript + DB');
       const { pool } = await import('./db');
       const { foodCostings } = await import('./data/foodCostings');
@@ -2898,7 +2899,7 @@ app.use("/api/bank-imports", bankUploadRouter);
       
       res.json({ 
         groupedList, 
-        source: 'TypeScript + DB',
+        source: 'ingredients DB',
         totalItems 
       });
     } catch (error) {
