@@ -2780,19 +2780,40 @@ app.use("/api/bank-imports", bankUploadRouter);
           quantity: item.qty || 1,
           unit: item.unit || 'each',
           supplier: ingredientData?.supplier || 'Unknown',
+          pricePerUnit: unitCost.toFixed(2),
           estimatedCost: estimatedCost.toFixed(2),
           priority: 'medium',
           category: item.category || 'General',
-          notes: `Generated from form ${new Date(lastForm.date).toLocaleDateString()}`
+          notes: `Generated from form ${new Date(lastForm.date).toLocaleDateString()}`,
+          selected: false,
+          aiGenerated: true
         };
       });
+
+      // Save to database - clear existing current shopping list and insert new one
+      await pool.query('DELETE FROM shopping_list WHERE is_completed = false OR is_completed IS NULL');
+      
+      const insertResult = await pool.query(`
+        INSERT INTO shopping_list (
+          sales_form_id, items, total_items, list_name, 
+          is_completed, ai_generated, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        RETURNING id
+      `, [
+        lastForm.id,
+        JSON.stringify(shoppingItems),
+        shoppingItems.length,
+        `Shopping List from ${new Date(lastForm.date).toLocaleDateString()}`,
+        false,
+        true
+      ]);
 
       res.json({ 
         ok: true, 
         message: "Shopping list regenerated successfully", 
         itemsGenerated: shoppingItems.length,
-        items: shoppingItems,
-        sourceDate: lastForm.date
+        sourceDate: lastForm.date,
+        shoppingListId: insertResult.rows[0].id
       });
     } catch (error) {
       console.error('Error regenerating shopping list:', error);
@@ -2805,112 +2826,41 @@ app.use("/api/bank-imports", bankUploadRouter);
 
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
-      // Allow date parameter, default to today
-      const requestedDate = req.params.date || new Date().toISOString().split('T')[0];
-      // Get actual requisition data from daily sales records
-      const response = await fetch('http://localhost:5000/api/forms/daily-sales/v2');
-      const data = await response.json();
-      
-      if (!data.ok || !data.records) {
-        return res.json({ ok: true, data: { items: [] } });
-      }
-      
-      // Find records for the requested date with requisition data
-      const dateRecords = data.records.filter((record: any) => {
-        const recordDate = new Date(record.date).toISOString().split('T')[0];
-        const hasRequisition = record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0;
-        return recordDate === requestedDate && hasRequisition;
-      });
-      
-      // If no data for requested date and no specific date requested, find the most recent date with data
-      if (dateRecords.length === 0 && !req.params.date) {
-        const recordsWithRequisition = data.records.filter((record: any) => {
-          return record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0;
-        });
-        
-        const datesWithData = recordsWithRequisition.map((record: any) => new Date(record.date).toISOString().split('T')[0])
-          .sort().reverse();
-        
-        if (datesWithData.length > 0) {
-          const mostRecentDate = datesWithData[0];
-          const recentRecords = data.records.filter((record: any) => {
-            const recordDate = new Date(record.date).toISOString().split('T')[0];
-            return recordDate === mostRecentDate && record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0;
-          });
-          
-          dateRecords.push(...recentRecords);
-        }
-      }
-      
-      // Get ingredient cost data from database
       const { pool } = await import('./db');
-      const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand, packagesize, portionsize, lastreview FROM ingredient_v2');
-      const ingredients = ingredientsQuery.rows;
       
-      // Create a lookup map for ingredient costs
-      const ingredientCosts = ingredients.reduce((acc: any, item) => {
-        acc[item.name.toLowerCase()] = {
-          cost: parseFloat(item.unitCost) || 0,
-          unit: item.packagesize || 'each',
-          supplier: item.supplier || 'Unknown',
-          brand: item.brand || '',
-          portion: item.portionsize || '',
-          lastReview: item.lastreview || ''
-        };
-        return acc;
-      }, {});
-      
-      // Aggregate actual requisition items with cost calculations
-      const allItems: any[] = [];
-      dateRecords.forEach((record: any) => {
-        if (record.payload?.requisition) {
-          record.payload.requisition.forEach((item: any) => {
-            const ingredientKey = item.name.toLowerCase();
-            const ingredientData = ingredientCosts[ingredientKey];
-            const unitCost = ingredientData?.cost || 0;
-            const estimatedTotalCost = unitCost * (item.qty || 1);
-            
-            allItems.push({
-              name: item.name,
-              qty: item.qty,
-              unit: item.unit,
-              category: item.category || 'General',
-              unitCost: unitCost,
-              totalCost: estimatedTotalCost,
-              supplier: ingredientData?.supplier || 'Unknown'
-            });
-          });
-        }
-      });
-      
-      // Group and sum quantities for duplicate items
-      const groupedItems = allItems.reduce((acc: any, item) => {
-        const key = item.name;
-        if (acc[key]) {
-          acc[key].qty += item.qty;
-          acc[key].totalCost += item.totalCost;
+      if (req.params.date) {
+        // Get shopping list for specific date
+        const requestedDate = req.params.date;
+        const result = await pool.query(`
+          SELECT items FROM shopping_list 
+          WHERE DATE(created_at) = $1 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `, [requestedDate]);
+        
+        if (result.rows.length > 0 && result.rows[0].items) {
+          return res.json(result.rows[0].items);
         } else {
-          acc[key] = { ...item };
+          return res.json([]);
         }
-        return acc;
-      }, {});
-      
-      const itemsWithCosts = Object.values(groupedItems);
-      const totalShoppingCost = itemsWithCosts.reduce((sum: number, item: any) => sum + (item.totalCost || 0), 0);
-      
-      res.json({
-        ok: true,
-        data: {
-          items: itemsWithCosts,
-          summary: {
-            totalItems: itemsWithCosts.length,
-            estimatedTotalCost: totalShoppingCost
-          }
+      } else {
+        // Get current shopping list (most recent incomplete one)
+        const result = await pool.query(`
+          SELECT items FROM shopping_list 
+          WHERE is_completed = false OR is_completed IS NULL
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `);
+        
+        if (result.rows.length > 0 && result.rows[0].items) {
+          return res.json(result.rows[0].items);
+        } else {
+          return res.json([]);
         }
-      });
+      }
     } catch (error) {
-      console.error('Error fetching today\'s shopping list:', error);
-      res.status(500).json({ ok: false, error: 'Failed to get shopping list' });
+      console.error('Shopping list error:', error);
+      res.status(500).json({ ok: false, error: 'Failed to retrieve shopping list' });
     }
   });
   
