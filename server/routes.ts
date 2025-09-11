@@ -2734,12 +2734,65 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Shopping List API endpoints
   app.post('/api/shopping-list/regenerate', async (req: Request, res: Response) => {
     try {
-      // Regenerate shopping list from last completed form
-      // For now, return a simple success response
+      // Get the most recent daily sales form with requisition data
+      const response = await fetch('http://localhost:5000/api/forms/daily-sales/v2');
+      const data = await response.json();
+      
+      if (!data.ok || !data.records) {
+        return res.json({ ok: true, message: "No forms found", itemsGenerated: 0 });
+      }
+
+      // Find the most recent record with requisition data
+      const recordsWithRequisition = data.records
+        .filter((record: any) => record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0)
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      if (recordsWithRequisition.length === 0) {
+        return res.json({ ok: true, message: "No requisition data found in recent forms", itemsGenerated: 0 });
+      }
+
+      const lastForm = recordsWithRequisition[0];
+      const requisitionItems = lastForm.payload.requisition;
+
+      // Get ingredient cost data for pricing
+      const { pool } = await import('./db');
+      const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand FROM ingredient_v2');
+      const ingredients = ingredientsQuery.rows;
+      
+      const ingredientCosts = ingredients.reduce((acc: any, item) => {
+        acc[item.name.toLowerCase()] = {
+          cost: parseFloat(item.unitCost) || 0,
+          supplier: item.supplier || 'Unknown',
+          brand: item.brand || ''
+        };
+        return acc;
+      }, {});
+
+      // Process requisition items into shopping list format
+      const shoppingItems = requisitionItems.map((item: any) => {
+        const ingredientKey = item.name.toLowerCase();
+        const ingredientData = ingredientCosts[ingredientKey];
+        const unitCost = ingredientData?.cost || 0;
+        const estimatedCost = unitCost * (item.qty || 1);
+
+        return {
+          itemName: item.name,
+          quantity: item.qty || 1,
+          unit: item.unit || 'each',
+          supplier: ingredientData?.supplier || 'Unknown',
+          estimatedCost: estimatedCost.toFixed(2),
+          priority: 'medium',
+          category: item.category || 'General',
+          notes: `Generated from form ${new Date(lastForm.date).toLocaleDateString()}`
+        };
+      });
+
       res.json({ 
         ok: true, 
         message: "Shopping list regenerated successfully", 
-        itemsGenerated: 0 
+        itemsGenerated: shoppingItems.length,
+        items: shoppingItems,
+        sourceDate: lastForm.date
       });
     } catch (error) {
       console.error('Error regenerating shopping list:', error);
@@ -2775,7 +2828,7 @@ app.use("/api/bank-imports", bankUploadRouter);
           return record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0;
         });
         
-        const datesWithData = recordsWithRequisition.map(record => new Date(record.date).toISOString().split('T')[0])
+        const datesWithData = recordsWithRequisition.map((record: any) => new Date(record.date).toISOString().split('T')[0])
           .sort().reverse();
         
         if (datesWithData.length > 0) {
@@ -2809,7 +2862,7 @@ app.use("/api/bank-imports", bankUploadRouter);
       
       // Aggregate actual requisition items with cost calculations
       const allItems: any[] = [];
-      dateRecords.forEach(record => {
+      dateRecords.forEach((record: any) => {
         if (record.payload?.requisition) {
           record.payload.requisition.forEach((item: any) => {
             const ingredientKey = item.name.toLowerCase();
