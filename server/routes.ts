@@ -2827,69 +2827,39 @@ app.use("/api/bank-imports", bankUploadRouter);
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
       console.log('Shopping list source:', 'ingredients DB');
-      console.log('Shopping list pulling from: TypeScript + DB');
       const { pool } = await import('./db');
-      const { foodCostings } = await import('./data/foodCostings');
       
-      // Get the most recent daily stock sales form with requisition data
-      const latestStock = await pool.query(`
-        SELECT requisition FROM daily_stock_sales 
-        WHERE requisition IS NOT NULL 
-        AND JSON_ARRAY_LENGTH(requisition) > 0
+      // Get the most recent shopping list from the shopping_list table
+      const latestShoppingList = await pool.query(`
+        SELECT items FROM shopping_list 
+        WHERE items IS NOT NULL 
+        AND jsonb_array_length(items) > 0
         ORDER BY created_at DESC 
         LIMIT 1
       `);
       
-      if (latestStock.rows.length === 0) {
-        console.log('No requisition data found');
-        return res.json({ groupedList: {}, source: 'TypeScript + DB', totalItems: 0 });
+      if (latestShoppingList.rows.length === 0) {
+        console.log('No shopping list data found');
+        return res.json({ groupedList: {}, source: 'ingredients DB', totalItems: 0 });
       }
       
-      const requisition = latestStock.rows[0].requisition || [];
-      console.log('Requisition items found:', requisition.length);
-      
-      // Create lookup map from TypeScript data for categorization
-      const categoryLookup = new Map();
-      foodCostings.forEach(item => {
-        categoryLookup.set(item.item.toLowerCase(), item.category);
-      });
+      const items = latestShoppingList.rows[0].items || [];
+      console.log('Shopping list items found:', items.length);
       
       // Group by category with only item name and quantity
       const groupedList: any = {};
       let totalItems = 0;
       
-      for (const reqItem of requisition) {
-        // Try to find category from TypeScript data first
-        let category = categoryLookup.get(reqItem.name.toLowerCase());
-        
-        // Fallback categorization for common items
-        if (!category) {
-          const itemLower = reqItem.name.toLowerCase();
-          if (itemLower.includes('coke') || itemLower.includes('fanta') || itemLower.includes('sprite') || 
-              itemLower.includes('drink') || itemLower.includes('water') || itemLower.includes('juice')) {
-            category = 'Drinks';
-          } else if (itemLower.includes('beef') || itemLower.includes('meat') || 
-                     itemLower.includes('chicken') || itemLower.includes('pork')) {
-            category = 'Meat';
-          } else if (itemLower.includes('bun') || itemLower.includes('roll') || itemLower.includes('bread')) {
-            category = 'Bakery';
-          } else if (itemLower.includes('lettuce') || itemLower.includes('tomato') || 
-                     itemLower.includes('onion') || itemLower.includes('vegetable') || itemLower.includes('salad')) {
-            category = 'Fresh Food';
-          } else if (itemLower.includes('fries') || itemLower.includes('frozen')) {
-            category = 'Frozen Food';
-          } else {
-            category = 'Other';
-          }
-        }
+      for (const item of items) {
+        const category = item.category || 'Other';
         
         if (!groupedList[category]) {
           groupedList[category] = [];
         }
         
         groupedList[category].push({
-          name: reqItem.name,
-          qty: reqItem.qty
+          name: item.itemName,
+          qty: item.quantity
         });
         totalItems++;
       }

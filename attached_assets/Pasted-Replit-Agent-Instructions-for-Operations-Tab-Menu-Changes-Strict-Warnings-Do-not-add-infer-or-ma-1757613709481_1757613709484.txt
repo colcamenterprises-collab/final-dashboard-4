@@ -1,0 +1,113 @@
+Replit Agent Instructions for Operations Tab Menu Changes
+Strict Warnings:
+
+Do not add, infer, or make up data or features—stick to exact specs.
+Use ONLY ingredients DB as source of truth; no legacy.
+If any mismatch (e.g., count != 62), stop and ask Cam with logs.
+Verify EVERY change with evidence; no "completed" until all tests pass.
+All changes verified with tests: Yes/No at end.
+
+Task Overview
+
+Restructure Operations tab per specs: Add sub-items, rename Shopping List to "Purchasing", create Operations Analysis with main page sections, combine Receipts/Shift Analysis/Reports.
+Proactive: Add date picker to main page for analysis (default today); Jussi AI section uses existing prompts; enhance uploads with file type validation (PDF/CSV for POS/Grab); add total estimated cost to Purchasing (sum qty * unitPrice from ingredients).
+
+Step-by-Step Actions
+
+Update Sidebar Routing (Frontend):
+
+Open client/src/components/Sidebar.tsx (or layout with menu).
+Full updated Operations section:
+textimport { Link } from 'react-router-dom';
+
+// In sidebar Operations group:
+<div>Operations</div>
+<Link to="/operations/daily-sales-stock">Daily Sales & Stock</Link>
+<Link to="/operations/daily-sales-library">Daily Sales Library</Link>
+<Link to="/operations/purchasing">Purchasing</Link>  // Renamed from Shopping List
+<Link to="/operations/expenses">Expenses</Link>
+<Link to="/operations/operations-analysis">Operations Analysis</Link>
+<Link to="/operations/receipts">Receipts</Link>
+<Link to="/operations/shift-analysis">Shift Analysis</Link>  // New combined
+
+Rename file client/src/pages/operations/shopping-list/ShoppingListPage.tsx to Purchasing.tsx; update route in App.tsx to /operations/purchasing.
+Test: Load sidebar — shows new structure, no 404 on clicks. Evidence: Console 'Sidebar loaded, items: 7'; curl /operations/purchasing 200.
+
+
+Create Operations Analysis Main Page (Frontend/Backend):
+
+Create client/src/pages/operations/OperationsAnalysis.tsx.
+Full template:
+textimport { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import { Input, Button, Select, DatePicker } from '@/components/ui/';  // Adjust for shadcn
+import { useState } from 'react';
+
+export function OperationsAnalysis() {
+  const [date, setDate ] = useState(new Date());
+  const { data: stats } = useQuery({ queryKey: ['stats', date], queryFn: () => axios.get('/api/operations/stats?date=' + date.toISOString()) });  // Graphs data
+  const { data: jussiPrompts } = useQuery({ queryKey: ['jussi'], queryFn: () => axios.get('/api/jussi/prompts') });  // Existing prompts
+
+  return (
+    <div>
+      <h1>Operations Analysis</h1>
+      <DatePicker value={date} onChange={setDate} />  // Filter by date
+
+      <div>1. Statistics</div>
+      <div className="grid grid-cols-3 gap-4">  // Visual boxes/graphs
+        <Card><CardTitle>Sales</CardTitle><CardContent>{stats.sales}</CardContent></Card>
+        <Card><CardTitle>Expenses</CardTitle><CardContent>{stats.expenses}</CardContent></Card>
+        <Card><CardTitle>Variance</CardTitle><CardContent>{stats.variance}</CardContent></Card>
+        {/* Add more for graphs, use Chart.js if installed */}
+      </div>
+
+      <div>2. POS Report Uploads</div>
+      <Input type="file" accept=".pdf,.csv" multiple onChange={handleUpload('/api/operations/pos-upload')} />  // Loyverse reports
+
+      <div>3. Delivery Partner Reports</div>
+      <Input type="file" accept=".pdf,.csv" multiple onChange={handleUpload('/api/operations/delivery-upload')} />  // Grab Food
+
+      <div>4. Jussi AI Instructions</div>
+      <div>{jussiPrompts.map(p => <p>{p}</p>)}</div>
+    </div>
+  );
+}
+
+const handleUpload = (endpoint) => (e) => {
+  const formData = new FormData();
+  Array.from(e.target.files).forEach(file => formData.append('files', file));
+  axios.post(endpoint, formData).then(() => toast.success('Uploaded'));
+};
+
+Backend add /api/operations/stats: Aggregate sales/expenses/variance from dailySalesV2.
+Backend add /api/operations/pos-upload, /api/operations/delivery-upload: Multer upload, save to uploads, log/process.
+/api/jussi/prompts: Hardcode or pull existing prompts.
+Test: Load page, upload file — success toast. Evidence: Curl POST file, 200; GET stats, grep sales X.
+
+
+Combine Receipts/Shift Analysis/Reports (Frontend/Backend):
+
+Create client/src/pages/operations/ShiftAnalysis.tsx (combine).
+Full template: Merge content from Receipts/Shift Reports/Summary (add sections: Receipts upload, Shift Reports table, Summary stats).
+text<div>
+  <h1>Shift Analysis</h1>
+  <div>Receipts</div>
+  <Input type="file" onChange={handleUpload('/api/operations/receipts')} />
+  <div>Shift Reports</div>
+  <Table>{/* Table from Shift Reports */}</Table>
+  <div>Summary</div>
+  <div>{/* Stats from Shift Summary */}</div>
+</div>
+
+Remove old routes in App.tsx, redirect to /operations/shift-analysis.
+Test: Load — shows all. Evidence: Curl /operations/shift-analysis 200, grep 'Receipts', 'Reports', 'Summary'.
+
+
+Report Back:
+
+List with evidence.
+All verified: Yes/No.
+
+
+
+Run this—restructures menu. Test navigation, upload, share screenshot. Proactive: Add date filter to all sections.
