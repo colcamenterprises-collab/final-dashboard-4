@@ -2734,25 +2734,25 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Shopping List API endpoints
   app.post('/api/shopping-list/regenerate', async (req: Request, res: Response) => {
     try {
-      // Get the most recent daily stock form with requisition data
-      const response = await fetch('http://localhost:5000/api/forms/daily-stock/v2');
+      // Get the most recent daily stock sales form with requisition data  
+      const response = await fetch('http://localhost:5000/api/daily-stock-sales');
       const data = await response.json();
       
-      if (!data.ok || !data.records) {
+      if (!data.ok || !data.data || !Array.isArray(data.data)) {
         return res.json({ ok: true, message: "No stock forms found", itemsGenerated: 0 });
       }
 
       // Find the most recent record with requisition data
-      const recordsWithRequisition = data.records
-        .filter((record: any) => record.payload?.requisition && Array.isArray(record.payload.requisition) && record.payload.requisition.length > 0)
-        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const recordsWithRequisition = data.data
+        .filter((record: any) => record.requisition && Array.isArray(record.requisition) && record.requisition.length > 0)
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       if (recordsWithRequisition.length === 0) {
         return res.json({ ok: true, message: "No requisition data found in recent stock forms", itemsGenerated: 0 });
       }
 
       const lastForm = recordsWithRequisition[0];
-      const requisitionItems = lastForm.payload.requisition;
+      const requisitionItems = lastForm.requisition;
 
       // Get ingredient cost data for pricing
       const { pool } = await import('./db');
@@ -2803,7 +2803,7 @@ app.use("/api/bank-imports", bankUploadRouter);
         lastForm.id,
         JSON.stringify(shoppingItems),
         shoppingItems.length,
-        `Shopping List from ${new Date(lastForm.date).toLocaleDateString()}`,
+        `Shopping List from ${new Date(lastForm.createdAt).toLocaleDateString()}`,
         false,
         true
       ]);
@@ -2812,7 +2812,7 @@ app.use("/api/bank-imports", bankUploadRouter);
         ok: true, 
         message: "Shopping list regenerated successfully", 
         itemsGenerated: shoppingItems.length,
-        sourceDate: lastForm.date,
+        sourceDate: lastForm.createdAt,
         shoppingListId: insertResult.rows[0].id
       });
     } catch (error) {
@@ -2830,11 +2830,12 @@ app.use("/api/bank-imports", bankUploadRouter);
       const { pool } = await import('./db');
       const { foodCostings } = await import('./data/foodCostings');
       
-      // Get the most recent daily stock form requisition data
+      // Get the most recent daily stock sales form with requisition data
       const latestStock = await pool.query(`
-        SELECT payload FROM daily_stock_v2 
-        WHERE payload->>'requisition' IS NOT NULL 
-        ORDER BY "createdAt" DESC 
+        SELECT requisition FROM daily_stock_sales 
+        WHERE requisition IS NOT NULL 
+        AND JSON_ARRAY_LENGTH(requisition) > 0
+        ORDER BY created_at DESC 
         LIMIT 1
       `);
       
@@ -2843,7 +2844,7 @@ app.use("/api/bank-imports", bankUploadRouter);
         return res.json({ groupedList: {}, source: 'TypeScript + DB', totalItems: 0 });
       }
       
-      const requisition = latestStock.rows[0].payload?.requisition || [];
+      const requisition = latestStock.rows[0].requisition || [];
       console.log('Requisition items found:', requisition.length);
       
       // Create lookup map from TypeScript data for categorization
