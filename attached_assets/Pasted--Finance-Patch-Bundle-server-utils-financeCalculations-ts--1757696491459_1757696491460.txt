@@ -1,0 +1,313 @@
+📦 Finance Patch Bundle
+// ===============================
+// server/utils/financeCalculations.ts
+// ===============================
+import { fromCents, toCents } from "../helpers/currency";
+
+export interface FinanceInput {
+  sales: number; // cents
+  cogs: number; // cents
+  labor: number; // cents
+  occupancy: number; // cents
+  expenses: number; // cents
+}
+
+export interface FinanceResult {
+  sales: number;
+  cogs: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+  primeCostPct: number;
+  foodCostPct: number;
+  laborPct: number;
+  occupancyPct: number;
+  netMarginPct: number;
+}
+
+export function calculateFinance(input: FinanceInput): FinanceResult {
+  const { sales, cogs, labor, occupancy, expenses } = input;
+
+  const safeSales = sales || 0;
+  const safeCogs = cogs || 0;
+  const safeLabor = labor || 0;
+  const safeOccupancy = occupancy || 0;
+  const safeExpenses = expenses || 0;
+
+  const grossProfit = safeSales - safeCogs;
+  const netProfit = safeSales - (safeCogs + safeLabor + safeOccupancy + safeExpenses);
+
+  const pct = (num: number, denom: number) =>
+    denom > 0 ? parseFloat(((num / denom) * 100).toFixed(2)) : 0;
+
+  return {
+    sales: safeSales,
+    cogs: safeCogs,
+    grossProfit,
+    expenses: safeExpenses + safeLabor + safeOccupancy,
+    netProfit,
+    primeCostPct: pct(safeCogs + safeLabor, safeSales),
+    foodCostPct: pct(safeCogs, safeSales),
+    laborPct: pct(safeLabor, safeSales),
+    occupancyPct: pct(safeOccupancy, safeSales),
+    netMarginPct: pct(netProfit, safeSales),
+  };
+}
+
+// ===============================
+// server/jobs/dailyFinanceJob.ts
+// ===============================
+import db from "../db";
+import { dailySalesV2 } from "../schema";
+import { calculateFinance } from "../utils/financeCalculations";
+import { desc } from "drizzle-orm";
+
+export async function runDailyFinanceJob() {
+  console.log("▶ Running Daily Finance Job...");
+
+  const rows = await db
+    .select()
+    .from(dailySalesV2)
+    .orderBy(desc(dailySalesV2.createdAt))
+    .limit(30);
+
+  for (const row of rows) {
+    try {
+      const payload = row.payload || {};
+      const finance = calculateFinance({
+        sales: payload.sales || 0,
+        cogs: payload.cogs || 0,
+        labor: payload.labor || 0,
+        occupancy: payload.occupancy || 0,
+        expenses: payload.expenses || 0,
+      });
+
+      await db
+        .update(dailySalesV2)
+        .set({
+          finance_summary: finance, // JSONB column (must already exist)
+        })
+        .where(dailySalesV2.id.eq(row.id));
+    } catch (err) {
+      console.error("Finance calc failed for row:", row.id, err);
+    }
+  }
+
+  console.log("✔ Daily Finance Job complete");
+}
+
+// ===============================
+// server/routes/finance.ts
+// ===============================
+import express from "express";
+import db from "../db";
+import { dailySalesV2 } from "../schema";
+import { desc } from "drizzle-orm";
+
+const router = express.Router();
+
+router.get("/summary", async (req, res) => {
+  try {
+    const row = await db
+      .select()
+      .from(dailySalesV2)
+      .orderBy(desc(dailySalesV2.createdAt))
+      .limit(1);
+
+    if (!row.length || !row[0].finance_summary) {
+      return res.json({});
+    }
+
+    return res.json(row[0].finance_summary);
+  } catch (err) {
+    console.error("Finance summary error:", err);
+    return res.status(500).json({ error: "Failed to fetch finance summary" });
+  }
+});
+
+router.get("/summary/today", async (req, res) => {
+  try {
+    const row = await db
+      .select()
+      .from(dailySalesV2)
+      .orderBy(desc(dailySalesV2.createdAt))
+      .limit(1);
+
+    if (!row.length || !row[0].finance_summary) {
+      return res.json({});
+    }
+
+    const fs = row[0].finance_summary as any;
+    const snapshot = {
+      sales: fs.sales || 0,
+      netProfit: fs.netProfit || 0,
+      primeCostPct: fs.primeCostPct || 0,
+      topItem: row[0].top_item || null,
+      varianceAlert: row[0].variance_alert || null,
+    };
+
+    return res.json(snapshot);
+  } catch (err) {
+    console.error("Finance snapshot error:", err);
+    return res.status(500).json({ error: "Failed to fetch finance snapshot" });
+  }
+});
+
+export default router;
+
+// ===============================
+// server/index.ts (add route use)
+// ===============================
+// import financeRoutes from "./routes/finance";
+// app.use("/api/finance", financeRoutes);
+
+// ===============================
+// client/src/pages/finance/FinancePage.tsx
+// ===============================
+import React, { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { thb } from "@/utils/format";
+
+interface FinanceSummary {
+  sales: number;
+  cogs: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+  primeCostPct: number;
+  foodCostPct: number;
+  laborPct: number;
+  occupancyPct: number;
+  netMarginPct: number;
+}
+
+export default function FinancePage() {
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+
+  useEffect(() => {
+    fetch("/api/finance/summary")
+      .then((res) => res.json())
+      .then((data) => setSummary(data))
+      .catch(() => setSummary(null));
+  }, []);
+
+  if (!summary) return <div className="p-6">Loading finance data...</div>;
+
+  return (
+    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card><CardContent><h2>Sales</h2><p>{thb(summary.sales)}</p></CardContent></Card>
+      <Card><CardContent><h2>Gross Profit</h2><p>{thb(summary.grossProfit)}</p></CardContent></Card>
+      <Card><CardContent><h2>Net Profit</h2><p>{thb(summary.netProfit)}</p></CardContent></Card>
+
+      <Card className="col-span-3">
+        <CardContent>
+          <h2>Ratios</h2>
+          <ul className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <li>Prime Cost: {summary.primeCostPct}%</li>
+            <li>Food Cost: {summary.foodCostPct}%</li>
+            <li>Labor: {summary.laborPct}%</li>
+            <li>Occupancy: {summary.occupancyPct}%</li>
+            <li>Net Margin: {summary.netMarginPct}%</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card className="col-span-3">
+        <CardContent>
+          <h2>Profit & Loss</h2>
+          <table className="w-full text-left">
+            <tbody>
+              <tr><td>Sales</td><td>{thb(summary.sales)}</td></tr>
+              <tr><td>COGS</td><td>{thb(summary.cogs)}</td></tr>
+              <tr><td>Gross Profit</td><td>{thb(summary.grossProfit)}</td></tr>
+              <tr><td>Expenses</td><td>{thb(summary.expenses)}</td></tr>
+              <tr><td>Net Profit</td><td>{thb(summary.netProfit)}</td></tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ===============================
+// client/src/components/HomeFinanceSnapshot.tsx
+// ===============================
+import React, { useEffect, useState } from "react";
+import { thb } from "@/utils/format";
+import { Card, CardContent } from "@/components/ui/card";
+
+interface FinanceSummary {
+  sales: number;
+  netProfit: number;
+  primeCostPct: number;
+  topItem?: string;
+  varianceAlert?: string;
+}
+
+export default function HomeFinanceSnapshot() {
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+
+  useEffect(() => {
+    fetch("/api/finance/summary/today")
+      .then((res) => res.json())
+      .then((data) => setSummary(data))
+      .catch(() => setSummary(null));
+  }, []);
+
+  if (!summary) return null;
+
+  return (
+    <Card>
+      <CardContent>
+        <h2>Finance Snapshot</h2>
+        <ul>
+          <li>Sales Today: {thb(summary.sales)}</li>
+          <li>Net Profit: {thb(summary.netProfit)}</li>
+          <li>Prime Cost: {summary.primeCostPct}%</li>
+          {summary.topItem && <li>Top Item: {summary.topItem}</li>}
+          {summary.varianceAlert && (
+            <li className="text-red-500">{summary.varianceAlert}</li>
+          )}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ===============================
+// client/src/tests/finance.test.tsx
+// ===============================
+import { calculateFinance } from "../../../server/utils/financeCalculations";
+
+test("calculates finance correctly", () => {
+  const res = calculateFinance({
+    sales: 100000,
+    cogs: 30000,
+    labor: 20000,
+    occupancy: 10000,
+    expenses: 5000,
+  });
+
+  expect(res.sales).toBe(100000);
+  expect(res.grossProfit).toBe(70000);
+  expect(res.netProfit).toBe(35000);
+  expect(res.primeCostPct).toBeCloseTo(50);
+  expect(res.netMarginPct).toBeCloseTo(35);
+});
+
+✅ Testing Requirements
+
+Run runDailyFinanceJob() → verify finance_summary JSON updates in daily_sales_v2.
+
+Call /api/finance/summary → returns full P&L.
+
+Call /api/finance/summary/today → returns snapshot.
+
+Open /finance page → KPI cards, ratios, table visible.
+
+Home page → snapshot widget shows sales, profit, prime cost, alerts.
+
+Run npm test → finance test passes.
+
+Confirm no schema migrations created.
