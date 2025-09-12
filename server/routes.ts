@@ -2734,28 +2734,37 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Shopping List API endpoints
   app.post('/api/shopping-list/regenerate', async (req: Request, res: Response) => {
     try {
-      // Get the most recent daily stock sales form with requisition data  
-      const response = await fetch('http://localhost:5000/api/daily-stock-sales');
-      const data = await response.json();
+      // Get the most recent daily sales form with requisition data directly from database
+      const { pool } = await import('./db');
+      const formsQuery = await pool.query(`
+        SELECT id, "createdAt", payload 
+        FROM daily_sales_v2 
+        WHERE payload IS NOT NULL 
+        ORDER BY "createdAt" DESC 
+        LIMIT 10
+      `);
       
-      if (!data.ok || !data.data || !Array.isArray(data.data)) {
-        return res.json({ ok: true, message: "No stock forms found", itemsGenerated: 0 });
+      if (formsQuery.rows.length === 0) {
+        return res.json({ ok: true, message: "No forms found", itemsGenerated: 0 });
       }
 
       // Find the most recent record with requisition data
-      const recordsWithRequisition = data.data
-        .filter((record: any) => record.requisition && Array.isArray(record.requisition) && record.requisition.length > 0)
+      const recordsWithRequisition = formsQuery.rows
+        .filter((record: any) => {
+          const payload = typeof record.payload === 'string' ? JSON.parse(record.payload) : record.payload;
+          return payload.requisition && Array.isArray(payload.requisition) && payload.requisition.length > 0;
+        })
         .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       if (recordsWithRequisition.length === 0) {
-        return res.json({ ok: true, message: "No requisition data found in recent stock forms", itemsGenerated: 0 });
+        return res.json({ ok: true, message: "No requisition data found in recent forms", itemsGenerated: 0 });
       }
 
       const lastForm = recordsWithRequisition[0];
-      const requisitionItems = lastForm.requisition;
+      const payload = typeof lastForm.payload === 'string' ? JSON.parse(lastForm.payload) : lastForm.payload;
+      const requisitionItems = payload.requisition;
 
       // Get ingredient cost data for pricing
-      const { pool } = await import('./db');
       const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand FROM ingredient_v2');
       const ingredients = ingredientsQuery.rows;
       
@@ -2784,7 +2793,7 @@ app.use("/api/bank-imports", bankUploadRouter);
           estimatedCost: estimatedCost.toFixed(2),
           priority: 'medium',
           category: item.category || 'General',
-          notes: `Generated from form ${new Date(lastForm.date).toLocaleDateString()}`,
+          notes: `Generated from form ${new Date(lastForm.createdAt).toLocaleDateString()}`,
           selected: false,
           aiGenerated: true
         };
