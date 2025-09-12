@@ -8,9 +8,9 @@ router.get("/summary", async (req, res) => {
     const result = await pool.query(
       `SELECT payload 
        FROM daily_sales_v2 
-       WHERE deleted_at IS NULL 
+       WHERE "deletedAt" IS NULL 
        AND payload ? 'finance_summary'
-       ORDER BY created_at DESC 
+       ORDER BY "createdAt" DESC 
        LIMIT 1`
     );
 
@@ -36,8 +36,8 @@ router.get("/summary/today", async (req, res) => {
     const result = await pool.query(
       `SELECT payload 
        FROM daily_sales_v2 
-       WHERE deleted_at IS NULL 
-       ORDER BY created_at DESC 
+       WHERE "deletedAt" IS NULL 
+       ORDER BY "createdAt" DESC 
        LIMIT 1`
     );
 
