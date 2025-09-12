@@ -285,18 +285,18 @@ export default function ShoppingList() {
       <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-2 bg-gray-50 font-semibold text-gray-900">{category}</div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-3/4">Item</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase w-1/4">Qty</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {items.map((it: any, idx: number) => (
                 <tr key={idx}>
-                  <td className="px-4 py-2 text-sm text-gray-900">{it.name}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900">{it.qty}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900 truncate">{it.name}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900 text-center">{it.qty}</td>
                 </tr>
               ))}
             </tbody>
