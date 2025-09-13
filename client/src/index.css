@@ -77,67 +77,94 @@ html, body {
 }
 
 :root {
-  --primary: #F59E0B;
-  --secondary: #EF4444;
-  --success: #22C55E;
-  --background: #FFFFFF;
-  --text: #111827;
-  --label: #6B7280;
-  --border: #E5E7EB;
-  --sidebar-bg: #1f1f1f;
+  /* Modern Finance App Color Palette */
+  --app-bg: hsl(0, 0%, 98%);
+  --card-bg: hsl(0, 0%, 100%);
+  --text-primary: hsl(222, 47%, 11%);
+  --text-secondary: hsl(215, 16%, 47%);
+  --border-light: hsl(214, 32%, 91%);
+  --accent-lime: hsl(84, 81%, 59%);
+  --accent-emerald: hsl(152, 76%, 40%);
+  --accent-slate: hsl(222, 47%, 11%);
+  --success: hsl(142, 76%, 36%);
+  --warning: hsl(45, 93%, 47%);
+  --error: hsl(0, 84%, 60%);
+  
+  /* Legacy compatibility */
+  --primary: hsl(84, 81%, 59%);
+  --secondary: hsl(152, 76%, 40%);
+  --background: var(--app-bg);
+  --text: var(--text-primary);
+  --label: var(--text-secondary);
+  --border: var(--border-light);
+  --sidebar-bg: var(--accent-slate);
   --sidebar-text: #ffffff;
   
   /* Tailwind compatibility */
-  --background-hsl: hsl(0, 0%, 100%);
-  --foreground: hsl(17, 21%, 11%);
+  --background-hsl: var(--app-bg);
+  --foreground: var(--text-primary);
   --muted: hsl(210, 40%, 98%);
-  --muted-foreground: hsl(215, 16%, 47%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(17, 21%, 11%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(17, 21%, 11%);
-  --border-hsl: hsl(214, 32%, 91%);
-  --input: hsl(214, 32%, 91%);
-  --primary-hsl: hsl(43, 89%, 54%);
-  --primary-foreground: hsl(17, 21%, 11%);
+  --muted-foreground: var(--text-secondary);
+  --popover: var(--card-bg);
+  --popover-foreground: var(--text-primary);
+  --card: var(--card-bg);
+  --card-foreground: var(--text-primary);
+  --border-hsl: var(--border-light);
+  --input: var(--border-light);
+  --primary-hsl: var(--accent-lime);
+  --primary-foreground: var(--text-primary);
   --secondary-hsl: hsl(210, 40%, 98%);
-  --secondary-foreground: hsl(222, 84%, 5%);
+  --secondary-foreground: var(--accent-slate);
   --accent: hsl(210, 40%, 98%);
-  --accent-foreground: hsl(222, 84%, 5%);
-  --destructive: hsl(0, 84%, 60%);
+  --accent-foreground: var(--accent-slate);
+  --destructive: var(--error);
   --destructive-foreground: hsl(210, 40%, 98%);
-  --ring: hsl(43, 89%, 54%);
-  --radius: 0.5rem;
+  --ring: var(--accent-lime);
+  --radius: 1rem;
 }
 
 .dark {
-  --background: #1F2937;
-  --text: #D1D5DB;
-  --label: #9CA3AF;
-  --border: #4B5563;
-  --sidebar-bg: #1f1f1f;
-  --sidebar-text: #ffffff;
+  /* Dark Mode Finance App Palette */
+  --app-bg: hsl(222, 47%, 4%);
+  --card-bg: hsl(222, 47%, 8%);
+  --text-primary: hsl(213, 31%, 91%);
+  --text-secondary: hsl(215, 16%, 65%);
+  --border-light: hsl(215, 28%, 17%);
+  --accent-lime: hsl(84, 81%, 59%);
+  --accent-emerald: hsl(152, 76%, 50%);
+  --accent-slate: hsl(222, 47%, 15%);
+  --success: hsl(142, 76%, 45%);
+  --warning: hsl(45, 93%, 58%);
+  --error: hsl(0, 84%, 60%);
+  
+  /* Legacy compatibility */
+  --background: var(--app-bg);
+  --text: var(--text-primary);
+  --label: var(--text-secondary);
+  --border: var(--border-light);
+  --sidebar-bg: var(--accent-slate);
+  --sidebar-text: var(--text-primary);
   
   /* Tailwind compatibility */
-  --background-hsl: hsl(220, 39%, 11%);
-  --foreground: hsl(213, 31%, 82%);
-  --muted: hsl(223, 47%, 11%);
-  --muted-foreground: hsl(215, 14%, 62%);
-  --popover: hsl(220, 39%, 11%);
-  --popover-foreground: hsl(213, 31%, 82%);
-  --card: hsl(220, 39%, 11%);
-  --card-foreground: hsl(213, 31%, 82%);
-  --border-hsl: hsl(215, 28%, 17%);
-  --input: hsl(215, 28%, 17%);
-  --primary-hsl: hsl(43, 89%, 54%);
-  --primary-foreground: hsl(17, 21%, 11%);
-  --secondary-hsl: hsl(223, 47%, 11%);
-  --secondary-foreground: hsl(213, 31%, 82%);
-  --accent: hsl(223, 47%, 11%);
-  --accent-foreground: hsl(213, 31%, 82%);
-  --destructive: hsl(0, 63%, 31%);
-  --destructive-foreground: hsl(213, 31%, 82%);
-  --ring: hsl(216, 12%, 84%);
+  --background-hsl: var(--app-bg);
+  --foreground: var(--text-primary);
+  --muted: var(--accent-slate);
+  --muted-foreground: var(--text-secondary);
+  --popover: var(--card-bg);
+  --popover-foreground: var(--text-primary);
+  --card: var(--card-bg);
+  --card-foreground: var(--text-primary);
+  --border-hsl: var(--border-light);
+  --input: var(--border-light);
+  --primary-hsl: var(--accent-lime);
+  --primary-foreground: var(--accent-slate);
+  --secondary-hsl: var(--accent-slate);
+  --secondary-foreground: var(--text-primary);
+  --accent: var(--accent-slate);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--error);
+  --destructive-foreground: var(--text-primary);
+  --ring: var(--accent-lime);
 }
 
 /* Custom scrollbar for sidebar - subtle and blended */
@@ -439,6 +466,72 @@ html, body {
 }
 
 @layer components {
+  /* Modern Finance App Components */
+  .metric-card {
+    @apply rounded-2xl border p-4 shadow-sm hover:shadow-md transition-all duration-200;
+    background: var(--card-bg);
+    border-color: var(--border-light);
+  }
+  
+  .metric-card-accent {
+    @apply rounded-2xl border-0 p-4 shadow-sm text-white;
+    background: var(--accent-slate);
+  }
+  
+  .metric-card-lime {
+    @apply rounded-2xl border-0 p-4 shadow-sm;
+    background: var(--accent-lime);
+    color: var(--accent-slate);
+  }
+  
+  .accent-card-blue {
+    background: hsl(214, 89%, 52%);
+    color: white;
+  }
+  
+  .accent-card-orange {
+    background: hsl(20, 90%, 56%);
+    color: white;
+  }
+  
+  .accent-card-emerald {
+    background: var(--accent-emerald);
+    color: white;
+  }
+  
+  .accent-card-slate {
+    background: var(--accent-slate);
+    color: white;
+  }
+  
+  .accent-card-lime {
+    background: var(--accent-lime);
+    color: var(--accent-slate);
+  }
+  
+  .section-card {
+    @apply bg-white rounded-2xl border border-gray-100 p-6 shadow-sm;
+    background: var(--card-bg);
+    border-color: var(--border-light);
+  }
+  
+  .modern-button {
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95;
+  }
+  
+  .modern-button-primary {
+    @apply modern-button text-white;
+    background: var(--accent-lime);
+    color: var(--accent-slate);
+  }
+  
+  .modern-button-secondary {
+    @apply modern-button;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+  }
+
   .card {
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
