@@ -77,28 +77,28 @@ html, body {
 }
 
 :root {
-  /* Modern Finance App Color Palette */
-  --app-bg: hsl(0, 0%, 98%);
+  /* Black and Yellow Color Palette */
+  --app-bg: hsl(0, 0%, 100%);
   --card-bg: hsl(0, 0%, 100%);
-  --text-primary: hsl(222, 47%, 11%);
-  --text-secondary: hsl(215, 16%, 47%);
-  --border-light: hsl(214, 32%, 91%);
-  --accent-lime: hsl(84, 81%, 59%);
-  --accent-emerald: hsl(152, 76%, 40%);
-  --accent-slate: hsl(222, 47%, 11%);
-  --success: hsl(142, 76%, 36%);
-  --warning: hsl(45, 93%, 47%);
+  --text-primary: hsl(0, 0%, 0%);
+  --text-secondary: hsl(0, 0%, 40%);
+  --border-light: hsl(0, 0%, 91%);
+  --accent-lime: hsl(60, 100%, 50%);
+  --accent-emerald: hsl(60, 100%, 50%);
+  --accent-slate: hsl(0, 0%, 0%);
+  --success: hsl(60, 100%, 50%);
+  --warning: hsl(60, 100%, 50%);
   --error: hsl(0, 84%, 60%);
   
   /* Legacy compatibility */
-  --primary: hsl(84, 81%, 59%);
-  --secondary: hsl(152, 76%, 40%);
+  --primary: hsl(60, 100%, 50%);
+  --secondary: hsl(0, 0%, 0%);
   --background: var(--app-bg);
   --text: var(--text-primary);
   --label: var(--text-secondary);
   --border: var(--border-light);
   --sidebar-bg: var(--accent-slate);
-  --sidebar-text: #ffffff;
+  --sidebar-text: hsl(60, 100%, 50%);
   
   /* Tailwind compatibility */
   --background-hsl: var(--app-bg);
@@ -124,17 +124,17 @@ html, body {
 }
 
 .dark {
-  /* Dark Mode Finance App Palette */
-  --app-bg: hsl(222, 47%, 4%);
-  --card-bg: hsl(222, 47%, 8%);
-  --text-primary: hsl(213, 31%, 91%);
-  --text-secondary: hsl(215, 16%, 65%);
-  --border-light: hsl(215, 28%, 17%);
-  --accent-lime: hsl(84, 81%, 59%);
-  --accent-emerald: hsl(152, 76%, 50%);
-  --accent-slate: hsl(222, 47%, 15%);
-  --success: hsl(142, 76%, 45%);
-  --warning: hsl(45, 93%, 58%);
+  /* Dark Mode - Black and Yellow */
+  --app-bg: hsl(0, 0%, 0%);
+  --card-bg: hsl(0, 0%, 5%);
+  --text-primary: hsl(60, 100%, 50%);
+  --text-secondary: hsl(60, 100%, 70%);
+  --border-light: hsl(0, 0%, 20%);
+  --accent-lime: hsl(60, 100%, 50%);
+  --accent-emerald: hsl(60, 100%, 50%);
+  --accent-slate: hsl(0, 0%, 0%);
+  --success: hsl(60, 100%, 50%);
+  --warning: hsl(60, 100%, 50%);
   --error: hsl(0, 84%, 60%);
   
   /* Legacy compatibility */
@@ -143,7 +143,7 @@ html, body {
   --label: var(--text-secondary);
   --border: var(--border-light);
   --sidebar-bg: var(--accent-slate);
-  --sidebar-text: var(--text-primary);
+  --sidebar-text: hsl(60, 100%, 50%);
   
   /* Tailwind compatibility */
   --background-hsl: var(--app-bg);

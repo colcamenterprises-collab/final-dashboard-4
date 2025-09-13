@@ -27,27 +27,6 @@ export function ModernHeader({ onMenuToggle, title, subtitle }: ModernHeaderProp
           >
             <Menu className="h-5 w-5" />
           </ModernButton>
-
-          {/* Brand/Logo area */}
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-lime-400 to-emerald-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            
-            {/* Page title section */}
-            <div className="hidden sm:block">
-              {title && (
-                <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {title}
-                </h1>
-              )}
-              {subtitle && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 -mt-1">
-                  {subtitle}
-                </p>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Right section */}

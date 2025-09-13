@@ -177,16 +177,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-lime-400 to-emerald-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="text-lg font-semibold text-slate-900 dark:text-white">
-              Restaurant
-            </span>
-          </div>
-          
+        <div className="flex items-center justify-end p-6 border-b border-slate-200 dark:border-slate-800">
           <ModernButton
             variant="ghost"
             size="sm"
