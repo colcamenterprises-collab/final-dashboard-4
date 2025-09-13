@@ -1,0 +1,312 @@
+What This Final Patch Will Do
+
+Unify Expenses
+
+Sync payload.expenses[] (shift-paid) into expensesV2 with source = "SHIFT_FORM".
+
+Manual modal entries = source = "DIRECT".
+
+Rolls purchases auto-log into expensesV2 with source = "STOCK_LODGMENT".
+
+Meat/Drinks stay in purchase_tally only.
+
+Finance Dashboard
+
+Daily vs Monthly P&L split.
+
+Expense breakdown by type (Direct, Business, Rolls).
+
+Finance Job
+
+Scheduled nightly calc, writing JSON into payload.finance_summary.
+
+Sidebar Fix
+
+Expenses moved under Finance.
+
+No duplication under Ops.
+
+📦 Final Combined Patch Bundle
+// =====================================
+// server/utils/financeCalculations.ts
+// =====================================
+interface Totals {
+  direct: number;
+  business: number;
+  stock: number;
+}
+
+interface FinanceInput {
+  sales: number;
+  cogs: number;
+  labor: number;
+  totals: Totals;
+}
+
+export interface FinanceResult {
+  sales: number;
+  cogs: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+  primeCostPct: number;
+  foodCostPct: number;
+  laborPct: number;
+  netMarginPct: number;
+  breakdown: Totals;
+}
+
+export function calculateFinance(input: FinanceInput): FinanceResult {
+  const { sales, cogs, labor, totals } = input;
+  const safeSales = sales || 0;
+  const grossProfit = safeSales - cogs;
+
+  const totalExpenses = (totals.direct || 0) + (totals.business || 0) + (totals.stock || 0);
+  const netProfit = safeSales - (cogs + labor + totalExpenses);
+
+  const pct = (num: number, denom: number) =>
+    denom > 0 ? parseFloat(((num / denom) * 100).toFixed(2)) : 0;
+
+  return {
+    sales: safeSales,
+    cogs,
+    grossProfit,
+    expenses: totalExpenses + labor,
+    netProfit,
+    primeCostPct: pct(cogs + labor, safeSales),
+    foodCostPct: pct(cogs, safeSales),
+    laborPct: pct(labor, safeSales),
+    netMarginPct: pct(netProfit, safeSales),
+    breakdown: totals,
+  };
+}
+
+// =====================================
+// server/forms/dailySalesV2.ts (snippet)
+// =====================================
+import db from "../db";
+import { expensesV2 } from "../schema";
+import { v4 as uuid } from "uuid";
+
+async function logDirectExpenses(shiftDate: Date, expenses: any[]) {
+  for (const e of expenses) {
+    await db.insert(expensesV2).values({
+      id: uuid(),
+      shiftDate,
+      item: e.item || e.description,
+      costCents: e.costCents || 0,
+      supplier: e.shop || "Unknown",
+      expenseType: e.category || "Misc",
+      meta: {},
+      source: "SHIFT_FORM",
+      createdAt: new Date(),
+    });
+  }
+}
+
+// in form submission handler:
+if (payload.expenses && payload.expenses.length > 0) {
+  await logDirectExpenses(saved.createdAt, payload.expenses);
+}
+
+// =====================================
+// server/jobs/dailyFinanceJob.ts
+// =====================================
+import db from "../db";
+import { dailySalesV2, expensesV2 } from "../schema";
+import { desc, eq } from "drizzle-orm";
+import { calculateFinance } from "../utils/financeCalculations";
+
+export async function runDailyFinanceJob() {
+  console.log("▶ Running Daily Finance Job…");
+
+  const [row] = await db.select().from(dailySalesV2).orderBy(desc(dailySalesV2.createdAt)).limit(1);
+  if (!row) return;
+
+  const payload = row.payload || {};
+
+  const expenseRows = await db.select().from(expensesV2).where(eq(expensesV2.shiftDate, row.createdAt));
+  const totals = { direct: 0, business: 0, stock: 0 };
+  for (const e of expenseRows) {
+    if (e.source === "SHIFT_FORM") totals.direct += e.costCents || 0;
+    if (e.source === "DIRECT") totals.business += e.costCents || 0;
+    if (e.source === "STOCK_LODGMENT") totals.stock += e.costCents || 0;
+  }
+
+  const finance = calculateFinance({
+    sales: payload.totalSales || 0,
+    cogs: payload.cogs || 0,
+    labor: (payload.wages || []).reduce((sum: number, w: any) => sum + (w.amount || 0), 0),
+    totals,
+  });
+
+  await db.update(dailySalesV2).set({
+    payload: { ...payload, finance_summary: finance },
+  }).where(eq(dailySalesV2.id, row.id));
+
+  console.log("✔ Daily Finance Job complete");
+}
+
+// =====================================
+// server/routes/finance.ts
+// =====================================
+import express from "express";
+import db from "../db";
+import { dailySalesV2 } from "../schema";
+import { desc } from "drizzle-orm";
+
+const router = express.Router();
+
+router.get("/summary", async (_req, res) => {
+  const [row] = await db.select().from(dailySalesV2).orderBy(desc(dailySalesV2.createdAt)).limit(1);
+  return res.json(row?.payload?.finance_summary || {});
+});
+
+router.get("/summary/today", async (_req, res) => {
+  const [row] = await db.select().from(dailySalesV2).orderBy(desc(dailySalesV2.createdAt)).limit(1);
+  if (!row?.payload?.finance_summary) return res.json({});
+  const fs = row.payload.finance_summary;
+  res.json({
+    sales: fs.sales,
+    netProfit: fs.netProfit,
+    primeCostPct: fs.primeCostPct,
+    directExpenses: fs.breakdown.direct,
+    businessExpenses: fs.breakdown.business,
+    stockExpenses: fs.breakdown.stock,
+  });
+});
+
+export default router;
+
+// =====================================
+// client/src/pages/finance/FinancePage.tsx
+// =====================================
+import React, { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { thb } from "@/utils/format";
+
+interface FinanceSummary {
+  sales: number;
+  cogs: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+  primeCostPct: number;
+  foodCostPct: number;
+  laborPct: number;
+  netMarginPct: number;
+  breakdown: { direct: number; business: number; stock: number };
+}
+
+export default function FinancePage() {
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+
+  useEffect(() => {
+    fetch("/api/finance/summary").then((res) => res.json()).then(setSummary);
+  }, []);
+
+  if (!summary) return <div className="p-6">Loading finance data…</div>;
+
+  return (
+    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card><CardContent><h2>Sales</h2><p>{thb(summary.sales)}</p></CardContent></Card>
+      <Card><CardContent><h2>Gross Profit</h2><p>{thb(summary.grossProfit)}</p></CardContent></Card>
+      <Card><CardContent><h2>Net Profit</h2><p>{thb(summary.netProfit)}</p></CardContent></Card>
+
+      <Card className="col-span-3">
+        <CardContent>
+          <h2>Ratios</h2>
+          <ul className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <li>Prime Cost: {summary.primeCostPct}%</li>
+            <li>Food Cost: {summary.foodCostPct}%</li>
+            <li>Labor: {summary.laborPct}%</li>
+            <li>Net Margin: {summary.netMarginPct}%</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card className="col-span-3">
+        <CardContent>
+          <h2>Expense Breakdown</h2>
+          <ul>
+            <li>Direct (Shift): {thb(summary.breakdown.direct)}</li>
+            <li>Business: {thb(summary.breakdown.business)}</li>
+            <li>Rolls Purchases: {thb(summary.breakdown.stock)}</li>
+            <li>Total: {thb(summary.expenses)}</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// =====================================
+// client/src/components/HomeFinanceSnapshot.tsx
+// =====================================
+import React, { useEffect, useState } from "react";
+import { thb } from "@/utils/format";
+import { Card, CardContent } from "@/components/ui/card";
+
+interface Snapshot {
+  sales: number;
+  netProfit: number;
+  primeCostPct: number;
+  directExpenses: number;
+  businessExpenses: number;
+  stockExpenses: number;
+}
+
+export default function HomeFinanceSnapshot() {
+  const [data, setData] = useState<Snapshot | null>(null);
+
+  useEffect(() => {
+    fetch("/api/finance/summary/today").then((res) => res.json()).then(setData);
+  }, []);
+
+  if (!data) return null;
+
+  return (
+    <Card>
+      <CardContent>
+        <h2>Finance Snapshot</h2>
+        <ul>
+          <li>Sales Today: {thb(data.sales)}</li>
+          <li>Net Profit: {thb(data.netProfit)}</li>
+          <li>Prime Cost: {data.primeCostPct}%</li>
+          <li>Direct Expenses: {thb(data.directExpenses)}</li>
+          <li>Business Expenses: {thb(data.businessExpenses)}</li>
+          <li>Rolls Purchases: {thb(data.stockExpenses)}</li>
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =====================================
+// client/src/components/Sidebar.tsx (snippet)
+// =====================================
+{
+  title: "Finance",
+  items: [
+    { label: "Profit & Loss", path: "/finance/profit-loss" },
+    { label: "Expenses", path: "/finance/expenses" },   // moved here
+    { label: "Analysis", path: "/finance/analysis" },   // optional
+  ],
+}
+// ✅ Remove any Expenses entry under Operations
+
+✅ What You Get
+
+Direct expenses auto-logged and shown in Finance.
+
+Rolls only lodged as stock expense.
+
+Business expenses stay clean.
+
+Meat/Drinks → tracked but not double-counted.
+
+Finance dashboard + home snapshot updated.
+
+Sidebar corrected.
+
+All in one patch, no loose ends.

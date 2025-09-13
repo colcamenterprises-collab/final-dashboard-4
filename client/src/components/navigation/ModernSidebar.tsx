@@ -184,9 +184,6 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
               alt="Logo" 
               className="w-9 h-9"
             />
-            <span className="text-lg font-semibold text-slate-900 dark:text-white">
-              Restaurant
-            </span>
           </div>
           
           <ModernButton
