@@ -20,10 +20,11 @@ interface DailyStockRequest {
 export async function submitDailyStock(req: express.Request, res: express.Response) {
   const data = req.body;
   const errors = [];
-  if (!data.rollsEnd || parseInt(data.rollsEnd) < 0) errors.push('Rolls count required, non-negative');
-  if (!data.meatCount || parseInt(data.meatCount) < 0) errors.push('Meat count required, non-negative');
-  if (!data.drinksEnd || data.drinksEnd.length === 0) errors.push('Drinks counts required (at least one)');
-  if (!data.requisition || data.requisition.length === 0) errors.push('Requisition items required');
+  // FIXED: Allow zero values, only check for null/undefined/negative
+  if (data.rollsEnd == null || isNaN(Number(data.rollsEnd)) || Number(data.rollsEnd) < 0) errors.push('Rolls count required, non-negative');
+  if (data.meatCount == null || isNaN(Number(data.meatCount)) || Number(data.meatCount) < 0) errors.push('Meat count required, non-negative');
+  // FIXED: Don't require drinks/requisition arrays - zero counts are valid
+  
   if (errors.length) {
     return res.status(400).json({ error: errors.join('; ') });
   }

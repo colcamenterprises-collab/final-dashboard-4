@@ -19,6 +19,18 @@ export type CategoryBlock = {
   items: { id: string; label: string; qty: number; unit: string }[];
 };
 
+// EXACT labels from consolidated patch (same as Daily Sales)  
+const labels = {
+  en: { rollsEnd: 'Rolls (pcs)', meatCount: 'Meat (grams)', drinksEnd: 'Drinks Count', requisition: 'Requisition Items' },
+  th: { rollsEnd: 'โรล (ชิ้น)', meatCount: 'เนื้อ (กรัม)', drinksEnd: 'เครื่องดื่ม', requisition: 'รายการสั่งซื้อ' }
+};
+
+// EXACT LanguageToggle as inline component (NO new file)
+const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
+  const [lang, setLang] = useState('en');
+  return <button className="mb-4 bg-gray-200 p-2 rounded" onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}>{lang === 'en' ? 'Switch to Thai' : 'Switch to English'}</button>;
+};
+
 const DailyStock: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
@@ -29,6 +41,8 @@ const DailyStock: React.FC = () => {
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [lang, setLang] = useState<'en' | 'th'>('en');
 
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
 
@@ -143,11 +157,30 @@ const DailyStock: React.FC = () => {
 
   const handleSubmit = async () => {
     if (submitting) return;
+    
+    // EXACT VALIDATION from consolidated patch - FIXED to allow zero values
+    const errors = [];
+    if (rolls == null || isNaN(Number(rolls)) || Number(rolls) < 0) errors.push('rollsEnd');
+    if (meatGrams == null || isNaN(Number(meatGrams)) || Number(meatGrams) < 0) errors.push('meatCount');
+    
+    // Allow zero counts but ensure forms are at least attempted (not completely untouched)
+    const drinksEnd = buildDrinksFromState();
+    // Don't require drinks - zero counts are valid
+    
+    const requisition = buildItemsFromState();  
+    // Don't require requisition items - zero purchases are valid
+    
+    setErrors(errors);
+    if (errors.length) {
+      setMessage({ type: "error", text: "Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas." });
+      return; // Block submission
+    }
+    
     setSubmitting(true);
     setMessage(null);
 
-    // Build requisition array for shopping list generation
-    const requisition = buildItemsFromState().map(item => ({
+    // Build requisition array for shopping list generation  
+    const requisitionItems = buildItemsFromState().map(item => ({
       name: item.name,
       category: item.category,
       qty: item.quantity,
@@ -161,7 +194,7 @@ const DailyStock: React.FC = () => {
       rollsEnd: rolls,
       meatEnd: meatGrams,
       drinkStock: drinkStock,
-      requisition,
+      requisition: requisitionItems,
       notes: notes.trim()
     };
 
@@ -208,6 +241,12 @@ const DailyStock: React.FC = () => {
           )}
         </div>
       </div>
+      
+      {/* EXACT LanguageToggle from consolidated patch */}
+      <LanguageToggle onChange={setLang} />
+      
+      {/* EXACT error display from consolidated patch */}
+      {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
 
       {/* End-of-Shift Counts */}
       <section className="space-y-6">
@@ -215,28 +254,30 @@ const DailyStock: React.FC = () => {
           <h2 className="text-[14px] font-semibold mb-4">End-of-Shift Counts</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[14px] mb-1">Rolls (pcs)</label>
+              <label className="block text-[14px] mb-1 font-medium">{labels[lang].rollsEnd}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.includes('rollsEnd') ? 'border-red-500' : ''}`}
                 value={rolls || ''}
                 onChange={(e) => setRolls(safeInt(e.target.value))}
                 placeholder=""
                 aria-label="Rolls quantity"
               />
+              {errors.includes('rollsEnd') && <p className="text-red-500 text-sm">Rolls count required, non-negative for theft prevention.</p>}
             </div>
             <div>
-              <label className="block text-[14px] mb-1">Meat</label>
+              <label className="block text-[14px] mb-1 font-medium">{labels[lang].meatCount}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className="w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.includes('meatCount') ? 'border-red-500' : ''}`}
                 value={meatGrams || ''}
                 onChange={(e) => setMeatGrams(safeInt(e.target.value))}
                 placeholder=""
                 aria-label="Meat quantity in grams"
               />
+              {errors.includes('meatCount') && <p className="text-red-500 text-sm">Meat count required, non-negative for theft prevention.</p>}
               {meatGrams > 0 && (
                 <div className="text-xs text-gray-500 mt-1">
                   {(meatGrams / 1000).toFixed(1)}kg or {meatGrams.toLocaleString()} grams

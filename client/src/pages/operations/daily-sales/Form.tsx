@@ -142,7 +142,11 @@ export default function DailySales() {
     };
     
     const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
-    const newErrors = required.filter(f => !formData[f as keyof typeof formData] || parseFloat(String(formData[f as keyof typeof formData])) < 0);
+    const newErrors = required.filter(f => {
+      const value = formData[f as keyof typeof formData];
+      if (f === 'completedBy') return !value || value.toString().trim() === '';
+      return value == null || isNaN(Number(value)) || Number(value) < 0;
+    });
     setErrors(newErrors);
     if (newErrors.length) {
       setError(`Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas: ${newErrors.join(', ')}`);
@@ -180,6 +184,13 @@ export default function DailySales() {
       const data = await res.json().catch(() => ({} as any));
       console.log("[Form1] submit response:", data);
       
+      // CRITICAL FIX: Check success FIRST before navigation
+      if (!res.ok || !data?.ok) {
+        throw new Error(
+          data?.error || "Submit failed - please check required fields."
+        );
+      }
+      
       // Accept any ID shape we might get back
       const shiftId = 
         data?.shiftId ?? 
@@ -188,15 +199,7 @@ export default function DailySales() {
       
       if (!shiftId) {
         console.error("[Form1] Missing shiftId in response:", data);
-        // Last resort: still move user to Form 2 (without context)
-        window.location.assign(FORM2_PATH);
-        return;
-      }
-      
-      if (!res.ok || !data?.ok) {
-        throw new Error(
-          data?.error || "Submit OK flag missing from response."
-        );
+        throw new Error("Server error: missing shift ID. Please try again.");
       }
       
       // Show loading indicator before navigation
