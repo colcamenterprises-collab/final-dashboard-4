@@ -23,6 +23,7 @@ const groups: Group[] = [
   {
     title: "Finance",
     items: [
+      { to: "/finance", label: "Finance Dashboard" },
       { to: "/finance/profit-loss", label: "Profit & Loss" },
       { to: "/operations/analysis", label: "Analysis" },
     ],

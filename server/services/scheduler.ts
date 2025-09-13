@@ -40,6 +40,11 @@ export class SchedulerService {
       this.sendDailySalesSummary();
     }, 9, 0); // 9:00 AM Bangkok time
 
+    // Schedule finance calculations at 3:35 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.runFinanceCalculations();
+    }, 3, 35); // 3:35 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
     console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
@@ -450,6 +455,20 @@ export class SchedulerService {
   async triggerJussiSummary() {
     const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
     return await generateDailySummary();
+  }
+
+  private async runFinanceCalculations() {
+    try {
+      console.log('💰 Running finance calculations...');
+      
+      // Import the finance job here to avoid circular dependencies
+      const { runDailyFinanceJob } = await import('../jobs/dailyFinanceJob');
+      await runDailyFinanceJob();
+      
+      console.log('✅ Finance calculations completed');
+    } catch (error) {
+      console.error('❌ Failed to run finance calculations:', error);
+    }
   }
 }
 

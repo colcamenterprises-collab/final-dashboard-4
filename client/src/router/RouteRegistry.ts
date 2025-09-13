@@ -17,6 +17,7 @@ export const ROUTES = {
   SHIFT_SUMMARY: "/operations/shift-summary",
 
   // Finance
+  FINANCE: "/finance",
   PROFIT_LOSS: "/finance/profit-loss",
 
   // Menu Mgmt

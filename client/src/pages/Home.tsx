@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
+import HomeFinanceSnapshot from "@/components/HomeFinanceSnapshot";
 
 export default function Home() {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -81,7 +82,7 @@ export default function Home() {
       </div>
 
       {/* MTD Tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* MTD Expenses */}
         <div className="rounded-2xl border bg-blue-600 text-white p-5 shadow-sm">
           <div className="text-sm opacity-90">MTD Expenses</div>
@@ -108,6 +109,9 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Finance Snapshot */}
+        <HomeFinanceSnapshot />
       </div>
 
       {/* two columns */}

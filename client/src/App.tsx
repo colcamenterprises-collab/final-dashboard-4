@@ -18,6 +18,7 @@ import Receipts from "./pages/Receipts";
 import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
 import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
+import FinancePage from "./pages/finance/FinancePage";
 import CostCalculator from "./pages/CostCalculator";
 import Ingredients from "./pages/Ingredients";
 import Expenses from "./pages/Expenses";
@@ -93,6 +94,7 @@ export default function App() {
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
 
                   {/* Finance */}
+                  <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
                   <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
 
                   {/* Menu Mgmt */}
