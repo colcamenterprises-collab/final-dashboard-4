@@ -491,7 +491,7 @@ export default function DailySales() {
           {/* Summary Section */}
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Summary</h3>
-            <div className="space-y-2 text-lg">
+            <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Total Sales:</span>
                 <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
@@ -500,7 +500,7 @@ export default function DailySales() {
                 <span>Total Expenses:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between font-bold text-xl border-t pt-2">
+              <div className="flex justify-between font-bold text-base border-t pt-2">
                 <span>Net Position:</span>
                 <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
                   ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
