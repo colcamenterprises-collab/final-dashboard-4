@@ -174,7 +174,7 @@ export default function DailySales() {
         cashSales: cash,
         qrSales: qr,
         grabSales: grab,
-        aroiSales: aroi,
+        otherSales: aroi,
         totalSales: cash + qr + grab + aroi,
         expenses: shiftExpenses,  // Fix field name mismatch
         wages: staffWages,        // Fix field name mismatch
