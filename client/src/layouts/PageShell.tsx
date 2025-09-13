@@ -1,47 +1,47 @@
 import { useState } from "react";
-import Sidebar from "../components/Sidebar";
+import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
 
 export default function PageShell({ children }: { children: React.ReactNode }) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f5f7f8]">
-      {/* Shell */}
-      <div className="flex">
-        {/* Sidebar renders desktop+mobile variants internally */}
-        <Sidebar
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          onNavigate={() => setMenuOpen(false)}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Modern layout shell */}
+      <div className="flex h-screen overflow-hidden">
+        {/* Modern Sidebar - Desktop & Mobile */}
+        <ModernSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          className="hidden lg:flex lg:flex-shrink-0"
         />
 
-        {/* Main column */}
-        <div className="flex-1 min-w-0 md:ml-0">
-          {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-[#f5f7f8]/80 backdrop-blur border-b border-gray-200">
-            <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
-              {/* Mobile menu button */}
-              <button
-                className="p-2 rounded-md hover:bg-gray-100 md:hidden"
-                aria-label="Open menu"
-                onClick={() => setMenuOpen(true)}
-              >
-                ☰
-              </button>
-              {/* Page title placeholder; your pages can slot their own titles */}
-              <div className="text-[22px] font-extrabold text-slate-900">
-                {/* Individual pages typically render their own <h1>— this keeps space consistent */}
-              </div>
-              <div className="ml-auto flex items-center gap-3">
-                {/* right side actions if any */}
-              </div>
-            </div>
-          </header>
+        {/* Main content area */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Modern Header */}
+          <ModernHeader
+            onMenuToggle={() => setSidebarOpen(true)}
+            title="Restaurant Dashboard"
+            subtitle="Manage your operations efficiently"
+          />
 
-          {/* Content */}
-          <main className="px-4 sm:px-6 lg:px-8 py-6">{children}</main>
+          {/* Content with proper scrolling */}
+          <main className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900">
+            <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <BottomNav />
+
+      {/* Mobile Sidebar Overlay */}
+      <ModernSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        className="lg:hidden"
+      />
     </div>
   );
 }
