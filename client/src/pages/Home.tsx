@@ -67,16 +67,16 @@ export default function Home() {
       </div>
 
       {/* KPI bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: "Total Orders", value: "1,249" },
           { label: "Total Revenue", value: "฿89,542" },
           { label: "Growth", value: "+12.5%" },
           { label: "Active Items", value: "32" },
         ].map((k) => (
-          <div key={k.label} className="rounded-2xl border bg-emerald-600 text-white p-5 shadow-sm">
-            <div className="text-sm opacity-90">{k.label}</div>
-            <div className="text-2xl font-extrabold mt-1">{k.value}</div>
+          <div key={k.label} className="rounded-2xl border bg-emerald-600 text-white p-3 md:p-5 shadow-sm">
+            <div className="text-xs md:text-sm opacity-90">{k.label}</div>
+            <div className="text-lg md:text-2xl font-extrabold mt-1">{k.value}</div>
           </div>
         ))}
       </div>
