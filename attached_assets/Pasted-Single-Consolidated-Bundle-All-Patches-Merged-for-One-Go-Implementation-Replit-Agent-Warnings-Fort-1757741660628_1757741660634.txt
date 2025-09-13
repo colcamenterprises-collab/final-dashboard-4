@@ -1,0 +1,186 @@
+Single Consolidated Bundle: All Patches Merged for One-Go Implementation
+Replit Agent Warnings (Fort Knox Level):
+
+CRITICAL: Execute ONLY these exact updates. Do NOT create, delete, or rename ANY files/components/endpoints. If a file doesn't exist (e.g., exact name mismatch), STOP, log "File [name] missing—cannot proceed without Cam approval," and do not improvise.
+NO deviations: No new features (e.g., reservations, seating). No new dependencies/libs. Stick to existing stack (React 18/TS/Vite/Tailwind/shadcn/Radix/TanStack Query/React Router v7; Node/Express/TS/PostgreSQL/Drizzle/Nodemailer/OpenAI). Direct APIs only—no 3rd-party wrappers.
+Fort Knox Lock: Do NOT modify form structure (e.g., no new tabs/fields). Only add validations/errors to existing submit/next logic for data accuracy.
+Test Protocol: After updates, run npm run dev in split terminals. Manually test: Load /operations/daily-sales, fill partial form, click Next—should block with errors. Fill fully, submit, check DB/email/shopping for accuracy. Log all results. If issues, revert checkpoint—do not fix creatively.
+Data Accuracy: Validations MUST prevent submit on invalid (e.g., empty/negative stock). Use Bangkok timezone for emails.
+If unsure: Reference Replit docs directly (browse in IDE). Report conflicts without proceeding.
+
+Step-by-Step Replit Implementation:
+
+Open existing files in IDE (from your summary: client/src/pages/operations/DailySales/Form.tsx → rename to DailySalesForm.tsx if needed for consistency; DailyStock.tsx; server/api/forms/dailySalesV2.ts; dailyStock.ts; shopping-list.ts; utils/email.ts if exists).
+Copy-paste blocks below into exact locations (e.g., replace handlers).
+Save, commit checkpoint.
+Test as above; share logs.
+
+Backend Consolidated Updates (Merge of both patches):
+
+Update server/api/forms/dailySalesV2.ts (existing POST /api/forms/daily-sales/v2):
+typescript// Replace entire submitDailySales handler
+import { db } from '../db';
+import { daily_sales_v2 } from '../../shared/schema';
+import { sendDailyEmail } from '../../utils/email'; // Assume exists or create inline if missing—but NO new file
+
+export const submitDailySales = async (req, res) => {
+  const data = req.body;
+  const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'totalSales'];
+  const missing = requiredFields.filter(field => !data[field] || data[field] < 0); // Add non-negative check
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing or invalid fields: ${missing.join(', ')}. Must be non-negative.` });
+  }
+  if (data.aroiSales) { data.otherSales = data.aroiSales; delete data.aroiSales; } // Legacy rename
+  await db.insert(daily_sales_v2).values(data);
+  sendDailyEmail(); // Enhanced below
+  res.json({ success: true });
+};
+
+Update server/api/forms/dailyStock.ts (existing POST /api/forms/daily-stock):
+typescript// Replace entire submitDailyStock handler
+import { db } from '../db';
+import { daily_stock_v2 } from '../../shared/schema';
+
+export const submitDailyStock = async (req, res) => {
+  const data = req.body;
+  const errors = [];
+  if (!data.rollsEnd || parseInt(data.rollsEnd) < 0) errors.push('Rolls count required, non-negative');
+  if (!data.meatCount || parseInt(data.meatCount) < 0) errors.push('Meat count required, non-negative');
+  if (!data.drinksEnd || data.drinksEnd.length === 0) errors.push('Drinks counts required (at least one)');
+  if (!data.requisition || data.requisition.length === 0) errors.push('Requisition items required');
+  if (errors.length) {
+    return res.status(400).json({ error: errors.join('; ') });
+  }
+  data.rollsEnd = parseInt(data.rollsEnd, 10);
+  data.meatCount = parseInt(data.meatCount, 10);
+  await db.insert(daily_stock_v2).values(data);
+  res.json({ success: true });
+};
+
+Update server/api/shopping-list.ts (existing GET /api/shopping-list):
+typescript// Replace getShoppingList
+export const getShoppingList = async (req, res) => {
+  const latestSales = await db.select().from(daily_sales_v2).orderBy(desc(daily_sales_v2.shiftDate)).limit(1)[0];
+  const latestStock = await db.select().from(daily_stock_v2).orderBy(desc(daily_stock_v2.createdAt)).limit(1)[0];
+  const ingredients = await db.select().from(ingredients);
+  const reqItems = latestStock.requisition.filter(i => i.qty > 0);
+  const grouped = {
+    Rolls: { qty: latestSales.rollsEnd || 0, estCost: (latestSales.rollsEnd || 0) * 8 },
+    Meat: { qty: latestStock.meatCount || 0, estCost: 0 /* Add logic if priced */ },
+    Drinks: latestSales.drinksEnd || [] // jsonb
+  };
+  reqItems.forEach(i => {
+    const ing = ingredients.find(ing => ing.id === i.id);
+    const category = ing ? ing.category : 'Other';
+    const estCost = ing ? i.qty * ing.unitPrice : 0;
+    if (!grouped[category]) grouped[category] = [];
+    grouped[category].push({ item: ing ? ing.name : i.id, qty: i.qty, estCost });
+  });
+  res.json({ groupedList: grouped });
+};
+
+Update/Create Inline sendDailyEmail in server/utils/email.ts (if missing, add to routes.ts—no new file):
+typescriptimport nodemailer from 'nodemailer';
+
+export const sendDailyEmail = async () => {
+  const transport = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: 587, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+  const latestSales = await db.select().from(daily_sales_v2).orderBy(desc(shiftDate)).limit(1)[0];
+  const latestStock = await db.select().from(daily_stock_v2).orderBy(desc(createdAt)).limit(1)[0];
+  const shopping = await getShoppingList(); // Internal call
+  let content = `
+    Sales: Cash ${latestSales.cashSales}, QR ${latestSales.qrSales}, Grab ${latestSales.grabSales}, Other ${latestSales.otherSales}
+    Total Sales: ${latestSales.totalSales}, Expenses: ${latestSales.expenses}
+    Rolls End: ${latestSales.rollsEnd}, Meat: ${latestStock.meatCount}, Drinks: ${JSON.stringify(latestSales.drinksEnd)}
+    Requisitions (>0): ${latestStock.requisition.filter(i => i.qty > 0).map(i => `${i.id}: ${i.qty}`).join('\n')}
+    Shopping List with Est. Costs: ${Object.entries(shopping.groupedList).map(([cat, items]) => `${cat}: ${Array.isArray(items) ? items.map(i => `${i.item} - ${i.qty} (${i.estCost} THB)`).join(', ') : `Qty ${items.qty} (${items.estCost} THB)`}`).join('\n')}
+  `;
+  await transport.sendMail({ from: process.env.SMTP_USER, to: 'smashbrothersburgersth@gmail.com', subject: 'Daily Shift Report - ' + new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok' }), text: content });
+};
+// For auto-send: Add simple setInterval in server/index.ts (check 8am Bangkok daily)—but manual trigger for v1.
+
+
+Frontend Consolidated Updates:
+
+Update client/src/pages/operations/DailySales/Form.tsx (existing; rename to DailySalesForm.tsx if needed for consistency):
+tsx// Add at top: Language labels (inline, no new file)
+const labels = {
+  en: { completedBy: 'Completed By', startingCash: 'Starting Cash', otherSales: 'Other Sales' /* Add all required */ },
+  th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', otherSales: 'ยอดขายอื่นๆ' /* Full Thai */ }
+};
+
+// Add LanguageToggle as inline component (NO new file)
+const LanguageToggle = ({ onChange }) => {
+  const [lang, setLang] = useState('en');
+  return <button className="mb-4 bg-gray-200 p-2 rounded" onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}>{lang === 'en' ? 'Switch to Thai' : 'Switch to English'}</button>;
+};
+
+// In main component: Add state for lang/errors
+const [lang, setLang] = useState('en');
+const [errors, setErrors] = useState([]);
+
+// Update inputs: Add placeholders, classes for errors/fonts
+// E.g., for completedBy:
+<input placeholder={labels[lang].completedBy} onChange={/*...*/} className={`border p-2 w-full text-base ${errors.includes('completedBy') ? 'border-red-500' : ''}`} />
+
+// Similar for all required: startingCash (type="number", min=0), sales fields
+
+// Update Summary section: <div className="text-sm"> {/* Small fonts as requested */ } Summary: ...</div>
+
+// Update submit/next button logic (assume it's called submit() or handleNext):
+const handleNext = () => {
+  const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
+  const newErrors = required.filter(f => !formData[f] || parseFloat(formData[f]) < 0);
+  setErrors(newErrors);
+  if (newErrors.length) {
+    return; // Block navigation to Form 2
+  }
+  // Proceed to /operations/daily-stock or step 2
+  mutation.mutate(formData); // If submit on next
+};
+
+// Add error display: {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+
+// Add <LanguageToggle onChange={setLang} /> at top
+
+Update client/src/pages/operations/DailyStock.tsx (existing):
+tsx// Add same labels and LanguageToggle inline as above
+
+// In component: Same [lang, errors] state
+
+// Update inputs for lockdowns:
+<label className="text-sm font-medium">{labels[lang].rollsEnd}</label>
+<input type="number" min="0" value={formData.rollsEnd} onChange={e => setFormData({...formData, rollsEnd: e.target.value})} className={`border p-2 w-full ${errors.includes('rollsEnd') ? 'border-red-500' : ''}`} />
+{errors.includes('rollsEnd') && <p className="text-red-500 text-sm">Rolls count required, non-negative for theft prevention.</p>}
+
+// Similar for meatCount, drinksEnd (textarea for jsonb)
+
+// Update handleSubmit: Same error checks as backend, block if errors
+
+Update client/src/pages/operations/ShoppingListPage.tsx (existing):
+tsx// Fetch groupedList, render: <ul className="space-y-2">{Object.entries(groupedList).map(([cat, items]) => <li className="text-sm">{cat}: {Array.isArray(items) ? items.map(i => `${i.item}: ${i.qty} (${i.estCost} THB)`).join(', ') : `Qty ${items.qty} (${items.estCost} THB)`}</li>)}</ul>
+
+Update Form Library (client/src/pages/operations/DailySalesLibrary.tsx existing):
+tsx// In render: Expand all fields, e.g., drinksEnd as list, requisition filter qty >0
+
+
+Tests Consolidated (Update your existing testApp.ts):
+javascriptconst axios = require('axios');
+axios.defaults.baseURL = 'http://localhost:3000'; // For local test
+
+async function test() {
+  // Existing tests...
+  // Add invalid sales
+  try {
+    await axios.post('/api/forms/daily-sales/v2', { completedBy: '' });
+  } catch (e) { console.log('Expected error: ' + e.response.data.error); }
+
+  // Valid sales...
+  // Stock invalid
+  try {
+    await axios.post('/api/forms/daily-stock', { rollsEnd: -1 });
+  } catch (e) { console.log('Expected stock error: ' + e.response.data.error); }
+
+  // Valid stock...
+}
+test();
+Apply this bundle, test thoroughly, and share results/logs. This should fix the next button skip, lockdowns, and all issues in one go without new files. If any file name mismatch, let me know for tweaks

@@ -80,6 +80,7 @@ export default function DailySales() {
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(4);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -116,11 +117,30 @@ export default function DailySales() {
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault(); // allow call from button with no event
     if (submitting) return;
+    
+    // EXACT VALIDATION from consolidated patch - prevent Form 2 progression without proper data
+    const formData = {
+      completedBy,
+      startingCash: cashStart,
+      cashSales: cash,
+      qrSales: qr,
+      grabSales: grab,
+      otherSales: aroi
+    };
+    
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
+    const newErrors = required.filter(f => !formData[f as keyof typeof formData] || parseFloat(String(formData[f as keyof typeof formData])) < 0);
+    setErrors(newErrors);
+    if (newErrors.length) {
+      setError(`Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas: ${newErrors.join(', ')}`);
+      return; // Block navigation to Form 2
+    }
+    
     setSubmitting(true);
     setError(null);
     
     try {
-      const formData = {
+      const submitData = {
         completedBy,
         startingCash: cashStart,  // Fix field name mismatch
         cashSales: cash,
@@ -141,7 +161,7 @@ export default function DailySales() {
       const res = await fetch("/api/forms/daily-sales/v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
       
       const data = await res.json().catch(() => ({} as any));
