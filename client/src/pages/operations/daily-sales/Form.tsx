@@ -413,7 +413,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="px-3 py-2 border rounded-xl" 
+                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
                   + Add Row
@@ -474,7 +474,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="px-3 py-2 border rounded-xl" 
+                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
                   + Add Row
