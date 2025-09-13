@@ -167,9 +167,12 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
       <div 
         ref={sidebarRef}
         className={cn(
-          "fixed top-0 left-0 z-50 h-full w-80 bg-white border-r border-slate-200 transform transition-transform duration-300 lg:transform-none lg:relative lg:z-auto dark:bg-slate-900 dark:border-slate-800",
-          isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:w-64",
+          // Mobile: fixed overlay that slides in/out
+          "fixed top-0 left-0 z-50 h-full w-80 bg-white border-r border-slate-200 transform transition-transform duration-300 dark:bg-slate-900 dark:border-slate-800",
+          // Mobile visibility
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          // Desktop: always visible, positioned normally
+          "lg:fixed lg:w-64 lg:z-auto",
           className
         )}
       >

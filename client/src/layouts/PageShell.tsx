@@ -6,15 +6,14 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Modern layout shell */}
-      <div className="flex h-screen overflow-hidden">
-        {/* Modern Sidebar - Desktop & Mobile */}
-        <ModernSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          className="hidden lg:flex lg:flex-shrink-0"
-        />
+      {/* Single Modern Sidebar - handles both desktop and mobile */}
+      <ModernSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
+      {/* Modern layout shell */}
+      <div className="flex h-screen overflow-hidden lg:ml-64">
         {/* Main content area */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Modern Header */}
@@ -35,13 +34,6 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
 
       {/* Bottom Navigation - Mobile Only */}
       <BottomNav />
-
-      {/* Mobile Sidebar Overlay */}
-      <ModernSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        className="lg:hidden"
-      />
     </div>
   );
 }
