@@ -14,6 +14,13 @@ const formatTHB = (thb: number) => thb.toLocaleString();
 export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const body = req.body;
+    
+    // EXACT VALIDATION from consolidated patch
+    const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
+    const missing = requiredFields.filter(field => !body[field] || body[field] < 0);
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing or invalid fields: ${missing.join(', ')}. Must be non-negative.` });
+    }
 
     // Normalize field names (frontend may send legacy keys)
     const otherSales = body.otherSales ?? body.aroiDeeSales ?? 0;
@@ -160,10 +167,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
     `;
 
-    // First send the immediate email with current data
+    // Enhanced email with Bangkok timezone (from consolidated patch)
+    const bangkokDate = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok' });
     let emailSent = await workingEmailService.sendEmail(
-      "smashbrothersburgersth@gmail.com",
-      `Daily Sales & Stock – ${shiftDate}`,
+      "smashbrothersburgersth@gmail.com", 
+      `Daily Shift Report - ${bangkokDate}`,
       html
     );
     

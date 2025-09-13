@@ -8,6 +8,18 @@ import { useState, useEffect } from "react";
 
 const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 
+// EXACT Language labels from consolidated patch (inline, no new file)
+const labels = {
+  en: { completedBy: 'Completed By', startingCash: 'Starting Cash', cashSales: 'Cash Sales', qrSales: 'QR Sales', grabSales: 'Grab Sales', otherSales: 'Other Sales' },
+  th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', cashSales: 'ยอดขายเงินสด', qrSales: 'ยอดขาย QR', grabSales: 'ยอดขาย Grab', otherSales: 'ยอดขายอื่นๆ' }
+};
+
+// EXACT LanguageToggle as inline component (NO new file)
+const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
+  const [lang, setLang] = useState('en');
+  return <button className="mb-4 bg-gray-200 p-2 rounded" onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}>{lang === 'en' ? 'Switch to Thai' : 'Switch to English'}</button>;
+};
+
 // Success Modal Component
 function SuccessModal({
   open,
@@ -81,6 +93,7 @@ export default function DailySales() {
   const [countdown, setCountdown] = useState(4);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [lang, setLang] = useState<'en' | 'th'>('en');
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -240,6 +253,12 @@ export default function DailySales() {
         </div>
 
         <form onSubmit={submit} className="mt-6 space-y-6">
+          {/* EXACT LanguageToggle from consolidated patch */}
+          <LanguageToggle onChange={setLang} />
+          
+          {/* EXACT error display from consolidated patch */}
+          {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+          
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Shift Information</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -253,21 +272,24 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Completed By</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].completedBy}</label>
                 <input 
+                  placeholder={labels[lang].completedBy}
                   value={completedBy} 
                   onChange={e=>setCompletedBy(e.target.value)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('completedBy') ? 'border-red-500' : ''}`}
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Starting Cash (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].startingCash}</label>
                 <input 
                   type="number" 
+                  min="0"
+                  placeholder={labels[lang].startingCash}
                   value={cashStart} 
                   onChange={e=>setCashStart(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('startingCash') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
@@ -278,39 +300,47 @@ export default function DailySales() {
             <h2 className="text-lg font-bold mb-4">Sales Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Cash Sales</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
                 <input 
                   type="number" 
+                  min="0"
+                  placeholder={labels[lang].cashSales}
                   value={cash} 
                   onChange={e=>setCash(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">QR Sales</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrSales}</label>
                 <input 
                   type="number" 
+                  min="0"
+                  placeholder={labels[lang].qrSales}
                   value={qr} 
                   onChange={e=>setQr(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Grab Sales</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabSales}</label>
                 <input 
                   type="number" 
+                  min="0"
+                  placeholder={labels[lang].grabSales}
                   value={grab} 
                   onChange={e=>setGrab(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Aroi Dee Sales</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherSales}</label>
                 <input 
                   type="number" 
+                  min="0"
+                  placeholder={labels[lang].otherSales}
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
