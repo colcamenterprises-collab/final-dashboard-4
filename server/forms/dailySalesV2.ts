@@ -160,6 +160,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
         <li>Meat Remaining: ${meatEnd || "Not specified"}</li>
       </ul>
 
+      <h3>Drinks Stock</h3>
+      ${
+        (finalDrinkStock || []).length === 0
+          ? '<p style="color: #6c757d;">No drinks counted.</p>'
+          : `<ul>
+               ${(finalDrinkStock || []).map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+             </ul>`
+      }
+
       <h3>Shopping List - Items to Purchase</h3>
       ${
         shoppingList.length === 0
@@ -261,15 +270,15 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
 export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { rollsEnd, meatEnd, requisition } = req.body;
+    const { rollsEnd, meatEnd, requisition, drinkStock } = req.body;
 
-    // Update the existing record with stock data
+    // Update the existing record with stock data including drinks
     const result = await pool.query(
       `UPDATE daily_sales_v2 
        SET payload = payload || $1
        WHERE id = $2
        RETURNING id, "shiftDate", "completedBy", payload`,
-      [JSON.stringify({ rollsEnd, meatEnd, requisition }), id]
+      [JSON.stringify({ rollsEnd, meatEnd, requisition, drinkStock }), id]
     );
 
     if (result.rows.length === 0) {
@@ -288,6 +297,9 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     // Build shopping list
     const shoppingList = (requisition || [])
       .filter((i: any) => (i.qty || 0) > 0);
+    
+    // Extract drinks from payload or request body
+    const finalDrinkStock = drinkStock || payload.drinkStock || [];
     
     const updatedHtml = `
       <h2>Daily Sales & Stock Report - COMPLETE</h2>

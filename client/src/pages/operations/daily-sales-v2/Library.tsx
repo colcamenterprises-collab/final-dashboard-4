@@ -225,7 +225,8 @@ export default function DailySalesV2Library() {
         },
         stock: {
           rolls: p.rollsEnd || 0,
-          meat: p.meatEnd || 0
+          meat: p.meatEnd || 0,
+          drinks: p.drinkStock || []
         },
         shoppingList: p.requisition || []
       };
@@ -270,6 +271,7 @@ export default function DailySalesV2Library() {
               <th className="p-2 border-b">Total Sales</th>
               <th className="p-2 border-b">Rolls</th>
               <th className="p-2 border-b">Meat</th>
+              <th className="p-2 border-b">Drinks</th>
               <th className="p-2 border-b">Balanced</th>
               <th className="p-2 border-b">Status</th>
               <th className="p-2 border-b">Actions</th>
@@ -278,7 +280,7 @@ export default function DailySalesV2Library() {
           <tbody>
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-4 text-center text-gray-500">
+                <td colSpan={9} className="p-4 text-center text-gray-500">
                   No records found
                 </td>
               </tr>
@@ -292,6 +294,11 @@ export default function DailySalesV2Library() {
                   <td className="p-2 border-b">{thb(rec.totalSales)}</td>
                   <td className="p-2 border-b">{rec.buns}</td>
                   <td className="p-2 border-b">{rec.meat}</td>
+                  <td className="p-2 border-b">
+                    {(rec.payload?.drinkStock || []).length > 0 
+                      ? `${(rec.payload?.drinkStock || []).reduce((sum, d) => sum + (d.quantity || 0), 0)} items`
+                      : "-"}
+                  </td>
                   <td className="p-2 border-b">
                     {rec.payload?.balanced ? (
                       <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">
@@ -602,6 +609,20 @@ export default function DailySalesV2Library() {
                   <p><strong>Rolls:</strong> {selected.stock.rolls} pcs</p>
                   <p><strong>Meat:</strong> {selected.stock.meat} grams</p>
                 </div>
+
+                {/* Drinks Stock Section */}
+                {selected.stock.drinks && selected.stock.drinks.length > 0 && (
+                  <div className="bg-blue-50 p-3 rounded">
+                    <h4 className="font-semibold mb-2">Drinks Count</h4>
+                    <div className="space-y-1">
+                      {selected.stock.drinks.map((drink, idx) => (
+                        <p key={idx}>
+                          <strong>{drink.name}:</strong> {drink.quantity} {drink.unit}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-orange-50 p-3 rounded">
                   <h4 className="font-semibold mb-2">Shopping List / Requisition</h4>
