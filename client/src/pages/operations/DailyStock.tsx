@@ -30,14 +30,14 @@ const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
   const [lang, setLang] = useState('en');
   return (
     <div className="mb-4 flex items-center gap-3">
-      <span className={`text-sm ${lang === 'en' ? 'text-blue-600' : 'text-gray-600'}`}>EN</span>
+      <span className={`text-sm font-medium ${lang === 'en' ? 'text-blue-600' : 'text-gray-500'}`}>EN</span>
       <button 
-        className={`relative w-11 h-6 rounded-full transition-all duration-200 ${lang === 'en' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        className={`relative w-12 h-6 rounded-full border-2 transition-all duration-300 ${lang === 'en' ? 'bg-blue-500 border-blue-500' : 'bg-emerald-500 border-emerald-500'}`}
         onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}
       >
-        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${lang === 'en' ? 'translate-x-0' : 'translate-x-5'}`} />
+        <div className={`absolute top-0 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${lang === 'en' ? 'left-0' : 'left-6'}`} />
       </button>
-      <span className={`text-sm ${lang === 'th' ? 'text-emerald-600' : 'text-gray-600'}`}>ไทย</span>
+      <span className={`text-sm font-medium ${lang === 'th' ? 'text-emerald-600' : 'text-gray-500'}`}>ไทย</span>
     </div>
   );
 };
@@ -81,21 +81,21 @@ const DailyStock: React.FC = () => {
     return ingredients.filter(item => item.category === 'Drinks');
   }, [ingredients]);
 
-  // Group all ingredients by category with custom order (including drinks)
+  // Group all ingredients by category with custom order (EXCLUDING drinks and meat)
   const blocks: CategoryBlock[] = useMemo(() => {
     if (!Array.isArray(ingredients)) return [];
     const map = new Map<string, IngredientItem[]>();
     
-    // Include ALL ingredients including drinks in requisition calculation
-    const allIngredients = ingredients;
+    // Filter out drinks and meat from requisition (drinks have separate section, meat should be hidden)
+    const allIngredients = ingredients.filter(item => item.category !== 'Drinks' && item.category !== 'Meat');
     
     for (const ingredient of allIngredients) {
       if (!map.has(ingredient.category)) map.set(ingredient.category, []);
       map.get(ingredient.category)!.push(ingredient);
     }
     
-    // Custom category order: Drinks first, then Fresh Food, Shelf Items, Frozen Food, others alphabetically
-    const categoryOrder = ['Drinks', 'Fresh Food', 'Shelf Items', 'Frozen Food'];
+    // Custom category order: Fresh Food, Shelf Items, Frozen Food, others alphabetically (excluding Drinks and Meat)
+    const categoryOrder = ['Fresh Food', 'Shelf Items', 'Frozen Food'];
     const orderedCategories = Array.from(map.keys()).sort((a, b) => {
       const aIndex = categoryOrder.indexOf(a);
       const bIndex = categoryOrder.indexOf(b);
@@ -309,14 +309,14 @@ const DailyStock: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {drinkItems.map((drink) => (
-                  <div key={drink.name} className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="text-[14px] font-medium truncate pr-3">{drink.name}</div>
+                  <div key={drink.name} className="rounded-lg border p-3">
+                    <label className="block text-[14px] font-medium mb-2">{drink.name}</label>
                     <input
                       type="number"
                       inputMode="numeric"
                       min="0"
                       step="1"
-                      className="w-24 rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       value={drinkQuantities[drink.name] ?? 0}
                       onChange={(e) => setDrinkQuantity(drink.name, safeInt(e.target.value))}
                       aria-label={`${drink.name} quantity`}

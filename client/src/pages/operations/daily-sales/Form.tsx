@@ -19,14 +19,14 @@ const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
   const [lang, setLang] = useState('en');
   return (
     <div className="mb-4 flex items-center gap-3">
-      <span className={`text-sm ${lang === 'en' ? 'text-blue-600' : 'text-gray-600'}`}>EN</span>
+      <span className={`text-sm font-medium ${lang === 'en' ? 'text-blue-600' : 'text-gray-500'}`}>EN</span>
       <button 
-        className={`relative w-11 h-6 rounded-full transition-all duration-200 ${lang === 'en' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        className={`relative w-12 h-6 rounded-full border-2 transition-all duration-300 ${lang === 'en' ? 'bg-blue-500 border-blue-500' : 'bg-emerald-500 border-emerald-500'}`}
         onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}
       >
-        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${lang === 'en' ? 'translate-x-0' : 'translate-x-5'}`} />
+        <div className={`absolute top-0 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${lang === 'en' ? 'left-0' : 'left-6'}`} />
       </button>
-      <span className={`text-sm ${lang === 'th' ? 'text-emerald-600' : 'text-gray-600'}`}>ไทย</span>
+      <span className={`text-sm font-medium ${lang === 'th' ? 'text-emerald-600' : 'text-gray-500'}`}>ไทย</span>
     </div>
   );
 };
