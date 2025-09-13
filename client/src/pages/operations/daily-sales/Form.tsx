@@ -14,10 +14,21 @@ const labels = {
   th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', cashSales: 'ยอดขายเงินสด', qrSales: 'ยอดขาย QR', grabSales: 'ยอดขาย Grab', otherSales: 'ยอดขายอื่นๆ' }
 };
 
-// EXACT LanguageToggle as inline component (NO new file)
+// EXACT LanguageToggle as inline component (NO new file) - styled as toggle switch
 const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
   const [lang, setLang] = useState('en');
-  return <button className="mb-4 bg-gray-200 p-2 rounded" onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}>{lang === 'en' ? 'Switch to Thai' : 'Switch to English'}</button>;
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className={`text-sm font-medium ${lang === 'en' ? 'text-blue-600' : 'text-gray-500'}`}>EN</span>
+      <button 
+        className={`relative w-12 h-6 rounded-full transition-all duration-200 ${lang === 'en' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}
+      >
+        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${lang === 'en' ? 'translate-x-0.5' : 'translate-x-6'}`} />
+      </button>
+      <span className={`text-sm font-medium ${lang === 'th' ? 'text-emerald-600' : 'text-gray-500'}`}>ไทย</span>
+    </div>
+  );
 };
 
 // Success Modal Component
