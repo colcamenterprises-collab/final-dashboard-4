@@ -177,7 +177,18 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-end p-6 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/attached_assets/Yellow Circle - Black Logo_1757766401641.png" 
+              alt="Logo" 
+              className="w-9 h-9"
+            />
+            <span className="text-lg font-semibold text-slate-900 dark:text-white">
+              Restaurant
+            </span>
+          </div>
+          
           <ModernButton
             variant="ghost"
             size="sm"
