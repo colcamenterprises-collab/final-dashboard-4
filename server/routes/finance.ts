@@ -3,35 +3,24 @@ import { pool } from "../db";
 
 const router = express.Router();
 
-router.get("/summary", async (req, res) => {
+router.get("/summary", async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT payload 
        FROM daily_sales_v2 
        WHERE "deletedAt" IS NULL 
-       AND payload ? 'finance_summary'
        ORDER BY "createdAt" DESC 
        LIMIT 1`
     );
-
-    if (!result.rows.length) {
-      return res.json({});
-    }
-
-    const financeSummary = result.rows[0].payload?.finance_summary;
-    
-    if (!financeSummary) {
-      return res.json({});
-    }
-
-    return res.json(financeSummary);
+    const financeSummary = result.rows[0]?.payload?.finance_summary;
+    return res.json(financeSummary || {});
   } catch (err) {
     console.error("Finance summary error:", err);
     return res.status(500).json({ error: "Failed to fetch finance summary" });
   }
 });
 
-router.get("/summary/today", async (req, res) => {
+router.get("/summary/today", async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT payload 
@@ -40,43 +29,21 @@ router.get("/summary/today", async (req, res) => {
        ORDER BY "createdAt" DESC 
        LIMIT 1`
     );
-
-    if (!result.rows.length) {
-      return res.json({});
-    }
-
-    const payload = result.rows[0].payload || {};
-    const financeSummary = payload.finance_summary;
+    const payload = result.rows[0]?.payload || {};
+    const fs = payload.finance_summary;
+    if (!fs) return res.json({});
     
-    if (!financeSummary) {
-      return res.json({});
-    }
-
-    // Create snapshot with key metrics
-    const snapshot = {
-      sales: financeSummary.sales || 0,
-      netProfit: financeSummary.netProfit || 0,
-      primeCostPct: financeSummary.primeCostPct || 0,
-      topItem: null, // Could be extracted from POS data later
-      varianceAlert: payload.balanced === false ? "Cash register not balanced" : null,
-    };
-
-    return res.json(snapshot);
+    res.json({
+      sales: fs.sales || 0,
+      netProfit: fs.netProfit || 0,
+      primeCostPct: fs.primeCostPct || 0,
+      directExpenses: fs.breakdown?.direct || 0,
+      businessExpenses: fs.breakdown?.business || 0,
+      stockExpenses: fs.breakdown?.stock || 0,
+    });
   } catch (err) {
     console.error("Finance snapshot error:", err);
     return res.status(500).json({ error: "Failed to fetch finance snapshot" });
-  }
-});
-
-// Manual trigger for finance calculations
-router.post("/calculate", async (req, res) => {
-  try {
-    const { runDailyFinanceJob } = await import("../jobs/dailyFinanceJob");
-    await runDailyFinanceJob();
-    res.json({ ok: true, message: "Finance calculations updated" });
-  } catch (err) {
-    console.error("Finance calculation trigger error:", err);
-    res.status(500).json({ error: "Failed to run finance calculations" });
   }
 });
 

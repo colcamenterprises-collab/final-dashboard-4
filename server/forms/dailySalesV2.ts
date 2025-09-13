@@ -5,10 +5,29 @@ import { Request, Response } from "express";
 import { pool } from "../db";
 import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
+import db from "../db";
+import { v4 as uuid } from "uuid";
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
 const formatTHB = (thb: number) => thb.toLocaleString();
+
+// TODO: Restore logDirectExpenses function when schema import is fixed
+// async function logDirectExpenses(shiftDate: Date, expenses: any[]) {
+//   for (const e of expenses) {
+//     await db.insert(expensesV2).values({
+//       id: uuid(),
+//       shiftDate,
+//       item: e.item || e.description,
+//       costCents: e.costCents || 0,
+//       supplier: e.shop || "Unknown",
+//       expenseType: e.category || "Misc",
+//       meta: {},
+//       source: "SHIFT_FORM",
+//       createdAt: new Date(),
+//     });
+//   }
+// }
 
 
 export async function createDailySalesV2(req: Request, res: Response) {
@@ -100,6 +119,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [id, shiftDate, completedBy, createdAt, createdAt, payload]
     );
+
+    // TODO: Re-enable when schema import is fixed
+    // Log shift expenses to expensesV2 table
+    // if (payload.expenses && payload.expenses.length > 0) {
+    //   await logDirectExpenses(new Date(createdAt), payload.expenses);
+    // }
 
     // Build shopping list for email
     const shoppingList = (requisition || [])

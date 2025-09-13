@@ -43,15 +43,14 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/daily-sales", label: "Daily Sales & Stock", icon: Receipt, testId: "nav-daily-sales" },
       { to: "/operations/daily-sales-v2/library", label: "Sales Library", icon: BarChart3, testId: "nav-sales-library" },
       { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-      { to: "/operations/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" },
       { to: "/operations/analysis", label: "Analysis", icon: BarChart3, testId: "nav-analysis" }
     ]
   },
   {
     title: "Finance",
     items: [
-      { to: "/finance", label: "Finance Dashboard", icon: BarChart3, testId: "nav-finance" },
-      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" }
+      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" },
+      { to: "/finance/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" }
     ]
   },
   {
