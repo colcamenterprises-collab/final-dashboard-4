@@ -21,22 +21,22 @@ router.post('/', async (req, res) => {
   try {
     console.log('[daily-stock] Received payload:', JSON.stringify(req.body, null, 2));
 
-    const { shiftId, rolls, meatGrams, items }: DailyStockRequest = req.body;
-
-    // Validate required fields
-    if (typeof rolls !== 'number' || typeof meatGrams !== 'number') {
-      return res.status(400).json({
-        ok: false,
-        error: 'Missing required fields: rolls and meatGrams must be numbers'
-      });
+    const data = req.body;
+    const errors = [];
+    
+    // Mandatory checks as specified in warnings file
+    if (!data.rollsEnd || data.rollsEnd < 0) errors.push('Rolls count is required and must be non-negative');
+    if (!data.meatCount || data.meatCount < 0) errors.push('Meat count is required and must be non-negative');  
+    if (!data.drinksEnd || data.drinksEnd.length === 0) errors.push('Drinks counts are required (at least one item)');
+    if (!data.requisition || data.requisition.length === 0) errors.push('Requisition items required');
+    
+    if (errors.length) {
+      return res.status(400).json({ error: errors.join('; ') });
     }
-
-    if (!Array.isArray(items)) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Missing required field: items must be an array'
-      });
-    }
+    
+    // Numeric enforcement (parse if needed for accuracy)
+    data.rollsEnd = parseInt(data.rollsEnd, 10);
+    data.meatCount = parseInt(data.meatCount, 10);
 
     // Generate a saved ID for the response
     const savedId = shiftId || uuidv4();
