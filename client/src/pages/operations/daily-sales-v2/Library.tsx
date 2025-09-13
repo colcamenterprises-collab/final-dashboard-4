@@ -25,7 +25,10 @@ type RecordType = {
   buns: string;
   meat: string;
   status: string;
-  payload?: { balanced?: boolean };
+  payload?: { 
+    balanced?: boolean;
+    drinkStock?: { name: string; quantity: number; unit: string }[];
+  };
   deletedAt?: string | null;
 };
 
@@ -636,7 +639,7 @@ export default function DailySalesV2Library() {
                             <span className="font-medium">{item.name}</span>
                             <span className="text-xs text-gray-500 ml-2">({item.category})</span>
                           </div>
-                          <span className="font-bold">{item.qty} {item.unit}</span>
+                          <span className="font-bold">{item.qty} {item.qty === 1 ? 'item' : 'items'}</span>
                         </div>
                       ))}
                     </div>

@@ -34,6 +34,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const requisition = body.requisition ?? [];
     const rollsEnd = body.rollsEnd ?? 0;
     const meatEnd = body.meatEnd ?? 0;
+    const finalDrinkStock = body.drinkStock ?? [];
 
     const {
       completedBy,
@@ -336,6 +337,15 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
         <li>Rolls Remaining: ${rollsEnd || "Not specified"}</li>
         <li>Meat Remaining: ${meatEnd ? `${meatEnd}g (${(meatEnd/1000).toFixed(1)}kg)` : "Not specified"}</li>
       </ul>
+
+      <h3>Drinks Stock</h3>
+      ${
+        (finalDrinkStock || []).length === 0
+          ? '<p style="color: #6c757d;">No drinks counted.</p>'
+          : `<ul>
+               ${(finalDrinkStock || []).map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+             </ul>`
+      }
 
       <h3>Shopping List - Items to Purchase</h3>
       ${
