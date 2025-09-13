@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import { Eye, Printer, Download } from 'lucide-react';
 
 // THB formatting helper
 const thb = (v: unknown): string => {
@@ -327,22 +328,25 @@ export default function DailySalesV2Library() {
                   <td className="p-2 border-b">
                     <div className="flex flex-wrap gap-1">
                       <button
-                        className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded text-xs"
+                        className="p-2 hover:bg-gray-100 text-black rounded"
                         onClick={() => viewRecord(rec.id)}
+                        title="View"
                       >
-                        View
+                        <Eye size={16} />
                       </button>
                       <button
-                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded text-xs"
+                        className="p-2 hover:bg-gray-100 text-black rounded"
                         onClick={() => printRecord(rec.id)}
+                        title="Print"
                       >
-                        Print
+                        <Printer size={16} />
                       </button>
                       <button
-                        className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded text-xs"
+                        className="p-2 hover:bg-gray-100 text-black rounded"
                         onClick={() => downloadRecord(rec)}
+                        title="Download"
                       >
-                        Download
+                        <Download size={16} />
                       </button>
                       {!rec.deletedAt && (
                         <>
@@ -444,27 +448,30 @@ export default function DailySalesV2Library() {
               {/* Actions */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <button
-                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-black font-[Poppins] rounded text-sm"
+                  className="p-3 hover:bg-gray-100 text-black rounded"
                   onClick={() => viewRecord(rec.id)}
+                  title="View"
                 >
-                  View
+                  <Eye size={18} />
                 </button>
                 <button
-                  className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-[Poppins] rounded text-sm"
+                  className="p-3 hover:bg-gray-100 text-black rounded"
                   onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/print-full`, "_blank")}
+                  title="Print"
                 >
-                  Print
+                  <Printer size={18} />
                 </button>
                 <button
-                  className="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded text-sm"
+                  className="p-3 hover:bg-gray-100 text-black rounded"
                   onClick={() => {
                     const link = document.createElement("a");
                     link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
                     link.download = `daily-sales-${rec.id}.pdf`;
                     link.click();
                   }}
+                  title="Download"
                 >
-                  Download
+                  <Download size={18} />
                 </button>
                 {!rec.deletedAt && (
                   <>
