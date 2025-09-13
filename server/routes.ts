@@ -266,12 +266,6 @@ export function registerRoutes(app: express.Application): Server {
     return saveDailyStock(req, res);
   });
 
-  // New mandatory validation endpoint as specified in warnings
-  app.post('/api/forms/daily-stock', async (req: Request, res: Response) => {
-    const { submitDailyStock } = await import('./api/forms/dailyStock');
-    return submitDailyStock(req, res);
-  });
-
   // POS Bundle Upload
   app.post('/api/pos/upload', async (req: Request, res: Response) => {
     try {

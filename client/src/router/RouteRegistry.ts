@@ -5,7 +5,6 @@ export const ROUTES = {
   // Operations
   DAILY_SALES_STOCK: "/operations/stock",
   DAILY_STOCK: "/operations/daily-stock",
-  DAILY_STOCK_FORM: "/operations/daily-stock-form",
   DAILY_SALES_LIBRARY: "/operations/daily-sales-v2/library",
   ANALYSIS: "/operations/analysis",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",

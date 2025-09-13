@@ -35,7 +35,6 @@ import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
-import DailyStockForm from "./pages/operations/DailyStockForm";
 import PosUpload from "./pages/analysis/PosUpload";
 import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
 import PosReceipts from "./pages/analysis/PosReceipts";
@@ -73,7 +72,6 @@ export default function App() {
 
                   {/* ---- FORM 2: canonical + aliases ---- */}
                   <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
-                  <Route path="/operations/daily-stock-form" element={<Guard><DailyStockForm /></Guard>} />
                   {/* Comment out duplicates to avoid conflicts */}
                   {/* <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} /> */}
                   {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
