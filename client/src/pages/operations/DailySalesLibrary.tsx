@@ -29,10 +29,11 @@ const THB = (v: unknown): string =>
 const fromRow = (row: any, key: string, fallback: any = 0) =>
   row?.[key] ?? row?.payload?.[key] ?? fallback;
 
-const getBunsStart = (row: any) => fromRow(row, "rollsStart", fromRow(row, "burgerBunsStart", null));
-const getBunsEnd   = (row: any) => fromRow(row, "rollsEnd",   fromRow(row, "burgerBunsEnd",   null));
-const getMeatStart = (row: any) => fromRow(row, "meatStartGrams", fromRow(row, "meatStart", null));
-const getMeatEnd   = (row: any) => fromRow(row, "meatEndGrams",   fromRow(row, "meatEnd",   null));
+// Fixed field mapping to match actual interface field names
+const getBunsStart = (row: any) => fromRow(row, "burgerBunsStart", null);
+const getBunsEnd   = (row: any) => fromRow(row, "burgerBunsEnd", null);   
+const getMeatStart = (row: any) => fromRow(row, "meatCountStart", null);
+const getMeatEnd   = (row: any) => fromRow(row, "meatCountEnd", null);
 
 const getStaff = (row: any) =>
   row?.completedBy ?? row?.staff ?? row?.payload?.staffName ?? "";

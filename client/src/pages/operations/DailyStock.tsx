@@ -359,12 +359,12 @@ const DailyStock: React.FC = () => {
       <section className="space-y-6">
         <div className="rounded-xl border p-4">
           <h2 className="text-[14px] font-semibold mb-4">Notes</h2>
+          <label className="block text-[14px] mb-2 font-medium">Any items not listed above or special notes...</label>
           <textarea
             className="w-full border rounded-md px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
             rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any items not listed above or special notes..."
             aria-label="Additional notes"
           />
           <div className="text-xs text-gray-500 mt-2">
