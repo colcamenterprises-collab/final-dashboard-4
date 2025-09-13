@@ -8,7 +8,7 @@ export const DailyStockSchema = z.object({
   
   // Section 2: Sales Information
   grab_sales: z.number().min(0, 'Grab sales must be positive'),
-  aroi_dee_sales: z.number().min(0, 'Aroi Dee sales must be positive'),
+  other_sales: z.number().min(0, 'Other sales must be positive'), // Updated from aroi_dee_sales to other_sales
   qr_scan_sales: z.number().min(0, 'QR scan sales must be positive'),
   cash_sales: z.number().min(0, 'Cash sales must be positive'),
   total_sales: z.number().min(0, 'Total sales must be positive'),

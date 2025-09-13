@@ -65,7 +65,7 @@ export async function parseLoyverseFilesToSummary(files: File[], opts: { dateHin
     Cash: paymentBreakdown["Cash"] || 0,
     QR: paymentBreakdown["QR"] || paymentBreakdown["PromptPay"] || paymentBreakdown["QR PromptPay"] || 0,
     Grab: Object.keys(paymentBreakdown).filter(k=>lc(k).includes("grab")).reduce((a,k)=>a+paymentBreakdown[k],0),
-    "Aroi Dee": Object.keys(paymentBreakdown).filter(k=>lc(k).includes("aroi")).reduce((a,k)=>a+paymentBreakdown[k],0),
+    "OtherSales": Object.keys(paymentBreakdown).filter(k=>lc(k).includes("aroi")).reduce((a,k)=>a+paymentBreakdown[k],0), // Updated from "Aroi Dee" to "OtherSales"
     Direct: paymentBreakdown["Direct"] || 0,
     Other: paymentBreakdown["Other"] || 0,
     Card: paymentBreakdown["Card"] || 0
@@ -90,9 +90,9 @@ export async function parseLoyverseFilesToSummary(files: File[], opts: { dateHin
   // 5) Burgers sold (heuristic contains 'burger')
   const burgersSold = items.filter(i => lc(i.itemName).includes("burger")).reduce((a,i)=>a+i.qty,0);
 
-  // 6) Aroi/Grab from normalized pay
+  // 6) Other Sales/Grab from normalized pay
   const grabSales = normPay.Grab;
-  const aroiDeeSales = normPay["Aroi Dee"];
+  const otherSales = normPay["OtherSales"]; // Updated from aroiDeeSales
 
   // 7) Date (local)
   let dateLocal = opts.dateHint || "";
@@ -114,7 +114,7 @@ export async function parseLoyverseFilesToSummary(files: File[], opts: { dateHin
       totalReceipts,
       members,
       grabSales,
-      aroiDeeSales,
+      otherSales, // Updated from aroiDeeSales
       burgersSold
     },
     paymentBreakdown: normPay,

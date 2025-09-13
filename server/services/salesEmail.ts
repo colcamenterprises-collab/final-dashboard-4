@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 export async function sendDailySalesEmail(submission: any) {
   const {
     shiftDate, completedBy, cashStart,
-    cashSales, qrSales, grabSales, aroiDeeSales, directSales, totalSales,
+    cashSales, qrSales, grabSales, otherSales, directSales, totalSales, // Updated from aroiDeeSales to otherSales
     shopping = [], wages = [], otherMoneyOut = [],
     totalExpenses, endingCash, cashBanked, qrTransferred
   } = submission;
@@ -49,7 +49,7 @@ export async function sendDailySalesEmail(submission: any) {
       ${tr(['Cash Sales', money(cashSales)])}
       ${tr(['QR Sales', money(qrSales)])}
       ${tr(['Grab Sales', money(grabSales)])}
-      ${tr(['Aroi Dee Sales', money(aroiDeeSales)])}
+      ${tr(['Other Sales', money(otherSales)])} // Updated from 'Aroi Dee Sales' to 'Other Sales'
       ${tr(['Direct Sales', money(directSales)])}
       ${tr(['<strong>Total Sales</strong>', `<strong>${money(totalSales)}</strong>`])}
     </table>

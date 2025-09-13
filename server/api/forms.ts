@@ -60,7 +60,7 @@ export async function listForms(req: Request, res: Response) {
           completedBy: s.completedBy,
           totalSales:
             s.totalSales ??
-            (Number(s.cashSales || 0) + Number(s.qrSales || 0) + Number(s.grabSales || 0) + Number(s.aroiDeeSales || 0)),
+            (Number(s.cashSales || 0) + Number(s.qrSales || 0) + Number(s.grabSales || 0) + Number(s.otherSales || s.aroiDeeSales || 0)), // Fixed to include otherSales fallback
           meatGrams: st.meatGrams,
           burgerBuns: st.burgerBuns,
 
@@ -137,7 +137,7 @@ export async function emailForm(req: Request, res: Response) {
       (Number(sales.cashSales || 0) +
        Number(sales.qrSales || 0) +
        Number(sales.grabSales || 0) +
-       Number(sales.aroiDeeSales || 0));
+       Number(sales.otherSales || sales.aroiDeeSales || 0)); // Updated to support both otherSales and legacy aroiDeeSales
 
     const lines: string[] = [
       `Daily Submission`,
@@ -149,7 +149,7 @@ export async function emailForm(req: Request, res: Response) {
       `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
       `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
       `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
-      `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+      `- Other Sales: ฿${(sales.otherSales || sales.aroiDeeSales || 0).toFixed(2)}`, // Updated from Aroi Dee to Other Sales
       `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
       ``,
       `EXPENSES`,

@@ -1,0 +1,147 @@
+Prioritized Plan for One-Go Implementation
+Implement in sequence: Backend first (data accuracy), then frontend (UI/flow), tests last. Copy-paste snippets into Replit files, run npm run dev (assuming Vite/Express setup). Total est. time: 1-2 hours if no conflicts.
+
+
+Backend Fixes (server/routes.ts, api/forms/dailySalesV2.ts, api/shopping-list.ts, etc.)
+
+Add mandatory validation in POST handlers (e.g., check required fields, return 400 with error msg).
+Update email logic: Fetch latest form data, format with all sections (sales, expenses, counts, requisitions >0—not >1, assuming typo for any needed).
+Shopping list: Include counts, group requisitions, calc costs (query ingredients for prices).
+Change "Aroi" to "Other Sales" in schemas/endpoints (string replace).
+
+Update server/api/forms/dailySalesV2.ts (or routes.ts if aggregated):
+typescript// In POST /api/forms/daily-sales/v2
+import { db } from '../db'; // Assuming Drizzle setup
+import { daily_sales_v2 } from '../../shared/schema';
+
+export const submitDailySales = async (req, res) => {
+  const data = req.body;
+  const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'totalSales']; // Updated from Aroi to otherSales
+  const missing = requiredFields.filter(field => !data[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(', ')}` });
+  }
+  // Rename aroiSales to otherSales if legacy
+  if (data.aroiSales) { data.otherSales = data.aroiSales; delete data.aroiSales; }
+  // Insert logic...
+  await db.insert(daily_sales_v2).values(data);
+  // Trigger email update (separate function below)
+  sendDailyEmail(); // Call your existing Nodemailer func, enhanced below
+  res.json({ success: true });
+};
+
+// Similar for daily-stock POST: Validate requisition jsonb has items
+export const submitDailyStock = async (req, res) => {
+  const data = req.body;
+  if (!data.requisition || data.requisition.length === 0) {
+    return res.status(400).json({ error: 'Requisition items required' });
+  }
+  // Insert...
+};
+
+// Enhance email in server/utils/email.ts (create if missing)
+import nodemailer from 'nodemailer';
+export const sendDailyEmail = async () => {
+  const transport = nodemailer.createTransport({ /* SMTP from env */ });
+  const latestSales = await db.select().from(daily_sales_v2).orderBy(desc(daily_sales_v2.shiftDate)).limit(1);
+  const latestStock = await db.select().from(daily_stock_v2).orderBy(desc(daily_stock_v2.createdAt)).limit(1);
+  const shopping = await getShoppingList(); // From api/shopping-list.ts
+  let content = `
+    Sales: Cash ${latestSales[0].cashSales}, QR ${latestSales[0].qrSales}, Grab ${latestSales[0].grabSales}, Other ${latestSales[0].otherSales}
+    Expenses: ${latestSales[0].expenses}
+    Rolls End: ${latestSales[0].rollsEnd}, Meat Count: ${latestStock[0].meatCount || 'N/A'}, Drinks: ${JSON.stringify(latestSales[0].drinksEnd)}
+    Requisitions (>0): ${latestStock[0].requisition.filter(i => i.qty > 0).map(i => `${i.id}: ${i.qty}`).join('\n')}
+    Shopping List: ${shopping.groupedList.map(g => `${g.category}: ${g.items.map(i => `${i.item} - ${i.qty} (Est. ${i.estCost} THB)`).join(', ')}`).join('\n')}
+  `;
+  await transport.sendMail({ to: 'smashbrothersburgersth@gmail.com', subject: 'Daily Report', text: content });
+};
+// Schedule via setInterval or cron (simple: setTimeout for 8am Bangkok, but Replit may need always-on; suggest manual trigger for v1).
+Update server/api/shopping-list.ts:
+typescriptexport const getShoppingList = async (req, res) => {
+  const latestStock = await db.select().from(daily_stock_v2).orderBy(desc(createdAt)).limit(1);
+  const ingredients = await db.select().from(ingredients); // For costs
+  const reqItems = latestStock[0].requisition.filter(i => i.qty > 0);
+  const grouped = { Rolls: { qty: latestSales[0].rollsEnd || 0, estCost: (latestSales[0].rollsEnd || 0) * 8 }, // From summary
+                    Meat: { /* similar */ },
+                    Drinks: { /* jsonb parse */ } };
+  reqItems.forEach(i => {
+    const ing = ingredients.find(ing => ing.id === i.id);
+    const estCost = ing ? i.qty * ing.unitPrice : 0;
+    if (!grouped[ing.category]) grouped[ing.category] = [];
+    grouped[ing.category].push({ item: ing.name, qty: i.qty, estCost });
+  });
+  res.json({ groupedList: grouped });
+};
+
+
+Frontend Fixes (client/src/pages/operations/DailySalesForm.tsx, DailyStock.tsx, etc.)
+
+2-step form: Use tabs or steps (Radix UI if setup; else simple state).
+Mandatory: Use state for errors, highlight inputs (e.g., border-red-500).
+Language: Add toggle button, use i18n-like object (simple JS, no lib).
+Library: In DailySalesLibrary.tsx, render all fields (expand jsonb).
+Fonts: Apply consistent Tailwind (text-base for labels, text-sm for summaries).
+Shopping Page: Fetch grouped, display with costs.
+
+Update client/src/components/LanguageToggle.tsx (create if missing):
+tsximport { useState } from 'react';
+
+export const LanguageToggle = ({ onChange }) => {
+  const [lang, setLang] = useState('en');
+  return (
+    <button onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}>
+      {lang === 'en' ? 'Switch to Thai' : 'Switch to English'}
+    </button>
+  );
+};
+Update DailySalesForm.tsx (integrate toggle, validations, styles):
+tsximport { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import axios from 'axios';
+import { LanguageToggle } from '../components/LanguageToggle';
+
+const labels = {
+  en: { completedBy: 'Completed By', startingCash: 'Starting Cash', otherSales: 'Other Sales', /* all fields */ },
+  th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', otherSales: 'ยอดขายอื่นๆ', /* Thai translations - add full */ }
+};
+
+export const DailySalesForm = () => {
+  const [lang, setLang] = useState('en');
+  const [formData, setFormData] = useState({ /* init */ });
+  const [errors, setErrors] = useState([]);
+  const mutation = useMutation(data => axios.post('/api/forms/daily-sales/v2', data));
+
+  const handleSubmit = () => {
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
+    const missing = required.filter(f => !formData[f]);
+    if (missing.length) {
+      setErrors(missing);
+      return; // Show styled error: <div className="text-red-500">Missing: {missing.join(', ')}</div>
+    }
+    mutation.mutate(formData);
+  };
+
+  return (
+    <div className="p-4">
+      <LanguageToggle onChange={setLang} />
+      <input placeholder={labels[lang].completedBy} onChange={e => setFormData({ ...formData, completedBy: e.target.value })}
+             className={`border ${errors.includes('completedBy') ? 'border-red-500' : ''}`} /> {/* Highlight */}
+      {/* Similar for all; Step 2: Stock inputs */}
+      <div className="text-sm"> {/* Summary fonts */}
+        Summary: Total Sales {formData.totalSales}
+      </div>
+      <button onClick={handleSubmit}>Submit</button>
+    </div>
+  );
+};
+Update ShoppingListPage.tsx:
+tsx// Fetch from /api/shopping-list, render grouped with Item: Qty (Est. Cost THB)
+// E.g., <ul>{Object.entries(groupedList).map(([cat, items]) => <li>{cat}: {items.map(i => `${i.item}: ${i.qty} (${i.estCost})`)}</li>)}</ul>
+Form Library (pages/operations/DailySalesLibrary.tsx):
+tsx// Fetch GET /api/forms/daily-sales/v2, render full: sales, expenses, rollsEnd, drinksEnd (map jsonb), requisition (filter >0)
+
+
+Tests
+
+Run your provided testApp.ts (update axios baseURL to localhost:3000).
+Add: Test form submit with missing fields (expect 400), language toggle (manual UI check), email content (console.log before send).

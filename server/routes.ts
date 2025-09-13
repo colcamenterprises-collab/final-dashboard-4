@@ -848,7 +848,7 @@ export function registerRoutes(app: express.Application): Server {
         shiftDate: dailyStockSales.shiftDate,
         totalSales: dailyStockSales.totalSales,
         grabSales: dailyStockSales.grabSales,
-        aroiDeeSales: dailyStockSales.aroiDeeSales,
+        otherSales: dailyStockSales.otherSales || dailyStockSales.aroiDeeSales, // Updated from aroiDeeSales to otherSales
         cashSales: dailyStockSales.cashSales,
         qrScanSales: dailyStockSales.qrScanSales,
         completedBy: dailyStockSales.completedBy
@@ -867,7 +867,7 @@ export function registerRoutes(app: express.Application): Server {
         averageDailySales,
         salesByChannel: {
           grab: salesData.reduce((sum, sale) => sum + (parseFloat(sale.grabSales || '0')), 0),
-          aroiDee: salesData.reduce((sum, sale) => sum + (parseFloat(sale.aroiDeeSales || '0')), 0),
+          otherSales: salesData.reduce((sum, sale) => sum + (parseFloat(sale.otherSales || sale.aroiDeeSales || '0')), 0), // Updated from aroiDee to otherSales
           cash: salesData.reduce((sum, sale) => sum + (parseFloat(sale.cashSales || '0')), 0),
           qrScan: salesData.reduce((sum, sale) => sum + (parseFloat(sale.qrScanSales || '0')), 0)
         },
@@ -1064,7 +1064,7 @@ export function registerRoutes(app: express.Application): Server {
         // Sales data (validated by middleware)
         startingCash: data.starting_cash || data.startingCash || 0,
         grabSales: data.grab_sales || data.grabSales || 0,
-        aroiDeeSales: data.aroi_dee_sales || data.aroiDeeSales || 0,
+        otherSales: data.other_sales || data.otherSales || data.aroi_dee_sales || data.aroiDeeSales || 0, // Updated from aroiDeeSales to otherSales
         qrScanSales: data.qr_scan_sales || data.qrScanSales || 0,
         cashSales: data.cash_sales || data.cashSales || 0,
         totalSales: data.total_sales || data.totalSales || 0,
@@ -1108,6 +1108,12 @@ export function registerRoutes(app: express.Application): Server {
   app.post("/api/daily-stock-sales/draft", async (req: Request, res: Response) => {
     try {
       const data = req.body;
+      
+      // Basic validation for draft forms
+      if (!data.completedBy) {
+        return res.status(400).json({ error: 'Missing required field: completedBy' });
+      }
+      
       console.log("Draft save request:", data);
       
       const [result] = await db.insert(dailyStockSales).values({
@@ -1234,7 +1240,7 @@ export function registerRoutes(app: express.Application): Server {
         endingCash: data.ending_cash,
         grabSales: data.grab_sales,
         foodPandaSales: data.food_panda_sales,
-        aroiDeeSales: data.aroi_dee_sales,
+        otherSales: data.other_sales || data.aroi_dee_sales, // Updated from aroiDeeSales to otherSales
         qrScanSales: data.qr_scan_sales,
         cashSales: data.cash_sales,
         totalSales: data.total_sales,
@@ -1380,7 +1386,7 @@ export function registerRoutes(app: express.Application): Server {
         startingCash: formData.starting_cash || 0,
         endingCash: formData.ending_cash || 0,
         grabSales: formData.grab_sales || 0,
-        aroiDeeSales: formData.aroi_dee_sales || 0,
+        otherSales: formData.other_sales || formData.aroi_dee_sales || 0, // Updated from aroiDeeSales to otherSales
         qrScanSales: formData.qr_scan_sales || formData.qr_sales || 0,
         cashSales: formData.cash_sales || 0,
         totalSales: formData.total_sales || 0,
@@ -2193,6 +2199,13 @@ export function registerRoutes(app: express.Application): Server {
     try {
       const payload = req.body;
       
+      // Mandatory validation as specified in the plan (fixed field naming)
+      const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'totalSales']; // Fixed cashStart to startingCash
+      const missing = requiredFields.filter(field => !payload[field] && payload[field] !== 0);
+      if (missing.length) {
+        return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+      }
+      
       const data = {
         completedBy: payload.completedBy || 'Unknown',
         shiftDate: payload.shiftDate ? new Date(payload.shiftDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
@@ -2200,8 +2213,8 @@ export function registerRoutes(app: express.Application): Server {
         cashSales: Math.round(Number(payload.cashSales) * 100) || 0,
         qrSales: Math.round(Number(payload.qrSales) * 100) || 0,
         grabSales: Math.round(Number(payload.grabSales) * 100) || 0,
-        aroiSales: Math.round(Number(payload.aroiDeeSales) * 100) || 0, // Note: using correct field name
-        totalSales: Math.round(Number(payload.totalSales) * 100) || Math.round((Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.aroiDeeSales || 0)) * 100),
+        otherSales: Math.round(Number(payload.otherSales || payload.aroiDeeSales) * 100) || 0, // Updated from aroiSales to otherSales
+        totalSales: Math.round(Number(payload.totalSales) * 100) || Math.round((Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.otherSales || payload.aroiDeeSales || 0)) * 100), // Fixed to include otherSales fallback
         totalExpenses: Math.round(Number(payload.totalExpenses) * 100) || 0,
         closingCash: Math.round(Number(payload.endingCash) * 100) || 0,
         cashBanked: Math.round(Number(payload.cashBanked) * 100) || 0,
@@ -2241,7 +2254,7 @@ export function registerRoutes(app: express.Application): Server {
 
     const totalSales = sales.totalSales ?? 
       (Number(sales.cashSales || 0) + Number(sales.qrSales || 0) + 
-       Number(sales.grabSales || 0) + Number(sales.aroiDeeSales || 0));
+       Number(sales.grabSales || 0) + Number(sales.otherSales || sales.aroiDeeSales || 0)); // Updated to use otherSales
 
     const lines: string[] = [
       `Daily Submission`,
@@ -2253,7 +2266,7 @@ export function registerRoutes(app: express.Application): Server {
       `- Cash: ฿${(sales.cashSales || 0).toFixed(2)}`,
       `- QR: ฿${(sales.qrSales || 0).toFixed(2)}`,
       `- Grab: ฿${(sales.grabSales || 0).toFixed(2)}`,
-      `- Aroi Dee: ฿${(sales.aroiDeeSales || 0).toFixed(2)}`,
+      `- Other Sales: ฿${(sales.otherSales || sales.aroiDeeSales || 0).toFixed(2)}`, // Updated from Aroi Dee to Other Sales
       `Total Sales: ฿${(totalSales || 0).toFixed(2)}`,
       ``,
       `EXPENSES`,
@@ -2307,6 +2320,20 @@ export function registerRoutes(app: express.Application): Server {
     const prisma = new PrismaClient();
     
     try {
+      const payload = req.body;
+      
+      // Mandatory validation for daily stock as specified in plan
+      const requiredFields = ['meatGrams', 'burgerBuns'];
+      const missing = requiredFields.filter(field => payload[field] === undefined || payload[field] === null);
+      if (missing.length) {
+        return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+      }
+      
+      // Validate requisition items >0 (not >1 as mentioned in plan - assumed typo)
+      if (!payload.stockRequests || Object.keys(payload.stockRequests).length === 0) {
+        return res.status(400).json({ error: 'Requisition items required' });
+      }
+      
       const {
         salesFormId = null,
         meatGrams,
@@ -2855,12 +2882,14 @@ app.use("/api/bank-imports", bankUploadRouter);
       const items = latestShoppingList.rows[0].items || [];
       console.log('Shopping list items found:', items.length);
       
-      // Group by category with only item name and quantity
+      // Group by category with costs (enhanced as specified in plan)
       const groupedList: any = {};
       let totalItems = 0;
+      let totalEstimatedCost = 0;
       
       for (const item of items) {
         const category = item.category || 'Other';
+        const estimatedCost = item.estimatedCost || 0; // Include cost calculations as specified
         
         if (!groupedList[category]) {
           groupedList[category] = [];
@@ -2868,9 +2897,11 @@ app.use("/api/bank-imports", bankUploadRouter);
         
         groupedList[category].push({
           name: item.itemName,
-          qty: item.quantity
+          qty: item.quantity,
+          estCost: estimatedCost // Enhanced with cost as specified in plan
         });
         totalItems++;
+        totalEstimatedCost += estimatedCost;
       }
       
       console.log('Grouped categories:', Object.keys(groupedList));
@@ -2879,7 +2910,8 @@ app.use("/api/bank-imports", bankUploadRouter);
       res.json({ 
         groupedList, 
         source: 'ingredients DB',
-        totalItems 
+        totalItems,
+        totalEstimatedCost // Enhanced with total cost calculations as specified in plan
       });
     } catch (error) {
       console.error('Shopping list error:', error);

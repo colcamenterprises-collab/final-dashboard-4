@@ -191,7 +191,7 @@ async function checkSchema() {
         cashSales,
         qrSales,
         grabSales,
-        aroiDeeSales,
+        otherSales, // Updated from aroiDeeSales
         totalSales,
         shoppingExpenses,
         wages,
@@ -211,7 +211,7 @@ async function checkSchema() {
           cashSales: parseFloat(cashSales) || 0,
           qrSales: parseFloat(qrSales) || 0,
           grabSales: parseFloat(grabSales) || 0,
-          aroiSales: parseFloat(aroiDeeSales) || 0,
+          otherSales: parseFloat(otherSales) || 0, // Updated from aroiSales to otherSales
           totalSales: parseFloat(totalSales) || 0,
           // Note: shoppingExpenses and wages fields not in current schema
           totalExpenses: parseFloat(totalExpenses) || 0,
