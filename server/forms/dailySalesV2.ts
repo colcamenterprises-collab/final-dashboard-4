@@ -15,12 +15,19 @@ export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const body = req.body;
     
+    console.log('[DEBUG] Received body:', JSON.stringify(body, null, 2));
+    
     // EXACT VALIDATION from consolidated patch - FIXED to allow zero values
     const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
     const missing = requiredFields.filter(field => {
-      if (field === 'completedBy') return !body[field] || body[field].toString().trim() === '';
-      return body[field] == null || isNaN(Number(body[field])) || Number(body[field]) < 0;
+      const value = body[field];
+      console.log(`[DEBUG] Validating ${field}:`, value, `type: ${typeof value}`);
+      if (field === 'completedBy') return !value || value.toString().trim() === '';
+      return value == null || isNaN(Number(value)) || Number(value) < 0;
     });
+    
+    console.log('[DEBUG] Missing fields:', missing);
+    
     if (missing.length) {
       return res.status(400).json({ error: `Missing or invalid fields: ${missing.join(', ')}. Must be non-negative.` });
     }

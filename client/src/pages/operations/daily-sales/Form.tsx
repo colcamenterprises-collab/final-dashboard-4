@@ -492,13 +492,42 @@ export default function DailySales() {
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Summary</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
+              <div className="flex justify-between font-medium">
                 <span>Total Sales:</span>
                 <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="ml-4 space-y-1 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>• Cash Sales:</span>
+                  <span>฿{cash.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• QR Sales:</span>
+                  <span>฿{qr.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Grab Sales:</span>
+                  <span>฿{grab.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Other Sales:</span>
+                  <span>฿{aroi.toLocaleString()}</span>
+                </div>
+              </div>
+              
+              <div className="flex justify-between font-medium">
                 <span>Total Expenses:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
+              </div>
+              <div className="ml-4 space-y-1 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>• Shift Expenses:</span>
+                  <span>฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Staff Wages:</span>
+                  <span>฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
+                </div>
               </div>
               <div className="flex justify-between font-bold text-base border-t pt-2">
                 <span>Net Position:</span>
