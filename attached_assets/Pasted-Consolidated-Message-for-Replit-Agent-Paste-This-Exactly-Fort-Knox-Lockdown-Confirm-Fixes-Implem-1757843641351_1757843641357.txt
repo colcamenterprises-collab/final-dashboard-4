@@ -1,0 +1,92 @@
+Consolidated Message for Replit Agent (Paste This Exactly)
+Fort Knox Lockdown: Confirm Fixes, Implement Pending, Re-Test
+Execute ONLY these exact instructions—no deviations, no new files/deps/features. Update ONLY listed existing files. If mismatch, STOP and log. Data accuracy: Precise variances (e.g., sold * portion - lodgment = discrepancy >5% alert). Direct APIs (Loyverse token in env, OpenAI, Nodemailer). Test split terminals, checkpoint.
+Step 1: Confirm Current Fixes (Manual Check)
+
+Run npx tsx server/testApp.ts—log full output (expect drinks >0, beef 30.305, validations 400).
+Query DB: "SELECT * FROM recipes LIMIT 1;"—log cost fields.
+Load /operations/daily-sales-library—log if full data visible.
+
+Step 2: Implement Pending Fixes (One-Go)
+
+Legacy Clean (New Script in server/scripts/cleanLegacy.ts—create only this, run once):
+
+typescriptimport { db } from '../db';
+import { ingredients } from '../../shared/schema';
+
+async function cleanLegacy() {
+  // Delete made-up/old (list from summary, e.g., filter name like 'made-up%')
+  await db.delete(ingredients).where(ilike(name, '%made-up%'));
+  // Update old costs (e.g., onions from script)
+  await db.update(ingredients).set({ unitPrice: 50 }).where(eq(name, 'onions'));
+  console.log('Legacy cleaned');
+}
+cleanLegacy();
+// Run npx tsx server/scripts/cleanLegacy.ts—log changes, then comment out.
+
+Update server/api/recipes.ts (add enhancements: waste/yield/allergens):
+
+typescript// In createRecipe, after cost calc:
+data.wasteFactor = req.body.wasteFactor || 1.05; // Default 5% waste
+data.yieldEfficiency = req.body.yieldEfficiency || 0.95; // 95% yield
+data.totalCost *= data.wasteFactor / data.yieldEfficiency; // Adjust
+data.allergens = req.body.allergens || []; // jsonb array
+// Insert...
+
+Update server/api/operations/stats.ts or routes.ts (add variance calc, Loyverse pull):
+
+typescript// Add GET /api/operations/variance (new handler, but in existing routes)
+import { Loyverse } from 'loyverse-api'; // Assume direct lib if installed; else axios for API
+export const getVariance = async (req, res) => {
+  const shiftDate = req.query.shiftDate;
+  // Direct Loyverse API (env LOYVERSE_TOKEN)
+  const loyverse = new Loyverse({ token: process.env.LOYVERSE_TOKEN });
+  const receipts = await loyverse.getReceipts({ date: shiftDate }); // Sales/items
+  const soldItems = receipts.reduce((acc, r) => { // Category/modifiers
+    r.items.forEach(i => acc[i.category] = (acc[i.category] || 0) + i.quantity);
+    return acc;
+  }, {});
+  // Match recipes/ingredients
+  const expectedUsage = Object.entries(soldItems).reduce((acc, [cat, qty]) => {
+    // E.g., for burgers: qty * portion from recipes
+    acc['beef'] = qty * 95 / 1000 * 319; // Est THB, adjust per cat
+    return acc;
+  }, {});
+  const actualLodgment = await db.select().from(stock_lodgment).where(eq(date, shiftDate)); // From staff
+  const discrepancies = Object.keys(expectedUsage).map(k => ({
+    item: k, expected: expectedUsage[k], actual: actualLodgment.find(l => l.type === k)?.quantity || 0,
+    variance: expectedUsage[k] - (actualLodgment.find(l => l.type === k)?.quantity || 0)
+  })).filter(d => Math.abs(d.variance) > 5); // Alert threshold
+  res.json({ discrepancies });
+};
+
+Update server/utils/email.ts (add variances, est. costs):
+
+typescript// In sendDailyEmail:
+const variances = await getVariance({ shiftDate: latestSales.shiftDate }); // Internal
+content += `
+Discrepancies: ${variances.map(v => `${v.item}: Expected ${v.expected.toFixed(3)} vs Actual ${v.actual} (Variance ${v.variance.toFixed(3)})`).join('\n')}
+`;
+// Est. costs from shopping (existing)
+
+Update client/src/components/Sidebar.tsx (menu restructure, no dups):
+
+tsx// Replace items array:
+const menuItems = [
+  { label: 'Operations', path: '/operations' },
+  { label: 'Finance', path: '/finance' },
+  { label: 'Menu and Costing', path: '/menu' },
+  { label: 'Analysis', path: '/analysis' },
+  { label: 'Membership', path: '/membership' },
+]; // Simple, no dups—sub-pages via router
+
+Add auto-order gen in server/api/shopping-list.ts (manual Line text v1):
+
+typescript// After grouped:
+const orderText = `Order: ${Object.entries(grouped).map(([cat, items]) => `${cat}: ${items.map(i => `${i.item} x${i.qty}`).join(', ')}`).join('\n')}`;
+if (grouped.Rolls.qty < 80) {
+  // Send to bakery Line (manual: console.log(orderText); v2: direct Line API with token)
+}
+// Return with orderText for dashboard
+Step 3: Re-Run Rigorous Tests
+Use the updated prompt from Grok (with port 5000, verify variances, drinks in email, calc enhancements). Log summary.
