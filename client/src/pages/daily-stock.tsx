@@ -136,8 +136,8 @@ const DailyStockForm = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-2">Fresh Food</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Fresh Food"].map((item) => (
-              <div key={item}>
-                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
+              <div key={item} className="min-w-0">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2 leading-tight break-words whitespace-normal">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
@@ -154,8 +154,8 @@ const DailyStockForm = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-2">Frozen Food</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Frozen Food"].map((item) => (
-              <div key={item}>
-                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
+              <div key={item} className="min-w-0">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2 leading-tight break-words whitespace-normal">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
@@ -172,8 +172,8 @@ const DailyStockForm = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-2">Shelf Items</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Shelf Items"].map((item) => (
-              <div key={item}>
-                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
+              <div key={item} className="min-w-0">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2 leading-tight break-words whitespace-normal">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
@@ -190,8 +190,8 @@ const DailyStockForm = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-2">Kitchen Supplies</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems["Kitchen Supplies"].map((item) => (
-              <div key={item}>
-                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
+              <div key={item} className="min-w-0">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2 leading-tight break-words whitespace-normal">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
@@ -208,8 +208,8 @@ const DailyStockForm = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-2">Packaging</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {stockItems.Packaging.map((item) => (
-              <div key={item}>
-                <label className="block text-sm md:text-base font-medium text-gray-700 mb-1">{item}</label>
+              <div key={item} className="min-w-0">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2 leading-tight break-words whitespace-normal">{item}</label>
                 <input
                   type="number"
                   onChange={(e) => handleStockRequestChange(item, e.target.value)}
