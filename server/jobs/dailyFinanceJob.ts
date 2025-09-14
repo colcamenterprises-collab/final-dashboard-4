@@ -6,19 +6,19 @@ import { calculateFinance } from "../utils/financeCalculations";
 export async function runDailyFinanceJob() {
   console.log("▶ Running Daily Finance Job…");
 
-  const result = await db.execute(sql`
+  const { rows } = await db.execute(sql`
     SELECT id, "createdAt", payload
     FROM "daily_sales_v2"
     ORDER BY "createdAt" DESC
     LIMIT 1
-  `) as unknown as Array<{ id: string; createdAt: string; payload: any }>;
+  `);
 
-  if (!result?.length) {
+  if (!rows?.length) {
     console.log("No daily_sales_v2 rows found.");
     return;
   }
 
-  const row = result[0];
+  const row = rows[0];
   const shiftDate = new Date(row.createdAt);
   const payload = row.payload || {};
 
