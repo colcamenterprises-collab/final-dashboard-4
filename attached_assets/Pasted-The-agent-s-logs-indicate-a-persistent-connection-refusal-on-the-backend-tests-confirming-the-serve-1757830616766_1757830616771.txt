@@ -1,0 +1,141 @@
+The agent's logs indicate a persistent connection refusal on the backend tests, confirming the server is likely running on port 5000 (as per previous observations in logs like "HTML response from localhost:5000"). This matches common Replit Node setups for Express servers (from research: ports like 5000 are standard for Flask-like but often used in Node; defaults include 3000/5000/8000). The ECONNREFUSED error means the server must be running and listening on '0.0.0.0' for accessibility—ensure this in your code (e.g., app.listen(port, '0.0.0.0')).
+I've updated the testing prompt to:
+
+Reinforce server start in setup (log if not responding on 5000, STOP if fail).
+Keep baseURL as 'http://localhost:5000' in testApp.ts.
+Add manual port check: Curl or browser log to verify / on 5000 returns app response.
+Maintain Fort Knox: No fixes, just log and stop on errors; data accuracy in all verifications.
+
+Paste this into the Replit agent to rerun. This should allow full testing, uncovering any app issues (e.g., drinks in email, calc accuracy).
+
+CRITICAL TESTING INSTRUCTIONS: Fort Knox Lockdown Mode - UPDATED FOR PORT CONFIRMATION AND CONNECTION RESOLUTION
+You are now in STRICT TESTING MODE. Follow these rules EXACTLY—no deviations, no freestyling, no fixes, no new code/features/deps. If you hit any error or "brick wall" (e.g., ECONNREFUSED, failed submit), LOG verbatim (full trace/output/screenshots) and STOP—do NOT resolve or continue. Report ONLY test results; no advice. Data accuracy paramount: Manual calc verifies. Use Replit native tools only. Commit checkpoint; revert if needed.
+Test Environment Setup (Execute First):
+
+Start server if not running: Terminal 1: Run node server/index.js (or exact start command; log command used). Confirm running by browsing localhost:5000 in Replit browser tool or curl - log response (expected: App HTML or API root if exists; if refused, STOP).
+Start client: Terminal 2: npm run dev (port 3000; log if different).
+Clear cache; incognito for frontend.
+Verify env: SMTP_USER/PASS (log missing—email fail but continue), DATABASE_URL, OPENAI_API_KEY.
+Timezone: Asia/Bangkok; log.
+Log start: Console.log("Test Start - Date: " + new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })).
+Port Check: Run curl http://localhost:5000 in terminal; log output. Expected: Success response. If ECONNREFUSED or no response, STOP with "Server not responding on 5000".
+
+Special Resolution Step (testApp.ts):
+
+Check server/testApp.ts.
+If MISSING or needs update: CREATE/UPDATE with BASE code (verbatim, baseURL 'http://localhost:5000'):
+textimport axios from 'axios';
+
+axios.defaults.baseURL = 'http://localhost:5000';
+
+async function test() {
+  // Base
+  try {
+    const ing = await axios.get('/api/ingredients');
+    console.log('Ingredients count: ' + ing.data.length);
+  } catch (e) { console.log('Ingredients error: ' + e.message); }
+
+  try {
+    const shop = await axios.get('/api/shopping-list');
+    console.log('Shopping drinks: ' + (shop.data.groupedList.Drinks?.length || 0));
+  } catch (e) { console.log('Shopping error: ' + e.message); }
+
+  try {
+    const recipe = await axios.post('/api/recipes', { name: 'Test', ingredients: [{id: 'beef', portion: 95, unit: 'g'}] });
+    console.log('Beef cost: ' + recipe.data.ingredients[0].cost);
+  } catch (e) { console.log('Recipe error: ' + e.message); }
+}
+test();
+
+UPDATE with validation (append):
+text// Invalid sales
+  try {
+    const invalidSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: '' });
+    console.log('Invalid sales success (unexpected): ' + invalidSales.data.success);
+  } catch (e) {
+    console.log('Expected sales error: ' + e.response.data.error);
+  }
+
+  // Valid sales
+  try {
+    const validSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: 'TestStaff', startingCash: 1000, cashSales: 5000, qrSales: 2000, grabSales: 3000, otherSales: 1000, totalSales: 11000 });
+    console.log('Valid sales success: ' + validSales.data.success);
+  } catch (e) { console.log('Sales error: ' + e.message); }
+
+  // Invalid stock
+  try {
+    const invalidStock = await axios.post('/api/forms/daily-stock', { rollsEnd: -1, meatCount: '', drinksEnd: [] });
+    console.log('Invalid stock success (unexpected): ' + invalidStock.data.success);
+  } catch (e) {
+    console.log('Expected stock error: ' + e.response.data.error);
+  }
+
+  // Valid stock
+  try {
+    const validStock = await axios.post('/api/forms/daily-stock', { rollsEnd: 50, meatCount: 20, drinksEnd: [{drink:'Coke',qty:10}], requisition: [{id:'beef',qty:5},{id:'cheese',qty:0}] });
+    console.log('Valid stock success: ' + validStock.data.success);
+  } catch (e) { console.log('Stock error: ' + e.message); }
+
+Log "Updated testApp.ts for port 5000" or error—STOP if fail.
+ONLY this; no other changes.
+
+Rigorous Test Sequence: Order. Log Action, Expected, Actual, Errors, Pass/Fail. If Fail, STOP.
+
+Backend Validation Tests:
+
+Run npx tsx server/testApp.ts.
+Expected: Invalid 400 specific errors, valid success. Base: Ingredients ~70, Drinks >0, Beef ~30.305 (manual verify no bug).
+DB query: "SELECT * FROM daily_sales_v2 LIMIT 1;" — log.
+Pass/Fail: Accuracy.
+
+
+Frontend Form Tests:
+
+Load /operations/daily-sales (client port).
+Toggle: Switch, log labels.
+Form 1 invalid: Block, red, error. Log.
+Valid: Proceed.
+Form 2 invalid: Block. Log.
+Valid: Submit.
+Fonts: text-sm. Log.
+Pass/Fail: No skips.
+
+
+Flow Tests:
+
+Load /operations/purchasing.
+Expected: Grouped, Drinks shown, costs accurate (manual).
+Email: Trigger, full content. Log.
+DB: Matches.
+Pass/Fail: Visible, accurate.
+
+
+Form Library Tests:
+
+Load /operations/daily-sales-library.
+Expected: Full, CRUD. Log.
+Pass/Fail: Visibility.
+
+
+Ramsay Gordon Tests:
+
+Load /menu/recipes.
+Create, calc: 30.305. Log.
+AI: Log output.
+Save, PDF: Success. Describe.
+Invalid: Log bug.
+Pass/Fail: Accuracy.
+
+
+Overall Tests:
+
+Menu: No dups.
+Edge: Log.
+Security: Blocked.
+Perf: No errors.
+Pass/Fail: Flow.
+
+
+
+End: Summary Pass/Fail, logs. If Fail, "Hit brick wall—awaiting Cam approval."
+Test Complete.
