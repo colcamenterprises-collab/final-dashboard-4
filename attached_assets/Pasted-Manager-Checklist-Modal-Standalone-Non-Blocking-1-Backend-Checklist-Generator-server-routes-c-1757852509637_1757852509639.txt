@@ -1,0 +1,193 @@
+Manager Checklist Modal (Standalone, Non-Blocking)
+
+1) Backend: Checklist Generator
+
+server/routes/checklists.ts
+
+import express from "express";
+import db from "../db";
+import { sql } from "drizzle-orm";
+
+const router = express.Router();
+
+// Get random tasks (zone + phase)
+router.get("/random", async (req, res) => {
+  const { zone = "Kitchen", phase = "End", count = 3 } = req.query;
+
+  const result = await db.execute(sql`
+    SELECT id, "taskName", "taskDetail", zone, "shiftPhase"
+    FROM cleaning_tasks
+    WHERE active = true AND zone = ${zone} AND "shiftPhase" = ${phase}
+    ORDER BY random()
+    LIMIT ${Number(count)}
+  `);
+
+  res.json(result.rows);
+});
+
+// Save checklist completion
+router.post("/complete", async (req, res) => {
+  const { shiftId, managerName, tasks } = req.body;
+
+  if (!shiftId || !managerName || !Array.isArray(tasks)) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  await db.execute(sql`
+    INSERT INTO manager_checklists ("shiftId","managerName","tasksAssigned","tasksCompleted","createdAt","signedAt")
+    VALUES (
+      ${shiftId},
+      ${managerName},
+      ${JSON.stringify(tasks)}::jsonb,
+      ${JSON.stringify(tasks)}::jsonb,
+      NOW(),
+      NOW()
+    )
+  `);
+
+  res.json({ ok: true });
+});
+
+export default router;
+
+Mount in server/index.ts:
+
+import checklistRoutes from "./routes/checklists";
+app.use("/api/checklists", checklistRoutes);
+
+
+---
+
+2) Frontend: Manager Checklist Modal
+
+client/src/components/ManagerChecklistModal.tsx
+
+import React, { useEffect, useState } from "react";
+
+type Task = {
+  id: number;
+  taskName: string;
+  taskDetail?: string;
+  zone: string;
+  shiftPhase: string;
+};
+
+interface Props {
+  shiftId: string;
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function ManagerChecklistModal({ shiftId, open, onClose }: Props) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [checked, setChecked] = useState<number[]>([]);
+  const [managerName, setManagerName] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      fetch(`/api/checklists/random?zone=Kitchen&phase=End&count=3`)
+        .then((res) => res.json())
+        .then(setTasks);
+    }
+  }, [open]);
+
+  const toggleCheck = (id: number) => {
+    setChecked((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSubmit = async () => {
+    const completed = tasks.filter((t) => checked.includes(t.id));
+    await fetch("/api/checklists/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shiftId,
+        managerName,
+        tasks: completed,
+      }),
+    });
+    onClose();
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white p-6 rounded-xl w-96">
+        <h2 className="font-semibold mb-4">Manager Checklist</h2>
+
+        <ul className="mb-4">
+          {tasks.map((task) => (
+            <li key={task.id} className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                checked={checked.includes(task.id)}
+                onChange={() => toggleCheck(task.id)}
+                className="mr-2"
+              />
+              <span>{task.taskName}</span>
+            </li>
+          ))}
+        </ul>
+
+        <input
+          type="text"
+          placeholder="Manager Name"
+          value={managerName}
+          onChange={(e) => setManagerName(e.target.value)}
+          className="border p-2 w-full mb-4"
+        />
+
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 rounded mr-2"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={checked.length !== tasks.length || !managerName}
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-emerald-600 text-white rounded"
+          >
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+---
+
+3) Usage (Standalone Testing)
+
+Seed Kitchen + Cashier tasks with the scripts I gave earlier.
+
+Open modal manually from any page (for testing, add a button to trigger it).
+
+It will:
+
+Fetch 3 random tasks from Kitchen → End phase.
+
+Allow manager to tick all + enter name.
+
+Save to manager_checklists.
+
+
+
+
+---
+
+4) Next Step
+
+Once tested and stable:
+
+Add random rotation logic (Kitchen + Cashier, phase-based).
+
+Add blocking rules (end-of-shift form can’t submit until checklist done).
+
+Add owner notifications (email/WhatsApp with tasks shown + status).

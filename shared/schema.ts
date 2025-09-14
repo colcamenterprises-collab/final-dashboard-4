@@ -1242,5 +1242,39 @@ export const bankTxnRelations = relations(bankTxn, ({ one }) => ({
   }),
 }));
 
+// === Manager Checklist System ===
+
+// Cleaning Tasks table - stores all possible cleaning tasks
+export const cleaningTasks = pgTable("cleaning_tasks", {
+  id: serial("id").primaryKey(),
+  taskName: text("task_name").notNull(),
+  taskDetail: text("task_detail"),
+  zone: text("zone").notNull(), // Kitchen, Cashier, Dining, Storage, etc.
+  shiftPhase: text("shift_phase").notNull(), // Start, Mid, End
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Manager Checklists table - stores completed checklist records
+export const managerChecklists = pgTable("manager_checklists", {
+  id: serial("id").primaryKey(),
+  shiftId: text("shift_id").notNull(),
+  managerName: text("manager_name").notNull(),
+  tasksAssigned: jsonb("tasks_assigned").notNull(), // Array of task objects
+  tasksCompleted: jsonb("tasks_completed").notNull(), // Array of completed task objects
+  createdAt: timestamp("created_at").defaultNow(),
+  signedAt: timestamp("signed_at").defaultNow(),
+});
+
+// Manager Checklist Insert Schemas
+export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
+export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
+
+// Manager Checklist Types
+export type InsertCleaningTask = typeof cleaningTasks.$inferInsert;
+export type SelectCleaningTask = typeof cleaningTasks.$inferSelect;
+export type InsertManagerChecklist = typeof managerChecklists.$inferInsert;
+export type SelectManagerChecklist = typeof managerChecklists.$inferSelect;
+
 // --- compat alias for older imports ---
 export const dailySalesV2 = dailySales;
