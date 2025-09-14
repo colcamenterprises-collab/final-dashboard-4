@@ -96,6 +96,7 @@ export default function App() {
                   {/* Finance */}
                   <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
                   <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
+                  <Route path="/finance/expenses" element={<Guard><Expenses /></Guard>} />
 
                   {/* Menu Mgmt */}
                   <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
