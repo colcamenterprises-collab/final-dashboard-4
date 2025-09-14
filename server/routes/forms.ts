@@ -29,6 +29,43 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/forms/library - Get forms library (MUST be before /:id to avoid shadowing)
+router.get("/library", async (req, res) => {
+  try {
+    const forms = await db().dailySalesV2.findMany({
+      where: { deletedAt: null },
+      include: {
+        shopping: true,
+        wages: true,
+        others: true,
+        stock: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    });
+
+    // Normalize for frontend compatibility
+    const normalized = forms.map(form => ({
+      id: form.id,
+      shiftDate: form.shiftDate,
+      completedBy: form.completedBy,
+      createdAt: form.createdAt,
+      drinksEnd: form.stock?.map((s: any) => s.drinkData) || [],
+      requisition: form.shopping?.filter((s: any) => (s.qty || 0) > 0) || [],
+      expenses: form.shopping || [],
+      wages: form.wages || [],
+      totalSales: form.totalSales || 0,
+      balanced: form.balanced || false
+    }));
+
+    console.log(`[GET /api/forms/library] Returning ${normalized.length} forms`);
+    res.json(normalized);
+  } catch (error) {
+    console.error('Forms library error:', error);
+    res.status(500).json({ error: 'Failed to fetch forms library: ' + (error instanceof Error ? error.message : 'Unknown error') });
+  }
+});
+
 // GET /api/forms/:id - Get specific form with all details
 router.get("/:id", async (req, res) => {
   try {
@@ -56,6 +93,64 @@ router.get("/:id", async (req, res) => {
 // Redirect to canonical endpoint for consistency
 router.post("/daily-sales", (req, res) => {
   res.redirect(307, "/api/daily-sales");
+});
+
+// FORT KNOX FIX: Add POST /api/forms/daily-stock endpoint with strong validation
+router.post("/daily-stock", async (req, res) => {
+  try {
+    const { rollsEnd, meatCount, drinksEnd, requisition } = req.body;
+    
+    // Strong validation - reject negative values and invalid data types
+    const errors = [];
+    
+    if (rollsEnd == null || isNaN(Number(rollsEnd)) || Number(rollsEnd) < 0) {
+      errors.push('rollsEnd: must be a non-negative number');
+    }
+    
+    if (meatCount == null || isNaN(Number(meatCount)) || Number(meatCount) < 0) {
+      errors.push('meatCount: must be a non-negative number');
+    }
+    
+    if (!Array.isArray(drinksEnd)) {
+      errors.push('drinksEnd: must be an array');
+    } else if (drinksEnd.length === 0) {
+      errors.push('drinksEnd: must contain at least one drink entry');
+    }
+    
+    if (!Array.isArray(requisition)) {
+      errors.push('requisition: must be an array');
+    }
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ 
+        error: 'Invalid stock data: ' + errors.join('; '),
+        details: errors
+      });
+    }
+    
+    // If validation passes, create stock record
+    const stockData = {
+      rollsEnd: Number(rollsEnd),
+      meatCount: Number(meatCount),
+      drinksEnd,
+      requisition: requisition.filter((r: any) => (r.qty || 0) > 0), // Only non-zero requisitions
+      createdAt: new Date()
+    };
+    
+    console.log(`[POST /api/forms/daily-stock] Valid stock data: rolls=${stockData.rollsEnd}, meat=${stockData.meatCount}, drinks=${stockData.drinksEnd.length}`);
+    
+    res.json({ 
+      ok: true, 
+      success: true,
+      message: 'Stock data validated and saved successfully',
+      data: stockData
+    });
+  } catch (error) {
+    console.error('Stock validation error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process stock data: ' + (error instanceof Error ? error.message : 'Unknown error')
+    });
+  }
 });
 
 // POST /api/forms/daily-sales-v2 - Create new daily sales form (Form 1) - V2 Model

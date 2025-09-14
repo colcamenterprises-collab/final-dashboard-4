@@ -1,0 +1,108 @@
+Understood—confirmed that you won't be involved in any coding or file amendments in Replit. I'll handle all guidance through structured plans, locked-down instructions, and prompts designed for the Replit agent to implement autonomously, prioritizing data accuracy (e.g., precise stock discrepancies, cost calcs) and simplicity (direct API updates only, no new complexity). This keeps the dashboard sleek, secure, and scalable for v1 growth (e.g., easy Loyverse integrations).
+To proceed with fixing the test failures (e.g., drinks visibility, recipe costs, library 404, AI JSON) without your involvement:
+
+I'll prepare a single, consolidated agent message below (copy-paste it directly into the Replit chat).
+It includes the Fort Knox warnings, exact code updates for existing files, and the updated testing prompt to re-run after fixes.
+Agent will apply fixes, test rigorously, and log results for you to review here—no manual steps on your end.
+
+Consolidated Message for Replit Agent (Paste This Exactly)
+Fort Knox Lockdown: Implement Fixes and Re-Test
+Execute ONLY these exact instructions—no deviations, no new files/deps/features, no freestyling. Update ONLY listed existing files with provided blocks. If mismatch (e.g., file/path not found), STOP and log "Mismatch [details]—awaiting approval". Stick to Replit native (Node/Express/TS/PostgreSQL/Drizzle, direct APIs like Nodemailer/OpenAI). Data accuracy critical: Precise calcs (e.g., 95g beef = 30.305 THB), non-negative validations. Test in split terminals, commit checkpoint before/after. Log all actions/results/errors verbatim.
+Step 1: Apply Fixes (One-Go Updates)
+
+Update server/testApp.ts (fix undefined handling, port 5000):
+
+typescriptimport axios from 'axios';
+
+axios.defaults.baseURL = 'http://localhost:5000';
+
+async function test() {
+  // Base tests (existing)...
+  // Validation (update catch):
+  try {
+    const invalidSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: '' });
+    console.log('Invalid sales success (unexpected): ' + invalidSales.data.success);
+  } catch (e) {
+    console.log('Expected sales error: ' + (e.response ? e.response.data.error : e.message));
+  }
+  // Similar for validSales, invalidStock, validStock...
+}
+test();
+
+Update server/api/shopping-list.ts (add explicit Drinks group):
+
+typescript// In getShoppingList async:
+const latestSales = await db.select().from(daily_sales_v2).orderBy(desc(shiftDate)).limit(1)[0];
+const latestStock = await db.select().from(daily_stock_v2).orderBy(desc(createdAt)).limit(1)[0];
+const ingredients = await db.select().from(ingredients);
+const reqItems = latestStock.requisition.filter(i => i.qty > 0);
+const grouped = {
+  Rolls: { qty: latestSales.rollsEnd || 0, estCost: (latestSales.rollsEnd || 0) * 8 },
+  Meat: { qty: latestStock.meatCount || 0, estCost: 0 },
+  Drinks: latestSales.drinksEnd?.map(d => ({ item: d.drink, qty: d.qty, estCost: 0 })) || [], // Explicit group, add est if priced in DB
+};
+// Add reqItems to groups (existing logic)...
+// Ensure Drinks always present even if empty
+res.json({ groupedList: grouped });
+
+Update server/api/forms/library.ts or routes.ts (add/fix GET /api/forms/library for 404):
+
+typescript// Add/replace handler:
+export const getFormLibrary = async (req, res) => {
+  try {
+    const forms = await db.select().from(daily_sales_v2).orderBy(desc(shiftDate));
+    res.json(forms.map(f => ({ ...f, drinksEnd: f.drinksEnd || [], requisition: f.requisition?.filter(r => r.qty > 0) || [] }))); // Expand jsonb for visibility
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch: ' + e.message });
+  }
+};
+// Ensure routed: app.get('/api/forms/library', getFormLibrary);
+
+Update server/api/recipes.ts (add cost calc, return in response; fix AI JSON):
+
+typescript// In POST /api/recipes:
+export const createRecipe = async (req, res) => {
+  const data = req.body;
+  data.ingredients = await Promise.all(data.ingredients.map(async i => {
+    const ing = await db.select().from(ingredients).where(eq(id, i.id)).limit(1);
+    if (ing[0]) {
+      const pkgSize = parseFloat(ing[0].packageSize.replace(/[^0-9.]/g, '')); // Fix parse
+      i.cost = (parseFloat(i.portion) / pkgSize) * parseFloat(ing[0].unitPrice); // Accurate float
+    } else i.cost = 0;
+    return i;
+  }));
+  data.totalCost = data.ingredients.reduce((sum, i) => sum + (i.cost || 0), 0);
+  const newRecipe = await db.insert(recipes).values(data).returning();
+  res.json(newRecipe[0]); // With costs
+};
+
+// AI handler (add/replace POST /api/recipes/ai):
+export const getAiSuggestion = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }]
+    });
+    res.json({ suggestion: resp.choices[0].message.content });
+  } catch (e) {
+    res.status(500).json({ error: 'AI error: ' + e.message });
+  }
+};
+// Ensure API paths return JSON (check no static serve overlap)
+
+Update server/api/forms/dailyStock.ts (enforce strict validation):
+
+typescript// In submitDailyStock:
+const data = req.body;
+const errors = [];
+if (isNaN(parseInt(data.rollsEnd)) || parseInt(data.rollsEnd) < 0) errors.push('Invalid rolls: non-negative number required');
+if (isNaN(parseInt(data.meatCount)) || parseInt(data.meatCount) < 0) errors.push('Invalid meat');
+if (!Array.isArray(data.drinksEnd) || data.drinksEnd.length === 0) errors.push('Drinks required');
+if (errors.length) return res.status(400).json({ error: errors.join('; ') });
+// Insert...
+Step 2: Re-Run Rigorous Tests (Paste and Execute the Prompt Below After Fixes)
+CRITICAL TESTING INSTRUCTIONS: Fort Knox Lockdown Mode - POST-FIX RE-RUN
+[Insert the full updated testing prompt from my previous response here, with baseURL 5000 and port check in setup.]
+Log "Fixes applied successfully" or any errors—STOP if fail. Then run the sequence.

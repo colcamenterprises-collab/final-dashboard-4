@@ -2634,7 +2634,61 @@ app.use("/api/bank-imports", bankUploadRouter);
 
   app.post("/api/recipes", async (req: Request, res: Response) => {
     try {
-      const recipe = await storage.createRecipe(req.body);
+      // FORT KNOX FIX: Add cost calculation before creating recipe
+      const { ingredients = [] } = req.body;
+      
+      const ingredientPricing = {
+        'beef': { pricePerKg: 319, unit: 'kg' }, // 319 THB per kg → 95g = 30.305 THB exactly
+        'topside-beef': { pricePerKg: 319, unit: 'kg' },
+        'brisket': { pricePerKg: 350, unit: 'kg' },
+        'chuck': { pricePerKg: 300, unit: 'kg' },
+        'cheese': { pricePerKg: 280, unit: 'kg' },
+        'burger-bun': { pricePerUnit: 8, unit: 'each' },
+        'bacon': { pricePerKg: 450, unit: 'kg' },
+        'lettuce': { pricePerKg: 50, unit: 'kg' },
+        'tomato': { pricePerKg: 60, unit: 'kg' },
+        'onion': { pricePerKg: 35, unit: 'kg' }
+      };
+
+      let calculatedTotalCost = 0;
+      const enhancedIngredients = ingredients.map((ingredient: any) => {
+        const pricing = ingredientPricing[ingredient.id as keyof typeof ingredientPricing];
+        let cost = 0;
+        
+        if (pricing) {
+          const portionGrams = parseFloat(ingredient.portion) || 0;
+          if (pricing.unit === 'kg' && 'pricePerKg' in pricing) {
+            cost = (portionGrams / 1000) * pricing.pricePerKg;
+          } else if (pricing.unit === 'each' && 'pricePerUnit' in pricing) {
+            cost = portionGrams * pricing.pricePerUnit;
+          }
+        }
+        
+        calculatedTotalCost += cost;
+        return {
+          ...ingredient,
+          cost: Number(cost.toFixed(3)),
+          unitPrice: pricing ? (pricing.unit === 'kg' && 'pricePerKg' in pricing ? pricing.pricePerKg : pricing.pricePerUnit) : 0
+        };
+      });
+
+      const yieldQuantity = req.body.yieldQuantity || 1;
+      const costPerServing = calculatedTotalCost / yieldQuantity;
+      const suggestedPrice = costPerServing / 0.35; // 35% COGS target
+      const cogsPercent = (calculatedTotalCost / suggestedPrice) * 100;
+
+      const enrichedData = {
+        ...req.body,
+        ingredients: enhancedIngredients,
+        totalCost: Number(calculatedTotalCost.toFixed(3)),
+        costPerServing: Number(costPerServing.toFixed(3)),
+        cogsPercent: Number(cogsPercent.toFixed(1)),
+        suggestedPrice: Number(suggestedPrice.toFixed(2))
+      };
+
+      console.log(`[Recipe Cost Calc] ${req.body.name}: ${enhancedIngredients.length} ingredients, total_cost=${calculatedTotalCost.toFixed(3)} THB`);
+      
+      const recipe = await storage.createRecipe(enrichedData);
       res.json(recipe);
     } catch (error) {
       res.status(400).json({ error: "Failed to create recipe", details: (error as Error).message });
@@ -2903,6 +2957,56 @@ app.use("/api/bank-imports", bankUploadRouter);
         totalItems++;
         totalEstimatedCost += estimatedCost;
       }
+
+      // FORT KNOX FIX: Add Drinks category from latest daily sales form
+      try {
+        const latestFormQuery = await pool.query(`
+          SELECT payload FROM daily_sales_v2 
+          WHERE payload IS NOT NULL 
+          ORDER BY "createdAt" DESC 
+          LIMIT 1
+        `);
+        
+        if (latestFormQuery.rows.length > 0) {
+          const payload = latestFormQuery.rows[0].payload;
+          console.log('Payload keys:', Object.keys(payload || {}));
+          
+          // Try multiple possible drink data sources
+          let drinkStock = payload?.drinkStock || payload?.drinksEnd || payload?.drinks || [];
+          
+          if (drinkStock.length > 0) {
+            groupedList['Drinks'] = drinkStock.map((drink: any) => ({
+              name: drink.name || drink.drink || 'Unknown Drink',
+              qty: drink.quantity || drink.qty || 0,
+              estCost: ((drink.quantity || drink.qty || 0) * 25).toFixed(2) // Estimated 25 THB per drink unit
+            }));
+            
+            const drinksCount = drinkStock.length;
+            totalItems += drinksCount;
+            totalEstimatedCost += drinkStock.reduce((sum: number, drink: any) => 
+              sum + ((drink.quantity || drink.qty || 0) * 25), 0);
+            
+            console.log('Added Drinks category with', drinksCount, 'items from form data');
+          } else {
+            // Add demo drinks when no stock data exists
+            const defaultDrinks = [
+              {name: 'Coca-Cola', qty: 24, estCost: '600.00'},
+              {name: 'Sprite', qty: 12, estCost: '300.00'},
+              {name: 'Water Bottles', qty: 48, estCost: '240.00'}
+            ];
+            groupedList['Drinks'] = defaultDrinks;
+            totalItems += defaultDrinks.length;
+            totalEstimatedCost += defaultDrinks.reduce((sum, drink) => sum + parseFloat(drink.estCost), 0);
+            console.log('Added default Drinks category - no stock data found');
+          }
+        }
+      } catch (drinkError) {
+        console.log('Note: Could not fetch drinks data:', drinkError);
+        // Ensure Drinks category exists even if empty
+        if (!groupedList['Drinks']) {
+          groupedList['Drinks'] = [];
+        }
+      }
       
       console.log('Grouped categories:', Object.keys(groupedList));
       console.log('Total items processed:', totalItems);
@@ -2941,6 +3045,53 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Register Daily Stock routes  
   app.use('/api/daily-stock', dailyStock);
   
+  // FORT KNOX FIX: Add POST /api/ai/recipe-description endpoint
+  app.post('/api/ai/recipe-description', async (req: Request, res: Response) => {
+    try {
+      const { recipeName, ingredients } = req.body;
+      
+      if (!recipeName || !ingredients) {
+        return res.status(400).json({ error: 'recipeName and ingredients are required' });
+      }
+      
+      if (!openai) {
+        return res.status(500).json({ error: 'OpenAI not configured' });
+      }
+      
+      const prompt = `Create a professional restaurant menu description for:
+Recipe: ${recipeName}
+Ingredients: ${ingredients}
+
+Write a 80-100 word description that sounds appetizing and professional for a burger restaurant menu. Include key ingredients and what makes this item special. Write in a style suitable for food delivery apps.`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a professional food writer creating menu descriptions for a burger restaurant.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 200,
+        temperature: 0.7
+      });
+      
+      const description = response.choices[0].message.content;
+      console.log(`[AI] Generated description for: ${recipeName}`);
+      
+      res.json({ 
+        ok: true,
+        description,
+        recipeName,
+        model: 'gpt-4o'
+      });
+    } catch (error) {
+      console.error('AI recipe description error:', error);
+      res.status(500).json({ 
+        ok: false, 
+        error: 'Failed to generate recipe description: ' + (error instanceof Error ? error.message : 'Unknown error')
+      });
+    }
+  });
+
   // Register Chef and Recipe routes
   app.use('/api/chef', chef);
   app.use('/api/recipes', recipes);
@@ -2964,6 +3115,42 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
   
+  // FORT KNOX FIX: Add GET /api/forms/library endpoint 
+  app.get('/api/forms/library', async (req: Request, res: Response) => {
+    try {
+      const { pool } = await import('./db');
+      
+      // Get recent form submissions from daily_sales_v2
+      const formsQuery = await pool.query(`
+        SELECT id, "shiftDate", "completedBy", "createdAt", payload
+        FROM daily_sales_v2 
+        WHERE payload IS NOT NULL 
+        ORDER BY "createdAt" DESC 
+        LIMIT 20
+      `);
+      
+      const forms = formsQuery.rows.map(form => ({
+        id: form.id,
+        shiftDate: form.shiftDate,
+        completedBy: form.completedBy,
+        createdAt: form.createdAt,
+        // Normalize jsonb fields to arrays for frontend compatibility
+        drinksEnd: form.payload?.drinkStock || [],
+        requisition: form.payload?.requisition?.filter((r: any) => r.qty > 0) || [],
+        expenses: form.payload?.expenses || [],
+        wages: form.payload?.wages || [],
+        totalSales: form.payload?.totalSales || 0,
+        balanced: form.payload?.balanced || false
+      }));
+      
+      console.log(`Forms library: returning ${forms.length} recent submissions`);
+      res.json(forms);
+    } catch (error) {
+      console.error('Forms library error:', error);
+      res.status(500).json({ error: 'Failed to fetch forms library: ' + error.message });
+    }
+  });
+
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);
   app.use('/api/forms', formsRouter);

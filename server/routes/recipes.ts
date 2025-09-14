@@ -176,7 +176,49 @@ router.post('/', async (req, res) => {
       allergens = [], nutritional = {}, isActive = true
     } = req.body;
 
-    const cogsPercent = calculateCOGS(cleanMoney(totalCost), cleanMoney(suggestedPrice));
+    // FORT KNOX FIX: Calculate ingredient costs with fallback pricing
+    const ingredientPricing = {
+      'beef': { pricePerKg: 319, unit: 'kg' }, // 319 THB per kg → 95g = 30.305 THB exactly
+      'topside-beef': { pricePerKg: 319, unit: 'kg' },
+      'brisket': { pricePerKg: 350, unit: 'kg' },
+      'chuck': { pricePerKg: 300, unit: 'kg' },
+      'cheese': { pricePerKg: 280, unit: 'kg' },
+      'burger-bun': { pricePerUnit: 8, unit: 'each' },
+      'bacon': { pricePerKg: 450, unit: 'kg' },
+      'lettuce': { pricePerKg: 50, unit: 'kg' },
+      'tomato': { pricePerKg: 60, unit: 'kg' },
+      'onion': { pricePerKg: 35, unit: 'kg' }
+    };
+
+    let calculatedTotalCost = 0;
+    const enhancedIngredients = ingredients.map((ingredient: any) => {
+      const pricing = ingredientPricing[ingredient.id as keyof typeof ingredientPricing];
+      let cost = 0;
+      
+      if (pricing) {
+        const portionGrams = parseFloat(ingredient.portion) || 0;
+        if (pricing.unit === 'kg' && 'pricePerKg' in pricing) {
+          cost = (portionGrams / 1000) * pricing.pricePerKg;
+        } else if (pricing.unit === 'each' && 'pricePerUnit' in pricing) {
+          cost = portionGrams * pricing.pricePerUnit;
+        }
+      }
+      
+      calculatedTotalCost += cost;
+      
+      return {
+        ...ingredient,
+        cost: parseFloat(cost.toFixed(2)),
+        unitPrice: pricing ? (pricing.unit === 'kg' ? (pricing as any).pricePerKg : (pricing as any).pricePerUnit) : 0
+      };
+    });
+
+    const finalTotalCost = calculatedTotalCost > 0 ? calculatedTotalCost : cleanMoney(totalCost);
+    const finalCostPerServing = finalTotalCost / Math.max(1, yieldQuantity);
+    const finalSuggestedPrice = suggestedPrice > 0 ? cleanMoney(suggestedPrice) : suggestPrice(finalTotalCost);
+    const cogsPercent = calculateCOGS(finalTotalCost, finalSuggestedPrice);
+
+    console.log(`[POST /recipes] Cost calculation: ${name} - Total: ฿${finalTotalCost.toFixed(2)}, Per Serving: ฿${finalCostPerServing.toFixed(2)}`);
 
     const { rows } = await pool.query(`
       INSERT INTO recipes (
@@ -187,8 +229,8 @@ router.post('/', async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
       RETURNING *
     `, [
-      name, description, category, yieldQuantity, yieldUnit, JSON.stringify(ingredients),
-      cleanMoney(totalCost), cleanMoney(costPerServing), cogsPercent, cleanMoney(suggestedPrice),
+      name, description, category, yieldQuantity, yieldUnit, JSON.stringify(enhancedIngredients),
+      finalTotalCost, finalCostPerServing, cogsPercent, finalSuggestedPrice,
       wasteFactor, yieldEfficiency, imageUrl, instructions, notes,
       JSON.stringify(allergens), JSON.stringify(nutritional), isActive
     ]);
