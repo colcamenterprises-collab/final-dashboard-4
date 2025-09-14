@@ -7,6 +7,7 @@ import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
 import db from "../db";
 import { v4 as uuid } from "uuid";
+import { insertDirectExpensesFromShift } from "../utils/expenseLedger";
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
@@ -120,11 +121,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       [id, shiftDate, completedBy, createdAt, createdAt, payload]
     );
 
-    // TODO: Re-enable when schema import is fixed
-    // Log shift expenses to expensesV2 table
-    // if (payload.expenses && payload.expenses.length > 0) {
-    //   await logDirectExpenses(new Date(createdAt), payload.expenses);
-    // }
+    // Log shift expenses to expenses table
+    const savedRowCreatedAt = new Date(createdAt);
+    const directExpenses = Array.isArray(payload.expenses) ? payload.expenses : [];
+    await insertDirectExpensesFromShift(savedRowCreatedAt, directExpenses);
 
     // Build shopping list for email
     const shoppingList = (requisition || [])
