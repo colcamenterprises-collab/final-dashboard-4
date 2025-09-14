@@ -1,0 +1,129 @@
+CRITICAL TESTING INSTRUCTIONS: Fort Knox Lockdown Mode - UPDATED FOR MISSING FILE RESOLUTION
+You are now in STRICT TESTING MODE. Follow these rules EXACTLY—no deviations, no freestyling, no fixes beyond the explicit file creation below, no new code/features. If you hit any error or "brick wall" (e.g., failed submit, data mismatch), LOG it verbatim (including full stack trace/console output/screenshots if possible) and STOP the test sequence—do NOT attempt to resolve, modify, or continue. Report ONLY test results; do not add unsolicited advice. Data accuracy is paramount: Verify all calcs (e.g., costs, discrepancies) match expected (use manual math checks). Use Replit's native tools only (split terminals for client/server, console logs, manual UI interactions). Test in isolation: Assume clean DB (run any seed scripts if needed, but log if not). Commit checkpoint before starting; revert if needed.
+Test Environment Setup (Execute First):
+
+Ensure app is running: In Replit terminal 1, run node server/index.js (or your server start command if different); terminal 2, npm run dev for client (Vite on port 3000 or equivalent).
+Clear browser cache; use incognito mode for frontend tests.
+Verify env vars: SMTP_USER/PASS (log if missing—do not fix), DATABASE_URL, OPENAI_API_KEY. If SMTP missing, log and note email tests will fail but continue.
+Timezone: Set to Asia/Bangkok (manual override if needed for email timestamps; log confirmation).
+Log start: Console.log("Test Start - Date: " + new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+
+Special Resolution Step (Only for Missing testApp.ts):
+
+Action: Check for server/testApp.ts.
+If exists: Proceed to sequence.
+If MISSING: CREATE exactly server/testApp.ts with this BASE code (copy-paste verbatim—no changes):
+textconst axios = require('axios');
+axios.defaults.baseURL = 'http://localhost:3000'; // Adjust port if needed
+
+async function test() {
+  // Base tests from project summary
+  try {
+    const ing = await axios.get('/api/ingredients');
+    console.log('Ingredients count: ' + ing.data.length);
+  } catch (e) { console.log('Ingredients error: ' + e.message); }
+
+  try {
+    const shop = await axios.get('/api/shopping-list');
+    console.log('Shopping drinks: ' + (shop.data.groupedList.Drinks?.length || 0));
+  } catch (e) { console.log('Shopping error: ' + e.message); }
+
+  try {
+    const recipe = await axios.post('/api/recipes', { name: 'Test', ingredients: [{id: 'beef', portion: 95, unit: 'g'}] });
+    console.log('Beef cost: ' + recipe.data.ingredients[0].cost);
+  } catch (e) { console.log('Recipe error: ' + e.message); }
+}
+test();
+
+Then, UPDATE it by adding the consolidated validation tests below (append to test() function—no other changes):
+text// Add invalid sales test
+  try {
+    const invalidSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: '' });
+    console.log('Invalid sales success (unexpected): ' + invalidSales.data.success);
+  } catch (e) {
+    console.log('Expected sales error: ' + e.response.data.error);
+  }
+
+  // Valid sales
+  try {
+    const validSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: 'TestStaff', startingCash: 1000, cashSales: 5000, qrSales: 2000, grabSales: 3000, otherSales: 1000, totalSales: 11000 });
+    console.log('Valid sales success: ' + validSales.data.success);
+  } catch (e) { console.log('Sales error: ' + e.message); }
+
+  // Invalid stock
+  try {
+    const invalidStock = await axios.post('/api/forms/daily-stock', { rollsEnd: -1, meatCount: '', drinksEnd: [] });
+    console.log('Invalid stock success (unexpected): ' + invalidStock.data.success);
+  } catch (e) {
+    console.log('Expected stock error: ' + e.response.data.error);
+  }
+
+  // Valid stock
+  try {
+    const validStock = await axios.post('/api/forms/daily-stock', { rollsEnd: 50, meatCount: 20, drinksEnd: [{drink:'Coke',qty:10}], requisition: [{id:'beef',qty:5},{id:'cheese',qty:0}] });
+    console.log('Valid stock success: ' + validStock.data.success);
+  } catch (e) { console.log('Stock error: ' + e.message); }
+
+Log: "Created/Updated testApp.ts successfully" or error if creation fails—STOP if fail.
+DO NOT create any other files; this is the ONLY exception.
+
+Rigorous Test Sequence: Perform in ORDER. For each step, LOG: Action taken, Expected result, Actual result, Any errors (full trace), Pass/Fail. Include screenshots/code snippets where relevant (describe if can't attach). If Fail, STOP and report.
+
+Backend Validation Tests (Using testApp.ts):
+
+Run node server/testApp.ts in terminal.
+Expected: Invalid submits return 400 with specific errors (e.g., "Missing or invalid fields: completedBy..."; "Rolls count required, non-negative"). Valid succeed. Base tests: Ingredients >0 (e.g., 70 from god list), Shopping drinks length >0 if data, Beef cost ~30.305 (accurate parse, no 31,900 bug).
+Check DB manually (e.g., via Drizzle query in console: "SELECT * FROM daily_sales_v2 LIMIT 1;")—log data matches (no negatives, jsonb accurate).
+Pass/Fail: Data accuracy in errors/calcs.
+
+
+Frontend Form Tests (Daily Sales & Stock - 2-Step Flow):
+
+Load /operations/daily-sales in browser.
+Test Language Toggle: Click—labels switch English/Thai. Log before/after (e.g., describe 3 labels).
+Test Mandatory/Lockdowns (Form 1): Leave required empty/negative. Click Next. Expected: Block, red highlights, styled error. No backend hit. Log UI.
+Fill valid (as in testApp validSales). Click Next—proceed to Form 2.
+Form 2: Invalid rolls/meat/drinks. Submit: Block, specific messages. Log.
+Fill valid (as in testApp validStock). Submit: Success.
+Test Fonts: Summary text-sm, matches app style. Log if oversized.
+Pass/Fail: No skips; accurate inputs.
+
+
+Flow Tests (Form → Shopping List → Email):
+
+After submit, load /operations/purchasing.
+Expected: Grouped list with Rolls/Meat/Drinks (Coke:10 shows), requisitions >0 (beef:5 with est. cost from DB unitPrice), totals accurate (manual verify: e.g., rolls 50*8=400 THB).
+Trigger email (manual call if no auto, e.g., add temp GET /api/test-email but revert—log). Expected: Full content (sales, counts, drinks json, requisitions >0, shopping with costs). Log intercepted content/timestamp.
+DB sync: Query—matches.
+Pass/Fail: Drinks visible; calcs accurate.
+
+
+Form Library Tests:
+
+Load /operations/daily-sales-library.
+Expected: Full view (sales, rolls, meat, drinks list, requisition >0). CRUD works. Log if sections hidden/legacy data.
+Pass/Fail: Visibility/accuracy.
+
+
+Ramsay Gordon Tests (Recipe/Cost Calculator with AI):
+
+Load /menu/recipes.
+Create: Cheeseburger, add beef 95g. Calc: Expected 30.305 THB (verify manual: 95/1000*319). Log totals/COGS.
+AI: Trigger for desc. Expected: OpenAI response (e.g., suggestions). Log output.
+Save: Success, no errors. PDF gen: Describe card/image.
+Error test: Invalid portion—log if parse bug.
+Pass/Fail: Accuracy; no failures.
+
+
+Overall App Tests (Integration/Edge Cases):
+
+Menu: No dups in Operations.
+Edge: Max ingredients, zero req (skips in shopping), legacy (log).
+Security: Invalid attempts blocked.
+Perf: No errors.
+Pass/Fail: End-to-end flow.
+
+
+
+End of Tests: Log summary—Pass/Fail count, compiled logs. If any Fail, "Hit brick wall—awaiting Cam approval."
+Test Complete.
