@@ -1,0 +1,81 @@
+🧪 Testing Prompt for Replit AI Agent
+# FINANCE + EXPENSES PATCH TEST PLAN
+# DO NOT SKIP STEPS. DO NOT ADD EXTRA CODE. ONLY EXECUTE TESTS AND REPORT RESULTS.
+
+Your task: Test the Finance + Expenses integration patch end-to-end.
+You must test BOTH backend and frontend. 
+At the end, provide a structured SUMMARY of results.
+
+---
+
+## 1. Direct Expense Sync Test
+1. Submit a Daily Sales & Stock Form with one expense (e.g., Ice = ฿150).
+2. Run SQL:
+   SELECT "item","costCents","source" 
+   FROM "expenses" 
+   ORDER BY "createdAt" DESC 
+   LIMIT 3;
+✅ Expect: Entry appears with "source" = 'SHIFT_FORM' and costCents = 15000.
+
+---
+
+## 2. Rolls Lodgment Test
+1. Lodge a rolls purchase (e.g., 100 rolls at 8 THB each).
+2. Run SQL:
+   SELECT "item","costCents","source" 
+   FROM "expenses" 
+   WHERE "source"='STOCK_LODGMENT' 
+   ORDER BY "createdAt" DESC 
+   LIMIT 1;
+✅ Expect: One entry logged with correct costCents. 
+❌ Meat and drinks must NOT appear in "expenses".
+
+---
+
+## 3. Finance Job Test
+1. Manually trigger runDailyFinanceJob().
+2. Run SQL:
+   SELECT payload->'finance_summary' 
+   FROM "daily_sales_v2" 
+   ORDER BY "createdAt" DESC 
+   LIMIT 1;
+✅ Expect: JSON object exists with breakdown.direct > 0 (from test expense).
+
+---
+
+## 4. API Test
+1. GET /api/finance/summary
+✅ Expect: Full finance summary JSON with breakdown object.
+2. GET /api/finance/summary/today
+✅ Expect: sales, netProfit, primeCostPct, directExpenses, businessExpenses, stockExpenses.
+
+---
+
+## 5. Frontend Test
+1. Open Finance → Profit & Loss page.
+✅ Expect: KPI cards (Sales, Gross, Net), Ratios grid, Expense Breakdown (Direct, Business, Rolls, Total).
+2. Open Home Dashboard.
+✅ Expect: Finance Snapshot card with correct values (sales, profit, prime cost, expense breakdown).
+
+---
+
+## 6. Sidebar Test
+1. Inspect sidebar navigation.
+✅ Expect: "Expenses" listed ONLY under Finance, NOT under Operations.
+
+---
+
+## 7. Performance & Integrity Check
+1. Confirm no NaN or undefined values rendered on frontend.
+2. Confirm no alias import errors (grep for "@/utils/format" returns nothing).
+3. Confirm no duplicate expense rows created for meat or drinks.
+
+---
+
+## FINAL SUMMARY (MANDATORY)
+Provide a structured summary with:
+- ✅ What passed
+- ❌ What failed
+- 🔧 Any anomalies or fixes required
+
+Do not stop until all steps have been tested and the summary has been provided.
