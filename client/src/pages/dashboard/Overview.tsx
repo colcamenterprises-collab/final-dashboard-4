@@ -68,13 +68,13 @@ export default function Overview() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Main KPI Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
+      {/* Main KPI Banner - Style Guide Primary */}
+      <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white" style={{background: 'linear-gradient(to right, var(--primary), #1e4fa3)'}}>
         <div className="grid grid-cols-4 gap-8">
           {KPIS.map((k,i)=>(
             <div key={i} className="text-center">
               <div className="text-sm opacity-90 mb-1">{k.label}</div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-black tracking-tight">
                 {typeof k.value === "number" ? `${k.prefix ?? ""}${fmt(k.value)}` : k.value}
               </div>
             </div>
@@ -87,7 +87,7 @@ export default function Overview() {
         {/* Summary Revenue Chart */}
         <div className="xl:col-span-2 rounded-2xl bg-white shadow-sm border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Summary Revenue</h3>
+            <h3 className="text-xl font-medium text-gray-900">Summary Revenue</h3>
             <div className="text-xs text-gray-500">Last update last week</div>
           </div>
           <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
@@ -101,26 +101,26 @@ export default function Overview() {
 
       {/* Bottom row */}
       <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Orange promo */}
-        <div className="rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 text-white p-6">
-          <h3 className="text-lg font-semibold mb-2">Need more information?</h3>
+        {/* Warning Card - Style Guide Orange */}
+        <div className="rounded-2xl text-white p-6" style={{background: 'linear-gradient(to bottom right, var(--warning), #b45309)'}}>
+          <h3 className="text-xl font-medium mb-2">Need more information?</h3>
           <p className="text-sm text-orange-100 mb-4">Present information in a visually appealing way</p>
-          <button className="rounded-lg bg-white/20 hover:bg-white/30 px-4 py-2 text-sm font-medium">
+          <button className="btn-secondary rounded-lg bg-white/20 hover:bg-white/30 px-4 py-2 text-sm font-medium transition-all">
             See more →
           </button>
         </div>
 
         {/* Additional card placeholder */}
         <div className="rounded-2xl bg-white shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <h3 className="text-xl font-medium text-gray-900 mb-4">Quick Actions</h3>
           <div className="space-y-3">
-            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+            <button className="btn-secondary w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm transition-all">
               Daily Sales Form
             </button>
-            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+            <button className="btn-secondary w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm transition-all">
               Stock Management
             </button>
-            <button className="w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm">
+            <button className="btn-secondary w-full text-left p-3 rounded-lg hover:bg-gray-50 text-sm transition-all">
               Recipe Management
             </button>
           </div>
@@ -130,7 +130,7 @@ export default function Overview() {
       {/* Best Seller */}
       <div className="mt-6 rounded-2xl bg-white shadow-sm border p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Best Seller</h3>
+          <h3 className="text-xl font-medium text-gray-900">Best Seller</h3>
           <button className="text-sm text-gray-500 hover:text-gray-700">→</button>
         </div>
         <div className="grid grid-cols-3 gap-4">
