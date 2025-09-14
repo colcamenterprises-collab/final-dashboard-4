@@ -344,6 +344,10 @@ async function checkSchema() {
   const financeRouter = (await import('./routes/finance')).default;
   app.use('/api/finance', financeRouter);
   
+  // Add checklist routes
+  const checklistRouter = (await import('./routes/checklists')).default;
+  app.use('/api/checklists', checklistRouter);
+  
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks
