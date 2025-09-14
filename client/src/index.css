@@ -5,37 +5,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Typography & spacing for small screens */
-@media (max-width: 1024px) {
-  html { font-size: 15px; }
-  .card { padding: 14px; }
+/* FIXED: Consistent Base Typography */
+html {
+  font-size: 16px; /* Fixed base size - no clamp issues */
+  -webkit-text-size-adjust: 100%;
+  line-height: 1.5;
+}
+
+/* Mobile responsive sizing */
+@media (max-width: 768px) {
+  html { font-size: 14px; }
 }
 
 @media (max-width: 640px) {
-  html { font-size: 14px; }
-  .card { padding: 12px; }
+  html { font-size: 13px; }
 }
 
-/* === Responsive Typography === */
-/* Ensure correct viewport on mobile/tablet */
-@media (max-width: 1024px) {
-  html { -webkit-text-size-adjust: 100%; }
-}
-
-/* 14px base, smoothly scales up to 16px on wide screens */
-html {
-  font-size: clamp(14px, 1.6vw, 16px);
-}
-
-/* Ensure buttons and paragraph text use responsive base */
+/* FIXED: Consistent Text Sizing */
 button, .btn, p, .prose p { 
-  font-size: 1rem; /* Uses the clamp base size */
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
-/* Touch-safe form inputs */
+/* FIXED: Proper Form Input Sizing */
 input, select, textarea { 
-  font-size: 1rem; /* Prevents zoom on iOS */
-  min-height: 40px; /* Touch-friendly */
+  font-size: 1rem; 
+  min-height: 44px; /* Touch-friendly */
+  padding: 0.75rem;
+  line-height: 1.2;
+}
+
+/* FIXED: Consistent Placeholder Sizing */
+::placeholder {
+  font-size: 0.875rem !important; /* Smaller than input text */
+  color: #9ca3af;
+  opacity: 1;
 }
 
 /* Style Guide Typography */
@@ -109,27 +113,68 @@ button, .btn {
 .gap-24 { gap: 24px; }
 .gap-32 { gap: 32px; }
 
-/* Cards with better mobile spacing */
+/* FIXED: Proper Card Responsive Spacing */
 .card {
   background: #fff;
-  border: 1px solid #eee;
-  border-radius: 14px;
-  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
   .card {
-    padding: 12px;
-    border-radius: 12px;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
   }
 }
 
-/* Global responsive guards */
-html, body { 
-  overflow-x: hidden; 
+@media (max-width: 640px) {
+  .card {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
 }
+
+/* FIXED: Global Layout Containment */
+html, body { 
+  overflow-x: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 * { 
-  box-sizing: border-box; 
+  box-sizing: border-box;
+  max-width: 100%; /* Prevent any element from overflowing */
+}
+
+/* FIXED: Container Max-Width Control */
+.container, [class*="container"] {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* FIXED: Responsive Grid System */
+.grid {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .container { max-width: 1200px; padding-left: 2rem; padding-right: 2rem; }
 }
 
 :root {
@@ -250,19 +295,25 @@ html, body {
   }
 }
 
-/* Mobile and Tablet Responsive Styles */
+/* FIXED: Mobile Layout Optimization */
 @media (max-width: 768px) {
-  /* Mobile viewport optimizations */
   * {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
   }
   
-  /* Form containers - full width on mobile */
+  /* FIXED: Mobile Container Spacing */
   .container {
     max-width: 100% !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  /* FIXED: Mobile Page Spacing */
+  .page-content {
+    padding: 0.5rem;
+    width: 100%;
+    overflow-x: hidden;
   }
   
   /* Sticky action bars for forms */
@@ -294,9 +345,21 @@ html, body {
     padding: 1rem !important;
   }
   
-  /* Form grids - single column on mobile */
-  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+  /* FIXED: Mobile Grid Layout */
+  .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6 {
     grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  
+  /* FIXED: Mobile Table Responsiveness */
+  table {
+    font-size: 0.875rem !important;
+    width: 100% !important;
+  }
+  
+  th, td {
+    padding: 0.5rem !important;
+    font-size: 0.8rem !important;
   }
   
   /* Tables - stack cells on mobile */
@@ -344,11 +407,33 @@ html, body {
 
 /* Additional mobile styles for forms and interactions */
 @media (max-width: 768px) {
-  /* Input fields - larger touch targets */
-  input, select, textarea, button {
+  /* FIXED: Mobile Touch Targets */
+  input, select, textarea {
     min-height: 44px !important;
-    font-size: 16px !important; /* Prevent zoom on iOS */
+    font-size: 16px !important; /* Prevent iOS zoom */
     padding: 0.75rem !important;
+    width: 100% !important;
+    border-radius: 8px !important;
+  }
+  
+  button {
+    min-height: 44px !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    width: auto;
+  }
+  
+  /* FIXED: Mobile Button Groups */
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  
+  .btn-group button {
+    width: 100% !important;
   }
   
   /* Buttons - full width on mobile */
