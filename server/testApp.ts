@@ -1,4 +1,5 @@
-const axios = require('axios');
+import axios from 'axios';
+
 axios.defaults.baseURL = 'http://localhost:3000'; // Adjust port if needed
 
 async function test() {

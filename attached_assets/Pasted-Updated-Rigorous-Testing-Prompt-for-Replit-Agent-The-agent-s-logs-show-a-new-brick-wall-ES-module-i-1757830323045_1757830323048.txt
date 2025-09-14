@@ -1,0 +1,134 @@
+Updated Rigorous Testing Prompt for Replit Agent
+The agent's logs show a new brick wall: ES module incompatibility in testApp.ts (require vs import, as the project uses TypeScript with ES modules via "type": "module" in package.json or similar setup). This aligns with common Replit/Node TS issues—data accuracy in tests is blocked, but we can resolve simply without new complexity or deps (stick to direct execution like npx tsx, no 3rd-party tools). I've updated the prompt to use 'import' syntax in the base/updated code, explicitly run with 'npx tsx testApp.ts' (standard for TS in Replit/Node, assuming tsx is installed as per stack; if not, agent will log error and stop). This keeps Fort Knox lockdown: Only this syntax fix in creation—no other changes/fixes/freestyling.
+Paste this into the Replit agent chat to rerun. It ensures full end-to-end testing (forms, shopping/email with drinks, Ramsay calcs, etc.), with mandatory error exposure and data accuracy checks (e.g., manual cost verifications).
+
+CRITICAL TESTING INSTRUCTIONS: Fort Knox Lockdown Mode - UPDATED FOR ES MODULE COMPATIBILITY
+You are now in STRICT TESTING MODE. Follow these rules EXACTLY—no deviations, no freestyling, no fixes beyond the explicit syntax update below, no new code/features/deps. If you hit any error or "brick wall" (e.g., failed submit, data mismatch, tsx not found), LOG it verbatim (including full stack trace/console output/screenshots if possible) and STOP the test sequence—do NOT attempt to resolve, modify, or continue (e.g., do NOT install tsx or change package.json). Report ONLY test results; do not add unsolicited advice. Data accuracy is paramount: Verify all calcs (e.g., costs, discrepancies) match expected (use manual math checks). Use Replit's native tools only (split terminals for client/server, console logs, manual UI interactions). Test in isolation: Assume clean DB (run any seed scripts if needed, but log if not). Commit checkpoint before starting; revert if needed.
+Test Environment Setup (Execute First):
+
+Ensure app is running: In Replit terminal 1, run node server/index.js (or your server start command if different); terminal 2, npm run dev for client (Vite on port 3000 or equivalent).
+Clear browser cache; use incognito mode for frontend tests.
+Verify env vars: SMTP_USER/PASS (log if missing—note email tests will fail but continue), DATABASE_URL, OPENAI_API_KEY.
+Timezone: Set to Asia/Bangkok (manual override if needed; log confirmation).
+Log start: Console.log("Test Start - Date: " + new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+
+Special Resolution Step (Only for Missing testApp.ts with ES Module Fix):
+
+Action: Check for server/testApp.ts.
+If exists: Proceed to sequence.
+If MISSING: CREATE exactly server/testApp.ts with this BASE code (copy-paste verbatim—uses ES module 'import' syntax for project compatibility; no 'require'):
+textimport axios from 'axios';
+
+axios.defaults.baseURL = 'http://localhost:3000'; // Adjust port if needed
+
+async function test() {
+  // Base tests from project summary
+  try {
+    const ing = await axios.get('/api/ingredients');
+    console.log('Ingredients count: ' + ing.data.length);
+  } catch (e) { console.log('Ingredients error: ' + e.message); }
+
+  try {
+    const shop = await axios.get('/api/shopping-list');
+    console.log('Shopping drinks: ' + (shop.data.groupedList.Drinks?.length || 0));
+  } catch (e) { console.log('Shopping error: ' + e.message); }
+
+  try {
+    const recipe = await axios.post('/api/recipes', { name: 'Test', ingredients: [{id: 'beef', portion: 95, unit: 'g'}] });
+    console.log('Beef cost: ' + recipe.data.ingredients[0].cost);
+  } catch (e) { console.log('Recipe error: ' + e.message); }
+}
+test();
+
+Then, UPDATE it by adding the consolidated validation tests below (append to test() function—use ES module syntax; no other changes):
+text// Add invalid sales test
+  try {
+    const invalidSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: '' });
+    console.log('Invalid sales success (unexpected): ' + invalidSales.data.success);
+  } catch (e) {
+    console.log('Expected sales error: ' + e.response.data.error);
+  }
+
+  // Valid sales
+  try {
+    const validSales = await axios.post('/api/forms/daily-sales/v2', { completedBy: 'TestStaff', startingCash: 1000, cashSales: 5000, qrSales: 2000, grabSales: 3000, otherSales: 1000, totalSales: 11000 });
+    console.log('Valid sales success: ' + validSales.data.success);
+  } catch (e) { console.log('Sales error: ' + e.message); }
+
+  // Invalid stock
+  try {
+    const invalidStock = await axios.post('/api/forms/daily-stock', { rollsEnd: -1, meatCount: '', drinksEnd: [] });
+    console.log('Invalid stock success (unexpected): ' + invalidStock.data.success);
+  } catch (e) {
+    console.log('Expected stock error: ' + e.response.data.error);
+  }
+
+  // Valid stock
+  try {
+    const validStock = await axios.post('/api/forms/daily-stock', { rollsEnd: 50, meatCount: 20, drinksEnd: [{drink:'Coke',qty:10}], requisition: [{id:'beef',qty:5},{id:'cheese',qty:0}] });
+    console.log('Valid stock success: ' + validStock.data.success);
+  } catch (e) { console.log('Stock error: ' + e.message); }
+
+Log: "Created/Updated testApp.ts successfully with ES module syntax" or error if creation fails—STOP if fail.
+DO NOT create any other files or change syntax further; this is the ONLY exception.
+
+Rigorous Test Sequence: Perform in ORDER. For each step, LOG: Action taken, Expected result, Actual result, Any errors (full trace), Pass/Fail. Include screenshots/code snippets where relevant (describe if can't attach). If Fail, STOP and report.
+
+Backend Validation Tests (Using testApp.ts):
+
+Run npx tsx server/testApp.ts in terminal (for TS execution; log if tsx not found and STOP).
+Expected: Invalid submits return 400 with specific errors (e.g., "Missing or invalid fields: completedBy..."; "Rolls count required, non-negative"). Valid succeed. Base tests: Ingredients >0 (e.g., 70), Shopping drinks length >0 if data, Beef cost ~30.305 (accurate, no bug).
+Check DB manually (e.g., Drizzle query: "SELECT * FROM daily_sales_v2 LIMIT 1;"—log output).
+Pass/Fail: Data accuracy in errors/calcs.
+
+
+Frontend Form Tests (Daily Sales & Stock - 2-Step Flow):
+
+Load /operations/daily-sales.
+Language Toggle: Click—switch labels. Log 3 examples.
+Mandatory/Lockdowns Form 1: Empty/negative required. Next: Block, red, error. Log.
+Valid fill (match validSales). Next: Proceed.
+Form 2: Invalid rolls/meat/drinks. Submit: Block, messages. Log.
+Valid (match validStock). Submit: Success.
+Fonts: Summary text-sm. Log mismatch.
+Pass/Fail: No skips; accurate.
+
+
+Flow Tests (Form → Shopping List → Email):
+
+Load /operations/purchasing.
+Expected: Grouped with Drinks (Coke:10), requisitions >0 (beef:5 est. cost), accurate totals (manual: rolls 50*8=400).
+Email trigger (manual if no auto). Expected: Full (sales, counts, drinks, requisitions, shopping costs). Log content/timestamp.
+DB: Matches.
+Pass/Fail: Drinks visible; accurate calcs.
+
+
+Form Library Tests:
+
+Load /operations/daily-sales-library.
+Expected: Full data view (drinks/requisition >0). CRUD. Log hidden/legacy.
+Pass/Fail: Visibility.
+
+
+Ramsay Gordon Tests:
+
+Load /menu/recipes.
+Create Cheeseburger, beef 95g. Calc: 30.305 (manual verify). Log.
+AI: Desc suggestions. Log output.
+Save: Success. PDF: Describe.
+Invalid: Log parse bug.
+Pass/Fail: Accuracy; no fails.
+
+
+Overall App Tests:
+
+Menu: No dups.
+Edge: Max/zero, legacy (log).
+Security: Blocked.
+Perf: No errors.
+Pass/Fail: Flow.
+
+
+
+End of Tests: Log summary—Pass/Fail count, compiled logs. If Fail, "Hit brick wall—awaiting Cam approval."
+Test Complete.
