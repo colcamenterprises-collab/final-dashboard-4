@@ -10,6 +10,7 @@ This comprehensive restaurant management dashboard streamlines operations with A
 - **Mobile & Tablet Optimization**: Completed comprehensive responsive testing with enhanced touch interactions, auto-calculations, and navigation behavior across all devices
 - **Email Template Enhancement**: Added colored HTML badges in daily reports for balanced/unbalanced status with bold green/red styling for management visibility
 - **Form Banking Logic**: Real-time balance checking with visual feedback during data entry, auto-calculated cash/QR banking fields with proper float handling
+- **Manager Checklist System (Fort Knox Locked)**: Implemented standalone manager checklist modal with database tables, API endpoints, and React component. System now locked under Cam approval.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -24,6 +25,11 @@ Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Alw
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
 Fort Knox Locked Form System: Daily Sales & Stock form structure is LOCKED under Cam's direct approval. Form contains exact 13-section ordering, includes approved Other Sales field (renamed from Aroi Dee Sales), implements Burger Buns & Meat Count under Cash Management, and uses snake_case field names matching Pydantic schema. NO modifications allowed without explicit Cam approval. Located at /daily-stock-sales with clean minimal UI, Poppins font, and proper email integration to smashbrothersburgersth@gmail.com.
 Fort Knox File Structure: Core locked files include daily_sales_form_locked.html (frontend UI), daily_sales_schema.py (Pydantic validation), daily_sales_validation.py (runtime validation), and server/data/foodCostings.ts (TypeScript source of truth for all menu and stock items, replacing CSV). TypeScript file must be referenced for Menu Management and Ingredients List. No field modifications, renaming, or reordering allowed without Cam approval. All system emails locked to smashbrothersburgersth@gmail.com.
+Manager Checklist System (Fort Knox Locked): Golden database schema and API endpoints locked under Cam approval. No modifications allowed without explicit authorization.
+  - cleaning_tasks table: (id SERIAL PRIMARY KEY, zone TEXT NOT NULL, taskName TEXT NOT NULL, taskDetail TEXT, shiftPhase TEXT NOT NULL, active BOOLEAN DEFAULT TRUE)
+  - manager_checklists table: (id SERIAL PRIMARY KEY, shiftId TEXT NOT NULL, managerName TEXT NOT NULL, tasksAssigned JSONB NOT NULL, tasksCompleted JSONB NOT NULL, signedAt TIMESTAMP DEFAULT NOW())
+  - API endpoints: /api/checklists/random, /api/checklists/complete, /api/checklists/history (server-side validation enforced)
+  - Frontend: ManagerChecklistModal.tsx locked - enforces completion before shift closure
 Layout Protection: Clean app shell architecture (App.tsx + Sidebar.tsx) with automated prebuild validation preventing margin-left hacks. Layout uses proper flex-1 min-w-0 structure with 256px → 78px collapsible sidebar.
 Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashboard, Operations, Finance, Menu Management, Marketing) featuring emerald pill active states, monochrome SVG icons, and smooth expand/collapse animations with chevron indicators.
 

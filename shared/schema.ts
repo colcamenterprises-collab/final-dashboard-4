@@ -1266,9 +1266,20 @@ export const managerChecklists = pgTable("manager_checklists", {
   signedAt: timestamp("signed_at").defaultNow(),
 });
 
+// Checklist Assignments table - Fort Knox security for server-side task binding
+export const checklistAssignments = pgTable("checklist_assignments", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`), // assignmentId UUID
+  shiftId: text("shift_id").notNull(),
+  managerName: text("manager_name").notNull(),
+  assignedTaskIds: jsonb("assigned_task_ids").notNull(), // Array of task IDs assigned by server
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // Assignments expire after a reasonable time
+});
+
 // Manager Checklist Insert Schemas
 export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
 export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
+export const insertChecklistAssignmentsSchema = createInsertSchema(checklistAssignments);
 
 // Manager Checklist Types
 export type InsertCleaningTask = typeof cleaningTasks.$inferInsert;

@@ -1,0 +1,177 @@
+🔒 Fort Knox Overwrite Patch – Manager Checklist System
+🚫 Remove Freestyle
+
+Delete /test/checklist route and ChecklistTest page.
+
+Remove any demo mounts from App.tsx.
+
+No db:push --force allowed again — schema is final.
+
+1. Database Schema (Locked)
+cleaning_tasks
+CREATE TABLE cleaning_tasks (
+  id SERIAL PRIMARY KEY,
+  zone TEXT NOT NULL,            -- "Kitchen", "Cashier"
+  taskName TEXT NOT NULL,        -- Short description
+  taskDetail TEXT,               -- Optional details
+  shiftPhase TEXT NOT NULL,      -- "Start", "Mid", "End"
+  active BOOLEAN DEFAULT TRUE
+);
+
+manager_checklists
+CREATE TABLE manager_checklists (
+  id UUID PRIMARY KEY,
+  shiftId UUID NOT NULL,
+  managerName TEXT NOT NULL,
+  tasksAssigned JSONB NOT NULL,   -- array of task IDs
+  tasksCompleted JSONB NOT NULL,  -- array of task IDs
+  signedAt TIMESTAMP DEFAULT NOW()
+);
+
+
+✅ These are now golden schema → add to replit.md with “No modification without Cam approval.”
+
+2. Backend API (Overwrite Routes)
+server/routes/checklists.ts
+import express from "express";
+import db from "../db";
+import { sql } from "drizzle-orm";
+import { randomUUID } from "crypto";
+
+const router = express.Router();
+
+// Get random tasks by zone/phase
+router.get("/random", async (req, res) => {
+  const { zone = "Kitchen", phase = "End", count = 3 } = req.query;
+  const { rows } = await db.execute(sql`
+    SELECT id, taskName, taskDetail, zone, shiftPhase
+    FROM cleaning_tasks
+    WHERE zone = ${zone} AND shiftPhase = ${phase} AND active = TRUE
+    ORDER BY RANDOM()
+    LIMIT ${Number(count)}
+  `);
+  res.json(rows);
+});
+
+// Save completed checklist
+router.post("/complete", async (req, res) => {
+  const { shiftId, managerName, tasksAssigned, tasksCompleted } = req.body;
+  if (!shiftId || !managerName) return res.status(400).json({ error: "Missing required fields" });
+  await db.execute(sql`
+    INSERT INTO manager_checklists
+      (id, shiftId, managerName, tasksAssigned, tasksCompleted, signedAt)
+    VALUES (${randomUUID()}, ${shiftId}, ${managerName}, ${JSON.stringify(tasksAssigned)}::jsonb, ${JSON.stringify(tasksCompleted)}::jsonb, NOW())
+  `);
+  res.json({ ok: true });
+});
+
+// History
+router.get("/history", async (_req, res) => {
+  const { rows } = await db.execute(sql`
+    SELECT * FROM manager_checklists ORDER BY signedAt DESC LIMIT 50
+  `);
+  res.json(rows);
+});
+
+export default router;
+
+
+✅ No test routes. Only /api/checklists/random, /api/checklists/complete, /api/checklists/history.
+
+3. Modal Component (Frontend, Locked)
+client/src/components/ManagerChecklistModal.tsx
+import React, { useEffect, useState } from "react";
+
+type Task = { id: number; taskName: string; taskDetail?: string; zone: string; shiftPhase: string };
+
+export default function ManagerChecklistModal({ shiftId, managerName, onComplete }: { shiftId: string; managerName: string; onComplete: () => void }) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [completed, setCompleted] = useState<number[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/checklists/random?zone=Kitchen&phase=End&count=4`)
+      .then(r => r.json())
+      .then(setTasks);
+  }, []);
+
+  const toggleTask = (id: number) => {
+    setCompleted(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  };
+
+  const handleSubmit = async () => {
+    await fetch("/api/checklists/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shiftId, managerName, tasksAssigned: tasks.map(t => t.id), tasksCompleted: completed })
+    });
+    onComplete();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-lg font-semibold mb-4">Manager Checklist</h2>
+        <ul className="space-y-2">
+          {tasks.map(t => (
+            <li key={t.id} className="flex items-center">
+              <input type="checkbox" checked={completed.includes(t.id)} onChange={() => toggleTask(t.id)} className="mr-2" />
+              <span>{t.taskName}</span>
+            </li>
+          ))}
+        </ul>
+        <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded" disabled={completed.length !== tasks.length} onClick={handleSubmit}>
+          Confirm & Sign Off
+        </button>
+      </div>
+    </div>
+  );
+}
+
+4. Integration into Daily Stock Form
+client/src/pages/operations/daily-sales/View.tsx (snippet)
+// After submitting Form 2 (Daily Stock), before final save:
+import ManagerChecklistModal from "@/components/ManagerChecklistModal";
+
+// Inside component:
+const [showChecklist, setShowChecklist] = useState(true);
+
+return (
+  <>
+    {showChecklist && (
+      <ManagerChecklistModal
+        shiftId={shift.id}
+        managerName={currentUser.name}
+        onComplete={() => setShowChecklist(false)}
+      />
+    )}
+    {/* rest of view */}
+  </>
+);
+
+
+✅ This blocks shift submission until checklist completed.
+
+5. Owner Spot-Check Notification (Phase 2)
+
+Each time /api/checklists/complete fires:
+
+Also trigger email/WhatsApp summary to you:
+
+Shift Sept 14 – Manager Somchai
+Assigned: Mop floors, Check fridge, Wipe fryer
+Completed: 3/3 ✅
+
+
+This can be added after core patch is stable.
+
+✅ Locked State After Patch
+
+Schema is fixed (cleaning_tasks, manager_checklists).
+
+APIs limited to random, complete, history.
+
+Modal enforced inside Daily Stock flow (no more test pages).
+
+TasksAssigned vs TasksCompleted stored separately → audit trail.
+
+Shift can’t close until checklist is signed.
