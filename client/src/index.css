@@ -38,20 +38,76 @@ input, select, textarea {
   min-height: 40px; /* Touch-friendly */
 }
 
-/* Responsive Typography helpers */
-.h1 { @apply text-xl lg:text-2xl font-extrabold; }
-.h2 { @apply text-lg lg:text-xl font-bold; }
-.h3 { @apply text-base lg:text-lg font-semibold; }
-.text-body { @apply text-sm; }
+/* Style Guide Typography */
+.h1 { @apply text-2xl lg:text-3xl font-black tracking-tight; } /* Bigic style - bold and impactful */
+.h2 { @apply text-xl lg:text-2xl font-medium; } /* Medium weight */
+.h3 { @apply text-lg lg:text-xl font-normal; } /* Caption style */
+.text-body { @apply text-sm font-normal; }
+.text-caption { @apply text-sm font-normal text-gray-600; }
 
 /* Numeric alignment for tables */
 .num { text-align: right; }
 
-/* Touch-safe tap targets */
+/* Style Guide Button System */
 button, .btn {
   min-height: 40px;
   min-width: 40px;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
 }
+
+/* Primary Button - Style Guide Blue */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #1e4fa3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(34, 86, 62, 0.2);
+}
+
+/* Secondary Button - Gray Border */
+.btn-secondary {
+  background-color: white;
+  color: var(--text-primary);
+  border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* Destructive Button - Style Guide Red */
+.btn-destructive {
+  background-color: var(--danger);
+  color: white;
+  border: none;
+}
+
+.btn-destructive:hover {
+  background-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
+}
+
+/* Style Guide 8px Grid System */
+.spacing-1 { margin: 8px; padding: 8px; }
+.spacing-2 { margin: 16px; padding: 16px; }
+.spacing-3 { margin: 24px; padding: 24px; }
+.spacing-4 { margin: 32px; padding: 32px; }
+.spacing-5 { margin: 40px; padding: 40px; }
+.spacing-6 { margin: 48px; padding: 48px; }
+
+.gap-8 { gap: 8px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.gap-32 { gap: 32px; }
 
 /* Cards with better mobile spacing */
 .card {
@@ -77,18 +133,20 @@ html, body {
 }
 
 :root {
-  /* Modern Finance App Palette */
+  /* Style Guide Palette */
   --app-bg: hsl(210, 20%, 98%);
   --card-bg: hsl(0, 0%, 100%);
-  --text-primary: hsl(215, 28%, 17%);
-  --text-secondary: hsl(215, 16%, 47%);
+  --text-primary: hsl(215, 28%, 17%); /* Dark foreground */
+  --text-secondary: hsl(215, 16%, 47%); /* Medium foreground */
+  --text-muted: hsl(210, 16%, 82%); /* Muted foreground */
   --border-light: hsl(214, 32%, 91%);
-  --accent-lime: hsl(142, 76%, 36%);
-  --accent-emerald: hsl(158, 64%, 52%);
-  --accent-slate: hsl(215, 28%, 17%);
-  --success: hsl(142, 76%, 36%);
-  --warning: hsl(45, 93%, 47%);
-  --error: hsl(0, 84%, 60%);
+  
+  /* Style Guide Colors */
+  --primary: #22563EB; /* Primary blue */
+  --success: #059669; /* Success green */
+  --warning: #D97706; /* Warning orange */
+  --danger: #DC2626; /* Danger red */
+  --error: #DC2626;
   
   /* Legacy compatibility */
   --primary: hsl(158, 64%, 52%);
@@ -111,15 +169,15 @@ html, body {
   --card-foreground: var(--text-primary);
   --border-hsl: var(--border-light);
   --input: var(--border-light);
-  --primary-hsl: var(--accent-lime);
-  --primary-foreground: var(--text-primary);
+  --primary-hsl: var(--primary);
+  --primary-foreground: hsl(0, 0%, 100%);
   --secondary-hsl: hsl(210, 40%, 98%);
-  --secondary-foreground: var(--accent-slate);
+  --secondary-foreground: var(--text-primary);
   --accent: hsl(210, 40%, 98%);
-  --accent-foreground: var(--accent-slate);
-  --destructive: var(--error);
-  --destructive-foreground: hsl(210, 40%, 98%);
-  --ring: var(--accent-lime);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--danger);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --ring: var(--primary);
   --radius: 1rem;
 }
 
@@ -424,38 +482,74 @@ html, body {
   body {
     font-family: 'Poppins', sans-serif;
     background: var(--background);
-    color: var(--text);
+    color: var(--text-primary);
     line-height: 1.5;
     @apply antialiased;
   }
 
-  h1, h2 {
-    font-weight: 800;
+  /* Style Guide Typography */
+  h1 {
+    font-weight: 900; /* Bigic style - very bold */
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
   }
 
-  h3, h4 {
-    font-weight: 600;
+  h2 {
+    font-weight: 500; /* Medium weight */
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
+    line-height: 1.3;
   }
 
-  button {
-    border-radius: 0.5rem;
-    font-weight: 500;
-    transition: all 0.2s;
+  h3 {
+    font-weight: 400; /* Caption style - normal weight */
+    font-size: clamp(1.125rem, 2.5vw, 1.25rem);
+    line-height: 1.4;
   }
 
-  button:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  input {
-    border: 1px solid var(--border);
+  /* Style Guide Form Elements */
+  input, select, textarea {
+    border: 1px solid #d1d5db;
     border-radius: 0.375rem;
-    padding: 0.5rem;
+    padding: 0.75rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: white;
   }
 
-  input:focus {
+  input:focus, select:focus, textarea:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(34, 86, 62, 0.1);
+  }
+
+  /* Style Guide Label Styling */
+  label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+
+  /* Error Message Styling */
+  .error-message {
+    color: var(--danger);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
+  /* Placeholder Styling */
+  ::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+  }
+
+  /* Disabled State */
+  input:disabled, select:disabled, textarea:disabled, button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #f3f4f6;
   }
 }
 
@@ -521,15 +615,36 @@ html, body {
   
   .modern-button-primary {
     @apply modern-button text-white;
-    background: var(--accent-lime);
-    color: var(--accent-slate);
+    background: var(--primary);
+    color: white;
+  }
+  
+  .modern-button-primary:hover {
+    background: #1e4fa3;
+    transform: translateY(-1px);
   }
   
   .modern-button-secondary {
     @apply modern-button;
-    background: var(--card-bg);
+    background: white;
     color: var(--text-primary);
-    border: 1px solid var(--border-light);
+    border: 1px solid #d1d5db;
+  }
+  
+  .modern-button-secondary:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+  }
+  
+  .modern-button-destructive {
+    @apply modern-button text-white;
+    background: var(--danger);
+    color: white;
+  }
+  
+  .modern-button-destructive:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
   }
 
   .card {
