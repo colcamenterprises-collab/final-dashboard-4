@@ -38,6 +38,7 @@ import DailyStock from "./pages/operations/DailyStock";
 import PosUpload from "./pages/analysis/PosUpload";
 import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
 import PosReceipts from "./pages/analysis/PosReceipts";
+import ChecklistTest from "./pages/ChecklistTest";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -113,6 +114,9 @@ export default function App() {
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
                   <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
                   <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+                  
+                  {/* Test Pages */}
+                  <Route path="/test/checklist" element={<Guard><ChecklistTest /></Guard>} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
