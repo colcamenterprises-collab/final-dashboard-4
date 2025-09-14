@@ -1,0 +1,76 @@
+Rigorous Testing Prompt for Replit Agent
+Here's a complete, self-contained testing prompt you can copy-paste directly to the Replit agent. It's designed to be "Fort Knox" locked: It forces step-by-step, exhaustive testing of the exact features we've patched (Daily Sales & Stock forms, validations/lockdowns, language toggle, shopping list, email, Ramsay Gordon recipe/calc with AI, form library), with mandatory logging of all actions/results/errors. The agent cannot freestyle or fix—only test/report. If errors occur, they must stop, log, and not proceed without your approval. This ensures data accuracy, uncovers issues (e.g., drinks not showing), and aligns with Replit's native setup (manual runs in terminals, no new tools/files).
+To use: Paste this into your Replit chat/agent input. It references our patches (e.g., existing files like DailySales/Form.tsx, dailyStock.ts) and your testApp.ts for backend. Run after applying the consolidated bundle.
+
+CRITICAL TESTING INSTRUCTIONS: Fort Knox Lockdown Mode
+You are now in STRICT TESTING MODE. Follow these rules EXACTLY—no deviations, no freestyling, no fixes, no new code/files/features. If you hit any error or "brick wall" (e.g., missing file, failed submit, data mismatch), LOG it verbatim (including full stack trace/console output/screenshots if possible) and STOP the test sequence—do NOT attempt to resolve, modify, or continue. Report ONLY test results; do not add unsolicited advice. Data accuracy is paramount: Verify all calcs (e.g., costs, discrepancies) match expected (use manual math checks). Use Replit's native tools only (split terminals for client/server, console logs, manual UI interactions). Test in isolation: Assume clean DB (run any seed scripts if needed, but log if not). Commit checkpoint before starting; revert if needed.
+Test Environment Setup (Execute First):
+
+Ensure app is running: In Replit terminal 1, run npm run server (or node server/index.js if setup); terminal 2, npm run dev for client (Vite).
+Clear browser cache; use incognito mode for frontend tests.
+Verify env vars: SMTP_USER/PASS, DB creds (Neon PostgreSQL), OpenAI key for Ramsay AI.
+Timezone: Set to Asia/Bangkok (manual override if needed for email timestamps).
+Log start: Console.log("Test Start - Date: " + new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+
+Rigorous Test Sequence: Perform in ORDER. For each step, LOG: Action taken, Expected result, Actual result, Any errors (full trace), Pass/Fail. Include screenshots/code snippets where relevant (describe if can't attach). If Fail, STOP and report.
+
+Backend Validation Tests (Using testApp.ts - Update/Run Existing Script):
+
+Update your existing server/testApp.ts with the consolidated tests from Grok (invalid/valid submits for sales/stock). Do NOT create new file.
+Run node testApp.ts.
+Expected: Invalid sales/stock return 400 with specific errors (e.g., "Missing or invalid fields: completedBy. Must be non-negative."; "Rolls count required, non-negative"). Valid succeed with {success: true}. Log full outputs.
+Check DB (manual query via Drizzle console): Verify inserts in daily_sales_v2/daily_stock_v2 match data (e.g., no negatives, jsonb for drinks/requisition intact).
+Pass/Fail: Data accuracy (e.g., parseInt enforced).
+
+
+Frontend Form Tests (Daily Sales & Stock - 2-Step Flow):
+
+Load /operations/daily-sales in browser.
+Test Language Toggle: Click toggle—labels switch English/Thai. Log before/after labels (e.g., "Completed By" → "กรอกโดย"). Repeat toggle.
+Test Mandatory/Lockdowns (Form 1): Leave completedBy empty, startingCash -5, sales fields blank/negative. Click Next/Submit. Expected: Block progression, show red borders/highlights, error message "Cannot proceed: Missing/invalid fields...". No submit to backend. Log UI state.
+Fill valid (e.g., completedBy: "TestStaff", startingCash: 1000, cashSales: 5000, etc., otherSales instead of Aroi). Click Next—proceed to Form 2 (/operations/daily-stock).
+Form 2: Test lockdowns—rollsEnd blank/-1, meatCount negative, drinksEnd empty []. Submit. Expected: Block, red highlights, specific messages (e.g., "Rolls count required, non-negative for theft prevention."). Log.
+Fill valid (rollsEnd: 50, meatCount: 20, drinksEnd: [{"drink":"Coke","qty":10}], requisition: [{"id":"beef","qty":5},{"id":"cheese","qty":0}]). Submit. Expected: Success, redirect or confirmation.
+Test Fonts/Summary: Verify Summary section uses text-sm (small fonts, fits style). Log if mismatched.
+Pass/Fail: No skips past validations; data accuracy in inputs (numeric, non-negative).
+
+
+Flow Tests (Form → Shopping List → Email):
+
+After successful submit (use data from Step 2), load /operations/purchasing (Shopping List).
+Expected: Shows grouped (Rolls: Qty 50 (Est. 400 THB @8/roll), Meat: Qty 20 (Est. if priced), Drinks: Coke:10, Other: beef:5 (Est. from ingredients unitPrice, skip cheese qty=0)). Log full output—confirm drinks show (category filter fix).
+Trigger email manually (if no auto, add console trigger in code but revert after—log if missing). Expected: Email to smashbrothersburgersth@gmail.com with full data: Sales/expenses, rolls/meat/drinks counts, requisitions >0 (beef:5), shopping with est. costs. Timestamp 8am-ish Bangkok. Log email content (intercept via console if no real send).
+Verify DB sync: Query tables—data matches submitted (e.g., requisition jsonb filters >0 accurately).
+Pass/Fail: Drinks/requisitions visible; costs accurate (manual calc: e.g., beef 5 * unitPrice).
+
+
+Form Library Tests:
+
+Load /operations/daily-sales-library.
+Expected: Lists submitted forms, view shows FULL data—no hiding (sales/expenses, rollsEnd, meatCount, drinksEnd as list, requisition filtered >0). Print/Download/Delete/Edit work (log if errors). Thai/English toggle if applicable.
+Test legacy cleanup: If old data (e.g., Aroi, made-up items), log presence—do NOT delete.
+Pass/Fail: All sections visible; data accuracy.
+
+
+Ramsay Gordon Tests (Recipe/Cost Calculator with AI):
+
+Load /menu/recipes.
+Create recipe: Name "Cheeseburger", add ingredients (e.g., {id: "beef", portion: 95g, unit: "g"}), calc cost. Expected: Portion calc accurate (e.g., 95g /1000g *319/kg =30.305 THB, not rounded/erroneous). Log totalCost, costPerServing, COGS.
+Test AI: Trigger Ramsay AI for desc/suggestions (OpenAI GPT-4o). Input prompt like "Suggest description for Cheeseburger". Expected: Response integrated (e.g., "Juicy beef patty..."). Log full AI output.
+Save: Submit—expected success, no "Failed to save" (validation checks). View in library: Cards searchable, A4 PDF gen with 800x800 image, version history.
+Test errors: Invalid portion (e.g., parsePackage bug)—log if shows 31,900 instead of 30.305.
+Pass/Fail: Calc accuracy; AI integration; no save failures.
+
+
+Overall App Tests (Integration/Edge Cases):
+
+Test menu structure: No dups/length issues in Operations tab (e.g., restructure if long—but log only, no fix).
+Edge: Submit with max data (70 ingredients sync), zero requisitions (shopping skips), legacy data pull (drinks category filter).
+Security/Accuracy: Attempt invalid (e.g., non-numeric rolls)—block. Check theft prevention (rolls count accurate).
+Performance: Load times <2s; no console errors.
+Pass/Fail: Full flow works end-to-end without hidden errors.
+
+
+
+End of Tests: Log summary—Total Pass/Fail count, all logs compiled. If any Fail, state "Hit brick wall—awaiting Cam approval to proceed/fix." Do NOT suggest solutions.
+Test Complete.
