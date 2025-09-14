@@ -6,44 +6,44 @@ type Group = {
   items: { to: string; icon?: JSX.Element; label: string }[];
 };
 
+// Replace items array:
+const menuItems = [
+  { label: 'Operations', path: '/operations' },
+  { label: 'Finance', path: '/finance' },
+  { label: 'Menu and Costing', path: '/menu' },
+  { label: 'Analysis', path: '/analysis' },
+  { label: 'Membership', path: '/membership' },
+]; // Simple, no dups—sub-pages via router
+
 const groups: Group[] = [
   {
     title: "Operations",
     items: [
-      { to: "/operations/daily-sales", label: "Daily Sales & Stock" },
-      { to: "/operations/daily-sales-v2/library", label: "Daily Sales Library" },
-      { to: "/operations/shopping-list", label: "Shopping List" },
-      { to: "/operations/expenses", label: "Expenses" },
-      { to: "/operations/analysis/upload", label: "Upload Statements" },
-      { to: "/operations/analysis/receipts", label: "Receipts" },
-      { to: "/operations/shift-summary", label: "Shift Summary" },
-      { to: "/operations/shift-reports", label: "Shift Reports" },
+      { to: "/operations", label: "Operations" },
     ],
   },
   {
-    title: "Finance",
+    title: "Finance", 
     items: [
-      { to: "/finance", label: "Finance Dashboard" },
-      { to: "/finance/profit-loss", label: "Profit & Loss" },
-      { to: "/operations/analysis", label: "Analysis" },
+      { to: "/finance", label: "Finance" },
     ],
   },
   {
-    title: "Menu Mgmt",
+    title: "Menu and Costing",
     items: [
-      { to: "/menu/recipes", label: "Recipe Management" },
-      { to: "/menu/ingredient-management", label: "Ingredient Mgmt" },
-      { to: "/menu/manager", label: "Menu Manager" },
-      { to: "/menu/import", label: "Menu Import" },
-      { to: "/menu/description-tool", label: "Description Tool" },
+      { to: "/menu", label: "Menu and Costing" },
     ],
   },
   {
-    title: "AI Assistants",
+    title: "Analysis",
     items: [
-      { to: "/managers/nightly-checklist", label: "Nightly Checklist" },
-      { to: "/ai/jussi-ops", label: "Jussi (Ops AI)" },
-      { to: "/ai/jane-accounts", label: "Jane (Accounting)" },
+      { to: "/analysis", label: "Analysis" },
+    ],
+  },
+  {
+    title: "Membership",
+    items: [
+      { to: "/membership", label: "Membership" },
     ],
   },
 ];

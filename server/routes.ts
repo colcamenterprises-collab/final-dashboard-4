@@ -3011,11 +3011,20 @@ app.use("/api/bank-imports", bankUploadRouter);
       console.log('Grouped categories:', Object.keys(groupedList));
       console.log('Total items processed:', totalItems);
       
+      // ENHANCEMENT: Add auto-order gen (manual Line text v1)
+      const orderText = `Order: ${Object.entries(groupedList).map(([cat, items]: [string, any]) => `${cat}: ${Array.isArray(items) ? items.map((i: any) => `${i.name} x${i.qty}`).join(', ') : 'No items'}`).join('\n')}`;
+      
+      if (groupedList.Rolls && Array.isArray(groupedList.Rolls) && groupedList.Rolls.some((item: any) => item.qty < 80)) {
+        // Send to bakery Line (manual: console.log(orderText); v2: direct Line API with token)
+        console.log('🥖 BAKERY ORDER NEEDED:', orderText);
+      }
+      
       res.json({ 
         groupedList, 
         source: 'ingredients DB',
         totalItems,
-        totalEstimatedCost // Enhanced with total cost calculations as specified in plan
+        totalEstimatedCost, // Enhanced with total cost calculations as specified in plan
+        orderText // Return with orderText for dashboard
       });
     } catch (error) {
       console.error('Shopping list error:', error);
@@ -3045,6 +3054,49 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Register Daily Stock routes  
   app.use('/api/daily-stock', dailyStock);
   
+  // ENHANCEMENT: Add GET /api/operations/variance (new handler, but in existing routes)
+  app.get('/api/operations/variance', async (req: Request, res: Response) => {
+    try {
+      const shiftDate = req.query.shiftDate as string;
+      
+      // Direct Loyverse API (env LOYVERSE_TOKEN)
+      const loyverseToken = process.env.LOYVERSE_TOKEN;
+      if (!loyverseToken) {
+        return res.status(500).json({ error: 'LOYVERSE_TOKEN not configured' });
+      }
+      
+      // Mock Loyverse API response for now (replace with actual API call)
+      const receipts = []; // Would be: await loyverse.getReceipts({ date: shiftDate });
+      
+      const soldItems = receipts.reduce((acc: any, r: any) => {
+        r.items?.forEach((i: any) => acc[i.category] = (acc[i.category] || 0) + i.quantity);
+        return acc;
+      }, {});
+      
+      // Match recipes/ingredients
+      const expectedUsage = Object.entries(soldItems).reduce((acc: any, [cat, qty]: [string, any]) => {
+        // E.g., for burgers: qty * portion from recipes
+        acc['beef'] = qty * 95 / 1000 * 319; // Est THB, adjust per cat
+        return acc;
+      }, {});
+      
+      // Get actual lodgment from staff
+      const actualLodgment: any[] = []; // Would query: await db.select().from(stock_lodgment).where(eq(date, shiftDate));
+      
+      const discrepancies = Object.keys(expectedUsage).map(k => ({
+        item: k, 
+        expected: expectedUsage[k], 
+        actual: actualLodgment.find(l => l.type === k)?.quantity || 0,
+        variance: expectedUsage[k] - (actualLodgment.find(l => l.type === k)?.quantity || 0)
+      })).filter(d => Math.abs(d.variance) > 5); // Alert threshold
+      
+      res.json({ discrepancies });
+    } catch (error) {
+      console.error('Error calculating variance:', error);
+      res.status(500).json({ error: 'Failed to calculate variance' });
+    }
+  });
+
   // FORT KNOX FIX: Add POST /api/ai/recipe-description endpoint
   app.post('/api/ai/recipe-description', async (req: Request, res: Response) => {
     try {

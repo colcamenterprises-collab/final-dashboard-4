@@ -213,7 +213,13 @@ router.post('/', async (req, res) => {
       };
     });
 
-    const finalTotalCost = calculatedTotalCost > 0 ? calculatedTotalCost : cleanMoney(totalCost);
+    let finalTotalCost = calculatedTotalCost > 0 ? calculatedTotalCost : cleanMoney(totalCost);
+    
+    // ENHANCEMENT: Apply waste factor and yield efficiency adjustments
+    const wasteFactorAdjusted = req.body.wasteFactor || 1.05; // Default 5% waste
+    const yieldEfficiencyAdjusted = req.body.yieldEfficiency || 0.95; // 95% yield
+    finalTotalCost *= wasteFactorAdjusted / yieldEfficiencyAdjusted; // Adjust
+    
     const finalCostPerServing = finalTotalCost / Math.max(1, yieldQuantity);
     const finalSuggestedPrice = suggestedPrice > 0 ? cleanMoney(suggestedPrice) : suggestPrice(finalTotalCost);
     const cogsPercent = calculateCOGS(finalTotalCost, finalSuggestedPrice);
