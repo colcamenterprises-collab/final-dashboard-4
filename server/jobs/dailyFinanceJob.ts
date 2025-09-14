@@ -1,46 +1,52 @@
-import { pool } from "../db";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+import { getExpenseTotalsForShiftDate } from "../utils/expenseLedger";
 import { calculateFinance } from "../utils/financeCalculations";
 
 export async function runDailyFinanceJob() {
   console.log("▶ Running Daily Finance Job…");
 
-  try {
-    const result = await pool.query(
-      `SELECT id, payload 
-       FROM daily_sales_v2 
-       WHERE "deletedAt" IS NULL 
-       ORDER BY "createdAt" DESC 
-       LIMIT 1`
-    );
+  const result = await db.execute(sql`
+    SELECT id, "createdAt", payload
+    FROM "daily_sales_v2"
+    ORDER BY "createdAt" DESC
+    LIMIT 1
+  `) as unknown as Array<{ id: string; createdAt: string; payload: any }>;
 
-    if (!result.rows.length) return;
-    const row = result.rows[0];
-    const payload = row.payload || {};
-
-    // TODO: Re-enable expense aggregation when schema imports are fixed
-    const totals = { direct: 0, business: 0, stock: 0 };
-
-    const finance = calculateFinance({
-      sales: payload.totalSales || 0,
-      cogs: payload.cogs || 0,
-      labor: (payload.wages || []).reduce((sum: number, w: any) => sum + (w.amount || 0), 0),
-      totals,
-    });
-
-    const updatedPayload = {
-      ...payload,
-      finance_summary: finance
-    };
-
-    await pool.query(
-      `UPDATE daily_sales_v2 
-       SET payload = $1 
-       WHERE id = $2`,
-      [JSON.stringify(updatedPayload), row.id]
-    );
-
-    console.log("✔ Daily Finance Job complete");
-  } catch (err) {
-    console.error("Daily Finance Job failed:", err);
+  if (!result?.length) {
+    console.log("No daily_sales_v2 rows found.");
+    return;
   }
+
+  const row = result[0];
+  const shiftDate = new Date(row.createdAt);
+  const payload = row.payload || {};
+
+  const sales = Number(payload.totalSales) || 0;
+  const cogs = Number(payload.cogs) || 0;
+  const labor = Array.isArray(payload.wages)
+    ? payload.wages.reduce((acc: number, w: any) => acc + (Number(w?.amount) || 0), 0)
+    : 0;
+
+  const totals = await getExpenseTotalsForShiftDate(shiftDate);
+
+  const finance = calculateFinance({
+    sales,
+    cogs,
+    labor,
+    totals,
+  });
+
+  await db.execute(sql`
+    UPDATE "daily_sales_v2"
+    SET payload = jsonb_set(
+      COALESCE(payload, '{}'::jsonb),
+      '{finance_summary}',
+      ${JSON.stringify(finance)}::jsonb,
+      true
+    )
+    WHERE id = ${row.id}
+  `);
+
+  console.log("✔ Daily Finance Job complete");
 }
