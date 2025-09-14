@@ -4,6 +4,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { queryClient } from "@/lib/queryClient";
 
 
 const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
@@ -212,6 +213,9 @@ export default function DailySales() {
         console.error("[Form1] Missing shiftId in response:", data);
         throw new Error("Server error: missing shift ID. Please try again.");
       }
+      
+      // Invalidate finance cache to refresh home page data
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
       
       // Show loading indicator before navigation
       setSubmitting(true);

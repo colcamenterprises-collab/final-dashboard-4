@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 
 const thb = (amount: number) => `฿${amount.toLocaleString()}`;
@@ -13,13 +14,11 @@ interface Snapshot {
 }
 
 export default function HomeFinanceSnapshot() {
-  const [data, setData] = useState<Snapshot | null>(null);
+  const { data, isLoading } = useQuery<Snapshot>({
+    queryKey: ['/api/finance/summary/today'],
+  });
 
-  useEffect(() => {
-    fetch("/api/finance/summary/today").then((res) => res.json()).then(setData);
-  }, []);
-
-  if (!data) return null;
+  if (isLoading || !data) return null;
 
   return (
     <Card>

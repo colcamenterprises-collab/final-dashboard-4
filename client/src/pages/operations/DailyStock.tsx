@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { StockGrid } from "../../components/StockGrid";
+import { queryClient } from "@/lib/queryClient";
 
 // Server ingredient catalog from CSV import
 type IngredientItem = {
@@ -221,6 +222,9 @@ const DailyStock: React.FC = () => {
         throw new Error(data?.error || "Unable to submit stock.");
       }
 
+      // Invalidate finance cache to refresh home page data
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+      
       // ✅ Dashboard-style success message
       setMessage({ type: "success", text: "Stock data saved successfully! Redirecting to library..." });
 
