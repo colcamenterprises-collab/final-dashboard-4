@@ -1,0 +1,47 @@
+Fort Knox Lockdown: Implement Loyverse Viewing, Date Search, Storage Limits
+Execute ONLY: Update existing files. Data accuracy: Live, date-filtered, monthly purge (delete old receipts). No new deps.
+
+Update server/api/loyverse/shifts.ts & receipts.ts (add date range, purge):
+
+typescript// In getLoyverseShifts (similar for receipts):
+const startDate = req.query.startDate || shiftDate;
+const endDate = req.query.endDate || shiftDate;
+// Loop dates if range: for each day, pull/filter, aggregate
+const aggregates = { shifts: [], anomalies: [] }; // Sum sales etc.
+// Purge old: const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
+await db.delete(loyverse_receipts).where(lt(shiftDate, firstOfMonth));
+res.json(aggregates);
+
+Update client/src/pages/operations/Analysis.tsx (add viewing/search):
+
+tsximport { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+// shadcn: Table, DatePicker, Alert for anomalies
+
+export const AnalysisPage = () => {
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
+  const [endDate, setEndDate] = useState(startDate);
+
+  const { data: shifts } = useQuery(['loyverseShifts', startDate, endDate], () => axios.get(`/api/loyverse/shifts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data));
+  const { data: receipts } = useQuery(['loyverseReceipts', startDate, endDate], () => axios.get(`/api/loyverse/receipts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data));
+
+  return (
+    <div className="p-4 space-y-4">
+      <div>From <DatePicker value={startDate} onChange={setStartDate} /> To <DatePicker value={endDate} onChange={setEndDate} /></div>
+      <h2>Loyverse Shifts</h2>
+      <Table data={shifts?.shifts || []} columns={['Gross Sales', 'Net Sales', 'Expenses']} />
+      {shifts?.anomalies?.length > 0 && <Alert variant="destructive">{shifts.anomalies.join('\n')}</Alert>}
+      <h2>Items/Modifiers Sold</h2>
+      <Table data={Object.entries(receipts?.itemsSold || {})} columns={['Item/Modifier', 'Qty']} />
+      <h2>Receipts</h2>
+      <Accordion> {/* shadcn expandable for details */}
+        {receipts?.receipts?.map(r => <AccordionItem title={r.created_at}>{JSON.stringify(r)}</AccordionItem>)}
+      </Accordion>
+    </div>
+  );
+};
+
+Re-Run Test Prompt [Paste full previous test prompt, add Loyverse viewing verification: Load /operations/analysis, log displayed shifts/receipts/anomalies for test date, confirm purge (0 old records)].
+
+Log "Viewing complete" with sample Analysis output.

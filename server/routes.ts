@@ -350,22 +350,40 @@ export function registerRoutes(app: express.Application): Server {
   app.get('/api/loyverse/shifts', async (req: Request, res: Response) => {
     if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
     const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
+    const startDate = req.query.startDate as string || shiftDate;
+    const endDate = req.query.endDate as string || shiftDate;
+    
     try {
-      const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
-      let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
-      shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+      // Loop dates if range: for each day, pull/filter, aggregate
+      const aggregates = { shifts: [], anomalies: [] };
+      const currentDate = new Date(startDate);
+      const end = new Date(endDate);
       
-      // Store in database
-      await db.insert(loyverse_shifts).values({ shiftDate, data: shiftsData })
-        .onConflictDoUpdate({ target: [loyverse_shifts.shiftDate], set: { data: shiftsData } });
-      
-      // Compare vs form
-      const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(shiftDate))).limit(1);
-      const anomalies = [];
-      if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
-        anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const { min, max, exactStart, exactEnd } = getShiftUtcRange(dateStr);
+        let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
+        shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+        
+        // Store in database
+        await db.insert(loyverse_shifts).values({ shiftDate: dateStr, data: shiftsData })
+          .onConflictDoUpdate({ target: [loyverse_shifts.shiftDate], set: { data: shiftsData } });
+        
+        // Compare vs form
+        const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(dateStr))).limit(1);
+        if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
+          aggregates.anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
+        }
+        
+        aggregates.shifts.push(...shiftsData.shifts);
+        currentDate.setDate(currentDate.getDate() + 1);
       }
-      res.json({ shifts: shiftsData, anomalies });
+      
+      // Purge old: delete receipts older than first of current month
+      const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
+      await db.delete(loyverse_shifts).where(lt(loyverse_shifts.shiftDate, firstOfMonth));
+      
+      res.json(aggregates);
     } catch (error: any) {
       console.error('Loyverse shifts error:', error);
       res.status(500).json({ error: error.message });
@@ -375,33 +393,54 @@ export function registerRoutes(app: express.Application): Server {
   app.get('/api/loyverse/receipts', async (req: Request, res: Response) => {
     if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
     const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
+    const startDate = req.query.startDate as string || shiftDate;
+    const endDate = req.query.endDate as string || shiftDate;
+    
     try {
-      const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
-      let receipts: any[] = []; 
-      let cursor = null;
+      // Loop dates if range: for each day, pull/filter, aggregate
+      const aggregates = { receipts: [], itemsSold: {} as Record<string, number> };
+      const currentDate = new Date(startDate);
+      const end = new Date(endDate);
       
-      do {
-        const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
-        receipts = [...receipts, ...page.receipts];
-        cursor = page.cursor;
-      } while (cursor);
-      
-      receipts = filterByExactShift(receipts, exactStart, exactEnd);
-      const itemsSold = receipts.reduce((acc, r) => {
-        r.line_items?.forEach((li: any) => {
-          acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;
-          li.modifiers?.forEach((m: any) => acc[`Modifier: ${m.name}`] = (acc[`Modifier: ${m.name}`] || 0) + 1);
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const { min, max, exactStart, exactEnd } = getShiftUtcRange(dateStr);
+        let receipts: any[] = []; 
+        let cursor = null;
+        
+        do {
+          const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
+          receipts = [...receipts, ...page.receipts];
+          cursor = page.cursor;
+        } while (cursor);
+        
+        receipts = filterByExactShift(receipts, exactStart, exactEnd);
+        const itemsSold = receipts.reduce((acc, r) => {
+          r.line_items?.forEach((li: any) => {
+            acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;
+            li.modifiers?.forEach((m: any) => acc[`Modifier: ${m.name}`] = (acc[`Modifier: ${m.name}`] || 0) + 1);
+          });
+          return acc;
+        }, {} as Record<string, number>);
+        
+        // Store in database
+        await db.insert(loyverse_receipts).values({ shiftDate: dateStr, data: { receipts, itemsSold } })
+          .onConflictDoUpdate({ target: [loyverse_receipts.shiftDate], set: { data: { receipts, itemsSold } } });
+        
+        // Aggregate data
+        aggregates.receipts.push(...receipts);
+        Object.entries(itemsSold).forEach(([item, qty]) => {
+          aggregates.itemsSold[item] = (aggregates.itemsSold[item] || 0) + qty;
         });
-        return acc;
-      }, {} as Record<string, number>);
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
       
-      // Store in database
-      await db.insert(loyverse_receipts).values({ shiftDate, data: { receipts, itemsSold } })
-        .onConflictDoUpdate({ target: [loyverse_receipts.shiftDate], set: { data: { receipts, itemsSold } } });
+      // Purge old: delete receipts older than first of current month
+      const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
+      await db.delete(loyverse_receipts).where(lt(loyverse_receipts.shiftDate, firstOfMonth));
       
-      // Variance calculation placeholder
-      const variances: string[] = []; // Add comparisons here (e.g., itemsSold['Burger'] * 95g beef vs meat lodgment)
-      res.json({ receipts, itemsSold, variances });
+      res.json(aggregates);
     } catch (error: any) {
       console.error('Loyverse receipts error:', error);
       res.status(500).json({ error: error.message });
