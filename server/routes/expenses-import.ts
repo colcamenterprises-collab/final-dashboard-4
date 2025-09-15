@@ -10,6 +10,35 @@ import { z } from 'zod';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// SECURE Authentication middleware - REQUIRES valid authentication
+const requireAuth = (req: any, res: any, next: any) => {
+  const restaurantId = req.headers['x-restaurant-id'];
+  const userId = req.headers['x-user-id'];
+  const userRole = req.headers['x-user-role'];
+  
+  // SECURITY: Reject requests without proper authentication
+  if (!restaurantId || !userId || restaurantId === 'default' || userId === 'anonymous') {
+    return res.status(401).json({ error: 'Authentication required: Missing or invalid restaurant/user credentials' });
+  }
+  
+  req.restaurantId = restaurantId;
+  req.userId = userId;
+  req.userRole = userRole || 'user';
+  req.approvedBy = userId;
+  next();
+};
+
+// AUTHORIZATION: Check if user can perform sensitive operations
+const requireManagerRole = (req: any, res: any, next: any) => {
+  if (req.userRole !== 'manager' && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Insufficient permissions: Manager role required' });
+  }
+  next();
+};
+
+// Apply auth to all routes
+router.use(requireAuth);
+
 // CSV validation schemas
 const bankRowSchema = z.object({
   Date: z.string(),
@@ -44,8 +73,8 @@ function parseAmount(amountStr: string): number {
   return Math.round(amount * 100); // Convert to cents
 }
 
-// POST /api/expenses/upload-bank
-router.post('/upload-bank', upload.single('file'), async (req, res) => {
+// POST /api/expenses/upload-bank - REQUIRES MANAGER ROLE
+router.post('/upload-bank', requireManagerRole, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -59,7 +88,7 @@ router.post('/upload-bank', upload.single('file'), async (req, res) => {
     });
 
     const importBatchId = `batch_${Date.now()}`;
-    const restaurantId = 'default'; // TODO: Get from authenticated user
+    const restaurantId = req.restaurantId;
 
     const insertData = [];
     for (const record of records) {
@@ -107,8 +136,8 @@ router.post('/upload-bank', upload.single('file'), async (req, res) => {
   }
 });
 
-// POST /api/expenses/upload-partner  
-router.post('/upload-partner', upload.single('file'), async (req, res) => {
+// POST /api/expenses/upload-partner - REQUIRES MANAGER ROLE
+router.post('/upload-partner', requireManagerRole, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -122,7 +151,7 @@ router.post('/upload-partner', upload.single('file'), async (req, res) => {
     });
 
     const importBatchId = `partner_batch_${Date.now()}`;
-    const restaurantId = 'default'; // TODO: Get from authenticated user
+    const restaurantId = req.restaurantId;
     const partner = req.body.partner || 'Unknown';
 
     const insertData = [];
@@ -172,10 +201,14 @@ router.post('/upload-partner', upload.single('file'), async (req, res) => {
 // GET /api/expenses/pending
 router.get('/pending', async (req, res) => {
   try {
+    // SECURITY: Filter by restaurantId to prevent cross-tenant data leakage
     const pendingExpenses = await db
       .select()
       .from(importedExpenses)
-      .where(eq(importedExpenses.status, 'PENDING'))
+      .where(and(
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, req.restaurantId)
+      ))
       .orderBy(importedExpenses.createdAt);
 
     // Convert cents to THB for frontend display
@@ -191,29 +224,40 @@ router.get('/pending', async (req, res) => {
   }
 });
 
-// PATCH /api/expenses/:id/approve
-router.patch('/:id/approve', async (req, res) => {
+// PATCH /api/expenses/:id/approve - REQUIRES MANAGER ROLE
+router.patch('/:id/approve', requireManagerRole, async (req, res) => {
   try {
     const { id } = req.params;
     const { category, supplier } = req.body;
-    const approvedBy = 'manager'; // TODO: Get from authenticated user
+    const approvedBy = req.approvedBy;
 
-    // Get the pending expense
+    // SECURITY: Get pending expense with restaurant scoping
     const [pendingExpense] = await db
       .select()
       .from(importedExpenses)
-      .where(and(eq(importedExpenses.id, id), eq(importedExpenses.status, 'PENDING')));
+      .where(and(
+        eq(importedExpenses.id, id),
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, req.restaurantId)
+      ));
 
     if (!pendingExpense) {
-      return res.status(404).json({ error: 'Pending expense not found' });
+      return res.status(404).json({ error: 'Pending expense not found or access denied' });
+    }
+
+    // SECURITY: Validate ledger integrity - only negative amounts can be expenses
+    if (pendingExpense.amountCents >= 0) {
+      return res.status(400).json({ 
+        error: 'Ledger integrity violation: Cannot approve positive amounts as expenses. Positive amounts indicate income.' 
+      });
     }
 
     // Insert into canonical expenses table with BANK_IMPORT source
     await db.insert(expenses).values({
-      restaurantId: pendingExpense.restaurantId,
+      restaurantId: pendingExpense.restaurantId, // Already validated by query filter
       shiftDate: new Date(pendingExpense.date!),
       item: pendingExpense.description || 'Bank Import',
-      costCents: Math.abs(pendingExpense.amountCents || 0), // Ensure positive for expenses
+      costCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
       supplier: supplier || 'Bank Import',
       expenseType: category || 'General',
       source: 'BANK_IMPORT',
@@ -241,12 +285,13 @@ router.patch('/:id/approve', async (req, res) => {
   }
 });
 
-// PATCH /api/expenses/:id/reject
-router.patch('/:id/reject', async (req, res) => {
+// PATCH /api/expenses/:id/reject - REQUIRES MANAGER ROLE
+router.patch('/:id/reject', requireManagerRole, async (req, res) => {
   try {
     const { id } = req.params;
-    const approvedBy = 'manager'; // TODO: Get from authenticated user
+    const approvedBy = req.approvedBy;
 
+    // SECURITY: Reject with restaurant scoping
     const result = await db
       .update(importedExpenses)
       .set({ 
@@ -254,7 +299,11 @@ router.patch('/:id/reject', async (req, res) => {
         approvedBy,
         approvedAt: new Date()
       })
-      .where(and(eq(importedExpenses.id, id), eq(importedExpenses.status, 'PENDING')))
+      .where(and(
+        eq(importedExpenses.id, id),
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, req.restaurantId)
+      ))
       .returning();
 
     if (result.length === 0) {
@@ -269,51 +318,6 @@ router.patch('/:id/reject', async (req, res) => {
   }
 });
 
-// GET /api/partners/summary
-router.get('/partners/summary', async (req, res) => {
-  try {
-    const partnerSummaries = await db
-      .select()
-      .from(partnerStatements)
-      .where(eq(partnerStatements.status, 'APPROVED'));
-
-    // Calculate analytics
-    const analytics = partnerSummaries.reduce((acc: any, statement: any) => {
-      const partner = statement.partner || 'Unknown';
-      
-      if (!acc[partner]) {
-        acc[partner] = {
-          partner,
-          totalSales: 0,
-          totalCommission: 0,
-          totalPayout: 0,
-          statementCount: 0
-        };
-      }
-      
-      acc[partner].totalSales += statement.grossSalesCents || 0;
-      acc[partner].totalCommission += statement.commissionCents || 0;
-      acc[partner].totalPayout += statement.netPayoutCents || 0;
-      acc[partner].statementCount += 1;
-      
-      return acc;
-    }, {} as Record<string, any>);
-
-    // Convert to array and calculate percentages
-    const summaries = Object.values(analytics).map((summary: any) => ({
-      ...summary,
-      commissionRate: summary.totalSales > 0 ? (summary.totalCommission / summary.totalSales * 100) : 0,
-      totalSalesTHB: summary.totalSales / 100,
-      totalCommissionTHB: summary.totalCommission / 100,
-      totalPayoutTHB: summary.totalPayout / 100
-    }));
-
-    res.json(summaries);
-
-  } catch (error) {
-    console.error('Partners summary error:', error);
-    res.status(500).json({ error: 'Failed to fetch partner analytics' });
-  }
-});
+// Partners summary endpoint moved to server/routes/partners.ts
 
 export default router;

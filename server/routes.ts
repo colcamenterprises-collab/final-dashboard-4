@@ -28,6 +28,7 @@ import { menuRouter } from "./routes/menu";
 import { seedGodList } from "./lib/seedIngredients";
 
 import expensesImportRouter from "./routes/expenses-import";
+import partnersRouter from "./routes/partners";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2401,8 +2402,9 @@ export function registerRoutes(app: express.Application): Server {
 
   // Golden Patch - Expenses Import & Approval Routes
   app.use('/api/expenses', expensesImportRouter);
-  app.use('/api/imported-expenses', expensesImportRouter);
-  app.use('/api/partner-statements', expensesImportRouter);
+  
+  // Partners Router - Dedicated endpoints for partner analytics
+  app.use('/api/partners', partnersRouter);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

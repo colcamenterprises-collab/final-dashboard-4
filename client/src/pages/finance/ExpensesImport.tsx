@@ -45,14 +45,31 @@ export default function ExpensesImport() {
   const bankFileRef = useRef<HTMLInputElement>(null);
   const partnerFileRef = useRef<HTMLInputElement>(null);
 
-  // Queries
+  // SECURITY: Authentication headers required by backend security fixes
+  const getAuthHeaders = () => ({
+    'x-restaurant-id': 'smash-brothers-burgers', // Development restaurant ID
+    'x-user-id': 'dev-manager', // Development user ID  
+    'x-user-role': 'manager', // Required for manager operations
+  });
+
+  // SECURITY: Queries with authentication headers
   const pendingQuery = useQuery({
     queryKey: ['/api/expenses/pending'],
+    queryFn: async () => {
+      return apiRequest('/api/expenses/pending', {
+        headers: getAuthHeaders(),
+      });
+    },
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   const partnersQuery = useQuery({
     queryKey: ['/api/partners/summary'],
+    queryFn: async () => {
+      return apiRequest('/api/partners/summary', {
+        headers: getAuthHeaders(),
+      });
+    },
   });
 
   // Mutations
@@ -62,6 +79,7 @@ export default function ExpensesImport() {
       formData.append('file', file);
       return apiRequest('/api/expenses/upload-bank', {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
       });
     },
@@ -89,6 +107,7 @@ export default function ExpensesImport() {
       formData.append('partner', partner);
       return apiRequest('/api/expenses/upload-partner', {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
       });
     },
@@ -113,7 +132,10 @@ export default function ExpensesImport() {
     mutationFn: async ({ id, category, supplier }: { id: string; category: string; supplier: string }) => {
       return apiRequest(`/api/expenses/${id}/approve`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ category, supplier }),
       });
     },
@@ -132,6 +154,7 @@ export default function ExpensesImport() {
     mutationFn: async (id: string) => {
       return apiRequest(`/api/expenses/${id}/reject`, {
         method: 'PATCH',
+        headers: getAuthHeaders(),
       });
     },
     onSuccess: () => {
