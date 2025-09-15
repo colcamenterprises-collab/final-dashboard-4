@@ -1,0 +1,71 @@
+Fort Knox Lockdown: Fix DB Schema, Complete Loyverse Viewing/Search/Purge
+Execute ONLY: Update existing files, run DB push. Data accuracy: Live, filtered pulls, purge old. No new deps.
+
+Run DB Migration (Fix Missing Tables):
+
+
+Terminal: npx drizzle-kit push:pg --config=drizzle.config.ts (or your config; creates loyverse_shifts/receipts if not exist). Log output/success.
+
+
+Update server/api/loyverse/shifts.ts & receipts.ts (add range/purge):
+
+typescript// In getLoyverseShifts (similar for receipts):
+const startDate = req.query.startDate || shiftDate;
+const endDate = req.query.endDate || startDate;
+// Aggregate if range: Loop days, pull/filter, sum sales/items
+const aggregates = { shifts: [], itemsSold: {}, anomalies: [], variances: [] };
+// For each day in range (native loop):
+const current = new Date(startDate);
+while (current <= new Date(endDate)) {
+  const day = current.toISOString().slice(0,10);
+  const dayData = await loyverseGet('shifts', { opened_at_min: getShiftUtcRange(day).min, closed_at_max: getShiftUtcRange(day).max });
+  aggregates.shifts.push(...dayData.shifts);
+  // Sum items/modifiers, calc variances (sold * portion vs lodgment)
+  // Anomalies: Compare day sales vs form.totalSales
+  current.setDate(current.getDate() + 1);
+}
+// Purge: const firstMonth = new Date().toISOString().slice(0,7) + '-01';
+await db.delete(loyverse_receipts).where(lt(shiftDate, firstMonth));
+res.json(aggregates);
+
+Update client/src/pages/operations/Analysis.tsx (viewing/search):
+
+tsximport { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+// shadcn: Table, DatePicker, Alert, Accordion
+
+export const AnalysisPage = () => {
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
+  const [endDate, setEndDate] = useState(startDate);
+
+  const { data: shifts } = useQuery(['loyverseShifts', startDate, endDate], () => axios.get(`/api/loyverse/shifts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data));
+  const { data: receipts } = useQuery(['loyverseReceipts', startDate, endDate], () => axios.get(`/api/loyverse/receipts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data));
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex space-x-4">
+        <label>From <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
+        <label>To <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></label>
+      </div>
+      <h2>Loyverse Shifts Report</h2>
+      <Table columns={['Date', 'Gross Sales', 'Net Sales', 'Expenses']} data={shifts?.shifts?.map(s => ({ date: s.opened_at, gross: s.gross_sales, net: s.net_sales, expenses: s.expenses })) || []} />
+      {shifts?.anomalies?.length > 0 && <Alert variant="destructive">Anomalies: {shifts.anomalies.join(', ')}</Alert>}
+      <h2>Items/Modifiers Sold</h2>
+      <Table columns={['Item/Modifier', 'Qty']} data={Object.entries(receipts?.itemsSold || {}).map(([item, qty]) => ({ item, qty }))} />
+      <h2>Receipts Details</h2>
+      <Accordion type="single" collapsible>
+        {receipts?.receipts?.map((r, i) => (
+          <AccordionItem value={`item-${i}`}>
+            <AccordionTrigger>{r.created_at}</AccordionTrigger>
+            <AccordionContent>{JSON.stringify(r)}</AccordionContent>
+          </AccordionItem>
+        )) || 'No data'}
+      </Accordion>
+    </div>
+  );
+};
+
+Re-Run Test Prompt [Paste full previous test prompt, add: Test /operations/analysis load, log displayed tables/anomalies for test date range, confirm purge (delete old, log count)].
+
+Log "Complete" with Analysis sample (token missing ok, mock data if needed).

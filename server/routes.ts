@@ -36,7 +36,7 @@ import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; 
 import { db } from "./db"; // For transactions
 import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2 } from "../shared/schema"; // Adjust path
 import { z } from "zod";
-import { eq, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, desc, sql, inArray, isNull, lt } from "drizzle-orm";
 import multer from 'multer';
 import OpenAI from 'openai';
 import xlsx from 'xlsx';
@@ -370,7 +370,7 @@ export function registerRoutes(app: express.Application): Server {
           .onConflictDoUpdate({ target: [loyverse_shifts.shiftDate], set: { data: shiftsData } });
         
         // Compare vs form
-        const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(dateStr))).limit(1);
+        const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, dateStr)).limit(1);
         if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
           aggregates.anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
         }
