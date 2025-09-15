@@ -1,0 +1,68 @@
+Fort Knox Lockdown: Implement Home Viewing, Pre-Sets, Past Pulls
+Execute ONLY: Update existing files. Data accuracy: Live aggregates, ±50 THB balance tolerance, monthly purge. No new deps.
+
+Update server/api/loyverse/shifts.ts (add aggregates, purge):
+
+typescript// In getLoyverseShifts (similar for receipts):
+const aggregates = { totalGross: 0, totalNet: 0, totalExpenses: 0, anomalies: [], balances: [] };
+// Loop dates, pull/shifts, sum
+const current = new Date(startDate);
+while (current <= new Date(endDate)) {
+  const day = current.toISOString().slice(0,10);
+  const dayShifts = await loyverseGet('shifts', { opened_at_min: getShiftUtcRange(day).min, closed_at_max: getShiftUtcRange(day).max });
+  dayShifts.shifts.forEach(s => {
+    aggregates.totalGross += parseFloat(s.gross_sales) || 0;
+    aggregates.totalNet += parseFloat(s.net_sales) || 0;
+    aggregates.totalExpenses += parseFloat(s.expenses) || 0;
+    // Balance vs form
+    const form = await db.select().from(daily_sales_v2).where(eq(shiftDate, day)).limit(1)[0];
+    if (form) {
+      const diff = s.net_sales - form.totalSales;
+      aggregates.balances.push({ date: day, balance: diff, status: Math.abs(diff) <= 50 ? 'Balanced' : 'Unbalanced' });
+      if (Math.abs(diff) > 50) aggregates.anomalies.push(`${day}: Diff ${diff} THB`);
+    }
+  };
+  current.setDate(current.getDate() + 1);
+}
+// Purge receipts >1 month
+const firstMonth = new Date().toISOString().slice(0,7) + '-01';
+await db.delete(loyverse_receipts).where(lt(shiftDate, firstMonth));
+res.json(aggregates);
+
+Update client/src/pages/operations/Analysis.tsx (add pre-sets):
+
+tsx// Add to top:
+const preSets = [
+  { label: 'Today', start: new Date().toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
+  { label: 'Last 7 Days', start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
+  { label: 'MTD', start: new Date().toISOString().slice(0,7) + '-01', end: new Date().toISOString().slice(0,10) }
+];
+// In return:
+<div className="flex space-x-2">
+  {preSets.map(p => <button className="bg-blue-500 text-white p-2 rounded" onClick={() => { setStartDate(p.start); setEndDate(p.end); }}> {p.label} </button>)}
+</div>
+// Existing tables...
+
+Update client/src/pages/Dashboard.tsx or App.tsx (home recreation):
+
+tsximport { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+// shadcn: BarChart (Recharts if deps), Table, Alert
+
+export const Dashboard = () => {
+  const { data: balances } = useQuery(['loyverseBalances'], () => axios.get('/api/loyverse/shifts?startDate=last-30-days').then(res => res.data.balances || [])); // Mock range
+
+  return (
+    <div className="p-4">
+      <h2>Daily Register Balance</h2>
+      <BarChart data={balances.map(b => ({ date: b.date, balance: b.balance }))} colors={['orange', 'green']} /> // Simple bar, 0.0k scale
+      <Table columns={['Date', 'Balance']} data={balances.map(b => ({ date: b.date, balance: <span className={Math.abs(b.balance) <= 50 ? 'bg-green-500' : 'bg-red-500'} className="text-white p-1 rounded">{b.balance.toFixed(2)}</span> }))} />
+      <p className="text-sm mt-2">Note: Green boxes indicate register difference within ±50 (acceptable range). Red boxes indicate difference exceeding ±50 (requires attention).</p>
+    </div>
+  );
+};
+
+Re-Run Test Prompt [Paste full previous, add: Pull past shifts for test range (e.g., MTD), log aggregates/anomalies/balances, view in home/Analysis (green/red status, chart), confirm purge (log deleted count)].
+
+Log "Complete" with sample home/Analysis output (token live, past data pulled).
+This enables past pulls (aggregated summaries, balanced status), viewing in home (image style recreation) and Analysis (pre-sets for MTD/7 days). Share logs for verification.

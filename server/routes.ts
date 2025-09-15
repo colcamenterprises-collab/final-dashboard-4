@@ -354,8 +354,8 @@ export function registerRoutes(app: express.Application): Server {
     const endDate = req.query.endDate as string || shiftDate;
     
     try {
-      // Loop dates if range: for each day, pull/filter, aggregate
-      const aggregates = { shifts: [], anomalies: [] };
+      // Fort Knox aggregates with ±50 THB balance tolerance
+      const aggregates = { totalGross: 0, totalNet: 0, totalExpenses: 0, anomalies: [], balances: [], shifts: [] };
       const currentDate = new Date(startDate);
       const end = new Date(endDate);
       
@@ -369,19 +369,36 @@ export function registerRoutes(app: express.Application): Server {
         await db.insert(loyverse_shifts).values({ shiftDate: dateStr, data: shiftsData })
           .onConflictDoUpdate({ target: [loyverse_shifts.shiftDate], set: { data: shiftsData } });
         
-        // Compare vs form
+        // Process each shift for aggregates and balance checking
+        shiftsData.shifts.forEach((s: any) => {
+          aggregates.totalGross += parseFloat(s.gross_sales) || 0;
+          aggregates.totalNet += parseFloat(s.net_sales) || 0;
+          aggregates.totalExpenses += parseFloat(s.expenses) || 0;
+        });
+
+        // Balance vs form with ±50 THB tolerance
         const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, dateStr)).limit(1);
-        if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
-          aggregates.anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
+        if (form[0] && shiftsData.shifts[0]) {
+          const diff = Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales);
+          const isBalanced = Math.abs(diff) <= 50;
+          aggregates.balances.push({ 
+            date: dateStr, 
+            balance: diff, 
+            status: isBalanced ? 'Balanced' : 'Unbalanced' 
+          });
+          if (!isBalanced) {
+            aggregates.anomalies.push(`${dateStr}: Diff ${diff.toFixed(2)} THB`);
+          }
         }
         
         aggregates.shifts.push(...shiftsData.shifts);
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
-      // Purge old: delete receipts older than first of current month
+      // Purge old: delete shifts older than first of current month
       const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
-      await db.delete(loyverse_shifts).where(lt(loyverse_shifts.shiftDate, firstOfMonth));
+      const purgeResult = await db.delete(loyverse_shifts).where(lt(loyverse_shifts.shiftDate, firstOfMonth));
+      console.log(`Purged ${purgeResult.rowCount || 0} old shift records`);
       
       res.json(aggregates);
     } catch (error: any) {
