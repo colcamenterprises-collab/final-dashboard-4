@@ -1,0 +1,193 @@
+🔒 Unified Patch Prompt — Golden Patch (Expenses Import & Approval)
+
+Golden Rules (must follow):
+
+Do not freestyle.
+
+Do not split into partial implementations.
+
+Do not remove or alter schema/logic already secured.
+
+Do not create or delete unrelated files.
+
+Use the existing style guide for all frontend.
+
+After completion, provide evidence for each test step using the uploaded CSVs.
+
+1. Database (Confirm + Extend, no rollback)
+
+Ensure the following tables exist (update only if missing):
+
+imported_expenses
+
+id (UUID, PK)
+
+restaurantId (FK → restaurants, REQUIRED)
+
+date (date)
+
+description (text)
+
+amountCents (int)
+
+supplier (text)
+
+category (text)
+
+status (enum: PENDING, APPROVED, REJECTED)
+
+source (enum: BANK_UPLOAD, PARTNER_UPLOAD)
+
+raw_data (jsonb)
+
+createdAt, updatedAt
+
+partner_statements
+
+id (UUID, PK)
+
+restaurantId (FK → restaurants, REQUIRED)
+
+date (date)
+
+platform (text: Grab, Foodpanda, etc.)
+
+grossSalesCents (int)
+
+commissionCents (int)
+
+netPayoutCents (int)
+
+raw_data (jsonb)
+
+createdAt, updatedAt
+
+Do not change existing secured schema.
+
+2. Backend API (Extend Only)
+
+Upload Endpoints
+
+POST /api/expenses/upload-bank
+
+Accept CSV.
+
+Map Bank Statement → fields:
+
+Date → date
+
+Description → description
+
+Debit/Credit → amountCents (negative for debit/expense, positive for income but reject income on approval).
+
+Supplier/Bank reference text → supplier.
+
+source = BANK_UPLOAD.
+
+Store raw row JSON in raw_data.
+
+POST /api/expenses/upload-partner
+
+Accept CSV.
+
+Map Grabfood CSV → fields:
+
+Transaction Date → date
+
+Order ID/Reference → description
+
+Gross Sales → grossSalesCents
+
+Commission Fee → commissionCents
+
+Net Payout → netPayoutCents
+
+platform = Grab
+
+source = PARTNER_UPLOAD
+
+Store raw row JSON in raw_data.
+
+Review & Approval
+
+GET /api/expenses/pending → List unapproved expenses.
+
+PATCH /api/expenses/:id/approve → Approve expense (status = APPROVED, write to ledger).
+
+PATCH /api/expenses/:id/reject → Reject expense (status = REJECTED, stays in imported_expenses).
+
+Require manager role (auth check already implemented).
+
+Enforce restaurantId scoping.
+
+Reject positive income on approval.
+
+Analytics
+
+GET /api/partners/summary
+
+Return commission % (commission ÷ grossSales) grouped by platform + date.
+
+Return net payouts summary.
+
+3. Frontend Components
+
+Location: client/src/pages/finance/ExpensesImport.tsx
+
+Tabs:
+
+Upload → Dropzone for Bank + Partner CSVs (separate buttons).
+
+Review → Pending expense table with:
+
+Date, Description, Supplier, Amount, Category (editable before approval).
+
+Approve / Reject buttons.
+
+Batch Approve option.
+
+Partner Analytics → Commission %, Gross Sales, Net Payout by platform.
+
+Styling: Follow style guide (consistent H1/H2, button sizing, rounded corners).
+
+4. Testing Checklist (Mandatory Evidence)
+
+Agent must provide screenshots + console proof for each:
+
+Bank CSV Upload Test
+
+Upload Bank Statement July 1st to 13.09.25_unlocked - Table 1.csv.
+
+Confirm pending rows visible in review tab.
+
+Approve one expense → verify moves to APPROVED in DB.
+
+Reject one expense → verify status REJECTED.
+
+Verify positive income rows cannot be approved.
+
+Partner CSV Upload Test
+
+Upload Grabfood Merchant payments - 1.07.25 - 14.09.25.csv.
+
+Confirm rows visible in Partner Analytics tab.
+
+Verify commission % calculation matches CSV (show math).
+
+Security Tests
+
+Attempt approve with no auth → must fail.
+
+Attempt cross-restaurant approve → must fail.
+
+End-to-End
+
+Submit daily sales form → confirm direct expenses still log as SHIFT_FORM.
+
+Verify Finance snapshot includes approved uploaded expenses.
+
+Final Summary
+
+Provide a written checklist with ✅ / ❌ for each of the above.
+
+Confirm no schema rollback, no freestyle code.

@@ -13,6 +13,7 @@ export const bankTxnStatusEnum = pgEnum('bank_txn_status', ['pending', 'approved
 
 // Enums for Expenses Import & Approval System - Golden Patch
 export const importedExpenseStatusEnum = pgEnum('imported_expense_status', ['PENDING', 'APPROVED', 'REJECTED']);
+export const expenseSourceEnum = pgEnum('expense_source', ['BANK_UPLOAD', 'PARTNER_UPLOAD', 'MANUAL_ENTRY']);
 
 // Users table
 export const users = pgTable("users", {
@@ -556,12 +557,13 @@ export const shiftSummary = pgTable("shift_summary", {
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true }).extend({
-  isBalanced: z.boolean().optional(),  discrepancyNotes: z.string().optional(),
+  isBalanced: z.boolean().optional(),
+  discrepancyNotes: z.string().optional(),
 });
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true }).extend({
   supplier: z.string().nullable().optional(),
   items: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -619,6 +621,7 @@ export type ExpenseCategory = typeof expenseCategories.$inferSelect;
 export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
 
 // New expense import types
+
 export type ExpenseImportBatch = typeof expenseImportBatch.$inferSelect;
 export type InsertExpenseImportBatch = z.infer<typeof insertExpenseImportBatchSchema>;
 export type ExpenseImportLine = typeof expenseImportLine.$inferSelect;
@@ -1287,6 +1290,9 @@ export const importedExpenses = pgTable("imported_expenses", {
   date: date("date"),
   description: text("description"),
   amountCents: integer("amount_cents"),
+  supplier: text("supplier"),
+  category: text("category"),
+  source: expenseSourceEnum("source").notNull().default('MANUAL_ENTRY'),
   rawData: jsonb("raw_data"),
   status: importedExpenseStatusEnum("status").notNull().default('PENDING'),
   approvedBy: text("approved_by"),
@@ -1317,7 +1323,7 @@ export const insertManagerChecklistsSchema = createInsertSchema(managerChecklist
 export const insertChecklistAssignmentsSchema = createInsertSchema(checklistAssignments);
 
 // Expenses Import & Approval Insert Schemas
-export const insertImportedExpensesSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true });
+export const insertImportedExpenseSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true, approvedAt: true });
 export const insertPartnerStatementsSchema = createInsertSchema(partnerStatements).omit({ id: true, createdAt: true });
 
 // Manager Checklist Types
@@ -1327,10 +1333,10 @@ export type InsertManagerChecklist = typeof managerChecklists.$inferInsert;
 export type SelectManagerChecklist = typeof managerChecklists.$inferSelect;
 
 // Expenses Import & Approval Types
-export type InsertImportedExpense = z.infer<typeof insertImportedExpensesSchema>;
-export type SelectImportedExpense = typeof importedExpenses.$inferSelect;
+export type ImportedExpense = typeof importedExpenses.$inferSelect;
+export type InsertImportedExpense = z.infer<typeof insertImportedExpenseSchema>;
+export type PartnerStatement = typeof partnerStatements.$inferSelect;
 export type InsertPartnerStatement = z.infer<typeof insertPartnerStatementsSchema>;
-export type SelectPartnerStatement = typeof partnerStatements.$inferSelect;
 
 // --- compat alias for older imports ---
 export const dailySalesV2 = dailySales;

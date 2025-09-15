@@ -77,11 +77,21 @@ export default function ExpensesImport() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      return apiRequest('/api/expenses/upload-bank', {
+      
+      // Use fetch directly for FormData uploads (apiRequest doesn't handle FormData)
+      const res = await fetch('/api/expenses/upload-bank', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(), // Don't set Content-Type, let browser handle multipart/form-data
         body: formData,
+        credentials: 'include',
       });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
+      
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({
@@ -105,11 +115,21 @@ export default function ExpensesImport() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('partner', partner);
-      return apiRequest('/api/expenses/upload-partner', {
+      
+      // Use fetch directly for FormData uploads (apiRequest doesn't handle FormData)
+      const res = await fetch('/api/expenses/upload-partner', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(), // Don't set Content-Type, let browser handle multipart/form-data
         body: formData,
+        credentials: 'include',
       });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
+      
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({

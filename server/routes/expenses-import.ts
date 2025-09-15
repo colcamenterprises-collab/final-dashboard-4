@@ -1,5 +1,5 @@
 // Golden Patch - Expenses Import & Approval API Routes
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { db } from '../db.js';
@@ -7,30 +7,40 @@ import { importedExpenses, partnerStatements, expenses } from '../../shared/sche
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
+// Extend Express Request interface
+interface AuthenticatedRequest extends Request {
+  restaurantId: string;
+  userId: string;
+  userRole: string;
+  approvedBy: string;
+}
+
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // SECURE Authentication middleware - REQUIRES valid authentication
-const requireAuth = (req: any, res: any, next: any) => {
-  const restaurantId = req.headers['x-restaurant-id'];
-  const userId = req.headers['x-user-id'];
-  const userRole = req.headers['x-user-role'];
+const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  const restaurantId = req.headers['x-restaurant-id'] as string;
+  const userId = req.headers['x-user-id'] as string;
+  const userRole = req.headers['x-user-role'] as string;
   
   // SECURITY: Reject requests without proper authentication
   if (!restaurantId || !userId || restaurantId === 'default' || userId === 'anonymous') {
     return res.status(401).json({ error: 'Authentication required: Missing or invalid restaurant/user credentials' });
   }
   
-  req.restaurantId = restaurantId;
-  req.userId = userId;
-  req.userRole = userRole || 'user';
-  req.approvedBy = userId;
+  const authReq = req as AuthenticatedRequest;
+  authReq.restaurantId = restaurantId;
+  authReq.userId = userId;
+  authReq.userRole = userRole || 'user';
+  authReq.approvedBy = userId;
   next();
 };
 
 // AUTHORIZATION: Check if user can perform sensitive operations
-const requireManagerRole = (req: any, res: any, next: any) => {
-  if (req.userRole !== 'manager' && req.userRole !== 'admin') {
+const requireManagerRole = (req: Request, res: Response, next: NextFunction) => {
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.userRole !== 'manager' && authReq.userRole !== 'admin') {
     return res.status(403).json({ error: 'Insufficient permissions: Manager role required' });
   }
   next();
@@ -56,14 +66,16 @@ const partnerRowSchema = z.object({
 });
 
 // Utility functions
-function parseThaiDate(dateStr: string): Date {
-  // Handle dd/mm/yyyy format common in Thailand
+function parseThaiDate(dateStr: string): string {
+  // Handle dd/mm/yyyy format common in Thailand and return ISO date string for Drizzle
   const parts = dateStr.split('/');
   if (parts.length === 3) {
     const [day, month, year] = parts;
-    return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
-  return new Date(dateStr);
+  // Convert to ISO date string
+  const date = new Date(dateStr);
+  return date.toISOString().split('T')[0];
 }
 
 function parseAmount(amountStr: string): number {
@@ -74,8 +86,10 @@ function parseAmount(amountStr: string): number {
 }
 
 // POST /api/expenses/upload-bank - REQUIRES MANAGER ROLE
-router.post('/upload-bank', requireManagerRole, upload.single('file'), async (req, res) => {
+router.post('/upload-bank', requireManagerRole, upload.single('file'), async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
@@ -88,7 +102,7 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
     });
 
     const importBatchId = `batch_${Date.now()}`;
-    const restaurantId = req.restaurantId;
+    const restaurantId = authReq.restaurantId;
 
     const insertData = [];
     for (const record of records) {
@@ -106,9 +120,12 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
           insertData.push({
             restaurantId,
             importBatchId,
-            date,
+            date, // Already returns date string from parseThaiDate
             description: validatedRow.Description,
             amountCents,
+            supplier: null,
+            category: null,
+            source: 'BANK_UPLOAD' as const,
             rawData: record,
             status: 'PENDING' as const,
           });
@@ -137,8 +154,10 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
 });
 
 // POST /api/expenses/upload-partner - REQUIRES MANAGER ROLE
-router.post('/upload-partner', requireManagerRole, upload.single('file'), async (req, res) => {
+router.post('/upload-partner', requireManagerRole, upload.single('file'), async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
@@ -151,7 +170,7 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
     });
 
     const importBatchId = `partner_batch_${Date.now()}`;
-    const restaurantId = req.restaurantId;
+    const restaurantId = authReq.restaurantId;
     const partner = req.body.partner || 'Unknown';
 
     const insertData = [];
@@ -168,7 +187,7 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
           restaurantId,
           partner,
           importBatchId,
-          statementDate,
+          statementDate, // Already returns date string from parseThaiDate
           grossSalesCents,
           commissionCents,
           netPayoutCents,
@@ -199,22 +218,24 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
 });
 
 // GET /api/expenses/pending
-router.get('/pending', async (req, res) => {
+router.get('/pending', async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    
     // SECURITY: Filter by restaurantId to prevent cross-tenant data leakage
     const pendingExpenses = await db
       .select()
       .from(importedExpenses)
       .where(and(
         eq(importedExpenses.status, 'PENDING'),
-        eq(importedExpenses.restaurantId, req.restaurantId)
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
       ))
       .orderBy(importedExpenses.createdAt);
 
-    // Convert cents to THB for frontend display
-    const formatted = pendingExpenses.map((expense: any) => ({
+    // Convert cents to THB for frontend display with null safety
+    const formatted = pendingExpenses.map((expense) => ({
       ...expense,
-      amountTHB: expense.amountCents ? expense.amountCents / 100 : 0
+      amountTHB: expense.amountCents !== null ? expense.amountCents / 100 : 0
     }));
 
     res.json(formatted);
@@ -225,11 +246,12 @@ router.get('/pending', async (req, res) => {
 });
 
 // PATCH /api/expenses/:id/approve - REQUIRES MANAGER ROLE
-router.patch('/:id/approve', requireManagerRole, async (req, res) => {
+router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
     const { category, supplier } = req.body;
-    const approvedBy = req.approvedBy;
+    const approvedBy = authReq.approvedBy;
 
     // SECURITY: Get pending expense with restaurant scoping
     const [pendingExpense] = await db
@@ -238,7 +260,7 @@ router.patch('/:id/approve', requireManagerRole, async (req, res) => {
       .where(and(
         eq(importedExpenses.id, id),
         eq(importedExpenses.status, 'PENDING'),
-        eq(importedExpenses.restaurantId, req.restaurantId)
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
       ));
 
     if (!pendingExpense) {
@@ -246,7 +268,8 @@ router.patch('/:id/approve', requireManagerRole, async (req, res) => {
     }
 
     // SECURITY: Validate ledger integrity - only negative amounts can be expenses
-    if (pendingExpense.amountCents >= 0) {
+    // Add null safety check for amountCents
+    if (!pendingExpense.amountCents || pendingExpense.amountCents >= 0) {
       return res.status(400).json({ 
         error: 'Ledger integrity violation: Cannot approve positive amounts as expenses. Positive amounts indicate income.' 
       });
@@ -254,8 +277,8 @@ router.patch('/:id/approve', requireManagerRole, async (req, res) => {
 
     // Insert into canonical expenses table with BANK_IMPORT source
     await db.insert(expenses).values({
-      restaurantId: pendingExpense.restaurantId, // Already validated by query filter
-      shiftDate: new Date(pendingExpense.date!),
+      restaurantId: pendingExpense.restaurantId || '', // Add null safety
+      shiftDate: pendingExpense.date ? new Date(pendingExpense.date) : new Date(),
       item: pendingExpense.description || 'Bank Import',
       costCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
       supplier: supplier || 'Bank Import',
@@ -286,10 +309,11 @@ router.patch('/:id/approve', requireManagerRole, async (req, res) => {
 });
 
 // PATCH /api/expenses/:id/reject - REQUIRES MANAGER ROLE
-router.patch('/:id/reject', requireManagerRole, async (req, res) => {
+router.patch('/:id/reject', requireManagerRole, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
-    const approvedBy = req.approvedBy;
+    const approvedBy = authReq.approvedBy;
 
     // SECURITY: Reject with restaurant scoping
     const result = await db
@@ -302,7 +326,7 @@ router.patch('/:id/reject', requireManagerRole, async (req, res) => {
       .where(and(
         eq(importedExpenses.id, id),
         eq(importedExpenses.status, 'PENDING'),
-        eq(importedExpenses.restaurantId, req.restaurantId)
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
       ))
       .returning();
 
