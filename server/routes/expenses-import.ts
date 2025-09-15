@@ -50,12 +50,12 @@ const requireManagerRole = (req: Request, res: Response, next: NextFunction) => 
 router.use(requireAuth);
 
 // CSV validation schemas
+// Fixed for Thai bilingual bank statement headers with newlines
 const bankRowSchema = z.object({
-  Date: z.string(),
-  Description: z.string(), 
-  'Withdrawal': z.string().optional(),
-  'Deposit': z.string().optional(),
-  'Balance': z.string().optional(),
+  'Date\nวันที่': z.string(),
+  'Description\nรายละเอียด': z.string(), 
+  'Debit/Credit\nลูกหนี้/เจ้าหนี้': z.string(),
+  'Balance/Baht\nยอดเงินคงเหลือ': z.string().optional(),
 });
 
 const partnerRowSchema = z.object({
@@ -67,15 +67,32 @@ const partnerRowSchema = z.object({
 
 // Utility functions
 function parseThaiDate(dateStr: string): string {
-  // Handle dd/mm/yyyy format common in Thailand and return ISO date string for Drizzle
+  // Handle dd/mm/yy and dd/mm/yyyy format common in Thailand
   const parts = dateStr.split('/');
   if (parts.length === 3) {
-    const [day, month, year] = parts;
+    const [day, month, yearStr] = parts;
+    let year = yearStr;
+    
+    // Handle 2-digit years: convert yy to yyyy
+    if (yearStr.length === 2) {
+      const twoDigitYear = parseInt(yearStr, 10);
+      // Assume years 00-50 are 2000-2050, 51-99 are 1951-1999
+      year = twoDigitYear <= 50 ? `20${yearStr}` : `19${yearStr}`;
+    }
+    
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
-  // Convert to ISO date string
-  const date = new Date(dateStr);
-  return date.toISOString().split('T')[0];
+  
+  // Fallback for other formats
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date: ${dateStr}`);
+    }
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    throw new Error(`Unable to parse date: ${dateStr}`);
+  }
 }
 
 function parseAmount(amountStr: string): number {
@@ -109,19 +126,19 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
       try {
         const validatedRow = bankRowSchema.parse(record);
         
-        const date = parseThaiDate(validatedRow.Date);
-        const withdrawal = parseAmount(validatedRow.Withdrawal || '0');
-        const deposit = parseAmount(validatedRow.Deposit || '0'); 
+        const date = parseThaiDate(validatedRow['Date\nวันที่']);
+        // Handle single Debit/Credit column - positive values are credits (income), negative are debits (expenses)
+        const debitCreditAmount = parseAmount(validatedRow['Debit/Credit\nลูกหนี้/เจ้าหนี้']);
         
-        // Net amount: deposits are positive income, withdrawals are negative expenses
-        const amountCents = deposit - withdrawal;
+        // For bank statements: positive amounts are income (credits), negative are expenses (debits)
+        const amountCents = debitCreditAmount;
         
         if (amountCents !== 0) { // Only import non-zero transactions
           insertData.push({
             restaurantId,
             importBatchId,
             date, // Already returns date string from parseThaiDate
-            description: validatedRow.Description,
+            description: validatedRow['Description\nรายละเอียด'],
             amountCents,
             supplier: null,
             category: null,
