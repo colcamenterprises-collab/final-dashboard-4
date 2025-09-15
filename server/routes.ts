@@ -27,6 +27,7 @@ import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
 import { seedGodList } from "./lib/seedIngredients";
 
+import expensesImportRouter from "./routes/expenses-import";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2398,9 +2399,16 @@ export function registerRoutes(app: express.Application): Server {
     app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
 
-  // Expense Import Routes
+  // Golden Patch - Expenses Import & Approval Routes
+  app.use('/api/expenses', expensesImportRouter);
+  app.use('/api/imported-expenses', expensesImportRouter);
+  app.use('/api/partner-statements', expensesImportRouter);
+
+  // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
     app.use('/api/expensesV2/imports', expenseModule.default);
+  }).catch(err => console.warn('Legacy expense imports unavailable:', err));
+  
 app.use("/api/bank-imports", bankUploadRouter);
     
     // Import and register finance router
