@@ -1,6 +1,7 @@
 import { dailySalesV2Router } from "./forms/dailySalesV2";
 import { uploadIngredientsCSV, getShoppingListByDate } from "./forms/ingredients";
 import { bankUploadRouter } from "../src/server/bank/upload";
+import { loyverseGet, getShiftUtcRange, filterByExactShift } from './utils/loyverse';
 import express, { Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import type { Server } from "http";
@@ -33,7 +34,7 @@ import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2 } from "../shared/schema"; // Adjust path
 import { z } from "zod";
 import { eq, desc, sql, inArray, isNull } from "drizzle-orm";
 import multer from 'multer';
@@ -345,7 +346,67 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
   
+  // Loyverse API Integration Handlers
+  app.get('/api/loyverse/shifts', async (req: Request, res: Response) => {
+    if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
+    const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
+    try {
+      const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+      let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
+      shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+      
+      // Store in database
+      await db.insert(loyverse_shifts).values({ shiftDate, data: shiftsData })
+        .onConflictDoUpdate({ target: [loyverse_shifts.shiftDate], set: { data: shiftsData } });
+      
+      // Compare vs form
+      const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(shiftDate))).limit(1);
+      const anomalies = [];
+      if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
+        anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
+      }
+      res.json({ shifts: shiftsData, anomalies });
+    } catch (error: any) {
+      console.error('Loyverse shifts error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
+  app.get('/api/loyverse/receipts', async (req: Request, res: Response) => {
+    if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
+    const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
+    try {
+      const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+      let receipts: any[] = []; 
+      let cursor = null;
+      
+      do {
+        const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
+        receipts = [...receipts, ...page.receipts];
+        cursor = page.cursor;
+      } while (cursor);
+      
+      receipts = filterByExactShift(receipts, exactStart, exactEnd);
+      const itemsSold = receipts.reduce((acc, r) => {
+        r.line_items?.forEach((li: any) => {
+          acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;
+          li.modifiers?.forEach((m: any) => acc[`Modifier: ${m.name}`] = (acc[`Modifier: ${m.name}`] || 0) + 1);
+        });
+        return acc;
+      }, {} as Record<string, number>);
+      
+      // Store in database
+      await db.insert(loyverse_receipts).values({ shiftDate, data: { receipts, itemsSold } })
+        .onConflictDoUpdate({ target: [loyverse_receipts.shiftDate], set: { data: { receipts, itemsSold } } });
+      
+      // Variance calculation placeholder
+      const variances: string[] = []; // Add comparisons here (e.g., itemsSold['Burger'] * 95g beef vs meat lodgment)
+      res.json({ receipts, itemsSold, variances });
+    } catch (error: any) {
+      console.error('Loyverse receipts error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.get("/api/dashboard/stock-discrepancies", async (req: Request, res: Response) => {
     try {
