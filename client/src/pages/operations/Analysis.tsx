@@ -13,6 +13,13 @@ export const AnalysisPage = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
   const [endDate, setEndDate] = useState(startDate);
 
+  // Fort Knox pre-sets for quick date selection
+  const preSets = [
+    { label: 'Today', start: new Date().toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
+    { label: 'Last 7 Days', start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
+    { label: 'MTD', start: new Date().toISOString().slice(0,7) + '-01', end: new Date().toISOString().slice(0,10) }
+  ];
+
   const { data: shifts } = useQuery({
     queryKey: ['loyverseShifts', startDate, endDate],
     queryFn: () => axios.get(`/api/loyverse/shifts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data)
@@ -52,6 +59,23 @@ export const AnalysisPage = () => {
                 data-testid="input-end-date"
               />
             </div>
+          </div>
+
+          {/* Fort Knox Pre-sets */}
+          <div className="flex space-x-2">
+            {preSets.map(p => (
+              <Button 
+                key={p.label}
+                className="bg-blue-500 text-white hover:bg-blue-600" 
+                onClick={() => { 
+                  setStartDate(p.start); 
+                  setEndDate(p.end); 
+                }}
+                data-testid={`button-preset-${p.label.toLowerCase().replace(/\s+/g, '-')}`}
+              > 
+                {p.label} 
+              </Button>
+            ))}
           </div>
 
           {/* Loyverse Shifts Section */}
