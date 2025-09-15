@@ -11,6 +11,10 @@ export const salesFormStatusEnum = pgEnum('sales_form_status', ['DRAFT', 'SUBMIT
 export const bankImportStatusEnum = pgEnum('bank_import_status', ['pending', 'partially_approved', 'approved']);
 export const bankTxnStatusEnum = pgEnum('bank_txn_status', ['pending', 'approved', 'rejected', 'deleted']);
 
+// Enums for Expenses Import & Approval System
+export const importedExpenseStatusEnum = pgEnum('imported_expense_status', ['PENDING', 'APPROVED', 'REJECTED']);
+export const importedExpenseSourceEnum = pgEnum('imported_expense_source', ['BANK', 'PARTNER']);
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -1276,16 +1280,52 @@ export const checklistAssignments = pgTable("checklist_assignments", {
   expiresAt: timestamp("expires_at").notNull(), // Assignments expire after a reasonable time
 });
 
+// Imported Expenses table - Golden Patch Expenses Import & Approval
+export const importedExpenses = pgTable("imported_expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: date("date").notNull(),
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  source: importedExpenseSourceEnum("source").notNull(),
+  status: importedExpenseStatusEnum("status").notNull().default('PENDING'),
+  category: text("category"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Partner Statements table - Golden Patch Partner Analytics
+export const partnerStatements = pgTable("partner_statements", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerName: text("partner_name").notNull(),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  totalSalesCents: integer("total_sales_cents").notNull(),
+  commissionCents: integer("commission_cents").notNull(),
+  payoutCents: integer("payout_cents").notNull(),
+  feesBreakdown: jsonb("fees_breakdown").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Manager Checklist Insert Schemas
 export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
 export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
 export const insertChecklistAssignmentsSchema = createInsertSchema(checklistAssignments);
+
+// Expenses Import & Approval Insert Schemas
+export const insertImportedExpensesSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true });
+export const insertPartnerStatementsSchema = createInsertSchema(partnerStatements).omit({ id: true, createdAt: true });
 
 // Manager Checklist Types
 export type InsertCleaningTask = typeof cleaningTasks.$inferInsert;
 export type SelectCleaningTask = typeof cleaningTasks.$inferSelect;
 export type InsertManagerChecklist = typeof managerChecklists.$inferInsert;
 export type SelectManagerChecklist = typeof managerChecklists.$inferSelect;
+
+// Expenses Import & Approval Types
+export type InsertImportedExpense = z.infer<typeof insertImportedExpensesSchema>;
+export type SelectImportedExpense = typeof importedExpenses.$inferSelect;
+export type InsertPartnerStatement = z.infer<typeof insertPartnerStatementsSchema>;
+export type SelectPartnerStatement = typeof partnerStatements.$inferSelect;
 
 // --- compat alias for older imports ---
 export const dailySalesV2 = dailySales;
