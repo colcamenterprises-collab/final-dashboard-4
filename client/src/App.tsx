@@ -22,6 +22,7 @@ import FinancePage from "./pages/finance/FinancePage";
 import CostCalculator from "./pages/CostCalculator";
 import Ingredients from "./pages/Ingredients";
 import Expenses from "./pages/Expenses";
+import ExpensesImport from "./pages/finance/ExpensesImport";
 import MenuManager from "./pages/menu/MenuManager";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
@@ -97,6 +98,7 @@ export default function App() {
                   <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
                   <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
                   <Route path="/finance/expenses" element={<Guard><Expenses /></Guard>} />
+                  <Route path={ROUTES.EXPENSES_IMPORT} element={<Guard><ExpensesImport /></Guard>} />
 
                   {/* Menu Mgmt */}
                   <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />

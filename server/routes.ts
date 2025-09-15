@@ -2409,12 +2409,12 @@ export function registerRoutes(app: express.Application): Server {
     app.use('/api/expensesV2/imports', expenseModule.default);
   }).catch(err => console.warn('Legacy expense imports unavailable:', err));
   
-app.use("/api/bank-imports", bankUploadRouter);
+  app.use("/api/bank-imports", bankUploadRouter);
     
-    // Import and register finance router
-    const { financeRouter } = await import('./api/finance');
-    app.use('/api/finance', financeRouter);
-  }).catch(err => console.error('Failed to load expense imports API:', err));
+  // Import and register finance router
+  import('./api/finance').then(async financeModule => {
+    app.use('/api/finance', financeModule.financeRouter);
+  }).catch(err => console.error('Failed to load finance API:', err));
 
   // === NEW POS INGESTION & ANALYTICS ENDPOINTS ===
   
