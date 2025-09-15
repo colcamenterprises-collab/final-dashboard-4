@@ -1,0 +1,144 @@
+Refined Loyverse API Integration Plan (Data-Accurate, Scalable v1)
+Key Refinements for Timezone/Shift Coverage:
+
+Use BKK-localized start/end, convert to UTC min/max.
+For safety: Query UTC from start-1h to end+1h, filter results client-side to exact shift (avoids edge misses from Loyverse UTC rounding).
+Test with sample: For shift_date '2025-09-15', min: '2025-09-15T09:00:00Z' (buffer), max: '2025-09-15T21:00:00Z', then filter receipts/shifts to exact 10:00Z-20:00Z.
+Accuracy Check: After pull, sum sales/expenses/items and log "Matches report? Yes/No + diff" (manual verify v1, AI compare v2).
+Scalable: DB cache with shift_id to avoid re-pulls, but always refresh on request.
+
+Implementation Steps (One-Go, Replit Native):
+
+Env: LOYVERSE_TOKEN (Bearer auth).
+Direct axios for API (rate limit backoff).
+Drizzle for storage/comparisons (new tables: loyverse_shifts, loyverse_receipts jsonb).
+Integrate into /api/operations/stats for discrepancies vs forms.
+Email: Add Loyverse snapshot + anomalies at 8am BKK (setInterval with date check).
+
+Updated Replit Agent Instructions (Paste This Exactly to Agent)
+Fort Knox Lockdown: Implement Refined Loyverse API Plan
+Execute ONLY these updates—no new files/deps (use axios/native Date). Update existing (routes.ts, utils/email.ts). Data accuracy: Live pulls, buffer/filter for full shift coverage, compare vs forms (flag >1% diff). If token missing, STOP/log. Test with sample shift_date '2025-09-15'.
+
+Add utils/loyverse.ts (create if missing—only this):
+
+typescriptimport axios from 'axios';
+
+const LOYVERSE_BASE = 'https://api.loyverse.com/v1.0';
+const token = process.env.LOYVERSE_TOKEN;
+
+export async function loyverseGet(endpoint, params = {}) {
+  try {
+    const res = await axios.get(`${LOYVERSE_BASE}/${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { ...params, limit: 250 }
+    });
+    return res.data;
+  } catch (e) {
+    if (e.response?.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return loyverseGet(endpoint, params);
+    }
+    throw new Error(`Loyverse error: ${e.message}`);
+  }
+}
+
+export function getShiftUtcRange(shiftDate) {
+  const startBkk = new Date(`${shiftDate}T17:00:00+07:00`);
+  const endBkk = new Date(startBkk.getTime() + 10 * 60 * 60 * 1000); // 10h later
+  const buffer = 60 * 60 * 1000; // 1h buffer each side
+  const minUtc = new Date(startBkk.toUTCString()).getTime() - buffer;
+  const maxUtc = new Date(endBkk.toUTCString()).getTime() + buffer;
+  return {
+    min: new Date(minUtc).toISOString(),
+    max: new Date(maxUtc).toISOString(),
+    exactStart: new Date(startBkk.toUTCString()).toISOString(),
+    exactEnd: new Date(endBkk.toUTCString()).toISOString()
+  };
+}
+
+export function filterByExactShift(data, exactStart, exactEnd, dateKey = 'created_at') {
+  const startMs = new Date(exactStart).getTime();
+  const endMs = new Date(exactEnd).getTime();
+  return data.filter(item => {
+    const itemMs = new Date(item[dateKey]).getTime();
+    return itemMs >= startMs && itemMs < endMs;
+  });
+}
+
+Update routes.ts: Add Loyverse handlers:
+
+typescriptimport { loyverseGet, getShiftUtcRange, filterByExactShift } from '../utils/loyverse';
+import { db } from '../db';
+import { loyverse_shifts, loyverse_receipts } from '../../shared/schema'; // Add tables: id, shiftDate, data jsonb
+
+export const getLoyverseShifts = async (req, res) => {
+  if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
+  const shiftDate = req.query.shiftDate || new Date().toISOString().split('T')[0];
+  const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+  let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
+  shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+  await db.insert(loyverse_shifts).values({ shiftDate, data: shiftsData }).onConflictDoUpdate({ target: shiftDate, set: { data: shiftsData } });
+  // Compare vs form
+  const form = await db.select().from(daily_sales_v2).where(eq(shiftDate, shiftDate)).limit(1)[0];
+  const anomalies = [];
+  if (form && Math.abs(shiftsData.shifts[0]?.net_sales - form.totalSales) > form.totalSales * 0.01) {
+    anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form.totalSales}`);
+  }
+  res.json({ shifts: shiftsData, anomalies });
+};
+
+export const getLoyverseReceipts = async (req, res) => {
+  if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
+  const shiftDate = req.query.shiftDate || new Date().toISOString().split('T')[0];
+  const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+  let receipts = []; let cursor = null;
+  do {
+    const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
+    receipts = [...receipts, ...page.receipts];
+    cursor = page.cursor;
+  } while (cursor);
+  receipts = filterByExactShift(receipts, exactStart, exactEnd);
+  const itemsSold = receipts.reduce((acc, r) => {
+    r.line_items.forEach(li => {
+      acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;
+      li.modifiers.forEach(m => acc[`Modifier: ${m.name}`] = (acc[`Modifier: ${m.name}`] || 0) + 1);
+    });
+    return acc;
+  }, {});
+  await db.insert(loyverse_receipts).values({ shiftDate, data: { receipts, itemsSold } }).onConflictDoUpdate({ target: shiftDate, set: { data: { receipts, itemsSold } } });
+  // Variance: Calc usage vs staff requisition (e.g., modifiers * portion est. THB vs lodgment)
+  const variances = []; // Add comparisons here (e.g., itemsSold['Burger'] * 95g beef vs meat lodgment)
+  res.json({ receipts, itemsSold, variances });
+};
+
+Update utils/email.ts: Add Loyverse data/anomalies:
+
+typescript// In sendDailyEmail:
+const shifts = await getLoyverseShifts({ query: { shiftDate: latestSales.shiftDate } });
+const receipts = await getLoyverseReceipts({ query: { shiftDate: latestSales.shiftDate } });
+content += `
+Loyverse Shift Report: Sales Gross ${shifts.shifts[0]?.gross_sales}, Net ${shifts.shifts[0]?.net_sales}, Expenses ${shifts.shifts[0]?.expenses}
+Items Sold: ${Object.entries(receipts.itemsSold).map(([item, qty]) => `${item}: ${qty}`).join('\n')}
+Anomalies: ${shifts.anomalies.join('\n')}
+`;
+
+Add schema.ts tables:
+
+typescriptexport const loyverse_shifts = pgTable('loyverse_shifts', { shiftDate: date('shift_date').primaryKey(), data: jsonb('data') });
+export const loyverse_receipts = pgTable('loyverse_receipts', { shiftDate: date('shift_date').primaryKey(), data: jsonb('data') });
+
+Update testApp.ts: Add Loyverse tests (mock token if missing, use sample date).
+
+typescript// Append:
+try {
+  const shifts = await axios.get('/api/loyverse/shifts?shiftDate=2025-09-15');
+  console.log('Shifts count: ' + shifts.data.shifts.length);
+} catch (e) { console.log('Shifts error: ' + e.message); }
+try {
+  const receipts = await axios.get('/api/loyverse/receipts?shiftDate=2025-09-15');
+  console.log('Receipts count: ' + receipts.data.receipts.length);
+} catch (e) { console.log('Receipts error: ' + e.message); }
+
+Re-Run Full Test Prompt [Paste previous full test prompt here, updated to include Loyverse endpoints verification].
+
+Log "Implementation complete" with full results/anomalies example.Expert

@@ -1317,6 +1317,17 @@ export const partnerStatements = pgTable("partner_statements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Loyverse API Integration Tables
+export const loyverse_shifts = pgTable('loyverse_shifts', {
+  shiftDate: date('shift_date').primaryKey(),
+  data: jsonb('data')
+});
+
+export const loyverse_receipts = pgTable('loyverse_receipts', {
+  shiftDate: date('shift_date').primaryKey(),
+  data: jsonb('data')
+});
+
 // Manager Checklist Insert Schemas
 export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
 export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
