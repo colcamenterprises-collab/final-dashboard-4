@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 
 type DashboardDTO = {
   snapshot: {
@@ -63,6 +65,18 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  // Fort Knox balance data with 30-day range for home viewing
+  const { data: balances } = useQuery({
+    queryKey: ['loyverseBalances'], 
+    queryFn: () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const startDate = thirtyDaysAgo.toISOString().slice(0,10);
+      const endDate = new Date().toISOString().slice(0,10);
+      return axios.get(`/api/loyverse/shifts?startDate=${startDate}&endDate=${endDate}`).then(res => res.data.balances || []);
+    }
+  });
 
   useEffect(() => {
     (async () => {
@@ -240,6 +254,50 @@ export default function Dashboard() {
           </div>
         </Card>
       ) : null}
+
+      {/* Fort Knox Balance Visualization */}
+      {balances && balances.length > 0 && (
+        <Card title="Daily Register Balance">
+          {/* Simple Bar Chart */}
+          <div className="mb-4 space-y-2">
+            {balances.slice(-10).map((b: any) => (
+              <div key={b.date} className="flex items-center gap-2">
+                <div className="w-20 text-xs text-gray-600">{b.date.slice(-5)}</div>
+                <div className="flex-1 bg-gray-100 h-4 rounded relative overflow-hidden">
+                  <div 
+                    className={`h-full ${Math.abs(b.balance) <= 50 ? 'bg-green-500' : 'bg-red-500'}`} 
+                    style={{ 
+                      width: `${Math.min(Math.abs(b.balance) / 200 * 100, 100)}%`,
+                      marginLeft: b.balance < 0 ? 'auto' : '0'
+                    }}
+                  />
+                </div>
+                <div className="w-16 text-xs text-right">{b.balance.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Balance Table */}
+          <div className="space-y-1">
+            {balances.slice(-5).map((b: any) => (
+              <div key={b.date} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
+                <div className="text-sm">{b.date}</div>
+                <div className="flex items-center gap-2">
+                  <span 
+                    className={`${Math.abs(b.balance) <= 50 ? 'bg-green-500' : 'bg-red-500'} text-white px-2 py-1 rounded text-xs font-medium`}
+                  >
+                    {b.balance.toFixed(2)} THB
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <p className="text-sm mt-4 text-gray-500">
+            Note: Green boxes indicate register difference within ±50 THB (acceptable range). Red boxes indicate difference exceeding ±50 THB (requires attention).
+          </p>
+        </Card>
+      )}
 
       {/* Restaurant Hub Logo and Copyright */}
       <div className="flex flex-col items-end mt-8 mb-4">
