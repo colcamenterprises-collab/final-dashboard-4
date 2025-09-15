@@ -1,0 +1,218 @@
+Golden Patch — Expenses Import & Approval System
+
+🔑 Golden Rules
+
+1. Do NOT create a new expenses table
+
+The canonical expenses table already exists and remains the single source of truth.
+
+All approved expenses must flow into this table.
+
+
+
+2. Use staging tables only:
+
+imported_expenses (for bank CSV uploads).
+
+partner_statements (for delivery partner CSV uploads).
+
+
+
+3. Approval Required
+
+Uploaded rows = PENDING.
+
+Manager must Approve → copy into expenses with correct source.
+
+Reject → stays in staging, excluded from ledger.
+
+
+
+
+
+---
+
+🏗 Database Schema (additions only)
+
+// imported_expenses
+id             TEXT PRIMARY KEY DEFAULT gen_random_uuid()
+restaurantId   TEXT NOT NULL
+importBatchId  TEXT NOT NULL
+date           DATE
+description    TEXT
+amountCents    INTEGER
+rawData        JSONB
+status         TEXT CHECK (status IN ('PENDING','APPROVED','REJECTED')) DEFAULT 'PENDING'
+approvedBy     TEXT
+approvedAt     TIMESTAMP
+createdAt      TIMESTAMP DEFAULT NOW()
+
+// partner_statements
+id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()
+restaurantId    TEXT NOT NULL
+partner         TEXT
+importBatchId   TEXT NOT NULL
+statementDate   DATE
+grossSalesCents INTEGER
+commissionCents INTEGER
+netPayoutCents  INTEGER
+rawData         JSONB
+status          TEXT CHECK (status IN ('PENDING','APPROVED','REJECTED')) DEFAULT 'PENDING'
+approvedBy      TEXT
+approvedAt      TIMESTAMP
+createdAt       TIMESTAMP DEFAULT NOW()
+
+
+---
+
+🔄 Data Flow
+
+1. Upload
+
+Bank CSV → imported_expenses (rawData column keeps original row).
+
+Partner CSV → partner_statements (rawData column keeps original row).
+
+
+
+2. Review & Approval
+
+Frontend displays staging rows.
+
+Manager edits category/supplier if needed.
+
+Approve → insert into expenses with correct source.
+
+Reject → stays in staging.
+
+
+
+3. Ledger
+
+Finance dashboard & jobs always query from expenses.
+
+Staging = audit history, never deleted.
+
+
+
+
+
+---
+
+🗂 CSV Column Mapping Standard
+
+Bank Statement CSV (Thailand Standard: SCB/KBank format)
+
+Date → date (parse dd/mm/yyyy).
+
+Description → description.
+
+Withdrawal/Deposit → convert to signed amountCents (positive = income, negative = expense).
+
+Balance → stored only in rawData, not ledger.
+
+
+Partner Statement CSV (Grabfood/Foodpanda format)
+
+Statement Date → statementDate.
+
+Gross Sales → grossSalesCents.
+
+Commission Fee → commissionCents.
+
+Net Payout → netPayoutCents.
+
+Order ID / Details → stored in rawData.
+
+
+✅ Both mappers must:
+
+Validate required columns.
+
+Fail gracefully with clear error if columns missing.
+
+Store the original row in rawData for audit.
+
+
+
+---
+
+🎨 Frontend Requirements
+
+Upload Modal
+
+Drag & drop CSV.
+
+Preview parsed rows with edit option.
+
+Show PENDING badge.
+
+
+Review Table
+
+Manager sees: Date | Description | Amount | Category | Supplier | Status.
+
+Approve → moves to expenses.
+
+Reject → stays in staging (highlight red).
+
+
+Partner Analytics
+
+Upload → preview statement rows.
+
+Show totals: Gross, Commission, Net.
+
+Compare Partner Net vs POS Sales to validate.
+
+
+
+---
+
+🚨 Compliance Notes
+
+NEVER auto-insert uploads directly into expenses.
+
+ALL approved rows must include source:
+
+SHIFT_FORM = daily shift form expenses.
+
+DIRECT = manual lodged expenses.
+
+STOCK_LODGMENT = rolls purchases.
+
+BANK_IMPORT = bank CSV imports.
+
+PARTNER_STATEMENT = delivery partner fees/commissions.
+
+
+
+
+---
+
+✅ Deliverables
+
+[ ] Schema updated with staging tables.
+
+[ ] Backend routes:
+
+/api/imported-expenses/upload
+
+/api/imported-expenses/review
+
+/api/imported-expenses/approve
+
+/api/partner-statements/upload
+
+/api/partner-statements/approve
+
+
+[ ] CSV parsers for both bank + partner statements.
+
+[ ] Frontend Upload + Review UI (styled per Style Guide).
+
+[ ] Manager Approval workflow working end-to-end.
+
+[ ] Testing evidence: CSV uploaded → staging → approved → ledger.
+
+

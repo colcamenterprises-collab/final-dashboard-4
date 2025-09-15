@@ -11,9 +11,8 @@ export const salesFormStatusEnum = pgEnum('sales_form_status', ['DRAFT', 'SUBMIT
 export const bankImportStatusEnum = pgEnum('bank_import_status', ['pending', 'partially_approved', 'approved']);
 export const bankTxnStatusEnum = pgEnum('bank_txn_status', ['pending', 'approved', 'rejected', 'deleted']);
 
-// Enums for Expenses Import & Approval System
+// Enums for Expenses Import & Approval System - Golden Patch
 export const importedExpenseStatusEnum = pgEnum('imported_expense_status', ['PENDING', 'APPROVED', 'REJECTED']);
-export const importedExpenseSourceEnum = pgEnum('imported_expense_source', ['BANK', 'PARTNER']);
 
 // Users table
 export const users = pgTable("users", {
@@ -1280,29 +1279,35 @@ export const checklistAssignments = pgTable("checklist_assignments", {
   expiresAt: timestamp("expires_at").notNull(), // Assignments expire after a reasonable time
 });
 
-// Imported Expenses table - Golden Patch Expenses Import & Approval
+// Imported Expenses table - Golden Patch Expenses Import & Approval (staging only)
 export const importedExpenses = pgTable("imported_expenses", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
-  date: date("date").notNull(),
-  description: text("description").notNull(),
-  amountCents: integer("amount_cents").notNull(),
-  source: importedExpenseSourceEnum("source").notNull(),
+  restaurantId: text("restaurant_id").notNull(),
+  importBatchId: text("import_batch_id").notNull(),
+  date: date("date"),
+  description: text("description"),
+  amountCents: integer("amount_cents"),
+  rawData: jsonb("raw_data"),
   status: importedExpenseStatusEnum("status").notNull().default('PENDING'),
-  category: text("category"),
-  metadata: jsonb("metadata"),
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Partner Statements table - Golden Patch Partner Analytics
+// Partner Statements table - Golden Patch Partner Analytics (staging only)
 export const partnerStatements = pgTable("partner_statements", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
-  partnerName: text("partner_name").notNull(),
-  periodStart: date("period_start").notNull(),
-  periodEnd: date("period_end").notNull(),
-  totalSalesCents: integer("total_sales_cents").notNull(),
-  commissionCents: integer("commission_cents").notNull(),
-  payoutCents: integer("payout_cents").notNull(),
-  feesBreakdown: jsonb("fees_breakdown").notNull(),
+  restaurantId: text("restaurant_id").notNull(),
+  partner: text("partner"),
+  importBatchId: text("import_batch_id").notNull(),
+  statementDate: date("statement_date"),
+  grossSalesCents: integer("gross_sales_cents"),
+  commissionCents: integer("commission_cents"),
+  netPayoutCents: integer("net_payout_cents"),
+  rawData: jsonb("raw_data"),
+  status: importedExpenseStatusEnum("status").notNull().default('PENDING'),
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
