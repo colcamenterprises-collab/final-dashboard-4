@@ -377,9 +377,9 @@ export function registerRoutes(app: express.Application): Server {
         });
 
         // Balance vs form with ±50 THB tolerance
-        const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, dateStr)).limit(1);
-        if (form[0] && shiftsData.shifts[0]) {
-          const diff = Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales);
+        const [form] = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(dateStr))).limit(1);
+        if (form && shiftsData.shifts[0]) {
+          const diff = Number(shiftsData.shifts[0]?.net_sales) - Number(form.totalSales);
           const isBalanced = Math.abs(diff) <= 50;
           aggregates.balances.push({ 
             date: dateStr, 
