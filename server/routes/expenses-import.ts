@@ -66,7 +66,31 @@ const partnerRowSchema = z.object({
 });
 
 // Utility functions
-function parseThaiDate(dateStr: string): string {
+function parseThaiDate(dateStr: string): string | null {
+  // Early return for known non-date summary rows
+  const summaryPatterns = [
+    'TOTAL AMOUNTS',
+    'TOTAL ITEMS', 
+    'BALANCE BROUGHT FORWARD',
+    'ยอดเงินคงเหลือยกมา',
+    'รวมทั้งหมด',
+    'ยอดยกมา',
+    'ยอดคงเหลือ',
+    /^TOTAL\s/i,
+    /^รวม/
+  ];
+  
+  const trimmedDate = dateStr.trim();
+  for (const pattern of summaryPatterns) {
+    if (pattern instanceof RegExp) {
+      if (pattern.test(trimmedDate)) {
+        return null;
+      }
+    } else if (trimmedDate.includes(pattern)) {
+      return null;
+    }
+  }
+
   // Thai month names mapping to numbers
   const thaiMonths: { [key: string]: string } = {
     'มกราคม': '01', 'ม.ค.': '01',
@@ -104,68 +128,91 @@ function parseThaiDate(dateStr: string): string {
     return year;
   }
 
-  // Clean and convert Thai numerals
-  const cleanDateStr = convertThaiNumerals(dateStr.trim());
+  try {
+    // Clean and convert Thai numerals
+    const cleanDateStr = convertThaiNumerals(trimmedDate);
 
-  // Handle dd/mm/yyyy or dd/mm/yy format (most common in Thai bank statements)
-  const slashParts = cleanDateStr.split('/');
-  if (slashParts.length === 3) {
-    const [day, month, yearStr] = slashParts;
-    let year = parseInt(yearStr, 10);
-    
-    // Handle 2-digit years: convert yy to yyyy
-    if (yearStr.length === 2) {
-      const twoDigitYear = parseInt(yearStr, 10);
-      // Assume years 00-50 are 2000-2050, 51-99 are 1951-1999
-      year = twoDigitYear <= 50 ? 2000 + twoDigitYear : 1900 + twoDigitYear;
+    // Handle dd/mm/yyyy or dd/mm/yy format (most common in Thai bank statements)
+    const slashParts = cleanDateStr.split('/');
+    if (slashParts.length === 3) {
+      const [day, month, yearStr] = slashParts;
+      const dayNum = parseInt(day, 10);
+      const monthNum = parseInt(month, 10);
+      let year = parseInt(yearStr, 10);
+      
+      // Validate day and month ranges
+      if (isNaN(dayNum) || isNaN(monthNum) || isNaN(year) || 
+          dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+        return null;
+      }
+      
+      // Handle 2-digit years: convert yy to yyyy
+      if (yearStr.length === 2) {
+        const twoDigitYear = parseInt(yearStr, 10);
+        // Assume years 00-50 are 2000-2050, 51-99 are 1951-1999
+        year = twoDigitYear <= 50 ? 2000 + twoDigitYear : 1900 + twoDigitYear;
+      }
+      
+      // Convert Buddhist Era to Gregorian if needed
+      year = convertBuddhistYear(year);
+      
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
-    
-    // Convert Buddhist Era to Gregorian if needed
-    year = convertBuddhistYear(year);
-    
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
 
-  // Handle Thai date format like "1 มกราคม 2567" or "1 ม.ค. 67"
-  for (const [thaiMonth, monthNum] of Object.entries(thaiMonths)) {
-    if (cleanDateStr.includes(thaiMonth)) {
-      const regex = new RegExp(`(\\d+)\\s*${thaiMonth}\\s*(\\d+)`);
-      const match = cleanDateStr.match(regex);
-      if (match) {
-        const day = parseInt(match[1], 10);
-        let year = parseInt(match[2], 10);
-        
-        // Handle 2-digit years
-        if (year < 100) {
-          year = year <= 50 ? 2000 + year : 1900 + year;
+    // Handle Thai date format like "1 มกราคม 2567" or "1 ม.ค. 67"
+    for (const [thaiMonth, monthNum] of Object.entries(thaiMonths)) {
+      if (cleanDateStr.includes(thaiMonth)) {
+        const regex = new RegExp(`(\\d+)\\s*${thaiMonth}\\s*(\\d+)`);
+        const match = cleanDateStr.match(regex);
+        if (match) {
+          const day = parseInt(match[1], 10);
+          let year = parseInt(match[2], 10);
+          
+          // Validate ranges
+          if (isNaN(day) || isNaN(year) || day < 1 || day > 31) {
+            return null;
+          }
+          
+          // Handle 2-digit years
+          if (year < 100) {
+            year = year <= 50 ? 2000 + year : 1900 + year;
+          }
+          
+          // Convert Buddhist Era to Gregorian
+          year = convertBuddhistYear(year);
+          
+          return `${year}-${monthNum}-${day.toString().padStart(2, '0')}`;
         }
-        
-        // Convert Buddhist Era to Gregorian
-        year = convertBuddhistYear(year);
-        
-        return `${year}-${monthNum}-${day.toString().padStart(2, '0')}`;
       }
     }
-  }
 
-  // Handle dd-mm-yyyy format
-  const dashParts = cleanDateStr.split('-');
-  if (dashParts.length === 3) {
-    const [day, month, yearStr] = dashParts;
-    let year = parseInt(yearStr, 10);
-    year = convertBuddhistYear(year);
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
+    // Handle dd-mm-yyyy format
+    const dashParts = cleanDateStr.split('-');
+    if (dashParts.length === 3) {
+      const [day, month, yearStr] = dashParts;
+      const dayNum = parseInt(day, 10);
+      const monthNum = parseInt(month, 10);
+      let year = parseInt(yearStr, 10);
+      
+      // Validate ranges
+      if (isNaN(dayNum) || isNaN(monthNum) || isNaN(year) || 
+          dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+        return null;
+      }
+      
+      year = convertBuddhistYear(year);
+      return `${year}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
+    }
 
-  // Fallback for other formats
-  try {
+    // Fallback for other formats
     const date = new Date(cleanDateStr);
     if (isNaN(date.getTime())) {
-      throw new Error(`Invalid date: ${dateStr}`);
+      return null;
     }
     return date.toISOString().split('T')[0];
   } catch (error) {
-    throw new Error(`Unable to parse Thai date: ${dateStr}`);
+    // Return null instead of throwing error
+    return null;
   }
 }
 
@@ -201,6 +248,13 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
         const validatedRow = bankRowSchema.parse(record);
         
         const date = parseThaiDate(validatedRow['Date\nวันที่']);
+        
+        // Skip rows with invalid dates (summary rows, etc.)
+        if (!date) {
+          console.log('Skipping non-date row:', validatedRow['Date\nวันที่']);
+          continue;
+        }
+        
         // Handle single Debit/Credit column - positive values are credits (income), negative are debits (expenses)
         const debitCreditAmount = parseAmount(validatedRow['Debit/Credit\nลูกหนี้/เจ้าหนี้']);
         
@@ -270,6 +324,13 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
         const validatedRow = partnerRowSchema.parse(record);
         
         const statementDate = parseThaiDate(validatedRow['Statement Date']);
+        
+        // Skip rows with invalid dates (summary rows, etc.)
+        if (!statementDate) {
+          console.log('Skipping non-date partner row:', validatedRow['Statement Date']);
+          continue;
+        }
+        
         const grossSalesCents = parseAmount(validatedRow['Gross Sales']);
         const commissionCents = parseAmount(validatedRow['Commission Fee']);
         const netPayoutCents = parseAmount(validatedRow['Net Payout']);

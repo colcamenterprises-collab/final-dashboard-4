@@ -511,15 +511,17 @@ export default function ExpensesImport() {
               {approvalAction === 'approve' ? 'Approve Expense' : 'Reject Expense'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedExpense && (
-                <div className="space-y-2">
-                  <div><strong>Description:</strong> {selectedExpense.description}</div>
-                  <div><strong>Amount:</strong> {formatCurrency(selectedExpense.amountTHB)}</div>
-                  <div><strong>Date:</strong> {formatDate(selectedExpense.date)}</div>
-                </div>
-              )}
+              Please review the expense details below and confirm your action.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {selectedExpense && (
+            <div className="space-y-2 p-4 bg-gray-50 rounded-md">
+              <div><strong>Description:</strong> {selectedExpense.description}</div>
+              <div><strong>Amount:</strong> {formatCurrency(selectedExpense.amountTHB)}</div>
+              <div><strong>Date:</strong> {formatDate(selectedExpense.date)}</div>
+            </div>
+          )}
           
           {approvalAction === 'approve' && (
             <div className="space-y-4">
