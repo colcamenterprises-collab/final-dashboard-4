@@ -1,0 +1,116 @@
+🔒 Golden Patch – Expenses Import & Approval
+1. Database (Locked)
+imported_expenses
+id UUID PK
+date DATE
+description TEXT
+amountCents INT
+source TEXT CHECK ('BANK' OR 'PARTNER')
+status TEXT CHECK ('PENDING' OR 'APPROVED' OR 'REJECTED')
+category TEXT NULL
+metadata JSONB NULL
+createdAt TIMESTAMP DEFAULT now()
+
+
+Holds raw CSV rows.
+
+Only APPROVED rows get moved to the ledger.
+
+expenses (already exists)
+
+Approved entries land here with source='BANK_UPLOAD'.
+
+partner_statements
+id UUID PK
+partnerName TEXT
+periodStart DATE
+periodEnd DATE
+totalSalesCents INT
+commissionCents INT
+payoutCents INT
+feesBreakdown JSONB
+createdAt TIMESTAMP DEFAULT now()
+
+2. Backend API
+Upload
+
+POST /api/expenses/upload-bank
+
+Accepts CSV → parse → insert rows into imported_expenses with status='PENDING'.
+
+POST /api/expenses/upload-partner
+
+Accepts CSV → parse → insert into partner_statements.
+
+Review
+
+GET /api/expenses/pending
+
+Returns all imported_expenses where status='PENDING'.
+
+PATCH /api/expenses/:id/approve
+
+Moves row into expenses, updates status='APPROVED'.
+
+PATCH /api/expenses/:id/reject
+
+Marks row as status='REJECTED'.
+
+Analytics
+
+GET /api/partners/summary
+
+Returns commission % = (commissionCents ÷ totalSalesCents).
+
+3. Frontend (React/Tailwind)
+Upload Section
+
+Two buttons: “Upload Bank Statement” + “Upload Partner Statement”.
+
+Drag & drop zone.
+
+Pending Review Table
+
+Columns: Date | Description | Amount | Source | Category | Actions.
+
+Actions: ✏️ Edit → inline edit | ✅ Approve → ledger | ❌ Reject.
+
+Ledger Table
+
+Mirrors approved entries from expenses.
+
+Partner Analytics
+
+Card grid:
+
+Total Sales
+
+Commission (THB + %)
+
+Payouts
+
+Fees Breakdown
+
+Bar chart: Sales vs Fees.
+
+4. UX / Style (per style guide)
+
+H1 (Extra Bold 32px desktop / 24px mobile).
+
+Cards: 16px rounded, shadow-sm.
+
+Buttons: Rounded 12px, consistent padding, orange primary (#FF6B00).
+
+Mobile: Full-width buttons, stacked tables.
+
+5. Testing Checklist
+
+Upload sample bank CSV → rows show in Pending.
+
+Approve one row → check expenses table updated.
+
+Reject one row → stays in imported_expenses with status='REJECTED'.
+
+Upload partner CSV → analytics show commission %.
+
+Verify Finance dashboard pulls in approved totals only.
