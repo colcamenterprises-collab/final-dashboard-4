@@ -1,4 +1,8 @@
 import nodemailer from "nodemailer";
+import { loyverseGet, getShiftUtcRange, filterByExactShift } from '../utils/loyverse';
+import { db } from '../db';
+import { loyverse_shifts, loyverse_receipts, dailySalesV2 } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 
 // Helper function to get variances
 async function getVariance(shiftDate: string) {
@@ -9,8 +13,65 @@ async function getVariance(shiftDate: string) {
   ];
 }
 
+// Helper function to get Loyverse shifts data
+async function getLoyverseShifts(shiftDate: string) {
+  if (!process.env.LOYVERSE_TOKEN) return { shifts: [], anomalies: ['Token missing'] };
+  
+  try {
+    const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+    let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
+    shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+    
+    // Compare vs form
+    const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(shiftDate))).limit(1);
+    const anomalies = [];
+    if (form[0] && shiftsData.shifts[0] && Math.abs(Number(shiftsData.shifts[0]?.net_sales) - Number(form[0].totalSales)) > Number(form[0].totalSales) * 0.01) {
+      anomalies.push(`Sales discrepancy: Loyverse ${shiftsData.shifts[0]?.net_sales} vs Form ${form[0].totalSales}`);
+    }
+    return { shifts: shiftsData.shifts, anomalies };
+  } catch (error: any) {
+    console.error('Loyverse shifts error:', error);
+    return { shifts: [], anomalies: [error.message] };
+  }
+}
+
+// Helper function to get Loyverse receipts data
+async function getLoyverseReceipts(shiftDate: string) {
+  if (!process.env.LOYVERSE_TOKEN) return { receipts: [], itemsSold: {} };
+  
+  try {
+    const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
+    let receipts: any[] = [];
+    let cursor = null;
+    
+    do {
+      const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
+      receipts = [...receipts, ...page.receipts];
+      cursor = page.cursor;
+    } while (cursor);
+    
+    receipts = filterByExactShift(receipts, exactStart, exactEnd);
+    const itemsSold = receipts.reduce((acc, r) => {
+      r.line_items?.forEach((li: any) => {
+        acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;
+        li.modifiers?.forEach((m: any) => acc[`Modifier: ${m.name}`] = (acc[`Modifier: ${m.name}`] || 0) + 1);
+      });
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return { receipts, itemsSold };
+  } catch (error: any) {
+    console.error('Loyverse receipts error:', error);
+    return { receipts: [], itemsSold: {} };
+  }
+}
+
 export async function sendDailyEmail(latestSales: any) {
   const variances = await getVariance(latestSales.shiftDate);
+  
+  // Get Loyverse data for email
+  const shifts = await getLoyverseShifts(latestSales.shiftDate);
+  const receipts = await getLoyverseReceipts(latestSales.shiftDate);
   
   // Get shopping list data for email
   let shoppingListSection = '';
@@ -36,11 +97,21 @@ Shopping List Summary:
     `\nVariance Analysis:\n${variances.map(v => `${v.item}: Expected ${v.expected.toFixed(1)} vs Actual ${v.actual} (Variance ${v.variance.toFixed(1)})`).join('\n')}` :
     '\nNo significant variances detected.';
   
+  // Loyverse section
+  const loyverseSection = `
+Loyverse Shift Report: Sales Gross ${shifts.shifts[0]?.gross_sales || 'N/A'}, Net ${shifts.shifts[0]?.net_sales || 'N/A'}, Expenses ${shifts.shifts[0]?.expenses || 'N/A'}
+Items Sold: ${Object.entries(receipts.itemsSold).map(([item, qty]) => `${item}: ${qty}`).join('\n')}
+Anomalies: ${shifts.anomalies.join('\n')}
+`;
+  
   const content = `
 <h2>Daily Sales Report for ${latestSales.shiftDate}</h2>
 
 <h3>Sales Performance</h3>
 <p>Total Sales: <strong>฿${latestSales.totalSales}</strong></p>
+
+<h3>Loyverse POS Data</h3>
+<pre>${loyverseSection}</pre>
 
 <h3>Stock Variance</h3>
 <pre>${varianceSection}</pre>
