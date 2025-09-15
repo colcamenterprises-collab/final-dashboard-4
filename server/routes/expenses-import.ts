@@ -67,31 +67,105 @@ const partnerRowSchema = z.object({
 
 // Utility functions
 function parseThaiDate(dateStr: string): string {
-  // Handle dd/mm/yy and dd/mm/yyyy format common in Thailand
-  const parts = dateStr.split('/');
-  if (parts.length === 3) {
-    const [day, month, yearStr] = parts;
-    let year = yearStr;
+  // Thai month names mapping to numbers
+  const thaiMonths: { [key: string]: string } = {
+    'มกราคม': '01', 'ม.ค.': '01',
+    'กุมภาพันธ์': '02', 'ก.พ.': '02', 
+    'มีนาคม': '03', 'มี.ค.': '03',
+    'เมษายน': '04', 'เม.ย.': '04',
+    'พฤษภาคม': '05', 'พ.ค.': '05', 
+    'มิถุนายน': '06', 'มิ.ย.': '06',
+    'กรกฎาคม': '07', 'ก.ค.': '07',
+    'สิงหาคม': '08', 'ส.ค.': '08',
+    'กันยายน': '09', 'ก.ย.': '09',
+    'ตุลาคม': '10', 'ต.ค.': '10',
+    'พฤศจิกายน': '11', 'พ.ย.': '11',
+    'ธันวาคม': '12', 'ธ.ค.': '12'
+  };
+
+  // Convert Thai numerals to Arabic numerals
+  function convertThaiNumerals(str: string): string {
+    const thaiNumerals = ['๐', '๑', '๒', '๓', '๔', '๕', '๖', '๗', '๘', '๙'];
+    const arabicNumerals = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    
+    let result = str;
+    for (let i = 0; i < thaiNumerals.length; i++) {
+      result = result.replace(new RegExp(thaiNumerals[i], 'g'), arabicNumerals[i]);
+    }
+    return result;
+  }
+
+  // Convert Buddhist Era to Gregorian calendar
+  function convertBuddhistYear(year: number): number {
+    // Buddhist Era is 543 years ahead of Gregorian calendar
+    if (year > 2300) { // Likely Buddhist Era
+      return year - 543;
+    }
+    return year;
+  }
+
+  // Clean and convert Thai numerals
+  const cleanDateStr = convertThaiNumerals(dateStr.trim());
+
+  // Handle dd/mm/yyyy or dd/mm/yy format (most common in Thai bank statements)
+  const slashParts = cleanDateStr.split('/');
+  if (slashParts.length === 3) {
+    const [day, month, yearStr] = slashParts;
+    let year = parseInt(yearStr, 10);
     
     // Handle 2-digit years: convert yy to yyyy
     if (yearStr.length === 2) {
       const twoDigitYear = parseInt(yearStr, 10);
       // Assume years 00-50 are 2000-2050, 51-99 are 1951-1999
-      year = twoDigitYear <= 50 ? `20${yearStr}` : `19${yearStr}`;
+      year = twoDigitYear <= 50 ? 2000 + twoDigitYear : 1900 + twoDigitYear;
     }
+    
+    // Convert Buddhist Era to Gregorian if needed
+    year = convertBuddhistYear(year);
     
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
-  
+
+  // Handle Thai date format like "1 มกราคม 2567" or "1 ม.ค. 67"
+  for (const [thaiMonth, monthNum] of Object.entries(thaiMonths)) {
+    if (cleanDateStr.includes(thaiMonth)) {
+      const regex = new RegExp(`(\\d+)\\s*${thaiMonth}\\s*(\\d+)`);
+      const match = cleanDateStr.match(regex);
+      if (match) {
+        const day = parseInt(match[1], 10);
+        let year = parseInt(match[2], 10);
+        
+        // Handle 2-digit years
+        if (year < 100) {
+          year = year <= 50 ? 2000 + year : 1900 + year;
+        }
+        
+        // Convert Buddhist Era to Gregorian
+        year = convertBuddhistYear(year);
+        
+        return `${year}-${monthNum}-${day.toString().padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // Handle dd-mm-yyyy format
+  const dashParts = cleanDateStr.split('-');
+  if (dashParts.length === 3) {
+    const [day, month, yearStr] = dashParts;
+    let year = parseInt(yearStr, 10);
+    year = convertBuddhistYear(year);
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
   // Fallback for other formats
   try {
-    const date = new Date(dateStr);
+    const date = new Date(cleanDateStr);
     if (isNaN(date.getTime())) {
       throw new Error(`Invalid date: ${dateStr}`);
     }
     return date.toISOString().split('T')[0];
   } catch (error) {
-    throw new Error(`Unable to parse date: ${dateStr}`);
+    throw new Error(`Unable to parse Thai date: ${dateStr}`);
   }
 }
 
