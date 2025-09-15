@@ -455,7 +455,8 @@ export function registerRoutes(app: express.Application): Server {
       
       // Purge old: delete receipts older than first of current month
       const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
-      await db.delete(loyverse_receipts).where(lt(loyverse_receipts.shiftDate, firstOfMonth));
+      const purgeResult = await db.delete(loyverse_receipts).where(lt(loyverse_receipts.shiftDate, firstOfMonth));
+      console.log(`Purged ${purgeResult.rowCount || 0} old receipt records`);
       
       res.json(aggregates);
     } catch (error: any) {
