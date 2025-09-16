@@ -117,7 +117,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
       if (!approvalCategory || !approvalSupplier) {
         toast({
           title: '❌ Missing Information',
-          description: 'Please select category and enter supplier',
+          description: 'Please select category and supplier',
           variant: 'destructive',
         });
         return;
@@ -245,22 +245,57 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Food & Ingredients">Food & Ingredients</SelectItem>
-                    <SelectItem value="Utilities">Utilities</SelectItem>
-                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Food & Beverage">Food & Beverage</SelectItem>
+                    <SelectItem value="Staff Expenses (from Account)">Staff Expenses (from Account)</SelectItem>
+                    <SelectItem value="Rent">Rent</SelectItem>
+                    <SelectItem value="Administration">Administration</SelectItem>
+                    <SelectItem value="Advertising - Grab">Advertising - Grab</SelectItem>
+                    <SelectItem value="Advertising - Other">Advertising - Other</SelectItem>
+                    <SelectItem value="Director Payment">Director Payment</SelectItem>
+                    <SelectItem value="Fixtures & Fittings">Fixtures & Fittings</SelectItem>
+                    <SelectItem value="Kitchen Supplies or Packaging">Kitchen Supplies or Packaging</SelectItem>
                     <SelectItem value="Marketing">Marketing</SelectItem>
-                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="Printers">Printers</SelectItem>
+                    <SelectItem value="Subscriptions">Subscriptions</SelectItem>
+                    <SelectItem value="Stationary">Stationary</SelectItem>
+                    <SelectItem value="Travel">Travel</SelectItem>
+                    <SelectItem value="Utilities">Utilities</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="supplier">Supplier</Label>
-                <Input
-                  value={approvalSupplier}
-                  onChange={(e) => setApprovalSupplier(e.target.value)}
-                  placeholder="Enter supplier name"
-                  data-testid="input-supplier"
-                />
+                <Select value={approvalSupplier} onValueChange={setApprovalSupplier}>
+                  <SelectTrigger data-testid="select-supplier">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Makro">Makro</SelectItem>
+                    <SelectItem value="Mr DIY">Mr DIY</SelectItem>
+                    <SelectItem value="Bakery">Bakery</SelectItem>
+                    <SelectItem value="Big C">Big C</SelectItem>
+                    <SelectItem value="Printers">Printers</SelectItem>
+                    <SelectItem value="Supercheap">Supercheap</SelectItem>
+                    <SelectItem value="Burger Boxes">Burger Boxes</SelectItem>
+                    <SelectItem value="Cameron">Cameron</SelectItem>
+                    <SelectItem value="Colin">Colin</SelectItem>
+                    <SelectItem value="DTAC">DTAC</SelectItem>
+                    <SelectItem value="Company Expense">Company Expense</SelectItem>
+                    <SelectItem value="Gas">Gas</SelectItem>
+                    <SelectItem value="GO Wholesale">GO Wholesale</SelectItem>
+                    <SelectItem value="Grab Merchant">Grab Merchant</SelectItem>
+                    <SelectItem value="HomePro">HomePro</SelectItem>
+                    <SelectItem value="Landlord">Landlord</SelectItem>
+                    <SelectItem value="Lawyer">Lawyer</SelectItem>
+                    <SelectItem value="Lazada">Lazada</SelectItem>
+                    <SelectItem value="Lotus">Lotus</SelectItem>
+                    <SelectItem value="Loyverse">Loyverse</SelectItem>
+                    <SelectItem value="MEA">MEA</SelectItem>
+                    <SelectItem value="AIS">AIS</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
