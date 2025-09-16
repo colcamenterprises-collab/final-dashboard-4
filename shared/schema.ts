@@ -1293,6 +1293,8 @@ export const importedExpenses = pgTable("imported_expenses", {
   amountCents: integer("amount_cents").notNull(), // always stored in cents
   rawData: jsonb("raw_data"), // original CSV row for debugging
   status: text("status").default("pending"), // pending | approved | rejected
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

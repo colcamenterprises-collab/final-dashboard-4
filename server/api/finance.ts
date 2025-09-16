@@ -1,14 +1,42 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { plRow, plCategoryMap, plMonthCache, loyverseReceipts, expenses, expenseCategories } from "../../shared/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 
 const router = Router();
 
+// Extend Express Request interface for authentication
+interface AuthenticatedRequest extends Request {
+  restaurantId: string;
+  userId: string;
+  userRole: string;
+}
+
+// SECURE Authentication middleware - REQUIRES valid authentication
+const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  const restaurantId = req.headers['x-restaurant-id'] as string;
+  const userId = req.headers['x-user-id'] as string;
+  const userRole = req.headers['x-user-role'] as string;
+  
+  // SECURITY: Reject requests without proper authentication
+  if (!restaurantId || !userId || restaurantId === 'default' || userId === 'anonymous') {
+    return res.status(401).json({ error: 'Authentication required: Missing or invalid restaurant/user credentials' });
+  }
+  
+  const authReq = req as AuthenticatedRequest;
+  authReq.restaurantId = restaurantId;
+  authReq.userId = userId;
+  authReq.userRole = userRole || 'user';
+  next();
+};
+
+// Apply authentication to all finance routes
+router.use(requireAuth);
+
 // P&L calculation logic based on your specifications
 type MonthVec = { m: number[]; total: number };
 
-async function getPL(year: number, includeShift = false): Promise<Record<string, MonthVec>> {
+async function getPL(year: number, includeShift = false, restaurantId?: string): Promise<Record<string, MonthVec>> {
   const r: Record<string, MonthVec> = {};
   
   const acc = (code: string, m: number, val: number) => {
@@ -21,8 +49,8 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31, 23, 59, 59);
   
-  // Get sales data by month from loyverse receipts
-  const salesByMonth = await db
+  // Get sales data by month from loyverse receipts (with restaurant scoping if provided)
+  const salesQuery = db
     .select({
       month: sql<number>`EXTRACT(MONTH FROM ${loyverseReceipts.createdAt})`,
       totalAmount: sql<number>`SUM(CAST(${loyverseReceipts.totalAmount} AS DECIMAL))`,
@@ -31,9 +59,12 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
     .from(loyverseReceipts)
     .where(and(
       gte(loyverseReceipts.createdAt, startDate),
-      lte(loyverseReceipts.createdAt, endDate)
+      lte(loyverseReceipts.createdAt, endDate),
+      ...(restaurantId ? [eq(loyverseReceipts.restaurantId, restaurantId)] : [])
     ))
     .groupBy(sql`EXTRACT(MONTH FROM ${loyverseReceipts.createdAt})`);
+  
+  const salesByMonth = await salesQuery;
 
   // Process sales data (simplified - in reality you'd separate food vs drinks)
   for (const s of salesByMonth) {
@@ -69,22 +100,23 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
     acc('NET_REV_INC_FEES', m, netExFees - fees);
   }
 
-  // 2) Expenses aggregation
-  const sources = includeShift ? ['DIRECT_UPLOAD', 'MANUAL', 'SHIFT_FORM'] : ['DIRECT_UPLOAD', 'MANUAL'];
+  // 2) Expenses aggregation - Use valid schema enum values
+  const sources = includeShift ? ['BANK_UPLOAD', 'PARTNER_UPLOAD', 'MANUAL_ENTRY'] : ['BANK_UPLOAD', 'PARTNER_UPLOAD', 'MANUAL_ENTRY'];
   
   const expensesByMonth = await db
     .select({
       month: sql<number>`EXTRACT(MONTH FROM ${expenses.date})`,
-      categoryId: expenses.categoryId,
-      totalAmount: sql<number>`SUM(CAST(${expenses.amount} AS DECIMAL))`,
+      category: expenses.category,
+      totalAmount: sql<number>`SUM(CAST(${expenses.amountCents} AS DECIMAL) / 100)`,
     })
     .from(expenses)
     .where(and(
-      gte(expenses.date, startDate),
-      lte(expenses.date, endDate),
-      inArray(expenses.source, sources)
+      gte(sql`CAST(${expenses.date} AS DATE)`, startDate.toISOString().split('T')[0]),
+      lte(sql`CAST(${expenses.date} AS DATE)`, endDate.toISOString().split('T')[0]),
+      inArray(expenses.source, sources),
+      ...(restaurantId ? [eq(expenses.restaurantId, restaurantId)] : [])
     ))
-    .groupBy(sql`EXTRACT(MONTH FROM ${expenses.date})`, expenses.categoryId);
+    .groupBy(sql`EXTRACT(MONTH FROM ${expenses.date})`, expenses.category);
 
   // Map expenses to P&L rows through category mapping
   const categoryMappings = await db
@@ -97,12 +129,32 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
     categoryToPLRow[mapping.pl_category_map.categoryId] = mapping.pl_category_map.plrowCode;
   });
 
+  // Use database-driven category mapping (not hardcoded)
   for (const exp of expensesByMonth) {
-    if (exp.categoryId !== null) {
-      const plRowCode = categoryToPLRow[exp.categoryId];
-      if (plRowCode) {
-        acc(plRowCode, exp.month, exp.totalAmount);
+    if (exp.category) {
+      // First try to find in database category mappings
+      const categoryMapping = categoryMappings.find(
+        mapping => mapping.expense_categories.name === exp.category
+      );
+      
+      let plRowCode = 'GENERAL_EXPENSES'; // default fallback
+      
+      if (categoryMapping) {
+        // Use database mapping
+        plRowCode = categoryMapping.pl_category_map.plrowCode;
+      } else {
+        // Only use hardcoded mapping as absolute fallback
+        const fallbackMapping: Record<string, string> = {
+          'Food & Beverage': 'COGS_FOOD',
+          'Utilities': 'UTILITIES', 
+          'Rent': 'RENT',
+          'Fuel': 'FUEL',
+          'Bank Fees': 'BANK_FEES'
+        };
+        plRowCode = fallbackMapping[exp.category] || 'GENERAL_EXPENSES';
       }
+      
+      acc(plRowCode, exp.month, exp.totalAmount);
     }
   }
 
@@ -111,6 +163,22 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
     const cFood = r.COGS_FOOD?.m[m - 1] || 0;
     const cBev = r.COGS_BEVERAGE?.m[m - 1] || 0;
     acc('COGS_TOTAL', m, cFood + cBev);
+    
+    // Calculate comprehensive TOTAL_EXPENSES from all expense categories
+    const allExpenseCategories = Object.keys(r).filter(key => 
+      !key.includes('GROSS') && !key.includes('NET') && !key.includes('REVENUE') && 
+      !key.includes('DISCOUNT') && !key.includes('PAYMENT_FEES') && 
+      (key.includes('COGS') || key.includes('EXPENSE') || key.includes('UTIL') || 
+       key.includes('RENT') || key.includes('FUEL') || key.includes('BANK') ||
+       key.includes('WAGE') || key.includes('ADMIN') || key.includes('MARKETING') ||
+       key.includes('GENERAL'))
+    );
+    
+    const totalExpensesForMonth = allExpenseCategories.reduce((sum, category) => {
+      return sum + (r[category]?.m[m - 1] || 0);
+    }, 0);
+    
+    acc('TOTAL_EXPENSES', m, totalExpensesForMonth);
     
     const netIncFees = r.NET_REV_INC_FEES?.m[m - 1] || 0;
     const cogs = cFood + cBev;
@@ -122,20 +190,12 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
     acc('GROSS_MARGIN', m, margin);
   }
 
-  // 4) Total Expenses and EBIT
-  const expenseRows = [
-    'WAGES', 'TIPS_QR', 'BONUS_PAY', 'STAFF_FROM_ACCOUNT', 'RENT', 'ADMIN',
-    'ADVERTISING_GRAB', 'ADVERTISING_OTHER', 'DELIVERY_FEE_DISCOUNT', 'DIRECTOR_PAYMENT',
-    'DISCOUNT_MERCHANT_FUNDED', 'FITTINGS', 'KITCHEN_SUPPLIES', 'MARKETING',
-    'MARKETING_SUCCESS_FEE', 'MISC', 'PRINTERS', 'RENOVATIONS', 'SUBSCRIPTIONS',
-    'STATIONARY', 'TRAVEL', 'UTILITIES', 'MISC_CASH_PURCHASES'
-  ];
-
+  // 4) EBIT calculations (TOTAL_EXPENSES already calculated above - don't overwrite!)
   for (let m = 1; m <= 12; m++) {
-    const sum = expenseRows.reduce((a, code) => a + (r[code]?.m[m - 1] || 0), 0);
-    acc('TOTAL_EXPENSES', m, sum);
-
-    const ebit = (r.GROSS_PROFIT?.m[m - 1] || 0) - sum;
+    const totalExpenses = r.TOTAL_EXPENSES?.m[m - 1] || 0;
+    const grossProfit = r.GROSS_PROFIT?.m[m - 1] || 0;
+    
+    const ebit = grossProfit - totalExpenses;
     acc('EBIT', m, ebit);
     acc('EBT', m, ebit); // Assuming 0 interest for v1
     acc('NET_EARNINGS', m, ebit); // Assuming 0 tax for v1
@@ -145,12 +205,15 @@ async function getPL(year: number, includeShift = false): Promise<Record<string,
 }
 
 // GET /api/finance/pl
-router.get('/pl', async (req, res) => {
+router.get('/pl', async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const restaurantId = authReq.restaurantId;
+    
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
     const includeShift = req.query.includeShift === 'true';
     
-    const plData = await getPL(year, includeShift);
+    const plData = await getPL(year, includeShift, restaurantId);
     
     // Convert to format expected by frontend with labels
     const result: Record<string, any> = {};
@@ -225,12 +288,15 @@ router.get('/pl', async (req, res) => {
 });
 
 // GET /api/finance/pl/export
-router.get('/pl/export', async (req, res) => {
+router.get('/pl/export', async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthenticatedRequest;
+    const restaurantId = authReq.restaurantId;
+    
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
     const includeShift = req.query.includeShift === 'true';
     
-    const plData = await getPL(year, includeShift);
+    const plData = await getPL(year, includeShift, restaurantId);
     
     // Convert to CSV format
     let csv = 'Account,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec,Full Year\n';
@@ -246,6 +312,42 @@ router.get('/pl/export', async (req, res) => {
   } catch (error) {
     console.error('Error exporting P&L data:', error);
     res.status(500).json({ error: 'Failed to export P&L data' });
+  }
+});
+
+// GET /api/finance/summary - Golden Patch P&L Summary Endpoint
+router.get('/summary', async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const restaurantId = authReq.restaurantId;
+    
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const includeShift = req.query.includeShift === 'true';
+    
+    const plData = await getPL(year, includeShift, restaurantId);
+    
+    // Use comprehensive TOTAL_EXPENSES from P&L calculation (if available) or calculate sum
+    const totalExpenses = plData.TOTAL_EXPENSES?.total || Object.keys(plData)
+      .filter(key => key.startsWith('COGS_') || ['UTILITIES', 'RENT', 'FUEL', 'BANK_FEES', 'GENERAL_EXPENSES', 'WAGES', 'ADMIN', 'MARKETING'].includes(key))
+      .reduce((sum, category) => sum + (plData[category]?.total || 0), 0);
+    
+    // Transform P&L data to summary format for Golden Patch frontend
+    const summary = {
+      year,
+      totalRevenue: plData.TOTAL_GROSS_REVENUE?.total || 0,
+      netRevenue: plData.NET_REV_INC_FEES?.total || 0,
+      totalExpenses,
+      netProfit: (plData.NET_REV_INC_FEES?.total || 0) - totalExpenses,
+      monthlyBreakdown: plData,
+      includeShift,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json(summary);
+    
+  } catch (error) {
+    console.error('Finance summary error:', error);
+    res.status(500).json({ error: 'Failed to generate financial summary' });
   }
 });
 

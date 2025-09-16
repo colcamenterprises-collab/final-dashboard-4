@@ -427,19 +427,15 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       });
     }
 
-    // Insert into canonical expenses table with BANK_IMPORT source
+    // Insert into canonical expenses table with correct enum value
     await db.insert(expenses).values({
       restaurantId: pendingExpense.restaurantId || '', // Add null safety
-      shiftDate: pendingExpense.date ? new Date(pendingExpense.date) : new Date(),
-      item: pendingExpense.description || 'Bank Import',
-      costCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
+      date: pendingExpense.date || new Date().toISOString().split('T')[0],
+      description: pendingExpense.description || 'Bank Import',
+      amountCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
       supplier: supplier || 'Bank Import',
-      expenseType: category || 'General',
-      source: 'BANK_IMPORT',
-      meta: {
-        importedExpenseId: pendingExpense.id,
-        rawData: pendingExpense.rawData
-      }
+      category: category || 'General',
+      source: 'BANK_UPLOAD' // Golden Patch: Use valid schema enum value
     });
 
     // Mark as approved
