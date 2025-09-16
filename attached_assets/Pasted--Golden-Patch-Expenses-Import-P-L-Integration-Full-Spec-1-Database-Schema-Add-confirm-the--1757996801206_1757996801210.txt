@@ -1,0 +1,183 @@
+🔒 Golden Patch – Expenses Import & P&L Integration (Full Spec)
+1. Database Schema
+
+Add/confirm the following tables (do not delete existing data):
+
+// shared/schema.ts
+
+// Imported (unapproved) expenses
+export const imported_expenses = pgTable("imported_expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  date: date("date").notNull(),
+  supplier: text("supplier").default("Unknown"),
+  category: text("category").default("General"),
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull(), // always stored in cents
+  rawData: jsonb("raw_data"), // original CSV row for debugging
+  status: text("status").default("pending"), // pending | approved | rejected
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Approved ledger
+export const expenses = pgTable("expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  date: date("date").notNull(),
+  supplier: text("supplier").notNull(),
+  category: text("category").notNull(),
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull(),
+  source: text("source").default("UPLOAD"), // UPLOAD | SHIFT_FORM | STOCK_LODGMENT
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+2. Backend Endpoints
+Upload Bank CSV
+POST /api/expenses/upload-bank
+Body: multipart/form-data (file)
+
+
+Parse CSV using Papaparse / csv-parse.
+
+Column mapping (fixed):
+
+CSV Column	Map To
+วันที่ (Date)	date
+รายการ (Txn name)	supplier+description
+ถอน (Withdrawal)	amountCents (THB * 100)
+ฝาก (Deposit)	ignore (not an expense)
+คงเหลือ (Balance)	ignore
+
+For each row with a withdrawal:
+
+Insert into imported_expenses with status = "pending".
+
+Attach original row to rawData.
+
+Return: { imported: n, skipped: m }
+
+Review Imported
+GET /api/expenses/pending
+
+
+Return all pending rows for current restaurant.
+
+Approve / Reject
+PATCH /api/expenses/:id/approve
+
+
+Move row from imported_expenses → expenses
+
+Set category/supplier/description from UI edits
+
+Delete row from imported_expenses
+
+PATCH /api/expenses/:id/reject
+
+
+Set status = "rejected" (keep raw for audit)
+
+3. Frontend Components
+ExpensesImport.tsx
+
+Upload CSV → preview mapped rows.
+
+Table with Date | Supplier | Category | Description | Amount | Action
+
+Inline editable fields (Supplier, Category, Description).
+
+Buttons:
+
+✅ Approve → PATCH approve endpoint
+
+❌ Delete → PATCH reject endpoint
+
+Expenses Page
+
+Add new section "Review Uploaded Transactions" (like in your screenshot).
+
+Only show pending rows until approved.
+
+4. Profit & Loss Integration
+Aggregation Rules:
+
+Sales = SUM(totalSales) from daily_sales_v2
+
+COGS = SUM(meat + rolls + drinks purchases) from daily_stock
+
+Expenses = SUM(amountCents) from expenses
+
+Gross Profit = Sales – COGS
+
+Net Profit = Gross Profit – Expenses
+
+Endpoint
+GET /api/finance/summary
+
+
+Return P&L by month, YTD totals.
+
+Ensure restaurantId filter on all queries.
+
+5. Security
+
+All expense endpoints must use requireAuth.
+
+Scope every query by restaurantId.
+
+Only manager role can approve/reject expenses.
+
+Prevent negative/zero deposits from being logged as expenses.
+
+6. Testing Checklist
+
+The agent must run these tests and paste evidence:
+
+Upload a real bank CSV (July 1 → Sept 13).
+
+✅ Rows with Withdrawals appear in imported_expenses.
+
+❌ Deposits ignored.
+
+❌ Balance ignored.
+
+Approve a row.
+
+✅ Moves into expenses.
+
+✅ Disappears from pending list.
+
+✅ Amount stored in cents, correct THB conversion.
+
+Reject a row.
+
+✅ Status changes to rejected.
+
+✅ Row not in ledger.
+
+P&L refresh.
+
+✅ Approved expenses show under Expenses.
+
+✅ Daily sales show under Sales.
+
+✅ Net Profit reflects correctly.
+
+Security check.
+
+❌ Unauthenticated requests blocked.
+
+❌ Unauthorized role cannot approve.
+
+🚀 Instruction for Agent
+
+Implement the Golden Patch – Expenses Import & P&L Integration exactly as written.
+
+No freestyling.
+
+No schema deletions.
+
+All column mappings, endpoint names, and P&L rules are mandatory.
+
+After implementation, complete the full testing checklist with screenshots & evidence.

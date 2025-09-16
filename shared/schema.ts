@@ -182,8 +182,8 @@ export const stockEntries = pgTable("stock_entries", {
 
 
 
-// Enhanced Expenses table matching actual database structure
-export const expenses = pgTable("expenses", {
+// Legacy expenses table (renamed to preserve existing data)
+export const expensesLegacy = pgTable("expenses_legacy", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: text("restaurantId"),
   shiftDate: timestamp("shiftDate").notNull(),
@@ -224,7 +224,7 @@ export const expenseImportLine = pgTable("expense_import_line", {
   vendorGuess: text("vendor_guess"),
   categoryGuessId: integer("category_guess_id").references(() => categories.id),
   confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.0 to 1.0
-  duplicateOfExpenseId: integer("duplicate_of_expense_id").references(() => expenses.id),
+  duplicateOfExpenseId: text("duplicate_of_expense_id").references(() => expenses.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -563,7 +563,7 @@ export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true });
 export const insertShoppingListSchema = createInsertSchema(shoppingList).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true }).extend({
+export const insertExpenseLegacySchema = createInsertSchema(expensesLegacy).omit({ id: true, createdAt: true }).extend({
   supplier: z.string().nullable().optional(),
   items: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -613,8 +613,8 @@ export type Inventory = typeof inventory.$inferSelect;
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
 export type ShoppingList = typeof shoppingList.$inferSelect;
 export type InsertShoppingList = z.infer<typeof insertShoppingListSchema>;
-export type Expense = typeof expenses.$inferSelect;
-export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type ExpenseLegacy = typeof expensesLegacy.$inferSelect;
+export type InsertExpenseLegacy = z.infer<typeof insertExpenseLegacySchema>;
 export type ExpenseSupplier = typeof expenseSuppliers.$inferSelect;
 export type InsertExpenseSupplier = z.infer<typeof insertExpenseSupplierSchema>;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
@@ -1282,21 +1282,30 @@ export const checklistAssignments = pgTable("checklist_assignments", {
   expiresAt: timestamp("expires_at").notNull(), // Assignments expire after a reasonable time
 });
 
-// Imported Expenses table - Golden Patch Expenses Import & Approval (staging only)
+// Imported (unapproved) expenses - Golden Patch specification
 export const importedExpenses = pgTable("imported_expenses", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: text("restaurant_id").notNull(),
-  importBatchId: text("import_batch_id").notNull(),
-  date: date("date"),
+  date: date("date").notNull(),
+  supplier: text("supplier").default("Unknown"),
+  category: text("category").default("General"),
   description: text("description"),
-  amountCents: integer("amount_cents"),
-  supplier: text("supplier"),
-  category: text("category"),
-  source: expenseSourceEnum("source").notNull().default('MANUAL_ENTRY'),
-  rawData: jsonb("raw_data"),
-  status: importedExpenseStatusEnum("status").notNull().default('PENDING'),
-  approvedBy: text("approved_by"),
-  approvedAt: timestamp("approved_at"),
+  amountCents: integer("amount_cents").notNull(), // always stored in cents
+  rawData: jsonb("raw_data"), // original CSV row for debugging
+  status: text("status").default("pending"), // pending | approved | rejected
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Approved ledger - Golden Patch specification (EXACT table name as required)
+export const expenses = pgTable("expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  date: date("date").notNull(),
+  supplier: text("supplier").notNull(),
+  category: text("category").notNull(),
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull(),
+  source: text("source").default("UPLOAD"), // UPLOAD | SHIFT_FORM | STOCK_LODGMENT
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1333,8 +1342,9 @@ export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
 export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
 export const insertChecklistAssignmentsSchema = createInsertSchema(checklistAssignments);
 
-// Expenses Import & Approval Insert Schemas
-export const insertImportedExpenseSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true, approvedAt: true });
+// Golden Patch Insert Schemas
+export const insertImportedExpenseSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export const insertPartnerStatementsSchema = createInsertSchema(partnerStatements).omit({ id: true, createdAt: true });
 
 // Manager Checklist Types
@@ -1343,9 +1353,11 @@ export type SelectCleaningTask = typeof cleaningTasks.$inferSelect;
 export type InsertManagerChecklist = typeof managerChecklists.$inferInsert;
 export type SelectManagerChecklist = typeof managerChecklists.$inferSelect;
 
-// Expenses Import & Approval Types
+// Golden Patch Types
 export type ImportedExpense = typeof importedExpenses.$inferSelect;
 export type InsertImportedExpense = z.infer<typeof insertImportedExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type PartnerStatement = typeof partnerStatements.$inferSelect;
 export type InsertPartnerStatement = z.infer<typeof insertPartnerStatementsSchema>;
 
