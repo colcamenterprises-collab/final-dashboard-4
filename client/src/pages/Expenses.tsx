@@ -5,9 +5,281 @@ import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentMod
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Minus, Edit, Trash2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, FileText } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+// Golden Patch - Pending Transactions Review Component  
+function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [approvalCategory, setApprovalCategory] = useState('');
+  const [approvalSupplier, setApprovalSupplier] = useState('');
+
+  // Authentication headers for Golden Patch
+  const getAuthHeaders = () => ({
+    'x-restaurant-id': 'smash-brothers-burgers',
+    'x-user-id': 'dev-manager',
+    'x-user-role': 'manager',
+  });
+
+  // Query pending Golden Patch expenses
+  const { data: pendingExpenses = [], isLoading } = useQuery({
+    queryKey: ['/api/expenses/pending'],
+    queryFn: async () => {
+      return apiRequest('/api/expenses/pending', {
+        headers: getAuthHeaders(),
+      });
+    },
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
+  // Approve expense mutation
+  const approveExpenseMutation = useMutation({
+    mutationFn: async ({ id, category, supplier }: { id: string; category: string; supplier: string }) => {
+      return apiRequest(`/api/expenses/${id}/approve`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ category, supplier }),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: '✅ Expense Approved',
+        description: 'Expense has been added to the ledger',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+      queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+      // Call the callback to refresh main expenses list
+      if (onExpenseApproved) onExpenseApproved();
+      setShowApprovalDialog(false);
+      setSelectedExpense(null);
+    },
+    onError: () => {
+      toast({
+        title: '❌ Approval Failed',
+        description: 'Failed to approve expense',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reject expense mutation
+  const rejectExpenseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/expenses/${id}/reject`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: '✅ Expense Rejected',
+        description: 'Expense has been marked as rejected',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/pending'] });
+      setShowApprovalDialog(false);
+      setSelectedExpense(null);
+    },
+    onError: () => {
+      toast({
+        title: '❌ Rejection Failed',
+        description: 'Failed to reject expense',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const openApprovalDialog = (expense: any, action: 'approve' | 'reject') => {
+    setSelectedExpense(expense);
+    setApprovalAction(action);
+    setApprovalCategory('');
+    setApprovalSupplier('');
+    setShowApprovalDialog(true);
+  };
+
+  const handleApprovalSubmit = () => {
+    if (!selectedExpense) return;
+    
+    if (approvalAction === 'approve') {
+      if (!approvalCategory || !approvalSupplier) {
+        toast({
+          title: '❌ Missing Information',
+          description: 'Please select category and enter supplier',
+          variant: 'destructive',
+        });
+        return;
+      }
+      approveExpenseMutation.mutate({
+        id: selectedExpense.id,
+        category: approvalCategory,
+        supplier: approvalSupplier,
+      });
+    } else {
+      rejectExpenseMutation.mutate(selectedExpense.id);
+    }
+  };
+
+  const formatCurrency = (amountCents: number) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+    }).format(amountCents / 100);
+  };
+
+  if (pendingExpenses.length === 0) {
+    return null; // Don't show section if no pending expenses
+  }
+
+  return (
+    <>
+      {/* Golden Patch - Review Uploaded Transactions */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="h-5 w-5 text-emerald-600" />
+          <h3 className="font-semibold text-lg">Review Uploaded Transactions ({pendingExpenses.length})</h3>
+          <Badge variant="outline" className="text-amber-600 border-amber-600">
+            Golden Patch
+          </Badge>
+        </div>
+        
+        {isLoading ? (
+          <div className="text-center py-4">Loading pending transactions...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 border text-left">Date</th>
+                  <th className="p-2 border text-left">Description</th>
+                  <th className="p-2 border text-right">Amount</th>
+                  <th className="p-2 border text-center">Status</th>
+                  <th className="p-2 border text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingExpenses.map((expense: any) => (
+                  <tr key={expense.id} className="hover:bg-gray-50">
+                    <td className="border p-2">
+                      {new Date(expense.date).toLocaleDateString('th-TH')}
+                    </td>
+                    <td className="border p-2">{expense.description}</td>
+                    <td className="border p-2 text-right">
+                      <span className="text-red-600">
+                        {formatCurrency(expense.amountCents)}
+                      </span>
+                    </td>
+                    <td className="border p-2 text-center">
+                      <Badge variant="outline" className="text-amber-600 border-amber-600">
+                        {expense.status}
+                      </Badge>
+                    </td>
+                    <td className="border p-2 text-center">
+                      <div className="flex justify-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openApprovalDialog(expense, 'approve')}
+                          className="h-8 w-8 p-0"
+                          data-testid={`button-approve-${expense.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openApprovalDialog(expense, 'reject')}
+                          className="h-8 w-8 p-0"
+                          data-testid={`button-reject-${expense.id}`}
+                        >
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Approval Dialog */}
+      <AlertDialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <AlertDialogContent data-testid="dialog-approval">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {approvalAction === 'approve' ? 'Approve Uploaded Transaction' : 'Reject Uploaded Transaction'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Please review the transaction details and confirm your action.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {selectedExpense && (
+            <div className="space-y-2 p-4 bg-gray-50 rounded-md">
+              <div><strong>Description:</strong> {selectedExpense.description}</div>
+              <div><strong>Amount:</strong> {formatCurrency(selectedExpense.amountCents)}</div>
+              <div><strong>Date:</strong> {new Date(selectedExpense.date).toLocaleDateString('th-TH')}</div>
+            </div>
+          )}
+          
+          {approvalAction === 'approve' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="category">Expense Category</Label>
+                <Select value={approvalCategory} onValueChange={setApprovalCategory}>
+                  <SelectTrigger data-testid="select-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Food & Ingredients">Food & Ingredients</SelectItem>
+                    <SelectItem value="Utilities">Utilities</SelectItem>
+                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="General">General</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="supplier">Supplier</Label>
+                <Input
+                  value={approvalSupplier}
+                  onChange={(e) => setApprovalSupplier(e.target.value)}
+                  placeholder="Enter supplier name"
+                  data-testid="input-supplier"
+                />
+              </div>
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleApprovalSubmit}
+              disabled={approveExpenseMutation.isPending || rejectExpenseMutation.isPending}
+              data-testid="button-confirm"
+            >
+              {approvalAction === 'approve' ? 'Approve' : 'Reject'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -329,6 +601,9 @@ export default function Expenses() {
           </div>
         </div>
       )}
+
+      {/* Golden Patch - Review Uploaded Transactions */}
+      <GoldenPatchReviewSection onExpenseApproved={fetchExpenses} />
 
       {/* Main Expense Table/Cards - Mobile Responsive */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
