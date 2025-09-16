@@ -1,0 +1,164 @@
+Golden Patch Bank Upload System — Full Specification
+1. Database Schema (shared/schema.ts)
+// Golden Patch Expenses Table
+export const expenses = pgTable("expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  date: date("date").notNull(),               // ✅ Date only (no time)
+  supplier: text("supplier"),
+  category: text("category"),
+  description: text("description"),
+  amountCents: integer("amount_cents").notNull(),
+  source: text("source", { enum: ["BANK_UPLOAD", "PARTNER_UPLOAD", "MANUAL_ENTRY"] }).notNull(),
+  approved: boolean("approved").default(false),
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Imported Raw Transactions (staging table)
+export const importedExpenses = pgTable("imported_expenses", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  date: date("date").notNull(),
+  description: text("description"),
+  debit: integer("debit").default(0),
+  credit: integer("credit").default(0),
+  amountCents: integer("amount_cents").notNull(),
+  supplier: text("supplier"),
+  category: text("category"),
+  status: text("status", { enum: ["PENDING", "APPROVED", "REJECTED"] }).default("PENDING"),
+  duplicateOfExpenseId: text("duplicate_of_expense_id"), // FK link if duplicate
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+2. Backend Parser & Endpoints (server/routes/expenses-import.ts)
+import express from "express";
+import multer from "multer";
+import csvParser from "csv-parser";
+import { db } from "../db";
+import { importedExpenses } from "../../shared/schema";
+import { parseISO, format } from "date-fns";
+
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+// 🔧 Normalize date → always YYYY-MM-DD
+function normalizeDate(raw: string): string {
+  // handles both ISO "2024-01-15" and Thai formats
+  const parsed = parseISO(raw.trim());
+  return format(parsed, "yyyy-MM-dd");
+}
+
+// 🔧 Convert row to internal format
+function mapRow(row: any, restaurantId: string) {
+  const description = row["Description"]?.trim() || "";
+  const amount = parseFloat(row["Amount"] || row["Debit/Credit"]) || 0;
+
+  return {
+    restaurantId,
+    date: normalizeDate(row["Date"]),
+    description,
+    amountCents: Math.round(amount * 100),
+    supplier: description.split(" ")[0], // crude extraction
+    category: null,
+    status: "PENDING",
+  };
+}
+
+// POST /api/expenses/upload-bank
+router.post("/upload-bank", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const rows: any[] = [];
+  const restaurantId = req.headers["x-restaurant-id"] as string;
+
+  const fileContent = req.file.buffer.toString("utf-8");
+  fileContent
+    .split("\n")
+    .slice(1) // skip header
+    .forEach((line) => {
+      const [date, description, amount] = line.split(",");
+      if (date && description && amount) {
+        rows.push(mapRow({ Date: date, Description: description, Amount: amount }, restaurantId));
+      }
+    });
+
+  await db.insert(importedExpenses).values(rows);
+  res.json({ ok: true, imported: rows.length });
+});
+
+// GET /api/expenses/pending
+router.get("/pending", async (req, res) => {
+  const restaurantId = req.headers["x-restaurant-id"] as string;
+  const result = await db.select().from(importedExpenses).where(eq(importedExpenses.restaurantId, restaurantId));
+  res.json(result);
+});
+
+// PATCH /api/expenses/:id/approve
+router.patch("/:id/approve", async (req, res) => {
+  const { id } = req.params;
+  const { category, supplier, managerName } = req.body;
+
+  const record = await db.query.importedExpenses.findFirst({ where: eq(importedExpenses.id, id) });
+  if (!record) return res.status(404).json({ error: "Expense not found" });
+
+  // Move to main ledger
+  await db.insert(expenses).values({
+    restaurantId: record.restaurantId,
+    date: record.date,
+    description: record.description,
+    supplier: supplier || record.supplier,
+    category,
+    amountCents: record.amountCents,
+    source: "BANK_UPLOAD",
+    approved: true,
+    approvedBy: managerName,
+    approvedAt: new Date(),
+  });
+
+  // Mark imported as approved
+  await db.update(importedExpenses).set({ status: "APPROVED" }).where(eq(importedExpenses.id, id));
+
+  res.json({ ok: true });
+});
+
+export default router;
+
+3. Frontend Integration (client/src/pages/finance/ExpensesImport.tsx)
+
+Upload Tab → file input for .csv or .xlsx → POST /api/expenses/upload-bank
+
+Pending Tab → table with rows from /api/expenses/pending
+
+Manager chooses category + edits supplier
+
+Approve button → PATCH /api/expenses/:id/approve
+
+Ledger Tab → shows all approved expenses
+
+Partner Tab → (Grab, Foodpanda, etc.) similar upload/review flow
+
+4. Testing Checklist
+
+Upload CSV (Bank Statement) → ✅ server accepts + imports into imported_expenses
+
+Pending list → ✅ appears in Expenses page
+
+Approve → ✅ moves to expenses table + removed from pending
+
+P&L /api/finance/summary → ✅ reflects new approved expenses
+
+Partner CSV upload → ✅ same flow as above, source=PARTNER_UPLOAD
+
+🔒 Security & Scoping
+
+All endpoints require:
+
+x-restaurant-id header
+
+x-user-role: manager | admin
+
+No defaults, no spoofable fallbacks
+
+All queries scoped with restaurantId
