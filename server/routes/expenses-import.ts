@@ -132,6 +132,23 @@ function parseThaiDate(dateStr: string): string | null {
     // Clean and convert Thai numerals
     const cleanDateStr = convertThaiNumerals(trimmedDate);
 
+    // Handle ISO date format YYYY-MM-DD (standard format for test data)
+    const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoDatePattern.test(cleanDateStr)) {
+      const [year, month, day] = cleanDateStr.split('-');
+      const yearNum = parseInt(year, 10);
+      const monthNum = parseInt(month, 10);
+      const dayNum = parseInt(day, 10);
+      
+      // Validate ranges
+      if (!isNaN(yearNum) && !isNaN(monthNum) && !isNaN(dayNum) &&
+          yearNum >= 1900 && yearNum <= 2100 &&
+          monthNum >= 1 && monthNum <= 12 &&
+          dayNum >= 1 && dayNum <= 31) {
+        return cleanDateStr; // Already in correct format
+      }
+    }
+
     // Handle dd/mm/yyyy or dd/mm/yy format (most common in Thai bank statements)
     const slashParts = cleanDateStr.split('/');
     if (slashParts.length === 3) {
@@ -223,6 +240,17 @@ function parseAmount(amountStr: string): number {
   return Math.round(amount * 100); // Convert to cents
 }
 
+// Normalize CSV headers by converting escaped newlines to literal newlines
+function normalizeHeaders(record: any): any {
+  const normalized: any = {};
+  for (const [key, value] of Object.entries(record)) {
+    // Convert escaped newlines (\\n) to literal newlines (\n)
+    const normalizedKey = key.replace(/\\n/g, '\n');
+    normalized[normalizedKey] = value;
+  }
+  return normalized;
+}
+
 // POST /api/expenses/upload-bank - REQUIRES MANAGER ROLE
 router.post('/upload-bank', requireManagerRole, upload.single('file'), async (req: Request, res: Response) => {
   try {
@@ -245,7 +273,9 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
     const insertData = [];
     for (const record of records) {
       try {
-        const validatedRow = bankRowSchema.parse(record);
+        // Normalize headers before validation
+        const normalizedRecord = normalizeHeaders(record);
+        const validatedRow = bankRowSchema.parse(normalizedRecord);
         
         const date = parseThaiDate(validatedRow['Date\nวันที่']);
         
@@ -276,7 +306,7 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
           });
         }
       } catch (rowError) {
-        console.warn('Skipping invalid row:', record, rowError);
+        console.warn('Skipping invalid bank row:', record, 'Available headers:', Object.keys(record), 'Error:', rowError);
       }
     }
 
@@ -321,7 +351,9 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
     const insertData = [];
     for (const record of records) {
       try {
-        const validatedRow = partnerRowSchema.parse(record);
+        // Normalize headers before validation (consistent with bank upload)
+        const normalizedRecord = normalizeHeaders(record);
+        const validatedRow = partnerRowSchema.parse(normalizedRecord);
         
         const statementDate = parseThaiDate(validatedRow['Statement Date']);
         
@@ -347,7 +379,7 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
           status: 'PENDING' as const,
         });
       } catch (rowError) {
-        console.warn('Skipping invalid partner row:', record, rowError);
+        console.warn('Skipping invalid partner row:', record, 'Available headers:', Object.keys(record), 'Error:', rowError);
       }
     }
 
