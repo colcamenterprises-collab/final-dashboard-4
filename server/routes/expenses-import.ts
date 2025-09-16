@@ -434,7 +434,7 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
   try {
     const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
-    const { category, supplier } = req.body;
+    const { category, supplier, notes } = req.body;
     const approvedBy = authReq.approvedBy;
 
     // SECURITY: Get pending expense with restaurant scoping
@@ -467,6 +467,7 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       amountCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
       supplier: supplier || 'Bank Import',
       category: category || 'General',
+      notes: notes || null, // Golden Patch: Store optional notes from approval
       source: 'BANK_UPLOAD' // Golden Patch: Use valid schema enum value
     });
 

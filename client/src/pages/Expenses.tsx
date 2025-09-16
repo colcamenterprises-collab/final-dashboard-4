@@ -23,6 +23,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalCategory, setApprovalCategory] = useState('');
   const [approvalSupplier, setApprovalSupplier] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState('');
 
   // Authentication headers for Golden Patch
   const getAuthHeaders = () => ({
@@ -44,14 +45,14 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
 
   // Approve expense mutation
   const approveExpenseMutation = useMutation({
-    mutationFn: async ({ id, category, supplier }: { id: string; category: string; supplier: string }) => {
+    mutationFn: async ({ id, category, supplier, notes }: { id: string; category: string; supplier: string; notes?: string }) => {
       return apiRequest(`/api/expenses/${id}/approve`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ category, supplier }),
+        body: JSON.stringify({ category, supplier, notes }),
       });
     },
     onSuccess: () => {
@@ -107,6 +108,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
     setApprovalAction(action);
     setApprovalCategory('');
     setApprovalSupplier('');
+    setApprovalNotes('');
     setShowApprovalDialog(true);
   };
 
@@ -126,6 +128,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
         id: selectedExpense.id,
         category: approvalCategory,
         supplier: approvalSupplier,
+        notes: approvalNotes,
       });
     } else {
       rejectExpenseMutation.mutate(selectedExpense.id);
@@ -296,6 +299,15 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
                     <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Input
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="Add a note about this expense..."
+                  data-testid="input-notes"
+                />
               </div>
             </div>
           )}
