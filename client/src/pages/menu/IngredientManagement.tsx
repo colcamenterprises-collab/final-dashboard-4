@@ -127,31 +127,44 @@ export default function IngredientManagement() {
     }
   });
 
-  // Reverse sync mutation - sync TO god file
-  const syncToGodFileMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/ingredients/sync-to-god', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ingredients: filteredIngredients })
-      });
-      if (!response.ok) throw new Error('Reverse sync failed');
-      return response.json();
-    },
-    onSuccess: (data) => {
+  // Sync to God File - Frontend as god source
+  const syncToGodFile = async () => {
+    try {
+      // Get current ingredients data (frontend as source of truth)
+      const { data } = { data: ingredients }; // Use current frontend data
+      
+      // Generate CSV in exact format specified
+      const csv = 'Name,Category,Supplier,Brand,SKU,Cost,Packaging,Portion,MinStock,Reviewed,Notes\n' + 
+        data.map(i => `${i.name || ''},${i.category || ''},${i.supplier || ''},${i.brand || ''},${i.id || ''},${i.costDisplay || i.cost || ''},${i.packageSize || ''},${i.portionSize || ''},${i.minStock || ''},${i.lastReview || ''},${i.notes || ''}`).join('\n');
+      
+      console.log('Sync to God File - CSV Content:', csv.slice(0, 200) + '...');
+      
+      // Download CSV file
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'god_ingredients.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      
       toast({ 
         title: "Synced to God File", 
-        description: data.message || "Updated foodCostings.ts with current data" 
+        description: `Exported ${data.length} ingredients to CSV` 
       });
-    },
-    onError: () => {
+      
+      // v2: POST to Google Sheets API if token available
+      // Future enhancement for direct Google Sheets integration
+      
+    } catch (error) {
+      console.error('Sync to God File error:', error);
       toast({ 
-        title: "Sync to God File Failed", 
-        description: "Failed to update god file", 
+        title: "Sync Failed", 
+        description: "Failed to export ingredients", 
         variant: "destructive" 
       });
     }
-  });
+  };
 
   // Filtered data
   const filteredIngredients = useMemo(() => {
@@ -232,12 +245,11 @@ export default function IngredientManagement() {
             {syncMutation.isPending ? "Syncing..." : "Sync from God File"}
           </Button>
           <Button 
-            onClick={() => syncToGodFileMutation.mutate()}
-            disabled={syncToGodFileMutation.isPending}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={syncToGodFile}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white"
           >
             <Upload className="h-4 w-4 mr-2" />
-            {syncToGodFileMutation.isPending ? "Syncing..." : "Sync to God File"}
+            Sync to God File
           </Button>
           <Button onClick={exportCSV} variant="outline">
             <Download className="h-4 w-4 mr-2" />

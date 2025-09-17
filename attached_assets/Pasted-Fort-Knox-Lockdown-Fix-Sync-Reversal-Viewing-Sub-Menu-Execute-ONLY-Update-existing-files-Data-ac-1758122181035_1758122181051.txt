@@ -1,0 +1,37 @@
+Fort Knox Lockdown: Fix Sync Reversal, Viewing/Sub-Menu
+Execute ONLY: Update existing files. Data accuracy: Frontend as god (sync to file, no overwrite), date search aggregates, monthly purge. No new deps.
+
+Update client/src/components/IngredientMgmt.tsx (reverse sync):
+
+tsx// Change button:
+<button onClick={syncToGodFile} className="bg-yellow-500 text-white p-2 rounded">Sync to God File</button>
+// Sync logic: Export CSV from table data (fetch /api/ingredients, generate CSV, download or POST to Google Sheets)
+const syncToGodFile = async () => {
+  const { data } = await axios.get('/api/ingredients');
+  const csv = 'Name,Category,Supplier,Brand,SKU,Cost,Packaging,Portion,MinStock,Reviewed,Notes\n' + data.map(i => `${i.name},${i.category},${i.supplier},${i.brand},${i.sku},${i.cost},${i.packageSize},${i.portionSize},${i.minStock},${i.reviewedDate},${i.notes}`).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'god_ingredients.csv'; a.click();
+  // v2: POST to Google Sheets API if token
+};
+
+Update client/src/pages/operations/Analysis.tsx (add sub-menu, stats/cards):
+
+tsx// Add sub-menu:
+<div className="flex space-x-4 mb-4">
+  <Link to="/analysis" className="text-blue-500">Main Analysis</Link>
+  <Link to="/analysis/loyverse" className="text-blue-500">Loyverse Reports</Link>
+</div>
+// Stats cards as per previous
+// For /analysis/loyverse: Move shifts/receipts tables here
+
+Update server/api/loyverse/shifts.ts (date search, purge):
+
+typescript// As per previous, add purge
+await db.delete(loyverse_receipts).where(lt(shiftDate, firstMonth));
+
+Re-Run Test Prompt [Paste full previous, add: Test sync button (log CSV content), Analysis sub-menu (screenshot), stats cards (mock data)].
+
+Log "Fixed" with screenshots (ingredient sync, Analysis sub-menu).
+This ensures god frontend priority, accurate sync export, viewing in Analysis with sub-menu. Share logs for verification.

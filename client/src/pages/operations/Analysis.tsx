@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +77,12 @@ export const AnalysisPage = () => {
 
   return (
     <div className="p-4 space-y-4" data-testid="analysis-page">
+      {/* Sub-menu navigation as specified in Fort Knox lockdown */}
+      <div className="flex space-x-4 mb-4">
+        <Link to="/analysis" className="text-blue-500 hover:text-blue-700 font-medium">Main Analysis</Link>
+        <Link to="/analysis/loyverse" className="text-blue-500 hover:text-blue-700 font-medium">Loyverse Reports</Link>
+      </div>
+      
       {/* Stats Cards as specified */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <Card>
