@@ -88,6 +88,11 @@ export default function App() {
                       <h2 className="text-xl font-semibold mb-4">Loyverse Reports</h2>
                       {/* Loyverse-specific content will be shown here */}
                     </div>} />
+                    <Route path="stock-review" element={<div className="p-4">
+                      <h2 className="text-xl font-semibold mb-4">Stock Review</h2>
+                      <p className="text-slate-600">Buns, Meat & Drinks Analysis</p>
+                      {/* Stock review content will be shown here */}
+                    </div>} />
                   </Route>
                   
                   {/* Legacy direct routes */}

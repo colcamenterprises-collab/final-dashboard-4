@@ -20,6 +20,7 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   testId: string;
+  subItems?: NavItem[];
 };
 
 type NavGroup = {
@@ -43,7 +44,16 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/daily-sales", label: "Daily Sales & Stock", icon: Receipt, testId: "nav-daily-sales" },
       { to: "/operations/daily-sales-v2/library", label: "Sales Library", icon: BarChart3, testId: "nav-sales-library" },
       { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-      { to: "/operations/analysis", label: "Analysis", icon: BarChart3, testId: "nav-analysis" }
+      { 
+        to: "/operations/analysis", 
+        label: "Analysis", 
+        icon: BarChart3, 
+        testId: "nav-analysis",
+        subItems: [
+          { to: "/operations/analysis/loyverse", label: "Loyverse Reports", icon: BarChart3, testId: "nav-loyverse" },
+          { to: "/operations/analysis/stock-review", label: "Stock Review", icon: BarChart3, testId: "nav-stock-review" }
+        ]
+      }
     ]
   },
   {
@@ -230,24 +240,56 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                       const active = isActive(item.to);
                       
                       return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={onClose}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                            active
-                              ? "bg-emerald-50 text-emerald-700 border-r-2 border-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-400"
-                              : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800"
+                        <div key={item.to}>
+                          {/* Main item */}
+                          <NavLink
+                            to={item.to}
+                            onClick={onClose}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-all duration-200",
+                              active
+                                ? "bg-black text-white rounded-[9px]"
+                                : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                            )}
+                            data-testid={item.testId}
+                          >
+                            <item.icon className={cn(
+                              "h-4 w-4 transition-colors",
+                              active ? "text-white" : "text-slate-500"
+                            )} />
+                            <span className="truncate">{item.label}</span>
+                          </NavLink>
+                          
+                          {/* Sub-items if they exist */}
+                          {item.subItems && (
+                            <div className="ml-6 mt-1 space-y-1">
+                              {item.subItems.map((subItem) => {
+                                const subActive = isActive(subItem.to);
+                                
+                                return (
+                                  <NavLink
+                                    key={subItem.to}
+                                    to={subItem.to}
+                                    onClick={onClose}
+                                    className={cn(
+                                      "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-all duration-200",
+                                      subActive
+                                        ? "bg-black text-white rounded-[9px]"
+                                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                                    )}
+                                    data-testid={subItem.testId}
+                                  >
+                                    <subItem.icon className={cn(
+                                      "h-3 w-3 transition-colors",
+                                      subActive ? "text-white" : "text-slate-400"
+                                    )} />
+                                    <span className="truncate text-xs">{subItem.label}</span>
+                                  </NavLink>
+                                );
+                              })}
+                            </div>
                           )}
-                          data-testid={item.testId}
-                        >
-                          <item.icon className={cn(
-                            "h-4 w-4 transition-colors",
-                            active ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500"
-                          )} />
-                          <span className="truncate">{item.label}</span>
-                        </NavLink>
+                        </div>
                       );
                     })}
                   </div>

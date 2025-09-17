@@ -10,6 +10,7 @@ export const ROUTES = {
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   LOYVERSE_REPORTS: "/operations/analysis/loyverse",
+  STOCK_REVIEW: "/operations/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
 
