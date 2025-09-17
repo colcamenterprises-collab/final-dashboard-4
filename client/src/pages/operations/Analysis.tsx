@@ -79,8 +79,8 @@ export const AnalysisPage = () => {
     <div className="p-4 space-y-4" data-testid="analysis-page">
       {/* Sub-menu navigation as specified in Fort Knox lockdown */}
       <div className="flex space-x-4 mb-4">
-        <Link to="/analysis" className="text-blue-500 hover:text-blue-700 font-medium">Main Analysis</Link>
-        <Link to="/analysis/loyverse" className="text-blue-500 hover:text-blue-700 font-medium">Loyverse Reports</Link>
+        <Link to="/operations/analysis" className="text-blue-500 hover:text-blue-700 font-medium">Main Analysis</Link>
+        <Link to="/operations/analysis/loyverse" className="text-blue-500 hover:text-blue-700 font-medium">Loyverse Reports</Link>
       </div>
       
       {/* Stats Cards as specified */}
