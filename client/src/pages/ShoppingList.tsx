@@ -24,6 +24,7 @@ export default function ShoppingList() {
   });
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [actualCost, setActualCost] = useState("");
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
@@ -38,7 +39,8 @@ export default function ShoppingList() {
   const { groupedList = {}, totalItems = 0 } = shoppingListData || {};
 
   const { data: shoppingListHistory } = useQuery({
-    queryKey: ["/api/shopping-list/history"],
+    queryKey: ["/api/shopping-list", { history: true, date: historyDate }],
+    queryFn: () => fetch(`/api/shopping-list?history=true&date=${historyDate}`).then(res => res.json())
   });
 
   const { data: shoppingListByDate } = useQuery({
@@ -62,8 +64,13 @@ export default function ShoppingList() {
         body: JSON.stringify(updates)
       }).then(res => res.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      // Invalidate all shopping-list related queries including history and by-date
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey as string[];
+          return queryKey[0] === "/api/shopping-list" || queryKey[0] === "/api/shopping-list/by-date";
+        }
+      });
     }
   });
 
@@ -71,8 +78,13 @@ export default function ShoppingList() {
     mutationFn: (id: number) => 
       fetch(`/api/shopping-list/${id}`, { method: 'DELETE' }).then(res => res.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      // Invalidate all shopping-list related queries including history and by-date
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey as string[];
+          return queryKey[0] === "/api/shopping-list" || queryKey[0] === "/api/shopping-list/by-date";
+        }
+      });
     }
   });
 
@@ -85,7 +97,7 @@ export default function ShoppingList() {
       }).then(res => res.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/by-date"] });
       setSelectedItems([]);
       setActualCost("");
       setCompletionDialogOpen(false);
@@ -101,8 +113,13 @@ export default function ShoppingList() {
         body: JSON.stringify(item)
       }).then(res => res.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      // Invalidate all shopping-list related queries including history and by-date
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey as string[];
+          return queryKey[0] === "/api/shopping-list" || queryKey[0] === "/api/shopping-list/by-date";
+        }
+      });
     }
   });
 
@@ -114,7 +131,7 @@ export default function ShoppingList() {
       }).then(res => res.json()),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shopping-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shopping-list/by-date"] });
       toast({ 
         title: "Shopping list regenerated successfully!",
         description: `Generated ${data.itemsGenerated} items from last completed form`
@@ -284,7 +301,7 @@ export default function ShoppingList() {
     Object.entries(groupedList || {}).map(([category, items]: [string, any[]]) => (
       <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-2 bg-gray-50 font-semibold text-gray-900">{category}</div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto md:overflow-visible">
           <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">
               <tr>
@@ -494,95 +511,55 @@ export default function ShoppingList() {
           </Card>
         </div>
 
-        {/* Suppliers & AI Suggestions */}
-        <div className="space-y-6">
-          {/* Suppliers */}
-          <Card className="restaurant-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">Preferred Suppliers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Array.isArray(suppliers) && suppliers.map((supplier: any) => (
-                  <div key={supplier.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                        <Truck className="text-primary text-sm" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{supplier.name}</p>
-                        <p className="text-xs text-gray-500">{supplier.category}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-green-600">{supplier.status}</p>
-                      <p className="text-xs text-gray-500">{supplier.deliveryTime}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* AI Suggestions */}
-          <Card className="restaurant-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                <Bot className="inline mr-2 text-primary" />
-                AI Suggestions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900">Bulk Discount Available</p>
-                  <p className="text-sm text-gray-700 mt-1">Order 75+ lbs of tomatoes to get 15% discount from FreshCorp.</p>
-                  <Button size="sm" className="mt-2 restaurant-primary">
-                    Apply Suggestion
-                  </Button>
-                </div>
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800">Alternative Supplier</p>
-                  <p className="text-sm text-gray-700 mt-1">CheeseMart offers same quality mozzarella at $5.20/lb vs current $5.80/lb.</p>
-                  <Button size="sm" variant="outline" className="mt-2 border-blue-600 text-blue-600 hover:bg-blue-50">
-                    Switch Supplier
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </TabsContent>
 
     <TabsContent value="history" className="space-y-6">
       <Card className="restaurant-card">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-            <History className="mr-2 h-5 w-5" />
-            Shopping List History
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+              <History className="mr-2 h-5 w-5" />
+              Shopping List History
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="history-date-picker">Date:</Label>
+              <Input
+                id="history-date-picker"
+                type="date"
+                value={historyDate}
+                onChange={(e) => setHistoryDate(e.target.value)}
+                className="w-auto"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {Array.isArray(shoppingListHistory) && shoppingListHistory.map((item: any) => (
-              <div key={item.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="font-medium text-gray-900">{item.itemName}</p>
-                    <p className="text-sm text-gray-500">{item.quantity} {item.unit} from {item.supplier}</p>
-                    {item.listName && (
-                      <p className="text-xs text-gray-400">{item.listName}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{formatCurrency(item.actualCost || 0)}</p>
-                  <p className="text-xs text-gray-500">{formatDate(item.completedAt)}</p>
-                </div>
+          <div className="overflow-x-auto md:overflow-visible">
+            {shoppingListHistory?.history && shoppingListHistory.history.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {shoppingListHistory.history.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-2 text-sm text-gray-900">{new Date(item.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{item.total_items || 0}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{formatCurrency(0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No history found for {new Date(historyDate).toLocaleDateString()}.</p>
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>

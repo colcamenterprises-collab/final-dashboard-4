@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Upload } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export const AnalysisPage = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
   const [endDate, setEndDate] = useState(startDate);
+  const { toast } = useToast();
 
   // Fort Knox pre-sets for quick date selection
   const preSets = [
@@ -19,6 +23,46 @@ export const AnalysisPage = () => {
     { label: 'Last 7 Days', start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
     { label: 'MTD', start: new Date().toISOString().slice(0,7) + '-01', end: new Date().toISOString().slice(0,10) }
   ];
+
+  // Add stats query as specified
+  const { data: stats } = useQuery({
+    queryKey: ['analysisStats'],
+    queryFn: () => axios.get('/api/operations/stats').then(res => res.data)
+  });
+
+  // Upload mutation for Loyverse reports
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/analysis/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Report Uploaded", 
+        description: data.message || "Loyverse report uploaded successfully" 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Upload Failed", 
+        description: "Failed to upload Loyverse report", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const uploadLoyverseReport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+  };
 
   const { data: shifts } = useQuery({
     queryKey: ['loyverseShifts', startDate, endDate],
@@ -32,6 +76,55 @@ export const AnalysisPage = () => {
 
   return (
     <div className="p-4 space-y-4" data-testid="analysis-page">
+      {/* Stats Cards as specified */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <Card>
+          <CardContent className="p-4">
+            <Label className="text-sm text-gray-600">Receipts Last Shift</Label>
+            <div className="text-2xl font-bold">{stats?.receiptsLast || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Label className="text-sm text-gray-600">Gross Last Shift</Label>
+            <div className="text-2xl font-bold">{stats?.grossLast?.toFixed(2) || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Label className="text-sm text-gray-600">Net MTD</Label>
+            <div className="text-2xl font-bold">{stats?.netMtd?.toFixed(2) || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Label className="text-sm text-gray-600">Anomalies</Label>
+            <Badge variant="destructive" className="text-lg">{stats?.anomalies || 0}</Badge>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upload Section */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Upload Loyverse Report</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Input 
+              type="file" 
+              onChange={uploadLoyverseReport}
+              accept=".csv,.xlsx,.json"
+              disabled={uploadMutation.isPending}
+            />
+            <Button disabled={uploadMutation.isPending}>
+              <Upload className="h-4 w-4 mr-2" />
+              {uploadMutation.isPending ? "Uploading..." : "Upload"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Loyverse Analysis</CardTitle>

@@ -66,6 +66,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // Add stats query from operations (same as Analysis)
+  const { data: stats } = useQuery({
+    queryKey: ['analysisStats'],
+    queryFn: () => axios.get('/api/operations/stats').then(res => res.data)
+  });
+
   // Fort Knox balance data with 30-day range for home viewing
   const { data: balances } = useQuery({
     queryKey: ['loyverseBalances'], 
@@ -118,6 +124,24 @@ export default function Dashboard() {
         </h1>
         <div className="text-xs text-[var(--muted)]">{windowStr}</div>
       </div>
+
+      {/* Stats Cards from Operations (same as Analysis) */}
+      {stats && (
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <Card title="Net MTD">
+            <div className="text-2xl font-bold text-emerald-600">{currency(stats.netMtd)}</div>
+          </Card>
+          <Card title="Gross Last">
+            <div className="text-2xl font-bold text-blue-600">{currency(stats.grossLast)}</div>
+          </Card>
+          <Card title="Receipts Last">
+            <div className="text-2xl font-bold text-purple-600">{stats.receiptsLast}</div>
+          </Card>
+          <Card title="Anomalies">
+            <div className="text-2xl font-bold text-red-600">{stats.anomalies}</div>
+          </Card>
+        </div>
+      )}
 
       {/* Top row */}
       <div className="grid gap-4 md:grid-cols-3 mt-6">

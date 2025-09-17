@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Download, Upload, RefreshCw, Search, Crown } from "lucide-react";
+import { Plus, Edit, Trash2, Download, Upload, RefreshCw, Search, Crown, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { calculateIngredientCosts, THB as formatTHB, formatUnitPrice, CalculatedIngredient } from "@/utils/ingredientCalculations";
 
 // Types
 type Ingredient = {
@@ -19,14 +20,18 @@ type Ingredient = {
   supplier: string;
   brand?: string;
   cost: number;
+  costDisplay?: string;
   unit: string;
   packageSize?: string;
   portionSize?: string;
+  unitPrice?: number;
+  costPerPortion?: number;
   lastReview?: string;
   source?: string; // 'god' | 'manual'
+  calculations?: CalculatedIngredient;
 };
 
-const THB = (n: number) => new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
+// THB formatter moved to utils file
 
 const categories = ["All", "Meat", "Drinks", "Fresh Food", "Frozen Food", "Kitchen Supplies", "Packaging", "Shelf Items"];
 
@@ -40,6 +45,15 @@ export default function IngredientManagement() {
   const [editingItem, setEditingItem] = useState<Ingredient | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [newItemForm, setNewItemForm] = useState({
+    name: '',
+    category: '',
+    supplier: '',
+    brand: '',
+    packageSize: '',
+    unitPrice: '',
+    portion: ''
+  });
 
   // Data queries - Direct from foodCostings.ts god file
   const { data: ingredients = [], isLoading, refetch, error } = useQuery({
@@ -54,20 +68,32 @@ export default function IngredientManagement() {
       console.log('God file data received:', data.total, 'items');
       console.log('First item:', data.list?.[0]);
       
-      return (data.list || []).map((x: any) => ({
-        id: x.id,
-        name: x.item || x.name,
-        category: x.category,
-        supplier: x.supplier,
-        brand: x.brand || '',
-        cost: x.costNumber || Number(x.cost?.replace(/[^\d.]/g, '') || 0),
-        costDisplay: x.cost || '',
-        unit: 'various',
-        packageSize: x.packagingQty || '',
-        portionSize: x.averageMenuPortion || '',
-        lastReview: x.lastReviewDate || '',
-        source: 'god' // All from god file
-      }));
+      return (data.list || []).map((x: any) => {
+        // Calculate costs using utility functions
+        const calculations = calculateIngredientCosts(
+          x.cost || '฿0.00',
+          x.packagingQty || '',
+          x.averageMenuPortion || ''
+        );
+        
+        return {
+          id: x.id,
+          name: x.item || x.name,
+          category: x.category,
+          supplier: x.supplier,
+          brand: x.brand || '',
+          cost: x.costNumber || Number(x.cost?.replace(/[^\d.]/g, '') || 0),
+          costDisplay: x.cost || '',
+          unit: 'various',
+          packageSize: x.packagingQty || '',
+          portionSize: x.averageMenuPortion || '',
+          unitPrice: calculations.unitPrice,
+          costPerPortion: calculations.costPerPortion,
+          lastReview: x.lastReviewDate || '',
+          source: 'god', // All from god file
+          calculations
+        };
+      });
     }
   });
 
@@ -101,6 +127,32 @@ export default function IngredientManagement() {
     }
   });
 
+  // Reverse sync mutation - sync TO god file
+  const syncToGodFileMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/ingredients/sync-to-god', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients: filteredIngredients })
+      });
+      if (!response.ok) throw new Error('Reverse sync failed');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Synced to God File", 
+        description: data.message || "Updated foodCostings.ts with current data" 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Sync to God File Failed", 
+        description: "Failed to update god file", 
+        variant: "destructive" 
+      });
+    }
+  });
+
   // Filtered data
   const filteredIngredients = useMemo(() => {
     return ingredients.filter(item => {
@@ -124,16 +176,17 @@ export default function IngredientManagement() {
 
   function exportCSV() {
     const csvData = [
-      ['Name', 'Category', 'Supplier', 'Brand', 'Cost (THB)', 'Unit', 'Package Size', 'Portion Size', 'Last Review', 'Source'],
+      ['Name', 'Category', 'Supplier', 'Brand', 'Package Cost', 'Package Size', 'Unit Price', 'Portion Size', 'Cost Per Portion', 'Last Review', 'Source'],
       ...filteredIngredients.map(item => [
         item.name,
         item.category,
         item.supplier,
         item.brand || '',
-        item.cost.toString(),
-        item.unit,
+        item.costDisplay || '',
         item.packageSize || '',
+        item.unitPrice ? formatUnitPrice(item.unitPrice, item.calculations?.packageSize?.unit || 'unit') : '',
         item.portionSize || '',
+        item.costPerPortion ? formatTHB(item.costPerPortion) : '',
         item.lastReview || '',
         item.source || 'manual'
       ])
@@ -178,6 +231,14 @@ export default function IngredientManagement() {
             <Crown className="h-4 w-4 mr-2" />
             {syncMutation.isPending ? "Syncing..." : "Sync from God File"}
           </Button>
+          <Button 
+            onClick={() => syncToGodFileMutation.mutate()}
+            disabled={syncToGodFileMutation.isPending}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {syncToGodFileMutation.isPending ? "Syncing..." : "Sync to God File"}
+          </Button>
           <Button onClick={exportCSV} variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -195,7 +256,7 @@ export default function IngredientManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.total}</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.godItems}</div>
             <div className="text-sm text-gray-600">God File Items</div>
           </CardContent>
         </Card>
@@ -257,8 +318,15 @@ export default function IngredientManagement() {
               <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded">
                 Note: Manual items will be marked as 'manual' source. Use "Sync from God File" to reset to foodCostings.ts data.
               </div>
-              <Input placeholder="Ingredient name" />
-              <Select>
+              <Input 
+                placeholder="Ingredient name" 
+                value={newItemForm.name}
+                onChange={(e) => setNewItemForm(prev => ({...prev, name: e.target.value}))}
+              />
+              <Select 
+                value={newItemForm.category}
+                onValueChange={(value) => setNewItemForm(prev => ({...prev, category: value}))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -268,9 +336,53 @@ export default function IngredientManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <Input placeholder="Supplier" />
-              <Input placeholder="Brand" />
-              <Input placeholder="Cost (THB)" type="number" />
+              <Input 
+                placeholder="Supplier" 
+                value={newItemForm.supplier}
+                onChange={(e) => setNewItemForm(prev => ({...prev, supplier: e.target.value}))}
+              />
+              <Input 
+                placeholder="Brand" 
+                value={newItemForm.brand}
+                onChange={(e) => setNewItemForm(prev => ({...prev, brand: e.target.value}))}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium">Package Size (e.g., 1000g)</label>
+                  <Input 
+                    type="text" 
+                    name="packageSize" 
+                    placeholder="1000g" 
+                    value={newItemForm.packageSize}
+                    onChange={(e) => setNewItemForm(prev => ({...prev, packageSize: e.target.value}))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Unit Price (THB)</label>
+                  <Input 
+                    type="number" 
+                    name="unitPrice" 
+                    placeholder="319" 
+                    value={newItemForm.unitPrice}
+                    onChange={(e) => setNewItemForm(prev => ({...prev, unitPrice: e.target.value}))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Portion Size</label>
+                <Input 
+                  placeholder="e.g., 95g" 
+                  value={newItemForm.portion}
+                  onChange={(e) => setNewItemForm(prev => ({...prev, portion: e.target.value}))}
+                />
+              </div>
+              <p className="text-sm">
+                <strong>Cost per Portion:</strong> {
+                  newItemForm.portion && newItemForm.packageSize && newItemForm.unitPrice ? 
+                  (parseFloat(newItemForm.portion) / parseFloat(newItemForm.packageSize) * parseFloat(newItemForm.unitPrice)).toFixed(3) + ' THB' : 
+                  'N/A'
+                }
+              </p>
               <div className="flex gap-3">
                 <Button 
                   onClick={() => setIsAddDialogOpen(false)}
@@ -304,11 +416,13 @@ export default function IngredientManagement() {
                   <TableHead>Category</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead>Package</TableHead>
-                  <TableHead>Portion</TableHead>
+                  <TableHead className="text-right">Package Cost</TableHead>
+                  <TableHead>Package Size</TableHead>
+                  <TableHead className="text-right">Unit Price</TableHead>
+                  <TableHead>Portion Size</TableHead>
+                  <TableHead className="text-right">Cost/Portion</TableHead>
                   <TableHead>Source</TableHead>
-                  <TableHead>Last Review</TableHead>
+                  <TableHead>Review</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -321,9 +435,34 @@ export default function IngredientManagement() {
                     </TableCell>
                     <TableCell>{item.supplier}</TableCell>
                     <TableCell>{item.brand || "-"}</TableCell>
-                    <TableCell className="text-right font-mono">{item.costDisplay || THB(item.cost)}</TableCell>
+                    <TableCell className="text-right font-mono">{item.costDisplay || formatTHB(item.cost)}</TableCell>
                     <TableCell className="text-sm">{item.packageSize || "-"}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {item.unitPrice > 0 ? (
+                        <div className="space-y-1">
+                          <div>{formatUnitPrice(item.unitPrice, item.calculations?.packageSize?.unit || 'unit')}</div>
+                          {item.calculations?.calculationNote && (
+                            <div className="text-xs text-gray-500 max-w-32 truncate" title={item.calculations.calculationNote}>
+                              <Calculator className="h-3 w-3 inline mr-1" />
+                              Calculated
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm">{item.portionSize || "-"}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">
+                      {item.costPerPortion > 0 ? (
+                        <div className="space-y-1">
+                          <div className="text-green-700">{formatTHB(item.costPerPortion)}</div>
+                          <div className="text-xs text-gray-500">per portion</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge 
                         variant={item.source === 'god' ? "default" : "secondary"}

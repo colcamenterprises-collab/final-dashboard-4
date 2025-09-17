@@ -8,7 +8,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { insertIngredientSchema, type Ingredient } from "@shared/schema";
 import { z } from "zod";
-import { Save, X } from "lucide-react";
+import { Save, X, Calculator } from "lucide-react";
+import { calculateIngredientCosts, THB, formatUnitPrice } from "@/utils/ingredientCalculations";
+import { useMemo } from "react";
 
 // Categories matching your spreadsheet
 const INGREDIENT_CATEGORIES = [
@@ -113,6 +115,27 @@ export function IngredientForm({ ingredient, onSubmit, onCancel, isSubmitting }:
       notes: ingredient?.notes || "",
     },
   });
+  
+  // Watch form values for real-time calculations
+  const watchedValues = form.watch();
+  
+  // Calculate real-time values
+  const calculations = useMemo(() => {
+    const costPerItem = watchedValues.costPerItem || 0;
+    const packageQty = watchedValues.packageQty || '';
+    const servingSize = watchedValues.servingSize || '';
+    
+    if (costPerItem > 0 && packageQty && servingSize) {
+      try {
+        const costString = `฿${costPerItem.toFixed(2)}`;
+        return calculateIngredientCosts(costString, packageQty, servingSize);
+      } catch (error) {
+        console.warn('Calculation error:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [watchedValues.costPerItem, watchedValues.packageQty, watchedValues.servingSize]);
 
   const handleSubmit = (data: any) => {
     // Ensure unitPrice matches costPerItem for backwards compatibility
@@ -334,6 +357,57 @@ export function IngredientForm({ ingredient, onSubmit, onCancel, isSubmitting }:
                 </FormItem>
               )}
             />
+
+            {/* Real-Time Calculations Display */}
+            {calculations && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calculator className="h-5 w-5 text-blue-600" />
+                    Live Calculations
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    Automatically calculated based on your inputs above
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Unit Price</Label>
+                      <div className="p-3 bg-white rounded-md border">
+                        <div className="font-mono text-lg font-semibold text-green-700">
+                          {formatUnitPrice(calculations.unitPrice, calculations.packageSize.unit)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Cost per {calculations.packageSize.unit}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Cost Per Portion</Label>
+                      <div className="p-3 bg-white rounded-md border">
+                        <div className="font-mono text-lg font-semibold text-orange-700">
+                          {THB(calculations.costPerPortion)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Per menu serving
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {calculations.calculationNote && (
+                    <div className="p-3 bg-gray-50 rounded-md border-l-4 border-blue-400">
+                      <div className="text-xs font-medium text-gray-700 mb-1">Calculation Details:</div>
+                      <div className="text-xs text-gray-600 font-mono">
+                        {calculations.calculationNote}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-2 pt-4">
