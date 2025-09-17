@@ -1925,27 +1925,27 @@ export function registerRoutes(app: express.Application): Server {
     try {
       // Get MTD (Month-to-Date) total - FIXED: Use correct column names
       const mtdResult = await db.execute(sql`
-        SELECT COALESCE(SUM("amount_cents"), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
       const mtd = Number(mtdResult.rows[0]?.total || 0); // In cents, convert to THB
 
       // Get YTD (Year-to-Date) total - FIXED: Use correct column names  
       const ytdResult = await db.execute(sql`
-        SELECT COALESCE(SUM("amount_cents"), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
       const ytd = Number(ytdResult.rows[0]?.total || 0); // In cents, convert to THB
 
       // Get previous month total for MoM calculation - FIXED: Use correct column names
       const prevMonthResult = await db.execute(sql`
-        SELECT COALESCE(SUM("amount_cents"), 0) as total 
+        SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE) - 1
-        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE) - 1
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
       `);
       const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // In cents, convert to THB
       const prevMonthTHB = prevMonth / 100; // Convert to THB
@@ -1955,12 +1955,12 @@ export function registerRoutes(app: express.Application): Server {
       // Get top 5 expense categories by total amount - FIXED: Use correct column names
       const top5Result = await db.execute(sql`
         SELECT 
-          "category" as type,
-          COALESCE(SUM("amount_cents"), 0) as total
+          "expenseType" as type,
+          COALESCE(SUM("costCents"), 0) as total
         FROM expenses
-        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
-        GROUP BY "category"
+        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        GROUP BY "expenseType"
         ORDER BY total DESC
         LIMIT 5
       `);

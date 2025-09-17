@@ -5,7 +5,7 @@ import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentMod
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Minus, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, FileText } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, FileText, Zap, Brain } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,51 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// Client-side supplier detection utility
+function detectSupplier(description: string): string | null {
+  if (!description) return null;
+  
+  const desc = description.toLowerCase();
+  
+  // Common Thai billers and suppliers with multiple name variations
+  const supplierPatterns = [
+    { patterns: ['makro', 'แม็คโคร', 'macro'], supplier: 'Makro' },
+    { patterns: ['big c', 'บิ๊กซี', 'bigc'], supplier: 'Big C' },
+    { patterns: ['lotus', 'โลตัส', 'tesco lotus'], supplier: 'Lotus' },
+    { patterns: ['7-eleven', 'เซเว่น', '7eleven', 'seven eleven'], supplier: '7-Eleven' },
+    { patterns: ['villa market', 'วิลล่า มาร์เก็ต', 'villa'], supplier: 'Villa Market' },
+    { patterns: ['central', 'เซ็นทรัล'], supplier: 'Central' },
+    { patterns: ['robinson', 'โรบินสัน'], supplier: 'Robinson' },
+    { patterns: ['foodland', 'ฟู้ดแลนด์'], supplier: 'Foodland' },
+    { patterns: ['tops', 'ท็อปส์'], supplier: 'Tops' },
+    { patterns: ['gourmet market', 'กูร์เมต์ มาร์เก็ต'], supplier: 'Gourmet Market' },
+    { patterns: ['shell', 'เชลล์'], supplier: 'Shell' },
+    { patterns: ['ptt', 'ปตท.'], supplier: 'PTT' },
+    { patterns: ['bangchak', 'บางจาก'], supplier: 'Bangchak' },
+    { patterns: ['esso', 'เอสโซ่'], supplier: 'Esso' },
+    { patterns: ['grab', 'แกร็บ'], supplier: 'Grab Merchant' },
+    { patterns: ['lineman', 'ไลน์แมน'], supplier: 'Lineman' },
+    { patterns: ['foodpanda', 'ฟู้ดแพนด้า'], supplier: 'FoodPanda' },
+    { patterns: ['mr diy', 'มิสเตอร์ดี.ไอ.วาย'], supplier: 'Mr DIY' },
+    { patterns: ['homepro', 'โฮมโปร'], supplier: 'HomePro' },
+    { patterns: ['lazada', 'ลาซาด้า'], supplier: 'Lazada' },
+    { patterns: ['dtac', 'ดีแทค'], supplier: 'DTAC' },
+    { patterns: ['ais', 'เอไอเอส'], supplier: 'AIS' },
+    { patterns: ['mea', 'การไฟฟ้านคร'], supplier: 'MEA' },
+  ];
+  
+  // Check each supplier pattern
+  for (const { patterns, supplier } of supplierPatterns) {
+    for (const pattern of patterns) {
+      if (desc.includes(pattern)) {
+        return supplier;
+      }
+    }
+  }
+  
+  return null;
+}
 
 // Golden Patch - Pending Transactions Review Component  
 function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: () => void }) {
@@ -25,15 +70,53 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   const [approvalCategory, setApprovalCategory] = useState('');
   const [approvalSupplier, setApprovalSupplier] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [rememberDefault, setRememberDefault] = useState(false);
+  const [detectedSupplier, setDetectedSupplier] = useState<string | null>(null);
+  const [hasDefaults, setHasDefaults] = useState(false);
   
   // Batch rejection state
   const [selectedExpenses, setSelectedExpenses] = useState<string[]>([]);
+  
+  // Batch approval state for same supplier
+  const [batchSupplierDetection, setBatchSupplierDetection] = useState<{
+    supplier: string;
+    count: number;
+    category?: string;
+  } | null>(null);
 
   // Authentication headers for Golden Patch
   const getAuthHeaders = () => ({
     'x-restaurant-id': 'smash-brothers-burgers',
     'x-user-id': 'dev-manager',
     'x-user-role': 'manager',
+  });
+
+  // Query supplier defaults
+  const { data: supplierDefaults = [] } = useQuery({
+    queryKey: ['/api/expenses/defaults'],
+    queryFn: async () => {
+      return apiRequest('/api/expenses/defaults', {
+        headers: getAuthHeaders(),
+      });
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Mutation for saving supplier defaults
+  const saveDefaultMutation = useMutation({
+    mutationFn: async ({ supplier, defaultCategory, notesTemplate }: { supplier: string; defaultCategory: string; notesTemplate?: string }) => {
+      return apiRequest('/api/expenses/defaults', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ supplier, defaultCategory, notesTemplate }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/defaults'] });
+    },
   });
 
   // Query pending Golden Patch expenses
@@ -49,14 +132,14 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
 
   // Approve expense mutation
   const approveExpenseMutation = useMutation({
-    mutationFn: async ({ id, category, supplier, notes }: { id: string; category: string; supplier: string; notes?: string }) => {
+    mutationFn: async ({ id, category, supplier, notes, rememberDefault }: { id: string; category: string; supplier: string; notes?: string; rememberDefault?: boolean }) => {
       return apiRequest(`/api/expenses/${id}/approve`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ category, supplier, notes }),
+        body: JSON.stringify({ category, supplier, notes, rememberDefault }),
       });
     },
     onSuccess: () => {
@@ -140,19 +223,51 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
 
   // Batch selection handlers
   const toggleExpenseSelection = (expenseId: string) => {
-    setSelectedExpenses(prev => 
-      prev.includes(expenseId) 
-        ? prev.filter(id => id !== expenseId)
-        : [...prev, expenseId]
-    );
+    const newSelection = selectedExpenses.includes(expenseId) 
+      ? selectedExpenses.filter(id => id !== expenseId)
+      : [...selectedExpenses, expenseId];
+    
+    setSelectedExpenses(newSelection);
+    // Detect batch supplier when selection changes
+    detectBatchSupplier(newSelection);
   };
 
   const selectAllExpenses = () => {
     setSelectedExpenses(pendingExpenses.map((exp: any) => exp.id));
+    // Detect batch supplier for bulk operations
+    detectBatchSupplier(pendingExpenses.map((exp: any) => exp.id));
   };
 
   const clearSelection = () => {
     setSelectedExpenses([]);
+    setBatchSupplierDetection(null);
+  };
+
+  // Detect if selected expenses are from same supplier
+  const detectBatchSupplier = (expenseIds: string[]) => {
+    const selectedExpenseData = pendingExpenses.filter((exp: any) => expenseIds.includes(exp.id));
+    
+    if (selectedExpenseData.length <= 1) {
+      setBatchSupplierDetection(null);
+      return;
+    }
+    
+    // Check if all selected expenses have the same detected supplier
+    const detectedSuppliers = selectedExpenseData.map((exp: any) => detectSupplier(exp.description)).filter(Boolean);
+    const uniqueSuppliers = Array.from(new Set(detectedSuppliers));
+    
+    if (uniqueSuppliers.length === 1 && uniqueSuppliers[0]) {
+      const supplier = uniqueSuppliers[0] as string;
+      const supplierDefault = supplierDefaults.find((d: any) => d.supplier === supplier);
+      
+      setBatchSupplierDetection({
+        supplier,
+        count: detectedSuppliers.length,
+        category: supplierDefault?.defaultCategory,
+      });
+    } else {
+      setBatchSupplierDetection(null);
+    }
   };
 
   const handleBatchReject = () => {
@@ -170,9 +285,21 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   const openApprovalDialog = (expense: any, action: 'approve' | 'reject') => {
     setSelectedExpense(expense);
     setApprovalAction(action);
-    setApprovalCategory('');
-    setApprovalSupplier('');
-    setApprovalNotes('');
+    
+    // Smart supplier detection and auto-populate
+    const detected = detectSupplier(expense.description);
+    setDetectedSupplier(detected);
+    
+    // Find supplier defaults
+    const supplierDefault = detected ? supplierDefaults.find((d: any) => d.supplier === detected) : null;
+    setHasDefaults(!!supplierDefault);
+    
+    // Auto-populate fields
+    setApprovalSupplier(detected || '');
+    setApprovalCategory(supplierDefault?.defaultCategory || '');
+    setApprovalNotes(supplierDefault?.notesTemplate || '');
+    setRememberDefault(false);
+    
     setShowApprovalDialog(true);
   };
 
@@ -193,11 +320,81 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
         category: approvalCategory,
         supplier: approvalSupplier,
         notes: approvalNotes,
+        rememberDefault: rememberDefault,
       });
     } else {
       rejectExpenseMutation.mutate(selectedExpense.id);
     }
   };
+
+  // Quick approve with defaults
+  const handleQuickApprove = () => {
+    if (!selectedExpense || !detectedSupplier) return;
+    
+    const supplierDefault = supplierDefaults.find((d: any) => d.supplier === detectedSupplier);
+    if (!supplierDefault) return;
+    
+    approveExpenseMutation.mutate({
+      id: selectedExpense.id,
+      category: supplierDefault.defaultCategory,
+      supplier: detectedSupplier,
+      notes: supplierDefault.notesTemplate || '',
+      rememberDefault: false, // Already has defaults
+    });
+  };
+
+  // Batch approve with same supplier detection
+  const handleBatchApproveWithDefaults = () => {
+    if (!batchSupplierDetection || selectedExpenses.length === 0) return;
+    
+    const supplierDefault = supplierDefaults.find((d: any) => d.supplier === batchSupplierDetection.supplier);
+    if (!supplierDefault) return;
+    
+    // Use existing batch approve endpoint
+    batchApproveMutation.mutate({
+      expenses: selectedExpenses.map(id => {
+        const expense = pendingExpenses.find((e: any) => e.id === id);
+        return {
+          id,
+          category: supplierDefault.defaultCategory,
+          supplier: batchSupplierDetection.supplier,
+          notes: supplierDefault.notesTemplate || '',
+        };
+      })
+    });
+  };
+
+  // Batch approve mutation
+  const batchApproveMutation = useMutation({
+    mutationFn: async ({ expenses }: { expenses: any[] }) => {
+      return apiRequest('/api/expenses/batch-approve', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ expenses }),
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: '✅ Batch Approval Complete',
+        description: `${data.approvedCount} expense(s) approved successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+      if (onExpenseApproved) onExpenseApproved();
+      setSelectedExpenses([]);
+      setBatchSupplierDetection(null);
+    },
+    onError: () => {
+      toast({
+        title: '❌ Batch Approval Failed',
+        description: 'Failed to approve selected expenses',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const formatCurrency = (amountCents: number) => {
     return new Intl.NumberFormat('th-TH', {
@@ -243,6 +440,19 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
               >
                 Clear Selection
               </Button>
+              {batchSupplierDetection && batchSupplierDetection.category && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleBatchApproveWithDefaults}
+                  disabled={batchApproveMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  data-testid="button-batch-approve-defaults"
+                >
+                  <Zap className="h-4 w-4 mr-1" />
+                  {batchApproveMutation.isPending ? 'Approving...' : `Approve ${batchSupplierDetection.count} ${batchSupplierDetection.supplier} expenses`}
+                </Button>
+              )}
               <Button
                 variant="destructive"
                 size="sm"
@@ -309,15 +519,43 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
                     </td>
                     <td className="border p-2 text-center">
                       <div className="flex justify-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openApprovalDialog(expense, 'approve')}
-                          className="h-8 w-8 p-0"
-                          data-testid={`button-approve-${expense.id}`}
-                        >
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </Button>
+                        {(() => {
+                          const detected = detectSupplier(expense.description);
+                          const hasDefault = detected && supplierDefaults.find((d: any) => d.supplier === detected);
+                          
+                          return hasDefault ? (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => {
+                                const supplierDefault = supplierDefaults.find((d: any) => d.supplier === detected);
+                                if (supplierDefault) {
+                                  approveExpenseMutation.mutate({
+                                    id: expense.id,
+                                    category: supplierDefault.defaultCategory,
+                                    supplier: detected,
+                                    notes: supplierDefault.notesTemplate || '',
+                                  });
+                                }
+                              }}
+                              className="h-8 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                              data-testid={`button-quick-approve-${expense.id}`}
+                            >
+                              <Zap className="h-3 w-3 mr-1" />
+                              Quick
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openApprovalDialog(expense, 'approve')}
+                              className="h-8 w-8 p-0"
+                              data-testid={`button-approve-${expense.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                          );
+                        })()}
                         <Button
                           size="sm"
                           variant="outline"
@@ -354,6 +592,15 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
               <div><strong>Description:</strong> {selectedExpense.description}</div>
               <div><strong>Amount:</strong> {formatCurrency(selectedExpense.amountCents)}</div>
               <div><strong>Date:</strong> {new Date(selectedExpense.date).toLocaleDateString('th-TH')}</div>
+              {detectedSupplier && (
+                <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded">
+                  <Brain className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm text-blue-800">
+                    <strong>Smart Detection:</strong> Detected supplier "{detectedSupplier}"
+                    {hasDefaults && <span className="text-green-600 ml-2">✓ Has saved defaults</span>}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           
@@ -427,11 +674,35 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
                   data-testid="input-notes"
                 />
               </div>
+              {approvalSupplier && approvalCategory && !hasDefaults && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-default"
+                    checked={rememberDefault}
+                    onCheckedChange={(checked) => setRememberDefault(checked as boolean)}
+                    data-testid="checkbox-remember-default"
+                  />
+                  <Label htmlFor="remember-default" className="text-sm">
+                    Remember as default for <strong>{approvalSupplier}</strong>
+                  </Label>
+                </div>
+              )}
             </div>
           )}
           
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel">Cancel</AlertDialogCancel>
+            {approvalAction === 'approve' && hasDefaults && detectedSupplier && (
+              <Button
+                onClick={handleQuickApprove}
+                disabled={approveExpenseMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                data-testid="button-quick-approve-defaults"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Quick Approve with Defaults
+              </Button>
+            )}
             <AlertDialogAction
               onClick={handleApprovalSubmit}
               disabled={approveExpenseMutation.isPending || rejectExpenseMutation.isPending}
@@ -563,7 +834,7 @@ export default function Expenses() {
   });
 
   // Filter helpers - ensure arrays are always defined
-  const rolls = expenses ? expenses.filter(e => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
+  const rolls = expenses ? expenses.filter((e: any) => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
   const meat = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
     ? purchaseTallyData.entries.filter((item: any) => item.meatGrams != null && item.meatGrams > 0) : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
@@ -1008,7 +1279,7 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {meat.map((m,i)=>(
+            {meat.map((m: any, i: number) => (
               <tr key={i} className="hover:bg-gray-50">
                 <td className="border p-1">{new Date(m.date).toLocaleDateString()}</td>
                 <td className="border p-1">{m.notes || m.meatType}</td>
@@ -1079,7 +1350,7 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {drinks.map((d,i)=>{
+            {drinks.map((d: any, i: number) => {
               // Parse the meta JSON to get drink type and quantity
               let drinkType = "N/A";
               let quantity = "N/A";

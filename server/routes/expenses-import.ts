@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { db } from '../db.js';
-import { importedExpenses, partnerStatements, expenses } from '../../shared/schema.js';
+import { importedExpenses, partnerStatements, expenses, supplierDefaults } from '../../shared/schema.js';
 import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -251,6 +251,45 @@ function normalizeHeaders(record: any): any {
   return normalized;
 }
 
+// Supplier Detection Utility - detects supplier from transaction description
+function detectSupplier(description: string): string | null {
+  if (!description) return null;
+  
+  const desc = description.toLowerCase();
+  
+  // Common Thai billers and suppliers with multiple name variations
+  const supplierPatterns = [
+    { patterns: ['makro', 'แม็คโคร', 'macro'], supplier: 'Makro' },
+    { patterns: ['big c', 'บิ๊กซี', 'bigc'], supplier: 'Big C' },
+    { patterns: ['lotus', 'โลตัส', 'tesco lotus'], supplier: 'Lotus' },
+    { patterns: ['7-eleven', 'เซเว่น', '7eleven', 'seven eleven'], supplier: '7-Eleven' },
+    { patterns: ['villa market', 'วิลล่า มาร์เก็ต', 'villa'], supplier: 'Villa Market' },
+    { patterns: ['central', 'เซ็นทรัล'], supplier: 'Central' },
+    { patterns: ['robinson', 'โรบินสัน'], supplier: 'Robinson' },
+    { patterns: ['foodland', 'ฟู้ดแลนด์'], supplier: 'Foodland' },
+    { patterns: ['tops', 'ท็อปส์'], supplier: 'Tops' },
+    { patterns: ['gourmet market', 'กูร์เมต์ มาร์เก็ต'], supplier: 'Gourmet Market' },
+    { patterns: ['shell', 'เชลล์'], supplier: 'Shell' },
+    { patterns: ['ptt', 'ปตท.'], supplier: 'PTT' },
+    { patterns: ['bangchak', 'บางจาก'], supplier: 'Bangchak' },
+    { patterns: ['esso', 'เอสโซ่'], supplier: 'Esso' },
+    { patterns: ['grab', 'แกร็บ'], supplier: 'Grab' },
+    { patterns: ['lineman', 'ไลน์แมน'], supplier: 'Lineman' },
+    { patterns: ['foodpanda', 'ฟู้ดแพนด้า'], supplier: 'FoodPanda' },
+  ];
+  
+  // Check each supplier pattern
+  for (const { patterns, supplier } of supplierPatterns) {
+    for (const pattern of patterns) {
+      if (desc.includes(pattern)) {
+        return supplier;
+      }
+    }
+  }
+  
+  return null;
+}
+
 // POST /api/expenses/upload-bank - REQUIRES MANAGER ROLE
 router.post('/upload-bank', requireManagerRole, upload.single('file'), async (req: Request, res: Response) => {
   try {
@@ -434,7 +473,7 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
   try {
     const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
-    const { category, supplier, notes } = req.body;
+    const { category, supplier, notes, rememberDefault } = req.body;
     const approvedBy = authReq.approvedBy;
 
     // SECURITY: Get pending expense with restaurant scoping
@@ -459,17 +498,79 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       });
     }
 
+    // Smart defaults logic
+    let finalSupplier = supplier;
+    let finalCategory = category;
+    let defaultsApplied = false;
+
+    // If category not provided, try to auto-detect supplier and fetch defaults
+    if (!finalCategory && pendingExpense.description) {
+      const detectedSupplier = detectSupplier(pendingExpense.description);
+      if (detectedSupplier) {
+        // Fetch default category for detected supplier
+        const [supplierDefault] = await db
+          .select()
+          .from(supplierDefaults)
+          .where(and(
+            eq(supplierDefaults.supplier, detectedSupplier),
+            eq(supplierDefaults.restaurantId, authReq.restaurantId)
+          ));
+
+        if (supplierDefault) {
+          finalSupplier = finalSupplier || detectedSupplier;
+          finalCategory = supplierDefault.defaultCategory;
+          defaultsApplied = true;
+          console.log(`Applied default category for ${detectedSupplier}: ${finalCategory}`);
+        }
+      }
+    }
+
     // Insert into canonical expenses table with correct enum value
     await db.insert(expenses).values({
       restaurantId: pendingExpense.restaurantId || '', // Add null safety
       date: pendingExpense.date || new Date().toISOString().split('T')[0],
       description: pendingExpense.description || 'Bank Import',
       amountCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
-      supplier: supplier || 'Bank Import',
-      category: category || 'General',
-      notes: notes || null, // Golden Patch: Store optional notes from approval
-      source: 'BANK_UPLOAD' // Golden Patch: Use valid schema enum value
+      supplier: finalSupplier || 'Bank Import',
+      category: finalCategory || 'General',
+      source: 'UPLOAD' // Golden Patch: Use valid schema enum value
     });
+
+    // Save supplier default if rememberDefault is true and both supplier and category are provided
+    if (rememberDefault && finalSupplier && finalCategory && finalSupplier !== 'Bank Import') {
+      // Check if supplier default already exists
+      const [existing] = await db
+        .select()
+        .from(supplierDefaults)
+        .where(and(
+          eq(supplierDefaults.supplier, finalSupplier),
+          eq(supplierDefaults.restaurantId, authReq.restaurantId)
+        ));
+
+      if (existing) {
+        // Update existing supplier default
+        await db
+          .update(supplierDefaults)
+          .set({
+            defaultCategory: finalCategory,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(supplierDefaults.supplier, finalSupplier),
+            eq(supplierDefaults.restaurantId, authReq.restaurantId)
+          ));
+      } else {
+        // Create new supplier default
+        await db
+          .insert(supplierDefaults)
+          .values({
+            restaurantId: authReq.restaurantId,
+            supplier: finalSupplier,
+            defaultCategory: finalCategory,
+          });
+      }
+      console.log(`Saved default for supplier ${finalSupplier}: ${finalCategory}`);
+    }
 
     // Mark as approved
     await db
@@ -481,7 +582,13 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       })
       .where(eq(importedExpenses.id, id));
 
-    res.json({ success: true, message: 'Expense approved and added to ledger' });
+    res.json({ 
+      success: true, 
+      message: 'Expense approved and added to ledger',
+      defaultsApplied,
+      appliedSupplier: finalSupplier,
+      appliedCategory: finalCategory
+    });
 
   } catch (error) {
     console.error('Approve expense error:', error);
@@ -523,6 +630,155 @@ router.patch('/:id/reject', requireManagerRole, async (req: Request, res: Respon
   }
 });
 
+// PATCH /api/expenses/batch-approve - REQUIRES MANAGER ROLE
+router.patch('/batch-approve', requireManagerRole, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { ids, supplier, category, rememberDefault } = req.body;
+    const approvedBy = authReq.approvedBy;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Invalid or missing expense IDs array' });
+    }
+
+    // SECURITY: Get pending expenses with restaurant scoping
+    const pendingExpenses = await db
+      .select()
+      .from(importedExpenses)
+      .where(and(
+        inArray(importedExpenses.id, ids),
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
+      ));
+
+    if (pendingExpenses.length === 0) {
+      return res.status(404).json({ error: 'No pending expenses found for approval' });
+    }
+
+    let approvedCount = 0;
+    const approvedExpenses = [];
+
+    // Process each expense individually to apply smart defaults
+    for (const pendingExpense of pendingExpenses) {
+      // SECURITY: Validate amount exists
+      if (!pendingExpense.amountCents || pendingExpense.amountCents === 0) {
+        console.warn(`Skipping expense ${pendingExpense.id}: Invalid amount`);
+        continue;
+      }
+
+      // Smart defaults logic (same as single approval)
+      let finalSupplier = supplier;
+      let finalCategory = category;
+      let defaultsApplied = false;
+
+      // If category not provided, try to auto-detect supplier and fetch defaults
+      if (!finalCategory && pendingExpense.description) {
+        const detectedSupplier = detectSupplier(pendingExpense.description);
+        if (detectedSupplier) {
+          // Fetch default category for detected supplier
+          const [supplierDefault] = await db
+            .select()
+            .from(supplierDefaults)
+            .where(and(
+              eq(supplierDefaults.supplier, detectedSupplier),
+              eq(supplierDefaults.restaurantId, authReq.restaurantId)
+            ));
+
+          if (supplierDefault) {
+            finalSupplier = finalSupplier || detectedSupplier;
+            finalCategory = supplierDefault.defaultCategory;
+            defaultsApplied = true;
+            console.log(`Applied default category for ${detectedSupplier}: ${finalCategory}`);
+          }
+        }
+      }
+
+      // Insert into canonical expenses table
+      await db.insert(expenses).values({
+        restaurantId: pendingExpense.restaurantId || '',
+        date: pendingExpense.date || new Date().toISOString().split('T')[0],
+        description: pendingExpense.description || 'Bank Import',
+        amountCents: Math.abs(pendingExpense.amountCents),
+        supplier: finalSupplier || 'Bank Import',
+        category: finalCategory || 'General',
+        source: 'UPLOAD'
+      });
+
+      approvedExpenses.push({
+        id: pendingExpense.id,
+        supplier: finalSupplier || 'Bank Import',
+        category: finalCategory || 'General',
+        defaultsApplied
+      });
+      
+      approvedCount++;
+    }
+
+    // Save supplier default if rememberDefault is true and both supplier and category are provided
+    if (rememberDefault && supplier && category && supplier !== 'Bank Import') {
+      // Check if supplier default already exists
+      const [existing] = await db
+        .select()
+        .from(supplierDefaults)
+        .where(and(
+          eq(supplierDefaults.supplier, supplier),
+          eq(supplierDefaults.restaurantId, authReq.restaurantId)
+        ));
+
+      if (existing) {
+        // Update existing supplier default
+        await db
+          .update(supplierDefaults)
+          .set({
+            defaultCategory: category,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(supplierDefaults.supplier, supplier),
+            eq(supplierDefaults.restaurantId, authReq.restaurantId)
+          ));
+      } else {
+        // Create new supplier default
+        await db
+          .insert(supplierDefaults)
+          .values({
+            restaurantId: authReq.restaurantId,
+            supplier: supplier,
+            defaultCategory: category,
+          });
+      }
+      console.log(`Saved batch default for supplier ${supplier}: ${category}`);
+    }
+
+    // Mark all processed expenses as approved
+    if (approvedCount > 0) {
+      const processedIds = approvedExpenses.map(exp => exp.id);
+      await db
+        .update(importedExpenses)
+        .set({ 
+          status: 'APPROVED', 
+          approvedBy,
+          approvedAt: new Date()
+        })
+        .where(and(
+          inArray(importedExpenses.id, processedIds),
+          eq(importedExpenses.restaurantId, authReq.restaurantId)
+        ));
+    }
+
+    res.json({ 
+      success: true, 
+      message: `${approvedCount} expense(s) approved and added to ledger`,
+      approvedCount,
+      approvedExpenses
+    });
+
+  } catch (error) {
+    console.error('Batch approve error:', error);
+    res.status(500).json({ error: 'Failed to batch approve expenses' });
+  }
+});
+
 // PATCH /api/expenses/batch-reject - REQUIRES MANAGER ROLE
 router.patch('/batch-reject', requireManagerRole, async (req: Request, res: Response) => {
   try {
@@ -558,6 +814,120 @@ router.patch('/batch-reject', requireManagerRole, async (req: Request, res: Resp
   } catch (error) {
     console.error('Batch reject error:', error);
     res.status(500).json({ error: 'Failed to batch reject expenses' });
+  }
+});
+
+// Supplier Defaults CRUD Endpoints
+
+// GET /api/expenses/defaults - List all supplier defaults for authenticated restaurant
+router.get('/defaults', async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    
+    // SECURITY: Filter by restaurantId to prevent cross-tenant data leakage
+    const defaults = await db
+      .select()
+      .from(supplierDefaults)
+      .where(eq(supplierDefaults.restaurantId, authReq.restaurantId))
+      .orderBy(supplierDefaults.supplier);
+
+    res.json(defaults);
+  } catch (error) {
+    console.error('Get supplier defaults error:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier defaults' });
+  }
+});
+
+// GET /api/expenses/defaults/:supplier - Get specific supplier default by supplier name
+router.get('/defaults/:supplier', async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { supplier } = req.params;
+
+    // SECURITY: Get supplier default with restaurant scoping
+    const [supplierDefault] = await db
+      .select()
+      .from(supplierDefaults)
+      .where(and(
+        eq(supplierDefaults.supplier, supplier),
+        eq(supplierDefaults.restaurantId, authReq.restaurantId)
+      ));
+
+    if (!supplierDefault) {
+      return res.status(404).json({ error: 'Supplier default not found' });
+    }
+
+    res.json(supplierDefault);
+  } catch (error) {
+    console.error('Get supplier default error:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier default' });
+  }
+});
+
+// POST /api/expenses/defaults - Upsert supplier default - REQUIRES MANAGER ROLE
+router.post('/defaults', requireManagerRole, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { supplier, defaultCategory, notesTemplate } = req.body;
+
+    // Validate required fields
+    if (!supplier || !defaultCategory) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: supplier and defaultCategory are required' 
+      });
+    }
+
+    // Check if supplier default already exists
+    const [existing] = await db
+      .select()
+      .from(supplierDefaults)
+      .where(and(
+        eq(supplierDefaults.supplier, supplier),
+        eq(supplierDefaults.restaurantId, authReq.restaurantId)
+      ));
+
+    if (existing) {
+      // Update existing supplier default
+      const [updated] = await db
+        .update(supplierDefaults)
+        .set({
+          defaultCategory,
+          notesTemplate: notesTemplate || null,
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(supplierDefaults.supplier, supplier),
+          eq(supplierDefaults.restaurantId, authReq.restaurantId)
+        ))
+        .returning();
+
+      res.json({ 
+        success: true, 
+        message: 'Supplier default updated',
+        data: updated 
+      });
+    } else {
+      // Create new supplier default
+      const [created] = await db
+        .insert(supplierDefaults)
+        .values({
+          restaurantId: authReq.restaurantId,
+          supplier,
+          defaultCategory,
+          notesTemplate: notesTemplate || null,
+        })
+        .returning();
+
+      res.json({ 
+        success: true, 
+        message: 'Supplier default created',
+        data: created 
+      });
+    }
+
+  } catch (error) {
+    console.error('Upsert supplier default error:', error);
+    res.status(500).json({ error: 'Failed to save supplier default' });
   }
 });
 

@@ -1328,6 +1328,16 @@ export const partnerStatements = pgTable("partner_statements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Supplier Defaults table - stores common biller mappings per restaurant
+export const supplierDefaults = pgTable("supplier_defaults", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id").notNull(),
+  supplier: text("supplier").notNull(),
+  defaultCategory: text("default_category").notNull(),
+  notesTemplate: text("notes_template"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Loyverse API Integration Tables
 export const loyverse_shifts = pgTable('loyverse_shifts', {
   shiftDate: date('shift_date').primaryKey(),
@@ -1348,6 +1358,7 @@ export const insertChecklistAssignmentsSchema = createInsertSchema(checklistAssi
 export const insertImportedExpenseSchema = createInsertSchema(importedExpenses).omit({ id: true, createdAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export const insertPartnerStatementsSchema = createInsertSchema(partnerStatements).omit({ id: true, createdAt: true });
+export const insertSupplierDefaultsSchema = createInsertSchema(supplierDefaults).omit({ id: true, updatedAt: true });
 
 // Manager Checklist Types
 export type InsertCleaningTask = typeof cleaningTasks.$inferInsert;
@@ -1362,6 +1373,8 @@ export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type PartnerStatement = typeof partnerStatements.$inferSelect;
 export type InsertPartnerStatement = z.infer<typeof insertPartnerStatementsSchema>;
+export type SupplierDefault = typeof supplierDefaults.$inferSelect;
+export type InsertSupplierDefault = z.infer<typeof insertSupplierDefaultsSchema>;
 
 // --- compat alias for older imports ---
 export const dailySalesV2 = dailySales;
