@@ -39,6 +39,7 @@ import DailyStock from "./pages/operations/DailyStock";
 import PosUpload from "./pages/analysis/PosUpload";
 import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
 import PosReceipts from "./pages/analysis/PosReceipts";
+import { LoyverseReports } from "./pages/operations/LoyverseReports";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
