@@ -50,13 +50,22 @@ export const AnalysisPage = () => {
       
       const lastShift = sortedShifts?.[0];
       const lastShiftReceipts = lastShift ? receipts?.receipts?.filter((r: any) => {
-        const receiptTime = new Date(r.created_at).getTime();
+        // Use closed_at for payment time, falling back to created_at
+        const receiptTime = new Date(r.closed_at || r.created_at).getTime();
         const shiftStart = new Date(lastShift.opened_at).getTime();
         const shiftEnd = new Date(lastShift.closed_at || Date.now()).getTime();
         return receiptTime >= shiftStart && receiptTime <= shiftEnd;
       }) : [];
       
-      return { lastShift, lastShiftReceipts, allShifts: shifts, allReceipts: receipts };
+      // Filter anomalies to only the last shift time window
+      const lastShiftAnomalies = lastShift && shifts?.anomalies ? shifts.anomalies.filter((anomaly: any) => {
+        const anomalyTime = new Date(anomaly.timestamp || anomaly.created_at).getTime();
+        const shiftStart = new Date(lastShift.opened_at).getTime();
+        const shiftEnd = new Date(lastShift.closed_at || Date.now()).getTime();
+        return anomalyTime >= shiftStart && anomalyTime <= shiftEnd;
+      }) : [];
+      
+      return { lastShift, lastShiftReceipts, lastShiftAnomalies, allShifts: shifts, allReceipts: receipts };
     }
   });
 
@@ -224,7 +233,7 @@ export const AnalysisPage = () => {
               <div>
                 <Label className="text-sm text-gray-600">Anomalies</Label>
                 <Badge variant="destructive" className="text-lg" data-testid="card-anomalies">
-                  {lastShiftData?.allShifts?.anomalies?.length || stats?.anomalies || 0}
+                  {lastShiftData?.lastShiftAnomalies?.length ?? 0}
                 </Badge>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
