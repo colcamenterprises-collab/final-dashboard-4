@@ -4,7 +4,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { db } from '../db.js';
 import { importedExpenses, partnerStatements, expenses } from '../../shared/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 // Extend Express Request interface
@@ -451,11 +451,11 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       return res.status(404).json({ error: 'Pending expense not found or access denied' });
     }
 
-    // SECURITY: Validate ledger integrity - only negative amounts can be expenses
+    // SECURITY: Validate amount exists (positive amounts are expected for expenses from CSV)
     // Add null safety check for amountCents
-    if (!pendingExpense.amountCents || pendingExpense.amountCents >= 0) {
+    if (!pendingExpense.amountCents || pendingExpense.amountCents === 0) {
       return res.status(400).json({ 
-        error: 'Ledger integrity violation: Cannot approve positive amounts as expenses. Positive amounts indicate income.' 
+        error: 'Invalid expense amount: Amount cannot be null or zero.' 
       });
     }
 
@@ -520,6 +520,44 @@ router.patch('/:id/reject', requireManagerRole, async (req: Request, res: Respon
   } catch (error) {
     console.error('Reject expense error:', error);
     res.status(500).json({ error: 'Failed to reject expense' });
+  }
+});
+
+// PATCH /api/expenses/batch-reject - REQUIRES MANAGER ROLE
+router.patch('/batch-reject', requireManagerRole, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { ids } = req.body; // Array of expense IDs to reject
+    const approvedBy = authReq.approvedBy;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Invalid or missing expense IDs array' });
+    }
+
+    // SECURITY: Batch reject with restaurant scoping
+    const result = await db
+      .update(importedExpenses)
+      .set({ 
+        status: 'REJECTED', 
+        approvedBy,
+        approvedAt: new Date()
+      })
+      .where(and(
+        inArray(importedExpenses.id, ids),
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
+      ))
+      .returning();
+
+    res.json({ 
+      success: true, 
+      message: `${result.length} expense(s) rejected`,
+      rejectedCount: result.length 
+    });
+
+  } catch (error) {
+    console.error('Batch reject error:', error);
+    res.status(500).json({ error: 'Failed to batch reject expenses' });
   }
 });
 

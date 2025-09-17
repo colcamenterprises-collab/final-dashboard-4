@@ -1,0 +1,77 @@
+Prioritized One-Go Plan (Simple, Data-Accurate Fixes)
+
+Quick Wins: Fix history/date search (DB query filter), mobile responsive (Tailwind classes), remove sidebar clutter.
+Data Integrity: Add packaging fields to forms (sync to ingredients for cost calcs), summary cards/MTD aggregates (Loyverse pulls + sums).
+Flows: Sub-menu for Loyverse, main Analysis with uploads (endpoint for file parse, store in DB).
+Tests: Re-run full prompt, verify history loads, date filters, mobile view, cards update (e.g., MTD net sales).
+
+Updates to existing files only (routes.ts for endpoints, pages for UI, schema if needed). Paste the below to agent—includes code, locked warnings, test prompt. No manual involvement.
+Fort Knox Lockdown: Fix Shopping/Analysis Issues, Add Packaging/Stats
+Execute ONLY: Update existing files. Data accuracy: DB filters for history/date, cost calcs with packageSize, MTD aggregates from Loyverse. Responsive Tailwind (overflow-auto). No new deps/files.
+
+Update server/api/shopping-list.ts (fix history/date search):
+
+typescript// In getShoppingList (add query param for date):
+const date = req.query.date || new Date().toISOString().slice(0,10);
+const lists = await db.select().from(shopping_lists).where(eq(shiftDate, date)); // Assume table
+// For history: if (req.query.history) return res.json(lists); // All past
+// For date: Filter lists by date, group as current
+res.json({ groupedList: lists[0]?.grouped || {}, history: lists });
+
+Update client/src/pages/operations/ShoppingListPage.tsx (fix mobile, history/date):
+
+tsx// Add responsive:
+<div className="overflow-x-auto"> {/* Mobile scroll */}
+  <Table data={data.groupedList} columns={['Category', 'Items']} />
+</div>
+// History tab: {history ? <Table data={history} /> : 'No history'}
+// Date input: <input type="date" onChange={e => fetchWithDate(e.target.value)} />
+
+Update client/src/components/forms/IngredientMgmt.tsx & ShoppingAdd.tsx (add packaging fields):
+
+tsx// In form:
+<label>Package Size (g/kg)</label>
+<input type="text" name="packageSize" placeholder="1000g" onChange={e => setForm({...form, packageSize: e.target.value})} />
+<label>Unit Price (THB)</label>
+<input type="number" name="unitPrice" placeholder="319" onChange={e => setForm({...form, unitPrice: e.target.value})} />
+<label>Cost Calc</label>
+<p>{form.portion ? (parseFloat(form.portion) / parseFloat(form.packageSize || 1000) * parseFloat(form.unitPrice || 0)).toFixed(3) : 'N/A'}</p>
+
+Update client/src/components/Sidebar.tsx (remove unwanted):
+
+tsx// Remove AI Suggestions/Preferred Supplier sections—keep core menu only
+const menuItems = [
+  { label: 'Operations', path: '/operations' },
+  { label: 'Finance', path: '/finance' },
+  { label: 'Menu and Costing', path: '/menu' },
+  { label: 'Analysis', path: '/analysis' }, // Sub: /analysis/loyverse
+  { label: 'Membership', path: '/membership' }
+];
+
+Update client/src/pages/operations/Analysis.tsx (add summary cards, stats):
+
+tsx// Add to top:
+const { data: stats } = useQuery(['analysisStats'], () => axios.get('/api/operations/stats').then(res => res.data)); // MTD/receipts from Loyverse
+<div className="grid grid-cols-4 gap-4">
+  <Card title="Receipts Last Shift"><Value>{stats.receiptsLast || 0}</Value></Card>
+  <Card title="Gross Last Shift"><Value>{stats.grossLast?.toFixed(2)}</Value></Card>
+  <Card title="Net MTD"><Value>{stats.netMtd?.toFixed(2)}</Value></Card>
+  <Card title="Anomalies"><Badge variant="destructive">{stats.anomalies || 0}</Badge></Card>
+</div>
+// For front page (Dashboard.tsx): Same cards from stats endpoint
+// Sub-menu: <Link to="/analysis/loyverse">Loyverse Analysis</Link> under Analysis
+// Upload: <input type="file" onChange={uploadReport} /> // POST /api/analysis/upload, parse with Jussi AI
+
+Update server/api/operations/stats.ts (add MTD/stats):
+
+typescript// Aggregate Loyverse for MTD:
+const firstMonth = new Date().toISOString().slice(0,7) + '-01';
+const mtdShifts = await db.select().from(loyverse_shifts).where(gte(shiftDate, firstMonth));
+const netMtd = mtdShifts.reduce((sum, s) => sum + parseFloat(s.data.net_sales), 0);
+const receiptsLast = await db.select().from(loyverse_receipts).where(eq(shiftDate, yesterday)).limit(1)[0]?.data.receipts?.length || 0;
+res.json({ netMtd, receiptsLast, grossLast: lastShift.gross_sales, anomalies: count >1% diffs });
+
+Re-Run Test Prompt [Paste full previous, add: Test shopping history/date (load past, log items), mobile view (screenshot), packaging calc (add item, log cost), Analysis cards (MTD stats), upload (mock file, log parse)].
+
+Log "Issues fixed" with screenshots (shopping history, mobile, Analysis cards).
+This resolves all—history/date working, mobile fixed, packaging for costs, sidebar clean, Analysis with stats/sub-menu. Share logs for confirmation.

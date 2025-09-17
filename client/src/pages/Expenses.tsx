@@ -6,6 +6,7 @@ import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, FileText } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -24,6 +25,9 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   const [approvalCategory, setApprovalCategory] = useState('');
   const [approvalSupplier, setApprovalSupplier] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
+  
+  // Batch rejection state
+  const [selectedExpenses, setSelectedExpenses] = useState<string[]>([]);
 
   // Authentication headers for Golden Patch
   const getAuthHeaders = () => ({
@@ -103,6 +107,66 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
     },
   });
 
+  // Batch reject mutation
+  const batchRejectMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return apiRequest('/api/expenses/batch-reject', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ ids }),
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: '✅ Batch Rejection Complete',
+        description: `${data.rejectedCount} expense(s) rejected successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+      if (onExpenseApproved) onExpenseApproved();
+      setSelectedExpenses([]);
+    },
+    onError: () => {
+      toast({
+        title: '❌ Batch Rejection Failed',
+        description: 'Failed to reject selected expenses',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Batch selection handlers
+  const toggleExpenseSelection = (expenseId: string) => {
+    setSelectedExpenses(prev => 
+      prev.includes(expenseId) 
+        ? prev.filter(id => id !== expenseId)
+        : [...prev, expenseId]
+    );
+  };
+
+  const selectAllExpenses = () => {
+    setSelectedExpenses(pendingExpenses.map((exp: any) => exp.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedExpenses([]);
+  };
+
+  const handleBatchReject = () => {
+    if (selectedExpenses.length === 0) {
+      toast({
+        title: '⚠️ No Selection',
+        description: 'Please select expenses to reject',
+        variant: 'destructive',
+      });
+      return;
+    }
+    batchRejectMutation.mutate(selectedExpenses);
+  };
+
   const openApprovalDialog = (expense: any, action: 'approve' | 'reject') => {
     setSelectedExpense(expense);
     setApprovalAction(action);
@@ -150,12 +214,46 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
     <>
       {/* Golden Patch - Review Uploaded Transactions */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <FileText className="h-5 w-5 text-emerald-600" />
-          <h3 className="font-semibold text-lg">Review Uploaded Transactions ({pendingExpenses.length})</h3>
-          <Badge variant="outline" className="text-amber-600 border-amber-600">
-            Golden Patch
-          </Badge>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-emerald-600" />
+            <h3 className="font-semibold text-lg">Review Uploaded Transactions ({pendingExpenses.length})</h3>
+            <Badge variant="outline" className="text-amber-600 border-amber-600">
+              Golden Patch
+            </Badge>
+          </div>
+          
+          {pendingExpenses.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectAllExpenses}
+                disabled={selectedExpenses.length === pendingExpenses.length}
+                data-testid="button-select-all"
+              >
+                Select All ({pendingExpenses.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearSelection}
+                disabled={selectedExpenses.length === 0}
+                data-testid="button-clear-selection"
+              >
+                Clear Selection
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBatchReject}
+                disabled={selectedExpenses.length === 0 || batchRejectMutation.isPending}
+                data-testid="button-batch-reject"
+              >
+                {batchRejectMutation.isPending ? 'Rejecting...' : `Reject Selected (${selectedExpenses.length})`}
+              </Button>
+            </div>
+          )}
         </div>
         
         {isLoading ? (
@@ -165,6 +263,19 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
             <table className="w-full border text-sm">
               <thead>
                 <tr className="bg-gray-100">
+                  <th className="p-2 border text-center w-12">
+                    <Checkbox
+                      checked={selectedExpenses.length === pendingExpenses.length && pendingExpenses.length > 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          selectAllExpenses();
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                      data-testid="checkbox-select-all-header"
+                    />
+                  </th>
                   <th className="p-2 border text-left">Date</th>
                   <th className="p-2 border text-left">Description</th>
                   <th className="p-2 border text-right">Amount</th>
@@ -175,6 +286,13 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
               <tbody>
                 {pendingExpenses.map((expense: any) => (
                   <tr key={expense.id} className="hover:bg-gray-50">
+                    <td className="border p-2 text-center">
+                      <Checkbox
+                        checked={selectedExpenses.includes(expense.id)}
+                        onCheckedChange={() => toggleExpenseSelection(expense.id)}
+                        data-testid={`checkbox-expense-${expense.id}`}
+                      />
+                    </td>
                     <td className="border p-2">
                       {new Date(expense.date).toLocaleDateString('th-TH')}
                     </td>
