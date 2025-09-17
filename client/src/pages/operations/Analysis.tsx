@@ -230,7 +230,7 @@ export const AnalysisPage = () => {
                 {receipts?.itemsSold && Object.entries(receipts.itemsSold).map(([item, qty]) => (
                   <TableRow key={item}>
                     <TableCell data-testid={`item-name-${item.replace(/\s/g, '-')}`}>{item}</TableCell>
-                    <TableCell data-testid={`item-qty-${item.replace(/\s/g, '-')}`}>{qty}</TableCell>
+                    <TableCell data-testid={`item-qty-${item.replace(/\s/g, '-')}`}>{String(qty)}</TableCell>
                   </TableRow>
                 )) || (
                   <TableRow>
