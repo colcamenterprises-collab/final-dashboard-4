@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -267,6 +267,9 @@ export const AnalysisPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Outlet for nested routes */}
+      <Outlet />
     </div>
   );
 };
