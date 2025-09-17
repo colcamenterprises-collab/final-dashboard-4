@@ -1923,54 +1923,56 @@ export function registerRoutes(app: express.Application): Server {
   // Get comprehensive expense totals for dashboard
   app.get("/api/expensesV2/totals", async (req: Request, res: Response) => {
     try {
-      // Get MTD (Month-to-Date) total
+      // Get MTD (Month-to-Date) total - FIXED: Use correct column names
       const mtdResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
+        SELECT COALESCE(SUM("amount_cents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const mtd = Number(mtdResult.rows[0]?.total || 0); // Already in THB
+      const mtd = Number(mtdResult.rows[0]?.total || 0); // In cents, convert to THB
 
-      // Get YTD (Year-to-Date) total
+      // Get YTD (Year-to-Date) total - FIXED: Use correct column names  
       const ytdResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
+        SELECT COALESCE(SUM("amount_cents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const ytd = Number(ytdResult.rows[0]?.total || 0); // Already in THB
+      const ytd = Number(ytdResult.rows[0]?.total || 0); // In cents, convert to THB
 
-      // Get previous month total for MoM calculation
+      // Get previous month total for MoM calculation - FIXED: Use correct column names
       const prevMonthResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
+        SELECT COALESCE(SUM("amount_cents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE) - 1
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE) - 1
+        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
       `);
-      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // Already in THB
-      const mom = prevMonth > 0 ? ((mtd - prevMonth) / prevMonth * 100).toFixed(1) : '0.0';
+      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // In cents, convert to THB
+      const prevMonthTHB = prevMonth / 100; // Convert to THB
+      const mtdTHB = mtd / 100; // Convert to THB  
+      const mom = prevMonthTHB > 0 ? ((mtdTHB - prevMonthTHB) / prevMonthTHB * 100).toFixed(1) : '0.0';
 
-      // Get top 5 expense categories by total amount
+      // Get top 5 expense categories by total amount - FIXED: Use correct column names
       const top5Result = await db.execute(sql`
         SELECT 
-          "expenseType" as type,
-          COALESCE(SUM("costCents"), 0) as total
+          "category" as type,
+          COALESCE(SUM("amount_cents"), 0) as total
         FROM expenses
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
-        GROUP BY "expenseType"
+        WHERE EXTRACT(month FROM "date") = EXTRACT(month FROM CURRENT_DATE)
+        AND EXTRACT(year FROM "date") = EXTRACT(year FROM CURRENT_DATE)
+        GROUP BY "category"
         ORDER BY total DESC
         LIMIT 5
       `);
       
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
-        total: Number(row.total || 0) // Already in THB
+        total: Number(row.total || 0) / 100 // Convert cents to THB
       }));
 
       res.json({
-        mtd: mtd,
-        ytd: ytd,
+        mtd: mtd / 100, // Convert cents to THB
+        ytd: ytd / 100, // Convert cents to THB
         mom: Number(mom),
         top5: top5
       });
