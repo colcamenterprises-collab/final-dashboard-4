@@ -84,10 +84,7 @@ export default function App() {
                     <Route path="pos-upload" element={<PosUpload />} />
                     <Route path="shift-analysis" element={<ShiftAnalysis />} />
                     <Route path="pos-receipts" element={<PosReceipts />} />
-                    <Route path="loyverse" element={<div className="p-4">
-                      <h2 className="text-xl font-semibold mb-4">Loyverse Reports</h2>
-                      {/* Loyverse-specific content will be shown here */}
-                    </div>} />
+                    <Route path="loyverse" element={<LoyverseReports />} />
                     <Route path="stock-review" element={<div className="p-4">
                       <h2 className="text-xl font-semibold mb-4">Stock Review</h2>
                       <p className="text-slate-600">Buns, Meat & Drinks Analysis</p>
