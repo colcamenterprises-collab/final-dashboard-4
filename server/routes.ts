@@ -2736,23 +2736,28 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Trigger Jussi Summary
-  app.post('/api/jussi/generate', async (req: Request, res: Response) => {
+  // Fort Knox Jussi Generate Endpoint
+  app.post("/api/jussi/generate", async (req: Request, res: Response) => {
+    const date = req.body.date || new Date().toISOString().slice(0,10);
     try {
-      const jussiModule = await import('./services/jussi/summaryGenerator.js');
-      const generateDailySummary = (jussiModule as any).generateDailySummary;
+      const { generateJussiReport } = await import('./services/summaryGenerator.js');
+      const data = await generateJussiReport(date);
+      res.json({ ok: true, data });
+    } catch (e: any) {
+      res.status(500).json({ error: "Jussi generation failed", details: e.message });
+    }
+  });
+
+  app.get("/api/jussi/latest", async (req: Request, res: Response) => {
+    try {
+      const { db } = await import('./db.js');
+      const { dailyReceiptSummaries } = await import('../shared/schema.js');
+      const { desc } = await import('drizzle-orm');
       
-      const result = await generateDailySummary();
-      
-      res.json({
-        success: true,
-        jobId: result.jobId,
-        emailSent: !!result.emailResult,
-        recipient: result.emailResult?.recipient
-      });
-    } catch (error) {
-      console.error('Jussi generation error:', error);
-      res.status(500).json({ error: 'Summary generation failed', details: (error as Error).message });
+      const latest = await db.select().from(dailyReceiptSummaries).orderBy(desc(dailyReceiptSummaries.shiftDate)).limit(1);
+      res.json({ ok: true, data: latest[0]?.data || null });
+    } catch (e: any) {
+      res.status(500).json({ error: "Fetch failed", details: e.message });
     }
   });
 

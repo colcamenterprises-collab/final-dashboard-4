@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import axios from 'axios';
@@ -18,6 +18,22 @@ export const AnalysisPage = () => {
   
   // Check if we're on the main analysis route (not a nested route)
   const isMainRoute = location.pathname === '/operations/analysis';
+
+  // Jussi Daily Report State
+  const [jussiData, setJussiData] = useState<any>(null);
+  
+  useEffect(() => {
+    async function fetchJussiData() {
+      try {
+        const res = await fetch("/api/jussi/latest");
+        const json = await res.json();
+        setJussiData(json.data);
+      } catch (error) {
+        console.error('Failed to fetch Jussi data:', error);
+      }
+    }
+    fetchJussiData();
+  }, []);
 
   // Fort Knox pre-sets for quick date selection
   const preSets = [
@@ -138,6 +154,91 @@ export const AnalysisPage = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Analysis Dashboard</h1>
         <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
       </div>
+
+      {/* Jussi Daily Report - Show only on main route */}
+      {isMainRoute && jussiData && (
+        <div className="mb-6 border rounded-lg p-4 bg-gray-100">
+          <h2 className="text-xl font-semibold">Jussi Daily Report - {new Date().toISOString().slice(0,10)}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {/* Top 5 Items */}
+            <div>
+              <h3 className="font-semibold mt-2 mb-2">Top 5 Items</h3>
+              <table className="w-full text-sm border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-300 px-2 py-1 text-left">Item</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jussiData.top5Items?.map((i: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="border border-gray-300 px-2 py-1">{i.item}</td>
+                      <td className="border border-gray-300 px-2 py-1">{i.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Payment Breakdown */}
+            <div>
+              <h3 className="font-semibold mt-2 mb-2">Payment Breakdown</h3>
+              <table className="w-full text-sm border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-300 px-2 py-1 text-left">Method</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jussiData.paymentBreakdown?.map((p: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="border border-gray-300 px-2 py-1">{p.method}</td>
+                      <td className="border border-gray-300 px-2 py-1">{p.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Stock Variances */}
+            <div>
+              <h3 className="font-semibold mt-2 mb-2">Stock Variances</h3>
+              <table className="w-full text-sm border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-300 px-2 py-1 text-left">Item</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left">Expected</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left">Actual</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left">Variance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jussiData.variances?.stockUsage?.map((s: any, idx: number) => (
+                    <tr key={idx} className={s.status === "🚨" ? "text-red-600" : ""}>
+                      <td className="border border-gray-300 px-2 py-1">{s.item}</td>
+                      <td className="border border-gray-300 px-2 py-1">{s.expected}</td>
+                      <td className="border border-gray-300 px-2 py-1">{s.actual}</td>
+                      <td className="border border-gray-300 px-2 py-1">{s.variance}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Flags */}
+          {jussiData.flags && jussiData.flags.length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-semibold mt-2 mb-2">🚨 Flags</h3>
+              <ul className="text-red-600 text-sm list-disc list-inside">
+                {jussiData.flags.map((f: string, idx: number) => <li key={idx}>{f}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Date Range and Pre-sets - Show only on main route */}
       {isMainRoute && (

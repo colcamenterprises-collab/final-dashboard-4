@@ -33,6 +33,7 @@ export const dailySales = pgTable("daily_sales", {
   staffMember: text("staff_member").notNull(),
 });
 
+
 // Daily Stock Sales table - synced with live database
 export const dailyStockSales = pgTable("daily_stock_sales", {
   id: serial("id").primaryKey(),
@@ -969,30 +970,12 @@ export type InsertShiftSales = z.infer<typeof insertShiftSalesSchema>;
 export type ShiftPurchase = typeof shiftPurchases.$inferSelect;
 export type InsertShiftPurchase = z.infer<typeof insertShiftPurchaseSchema>;
 
-// Daily receipt summaries processed by Jussi
-export const dailyReceiptSummaries = pgTable('daily_receipt_summaries', {
-  id: serial('id').primaryKey(),
-  date: date('date').notNull().unique(), // Shift date (YYYY-MM-DD)
-  shiftStart: timestamp('shift_start').notNull(),
-  shiftEnd: timestamp('shift_end').notNull(),
-  firstReceipt: varchar('first_receipt', { length: 50 }),
-  lastReceipt: varchar('last_receipt', { length: 50 }),
-  totalReceipts: integer('total_receipts').default(0),
-  grossSales: decimal('gross_sales', { precision: 10, scale: 2 }).default('0'),
-  netSales: decimal('net_sales', { precision: 10, scale: 2 }).default('0'),
-  paymentBreakdown: jsonb('payment_breakdown'), // Array of {payment_method, count, amount}
-  itemsSold: jsonb('items_sold'), // Object with item names and quantities
-  modifiersSold: jsonb('modifiers_sold'), // Object with modifier names and quantities
-  drinksSummary: jsonb('drinks_summary'), // Detailed drinks breakdown
-  rollsUsed: integer('rolls_used').default(0), // Calculated from burger items
-  refunds: jsonb('refunds'), // Array of refund details
-  processedAt: timestamp('processed_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-}, (table) => {
-  return {
-    dateIdx: index('daily_receipt_summaries_date_idx').on(table.date),
-    shiftStartIdx: index('daily_receipt_summaries_shift_start_idx').on(table.shiftStart),
-  };
+// ✅ Fort Knox Jussi Daily Receipt Summaries - DO NOT MODIFY
+export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull().unique(),
+  data: jsonb("data").notNull(), // { top5Items, paymentBreakdown, basketBreakdown, ingredientUsage, variances, flags }
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertDailyReceiptSummarySchema = createInsertSchema(dailyReceiptSummaries).omit({ 

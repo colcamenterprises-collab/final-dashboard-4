@@ -1,0 +1,205 @@
+Fort Knox Super Patch – Jussi Daily Management Report
+# 🚨 DO NOT MODIFY WITHOUT CAM’S EXPLICIT APPROVAL 🚨
+# Smash Brothers Burgers – Jussi Daily Report
+# Locked workflow: update ONLY existing files (schema.ts, routes.ts, summaryGenerator.js, Analysis.tsx)
+# No new deps, no extra files. Drizzle ORM + OpenAI + Loyverse utils ONLY.
+
+--- update: server/db/schema.ts
++ // ✅ Table for Jussi’s daily shift summaries
++ export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
++   id: serial("id").primaryKey(),
++   shiftDate: date("shift_date").notNull().unique(),
++   data: jsonb("data").notNull(), // { top5Items, paymentBreakdown, basketBreakdown, ingredientUsage, variances, flags }
++   createdAt: timestamp("created_at").defaultNow(),
++ });
+
+--- update: server/services/summaryGenerator.js
++ /**
++  * 🚨 DO NOT MODIFY 🚨
++  * Jussi Daily Report Generator
++  * Uses Loyverse receipts, staff forms, and recipes to build summary.
++  */
++ import { db } from "../db/client";
++ import { dailyReceiptSummaries, daily_sales_v2, expenses, recipes } from "../db/schema";
++ import { getLoyverseReceipts, getShiftReport } from "../utils/loyverse";
++ import OpenAI from "openai";
++
++ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
++
++ export async function generateJussiReport(date) {
++   const receipts = await getLoyverseReceipts({ date });
++   const shift = await getShiftReport({ date });
++   const form = await db.query.daily_sales_v2.findFirst({ where: (t, { eq }) => eq(t.date, date) });
++   const purchases = await db.query.expenses.findMany({ where: (t, { eq }) => eq(t.date, date) });
++   const recipeList = await db.query.recipes.findMany();
++
++   // Build OpenAI prompt
++   const prompt = `
++   You are Jussi, Head of Ops. Analyze data for shift ${date}.
++   Inputs:
++   - Receipts: ${JSON.stringify(receipts)}
++   - Shift Report: ${JSON.stringify(shift)}
++   - Staff Form: ${JSON.stringify(form)}
++   - Purchases: ${JSON.stringify(purchases)}
++   - Recipes: ${JSON.stringify(recipeList)}
++
++   Tasks:
++   1. Sales vs POS: Compare staff form totals (gross, net, grab, qr, direct, expenses) vs shift report. Flag any mismatch.
++   2. Stock Usage:
++      - Rolls: Expected = Start + Purchases – BurgersSold. Flag if variance < -4 or > +4.
++      - Meat: 90g per patty. Flag if variance > 500g.
++      - Drinks: 1 per sale. Flag if variance > 2 units.
++   3. Basket of Goods: Count burgers, side orders, modifiers sold.
++   4. Ingredient Breakdown: For each menu item sold, calculate expected ingredient usage based on recipes. Return totals.
++   5. Top 5 Items Sold (by qty).
++   6. Payment Breakdown: Total by cash, qr, grab, direct.
++   7. Flags: List all anomalies clearly.
++
++   Output JSON ONLY in structure:
++   {
++     top5Items: [{item, qty}],
++     paymentBreakdown: [{method, amount}],
++     basketBreakdown: {burgers, sides, modifiers},
++     ingredientUsage: [{ingredient, expected, actual, variance, status}],
++     variances: {salesVsPOS: [{field, formValue, posValue, status}], stockUsage: [{item, expected, actual, variance, status}]},
++     flags: [ "text summary of issues" ]
++   }
++   `;
++
++   const resp = await openai.chat.completions.create({
++     model: "gpt-4o",
++     messages: [{ role: "system", content: "You are Jussi, operations AI." }, { role: "user", content: prompt }],
++   });
++
++   const data = JSON.parse(resp.choices[0].message.content);
++
++   await db.insert(dailyReceiptSummaries).values({ shiftDate: date, data })
++     .onConflictDoUpdate({ target: dailyReceiptSummaries.shiftDate, set: { data } });
++
++   return data;
++ }
+
+--- update: server/routes.ts
++ import { generateJussiReport } from "./services/summaryGenerator";
++ import { db } from "./db/client";
++ import { dailyReceiptSummaries } from "./db/schema";
++ import { desc } from "drizzle-orm";
++
++ app.post("/api/jussi/generate", async (req, res) => {
++   const date = req.body.date || new Date().toISOString().slice(0,10);
++   try {
++     const data = await generateJussiReport(date);
++     res.json({ ok: true, data });
++   } catch (e) {
++     res.status(500).json({ error: "Jussi generation failed", details: e.message });
++   }
++ });
++
++ app.get("/api/jussi/latest", async (req, res) => {
++   try {
++     const latest = await db.select().from(dailyReceiptSummaries).orderBy(desc(dailyReceiptSummaries.shiftDate)).limit(1);
++     res.json({ ok: true, data: latest[0]?.data || null });
++   } catch (e) {
++     res.status(500).json({ error: "Fetch failed", details: e.message });
++   }
++ });
+
+--- update: server/index.ts
++ // 🚨 Jussi Daily Cron (3AM BKK)
++ import { generateJussiReport } from "./services/summaryGenerator";
++ setInterval(async () => {
++   const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
++   const time = bkkNow.slice(11,16);
++   if (time === "03:00") {
++     const today = bkkNow.slice(0,10);
++     await generateJussiReport(today);
++   }
++ }, 60*1000);
+
+--- update: client/src/pages/operations/Analysis.tsx
++ import { useEffect, useState } from "react";
++
++ export default function AnalysisPage() {
++   const [jussiData, setJussiData] = useState<any>(null);
++   useEffect(() => {
++     async function fetchData() {
++       const res = await fetch("/api/jussi/latest");
++       const json = await res.json();
++       setJussiData(json.data);
++     }
++     fetchData();
++   }, []);
++
++   return (
++     <div className="p-6">
++       <h1 className="text-2xl font-bold mb-4">Daily Analysis</h1>
++       {jussiData && (
++         <div className="mb-6 border rounded-lg p-4 bg-gray-100">
++           <h2 className="text-xl font-semibold">Jussi Daily Report</h2>
++           <h3 className="font-semibold mt-2">Top 5 Items</h3>
++           <table className="w-full text-sm">
++             <tbody>
++               {jussiData.top5Items?.map((i, idx) => (
++                 <tr key={idx}><td>{i.item}</td><td>{i.qty}</td></tr>
++               ))}
++             </tbody>
++           </table>
++           <h3 className="font-semibold mt-2">Payment Breakdown</h3>
++           <table className="w-full text-sm">
++             <tbody>
++               {jussiData.paymentBreakdown?.map((p, idx) => (
++                 <tr key={idx}><td>{p.method}</td><td>{p.amount}</td></tr>
++               ))}
++             </tbody>
++           </table>
++           <h3 className="font-semibold mt-2">Stock Variances</h3>
++           <table className="w-full text-sm">
++             <tbody>
++               {jussiData.variances?.stockUsage?.map((s, idx) => (
++                 <tr key={idx} className={s.status === "🚨" ? "text-red-600" : ""}>
++                   <td>{s.item}</td><td>{s.expected}</td><td>{s.actual}</td><td>{s.variance}</td>
++                 </tr>
++               ))}
++             </tbody>
++           </table>
++           <h3 className="font-semibold mt-2">Flags</h3>
++           <ul className="text-red-600 text-sm">
++             {jussiData.flags?.map((f, idx) => <li key={idx}>{f}</li>)}
++           </ul>
++         </div>
++       )}
++       {/* Existing Analysis content follows */}
++     </div>
++   );
++ }
+
+# ----------------------------------------------------
+# 🚨 MANDATORY QA CHECKLIST – REPORT ONLY
+# Agent must run these steps and report results:
+#
+# 1. DB: Confirm dailyReceiptSummaries table exists with (id, shiftDate, data, createdAt).
+# 2. POST /api/jussi/generate with today’s date → returns JSON with top5Items, paymentBreakdown, variances.
+# 3. GET /api/jussi/latest → returns latest summary JSON.
+# 4. Cron: wait or simulate 03:00 BKK → confirm report auto-inserted.
+# 5. Frontend: open /operations/analysis → screenshot showing Jussi Daily Report with tables.
+#
+# FORMAT: 
+# 1. Database: ✅/❌ details
+# 2. Manual Report: ✅/❌ details
+# 3. Latest API: ✅/❌ details
+# 4. Cron: ✅/❌ details
+# 5. Frontend: ✅/❌ screenshot + notes
+#
+# DO NOT fix, alter, or invent beyond these instructions.
+
+✅ Why This Is Better
+
+Combines their clarity (tight file scope, JSON shape, cron simplicity).
+
+Combines our rigour (tolerance rules, baskets of goods, flags first).
+
+Stores structured JSON for future expansion.
+
+Frontend shows tables + flags, not raw JSON.
+
+QA checklist forces proof of implementation.

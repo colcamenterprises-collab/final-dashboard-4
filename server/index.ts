@@ -357,6 +357,22 @@ async function checkSchema() {
   const { cronEmailService } = await import('./services/cronEmailService');
   cronEmailService.startEmailCron();
 
+  // 🚨 Jussi Daily Cron (3AM BKK)
+  setInterval(async () => {
+    const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+    const time = bkkNow.slice(11,16);
+    if (time === "03:00") {
+      try {
+        const { generateJussiReport } = await import('./services/summaryGenerator.js');
+        const today = bkkNow.slice(0,10);
+        await generateJussiReport(today);
+        console.log(`🚨 Jussi Daily Report generated for ${today}`);
+      } catch (error) {
+        console.error('🚨 Jussi Daily Cron failed:', error);
+      }
+    }
+  }, 60*1000);
+
   // Error guard middleware - must be LAST
   app.use(errorGuard);
 
