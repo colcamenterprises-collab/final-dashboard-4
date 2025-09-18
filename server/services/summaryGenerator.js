@@ -1,79 +1,101 @@
-/**
- * 🚨 DO NOT MODIFY 🚨
- * Jussi Daily Report Generator
- * Uses Loyverse receipts, staff forms, and recipes to build summary.
- */
 import { db } from "../db.js";
-import { dailyReceiptSummaries, dailySales, expenses, recipes } from "../../shared/schema.js";
+import { dailyReceiptSummaries, dailySalesV2, expenses, recipes } from "../../shared/schema.js";
+import { getShiftReport, getLoyverseReceipts } from "../utils/loyverse.js";
 import OpenAI from "openai";
-import axios from "axios";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function generateJussiReport(date) {
-  // ✅ Generate sample Jussi report data for now
-  console.log(`Generating Jussi report for ${date}`);
-  
-  // Get basic data from database
-  const form = await db.query.dailySales.findFirst({
-    where: (t, { eq }) => eq(t.date, date),
-  });
-  const purchases = await db.query.expenses.findMany({
-    where: (t, { eq }) => eq(t.date, date),
-  });
-  const recipeList = await db.query.recipes.findMany();
-  
-  // Create sample report structure
-  const data = {
+  try {
+    console.log(`Starting Jussi report generation for ${date}`);
+    
+    // 1. Pull data sources
+    console.log('Fetching shift report...');
+    const shift = await getShiftReport({ date });       // ✅ Gross, Net, Discounts, Refunds, Cash Drawer
+    
+    console.log('Fetching receipts...');
+    const receipts = await getLoyverseReceipts({ date });
+    
+    console.log('Fetching form data...');
+    const form = await db.query.dailySalesV2.findFirst({ where: (t, { eq }) => eq(t.date, new Date(date)) });
+    
+    console.log('Fetching purchases...');
+    const purchases = await db.query.expenses.findMany({ where: (t, { eq }) => eq(t.date, new Date(date)) });
+    
+    console.log('Fetching recipes...');
+    const recipeList = await db.query.recipes.findMany();
+
+  // 2. Build OpenAI prompt
+  const prompt = `
+  You are Jussi, Head of Ops. Build a JSON management report for shift ${date}.
+  Compare Staff Form vs POS Shift Report, receipts, and recipes.
+
+  Required Output:
+  {
+    executiveSummary: "text summary, list mismatches",
     salesVsPOS: [
-      {field: "Gross Sales", formValue: form?.grossSales || 0, posValue: 0, status: "⚠️"},
-      {field: "Net Sales", formValue: form?.netSales || 0, posValue: 0, status: "⚠️"}
+      { field: "Gross Sales", formValue, posValue, status },
+      { field: "Net Sales", formValue, posValue, status },
+      { field: "Cash Payments", formValue, posValue, status },
+      { field: "Cash Refunds", formValue, posValue, status },
+      { field: "Paid In", formValue, posValue, status },
+      { field: "Paid Out", formValue, posValue, status },
+      { field: "Expected Cash", formValue, posValue, status },
+      { field: "Actual Cash", formValue, posValue, status },
+      { field: "Difference", formValue, posValue, status },
+      { field: "Discounts", formValue, posValue, status },
+      { field: "Refunds", formValue, posValue, status }
     ],
     stockUsage: [
-      {item: "Burger Buns", expected: 50, actual: 48, variance: -2, status: "✅"},
-      {item: "Meat Patties", expected: 45, actual: 42, variance: -3, status: "🚨"}
+      { item: "Rolls", expected, actual, variance, status },
+      { item: "Meat", expected, actual, variance, status },
+      { item: "Drinks", expected, actual, variance, status }
     ],
-    basketBreakdown: {burgers: 25, sides: 15, modifiers: 8},
-    ingredientUsage: [
-      {ingredient: "Bun", expected: 50, actual: 48, variance: -2, status: "✅"},
-      {ingredient: "Beef Patty", expected: 45, actual: 42, variance: -3, status: "🚨"}
-    ],
-    top5Items: [
-      {item: "Classic Burger", qty: 15},
-      {item: "Cheese Burger", qty: 12},
-      {item: "Fries", qty: 20},
-      {item: "Coke", qty: 18},
-      {item: "Chicken Burger", qty: 8}
-    ],
-    paymentBreakdown: [
-      {method: "Cash", amount: 1250},
-      {method: "QR Code", amount: 890},
-      {method: "Grab", amount: 650},
-      {method: "Direct", amount: 420}
-    ],
-    variances: {
-      salesVsPOS: [
-        {field: "Total Sales", formValue: form?.grossSales || 0, posValue: 0, status: "🚨"}
+    basketBreakdown: { burgers, sides, modifiers },
+    top5Items: [{ item, qty }],
+    paymentBreakdown: [{ method, amount }],
+    flags: [ "list anomalies here" ]
+  }
+
+  Rules:
+  - Rolls tolerance: ±4
+  - Meat tolerance: ±500g
+  - Drinks tolerance: ±2 units
+  - Flag mismatches with 🚨, balanced with ✅
+
+  Inputs:
+  - Shift Report: ${JSON.stringify(shift)}
+  - Staff Form: ${JSON.stringify(form)}
+  - Receipts: ${JSON.stringify(receipts)}
+  - Purchases: ${JSON.stringify(purchases)}
+  - Recipes: ${JSON.stringify(recipeList)}
+  `;
+
+    console.log('Calling OpenAI...');
+    const resp = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are Jussi, operations AI. Output ONLY valid JSON." },
+        { role: "user", content: prompt }
       ],
-      stockUsage: [
-        {item: "Meat Patties", expected: 45, actual: 42, variance: -3, status: "🚨"}
-      ]
-    },
-    flags: [
-      "🚨 Meat patty variance exceeds 500g threshold",
-      "⚠️ POS system data unavailable for comparison",
-      "✅ Burger bun usage within acceptable range"
-    ]
-  };
+    });
 
+    console.log('Parsing OpenAI response...');
+    const data = JSON.parse(resp.choices[0].message.content);
 
-  // ✅ Save into DB with upsert using raw SQL to avoid date issues
-  await db.execute(`
-    INSERT INTO "dailyReceiptSummaries" (shift_date, data) 
-    VALUES ('${date}', '${JSON.stringify(data)}') 
-    ON CONFLICT (shift_date) 
-    DO UPDATE SET data = EXCLUDED.data
-  `);
+    console.log('Saving to database...');
+    // 3. Save to DB using raw SQL to avoid date issues
+    await db.execute(`
+      INSERT INTO "dailyReceiptSummaries" (shift_date, data) 
+      VALUES ('${date}', '${JSON.stringify(data)}') 
+      ON CONFLICT (shift_date) 
+      DO UPDATE SET data = EXCLUDED.data
+    `);
 
-  return data;
+    console.log('Jussi report generation completed successfully');
+    return data;
+  } catch (error) {
+    console.error('Error in generateJussiReport:', error);
+    throw error;
+  }
 }

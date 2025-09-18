@@ -23,16 +23,12 @@ export const AnalysisPage = () => {
   const [jussiData, setJussiData] = useState<any>(null);
   
   useEffect(() => {
-    async function fetchJussiData() {
-      try {
-        const res = await fetch("/api/jussi/latest");
-        const json = await res.json();
-        setJussiData(json.data);
-      } catch (error) {
-        console.error('Failed to fetch Jussi data:', error);
-      }
+    async function fetchData() {
+      const res = await fetch("/api/jussi/latest");
+      const json = await res.json();
+      setJussiData(json.data);
     }
-    fetchJussiData();
+    fetchData();
   }, []);
 
   // Fort Knox pre-sets for quick date selection
