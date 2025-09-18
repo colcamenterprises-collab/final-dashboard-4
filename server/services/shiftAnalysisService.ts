@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { dailySalesV2, expenses, dailyShiftAnalysis } from "../../shared/schema";
-import { getLoyverseShifts, getLoyverseReceipts } from "../utils/loyverse";
+import { getShiftReport, getLoyverseReceipts } from "../utils/loyverse";
 import { eq } from "drizzle-orm";
 
 export async function generateShiftAnalysis(date: string) {
@@ -10,11 +10,11 @@ export async function generateShiftAnalysis(date: string) {
   });
 
   // Pull Loyverse shift report (POS ground truth)
-  const shiftResult = await getLoyverseShifts({ startDate: date, endDate: date });
+  const shiftResult = await getShiftReport({ date: date });
   const shift = shiftResult?.shifts?.[0];
 
   // Pull receipts for stock usage
-  const receiptsResult = await getLoyverseReceipts({ startDate: date, endDate: date });
+  const receiptsResult = await getLoyverseReceipts({ date: date });
   const receipts = receiptsResult?.receipts || [];
 
   // --- Build comparison ---
