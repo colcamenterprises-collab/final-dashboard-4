@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 export const LoyverseReports = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
   const [endDate, setEndDate] = useState(startDate);
-  const { toast } = useToast();
 
   // Fort Knox pre-sets for quick date selection
   const preSets = [
@@ -22,40 +19,6 @@ export const LoyverseReports = () => {
     { label: 'Last 7 Days', start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().slice(0,10), end: new Date().toISOString().slice(0,10) },
     { label: 'MTD', start: new Date().toISOString().slice(0,7) + '-01', end: new Date().toISOString().slice(0,10) }
   ];
-
-  // Upload mutation for Loyverse reports
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch('/api/analysis/upload', {
-        method: 'POST',
-        body: formData
-      });
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({ 
-        title: "Report Uploaded", 
-        description: data.message || "Loyverse report uploaded successfully" 
-      });
-    },
-    onError: () => {
-      toast({ 
-        title: "Upload Failed", 
-        description: "Failed to upload Loyverse report", 
-        variant: "destructive" 
-      });
-    }
-  });
-
-  const uploadLoyverseReport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      uploadMutation.mutate(file);
-    }
-  };
 
   const { data: shifts } = useQuery({
     queryKey: ['loyverseShifts', startDate, endDate],
@@ -68,35 +31,7 @@ export const LoyverseReports = () => {
   });
 
   return (
-    <div className="p-6 space-y-6" data-testid="loyverse-reports-page">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Loyverse Reports</h1>
-        <p className="text-gray-600">Live POS data analysis and reporting</p>
-      </div>
-
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Loyverse Report</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Input 
-              type="file" 
-              onChange={uploadLoyverseReport}
-              accept=".csv,.xlsx,.json"
-              disabled={uploadMutation.isPending}
-              data-testid="input-upload-file"
-            />
-            <Button disabled={uploadMutation.isPending} data-testid="button-upload">
-              <Upload className="h-4 w-4 mr-2" />
-              {uploadMutation.isPending ? "Uploading..." : "Upload"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-6" data-testid="loyverse-reports-page">
       <Card>
         <CardHeader>
           <CardTitle>Loyverse Analysis</CardTitle>
@@ -131,7 +66,7 @@ export const LoyverseReports = () => {
             {preSets.map(p => (
               <Button 
                 key={p.label}
-                className="bg-blue-500 text-white hover:bg-blue-600" 
+                variant="outline"
                 onClick={() => { 
                   setStartDate(p.start); 
                   setEndDate(p.end); 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,10 @@ export const AnalysisPage = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
   const [endDate, setEndDate] = useState(startDate);
   const { toast } = useToast();
+  const location = useLocation();
+  
+  // Check if we're on the main analysis route (not a nested route)
+  const isMainRoute = location.pathname === '/operations/analysis';
 
   // Fort Knox pre-sets for quick date selection
   const preSets = [
@@ -135,53 +139,55 @@ export const AnalysisPage = () => {
         <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
       </div>
 
-      {/* Date Range and Pre-sets */}
-      <Card className="bg-white p-4 rounded shadow">
-        <CardHeader>
-          <CardTitle>Date Range Selection</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4 items-end">
-            <div>
-              <Label htmlFor="start-date">From</Label>
-              <Input 
-                id="start-date"
-                type="date" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)}
-                data-testid="input-start-date"
-              />
+      {/* Date Range and Pre-sets - Show only on main route */}
+      {isMainRoute && (
+        <Card className="bg-white p-4 rounded shadow">
+          <CardHeader>
+            <CardTitle>Date Range Selection</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4 items-end">
+              <div>
+                <Label htmlFor="start-date">From</Label>
+                <Input 
+                  id="start-date"
+                  type="date" 
+                  value={startDate} 
+                  onChange={(e) => setStartDate(e.target.value)}
+                  data-testid="input-start-date"
+                />
+              </div>
+              <div>
+                <Label htmlFor="end-date">To</Label>
+                <Input 
+                  id="end-date"
+                  type="date" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)}
+                  data-testid="input-end-date"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="end-date">To</Label>
-              <Input 
-                id="end-date"
-                type="date" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)}
-                data-testid="input-end-date"
-              />
-            </div>
-          </div>
 
-          {/* Fort Knox Pre-sets */}
-          <div className="flex space-x-2">
-            {preSets.map(p => (
-              <Button 
-                key={p.label}
-                variant="outline"
-                onClick={() => { 
-                  setStartDate(p.start); 
-                  setEndDate(p.end); 
-                }}
-                data-testid={`button-preset-${p.label.toLowerCase().replace(/\s+/g, '-')}`}
-              > 
-                {p.label} 
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            {/* Fort Knox Pre-sets */}
+            <div className="flex space-x-2">
+              {preSets.map(p => (
+                <Button 
+                  key={p.label}
+                  variant="outline"
+                  onClick={() => { 
+                    setStartDate(p.start); 
+                    setEndDate(p.end); 
+                  }}
+                  data-testid={`button-preset-${p.label.toLowerCase().replace(/\s+/g, '-')}`}
+                > 
+                  {p.label} 
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Summary Stats Cards (Sleek Tailwind styling) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -242,80 +248,83 @@ export const AnalysisPage = () => {
         </Card>
       </div>
 
-      {/* Upload Section */}
-      <Card className="bg-white p-4 rounded shadow">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload Loyverse Report
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Input 
-              id="loyverse-file-upload"
-              type="file" 
-              onChange={uploadLoyverseReport}
-              accept=".csv,.xlsx,.json"
-              disabled={uploadMutation.isPending}
-              data-testid="input-upload-file"
-            />
-            <Button 
-              onClick={handleUploadClick}
-              disabled={uploadMutation.isPending} 
-              data-testid="button-upload"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {uploadMutation.isPending ? "Processing with Jussi AI..." : "Upload & Analyze"}
-            </Button>
-          </div>
-          <p className="text-sm text-gray-500 mt-2">
-            Upload Loyverse reports for AI analysis, storage, and variance detection
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Analysis Modules */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
+      {/* Upload Section - Show only on main route */}
+      {isMainRoute && (
+        <Card className="bg-white p-4 rounded shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Loyverse Reports
+              <Upload className="h-5 w-5" />
+              Upload Loyverse Report
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600 mb-4">
-              Live receipts, items/modifiers sold, shifts data, and variance analysis from POS system.
-            </p>
-            <Link to="/operations/analysis/loyverse">
-              <Button className="w-full" data-testid="button-loyverse-module">
-                View Live Receipts & Data
+            <div className="flex items-center gap-4">
+              <Input 
+                id="loyverse-file-upload"
+                type="file" 
+                onChange={uploadLoyverseReport}
+                accept=".csv,.xlsx,.json"
+                disabled={uploadMutation.isPending}
+                data-testid="input-upload-file"
+              />
+              <Button 
+                onClick={handleUploadClick}
+                disabled={uploadMutation.isPending} 
+                data-testid="button-upload"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {uploadMutation.isPending ? "Processing with Jussi AI..." : "Upload & Analyze"}
               </Button>
-            </Link>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Upload Loyverse reports for AI analysis, storage, and variance detection
+            </p>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Stock Review
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600 mb-4">
-              Buns, meat & drinks analysis with usage vs recipes variance detection (over 5% flagged).
-            </p>
-            <Link to="/operations/analysis/stock-review">
-              <Button className="w-full" data-testid="button-stock-module">
-                View Buns, Meat & Drinks
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Analysis Modules - Show only on main route */}
+      {isMainRoute && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Loyverse Reports
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 mb-4">
+                Live receipts, items/modifiers sold, shifts data, and variance analysis from POS system.
+              </p>
+              <Link to="/operations/analysis/loyverse">
+                <Button className="w-full" data-testid="button-loyverse-module">
+                  View Live Receipts & Data
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
 
+          <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Stock Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 mb-4">
+                Buns, meat & drinks analysis with usage vs recipes variance detection (over 5% flagged).
+              </p>
+              <Link to="/operations/analysis/stock-review">
+                <Button className="w-full" data-testid="button-stock-module">
+                  View Buns, Meat & Drinks
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Outlet for nested routes */}
       <Outlet />
