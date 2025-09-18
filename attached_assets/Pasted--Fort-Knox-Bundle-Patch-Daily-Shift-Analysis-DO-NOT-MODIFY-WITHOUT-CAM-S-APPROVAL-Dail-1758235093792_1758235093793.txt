@@ -1,0 +1,211 @@
+🚨 Fort Knox Bundle Patch – Daily Shift Analysis
+# 🚨 DO NOT MODIFY WITHOUT CAM’S APPROVAL 🚨
+# Daily Shift Analysis – Full Implementation
+# Purpose: Side-by-side reconciliation of Staff Daily Sales & Stock Form vs Loyverse Shift Report
+# Rules:
+# - One new DB table only (dailyShiftAnalysis)
+# - One new backend service (generateShiftAnalysis)
+# - One new page (DailyShiftAnalysis.tsx)
+# - Styling MUST follow existing Library/Expenses table design
+# - Agent must run QA and SHOW populated data, not empty shells
+
+--- update: server/db/schema.ts
++ // ✅ New table to store reconciled shift analyses
++ export const dailyShiftAnalysis = pgTable("dailyShiftAnalysis", {
++   id: serial("id").primaryKey(),
++   shiftDate: date("shift_date").notNull(),
++   analysis: jsonb("analysis").notNull(), // structured comparison JSON
++   createdAt: timestamp("created_at").defaultNow(),
++ });
+
+--- add: server/services/shiftAnalysisService.ts
++ import { db } from "../db/client";
++ import { daily_sales_v2, expenses, dailyShiftAnalysis } from "../db/schema";
++ import { getShiftReport, getLoyverseReceipts } from "../utils/loyverse";
++
++ export async function generateShiftAnalysis(date: string) {
++   // Pull staff form
++   const form = await db.query.daily_sales_v2.findFirst({
++     where: (t, { eq }) => eq(t.date, date),
++   });
++
++   // Pull Loyverse shift report (POS ground truth)
++   const shift = await getShiftReport({ date });
++
++   // Pull receipts for stock usage
++   const receipts = await getLoyverseReceipts({ date });
++
++   // --- Build comparison ---
++   const salesVsPOS = [
++     { field: "Gross Sales", form: form?.gross_sales, pos: shift?.gross_sales },
++     { field: "Net Sales", form: form?.net_sales, pos: shift?.net_sales },
++     { field: "Cash Payments", form: form?.cash_sales, pos: shift?.cash_sales },
++     { field: "QR Sales", form: form?.qr_sales, pos: shift?.qr_sales },
++     { field: "Grab Sales", form: form?.grab_sales, pos: shift?.grab_sales },
++     { field: "Discounts", form: form?.discounts, pos: shift?.discounts },
++     { field: "Refunds", form: form?.refunds, pos: shift?.refunds },
++     { field: "Paid Out", form: form?.expenses_total, pos: shift?.paid_out },
++   ].map(r => ({
++     ...r,
++     status: r.form === r.pos ? "✅" : `🚨 Δ ${Number(r.form||0) - Number(r.pos||0)}`
++   }));
++
++   // --- Stock usage checks ---
++   // Rolls, Meat, Drinks (using receipts + form end counts)
++   const stockUsage = [
++     { item: "Rolls", expected: form?.rolls_expected, actual: form?.rolls_end, variance: (form?.rolls_expected||0) - (form?.rolls_end||0), tolerance: 4 },
++     { item: "Meat (g)", expected: form?.meat_expected, actual: form?.meat_end, variance: (form?.meat_expected||0) - (form?.meat_end||0), tolerance: 500 },
++     { item: "Drinks", expected: form?.drinks_expected, actual: form?.drinks_end, variance: (form?.drinks_expected||0) - (form?.drinks_end||0), tolerance: 2 },
++   ].map(s => ({
++     ...s,
++     status: Math.abs(s.variance) > s.tolerance ? "🚨" : "✅"
++   }));
++
++   // --- Flags summary ---
++   const flags = [
++     ...salesVsPOS.filter(f => f.status.includes("🚨")).map(f => `${f.field} mismatch ${f.status}`),
++     ...stockUsage.filter(s => s.status === "🚨").map(s => `${s.item} variance ${s.variance}`)
++   ];
++
++   const analysis = { salesVsPOS, stockUsage, flags };
++
++   // Save to DB
++   await db.insert(dailyShiftAnalysis)
++     .values({ shiftDate: date, analysis })
++     .onConflictDoUpdate({ target: dailyShiftAnalysis.shiftDate, set: { analysis } });
++
++   return analysis;
++ }
+
+--- update: server/routes.ts
++ import { generateShiftAnalysis } from "./services/shiftAnalysisService";
++
++ // Generate and store analysis for a given date
++ app.post("/api/analysis/generate", async (req, res) => {
++   const date = req.body.date || new Date().toISOString().slice(0,10);
++   try {
++     const data = await generateShiftAnalysis(date);
++     res.json({ ok: true, data });
++   } catch (e) {
++     res.status(500).json({ error: e.message });
++   }
++ });
++
++ // List analysis library
++ app.get("/api/analysis", async (req, res) => {
++   const rows = await db.select().from(dailyShiftAnalysis).orderBy(desc(dailyShiftAnalysis.shiftDate));
++   res.json({ ok: true, rows });
++ });
++
++ // Get one analysis by date
++ app.get("/api/analysis/:date", async (req, res) => {
++   const date = req.params.date;
++   const rows = await db.select().from(dailyShiftAnalysis).where(eq(dailyShiftAnalysis.shiftDate, date));
++   res.json({ ok: true, data: rows[0]?.analysis || null });
++ });
+
+--- add: client/src/pages/operations/DailyShiftAnalysis.tsx
++ import { useEffect, useState } from "react";
++
++ export default function DailyShiftAnalysis() {
++   const [rows, setRows] = useState<any[]>([]);
++
++   useEffect(() => {
++     fetch("/api/analysis").then(r => r.json()).then(json => setRows(json.rows));
++   }, []);
++
++   return (
++     <div className="p-6">
++       <h1 className="text-2xl font-bold mb-4">Daily Shift Analysis</h1>
++       <table className="w-full border-collapse">
++         <thead>
++           <tr className="bg-gray-100">
++             <th className="p-2 text-left">Date</th>
++             <th className="p-2 text-left">Field</th>
++             <th className="p-2 text-left">Staff Form</th>
++             <th className="p-2 text-left">POS Report</th>
++             <th className="p-2 text-left">Status</th>
++           </tr>
++         </thead>
++         <tbody>
++           {rows.map((row) =>
++             row.analysis.salesVsPOS.map((s, idx) => (
++               <tr key={`${row.shiftDate}-${idx}`} className={s.status.includes("🚨") ? "bg-red-100" : ""}>
++                 <td className="p-2">{row.shiftDate}</td>
++                 <td className="p-2">{s.field}</td>
++                 <td className="p-2">{s.form}</td>
++                 <td className="p-2">{s.pos}</td>
++                 <td className="p-2">{s.status}</td>
++               </tr>
++             ))
++           )}
++         </tbody>
++       </table>
++
++       <h2 className="text-xl font-semibold mt-6">Stock Variances</h2>
++       <table className="w-full border-collapse">
++         <thead>
++           <tr className="bg-gray-100">
++             <th className="p-2 text-left">Date</th>
++             <th className="p-2 text-left">Item</th>
++             <th className="p-2 text-left">Expected</th>
++             <th className="p-2 text-left">Actual</th>
++             <th className="p-2 text-left">Variance</th>
++             <th className="p-2 text-left">Status</th>
++           </tr>
++         </thead>
++         <tbody>
++           {rows.map((row) =>
++             row.analysis.stockUsage.map((s, idx) => (
++               <tr key={`${row.shiftDate}-stock-${idx}`} className={s.status === "🚨" ? "bg-red-100" : ""}>
++                 <td className="p-2">{row.shiftDate}</td>
++                 <td className="p-2">{s.item}</td>
++                 <td className="p-2">{s.expected}</td>
++                 <td className="p-2">{s.actual}</td>
++                 <td className="p-2">{s.variance}</td>
++                 <td className="p-2">{s.status}</td>
++               </tr>
++             ))
++           )}
++         </tbody>
++       </table>
++
++       <h2 className="text-xl font-semibold mt-6">Flags Summary</h2>
++       <ul className="list-disc ml-6">
++         {rows.map((row) =>
++           row.analysis.flags.map((f, idx) => (
++             <li key={`${row.shiftDate}-flag-${idx}`} className="text-red-600">{row.shiftDate}: {f}</li>
++           ))
++         )}
++       </ul>
++     </div>
++   );
++ }
+
+--- update: client/src/App.tsx (or RouteRegistry)
++ import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
++ // Add route
++ <Route path="/operations/daily-shift-analysis" element={<DailyShiftAnalysis />} />
++
++ // Add sidebar link under Analysis
++ { name: "Daily Shift Analysis", path: "/operations/daily-shift-analysis" },
+
+✅ QA Checklist (Agent must report with screenshots)
+
+Run:
+
+curl -X POST https://<replit-app-url>/api/analysis/generate -H "Content-Type: application/json" -d '{"date":"2025-09-18"}'
+
+
+→ Confirm JSON with salesVsPOS + stockUsage + flags.
+
+Query DB:
+
+SELECT shift_date, analysis FROM dailyShiftAnalysis ORDER BY shift_date DESC LIMIT 1;
+
+
+→ Confirm JSON saved.
+
+Visit /operations/daily-shift-analysis → Screenshot populated permanent comparison table with ✅ / 🚨 statuses.
+
+Verify Stock Variances table + Flags Summary render.

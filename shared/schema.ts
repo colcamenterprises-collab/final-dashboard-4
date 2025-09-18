@@ -1332,6 +1332,14 @@ export const loyverse_receipts = pgTable('loyverse_receipts', {
   data: jsonb('data')
 });
 
+// ✅ Fort Knox: Daily Shift Analysis - DO NOT MODIFY WITHOUT CAM'S APPROVAL
+export const dailyShiftAnalysis = pgTable("dailyShiftAnalysis", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull(),
+  analysis: jsonb("analysis").notNull(), // structured comparison JSON
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Manager Checklist Insert Schemas
 export const insertCleaningTasksSchema = createInsertSchema(cleaningTasks);
 export const insertManagerChecklistsSchema = createInsertSchema(managerChecklists);
