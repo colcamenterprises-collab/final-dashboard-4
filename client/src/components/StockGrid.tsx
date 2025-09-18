@@ -26,14 +26,14 @@ export function StockGrid({
           <div className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {block.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="text-[14px] font-medium truncate pr-3">{item.label}</div>
+                <div key={item.id} className="rounded-lg border p-3">
+                  <label className="block text-[14px] font-medium mb-2">{item.label}</label>
                   <input
                     type="number"
                     inputMode="numeric"
                     min="0"
                     step="1"
-                    className="w-24 rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={item.qty ?? 0}
                     onChange={(e) => onChange(item.id, safeInt(e.target.value))}
                     aria-label={`${item.label} quantity`}
