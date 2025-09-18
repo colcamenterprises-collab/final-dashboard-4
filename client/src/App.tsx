@@ -40,6 +40,7 @@ import PosUpload from "./pages/analysis/PosUpload";
 import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
 import PosReceipts from "./pages/analysis/PosReceipts";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
+import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -82,6 +83,7 @@ export default function App() {
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                     <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
+                    <Route path="daily-shift-analysis" element={<DailyShiftAnalysis />} />
                     <Route path="stock-review" element={<div className="p-4">
                       <h2 className="text-xl font-semibold mb-4">Stock Review</h2>
                       <p className="text-slate-600">Buns, Meat & Drinks Analysis</p>
