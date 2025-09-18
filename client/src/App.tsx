@@ -79,19 +79,22 @@ export default function App() {
                   {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
                   
                   {/* Analysis with nested routes */}
-                  <Route path={ROUTES.ANALYSIS} element={<Guard><Analysis /></Guard>}>
-                    <Route path="upload" element={<UploadStatements />} />
-                    <Route path="receipts" element={<Receipts />} />
-                    <Route path="pos-upload" element={<PosUpload />} />
-                    <Route path="shift-analysis" element={<ShiftAnalysis />} />
-                    <Route path="pos-receipts" element={<PosReceipts />} />
+                  <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
+                    <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
                     <Route path="stock-review" element={<div className="p-4">
                       <h2 className="text-xl font-semibold mb-4">Stock Review</h2>
                       <p className="text-slate-600">Buns, Meat & Drinks Analysis</p>
-                      {/* Stock review content will be shown here */}
+                      <p className="text-slate-600 mt-2">Coming soon: Buns, meat & drinks analysis with usage vs recipes variance detection.</p>
                     </div>} />
                   </Route>
+                  
+                  {/* Legacy analysis routes */}
+                  <Route path="upload" element={<UploadStatements />} />
+                  <Route path="receipts" element={<Receipts />} />
+                  <Route path="pos-upload" element={<PosUpload />} />
+                  <Route path="shift-analysis" element={<ShiftAnalysis />} />
+                  <Route path="pos-receipts" element={<PosReceipts />} />
                   
                   {/* Legacy direct routes */}
                   <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
