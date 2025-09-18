@@ -34,7 +34,8 @@ import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2 } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis } from "../shared/schema"; // Adjust path
+import { generateShiftAnalysis } from "./services/shiftAnalysisService";
 import { z } from "zod";
 import { eq, desc, sql, inArray, isNull, lt } from "drizzle-orm";
 import multer from 'multer';
@@ -712,6 +713,31 @@ export function registerRoutes(app: express.Application): Server {
 
       res.json(demoAnalysis);
     }
+  });
+
+  // ✅ Fort Knox: Daily Shift Analysis - DO NOT MODIFY WITHOUT CAM'S APPROVAL
+  // Generate and store analysis for a given date
+  app.post("/api/analysis/generate", async (req, res) => {
+    const date = req.body.date || new Date().toISOString().slice(0,10);
+    try {
+      const data = await generateShiftAnalysis(date);
+      res.json({ ok: true, data });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // List analysis library
+  app.get("/api/analysis", async (req, res) => {
+    const rows = await db.select().from(dailyShiftAnalysis).orderBy(desc(dailyShiftAnalysis.shiftDate));
+    res.json({ ok: true, rows });
+  });
+
+  // Get one analysis by date
+  app.get("/api/analysis/:date", async (req, res) => {
+    const date = req.params.date;
+    const rows = await db.select().from(dailyShiftAnalysis).where(eq(dailyShiftAnalysis.shiftDate, date));
+    res.json({ ok: true, data: rows[0]?.analysis || null });
   });
 
   app.get('/api/analysis/list', async (req: Request, res: Response) => {
