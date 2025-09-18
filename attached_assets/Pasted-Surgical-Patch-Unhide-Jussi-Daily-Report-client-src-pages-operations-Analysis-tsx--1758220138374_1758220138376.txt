@@ -1,0 +1,52 @@
+Surgical Patch – Unhide Jussi Daily Report
+--- client/src/pages/operations/Analysis.tsx
+-        {/* Jussi Daily Report – Show only on main route */}
+-        <h2 className="text-xl font-semibold">
+-          Jussi Daily Report – {new Date().toISOString().slice(0,10)}
+-        </h2>
+-        {/* Existing Jussi block is currently gated or commented */}
++        {/* 🚨 Fort Knox: Always show Jussi report at top of Analysis page */}
++        <div className="mb-6 border rounded-lg p-4 bg-gray-100">
++          <h2 className="text-xl font-semibold">
++            Jussi Daily Report – {new Date().toISOString().slice(0,10)}
++          </h2>
++          {jussiData ? (
++            <div>
++              <h3 className="font-semibold mt-2">Top 5 Items</h3>
++              <table className="w-full text-sm">
++                <tbody>
++                  {jussiData.top5Items?.map((i, idx) => (
++                    <tr key={idx}><td>{i.item}</td><td>{i.qty}</td></tr>
++                  ))}
++                </tbody>
++              </table>
++
++              <h3 className="font-semibold mt-2">Payment Breakdown</h3>
++              <table className="w-full text-sm">
++                <tbody>
++                  {jussiData.paymentBreakdown?.map((p, idx) => (
++                    <tr key={idx}><td>{p.method}</td><td>{p.amount}</td></tr>
++                  ))}
++                </tbody>
++              </table>
++
++              <h3 className="font-semibold mt-2">Stock Variances</h3>
++              <table className="w-full text-sm">
++                <tbody>
++                  {jussiData.variances?.stockUsage?.map((s, idx) => (
++                    <tr key={idx} className={s.status === "🚨" ? "text-red-600" : ""}>
++                      <td>{s.item}</td><td>{s.expected}</td><td>{s.actual}</td><td>{s.variance}</td>
++                    </tr>
++                  ))}
++                </tbody>
++              </table>
++
++              <h3 className="font-semibold mt-2">Flags</h3>
++              <ul className="text-red-600 text-sm">
++                {jussiData.flags?.map((f, idx) => <li key={idx}>{f}</li>)}
++              </ul>
++            </div>
++          ) : (
++            <p className="text-sm text-gray-500">No Jussi report available yet.</p>
++          )}
++        </div>

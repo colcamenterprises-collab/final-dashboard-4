@@ -155,11 +155,14 @@ export const AnalysisPage = () => {
         <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
       </div>
 
-      {/* Jussi Daily Report - Show only on main route */}
-      {isMainRoute && jussiData && (
+      {/* 🚨 Fort Knox: Always show Jussi report at top of Analysis page */}
+      {isMainRoute && (
         <div className="mb-6 border rounded-lg p-4 bg-gray-100">
-          <h2 className="text-xl font-semibold">Jussi Daily Report - {new Date().toISOString().slice(0,10)}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+          <h2 className="text-xl font-semibold">
+            Jussi Daily Report – {new Date().toISOString().slice(0,10)}
+          </h2>
+          {jussiData ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             {/* Top 5 Items */}
             <div>
               <h3 className="font-semibold mt-2 mb-2">Top 5 Items</h3>
@@ -226,16 +229,19 @@ export const AnalysisPage = () => {
                 </tbody>
               </table>
             </div>
+            
+            {/* Flags */}
+            {jussiData.flags && jussiData.flags.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-semibold mt-2 mb-2">🚨 Flags</h3>
+                <ul className="text-red-600 text-sm list-disc list-inside">
+                  {jussiData.flags.map((f: string, idx: number) => <li key={idx}>{f}</li>)}
+                </ul>
+              </div>
+            )}
           </div>
-          
-          {/* Flags */}
-          {jussiData.flags && jussiData.flags.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-semibold mt-2 mb-2">🚨 Flags</h3>
-              <ul className="text-red-600 text-sm list-disc list-inside">
-                {jussiData.flags.map((f: string, idx: number) => <li key={idx}>{f}</li>)}
-              </ul>
-            </div>
+          ) : (
+            <p className="text-sm text-gray-500 mt-4">No Jussi report available yet.</p>
           )}
         </div>
       )}
