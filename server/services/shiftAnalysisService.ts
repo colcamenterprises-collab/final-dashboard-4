@@ -53,10 +53,10 @@ export async function generateShiftAnalysis(date: string) {
 
   // Save to DB
   await db.insert(dailyShiftAnalysis)
-    .values({ shiftDate: new Date(date), analysis })
+    .values({ shiftDate: date, analysis })
     .onConflictDoUpdate({ 
       target: dailyShiftAnalysis.shiftDate, 
-      set: { analysis, createdAt: new Date() } 
+      set: { analysis } 
     });
 
   return analysis;
