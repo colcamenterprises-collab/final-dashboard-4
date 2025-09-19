@@ -137,6 +137,147 @@ export default function DailyShiftAnalysis() {
             </CardContent>
           </Card>
 
+          {/* Drinks Analysis Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>🥤 Drinks Analysis</CardTitle>
+              <p className="text-sm text-gray-600">Individual drink type analysis based on POS sales vs form counts</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300" data-testid="table-drinks-analysis">
+                  <thead>
+                    <tr className="bg-blue-100">
+                      <th className="border border-gray-300 p-2 text-left">Date</th>
+                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
+                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
+                      <th className="border border-gray-300 p-2 text-left">Expected Usage</th>
+                      <th className="border border-gray-300 p-2 text-left">Actual Count (Form)</th>
+                      <th className="border border-gray-300 p-2 text-left">Variance</th>
+                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) =>
+                      row.analysis?.drinksAnalysis?.map((d: any, idx: number) => (
+                        <tr key={`${row.shiftDate}-drinks-${idx}`} className={d.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-drinks-${idx}`}>
+                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-drink-name-${idx}`}>{d.itemName}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{d.qtySold}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{d.expectedUsage}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{d.actualCount}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{d.variance > 0 ? `+${d.variance}` : d.variance}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{d.status}</td>
+                        </tr>
+                      )) || []
+                    )}
+                    {rows.every(row => !row.analysis?.drinksAnalysis?.length) && (
+                      <tr>
+                        <td colSpan={7} className="border border-gray-300 p-4 text-center text-gray-500 italic">
+                          No drinks analysis data available. Generate analysis to see drink-specific variances.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Rolls/Buns Analysis Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>🍞 Rolls/Buns Analysis</CardTitle>
+              <p className="text-sm text-gray-600">Burger bun usage analysis based on burger sales vs actual bun counts</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300" data-testid="table-rolls-analysis">
+                  <thead>
+                    <tr className="bg-yellow-100">
+                      <th className="border border-gray-300 p-2 text-left">Date</th>
+                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
+                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
+                      <th className="border border-gray-300 p-2 text-left">Expected Usage</th>
+                      <th className="border border-gray-300 p-2 text-left">Actual Count (Form)</th>
+                      <th className="border border-gray-300 p-2 text-left">Variance</th>
+                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) =>
+                      row.analysis?.rollsAnalysis?.map((r: any, idx: number) => (
+                        <tr key={`${row.shiftDate}-rolls-${idx}`} className={r.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-rolls-${idx}`}>
+                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-roll-name-${idx}`}>{r.itemName}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{r.qtySold}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{r.expectedUsage}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{r.actualCount}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{r.variance > 0 ? `+${r.variance}` : r.variance}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{r.status}</td>
+                        </tr>
+                      )) || []
+                    )}
+                    {rows.every(row => !row.analysis?.rollsAnalysis?.length) && (
+                      <tr>
+                        <td colSpan={7} className="border border-gray-300 p-4 text-center text-gray-500 italic">
+                          No rolls analysis data available. Generate analysis to see bun usage variances.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Meat Analysis Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>🥩 Meat Analysis</CardTitle>
+              <p className="text-sm text-gray-600">Meat usage analysis based on burger patty requirements vs actual consumption</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300" data-testid="table-meat-analysis">
+                  <thead>
+                    <tr className="bg-red-100">
+                      <th className="border border-gray-300 p-2 text-left">Date</th>
+                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
+                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
+                      <th className="border border-gray-300 p-2 text-left">Expected Usage (g)</th>
+                      <th className="border border-gray-300 p-2 text-left">Actual Count (g)</th>
+                      <th className="border border-gray-300 p-2 text-left">Variance (g)</th>
+                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) =>
+                      row.analysis?.meatAnalysis?.map((m: any, idx: number) => (
+                        <tr key={`${row.shiftDate}-meat-${idx}`} className={m.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-meat-${idx}`}>
+                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-meat-name-${idx}`}>{m.itemName}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{m.qtySold}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{m.expectedUsage}g</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{m.actualCount}g</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{m.variance > 0 ? `+${m.variance}g` : `${m.variance}g`}</td>
+                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{m.status}</td>
+                        </tr>
+                      )) || []
+                    )}
+                    {rows.every(row => !row.analysis?.meatAnalysis?.length) && (
+                      <tr>
+                        <td colSpan={7} className="border border-gray-300 p-4 text-center text-gray-500 italic">
+                          No meat analysis data available. Generate analysis to see meat usage variances.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Flags Summary */}
           <Card>
             <CardHeader>
