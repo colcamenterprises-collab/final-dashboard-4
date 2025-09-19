@@ -27,22 +27,11 @@ export default function ProfitLoss() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   
-  // Fetch P&L data using authenticated apiRequest
+  // Fetch P&L data
   const { data: plData, isLoading, error } = useQuery<PLResponse>({
     queryKey: ['/api/profit-loss', selectedYear],
     queryFn: async () => {
-      try {
-        return await apiRequest(`/api/profit-loss?year=${selectedYear}`);
-      } catch (error: any) {
-        // Enhanced error handling for authentication and authorization errors
-        if (error.message.includes('401')) {
-          throw new Error('Authentication required: Please log in to view financial data');
-        }
-        if (error.message.includes('403')) {
-          throw new Error('Access denied: Manager/admin role required to view P&L data');
-        }
-        throw new Error(`Failed to load P&L data: ${error.message}`);
-      }
+      return await apiRequest(`/api/profit-loss?year=${selectedYear}`);
     }
   });
 
