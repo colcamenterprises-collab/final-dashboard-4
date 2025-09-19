@@ -43,20 +43,48 @@ export function filterByExactShift(data: any[], exactStart: string, exactEnd: st
 }
 
 // Fort Knox utility functions for Jussi Daily Report
-export async function getShiftReport({ date }: { date: string }) {
+export async function getShiftReport({ date, storeId }: { date: string; storeId?: string }) {
   const { min, max, exactStart, exactEnd } = getShiftUtcRange(date);
-  let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
+  
+  // ENFORCE store scoping - fail if no store_id provided
+  const finalStoreId = storeId || process.env.LOYVERSE_STORE_ID;
+  if (!finalStoreId) {
+    throw new Error('LOYVERSE_STORE_ID must be set to prevent fetching data from all stores');
+  }
+  
+  // Add mandatory store_id filter to only get data for specific store
+  const params: any = { 
+    opened_at_min: min, 
+    closed_at_max: max,
+    store_id: finalStoreId
+  };
+  
+  let shiftsData = await loyverseGet('shifts', params);
   shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
   return shiftsData;
 }
 
-export async function getLoyverseReceipts({ date }: { date: string }) {
+export async function getLoyverseReceipts({ date, storeId }: { date: string; storeId?: string }) {
   const { min, max, exactStart, exactEnd } = getShiftUtcRange(date);
   let receipts: any[] = []; 
   let cursor = null;
   
+  // ENFORCE store scoping - fail if no store_id provided
+  const finalStoreId = storeId || process.env.LOYVERSE_STORE_ID;
+  if (!finalStoreId) {
+    throw new Error('LOYVERSE_STORE_ID must be set to prevent fetching data from all stores');
+  }
+  
+  // Add mandatory store_id filter to only get data for specific store
+  const baseParams: any = { 
+    created_at_min: min, 
+    created_at_max: max,
+    store_id: finalStoreId
+  };
+  
   do {
-    const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
+    const params = cursor ? { ...baseParams, cursor } : baseParams;
+    const page = await loyverseGet('receipts', params);
     receipts = [...receipts, ...page.receipts];
     cursor = page.cursor;
   } while (cursor);

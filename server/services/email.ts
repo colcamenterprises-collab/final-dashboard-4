@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { loyverseGet, getShiftUtcRange, filterByExactShift } from '../utils/loyverse';
+import { getShiftReport, getLoyverseReceipts as getUtilReceipts } from '../utils/loyverse';
 import { db } from '../db';
 import { loyverse_shifts, loyverse_receipts, dailySalesV2 } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
@@ -13,14 +13,13 @@ async function getVariance(shiftDate: string) {
   ];
 }
 
-// Helper function to get Loyverse shifts data
+// Helper function to get Loyverse shifts data - now uses centralized utility
 async function getLoyverseShifts(shiftDate: string) {
   if (!process.env.LOYVERSE_TOKEN) return { shifts: [], anomalies: ['Token missing'] };
   
   try {
-    const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
-    let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
-    shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+    // Use centralized utility with enforced store filtering
+    const shiftsData = await getShiftReport({ date: shiftDate });
     
     // Compare vs form
     const form = await db.select().from(dailySalesV2).where(eq(dailySalesV2.shiftDate, new Date(shiftDate))).limit(1);
@@ -35,22 +34,15 @@ async function getLoyverseShifts(shiftDate: string) {
   }
 }
 
-// Helper function to get Loyverse receipts data
+// Helper function to get Loyverse receipts data - now uses centralized utility  
 async function getLoyverseReceipts(shiftDate: string) {
   if (!process.env.LOYVERSE_TOKEN) return { receipts: [], itemsSold: {} };
   
   try {
-    const { min, max, exactStart, exactEnd } = getShiftUtcRange(shiftDate);
-    let receipts: any[] = [];
-    let cursor = null;
+    // Use centralized utility with enforced store filtering
+    const receiptsData = await getUtilReceipts({ date: shiftDate });
+    const receipts = receiptsData.receipts;
     
-    do {
-      const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
-      receipts = [...receipts, ...page.receipts];
-      cursor = page.cursor;
-    } while (cursor);
-    
-    receipts = filterByExactShift(receipts, exactStart, exactEnd);
     const itemsSold = receipts.reduce((acc, r) => {
       r.line_items?.forEach((li: any) => {
         acc[li.item_name] = (acc[li.item_name] || 0) + li.quantity;

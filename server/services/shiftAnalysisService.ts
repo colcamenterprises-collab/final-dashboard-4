@@ -65,12 +65,15 @@ export async function generateShiftAnalysis(date: string) {
     console.warn('Stock form unavailable - daily_stock_sales table does not exist:', e);
   }
 
-  // Pull Loyverse shift report (POS ground truth)
-  const shiftResult = await getShiftReport({ date: date });
+  // Get store ID from environment or use default
+  const storeId = process.env.LOYVERSE_STORE_ID;
+
+  // Pull Loyverse shift report (POS ground truth) - filtered by store
+  const shiftResult = await getShiftReport({ date: date, storeId });
   const shift = shiftResult?.shifts?.[0];
 
-  // Pull receipts for stock usage
-  const receiptsResult = await getLoyverseReceipts({ date: date });
+  // Pull receipts for stock usage - filtered by store
+  const receiptsResult = await getLoyverseReceipts({ date: date, storeId });
   const receipts = receiptsResult?.receipts || [];
 
   console.log(`Analyzing ${receipts.length} receipts for date ${date}`);

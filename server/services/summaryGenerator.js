@@ -10,11 +10,14 @@ export async function generateJussiReport(date) {
     console.log(`Starting Jussi report generation for ${date}`);
     
     // 1. Pull data sources
+    // Get store ID from environment or use default
+    const storeId = process.env.LOYVERSE_STORE_ID;
+    
     console.log('Fetching shift report...');
-    const shift = await getShiftReport({ date });       // ✅ Gross, Net, Discounts, Refunds, Cash Drawer
+    const shift = await getShiftReport({ date, storeId });       // ✅ Gross, Net, Discounts, Refunds, Cash Drawer
     
     console.log('Fetching receipts...');
-    const receipts = await getLoyverseReceipts({ date });
+    const receipts = await getLoyverseReceipts({ date, storeId });
     
     console.log('Fetching form data...');
     const form = await db.query.dailySalesV2.findFirst({ where: (t, { eq }) => eq(t.date, new Date(date)) });
