@@ -723,7 +723,7 @@ export function registerRoutes(app: express.Application): Server {
       const data = await generateShiftAnalysis(date);
       res.json({ ok: true, data });
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ error: e instanceof Error ? e.message : 'An error occurred' });
     }
   });
 

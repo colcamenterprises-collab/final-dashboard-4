@@ -3,10 +3,13 @@ import { dailySalesV2, expenses, dailyShiftAnalysis } from "../../shared/schema"
 import { getShiftReport, getLoyverseReceipts } from "../utils/loyverse";
 import { eq } from "drizzle-orm";
 
+// Convert cents to THB for currency consistency
+const THB = (cents?: number | null) => Number(cents ?? 0) / 100;
+
 export async function generateShiftAnalysis(date: string) {
   // Pull staff form
   const form = await db.query.dailySalesV2.findFirst({
-    where: eq(dailySalesV2.date, new Date(date)),
+    where: eq(dailySalesV2.shift_date, date),
   });
 
   // Pull Loyverse shift report (POS ground truth)
@@ -19,11 +22,11 @@ export async function generateShiftAnalysis(date: string) {
 
   // --- Build comparison ---
   const salesVsPOS = [
-    { field: "Gross Sales", form: form?.totalSales, pos: shift?.gross_sales },
-    { field: "Net Sales", form: form?.totalSales, pos: shift?.net_sales },
-    { field: "Cash Payments", form: form?.cashSales, pos: shift?.cash_sales },
-    { field: "QR Sales", form: form?.cardSales, pos: shift?.qr_sales },
-    { field: "Grab Sales", form: 0, pos: shift?.grab_sales },
+    { field: "Gross Sales", form: THB(form?.totalSales), pos: shift?.gross_sales },
+    { field: "Net Sales", form: THB(form?.totalSales), pos: shift?.net_sales },
+    { field: "Cash Payments", form: THB(form?.cashSales), pos: shift?.cash_sales },
+    { field: "QR Sales", form: THB(form?.qrSales), pos: shift?.qr_sales },
+    { field: "Grab Sales", form: THB(form?.grabSales), pos: shift?.grab_sales },
     { field: "Discounts", form: 0, pos: shift?.discounts },
     { field: "Refunds", form: 0, pos: shift?.refunds },
     { field: "Paid Out", form: 0, pos: shift?.paid_out },

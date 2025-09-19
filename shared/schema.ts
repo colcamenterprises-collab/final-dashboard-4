@@ -1335,7 +1335,7 @@ export const loyverse_receipts = pgTable('loyverse_receipts', {
 // ✅ Fort Knox: Daily Shift Analysis - DO NOT MODIFY WITHOUT CAM'S APPROVAL
 export const dailyShiftAnalysis = pgTable("dailyShiftAnalysis", {
   id: serial("id").primaryKey(),
-  shiftDate: date("shift_date").notNull(),
+  shiftDate: date("shift_date").notNull().unique(),
   analysis: jsonb("analysis").notNull(), // structured comparison JSON
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1368,4 +1368,28 @@ export type SupplierDefault = typeof supplierDefaults.$inferSelect;
 export type InsertSupplierDefault = z.infer<typeof insertSupplierDefaultsSchema>;
 
 // --- compat alias for older imports ---
-export const dailySalesV2 = dailySales;
+// Note: dailySalesV2 maps to the actual database table daily_sales_v2
+export const dailySalesV2 = pgTable("daily_sales_v2", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("createdAt"),
+  shiftDate: text("shiftDate"),
+  submittedAtISO: timestamp("submittedAtISO"),
+  completedBy: text("completedBy"),
+  startingCash: integer("startingCash"),
+  endingCash: integer("endingCash"),
+  cashBanked: integer("cashBanked"),
+  cashSales: integer("cashSales"),
+  qrSales: integer("qrSales"),
+  grabSales: integer("grabSales"),
+  aroiSales: integer("aroiSales"),
+  totalSales: integer("totalSales"),
+  shoppingTotal: integer("shoppingTotal"),
+  wagesTotal: integer("wagesTotal"),
+  othersTotal: integer("othersTotal"),
+  totalExpenses: integer("totalExpenses"),
+  qrTransfer: integer("qrTransfer"),
+  deletedAt: timestamp("deletedAt"),
+  staff: text("staff"),
+  shift_date: date("shift_date"),
+  payload: jsonb("payload"),
+});
