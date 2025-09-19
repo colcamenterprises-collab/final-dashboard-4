@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, Upload, TrendingUp, AlertTriangle, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-export const AnalysisPage = () => {
+export const Analysis = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
   const [endDate, setEndDate] = useState(startDate);
   const { toast } = useToast();

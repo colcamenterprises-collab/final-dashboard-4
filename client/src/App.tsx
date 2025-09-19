@@ -9,7 +9,7 @@ import NotFound from "./pages/NotFound";
 
 // Pages
 import Home from "./pages/Home";
-import { AnalysisPage as Analysis } from "./pages/operations/Analysis";
+import { Analysis } from "./pages/operations/Analysis";
 import Overview from "./pages/dashboard/Overview";
 import DailySalesStock from "./pages/operations/DailySalesStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
