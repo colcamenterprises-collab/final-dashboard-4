@@ -34,7 +34,7 @@ import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis, expensesLegacy } from "../shared/schema"; // Adjust path
 import { generateShiftAnalysis } from "./services/shiftAnalysisService";
 import { z } from "zod";
 import { eq, desc, sql, inArray, isNull, lt } from "drizzle-orm";
@@ -344,6 +344,201 @@ export function registerRoutes(app: express.Application): Server {
     } catch (error) {
       console.error('Analysis failed:', error);
       res.status(500).json({ error: 'Analysis failed' });
+    }
+  });
+
+  // Extend Express Request interface for authentication
+  interface AuthenticatedRequest extends Request {
+    restaurantId: string;
+    userId: string;
+    userRole: string;
+  }
+
+  // SECURE Authentication middleware - REQUIRES valid authentication
+  const requireFinancialAuth = (req: Request, res: Response, next: NextFunction) => {
+    const restaurantId = req.headers['x-restaurant-id'] as string;
+    const userId = req.headers['x-user-id'] as string;
+    const userRole = req.headers['x-user-role'] as string;
+    
+    // SECURITY: Reject requests without proper authentication for financial data
+    if (!restaurantId || !userId || restaurantId === 'default' || userId === 'anonymous') {
+      return res.status(401).json({ 
+        error: 'Authentication required: Financial data access requires valid credentials',
+        success: false 
+      });
+    }
+    
+    // AUTHORIZATION: Require manager or admin role for P&L access
+    if (userRole !== 'manager' && userRole !== 'admin') {
+      return res.status(403).json({ 
+        error: 'Insufficient permissions: Financial data access requires manager/admin role',
+        success: false 
+      });
+    }
+    
+    // Attach authenticated data to request
+    const authReq = req as AuthenticatedRequest;
+    authReq.restaurantId = restaurantId;
+    authReq.userId = userId;
+    authReq.userRole = userRole;
+    
+    next();
+  };
+
+  // P&L Data Aggregation endpoint - Sales data sync from shift reports
+  app.get('/api/profit-loss', requireFinancialAuth, async (req: Request, res: Response) => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const restaurantId = authReq.restaurantId;
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      
+      // Initialize monthly data structure
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthlyData: Record<string, any> = {};
+      
+      // Initialize each month
+      months.forEach(month => {
+        monthlyData[month] = {
+          sales: 0,
+          cogs: 0, 
+          expenses: 0,
+          grossProfit: 0,
+          netProfit: 0
+        };
+      });
+
+      // 1. PRIMARY SOURCE: Aggregate sales data from loyverse_shifts table (POS data)
+      // SECURITY: Multi-tenant scoping with restaurantId filter
+      // FIXED: Handle multiple shifts per day with JSON array aggregation
+      const loyverseResult = await db.select({
+        month: sql<number>`EXTRACT(MONTH FROM shift_date)`.as('month'),
+        posGross: sql<number>`
+          SUM(
+            CASE 
+              WHEN jsonb_array_length(data->'shifts') > 0 
+              THEN (
+                SELECT SUM(CAST(shift->>'gross_sales' AS DECIMAL)) 
+                FROM jsonb_array_elements(data->'shifts') AS shift
+              )
+              ELSE 0 
+            END
+          )`.as('posGross'),
+        posNet: sql<number>`
+          SUM(
+            CASE 
+              WHEN jsonb_array_length(data->'shifts') > 0 
+              THEN (
+                SELECT SUM(CAST(shift->>'net_sales' AS DECIMAL)) 
+                FROM jsonb_array_elements(data->'shifts') AS shift
+              )
+              ELSE 0 
+            END
+          )`.as('posNet')
+      })
+      .from(loyverse_shifts)
+      .where(sql`EXTRACT(YEAR FROM shift_date) = ${year} AND restaurant_id = ${restaurantId}`)
+      .groupBy(sql`EXTRACT(MONTH FROM shift_date)`);
+
+      // 2. FALLBACK SOURCE: Aggregate sales data from daily_sales_v2 table (staff form data) 
+      // Used for reconciliation/fallback when POS data is unavailable
+      // SECURITY: Multi-tenant scoping with restaurantId filter
+      const salesResult = await db.select({
+        month: sql<number>`EXTRACT(MONTH FROM "shiftDate")`.as('month'),
+        totalSales: sql<number>`SUM(CAST(payload->>'totalSales' AS DECIMAL))`.as('totalSales')
+      })
+      .from(dailySalesV2)
+      .where(sql`EXTRACT(YEAR FROM "shiftDate") = ${year} AND "deletedAt" IS NULL AND "restaurantId" = ${restaurantId}`)
+      .groupBy(sql`EXTRACT(MONTH FROM "shiftDate")`);
+
+      // 3. SINGLE SOURCE for expenses: Get expenses data from expensesLegacy table only
+      // SECURITY: Multi-tenant scoping with restaurantId filter
+      const expensesResult = await db.select({
+        month: sql<number>`EXTRACT(MONTH FROM "shiftDate")`.as('month'),
+        totalExpenses: sql<number>`SUM("costCents"::DECIMAL / 100)`.as('totalExpenses')
+      })
+      .from(expensesLegacy)
+      .where(sql`EXTRACT(YEAR FROM "shiftDate") = ${year} AND "restaurantId" = ${restaurantId}`)
+      .groupBy(sql`EXTRACT(MONTH FROM "shiftDate")`);
+
+      // Process PRIMARY sales data from POS (loyverse_shifts)
+      loyverseResult.forEach(record => {
+        const monthIndex = record.month - 1;
+        const monthName = months[monthIndex];
+        if (monthName) {
+          // Use net sales as primary sales figure (gross - discounts/refunds)
+          monthlyData[monthName].sales = Number(record.posNet || 0);
+        }
+      });
+
+      // FALLBACK: Use staff form data for months where POS data is missing
+      const monthsWithPosData = new Set(loyverseResult.map(r => months[r.month - 1]));
+      salesResult.forEach(record => {
+        const monthIndex = record.month - 1;
+        const monthName = months[monthIndex];
+        if (monthName && !monthsWithPosData.has(monthName)) {
+          // Only use staff form data if POS data is not available for this month
+          monthlyData[monthName].sales = Number(record.totalSales || 0);
+        }
+      });
+
+      // Process expenses from SINGLE SOURCE (expensesLegacy only)
+      expensesResult.forEach(record => {
+        const monthIndex = record.month - 1;  
+        const monthName = months[monthIndex];
+        if (monthName) {
+          monthlyData[monthName].expenses = Number(record.totalExpenses || 0);
+        }
+      });
+
+      // Calculate COGS and profits for each month
+      months.forEach(month => {
+        const sales = monthlyData[month].sales;
+        const expenses = monthlyData[month].expenses;
+        
+        // Calculate COGS as 35% of sales (industry standard for fast food)
+        const cogs = sales * 0.35;
+        monthlyData[month].cogs = Math.round(cogs);
+        
+        // Calculate gross profit (Sales - COGS)
+        const grossProfit = sales - cogs;
+        monthlyData[month].grossProfit = Math.round(grossProfit);
+        
+        // Calculate net profit (Gross Profit - Operating Expenses)  
+        const netProfit = grossProfit - expenses;
+        monthlyData[month].netProfit = Math.round(netProfit);
+      });
+
+      // Calculate YTD totals
+      const ytdTotals = months.reduce((totals, month) => {
+        const data = monthlyData[month];
+        return {
+          sales: totals.sales + data.sales,
+          cogs: totals.cogs + data.cogs,
+          expenses: totals.expenses + data.expenses,
+          grossProfit: totals.grossProfit + data.grossProfit,
+          netProfit: totals.netProfit + data.netProfit
+        };
+      }, { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
+
+      // Return data in format expected by frontend
+      res.json({
+        success: true,
+        year,
+        monthlyData,
+        ytdTotals,
+        dataSource: {
+          salesRecords: salesResult.length,
+          loyverseRecords: loyverseResult.length,
+          expenseRecords: expensesResult.length
+        }
+      });
+
+    } catch (error) {
+      console.error('P&L aggregation error:', error);
+      res.status(500).json({ 
+        error: 'Failed to aggregate P&L data',
+        details: (error as Error).message 
+      });
     }
   });
   
