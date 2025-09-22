@@ -5,7 +5,7 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="h-dvh bg-slate-50 dark:bg-slate-900">
       {/* Single Modern Sidebar - handles both desktop and mobile */}
       <ModernSidebar
         isOpen={sidebarOpen}
@@ -13,9 +13,9 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Modern layout shell */}
-      <div className="flex min-h-screen lg:ml-64">
+      <div className="flex h-dvh lg:ml-64">
         {/* Main content area */}
-        <div className="flex flex-col flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* Modern Header */}
           <ModernHeader
             onMenuToggle={() => setSidebarOpen(true)}
@@ -24,7 +24,7 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
           />
 
           {/* Content with proper scrolling */}
-          <main className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900">
+          <main className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-slate-900">
             <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
               {children}
             </div>
