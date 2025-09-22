@@ -123,6 +123,74 @@ export default function Home() {
       
       {/* KPI Grid */}
       <KPIGrid />
+      
+      {/* Additional content to test scrolling */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border">
+          <h3 className="text-xl font-bold mb-4">Recent Orders</h3>
+          <div className="space-y-3">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="flex justify-between items-center py-2 border-b">
+                <span>Order #{1000 + i}</span>
+                <span className="font-semibold">฿{(Math.random() * 500 + 100).toFixed(0)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border">
+          <h3 className="text-xl font-bold mb-4">Top Items</h3>
+          <div className="space-y-3">
+            {['Burger Classic', 'Cheese Deluxe', 'BBQ Special', 'Chicken Wrap', 'Fries'].map(item => (
+              <div key={item} className="flex justify-between items-center py-2 border-b">
+                <span>{item}</span>
+                <span className="text-emerald-600 font-semibold">{Math.floor(Math.random() * 50 + 10)} sold</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-2xl p-6 shadow-sm border">
+        <h3 className="text-xl font-bold mb-4">Sales Chart</h3>
+        <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center">
+          <span className="text-slate-400">Chart would go here</span>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border">
+          <h4 className="font-bold mb-3">Quick Stats</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between"><span>Today's Revenue</span><span>฿2,450</span></div>
+            <div className="flex justify-between"><span>Orders</span><span>45</span></div>
+            <div className="flex justify-between"><span>Customers</span><span>38</span></div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border">
+          <h4 className="font-bold mb-3">Inventory</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between"><span>Burger Buns</span><span>120</span></div>
+            <div className="flex justify-between"><span>Meat (kg)</span><span>15</span></div>
+            <div className="flex justify-between"><span>Drinks</span><span>89</span></div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border">
+          <h4 className="font-bold mb-3">Staff</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between"><span>On Duty</span><span>5</span></div>
+            <div className="flex justify-between"><span>Break</span><span>1</span></div>
+            <div className="flex justify-between"><span>Total</span><span>6</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
+        <h3 className="text-xl font-bold mb-2">End of Page Test</h3>
+        <p>If you can see this section and scroll to it, then scrolling is working correctly!</p>
+      </div>
     </div>
   );
 }
