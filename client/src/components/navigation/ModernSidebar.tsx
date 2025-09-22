@@ -208,7 +208,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
             <img 
               src="/attached_assets/Yellow Circle - Black Logo_1757766401641.png" 
               alt="Logo" 
-              className="w-9 h-9"
+              className="w-[46px] h-[46px]"
             />
           </div>
           
@@ -224,7 +224,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2 sidebar-scroll">
           {navigationGroups.map((group) => {
             const isGroupOpen = openGroups.has(group.title);
             
