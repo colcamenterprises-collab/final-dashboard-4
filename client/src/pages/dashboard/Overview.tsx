@@ -66,7 +66,7 @@ export default function Overview() {
   const payTotal = payments.reduce((a,b)=>a+b.amount,0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50">
 
       {/* Main KPI Banner - Style Guide Primary */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white" style={{background: 'linear-gradient(to right, var(--primary), #1e4fa3)'}}>
