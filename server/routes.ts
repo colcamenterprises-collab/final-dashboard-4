@@ -3017,15 +3017,7 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Recipe Management Routes
-  app.get("/api/recipes", async (req: Request, res: Response) => {
-    try {
-      const recipes = await storage.getRecipes();
-      res.json(recipes);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch recipes", details: (error as Error).message });
-    }
-  });
+  // Recipe Management Routes - handled by /api/recipes router
 
   app.post("/api/recipes", async (req: Request, res: Response) => {
     try {

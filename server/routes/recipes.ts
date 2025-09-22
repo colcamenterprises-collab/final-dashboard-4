@@ -155,9 +155,32 @@ router.get('/', async (req, res) => {
   try {
     await initTables();
     const { rows } = await pool.query(`
-      SELECT * FROM recipes WHERE is_active = true ORDER BY created_at DESC
+      SELECT 
+        r.*,
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'ingredientId', rl.ingredient_id,
+              'name', rl.ingredient_name,
+              'qty', rl.qty::numeric,
+              'unit', rl.unit,
+              'unitCostTHB', rl.unit_cost_thb::numeric,
+              'costTHB', rl.cost_thb::numeric,
+              'supplier', rl.supplier
+            ) ORDER BY rl.id
+          ) FILTER (WHERE rl.id IS NOT NULL), 
+          '[]'::json
+        ) AS ingredients
+      FROM recipes r
+      LEFT JOIN recipe_lines rl ON r.id = rl.recipe_id
+      WHERE r.is_active = true
+      GROUP BY r.id, r.name, r.description, r.category, r.yield_quantity, r.yield_unit, 
+               r.total_cost, r.cost_per_serving, r.cogs_percent, r.suggested_price, 
+               r.waste_factor, r.yield_efficiency, r.image_url, r.instructions, 
+               r.notes, r.is_active, r.created_at, r.updated_at
+      ORDER BY r.created_at DESC
     `);
-    console.log(`[recipes] Returning ${rows.length} recipes`);
+    console.log(`[recipes] Returning ${rows.length} recipes with ingredients`);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching recipes:', error);
