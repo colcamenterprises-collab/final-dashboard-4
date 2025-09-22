@@ -24,7 +24,7 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
           />
 
           {/* Content with proper scrolling */}
-          <main className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-slate-900">
+          <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
             <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
               {children}
             </div>
