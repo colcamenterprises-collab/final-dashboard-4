@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2, Upload, Image, ChefHat, Calculator, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import ChefRamsayGordon from "@/components/ChefRamsayGordon";
+// import ChefRamsayGordon from "@/components/ChefRamsayGordon"; // DISABLED
 import { Link } from "wouter";
 
 // ---- Types ----
@@ -820,8 +820,8 @@ export default function RecipesUnified() {
             </Button>
           </div>
 
-          {/* Chef Ramsay Integration */}
-          {recipeName && linesWithCosts.length > 0 && (
+          {/* Chef Ramsay Integration - DISABLED */}
+          {/* {recipeName && linesWithCosts.length > 0 && (
             <ChefRamsayGordon 
               mode={chefMode}
               context={{
@@ -833,7 +833,7 @@ export default function RecipesUnified() {
                 menuPrice
               }}
             />
-          )}
+          )} */}
         </div>
       )}
     </div>

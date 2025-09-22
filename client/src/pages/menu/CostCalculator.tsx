@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import ChefRamsayGordon from "@/components/ChefRamsayGordon";
+// import ChefRamsayGordon from "@/components/ChefRamsayGordon"; // DISABLED
 import { RecipeEditor } from "./RecipeEditor";
 
 // ---- Types ----
@@ -391,8 +391,8 @@ export default function CostCalculator(){
         </div>
       </div>
 
-      {/* Chef Ramsay Gordon - Always Visible */}
-      <ChefRamsayGordon 
+      {/* Chef Ramsay Gordon - Always Visible - DISABLED */}
+      {/* <ChefRamsayGordon 
         mode={chefMode}
         context={{
           recipeName,
@@ -402,7 +402,7 @@ export default function CostCalculator(){
           costPerPortionTHB,
           menuPrice
         }}
-      />
+      /> */}
 
       {/* Recipe Editor Modal */}
       {showRecipeEditor && (
