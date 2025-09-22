@@ -13,9 +13,9 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Modern layout shell */}
-      <div className="flex h-screen overflow-hidden lg:ml-64">
+      <div className="flex min-h-screen lg:ml-64">
         {/* Main content area */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1">
           {/* Modern Header */}
           <ModernHeader
             onMenuToggle={() => setSidebarOpen(true)}
