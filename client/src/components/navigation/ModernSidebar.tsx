@@ -73,19 +73,10 @@ const navigationGroups: NavGroup[] = [
     ]
   },
   {
-    title: "Analysis (All)",
+    title: "Analysis",
     items: [
       { to: "/analysis/daily-shift", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-analysis-daily-shift" },
-      { to: "/analysis/core", label: "Core Analysis", icon: BarChart3, testId: "nav-analysis-core" },
-      { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-analysis-shift-summary" },
-      { to: "/analysis/shift-analysis", label: "Shift Analysis", icon: BarChart3, testId: "nav-analysis-shift-analysis" },
-      { to: "/analysis/pos-upload", label: "POS Upload", icon: BarChart3, testId: "nav-analysis-pos-upload" },
-      { to: "/analysis/root", label: "Root Analysis", icon: BarChart3, testId: "nav-analysis-root" },
-      { to: "/analysis/detail", label: "Analysis Detail", icon: BarChart3, testId: "nav-analysis-detail" },
-      { to: "/analysis/list", label: "Analysis List", icon: BarChart3, testId: "nav-analysis-list" },
-      { to: "/analysis/tabbed", label: "Tabbed Analysis", icon: BarChart3, testId: "nav-analysis-tabbed" },
-      { to: "/analysis/analytics", label: "Shift Analytics", icon: BarChart3, testId: "nav-analysis-analytics" },
-      { to: "/analysis/reports", label: "Reports Analysis", icon: BarChart3, testId: "nav-analysis-reports" }
+      { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-analysis-shift-summary" }
     ]
   },
   {
