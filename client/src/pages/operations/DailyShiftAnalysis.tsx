@@ -46,13 +46,17 @@ export default function DailyShiftAnalysis() {
   }
 
   return (
-    <div className="p-6" data-testid="daily-shift-analysis">
+    <div className="p-2 sm:p-3 lg:p-6" data-testid="daily-shift-analysis">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Daily Shift Analysis</h1>
-          <p className="text-gray-600">Side-by-side reconciliation of Staff Forms vs POS Reports</p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">Daily Shift Analysis</h1>
+          <p className="text-xs sm:text-sm lg:text-base text-gray-600">Side-by-side reconciliation of Staff Forms vs POS Reports</p>
         </div>
-        <Button onClick={generateAnalysis} data-testid="button-generate-analysis">
+        <Button 
+          onClick={generateAnalysis} 
+          data-testid="button-generate-analysis"
+          className="bg-blue-600 text-white hover:bg-blue-700 border-blue-600 p-2 sm:p-3 lg:p-4"
+        >
           Generate Today's Analysis
         </Button>
       </div>
@@ -74,23 +78,23 @@ export default function DailyShiftAnalysis() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300" data-testid="table-sales-comparison">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-gray-300 p-2 text-left">Date</th>
-                      <th className="border border-gray-300 p-2 text-left">Field</th>
-                      <th className="border border-gray-300 p-2 text-left">Staff Form</th>
-                      <th className="border border-gray-300 p-2 text-left">POS Report</th>
-                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Date</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Field</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Staff Form</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">POS Report</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) =>
                       row.analysis?.salesVsPOS?.map((s: any, idx: number) => (
-                        <tr key={`${row.shiftDate}-${idx}`} className={s.status.includes("🚨") ? "bg-red-50" : "bg-green-50"}>
-                          <td className="border border-gray-300 p-2">{row.shiftDate}</td>
-                          <td className="border border-gray-300 p-2">{s.field}</td>
-                          <td className="border border-gray-300 p-2">{s.form || 0}</td>
-                          <td className="border border-gray-300 p-2">{s.pos || 0}</td>
-                          <td className="border border-gray-300 p-2">{s.status}</td>
+                        <tr key={`${row.shiftDate}-${idx}`} className={s.status.includes("🚨") ? "bg-red-50 border-b border-gray-200" : "bg-green-50 border-b border-gray-200"}>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm">{row.shiftDate}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm font-medium">{s.field}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.form || 0}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.pos || 0}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.status}</td>
                         </tr>
                       )) || []
                     )}
@@ -109,25 +113,25 @@ export default function DailyShiftAnalysis() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300" data-testid="table-stock-variances">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-gray-300 p-2 text-left">Date</th>
-                      <th className="border border-gray-300 p-2 text-left">Item</th>
-                      <th className="border border-gray-300 p-2 text-left">Expected</th>
-                      <th className="border border-gray-300 p-2 text-left">Actual</th>
-                      <th className="border border-gray-300 p-2 text-left">Variance</th>
-                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Date</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Item</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Expected</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Actual</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Variance</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-gray-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) =>
                       row.analysis?.stockUsage?.map((s: any, idx: number) => (
-                        <tr key={`${row.shiftDate}-stock-${idx}`} className={s.status === "🚨" ? "bg-red-50" : "bg-green-50"}>
-                          <td className="border border-gray-300 p-2">{row.shiftDate}</td>
-                          <td className="border border-gray-300 p-2">{s.item}</td>
-                          <td className="border border-gray-300 p-2">{s.expected}</td>
-                          <td className="border border-gray-300 p-2">{s.actual}</td>
-                          <td className="border border-gray-300 p-2">{s.variance}</td>
-                          <td className="border border-gray-300 p-2">{s.status}</td>
+                        <tr key={`${row.shiftDate}-stock-${idx}`} className={s.status === "🚨" ? "bg-red-50 border-b border-gray-200" : "bg-green-50 border-b border-gray-200"}>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm">{row.shiftDate}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm font-medium">{s.item}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.expected}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.actual}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.variance}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center">{s.status}</td>
                         </tr>
                       )) || []
                     )}
@@ -147,27 +151,27 @@ export default function DailyShiftAnalysis() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300" data-testid="table-drinks-analysis">
                   <thead>
-                    <tr className="bg-blue-100">
-                      <th className="border border-gray-300 p-2 text-left">Date</th>
-                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
-                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
-                      <th className="border border-gray-300 p-2 text-left">Expected Usage</th>
-                      <th className="border border-gray-300 p-2 text-left">Actual Count (Form)</th>
-                      <th className="border border-gray-300 p-2 text-left">Variance</th>
-                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    <tr className="bg-blue-50 border-b border-blue-200">
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Date</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Item Name</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Qty Sold (POS)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Expected Usage</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Actual Count (Form)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Variance</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-blue-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) =>
                       row.analysis?.drinksAnalysis?.map((d: any, idx: number) => (
-                        <tr key={`${row.shiftDate}-drinks-${idx}`} className={d.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-drinks-${idx}`}>
-                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
-                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-drink-name-${idx}`}>{d.itemName}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{d.qtySold}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{d.expectedUsage}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{d.actualCount}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{d.variance > 0 ? `+${d.variance}` : d.variance}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{d.status}</td>
+                        <tr key={`${row.shiftDate}-drinks-${idx}`} className={d.status === "🚨" ? "bg-red-50 border-b border-gray-200" : "bg-green-50 border-b border-gray-200"} data-testid={`row-drinks-${idx}`}>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm font-medium" data-testid={`text-drink-name-${idx}`}>{d.itemName}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-qty-sold-${idx}`}>{d.qtySold}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-expected-${idx}`}>{d.expectedUsage}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-actual-${idx}`}>{d.actualCount}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-variance-${idx}`}>{d.variance > 0 ? `+${d.variance}` : d.variance}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-status-${idx}`}>{d.status}</td>
                         </tr>
                       )) || []
                     )}
@@ -194,27 +198,27 @@ export default function DailyShiftAnalysis() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300" data-testid="table-rolls-analysis">
                   <thead>
-                    <tr className="bg-yellow-100">
-                      <th className="border border-gray-300 p-2 text-left">Date</th>
-                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
-                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
-                      <th className="border border-gray-300 p-2 text-left">Expected Usage</th>
-                      <th className="border border-gray-300 p-2 text-left">Actual Count (Form)</th>
-                      <th className="border border-gray-300 p-2 text-left">Variance</th>
-                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    <tr className="bg-yellow-50 border-b border-yellow-200">
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Date</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Item Name</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Qty Sold (POS)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Expected Usage</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Actual Count (Form)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Variance</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-yellow-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) =>
                       row.analysis?.rollsAnalysis?.map((r: any, idx: number) => (
-                        <tr key={`${row.shiftDate}-rolls-${idx}`} className={r.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-rolls-${idx}`}>
-                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
-                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-roll-name-${idx}`}>{r.itemName}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{r.qtySold}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{r.expectedUsage}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{r.actualCount}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{r.variance > 0 ? `+${r.variance}` : r.variance}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{r.status}</td>
+                        <tr key={`${row.shiftDate}-rolls-${idx}`} className={r.status === "🚨" ? "bg-red-50 border-b border-gray-200" : "bg-green-50 border-b border-gray-200"} data-testid={`row-rolls-${idx}`}>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm font-medium" data-testid={`text-roll-name-${idx}`}>{r.itemName}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-qty-sold-${idx}`}>{r.qtySold}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-expected-${idx}`}>{r.expectedUsage}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-actual-${idx}`}>{r.actualCount}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-variance-${idx}`}>{r.variance > 0 ? `+${r.variance}` : r.variance}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-status-${idx}`}>{r.status}</td>
                         </tr>
                       )) || []
                     )}
@@ -241,27 +245,27 @@ export default function DailyShiftAnalysis() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300" data-testid="table-meat-analysis">
                   <thead>
-                    <tr className="bg-red-100">
-                      <th className="border border-gray-300 p-2 text-left">Date</th>
-                      <th className="border border-gray-300 p-2 text-left">Item Name</th>
-                      <th className="border border-gray-300 p-2 text-left">Qty Sold (POS)</th>
-                      <th className="border border-gray-300 p-2 text-left">Expected Usage (g)</th>
-                      <th className="border border-gray-300 p-2 text-left">Actual Count (g)</th>
-                      <th className="border border-gray-300 p-2 text-left">Variance (g)</th>
-                      <th className="border border-gray-300 p-2 text-left">Status</th>
+                    <tr className="bg-red-50 border-b border-red-200">
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Date</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Item Name</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Qty Sold (POS)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Expected Usage (g)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Actual Count (g)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Variance (g)</th>
+                      <th className="p-2 sm:p-3 lg:p-4 text-left text-xs sm:text-sm font-semibold text-red-900">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) =>
                       row.analysis?.meatAnalysis?.map((m: any, idx: number) => (
-                        <tr key={`${row.shiftDate}-meat-${idx}`} className={m.status === "🚨" ? "bg-red-50" : "bg-green-50"} data-testid={`row-meat-${idx}`}>
-                          <td className="border border-gray-300 p-2" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
-                          <td className="border border-gray-300 p-2 font-medium" data-testid={`text-meat-name-${idx}`}>{m.itemName}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-qty-sold-${idx}`}>{m.qtySold}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-expected-${idx}`}>{m.expectedUsage}g</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-actual-${idx}`}>{m.actualCount}g</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-variance-${idx}`}>{m.variance > 0 ? `+${m.variance}g` : `${m.variance}g`}</td>
-                          <td className="border border-gray-300 p-2 text-center" data-testid={`text-status-${idx}`}>{m.status}</td>
+                        <tr key={`${row.shiftDate}-meat-${idx}`} className={m.status === "🚨" ? "bg-red-50 border-b border-gray-200" : "bg-green-50 border-b border-gray-200"} data-testid={`row-meat-${idx}`}>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm" data-testid={`text-date-${row.shiftDate}`}>{row.shiftDate}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm font-medium" data-testid={`text-meat-name-${idx}`}>{m.itemName}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-qty-sold-${idx}`}>{m.qtySold}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-expected-${idx}`}>{m.expectedUsage}g</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-actual-${idx}`}>{m.actualCount}g</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-variance-${idx}`}>{m.variance > 0 ? `+${m.variance}g` : `${m.variance}g`}</td>
+                          <td className="p-2 sm:p-3 lg:p-4 text-xs sm:text-sm text-center" data-testid={`text-status-${idx}`}>{m.status}</td>
                         </tr>
                       )) || []
                     )}
