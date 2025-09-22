@@ -928,13 +928,6 @@ export function registerRoutes(app: express.Application): Server {
     res.json({ ok: true, rows });
   });
 
-  // Get one analysis by date
-  app.get("/api/analysis/:date", async (req, res) => {
-    const date = req.params.date;
-    const rows = await db.select().from(dailyShiftAnalysis).where(eq(dailyShiftAnalysis.shiftDate, date));
-    res.json({ ok: true, data: rows[0]?.analysis || null });
-  });
-
   app.get('/api/analysis/list', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
@@ -962,6 +955,13 @@ export function registerRoutes(app: express.Application): Server {
     } finally {
       await prisma.$disconnect();
     }
+  });
+
+  // Get one analysis by date
+  app.get("/api/analysis/:date", async (req, res) => {
+    const date = req.params.date;
+    const rows = await db.select().from(dailyShiftAnalysis).where(eq(dailyShiftAnalysis.shiftDate, date));
+    res.json({ ok: true, data: rows[0]?.analysis || null });
   });
 
   app.get('/api/analysis/snapshot/:id', async (req: Request, res: Response) => {

@@ -980,8 +980,7 @@ export const dailyReceiptSummaries = pgTable("dailyReceiptSummaries", {
 
 export const insertDailyReceiptSummarySchema = createInsertSchema(dailyReceiptSummaries).omit({ 
   id: true, 
-  processedAt: true,
-  updatedAt: true 
+  createdAt: true 
 });
 
 export type DailyReceiptSummary = typeof dailyReceiptSummaries.$inferSelect;
