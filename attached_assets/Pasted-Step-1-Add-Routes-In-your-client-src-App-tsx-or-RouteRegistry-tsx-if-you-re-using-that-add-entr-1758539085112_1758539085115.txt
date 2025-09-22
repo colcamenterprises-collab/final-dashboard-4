@@ -1,0 +1,56 @@
+Step 1: Add Routes
+
+In your client/src/App.tsx (or RouteRegistry.tsx if you’re using that), add entries for all 11 pages:
+
+import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
+import Analysis from "./pages/operations/Analysis";
+import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
+import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
+import PosUpload from "./pages/analysis/PosUpload";
+import RootAnalysis from "./pages/Analysis";
+import AnalysisDetail from "./pages/AnalysisDetail";
+import AnalysisList from "./pages/AnalysisList";
+import AnalysisTabbed from "./pages/AnalysisTabbed";
+import ShiftAnalytics from "./pages/ShiftAnalytics";
+import ReportsAnalysis from "./pages/ReportsAnalysis";
+
+<Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
+<Route path="/analysis/core" element={<Analysis />} />
+<Route path="/analysis/shift-summary" element={<ShiftSummary />} />
+<Route path="/analysis/shift-analysis" element={<ShiftAnalysis />} />
+<Route path="/analysis/pos-upload" element={<PosUpload />} />
+<Route path="/analysis/root" element={<RootAnalysis />} />
+<Route path="/analysis/detail" element={<AnalysisDetail />} />
+<Route path="/analysis/list" element={<AnalysisList />} />
+<Route path="/analysis/tabbed" element={<AnalysisTabbed />} />
+<Route path="/analysis/analytics" element={<ShiftAnalytics />} />
+<Route path="/analysis/reports" element={<ReportsAnalysis />} />
+
+📂 Step 2: Update Sidebar Menu
+
+In your sidebar config (looks like client/src/components/Sidebar.tsx or similar), add an “All Analysis Pages” group:
+
+{
+  label: "Analysis (All)",
+  items: [
+    { name: "Daily Shift Analysis", path: "/analysis/daily-shift" },
+    { name: "Core Analysis", path: "/analysis/core" },
+    { name: "Shift Summary", path: "/analysis/shift-summary" },
+    { name: "Shift Analysis", path: "/analysis/shift-analysis" },
+    { name: "POS Upload", path: "/analysis/pos-upload" },
+    { name: "Root Analysis", path: "/analysis/root" },
+    { name: "Analysis Detail", path: "/analysis/detail" },
+    { name: "Analysis List", path: "/analysis/list" },
+    { name: "Tabbed Analysis", path: "/analysis/tabbed" },
+    { name: "Shift Analytics", path: "/analysis/analytics" },
+    { name: "Reports Analysis", path: "/analysis/reports" }
+  ]
+}
+
+📂 Step 3: Run & Review
+
+Start app in Preview.
+
+Expand “Analysis (All)” in the sidebar.
+
+Click through each page → screenshot or list which ones are keepers, which are junk, and which you’d like to merge into the main Daily Analysis dashboard.
