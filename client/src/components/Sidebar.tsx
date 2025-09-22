@@ -37,23 +37,8 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
-      { to: "/analysis", label: "Analysis" },
-    ],
-  },
-  {
-    title: "Analysis (All)",
-    items: [
       { to: "/analysis/daily-shift", label: "Daily Shift Analysis" },
-      { to: "/analysis/core", label: "Core Analysis" },
-      { to: "/analysis/shift-summary", label: "Shift Summary" },
-      { to: "/analysis/shift-analysis", label: "Shift Analysis" },
-      { to: "/analysis/pos-upload", label: "POS Upload" },
-      { to: "/analysis/root", label: "Root Analysis" },
-      { to: "/analysis/detail", label: "Analysis Detail" },
-      { to: "/analysis/list", label: "Analysis List" },
-      { to: "/analysis/tabbed", label: "Tabbed Analysis" },
-      { to: "/analysis/analytics", label: "Shift Analytics" },
-      { to: "/analysis/reports", label: "Reports Analysis" }
+      { to: "/analysis/shift-summary", label: "Shift Summary" }
     ],
   },
   {

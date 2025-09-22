@@ -14,7 +14,6 @@ import DailySalesStock from "./pages/operations/DailySalesStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import ShoppingList from "./pages/ShoppingList";
 import Receipts from "./pages/Receipts";
-import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
 import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
 import FinancePage from "./pages/finance/FinancePage";
@@ -35,17 +34,9 @@ import JussiOps from "./pages/JussiOps";
 import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
-import PosUpload from "./pages/analysis/PosUpload";
-import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
-import PosReceipts from "./pages/analysis/PosReceipts";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
-import RootAnalysis from "./pages/Analysis";
-import AnalysisDetail from "./pages/AnalysisDetail";
-import AnalysisList from "./pages/AnalysisList";
-import AnalysisTabbed from "./pages/AnalysisTabbed";
-import ShiftAnalytics from "./pages/ShiftAnalytics";
-import ReportsAnalysis from "./pages/ReportsAnalysis";
+import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -97,14 +88,10 @@ export default function App() {
                   {/* Legacy analysis routes */}
                   <Route path="upload" element={<UploadStatements />} />
                   <Route path="receipts" element={<Receipts />} />
-                  <Route path="pos-upload" element={<PosUpload />} />
-                  <Route path="shift-analysis" element={<ShiftAnalysis />} />
-                  <Route path="pos-receipts" element={<PosReceipts />} />
                   
                   {/* Legacy direct routes */}
                   <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
                   <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
-                  <Route path={ROUTES.SHIFT_SUMMARY} element={<Guard><ShiftSummary /></Guard>} />
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
                   <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
@@ -133,16 +120,7 @@ export default function App() {
 
                   {/* All Analysis Pages */}
                   <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
-                  <Route path="/analysis/core" element={<Analysis />} />
                   <Route path="/analysis/shift-summary" element={<ShiftSummary />} />
-                  <Route path="/analysis/shift-analysis" element={<ShiftAnalysis />} />
-                  <Route path="/analysis/pos-upload" element={<PosUpload />} />
-                  <Route path="/analysis/root" element={<RootAnalysis />} />
-                  <Route path="/analysis/detail" element={<AnalysisDetail />} />
-                  <Route path="/analysis/list" element={<AnalysisList />} />
-                  <Route path="/analysis/tabbed" element={<AnalysisTabbed />} />
-                  <Route path="/analysis/analytics" element={<ShiftAnalytics />} />
-                  <Route path="/analysis/reports" element={<ReportsAnalysis />} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
