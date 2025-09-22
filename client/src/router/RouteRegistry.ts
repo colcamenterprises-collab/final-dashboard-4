@@ -16,7 +16,6 @@ export const ROUTES = {
   SHIFT_REPORTS: "/operations/shift-reports",
 
   // Legacy routes for compatibility
-  OVERVIEW: "/overview",
   SHIFT_SUMMARY: "/operations/shift-summary",
 
   // Finance

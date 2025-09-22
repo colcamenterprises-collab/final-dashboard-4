@@ -10,7 +10,6 @@ import NotFound from "./pages/NotFound";
 // Pages
 import Home from "./pages/Home";
 import { Analysis } from "./pages/operations/Analysis";
-import Overview from "./pages/dashboard/Overview";
 import DailySalesStock from "./pages/operations/DailySalesStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import ShoppingList from "./pages/ShoppingList";
@@ -66,8 +65,6 @@ export default function App() {
                   {/* Home */}
                   <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
                   
-                  {/* Legacy Dashboard route */}
-                  <Route path={ROUTES.OVERVIEW} element={<Guard><Overview /></Guard>} />
 
                   {/* Operations */}
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
