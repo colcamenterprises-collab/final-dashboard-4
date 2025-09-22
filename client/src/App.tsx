@@ -41,6 +41,12 @@ import ShiftAnalysis from "./pages/analysis/ShiftAnalysis";
 import PosReceipts from "./pages/analysis/PosReceipts";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
+import RootAnalysis from "./pages/Analysis";
+import AnalysisDetail from "./pages/AnalysisDetail";
+import AnalysisList from "./pages/AnalysisList";
+import AnalysisTabbed from "./pages/AnalysisTabbed";
+import ShiftAnalytics from "./pages/ShiftAnalytics";
+import ReportsAnalysis from "./pages/ReportsAnalysis";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -127,6 +133,19 @@ export default function App() {
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
                   <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
                   <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+
+                  {/* All Analysis Pages */}
+                  <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
+                  <Route path="/analysis/core" element={<Analysis />} />
+                  <Route path="/analysis/shift-summary" element={<ShiftSummary />} />
+                  <Route path="/analysis/shift-analysis" element={<ShiftAnalysis />} />
+                  <Route path="/analysis/pos-upload" element={<PosUpload />} />
+                  <Route path="/analysis/root" element={<RootAnalysis />} />
+                  <Route path="/analysis/detail" element={<AnalysisDetail />} />
+                  <Route path="/analysis/list" element={<AnalysisList />} />
+                  <Route path="/analysis/tabbed" element={<AnalysisTabbed />} />
+                  <Route path="/analysis/analytics" element={<ShiftAnalytics />} />
+                  <Route path="/analysis/reports" element={<ReportsAnalysis />} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
