@@ -224,7 +224,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2 sidebar-scroll">
+        <nav className="flex-1 overflow-y-scroll p-4 space-y-2 sidebar-scroll" style={{maxHeight: "calc(100vh - 140px)"}}>
           {navigationGroups.map((group) => {
             const isGroupOpen = openGroups.has(group.title);
             
