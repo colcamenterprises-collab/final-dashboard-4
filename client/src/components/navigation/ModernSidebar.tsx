@@ -52,6 +52,7 @@ const navigationGroups: NavGroup[] = [
         subItems: [
           { to: "/operations/analysis/loyverse", label: "Loyverse Reports", icon: BarChart3, testId: "nav-loyverse" },
           { to: "/operations/analysis/daily-shift-analysis", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-daily-shift-analysis" },
+          { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-shift-summary" },
           { to: "/operations/analysis/stock-review", label: "Stock Review", icon: BarChart3, testId: "nav-stock-review" }
         ]
       }
@@ -70,13 +71,6 @@ const navigationGroups: NavGroup[] = [
       { to: "/menu/recipes", label: "Recipe Management", icon: ChefHat, testId: "nav-recipes" },
       { to: "/menu/ingredient-management", label: "Ingredient Mgmt", icon: Settings, testId: "nav-ingredients" },
       { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" }
-    ]
-  },
-  {
-    title: "Analysis",
-    items: [
-      { to: "/analysis/daily-shift", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-analysis-daily-shift" },
-      { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-analysis-shift-summary" }
     ]
   },
   {
