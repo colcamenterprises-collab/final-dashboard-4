@@ -6,9 +6,13 @@ import { loyverse_shifts, loyverse_receipts } from "../../shared/schema";
 function detectCsvType(headers: string[]): "shift" | "receipt" | "summary" | "unknown" {
   const h = headers.map(h => h.toLowerCase());
 
-  if (h.some(x => x.includes("shift")) && h.some(x => x.includes("gross"))) return "shift";
+  // Loyverse shift reports can have different formats
+  if (h.some(x => x.includes("shift")) && (h.some(x => x.includes("gross")) || h.some(x => x.includes("cash")))) return "shift";
   if (h.some(x => x.includes("payment")) && h.some(x => x.includes("receipt"))) return "receipt";
   if (h.some(x => x.includes("gross")) && h.some(x => x.includes("net"))) return "summary";
+  
+  // Also check for expected cash amount pattern (another shift indicator)
+  if (h.some(x => x.includes("expected")) && h.some(x => x.includes("cash"))) return "shift";
 
   return "unknown";
 }
