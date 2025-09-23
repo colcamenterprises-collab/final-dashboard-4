@@ -1,3 +1,5 @@
+📂 Backend
+server/services/posUploadService.ts
 import fs from "fs";
 import csvParse from "csv-parse/sync";
 import { prisma } from "../db";
@@ -95,3 +97,85 @@ async function processSalesSummary(records: any[]) {
   }
   return { status: "ok", type: "summary" };
 }
+
+server/routes/posUpload.ts
+import { Router } from "express";
+import multer from "multer";
+import { processPosCsv } from "../services/posUploadService";
+
+const upload = multer({ dest: "uploads/" });
+const router = Router();
+
+router.post("/upload", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  try {
+    const result = await processPosCsv(req.file.path);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to process file" });
+  }
+});
+
+export default router;
+
+
+👉 Wire into server/index.ts:
+
+import posUploadRouter from "./routes/posUpload";
+app.use("/api/pos", posUploadRouter);
+
+📂 Frontend
+client/src/pages/operations/analysis/ShiftSummary.tsx
+import { useState } from "react";
+
+export default function ShiftSummary() {
+  const [message, setMessage] = useState("");
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const res = await fetch("/api/pos/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setMessage(JSON.stringify(data, null, 2));
+  };
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shift Summary Upload</h1>
+      <form onSubmit={handleUpload} className="space-y-4">
+        <input type="file" name="file" className="border p-2" />
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Upload
+        </button>
+      </form>
+      {message && (
+        <pre className="mt-4 p-4 bg-gray-100 border rounded">{message}</pre>
+      )}
+    </div>
+  );
+}
+
+📂 Package Additions
+
+Install dependencies:
+
+npm install multer csv-parse
+
+🚀 End Result
+
+Shift Summary Page → CSV upload form.
+
+Upload any Loyverse CSV (Shift Reports, Sales Summary, Payment Types).
+
+Backend parses + saves data into DB.
+
+JSON response shows what was processed.
+
+Data flows into the same tables (loyverse_shifts, loyverse_receipts) used by Daily Shift Analysis.
