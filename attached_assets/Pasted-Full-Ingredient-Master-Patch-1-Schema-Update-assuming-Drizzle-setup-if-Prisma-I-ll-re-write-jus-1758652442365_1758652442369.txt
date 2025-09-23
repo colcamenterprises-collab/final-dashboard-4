@@ -1,0 +1,128 @@
+Full Ingredient Master Patch
+1. Schema Update
+
+(assuming Drizzle setup, if Prisma I’ll re-write, just let me know)
+
+server/db/schema.ts
+
+import { pgTable, text, real, integer, timestamp, uuid } from "drizzle-orm/pg-core";
+
+export const ingredients = pgTable("ingredients", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  category: text("category"),
+  supplier: text("supplier"),
+  brand: text("brand"),
+
+  // Purchase (bulk side)
+  purchaseQty: real("purchase_qty").notNull(),
+  purchaseUnit: text("purchase_unit").notNull(),
+  purchaseCost: real("purchase_cost").notNull(),
+
+  // Portion (recipe side)
+  portionUnit: text("portion_unit"),
+  portionsPerPurchase: integer("portions_per_purchase"),
+  portionCost: real("portion_cost"),
+
+  lastReview: timestamp("last_review").defaultNow(),
+});
+
+2. Seed Script
+
+server/scripts/seedIngredients.ts
+
+import fs from "fs";
+import csv from "csv-parser";
+import { db } from "../db";
+import { ingredients } from "../db/schema";
+
+async function seedIngredients() {
+  const rows: any[] = [];
+
+  return new Promise<void>((resolve, reject) => {
+    fs.createReadStream("ingredient_master.csv")
+      .pipe(csv())
+      .on("data", (row) => {
+        rows.push({
+          name: row.Ingredient,
+          category: row.Category,
+          supplier: row.Supplier,
+          brand: row.Brand,
+          purchaseQty: parseFloat(row.Purchase_Qty) || 0,
+          purchaseUnit: row.Purchase_Unit,
+          purchaseCost: parseFloat(row.Purchase_Cost) || 0,
+          portionUnit: row.Portion_Unit || null,
+          portionsPerPurchase: row.Portions_Per_Purchase
+            ? parseInt(row.Portions_Per_Purchase)
+            : null,
+          portionCost: row.Portion_Cost
+            ? parseFloat(row.Portion_Cost)
+            : row.Portions_Per_Purchase
+              ? parseFloat(row.Purchase_Cost) / parseInt(row.Portions_Per_Purchase)
+              : null,
+        });
+      })
+      .on("end", async () => {
+        try {
+          await db.insert(ingredients).values(rows).onConflictDoNothing();
+          console.log(`✅ Seeded ${rows.length} ingredients`);
+          resolve();
+        } catch (err) {
+          console.error("❌ Error seeding ingredients", err);
+          reject(err);
+        }
+      });
+  });
+}
+
+seedIngredients();
+
+3. Service Layer
+
+server/services/ingredientService.ts
+
+import { db } from "../db";
+import { ingredients } from "../db/schema";
+import { eq } from "drizzle-orm";
+
+export async function getAllIngredients() {
+  return db.select().from(ingredients).orderBy(ingredients.name);
+}
+
+export async function updateIngredientPortion(id: string, portionUnit: string, portions: number) {
+  const ing = await db
+    .update(ingredients)
+    .set({
+      portionUnit,
+      portionsPerPurchase: portions,
+      portionCost: portions > 0 ? undefined : null,
+    })
+    .where(eq(ingredients.id, id))
+    .returning();
+
+  // auto-recalc cost if portions > 0
+  if (ing[0] && portions > 0) {
+    const portionCost = ing[0].purchaseCost / portions;
+    await db.update(ingredients)
+      .set({ portionCost })
+      .where(eq(ingredients.id, id));
+  }
+
+  return ing[0];
+}
+
+4. Frontend Ingredient Editor Hookup
+
+Ingredient table page loads from getAllIngredients().
+
+You can edit Portion_Unit and Portions_Per_Purchase.
+
+Portion cost auto-recalculates and saves back.
+
+✅ Result:
+
+Shopping list always uses purchaseQty × purchaseCost.
+
+Recipe calculator always uses portionCost.
+
+You can tweak portionUnit and portionsPerPurchase live from the frontend.

@@ -418,28 +418,39 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
-// Ingredients table
+// Ingredients table - Enhanced with Full Ingredient Master Patch
 export const ingredients = pgTable("ingredients", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  category: text("category").notNull(),
-  supplier: text("supplier").notNull(),
-  // Legacy fields for backwards compatibility
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  // Enhanced packaging and pricing fields
-  price: decimal("price", { precision: 10, scale: 2 }), // Package price (e.g., jar 89 THB)
-  packageSize: decimal("package_size", { precision: 10, scale: 2 }), // Package size (e.g., 300g)
-  portionSize: decimal("portion_size", { precision: 10, scale: 2 }), // Average per use (e.g., 30g)
-  costPerPortion: decimal("cost_per_portion", { precision: 10, scale: 2 }), // Auto-calculated: price / (packageSize / portionSize)
-  unit: text("unit").notNull(),
+  category: text("category"),
+  supplier: text("supplier"),
+  brand: text("brand"),
+
+  // Purchase (bulk side)
+  purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
+  purchaseUnit: text("purchase_unit").notNull(),
+  purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+
+  // Portion (recipe side)
+  portionUnit: text("portion_unit"),
+  portionsPerPurchase: integer("portions_per_purchase"),
+  portionCost: decimal("portion_cost", { precision: 10, scale: 4 }),
+
+  lastReview: timestamp("last_review").defaultNow(),
+  
+  // Legacy compatibility fields (kept for migration)
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  packageSize: decimal("package_size", { precision: 10, scale: 2 }),
+  portionSize: decimal("portion_size", { precision: 10, scale: 2 }),
+  costPerPortion: decimal("cost_per_portion", { precision: 10, scale: 2 }),
+  unit: text("unit"),
   notes: text("notes"),
-  // God file specific fields
-  brand: text("brand"), // Brand from foodCostings.ts
-  packagingQty: text("packaging_qty"), // Packaging quantity from foodCostings.ts  
-  lastReviewDate: text("last_review_date"), // Last review date from foodCostings.ts
-  source: text("source").default("manual"), // 'god' for foodCostings.ts, 'manual' for UI edits
+  packagingQty: text("packaging_qty"),
+  lastReviewDate: text("last_review_date"),
+  source: text("source").default("manual"),
   lastUpdated: timestamp("last_updated").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()), // Auto-timestamp on changes
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
