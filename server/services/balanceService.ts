@@ -1,73 +1,82 @@
 // server/services/balanceService.ts
 import { db } from "../db";
 import { loyverse_shifts, dailyStockSales } from "../../shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { sql, desc } from "drizzle-orm";
 
-export async function getDailyBalances(limit = 7) {
-  // POS balances from loyverse_shifts
-  const shifts = await db
+export async function getPosBalances(limit = 5) {
+  const rows = await db
     .select()
     .from(loyverse_shifts)
     .orderBy(desc(loyverse_shifts.shiftDate))
     .limit(limit);
 
-  const posBalances = shifts.map((s) => {
-    // Handle both CSV format and API format
+  return rows.map(r => {
+    const data = r.data as any;
     let expected = 0;
     let actual = 0;
     
-    const data = s.data as any;
     if (data?.['Expected cash amount']) {
       // CSV format
-      expected = Number(data['Expected cash amount'] || 0);
-      actual = Number(data['Actual cash amount'] || 0);
+      expected = parseFloat(data['Expected cash amount'] || 0);
+      actual = parseFloat(data['Actual cash amount'] || 0);
     } else if (data?.shifts?.[0]) {
       // API format
       const shiftInfo = data.shifts[0];
-      expected = Number(shiftInfo.expected_cash || 0);
-      actual = Number(shiftInfo.actual_cash || 0);
+      expected = parseFloat(shiftInfo.expected_cash || 0);
+      actual = parseFloat(shiftInfo.actual_cash || 0);
     }
-
-    const difference = actual - expected;
-    const status = Math.abs(difference) <= 50 ? "Balanced" : "Mismatch";
-
+    
+    const diff = actual - expected;
     return {
-      source: "POS",
-      date: s.shiftDate,
+      date: r.shiftDate,
       expected,
       actual,
-      difference,
-      status,
+      difference: diff,
+      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly"
     };
   });
+}
 
-  // Form balances from dailyStockSales
-  const forms = await db
+export async function getFormBalances(limit = 5) {
+  const rows = await db
     .select()
     .from(dailyStockSales)
     .orderBy(desc(dailyStockSales.createdAt))
     .limit(limit);
 
-  const formBalances = forms.map((f) => {
-    const startingCash = Number(f.startingCash || 0);
-    const cashSales = Number(f.cashSales || 0);
-    const endingCash = Number(f.endingCash || 0);
-
-    // For forms, we compare starting + cash sales vs ending cash
-    const expected = startingCash + cashSales;
-    const actual = endingCash;
-    const difference = actual - expected;
-    const status = Math.abs(difference) <= 50 ? "Balanced" : "Mismatch";
-
+  return rows.map(r => {
+    const expected =
+      Number(r.startingCash || 0) +
+      Number(r.cashSales || 0) -
+      Number(r.cashRefunds || 0) +
+      Number(r.paidIn || 0) -
+      Number(r.paidOut || 0);
+    const actual = Number(r.closingCash || 0);
+    const diff = actual - expected;
     return {
-      source: "Form",
-      date: f.shiftDate?.toISOString().split('T')[0] || 'Unknown',
+      date: r.shiftDate?.toISOString().split('T')[0] || r.createdAt?.toISOString().split('T')[0] || 'Unknown',
       expected,
       actual,
-      difference,
-      status,
+      difference: diff,
+      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly"
     };
   });
+}
 
-  return { posBalances, formBalances };
+export async function getCombinedBalances() {
+  const pos = await getPosBalances(30);
+  const forms = await getFormBalances(30);
+
+  return pos.map(p => {
+    const match = forms.find(f => f.date === p.date);
+    return {
+      date: p.date,
+      pos: p,
+      form: match || null,
+      anomaly:
+        !match ||
+        Math.abs(p.difference) > 50 ||
+        Math.abs((match?.difference || 0)) > 50
+    };
+  });
 }

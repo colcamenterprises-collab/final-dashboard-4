@@ -1,0 +1,206 @@
+Backend
+server/services/balanceService.ts
+import { db } from "../db";
+import { loyverse_shifts, daily_stock_sales } from "../db/schema";
+import { sql } from "drizzle-orm";
+
+export async function getPosBalances(limit = 5) {
+  const rows = await db
+    .select()
+    .from(loyverse_shifts)
+    .orderBy(sql`${loyverse_shifts.shiftDate} DESC`)
+    .limit(limit);
+
+  return rows.map(r => {
+    const expected = parseFloat(r.data?.ExpectedCash || 0);
+    const actual = parseFloat(r.data?.ActualCash || 0);
+    const diff = actual - expected;
+    return {
+      date: r.shiftDate,
+      expected,
+      actual,
+      difference: diff,
+      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly"
+    };
+  });
+}
+
+export async function getFormBalances(limit = 5) {
+  const rows = await db
+    .select()
+    .from(daily_stock_sales)
+    .orderBy(sql`${daily_stock_sales.createdAt} DESC`)
+    .limit(limit);
+
+  return rows.map(r => {
+    const expected =
+      (r.startingCash || 0) +
+      (r.cashSales || 0) -
+      (r.cashRefunds || 0) +
+      (r.paidIn || 0) -
+      (r.paidOut || 0);
+    const actual = r.closingCash || 0;
+    const diff = actual - expected;
+    return {
+      date: r.date,
+      expected,
+      actual,
+      difference: diff,
+      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly"
+    };
+  });
+}
+
+export async function getCombinedBalances() {
+  const pos = await getPosBalances(30);
+  const forms = await getFormBalances(30);
+
+  return pos.map(p => {
+    const match = forms.find(f => f.date === p.date);
+    return {
+      date: p.date,
+      pos: p,
+      form: match || null,
+      anomaly:
+        !match ||
+        Math.abs(p.difference) > 50 ||
+        Math.abs((match?.difference || 0)) > 50
+    };
+  });
+}
+
+server/routes/balance.ts
+import { Router } from "express";
+import { getPosBalances, getFormBalances, getCombinedBalances } from "../services/balanceService";
+
+const router = Router();
+
+router.get("/pos", async (req, res) => {
+  const data = await getPosBalances();
+  res.json(data);
+});
+
+router.get("/forms", async (req, res) => {
+  const data = await getFormBalances();
+  res.json(data);
+});
+
+router.get("/combined", async (req, res) => {
+  const data = await getCombinedBalances();
+  res.json(data);
+});
+
+export default router;
+
+
+Add to server/routes.ts:
+
+import balanceRoutes from "./routes/balance";
+app.use("/api/balance", balanceRoutes);
+
+🎨 Frontend
+client/src/components/BalanceCard.tsx
+import React from "react";
+
+interface Props {
+  date: string;
+  expected: number;
+  actual: number;
+  difference: number;
+  status: string;
+}
+
+export default function BalanceCard({ date, expected, actual, difference, status }: Props) {
+  const isBalanced = status === "Balanced";
+  return (
+    <div className={`p-4 rounded-xl shadow ${isBalanced ? "bg-green-100" : "bg-red-100"}`}>
+      <p className="font-semibold">{new Date(date).toLocaleDateString()}</p>
+      <p>Expected: ฿{expected.toFixed(2)}</p>
+      <p>Actual: ฿{actual.toFixed(2)}</p>
+      <p>
+        Difference: <span className={isBalanced ? "text-green-600" : "text-red-600"}>
+          {difference >= 0 ? "+" : ""}
+          {difference.toFixed(2)}
+        </span>
+      </p>
+      <p className="font-bold">{status}</p>
+    </div>
+  );
+}
+
+client/src/pages/Home.tsx (snapshot widget)
+import React, { useEffect, useState } from "react";
+import BalanceCard from "../components/BalanceCard";
+
+export default function Home() {
+  const [posBalances, setPosBalances] = useState([]);
+  const [formBalances, setFormBalances] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/balance/pos").then(r => r.json()).then(setPosBalances);
+    fetch("/api/balance/forms").then(r => r.json()).then(setFormBalances);
+  }, []);
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Cash Balance Snapshot</h2>
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">POS (Last 5)</h3>
+          {posBalances.map((b, i) => <BalanceCard key={i} {...b} />)}
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Forms (Last 5)</h3>
+          {formBalances.length > 0
+            ? formBalances.map((b, i) => <BalanceCard key={i} {...b} />)
+            : <p>No form data available</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+client/src/pages/operations/DailyShiftAnalysis.tsx (comparison table)
+import React, { useEffect, useState } from "react";
+
+export default function DailyShiftAnalysis() {
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/balance/combined").then(r => r.json()).then(setRows);
+  }, []);
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-4">Daily Shift Reconciliation</h2>
+      <table className="min-w-full bg-white border">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>POS Expected</th>
+            <th>POS Actual</th>
+            <th>POS Diff</th>
+            <th>Form Expected</th>
+            <th>Form Actual</th>
+            <th>Form Diff</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className={r.anomaly ? "bg-red-100" : "bg-green-50"}>
+              <td>{new Date(r.date).toLocaleDateString()}</td>
+              <td>฿{r.pos.expected.toFixed(2)}</td>
+              <td>฿{r.pos.actual.toFixed(2)}</td>
+              <td>{r.pos.difference.toFixed(2)}</td>
+              <td>{r.form ? `฿${r.form.expected.toFixed(2)}` : "-"}</td>
+              <td>{r.form ? `฿${r.form.actual.toFixed(2)}` : "-"}</td>
+              <td>{r.form ? r.form.difference.toFixed(2) : "-"}</td>
+              <td>{r.anomaly ? "❌ Anomaly" : "✅ Balanced"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

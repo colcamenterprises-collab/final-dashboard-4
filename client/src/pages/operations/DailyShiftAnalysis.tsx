@@ -4,11 +4,16 @@ import { Button } from "@/components/ui/button";
 
 export default function DailyShiftAnalysis() {
   const [rows, setRows] = useState<any[]>([]);
+  const [balanceRows, setBalanceRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/analysis").then(r => r.json()).then(json => {
-      setRows(json.rows || []);
+    Promise.all([
+      fetch("/api/analysis").then(r => r.json()),
+      fetch("/api/balance/combined").then(r => r.json())
+    ]).then(([analysisData, balanceData]) => {
+      setRows(analysisData.rows || []);
+      setBalanceRows(balanceData || []);
       setLoading(false);
     }).catch(err => {
       console.error('Failed to fetch analysis data:', err);
@@ -26,9 +31,13 @@ export default function DailyShiftAnalysis() {
       });
       const result = await response.json();
       if (result.ok) {
-        // Refresh the data
-        fetch("/api/analysis").then(r => r.json()).then(json => {
-          setRows(json.rows || []);
+        // Refresh both analysis and balance data
+        Promise.all([
+          fetch("/api/analysis").then(r => r.json()),
+          fetch("/api/balance/combined").then(r => r.json())
+        ]).then(([analysisData, balanceData]) => {
+          setRows(analysisData.rows || []);
+          setBalanceRows(balanceData || []);
         });
       }
     } catch (err) {
@@ -69,6 +78,58 @@ export default function DailyShiftAnalysis() {
         </Card>
       ) : (
         <div className="space-y-8">
+          {/* Daily Cash Balance Reconciliation */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Shift Reconciliation - Cash Balance Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white border border-gray-300">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 border-b text-left font-semibold">Date</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">POS Expected</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">POS Actual</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">POS Diff</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">Form Expected</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">Form Actual</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">Form Diff</th>
+                      <th className="px-4 py-2 border-b text-left font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {balanceRows.map((r: any, i: number) => (
+                      <tr key={i} className={`hover:bg-gray-50 ${r.anomaly ? "bg-red-50" : "bg-green-50"}`}>
+                        <td className="px-4 py-2 border-b font-medium">{new Date(r.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-2 border-b">฿{r.pos.expected.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td className="px-4 py-2 border-b">฿{r.pos.actual.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td className={`px-4 py-2 border-b font-medium ${r.pos.difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {r.pos.difference >= 0 ? '+' : ''}฿{r.pos.difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </td>
+                        <td className="px-4 py-2 border-b">{r.form ? `฿${r.form.expected.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "-"}</td>
+                        <td className="px-4 py-2 border-b">{r.form ? `฿${r.form.actual.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "-"}</td>
+                        <td className={`px-4 py-2 border-b font-medium ${r.form && r.form.difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {r.form ? `${r.form.difference >= 0 ? '+' : ''}฿${r.form.difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "-"}
+                        </td>
+                        <td className="px-4 py-2 border-b">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${r.anomaly ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            {r.anomaly ? "❌ Anomaly" : "✅ Balanced"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {balanceRows.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No balance reconciliation data available
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Sales vs POS Comparison */}
           <Card>
             <CardHeader>

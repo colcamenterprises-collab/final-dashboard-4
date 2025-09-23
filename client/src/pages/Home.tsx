@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
-import BalanceWidget from "@/components/BalanceWidget";
+import BalanceCard from "@/components/BalanceCard";
+import { useEffect, useState } from "react";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -115,6 +116,52 @@ function KPIGrid() {
   );
 }
 
+// Cash Balance Snapshot Component
+function CashBalanceSnapshot() {
+  const [posBalances, setPosBalances] = useState([]);
+  const [formBalances, setFormBalances] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/balance/pos").then(r => r.json()),
+      fetch("/api/balance/forms").then(r => r.json())
+    ]).then(([pos, forms]) => {
+      setPosBalances(pos);
+      setFormBalances(forms);
+      setLoading(false);
+    }).catch(err => {
+      console.error("Failed to fetch balance data:", err);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div className="bg-white rounded-2xl p-6 shadow-sm border text-gray-500">Loading balances...</div>;
+
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border">
+      <h2 className="text-xl font-bold mb-4 text-gray-800">Cash Balance Snapshot</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-blue-700">POS (Last 5)</h3>
+          {posBalances.length > 0 ? (
+            posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
+          ) : (
+            <div className="text-gray-500 text-sm">No POS data available</div>
+          )}
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-purple-700">Forms (Last 5)</h3>
+          {formBalances.length > 0 ? (
+            formBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
+          ) : (
+            <div className="text-gray-500 text-sm">No form data available</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -125,8 +172,8 @@ export default function Home() {
       {/* KPI Grid */}
       <KPIGrid />
       
-      {/* Balance Reconciliation Widget */}
-      <BalanceWidget />
+      {/* Cash Balance Snapshot */}
+      <CashBalanceSnapshot />
       
       {/* Additional content to test scrolling */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
