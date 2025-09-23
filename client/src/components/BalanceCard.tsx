@@ -1,5 +1,3 @@
-import { Calendar, DollarSign } from "lucide-react";
-
 interface Props {
   date: string;
   expected: number;
@@ -16,20 +14,16 @@ export default function BalanceCard({ date, expected, actual, difference, status
       data-testid={`balance-card-${date}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-blue-400">
-          <Calendar className="h-4 w-4" />
-          <span className="text-sm font-medium">{new Date(date).toLocaleDateString()}</span>
-        </div>
+        <span className="text-sm font-medium text-blue-400">{new Date(date).toLocaleDateString()}</span>
         <span className={`px-2 py-1 rounded-md text-xs font-medium ${
           isBalanced ? "bg-green-500 text-white" : "bg-red-500 text-white"
         }`}>
           {isBalanced ? "Balanced" : "Unbalanced"}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-green-400">
-        <DollarSign className="h-4 w-4" />
+      <div className="flex items-center justify-between text-green-400">
         <span className="text-sm font-medium">Balance</span>
-        <span className="text-sm font-medium ml-auto">
+        <span className="text-sm font-medium">
           {difference >= 0 ? "+" : ""}฿{difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
         </span>
       </div>
