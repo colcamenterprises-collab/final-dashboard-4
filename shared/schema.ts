@@ -420,7 +420,7 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
 
 // Ingredients table - Enhanced with Full Ingredient Master Patch
 export const ingredients = pgTable("ingredients", {
-  id: uuid("id").defaultRandom().primaryKey(),
+  id: serial("id").primaryKey(), // Keep existing serial ID for database safety
   name: text("name").notNull(),
   category: text("category"),
   supplier: text("supplier"),

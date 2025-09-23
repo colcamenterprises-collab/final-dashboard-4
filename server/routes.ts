@@ -31,6 +31,7 @@ import { seedGodList } from "./lib/seedIngredients";
 import expensesImportRouter from "./routes/expenses-import";
 import partnersRouter from "./routes/partners";
 import balanceRoutes from "./routes/balance";
+import ingredientsRoutes from "./routes/ingredients";
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2789,6 +2790,9 @@ export function registerRoutes(app: express.Application): Server {
 
   // Balance Reconciliation Router - Cash balance comparisons 
   app.use('/api/balance', balanceRoutes);
+
+  // Ingredients API routes
+  app.use('/api/ingredients', ingredientsRoutes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

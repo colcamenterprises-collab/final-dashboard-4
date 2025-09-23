@@ -6,7 +6,7 @@ export async function getAllIngredients() {
   return db.select().from(ingredients).orderBy(ingredients.name);
 }
 
-export async function getIngredientById(id: string) {
+export async function getIngredientById(id: number) {
   const result = await db.select().from(ingredients).where(eq(ingredients.id, id));
   return result[0] || null;
 }
@@ -27,14 +27,22 @@ export async function createIngredient(data: {
     : null;
 
   const result = await db.insert(ingredients).values({
-    ...data,
+    name: data.name,
+    category: data.category,
+    supplier: data.supplier,
+    brand: data.brand,
+    purchaseQty: String(data.purchaseQty),
+    purchaseUnit: data.purchaseUnit,
+    purchaseCost: String(data.purchaseCost),
+    portionUnit: data.portionUnit,
+    portionsPerPurchase: data.portionsPerPurchase,
     portionCost: portionCost ? String(portionCost) : null,
   }).returning();
 
   return result[0];
 }
 
-export async function updateIngredientPortion(id: string, portionUnit: string, portions: number) {
+export async function updateIngredientPortion(id: number, portionUnit: string, portions: number) {
   // First get the current ingredient to access purchase cost
   const current = await getIngredientById(id);
   if (!current) {
@@ -57,7 +65,7 @@ export async function updateIngredientPortion(id: string, portionUnit: string, p
   return result[0];
 }
 
-export async function updateIngredient(id: string, data: Partial<{
+export async function updateIngredient(id: number, data: Partial<{
   name: string;
   category: string;
   supplier: string;
@@ -80,21 +88,34 @@ export async function updateIngredient(id: string, data: Partial<{
   }
 
   const updateData = {
-    ...data,
+    name: data.name,
+    category: data.category,
+    supplier: data.supplier,
+    brand: data.brand,
+    purchaseQty: data.purchaseQty ? String(data.purchaseQty) : undefined,
+    purchaseUnit: data.purchaseUnit,
+    purchaseCost: data.purchaseCost ? String(data.purchaseCost) : undefined,
+    portionUnit: data.portionUnit,
+    portionsPerPurchase: data.portionsPerPurchase,
     ...(portionCost !== undefined && { portionCost }),
     lastReview: new Date(),
   };
 
+  // Remove undefined values
+  const cleanedData = Object.fromEntries(
+    Object.entries(updateData).filter(([_, value]) => value !== undefined)
+  );
+
   const result = await db
     .update(ingredients)
-    .set(updateData)
+    .set(cleanedData)
     .where(eq(ingredients.id, id))
     .returning();
 
   return result[0];
 }
 
-export async function deleteIngredient(id: string) {
+export async function deleteIngredient(id: number) {
   const result = await db.delete(ingredients).where(eq(ingredients.id, id)).returning();
   return result[0];
 }

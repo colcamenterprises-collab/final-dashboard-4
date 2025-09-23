@@ -1,0 +1,64 @@
+Ingredient,Category,Supplier,Brand,Purchase_Qty,Purchase_Unit,Purchase_Cost,Portion_Unit,Portions_Per_Purchase,Portion_Cost,Last_Review
+Topside Beef,Meat,Makro,Harvey Beef,1.0,kg,319.0,,,,2025-08-20
+Brisket Point End,Meat,Makro,Harvey Beef,1.0,kg,299.0,,,,2025-08-20
+Chuck Roll Beef,Meat,Makro,Harvey Beef,1.0,kg,319.0,,,,2025-08-20
+Other Beef (Mixed),Meat,Makro,Harvey Beef,1.0,kg,310.0,,,,2025-08-20
+Coke,Drinks,Makro,Coke,6.0,can,84.0,,,,2025-08-20
+Coke Zero,Drinks,Makro,Coke,6.0,can,84.0,,,,2025-08-20
+Fanta Orange,Drinks,Makro,Fanta,6.0,can,81.0,,,,2025-08-20
+Fanta Strawberry,Drinks,Makro,Fanta,6.0,can,81.0,,,,2025-08-20
+Schweppes Manow,Drinks,Makro,Schweppes,6.0,can,84.0,,,,2025-08-20
+Kids Juice (Orange),Drinks,Makro,Tipco,6.0,can,99.0,,,,2025-08-20
+Kids Juice (Apple),Drinks,Makro,Tipco,6.0,can,99.0,,,,2025-08-20
+Sprite,Drinks,Makro,Sprite,6.0,can,81.0,,,,2025-08-20
+Singha Red Soda,Drinks,Makro,Singha,6.0,can,81.0,,,,2025-08-20
+Singha Pink Soda,Drinks,Makro,Singha,6.0,can,81.0,,,,2025-08-20
+Singha Yellow Soda,Drinks,Makro,Singha,6.0,can,81.0,,,,2025-08-20
+Soda Water,Drinks,Makro,Leo,6.0,can,52.0,,,,2025-08-20
+Bottled Water,Drinks,Makro,Nestle,12.0,bottle,49.0,,,,2025-08-20
+Salad (Iceberg Lettuce),Fresh Food,Makro,Makro,1.0,kg,99.0,,,,2025-08-20
+Milk,Fresh Food,Makro,Makro,1.0,litre,80.0,,,,2025-08-20
+Burger Bun,Fresh Food,Bakery,Bakery,1.0,unit,8.0,,,,2025-08-20
+Tomatos,Fresh Food,Makro,Makro,1.0,kg,89.0,,,,2025-08-20
+White Cabbage,Fresh Food,Makro,Makro,1.0,kg,45.0,,,,2025-08-20
+Purple Cabbage,Fresh Food,Makro,Makro,1.0,kg,41.25,,,,2025-08-20
+Onions Bulk 10kg,Fresh Food,Makro,Makro,10.0,kg,290.0,,,,2025-08-20
+Onions (small bags),Fresh Food,Makro,Makro,1.0,kg,29.0,,,,2025-08-20
+Cheese,Fresh Food,Makro,Horecav,1.0,kg,359.0,,,,2025-08-20
+Bacon Short,Fresh Food,Makro,BMP,1.0,kg,305.0,,,,2025-08-20
+Bacon Long,Fresh Food,Makro,BMP,1.0,kg,430.0,,,,2025-08-20
+Jalapenos (tin),Fresh Food,Makro,Aro,1.0,kg,190.0,,,,2025-08-20
+Jalapenos (fresh),Fresh Food,Chiang Rai - Shoppee,Thai Peppers,1.0,kg,150.0,,,,2025-08-20
+French Fries 7mm,Frozen Food,Makro,Savepak 7mm,2.0,kg,129.0,,,,2025-08-20
+Chicken Nuggets,Frozen Food,Makro,Aro,1.0,kg,155.0,,,,2025-08-20
+Chicken Fillets,Frozen Food,Makro,,1.0,kg,199.0,,,,2025-08-20
+Sweet Potato Fries,Frozen Food,Makro,Aro,1.0,g,145.0,,,,2025-08-20
+Oil (Fryer),Kitchen Supplies,Makro,Bonus Palm Oil,5.0,litre,195.0,,,,2025-08-20
+Plastic Food Wrap,Kitchen Supplies,Makro,Aro,500.0,unit,375.0,,,,2025-08-20
+Paper Towel Long,Kitchen Supplies,Makro,savepack,6.0,roll,79.0,,,,2025-08-20
+Paper Towel Short (Serviettes),Kitchen Supplies,Makro,Aro,6.0,roll,116.0,,,,2025-08-20
+Food Gloves (Large),Kitchen Supplies,Makro,Satory,100.0,box,197.0,,,,2025-08-20
+Food Gloves (Medium),Kitchen Supplies,Supercheap,Satory,100.0,box,133.0,,,,2025-08-20
+Food Gloves (Small),Kitchen Supplies,Makro,Satory,100.0,box,133.0,,,,2025-08-20
+Aluminum Foil,Kitchen Supplies,Makro,Aro,29.5,unit,385.0,,,,2025-08-20
+Plastic Meat Gloves,Kitchen Supplies,Makro,M Glover,1.0,g,22.5,,,,2025-08-20
+Kitchen Cleaner,Kitchen Supplies,Makro,Aro Kitchen Cleaner,3.5,litre,149.0,,,,2025-08-20
+Alcohol Sanitiser,Kitchen Supplies,Makro,Alsoff,450.0,g,69.0,,,,2025-08-20
+French Fries Box,Packaging,Makro,Fest,1.0,g,105.0,,,,2025-08-20
+Plastic Carry Bags (Size- 6×14),Packaging,Makro,Koi Fish,500.0,g,36.0,,,,2025-08-20
+Plastic Carry Bags (Size - 9×18),Packaging,Makro,Koi Fish,500.0,g,36.0,,,,2025-08-20
+Brown Paper Food Bags,Packaging,Online,Lazada,50.0,g,139.0,,,,2025-08-20
+Loaded Fries Boxes,Packaging,Makro,Pac Away - Lazada 17x11x4.5,50.0,box,89.0,,,,2025-08-20
+Packaging Labels,Packaging,Printers,,45.0,sheet,50.0,,,,2025-08-20
+"Knife, Fork, Spoon Set",Packaging,Makro,,50.0,unit,89.0,,,,2025-08-20
+Cajun Fries Seasoning,Shelf Items,Makro,McCormick,510.0,g,508.0,,,,2025-08-20
+Crispy Fried Onions,Shelf Items,Makro,Fried Shallots,500.0,g,79.0,,,,2025-08-20
+Pickles(standard dill pickles),Shelf Items,Makro,Sis,480.0,g,89.0,,,,2025-08-20
+Pickles Sweet (standard),Shelf Items,Makro,SIS,480.0,g,89.0,,,,2025-08-20
+Mustard,Shelf Items,Makro,Aro,1.0,kg,88.0,,,,2025-08-20
+Mayonnaise,Shelf Items,Makro,Aro,1.0,unit,90.0,,,,2025-08-20
+Tomato Sauce,Shelf Items,Makro,Aro,5.0,litre,175.0,,,,2025-08-20
+Chili Sauce (Sriracha),Shelf Items,Makro,Aro,1000.0,g,108.0,,,,2025-08-20
+BBQ Sauce,Shelf Items,Makro,HEINZ,500.0,g,110.0,,,,2025-08-20
+Sriracha Sauce,Shelf Items,Makro,Aro,950.0,g,108.0,,,,2025-08-20
+Salt (Coarse Sea Salt),Shelf Items,Online,Salt Odyssey - Lazada,1.0,kg,121.0,,,,2025-08-20
