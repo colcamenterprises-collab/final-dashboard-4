@@ -153,6 +153,10 @@ async function checkSchema() {
 (async () => {
   // Check schema on startup
   await checkSchema();
+  
+  // Mount the POS upload router FIRST to avoid conflicts
+  app.use("/api/pos", posUploadRouter);
+  
   const server = await registerRoutes(app);
 
   // Setup webhooks for real-time Loyverse data
@@ -163,9 +167,6 @@ async function checkSchema() {
   // Mount the daily stock API router
   const dailyStockRouter = (await import('./api/daily-stock')).default;
   app.use('/api/daily-stock', dailyStockRouter);
-  
-  // Mount the POS upload router
-  app.use("/api/pos", posUploadRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {
