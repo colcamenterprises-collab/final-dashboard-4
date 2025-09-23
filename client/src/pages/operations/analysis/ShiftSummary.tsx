@@ -41,11 +41,11 @@ export default function ShiftSummary() {
       return {
         store: 'Smash Bros Burgers (Rawai)', // Default store name for API data
         shiftNumber: '-', // Not available in API format
-        cashPayments: shiftInfo.cash_payments ? (shiftInfo.cash_payments / 100).toFixed(2) : '-',
-        expectedCash: shiftInfo.expected_cash ? (shiftInfo.expected_cash / 100).toFixed(2) : '-',
-        actualCash: shiftInfo.actual_cash ? (shiftInfo.actual_cash / 100).toFixed(2) : '-',
+        cashPayments: shiftInfo.cash_payments ? shiftInfo.cash_payments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-',
+        expectedCash: shiftInfo.expected_cash ? shiftInfo.expected_cash.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-',
+        actualCash: shiftInfo.actual_cash ? shiftInfo.actual_cash.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-',
         difference: shiftInfo.expected_cash && shiftInfo.actual_cash ? 
-          ((shiftInfo.actual_cash - shiftInfo.expected_cash) / 100).toFixed(2) : '-'
+          (shiftInfo.actual_cash - shiftInfo.expected_cash).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'
       };
     }
     
