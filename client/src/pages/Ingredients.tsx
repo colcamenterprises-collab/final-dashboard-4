@@ -20,10 +20,11 @@ const addIngredientSchema = z.object({
   category: z.string().min(1, "Category is required"),
   supplier: z.string().min(1, "Supplier is required"),
   brand: z.string().optional(),
-  packagingQty: z.string().optional(),
-  cost: z.string().min(1, "Cost is required"),
-  averageMenuPortion: z.string().optional(),
-  lastReviewDate: z.string().optional(),
+  purchaseQty: z.coerce.number().positive("Purchase quantity must be positive"),
+  purchaseUnit: z.string().min(1, "Purchase unit is required"),
+  purchaseCost: z.coerce.number().positive("Purchase cost must be positive"),
+  portionUnit: z.string().optional(),
+  portionsPerPurchase: z.coerce.number().positive().optional(),
 });
 
 type AddIngredientForm = z.infer<typeof addIngredientSchema>;
@@ -44,10 +45,11 @@ export default function Ingredients() {
       category: "",
       supplier: "",
       brand: "",
-      packagingQty: "",
-      cost: "",
-      averageMenuPortion: "",
-      lastReviewDate: "",
+      purchaseQty: 1,
+      purchaseUnit: "",
+      purchaseCost: 0,
+      portionUnit: "",
+      portionsPerPurchase: undefined,
     },
   });
 
@@ -255,10 +257,10 @@ export default function Ingredients() {
                   <th className="text-left py-3 px-4 font-semibold">Category</th>
                   <th className="text-left py-3 px-4 font-semibold">Supplier</th>
                   <th className="text-left py-3 px-4 font-semibold">Brand</th>
-                  <th className="text-left py-3 px-4 font-semibold">Packaging Qty</th>
-                  <th className="text-left py-3 px-4 font-semibold">Cost</th>
-                  <th className="text-left py-3 px-4 font-semibold">Average Menu Portion</th>
-                  <th className="text-left py-3 px-4 font-semibold">Last Review Date</th>
+                  <th className="text-left py-3 px-4 font-semibold">Purchase Info</th>
+                  <th className="text-left py-3 px-4 font-semibold">Purchase Cost</th>
+                  <th className="text-left py-3 px-4 font-semibold">Portion Info</th>
+                  <th className="text-left py-3 px-4 font-semibold">Portion Cost</th>
                   <th className="text-left py-3 px-4 font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -271,14 +273,24 @@ export default function Ingredients() {
                         {ingredient.category}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4">{ingredient.supplier}</td>
-                    <td className="py-3 px-4">{(ingredient as any).brand || '-'}</td>
-                    <td className="py-3 px-4">{(ingredient as any).packagingQty || '-'}</td>
-                    <td className="py-3 px-4 font-semibold text-green-600">
-                      {(ingredient as any).cost || formatPrice((ingredient as any).unitPrice ?? 0)}
+                    <td className="py-3 px-4">{ingredient.supplier || '-'}</td>
+                    <td className="py-3 px-4">{ingredient.brand || '-'}</td>
+                    <td className="py-3 px-4">
+                      {ingredient.purchaseQty} {ingredient.purchaseUnit}
                     </td>
-                    <td className="py-3 px-4">{(ingredient as any).averageMenuPortion || '-'}</td>
-                    <td className="py-3 px-4">{(ingredient as any).lastReviewDate || '-'}</td>
+                    <td className="py-3 px-4 font-semibold text-green-600">
+                      ฿{Number(ingredient.purchaseCost || 0).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4">
+                      {ingredient.portionUnit && ingredient.portionsPerPurchase 
+                        ? `${ingredient.portionsPerPurchase} ${ingredient.portionUnit}` 
+                        : '-'}
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-blue-600">
+                      {ingredient.portionCost 
+                        ? `฿${Number(ingredient.portionCost).toFixed(2)}`
+                        : '-'}
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex space-x-1">
                         <Button
