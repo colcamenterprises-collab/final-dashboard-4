@@ -2,120 +2,65 @@ import fs from "fs";
 import { parse } from "csv-parse/sync";
 import { db } from "../db";
 import { loyverse_shifts, loyverse_receipts } from "../../shared/schema";
-import { eq } from "drizzle-orm";
 
 export async function processPosCsv(filePath: string) {
   const csvData = fs.readFileSync(filePath, "utf-8");
-  const records = parse(csvData, {
-    columns: true,
-    skip_empty_lines: true,
-  });
+  const records = parse(csvData, { columns: true, skip_empty_lines: true });
 
   if (!records.length) return { status: "error", message: "Empty CSV" };
 
+  // Detect type by headers
   const headers = Object.keys(records[0]).map(h => h.toLowerCase());
+  let type: "shift" | "receipt" | "unknown" = "unknown";
 
-  if (headers.includes("shift id")) {
-    return await processShiftReport(records);
-  }
-  if (headers.includes("payment type")) {
-    return await processPaymentReport(records);
-  }
-  if (headers.includes("gross sales") && headers.includes("net sales")) {
-    return await processSalesSummary(records);
-  }
+  if (headers.includes("shift id") && headers.includes("gross sales")) type = "shift";
+  if (headers.includes("payment type") && headers.includes("receipt number")) type = "receipt";
 
-  return { status: "error", message: "Unrecognized CSV format" };
-}
-
-async function processShiftReport(records: any[]) {
   let inserted = 0;
-  for (const row of records) {
-    const shiftDate = new Date(row["Opened At"]).toISOString().split('T')[0];
-    
-    const existing = await db.query.loyverse_shifts.findFirst({
-      where: eq(loyverse_shifts.shiftDate, shiftDate),
-    });
 
-    const shiftData = {
-      gross_sales: parseFloat(row["Gross Sales"] || 0),
-      net_sales: parseFloat(row["Net Sales"] || 0),
-      cash: parseFloat(row["Cash Payments"] || 0),
-      card: parseFloat(row["Card Payments"] || 0),
-      qr: parseFloat(row["QR Payments"] || 0),
-      pay_in: parseFloat(row["Pay Ins"] || 0),
-      pay_out: parseFloat(row["Pay Outs"] || 0),
-      expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
-      actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
-      raw_data: row
-    };
-
-    if (existing) {
-      await db
-        .update(loyverse_shifts)
-        .set({ data: shiftData })
-        .where(eq(loyverse_shifts.shiftDate, shiftDate));
-    } else {
+  if (type === "shift") {
+    for (const row of records) {
       await db.insert(loyverse_shifts).values({
-        shiftDate,
-        data: shiftData,
+        shiftDate: new Date(row["Opened At"] || Date.now()).toISOString().split('T')[0],
+        data: row, // store full row as JSON
       });
+      inserted++;
     }
-    inserted++;
   }
-  return { status: "ok", type: "shift", rows: inserted };
+
+  if (type === "receipt") {
+    for (const row of records) {
+      await db.insert(loyverse_receipts).values({
+        shiftDate: new Date(row["Receipt Date"] || Date.now()).toISOString().split('T')[0],
+        data: row, // store full row as JSON
+      });
+      inserted++;
+    }
+  }
+
+  return { status: "ok", type, rows: inserted };
 }
 
-async function processPaymentReport(records: any[]) {
-  let inserted = 0;
-  for (const row of records) {
-    const receiptDate = new Date(row["Receipt Date"]).toISOString().split('T')[0];
-    
-    const receiptData = {
-      receipt_number: row["Receipt Number"],
-      shift_id: row["Shift ID"],
-      payment_type: row["Payment Type"],
-      amount: parseFloat(row["Amount"] || 0),
-      raw_data: row
-    };
+// 🔎 Extractor for reconciliation
+export async function getShiftSummary(date: string) {
+  const shift = await db.query.loyverse_shifts.findFirst({
+    where: (s, { eq }) => eq(s.shiftDate, date),
+  });
 
-    await db.insert(loyverse_receipts).values({
-      shiftDate: receiptDate,
-      data: receiptData,
-    });
-    inserted++;
-  }
-  return { status: "ok", type: "payment", rows: inserted };
-}
+  if (!shift?.data) return null;
 
-async function processSalesSummary(records: any[]) {
-  let inserted = 0;
-  for (const row of records) {
-    const shiftDate = new Date(row["Opened At"] || Date.now()).toISOString().split('T')[0];
-    
-    const existing = await db.query.loyverse_shifts.findFirst({
-      where: eq(loyverse_shifts.shiftDate, shiftDate),
-    });
+  const row = shift.data as any;
 
-    const summaryData = {
-      gross_sales: parseFloat(row["Gross Sales"] || 0),
-      net_sales: parseFloat(row["Net Sales"] || 0),
-      expenses: parseFloat(row["Discounts"] || 0),
-      raw_data: row
-    };
-
-    if (existing) {
-      await db
-        .update(loyverse_shifts)
-        .set({ data: summaryData })
-        .where(eq(loyverse_shifts.shiftDate, shiftDate));
-    } else {
-      await db.insert(loyverse_shifts).values({
-        shiftDate,
-        data: summaryData,
-      });
-    }
-    inserted++;
-  }
-  return { status: "ok", type: "summary", rows: inserted };
+  return {
+    grossSales: Number(row["Gross Sales"] || 0),
+    netSales: Number(row["Net Sales"] || 0),
+    cash: Number(row["Cash"] || 0),
+    qr: Number(row["QR Code"] || 0),
+    grab: Number(row["Grab"] || 0),
+    other: Number(row["Other"] || 0),
+    payIn: Number(row["Pay In"] || 0),
+    payOut: Number(row["Pay Out"] || 0),
+    expectedCash: Number(row["Expected Cash Amount"] || 0),
+    actualCash: Number(row["Actual Cash Amount"] || 0),
+  };
 }

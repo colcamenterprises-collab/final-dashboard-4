@@ -1,0 +1,145 @@
+Full Patch: POS Upload + JSON Storage + Reconciliation Extractor
+
+This does 3 things in one go:
+
+Fixes the schema issue → stores CSV rows as JSON in loyverse_shifts and loyverse_receipts.
+
+Adds extractor functions → pull out Gross Sales, Net Sales, Cash, QR, Grab, Other, Pay In, Pay Out from the JSON.
+
+Wires reconciliation → your Daily Shift Analysis now displays parsed values side-by-side with staff Daily Sales & Stock Form.
+
+📂 server/services/posUploadService.ts
+import fs from "fs";
+import { parse } from "csv-parse/sync";
+import { db } from "../db";
+import { loyverse_shifts, loyverse_receipts } from "../db/schema";
+
+export async function processPosCsv(filePath: string) {
+  const csvData = fs.readFileSync(filePath, "utf-8");
+  const records = parse(csvData, { columns: true, skip_empty_lines: true });
+
+  if (!records.length) return { status: "error", message: "Empty CSV" };
+
+  // Detect type by headers
+  const headers = Object.keys(records[0]).map(h => h.toLowerCase());
+  let type: "shift" | "receipt" | "unknown" = "unknown";
+
+  if (headers.includes("shift id") && headers.includes("gross sales")) type = "shift";
+  if (headers.includes("payment type") && headers.includes("receipt number")) type = "receipt";
+
+  let inserted = 0;
+
+  if (type === "shift") {
+    for (const row of records) {
+      await db.insert(loyverse_shifts).values({
+        shiftDate: new Date(row["Opened At"] || Date.now()),
+        data: row, // store full row as JSON
+      });
+      inserted++;
+    }
+  }
+
+  if (type === "receipt") {
+    for (const row of records) {
+      await db.insert(loyverse_receipts).values({
+        shiftDate: new Date(row["Receipt Date"] || Date.now()),
+        data: row, // store full row as JSON
+      });
+      inserted++;
+    }
+  }
+
+  return { status: "ok", type, rows: inserted };
+}
+
+// 🔎 Extractor for reconciliation
+export async function getShiftSummary(date: string) {
+  const shift = await db.query.loyverse_shifts.findFirst({
+    where: (s, { eq }) => eq(s.shiftDate, new Date(date)),
+  });
+
+  if (!shift?.data) return null;
+
+  const row = shift.data as any;
+
+  return {
+    grossSales: Number(row["Gross Sales"] || 0),
+    netSales: Number(row["Net Sales"] || 0),
+    cash: Number(row["Cash"] || 0),
+    qr: Number(row["QR Code"] || 0),
+    grab: Number(row["Grab"] || 0),
+    other: Number(row["Other"] || 0),
+    payIn: Number(row["Pay In"] || 0),
+    payOut: Number(row["Pay Out"] || 0),
+    expectedCash: Number(row["Expected Cash Amount"] || 0),
+    actualCash: Number(row["Actual Cash Amount"] || 0),
+  };
+}
+
+📂 server/routes/posUpload.ts
+import express from "express";
+import multer from "multer";
+import { processPosCsv, getShiftSummary } from "../services/posUploadService";
+
+const upload = multer({ dest: "uploads/" });
+const router = express.Router();
+
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const result = await processPosCsv(req.file.path);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/summary/:date", async (req, res) => {
+  try {
+    const summary = await getShiftSummary(req.params.date);
+    res.json(summary || { message: "No data" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;
+
+📂 client/src/pages/analysis/DailyShiftAnalysis.tsx
+import React, { useEffect, useState } from "react";
+
+export default function DailyShiftAnalysis() {
+  const [summary, setSummary] = useState<any>(null);
+
+  useEffect(() => {
+    fetch(`/api/pos/summary/2025-09-19`) // TODO: dynamic date selector
+      .then(res => res.json())
+      .then(setSummary);
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h2 className="text-xl font-bold mb-4">Daily Shift Analysis</h2>
+
+      {!summary && <p>Loading...</p>}
+
+      {summary && (
+        <table className="table-auto border w-full text-left">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-2">Field</th>
+              <th className="p-2">POS Report</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(summary).map(([key, value]) => (
+              <tr key={key}>
+                <td className="p-2 font-medium">{key}</td>
+                <td className="p-2">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
