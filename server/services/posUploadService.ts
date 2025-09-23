@@ -23,6 +23,9 @@ export async function processPosCsv(filePath: string) {
       await db.insert(loyverse_shifts).values({
         shiftDate: new Date(row["Opened At"] || Date.now()).toISOString().split('T')[0],
         data: row, // store full row as JSON
+      }).onConflictDoUpdate({
+        target: loyverse_shifts.shiftDate,
+        set: { data: row }
       });
       inserted++;
     }
@@ -33,6 +36,9 @@ export async function processPosCsv(filePath: string) {
       await db.insert(loyverse_receipts).values({
         shiftDate: new Date(row["Receipt Date"] || Date.now()).toISOString().split('T')[0],
         data: row, // store full row as JSON
+      }).onConflictDoUpdate({
+        target: loyverse_receipts.shiftDate,
+        set: { data: row }
       });
       inserted++;
     }

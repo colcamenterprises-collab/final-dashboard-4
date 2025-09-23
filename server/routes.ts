@@ -270,16 +270,16 @@ export function registerRoutes(app: express.Application): Server {
     return saveDailyStock(req, res);
   });
 
-  // POS Bundle Upload
-  app.post('/api/pos/upload', async (req: Request, res: Response) => {
-    try {
-      const { batchId } = await importPosBundle(req.body);
-      res.json({ batchId });
-    } catch (error) {
-      console.error('POS upload failed:', error);
-      res.status(500).json({ error: 'Import failed' });
-    }
-  });
+  // POS Bundle Upload - DISABLED (conflicted with posUpload router)
+  // app.post('/api/pos/upload', async (req: Request, res: Response) => {
+  //   try {
+  //     const { batchId } = await importPosBundle(req.body);
+  //     res.json({ batchId });
+  //   } catch (error) {
+  //     console.error('POS upload failed:', error);
+  //     res.status(500).json({ error: 'Import failed' });
+  //   }
+  // });
 
   // POS Bundle Upload (Alternative endpoint)
   app.post('/api/pos/upload-bundle', async (req: Request, res: Response) => {
@@ -4201,33 +4201,33 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
 
-  // POS Integration routes
-  app.use('/api/pos', async (req, res, next) => {
-    try {
-      const { default: posUploadRoutes } = await import('./routes/posUpload');
-      posUploadRoutes(req, res, next);
-    } catch (error) {
-      next(error);
-    }
-  });
+  // POS Integration routes - DISABLED (conflicts with posUpload router mounted in index.ts)
+  // app.use('/api/pos', async (req, res, next) => {
+  //   try {
+  //     const { default: posUploadRoutes } = await import('./routes/posUpload');
+  //     posUploadRoutes(req, res, next);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // });
 
-  app.use('/api/pos', async (req, res, next) => {
-    try {
-      const { default: posReceiptsRoutes } = await import('./routes/posReceipts');
-      posReceiptsRoutes(req, res, next);
-    } catch (error) {
-      next(error);
-    }
-  });
+  // app.use('/api/pos', async (req, res, next) => {
+  //   try {
+  //     const { default: posReceiptsRoutes } = await import('./routes/posReceipts');
+  //     posReceiptsRoutes(req, res, next);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // });
 
-  app.use('/api/pos', async (req, res, next) => {
-    try {
-      const { default: posAnalysisRoutes } = await import('./routes/posAnalysis');
-      posAnalysisRoutes(req, res, next);
-    } catch (error) {
-      next(error);
-    }
-  });
+  // app.use('/api/pos', async (req, res, next) => {
+  //   try {
+  //     const { default: posAnalysisRoutes } = await import('./routes/posAnalysis');
+  //     posAnalysisRoutes(req, res, next);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // });
 
   return server;
 }
