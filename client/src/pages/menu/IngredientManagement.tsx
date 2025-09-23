@@ -55,46 +55,42 @@ export default function IngredientManagement() {
     portion: ''
   });
 
-  // Data queries - Direct from foodCostings.ts god file
-  const { data: ingredients = [], isLoading, refetch, error } = useQuery({
-    queryKey: ['ingredients-god-file'],
-    queryFn: async () => {
-      console.log('Fetching from god file endpoint...');
-      const response = await fetch('/api/ingredients/god-file');
-      if (!response.ok) {
-        throw new Error('Failed to fetch god file data');
-      }
-      const data = await response.json();
-      console.log('God file data received:', data.total, 'items');
-      console.log('First item:', data.list?.[0]);
-      
-      return (data.list || []).map((x: any) => {
-        // Calculate costs using utility functions
-        const calculations = calculateIngredientCosts(
-          x.cost || '฿0.00',
-          x.packagingQty || '',
-          x.averageMenuPortion || ''
-        );
-        
-        return {
-          id: x.id,
-          name: x.item || x.name,
-          category: x.category,
-          supplier: x.supplier,
-          brand: x.brand || '',
-          cost: x.costNumber || Number(x.cost?.replace(/[^\d.]/g, '') || 0),
-          costDisplay: x.cost || '',
-          unit: 'various',
-          packageSize: x.packagingQty || '',
-          portionSize: x.averageMenuPortion || '',
-          unitPrice: calculations.unitPrice,
-          costPerPortion: calculations.costPerPortion,
-          lastReview: x.lastReviewDate || '',
-          source: 'god', // All from god file
-          calculations
-        };
-      });
-    }
+  // Data queries - Using new ingredients API
+  const { data: rawIngredients = [], isLoading, refetch, error } = useQuery({
+    queryKey: ['/api/ingredients'],
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  // Transform the new API data to match the expected format
+  const ingredients = rawIngredients.map((x: any) => {
+    // Calculate costs using utility functions  
+    const costDisplay = `฿${Number(x.purchaseCost || 0).toFixed(2)}`;
+    const packageSizeText = (x.purchaseQty && x.purchaseUnit) ? `${x.purchaseQty} ${x.purchaseUnit}` : 'N/A';
+    const portionSizeText = (x.portionUnit && x.portionsPerPurchase) ? `${x.portionsPerPurchase} ${x.portionUnit}` : '';
+    
+    const calculations = calculateIngredientCosts(
+      costDisplay,
+      packageSizeText,
+      portionSizeText
+    );
+    
+    return {
+      id: x.id,
+      name: x.name,
+      category: x.category,
+      supplier: x.supplier || '',
+      brand: x.brand || '',
+      cost: Number(x.purchaseCost || 0),
+      costDisplay: costDisplay,
+      unit: x.purchaseUnit || 'unit',
+      packageSize: packageSizeText,
+      portionSize: portionSizeText,
+      unitPrice: calculations.unitPrice,
+      costPerPortion: x.portionCost ? Number(x.portionCost) : calculations.costPerPortion,
+      lastReview: x.lastReview || '',
+      source: 'api', // From new API
+      calculations
+    };
   });
 
   console.log('Ingredients loaded:', ingredients.length);
@@ -104,24 +100,24 @@ export default function IngredientManagement() {
     console.log('First ingredient:', ingredients[0]);
   }
 
-  // Mutations
+  // Mutations - Refresh data from API
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/ingredients/sync-god', { method: 'POST' });
-      if (!response.ok) throw new Error('Sync failed');
-      return response.json();
+      // Just refresh the data from the API
+      await queryClient.invalidateQueries({ queryKey: ['/api/ingredients'] });
+      return { message: "Refreshed ingredient data" };
     },
     onSuccess: (data) => {
       toast({ 
-        title: "God File Synced", 
-        description: data.message || "Synced from foodCostings.ts" 
+        title: "Ingredients Refreshed", 
+        description: data.message || "Refreshed ingredient data" 
       });
       refetch();
     },
     onError: () => {
       toast({ 
-        title: "Sync Failed", 
-        description: "Failed to sync from god file", 
+        title: "Refresh Failed", 
+        description: "Failed to refresh ingredient data", 
         variant: "destructive" 
       });
     }
