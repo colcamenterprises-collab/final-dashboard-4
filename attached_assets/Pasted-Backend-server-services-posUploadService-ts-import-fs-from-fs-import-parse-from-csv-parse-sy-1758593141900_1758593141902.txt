@@ -1,0 +1,185 @@
+Backend
+server/services/posUploadService.ts
+import fs from "fs";
+import { parse } from "csv-parse/sync";
+import { db } from "../db";
+import { loyverse_shifts, loyverse_receipts } from "../db/schema";
+import { eq } from "drizzle-orm";
+
+export async function processPosCsv(filePath: string) {
+  const csvData = fs.readFileSync(filePath, "utf-8");
+  const records = parse(csvData, {
+    columns: true,
+    skip_empty_lines: true,
+  });
+
+  if (!records.length) return { status: "error", message: "Empty CSV" };
+
+  const headers = Object.keys(records[0]).map(h => h.toLowerCase());
+
+  if (headers.includes("shift id")) {
+    return await processShiftReport(records);
+  }
+  if (headers.includes("payment type")) {
+    return await processPaymentReport(records);
+  }
+  if (headers.includes("gross sales") && headers.includes("net sales")) {
+    return await processSalesSummary(records);
+  }
+
+  return { status: "error", message: "Unrecognized CSV format" };
+}
+
+async function processShiftReport(records: any[]) {
+  let inserted = 0;
+  for (const row of records) {
+    const id = row["Shift ID"];
+    const existing = await db.query.loyverse_shifts.findFirst({
+      where: eq(loyverse_shifts.id, id),
+    });
+
+    if (existing) {
+      await db
+        .update(loyverse_shifts)
+        .set({
+          gross_sales: parseFloat(row["Gross Sales"] || 0),
+          net_sales: parseFloat(row["Net Sales"] || 0),
+          cash: parseFloat(row["Cash Payments"] || 0),
+          card: parseFloat(row["Card Payments"] || 0),
+          qr: parseFloat(row["QR Payments"] || 0),
+          pay_in: parseFloat(row["Pay Ins"] || 0),
+          pay_out: parseFloat(row["Pay Outs"] || 0),
+          expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
+          actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
+        })
+        .where(eq(loyverse_shifts.id, id));
+    } else {
+      await db.insert(loyverse_shifts).values({
+        id,
+        date: new Date(row["Opened At"]),
+        gross_sales: parseFloat(row["Gross Sales"] || 0),
+        net_sales: parseFloat(row["Net Sales"] || 0),
+        cash: parseFloat(row["Cash Payments"] || 0),
+        card: parseFloat(row["Card Payments"] || 0),
+        qr: parseFloat(row["QR Payments"] || 0),
+        pay_in: parseFloat(row["Pay Ins"] || 0),
+        pay_out: parseFloat(row["Pay Outs"] || 0),
+        expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
+        actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
+      });
+    }
+    inserted++;
+  }
+  return { status: "ok", type: "shift", rows: inserted };
+}
+
+async function processPaymentReport(records: any[]) {
+  let inserted = 0;
+  for (const row of records) {
+    await db.insert(loyverse_receipts).values({
+      id: row["Receipt Number"],
+      shift_id: row["Shift ID"],
+      payment_type: row["Payment Type"],
+      amount: parseFloat(row["Amount"] || 0),
+      date: new Date(row["Receipt Date"]),
+    });
+    inserted++;
+  }
+  return { status: "ok", type: "payment", rows: inserted };
+}
+
+async function processSalesSummary(records: any[]) {
+  let inserted = 0;
+  for (const row of records) {
+    const id = row["Shift ID"];
+    const existing = await db.query.loyverse_shifts.findFirst({
+      where: eq(loyverse_shifts.id, id),
+    });
+
+    if (existing) {
+      await db
+        .update(loyverse_shifts)
+        .set({
+          gross_sales: parseFloat(row["Gross Sales"] || 0),
+          net_sales: parseFloat(row["Net Sales"] || 0),
+          expenses: parseFloat(row["Discounts"] || 0),
+        })
+        .where(eq(loyverse_shifts.id, id));
+    } else {
+      await db.insert(loyverse_shifts).values({
+        id,
+        date: new Date(row["Opened At"] || Date.now()),
+        gross_sales: parseFloat(row["Gross Sales"] || 0),
+        net_sales: parseFloat(row["Net Sales"] || 0),
+        expenses: parseFloat(row["Discounts"] || 0),
+      });
+    }
+    inserted++;
+  }
+  return { status: "ok", type: "summary", rows: inserted };
+}
+
+📂 Frontend
+client/src/pages/operations/analysis/ShiftSummary.tsx
+import { useState } from "react";
+
+export default function ShiftSummary() {
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+
+    const formData = new FormData(e.currentTarget);
+    const res = await fetch("/api/pos/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+
+    setResult(data);
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shift Summary Upload</h1>
+      <form onSubmit={handleUpload} className="space-y-4">
+        <input type="file" name="file" className="border p-2" />
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          disabled={loading}
+        >
+          {loading ? "Uploading…" : "Upload"}
+        </button>
+      </form>
+
+      {result && (
+        <div className="mt-4 p-4 bg-gray-100 border rounded">
+          <p className="font-bold">Upload Result</p>
+          <p>Status: {result.status}</p>
+          <p>Type: {result.type}</p>
+          <p>Rows Processed: {result.rows}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+🚀 End Result
+
+Upload CSV → “Uploading…” shows immediately.
+
+Backend parses & inserts using Drizzle ORM into loyverse_shifts / loyverse_receipts.
+
+After finish → result box shows:
+
+Status: ok
+Type: shift
+Rows Processed: 19
+
+
+Data is now in the DB, ready for reconciliation.

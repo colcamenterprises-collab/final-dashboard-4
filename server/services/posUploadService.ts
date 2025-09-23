@@ -15,7 +15,6 @@ export async function processPosCsv(filePath: string) {
 
   const headers = Object.keys(records[0]).map(h => h.toLowerCase());
 
-  // Detect type
   if (headers.includes("shift id")) {
     return await processShiftReport(records);
   }
@@ -32,6 +31,12 @@ export async function processPosCsv(filePath: string) {
 async function processShiftReport(records: any[]) {
   let inserted = 0;
   for (const row of records) {
+    const shiftDate = new Date(row["Opened At"]).toISOString().split('T')[0];
+    
+    const existing = await db.query.loyverse_shifts.findFirst({
+      where: eq(loyverse_shifts.shiftDate, shiftDate),
+    });
+
     const shiftData = {
       gross_sales: parseFloat(row["Gross Sales"] || 0),
       net_sales: parseFloat(row["Net Sales"] || 0),
@@ -42,20 +47,19 @@ async function processShiftReport(records: any[]) {
       pay_out: parseFloat(row["Pay Outs"] || 0),
       expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
       actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
+      raw_data: row
     };
 
-    // Try to update first, then insert if not exists
-    const existing = await db.select().from(loyverse_shifts).where(eq(loyverse_shifts.shiftDate, new Date(row["Opened At"])));
-    
-    if (existing.length > 0) {
-      await db.update(loyverse_shifts)
-        .set(shiftData)
-        .where(eq(loyverse_shifts.shiftDate, new Date(row["Opened At"])));
+    if (existing) {
+      await db
+        .update(loyverse_shifts)
+        .set({ data: shiftData })
+        .where(eq(loyverse_shifts.shiftDate, shiftDate));
     } else {
       await db.insert(loyverse_shifts).values({
-        shiftDate: new Date(row["Opened At"]),
-        ...shiftData,
-      }).onConflictDoNothing();
+        shiftDate,
+        data: shiftData,
+      });
     }
     inserted++;
   }
@@ -65,13 +69,20 @@ async function processShiftReport(records: any[]) {
 async function processPaymentReport(records: any[]) {
   let inserted = 0;
   for (const row of records) {
-    await db.insert(loyverse_receipts).values({
+    const receiptDate = new Date(row["Receipt Date"]).toISOString().split('T')[0];
+    
+    const receiptData = {
       receipt_number: row["Receipt Number"],
+      shift_id: row["Shift ID"],
       payment_type: row["Payment Type"],
       amount: parseFloat(row["Amount"] || 0),
-      receipt_date: new Date(row["Receipt Date"]),
-      shift_id: row["Shift ID"],
-    }).onConflictDoNothing();
+      raw_data: row
+    };
+
+    await db.insert(loyverse_receipts).values({
+      shiftDate: receiptDate,
+      data: receiptData,
+    });
     inserted++;
   }
   return { status: "ok", type: "payment", rows: inserted };
@@ -80,24 +91,29 @@ async function processPaymentReport(records: any[]) {
 async function processSalesSummary(records: any[]) {
   let inserted = 0;
   for (const row of records) {
+    const shiftDate = new Date(row["Opened At"] || Date.now()).toISOString().split('T')[0];
+    
+    const existing = await db.query.loyverse_shifts.findFirst({
+      where: eq(loyverse_shifts.shiftDate, shiftDate),
+    });
+
     const summaryData = {
       gross_sales: parseFloat(row["Gross Sales"] || 0),
       net_sales: parseFloat(row["Net Sales"] || 0),
       expenses: parseFloat(row["Discounts"] || 0),
+      raw_data: row
     };
 
-    const shiftDate = new Date(row["Opened At"] || Date.now());
-    const existing = await db.select().from(loyverse_shifts).where(eq(loyverse_shifts.shiftDate, shiftDate));
-    
-    if (existing.length > 0) {
-      await db.update(loyverse_shifts)
-        .set(summaryData)
+    if (existing) {
+      await db
+        .update(loyverse_shifts)
+        .set({ data: summaryData })
         .where(eq(loyverse_shifts.shiftDate, shiftDate));
     } else {
       await db.insert(loyverse_shifts).values({
         shiftDate,
-        ...summaryData,
-      }).onConflictDoNothing();
+        data: summaryData,
+      });
     }
     inserted++;
   }

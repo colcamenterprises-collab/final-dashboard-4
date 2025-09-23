@@ -2,16 +2,22 @@ import { useState } from "react";
 
 export default function ShiftSummary() {
   const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
+    setResult(null);
+
     const formData = new FormData(e.currentTarget);
     const res = await fetch("/api/pos/upload", {
       method: "POST",
       body: formData,
     });
     const data = await res.json();
+
     setResult(data);
+    setLoading(false);
   };
 
   return (
@@ -22,8 +28,9 @@ export default function ShiftSummary() {
         <button
           type="submit"
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          disabled={loading}
         >
-          Upload
+          {loading ? "Uploading…" : "Upload"}
         </button>
       </form>
 
