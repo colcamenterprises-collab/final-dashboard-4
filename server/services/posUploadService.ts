@@ -14,8 +14,11 @@ function detectCsvType(headers: string[]): "shift" | "receipt" | "summary" | "un
 }
 
 export async function processPosCsv(filePath: string) {
+  console.log("🚀 processPosCsv called with:", filePath);
   const csvData = fs.readFileSync(filePath, "utf-8");
+  console.log("📄 CSV data length:", csvData.length);
   const records = parse(csvData, { columns: true, skip_empty_lines: true });
+  console.log("📊 Records parsed:", records.length);
 
   if (!records.length) return { status: "error", message: "Empty CSV" };
 
