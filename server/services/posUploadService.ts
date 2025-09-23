@@ -9,12 +9,22 @@ export async function processPosCsv(filePath: string) {
 
   if (!records.length) return { status: "error", message: "Empty CSV" };
 
-  // Detect type by headers
-  const headers = Object.keys(records[0]).map(h => h.toLowerCase());
+  // Detect type by headers (more flexible matching)
+  const headers = Object.keys(records[0]).map(h => h.toLowerCase().trim());
   let type: "shift" | "receipt" | "unknown" = "unknown";
 
-  if (headers.includes("shift id") && headers.includes("gross sales")) type = "shift";
-  if (headers.includes("payment type") && headers.includes("receipt number")) type = "receipt";
+  // Check for shift report indicators
+  if (headers.some(h => h.includes("shift")) && headers.some(h => h.includes("gross"))) {
+    type = "shift";
+  }
+  // Check for receipt/payment indicators  
+  else if (headers.some(h => h.includes("payment")) && headers.some(h => h.includes("receipt"))) {
+    type = "receipt";
+  }
+  // Also check for sales summary indicators
+  else if (headers.some(h => h.includes("gross")) && headers.some(h => h.includes("net"))) {
+    type = "shift";
+  }
 
   let inserted = 0;
 
