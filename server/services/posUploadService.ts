@@ -1,10 +1,11 @@
 import fs from "fs";
-import csvParse from "csv-parse/sync";
-import { prisma } from "../db";
+import { parse as csvParse } from "csv-parse/sync";
+import { db } from "../db";
+import { loyverseShiftReports, loyverseReceipts } from "../../shared/schema";
 
 export async function processPosCsv(filePath: string) {
   const csvData = fs.readFileSync(filePath, "utf-8");
-  const records = csvParse.parse(csvData, {
+  const records = csvParse(csvData, {
     columns: true,
     skip_empty_lines: true,
   });
@@ -29,69 +30,37 @@ export async function processPosCsv(filePath: string) {
 
 async function processShiftReport(records: any[]) {
   for (const row of records) {
-    await prisma.loyverse_shifts.upsert({
-      where: { id: row["Shift ID"] },
-      update: {
-        gross_sales: parseFloat(row["Gross Sales"] || 0),
-        net_sales: parseFloat(row["Net Sales"] || 0),
-        cash: parseFloat(row["Cash Payments"] || 0),
-        card: parseFloat(row["Card Payments"] || 0),
-        qr: parseFloat(row["QR Payments"] || 0),
-        pay_in: parseFloat(row["Pay Ins"] || 0),
-        pay_out: parseFloat(row["Pay Outs"] || 0),
-        expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
-        actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
-      },
-      create: {
-        id: row["Shift ID"],
-        date: new Date(row["Opened At"]),
-        gross_sales: parseFloat(row["Gross Sales"] || 0),
-        net_sales: parseFloat(row["Net Sales"] || 0),
-        cash: parseFloat(row["Cash Payments"] || 0),
-        card: parseFloat(row["Card Payments"] || 0),
-        qr: parseFloat(row["QR Payments"] || 0),
-        pay_in: parseFloat(row["Pay Ins"] || 0),
-        pay_out: parseFloat(row["Pay Outs"] || 0),
-        expected_cash: parseFloat(row["Expected Cash Amount"] || 0),
-        actual_cash: parseFloat(row["Actual Cash Amount"] || 0),
-      }
-    });
+    await db.insert(loyverseShiftReports).values({
+      reportId: row["Shift ID"] || `shift_${Date.now()}`,
+      totalSales: parseFloat(row["Gross Sales"] || 0).toString(),
+      reportData: row,
+    }).onConflictDoNothing();
   }
   return { status: "ok", type: "shift" };
 }
 
 async function processPaymentReport(records: any[]) {
   for (const row of records) {
-    await prisma.loyverse_receipts.create({
-      data: {
-        id: row["Receipt Number"],
-        shift_id: row["Shift ID"],
-        payment_type: row["Payment Type"],
-        amount: parseFloat(row["Amount"] || 0),
-        date: new Date(row["Receipt Date"]),
-      },
-    });
+    await db.insert(loyverseReceipts).values({
+      receiptId: row["Receipt Number"] || row["Receipt ID"] || `receipt_${Date.now()}`,
+      receiptNumber: row["Receipt Number"] || row["Receipt ID"] || "unknown",
+      receiptDate: new Date(row["Receipt Date"] || row["Date"]),
+      totalAmount: parseFloat(row["Amount"] || row["Total"] || 0),
+      paymentMethod: row["Payment Type"] || row["Payment Method"] || "unknown",
+      items: [{ name: "Payment record", amount: parseFloat(row["Amount"] || 0) }],
+      shiftDate: new Date(row["Receipt Date"] || row["Date"]),
+    }).onConflictDoNothing();
   }
   return { status: "ok", type: "payment" };
 }
 
 async function processSalesSummary(records: any[]) {
   for (const row of records) {
-    await prisma.loyverse_shifts.upsert({
-      where: { id: row["Shift ID"] },
-      update: {
-        gross_sales: parseFloat(row["Gross Sales"] || 0),
-        net_sales: parseFloat(row["Net Sales"] || 0),
-        expenses: parseFloat(row["Discounts"] || 0),
-      },
-      create: {
-        id: row["Shift ID"],
-        date: new Date(row["Opened At"] || Date.now()),
-        gross_sales: parseFloat(row["Gross Sales"] || 0),
-        net_sales: parseFloat(row["Net Sales"] || 0),
-        expenses: parseFloat(row["Discounts"] || 0),
-      }
-    });
+    await db.insert(loyverseShiftReports).values({
+      reportId: row["Shift ID"] || `summary_${Date.now()}`,
+      totalSales: parseFloat(row["Gross Sales"] || 0),
+      reportData: row,
+    }).onConflictDoNothing();
   }
   return { status: "ok", type: "summary" };
 }

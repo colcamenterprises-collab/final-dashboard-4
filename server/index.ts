@@ -13,6 +13,7 @@ import { timing } from './middleware/timing';
 import { errorGuard } from './middleware/errorGuard';
 import { readonlyGuard } from './middleware/readonly';
 import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
+import posUploadRouter from "./routes/posUpload";
 
 const prisma = new PrismaClient();
 
@@ -162,6 +163,9 @@ async function checkSchema() {
   // Mount the daily stock API router
   const dailyStockRouter = (await import('./api/daily-stock')).default;
   app.use('/api/daily-stock', dailyStockRouter);
+  
+  // Mount the POS upload router
+  app.use("/api/pos", posUploadRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {

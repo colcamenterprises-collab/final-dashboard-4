@@ -1,272 +1,34 @@
-import React, { useMemo, useState } from "react";
-import { JussiChatBubble } from "@/components/JussiChatBubble";
+import { useState } from "react";
 
-type Summary = {
-  dateLocal: string;
-  summary: {
-    kpis: any;
-    paymentBreakdown: Record<string, number>;
-    topItems: { itemName: string; qty: number; gross: number }[];
-    allItems: { itemName: string; qty: number; gross: number }[];
+export default function ShiftSummary() {
+  const [message, setMessage] = useState("");
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const res = await fetch("/api/pos/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setMessage(JSON.stringify(data, null, 2));
   };
-  daily: any | null;
-  discrepancies: { level: "ok"|"info"|"warn"; field: string; message: string }[];
-};
-
-const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(n||0);
-
-export default function ShiftSummary(){
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [date, setDate] = useState<string>("");
-  const [data, setData] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const onUpload = async ()=>{
-    if (!files || !files.length) return;
-    const fd = new FormData();
-    Array.from(files).forEach(f=> fd.append("files", f));
-    if (date) fd.append("date", date);
-    setLoading(true);
-    const resp = await fetch(`/api/analysis/shift-summary/upload${date?`?date=${date}`:""}`, { method: "POST", body: fd });
-    const json = await resp.json();
-    setLoading(false);
-    if (!resp.ok) return alert(json.error || "Upload failed");
-    setData(json);
-  };
-
-  const k = data?.summary?.kpis;
-  const pay = data?.summary?.paymentBreakdown || {};
 
   return (
-    <div className="bg-gray-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily:"Poppins, sans-serif" }}>
-      <div className="mb-6">
-        <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Shift Summary</h1>
-        <p className="text-gray-600 mt-1">Upload POS CSV exports to analyze shift performance and cross-check with daily forms</p>
-      </div>
-
-      {/* Instructions Card */}
-      {!data && (
-        <div className="bg-white border border-blue-200 rounded-2xl p-6 mb-6 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-start space-x-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">How to Use Shift Summary</h3>
-              <div className="text-gray-700 space-y-2">
-                <p>1. <strong>Export from POS:</strong> Export your sales data as CSV files</p>
-                <p>2. <strong>Select Date:</strong> Choose the shift date you want to analyze</p>
-                <p>3. <strong>Upload Files:</strong> Select your CSV data files</p>
-                <p>4. <strong>Review Analysis:</strong> Get KPIs, payment breakdown, top items, and cross-checking results</p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shift Summary Upload</h1>
+      <form onSubmit={handleUpload} className="space-y-4">
+        <input type="file" name="file" className="border p-2" />
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Upload
+        </button>
+      </form>
+      {message && (
+        <pre className="mt-4 p-4 bg-gray-100 border rounded">{message}</pre>
       )}
-
-      {/* Upload Section - moved here for better layout */}
-      {!data && (
-        <div className="bg-white rounded-2xl border p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload POS CSV Files</h3>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Date (Optional)</label>
-                <input 
-                  type="date" 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" 
-                  value={date} 
-                  onChange={e=>setDate(e.target.value)} 
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose CSV Files</label>
-                <input 
-                  type="file" 
-                  multiple 
-                  accept=".csv" 
-                  onChange={e=>setFiles(e.target.files)} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" 
-                />
-              </div>
-              <div className="flex items-end">
-                <button 
-                  onClick={onUpload} 
-                  disabled={loading || !files?.length} 
-                  className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white rounded-lg px-4 py-2 font-medium transition-colors"
-                >
-                  {loading ? "Processing..." : "Upload & Analyze"}
-                </button>
-              </div>
-            </div>
-            {files && files.length > 0 && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700 font-medium">Selected files: {files.length} CSV file{files.length !== 1 ? 's' : ''}</p>
-                <div className="text-xs text-gray-500 mt-1 space-y-1">
-                  {Array.from(files).map((f, i) => (
-                    <div key={i} className="flex items-center space-x-2">
-                      <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                      <span>{f.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* KPIs */}
-      {k && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          {[
-            ["Gross Sales", THB(k.grossSales)],
-            ["Net Sales", THB(k.netSales)],
-            ["Refunds", THB(k.refunds)],
-            ["Receipts", (k.totalReceipts||0).toString()],
-            ["Members", (k.members||0).toString()],
-            ["Grab Sales", THB(k.grabSales)],
-            ["Aroi Dee Sales", THB(k.aroiDeeSales)],
-            ["Burgers Sold", (k.burgersSold||0).toString()],
-          ].map(([label,value])=>(
-            <div key={label as string} className="rounded-2xl bg-white border p-5">
-              <div className="text-xs text-gray-500">{label}</div>
-              <div className="text-2xl font-semibold mt-1 tabular-nums">{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Payment breakdown */}
-      {data && (
-        <div className="card mt-6">
-          <div className="card-inner">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[18px] font-semibold">Payment Breakdown</h3>
-            </div>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Object.entries(pay).map(([label, amt])=>(
-                <div key={label} className="border rounded-xl p-3 bg-white">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 font-medium">{label}</span>
-                    <span className="text-gray-900 font-semibold">{THB(amt||0)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden mt-2">
-                    <div className="h-full bg-teal-600" style={{ width: `${Math.min(100, Math.max(0,(amt||0) / Math.max(1,(k?.grossSales||1)) * 100))}%`}}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top items */}
-      {data?.summary?.topItems?.length ? (
-        <div className="card mt-6">
-          <div className="card-inner">
-            <h3 className="text-[18px] font-semibold">Top 5 Items Sold</h3>
-            <div className="mt-3 overflow-auto">
-              <table className="min-w-[560px] w-full">
-                <thead><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Gross</th></tr></thead>
-                <tbody>
-                  {data.summary.topItems.map((r,i)=>(
-                    <tr key={i} className={i%2?"bg-gray-50/50":""}>
-                      <td className="p-2">{r.itemName}</td>
-                      <td className="p-2 text-right tabular-nums">{r.qty}</td>
-                      <td className="p-2 text-right tabular-nums">{THB(r.gross)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Full items table */}
-      {data?.summary?.allItems?.length ? (
-        <div className="card mt-6">
-          <div className="card-inner">
-            <h3 className="text-[18px] font-semibold">All Items Sold</h3>
-            <div className="mt-3 overflow-auto">
-              <table className="min-w-[720px] w-full">
-                <thead><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Gross</th></tr></thead>
-                <tbody>
-                  {data.summary.allItems.map((r,i)=>(
-                    <tr key={i} className={i%2?"bg-gray-50/50":""}>
-                      <td className="p-2">{r.itemName}</td>
-                      <td className="p-2 text-right tabular-nums">{r.qty}</td>
-                      <td className="p-2 text-right tabular-nums">{THB(r.gross)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Discrepancies */}
-      {data?.discrepancies?.length ? (
-        <div className="card mt-6">
-          <div className="card-inner">
-            <h3 className="text-[18px] font-semibold">Discrepancies vs Daily Sales</h3>
-            <ul className="mt-2 space-y-2">
-              {data.discrepancies.map((d,idx)=>(
-                <li key={idx} className={`p-3 rounded-xl border ${d.level==="warn"?"border-amber-300 bg-amber-50": d.level==="ok"?"border-green-300 bg-green-50":"border-gray-200 bg-white"}`}>
-                  <div className="text-sm"><strong>{d.field}:</strong> {d.message}</div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Jussi AI Analysis Section */}
-      {data && (
-        <div className="mt-6 space-y-6">
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-2xl border border-yellow-200 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
-                <span className="text-sm font-bold text-black">J</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">Jussi AI Analysis</h3>
-            </div>
-            
-            <div className="bg-white/60 rounded-lg p-4 mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">Shift Performance Insights</h4>
-              <div className="space-y-2 text-sm text-gray-700">
-                <p>• <strong>Revenue Performance:</strong> {data?.summary?.kpis?.grossSales > 12000 ? "Strong performance - above average daily target" : "Below average - consider promotional strategies"}</p>
-                <p>• <strong>Payment Mix:</strong> {((pay.Grab || 0) / (data?.summary?.kpis?.grossSales || 1) * 100).toFixed(0)}% delivery orders indicate {(pay.Grab || 0) / (data?.summary?.kpis?.grossSales || 1) > 0.6 ? "healthy online presence" : "opportunity to boost delivery sales"}</p>
-                <p>• <strong>Transaction Analysis:</strong> Average order value of {THB((data?.summary?.kpis?.grossSales || 0) / Math.max(1, data?.summary?.kpis?.totalReceipts || 1))} {((data?.summary?.kpis?.grossSales || 0) / Math.max(1, data?.summary?.kpis?.totalReceipts || 1)) > 400 ? "suggests premium positioning" : "indicates value pricing strategy"}</p>
-                <p>• <strong>Operational Efficiency:</strong> {data?.summary?.topItems?.[0]?.qty > 10 ? "High volume on top items shows good menu focus" : "Consider promoting best-selling items more"}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/60 rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 mb-2">Recommended Actions</h4>
-              <div className="space-y-1 text-sm text-gray-700">
-                {((pay.Cash || 0) / (data?.summary?.kpis?.grossSales || 1)) > 0.3 && (
-                  <p>• Consider promoting digital payments to reduce cash handling</p>
-                )}
-                {data?.summary?.kpis?.burgersSold < 20 && (
-                  <p>• Focus marketing on signature burger items to increase core sales</p>
-                )}
-                {data?.discrepancies?.some(d => d.level === "warn") && (
-                  <p>• Review cash handling procedures - discrepancies detected with Daily Sales form</p>
-                )}
-                <p>• Chat with me below for detailed analysis and specific recommendations</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Jussi Chat Component */}
-      <JussiChatBubble />
     </div>
   );
 }
