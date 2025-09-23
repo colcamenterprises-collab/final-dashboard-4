@@ -1,0 +1,192 @@
+1. Backend: server/services/balanceService.ts
+// server/services/balanceService.ts
+import { db } from "../db";
+import { loyverse_shifts, daily_stock_sales } from "../db/schema";
+import { eq, desc } from "drizzle-orm";
+
+export async function getDailyBalances(limit = 7) {
+  // POS balances
+  const shifts = await db
+    .select()
+    .from(loyverse_shifts)
+    .orderBy(desc(loyverse_shifts.shiftDate))
+    .limit(limit);
+
+  const posBalances = shifts.map((s) => {
+    const expected = Number(s.data.ExpectedCash || 0);
+    const actual = Number(s.data.ActualCash || 0);
+    const difference = actual - expected;
+    const status = Math.abs(difference) <= 50 ? "Balanced" : "Mismatch";
+
+    return {
+      source: "POS",
+      date: s.shiftDate,
+      expected,
+      actual,
+      difference,
+      status,
+    };
+  });
+
+  // Form balances
+  const forms = await db
+    .select()
+    .from(daily_stock_sales)
+    .orderBy(desc(daily_stock_sales.createdAt))
+    .limit(limit);
+
+  const formBalances = forms.map((f) => {
+    const startingCash = Number(f.startingCash || 0);
+    const cashSales = Number(f.cashSales || 0);
+    const cashRefunds = Number(f.cashRefunds || 0);
+    const paidIn = Number(f.paidIn || 0);
+    const paidOut = Number(f.paidOut || 0);
+    const closingCash = Number(f.closingCash || 0);
+
+    const expected =
+      startingCash + cashSales - cashRefunds + paidIn - paidOut;
+    const actual = closingCash;
+    const difference = actual - expected;
+    const status = Math.abs(difference) <= 50 ? "Balanced" : "Mismatch";
+
+    return {
+      source: "Form",
+      date: f.date,
+      expected,
+      actual,
+      difference,
+      status,
+    };
+  });
+
+  return { posBalances, formBalances };
+}
+
+2. Backend Route: server/routes/balance.ts
+// server/routes/balance.ts
+import { Router } from "express";
+import { getDailyBalances } from "../services/balanceService";
+
+const router = Router();
+
+router.get("/daily", async (req, res) => {
+  try {
+    const data = await getDailyBalances();
+    res.json({ status: "ok", ...data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: "error", error: err.message });
+  }
+});
+
+export default router;
+
+
+👉 Don’t forget to wire into server/routes.ts:
+
+import balanceRoutes from "./routes/balance";
+app.use("/api/balance", balanceRoutes);
+
+3. Frontend Widget: client/src/components/BalanceWidget.tsx
+// client/src/components/BalanceWidget.tsx
+import React, { useEffect, useState } from "react";
+
+interface BalanceEntry {
+  source: string;
+  date: string;
+  expected: number;
+  actual: number;
+  difference: number;
+  status: string;
+}
+
+export default function BalanceWidget() {
+  const [balances, setBalances] = useState<{
+    posBalances: BalanceEntry[];
+    formBalances: BalanceEntry[];
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/balance/daily")
+      .then((res) => res.json())
+      .then((data) => setBalances(data));
+  }, []);
+
+  if (!balances) return <div>Loading balances...</div>;
+
+  const renderCard = (entry: BalanceEntry) => (
+    <div
+      key={`${entry.source}-${entry.date}`}
+      className={`p-3 rounded-xl shadow-md mb-2 ${
+        entry.status === "Balanced" ? "bg-green-100" : "bg-red-100"
+      }`}
+    >
+      <div className="flex justify-between items-center">
+        <span className="font-bold">{entry.date}</span>
+        <span>{entry.source}</span>
+      </div>
+      <div>Expected: ฿{entry.expected.toFixed(2)}</div>
+      <div>Actual: ฿{entry.actual.toFixed(2)}</div>
+      <div>
+        Difference:{" "}
+        <span
+          className={`font-bold ${
+            entry.status === "Balanced" ? "text-green-700" : "text-red-700"
+          }`}
+        >
+          {entry.difference >= 0 ? "+" : ""}
+          {entry.difference.toFixed(2)}
+        </span>
+      </div>
+      <div
+        className={`mt-1 text-sm ${
+          entry.status === "Balanced" ? "text-green-700" : "text-red-700"
+        }`}
+      >
+        {entry.status}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <h3 className="text-lg font-bold mb-2">POS Balances</h3>
+        {balances.posBalances.map(renderCard)}
+      </div>
+      <div>
+        <h3 className="text-lg font-bold mb-2">Form Balances</h3>
+        {balances.formBalances.map(renderCard)}
+      </div>
+    </div>
+  );
+}
+
+4. Add Widget to Home Page
+
+In client/src/pages/Home.tsx:
+
+import BalanceWidget from "../components/BalanceWidget";
+
+export default function Home() {
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+      <BalanceWidget />
+      {/* existing home page widgets */}
+    </div>
+  );
+}
+
+5. Extend Anomalies (Optional)
+
+In your shiftAnalysisService.ts (or wherever anomalies are collected):
+
+if (Math.abs(formBalance.difference) > 50) {
+  anomalies.push({
+    type: "Cash Balance Mismatch",
+    date: formBalance.date,
+    detail: `Form closing cash ${formBalance.actual} vs expected ${formBalance.expected}`,
+    variance: formBalance.difference,
+  });
+}

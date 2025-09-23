@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
+import BalanceWidget from "@/components/BalanceWidget";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -123,6 +124,9 @@ export default function Home() {
       
       {/* KPI Grid */}
       <KPIGrid />
+      
+      {/* Balance Reconciliation Widget */}
+      <BalanceWidget />
       
       {/* Additional content to test scrolling */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
