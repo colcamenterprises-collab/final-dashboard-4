@@ -429,7 +429,6 @@ export default function IngredientManagement() {
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead>Portion Size</TableHead>
                   <TableHead className="text-right">Cost/Portion</TableHead>
-                  <TableHead>Source</TableHead>
                   <TableHead>Review</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -470,18 +469,6 @@ export default function IngredientManagement() {
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={item.source === 'god' ? "default" : "secondary"}
-                        className={item.source === 'god' ? "bg-yellow-100 text-yellow-800" : ""}
-                      >
-                        {item.source === 'god' ? (
-                          <><Crown className="h-3 w-3 mr-1" />God</>
-                        ) : (
-                          'Manual'
-                        )}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{item.lastReview || "-"}</TableCell>
                     <TableCell className="text-right">
