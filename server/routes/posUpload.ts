@@ -6,13 +6,18 @@ const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 
 router.post("/upload", upload.single("file"), async (req, res) => {
+  console.log("🔥 POS UPLOAD HANDLER CALLED");
   if (!req.file) {
+    console.log("❌ No file uploaded");
     return res.status(400).json({ error: "No file uploaded" });
   }
+  console.log("📁 File uploaded:", req.file.filename, req.file.size, "bytes");
   try {
     const result = await processPosCsv(req.file.path);
+    console.log("✅ processPosCsv result:", result);
     res.json(result);
   } catch (err) {
+    console.log("💥 processPosCsv error:", err);
     res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
   }
 });
