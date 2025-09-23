@@ -140,23 +140,15 @@ function CashBalanceSnapshot() {
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Cash Balance Snapshot</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-lg font-semibold mb-3 text-blue-700">POS (Last 5)</h3>
-          {posBalances.length > 0 ? (
-            posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
-          ) : (
-            <div className="text-gray-500 text-sm">No POS data available</div>
-          )}
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold mb-3 text-purple-700">Forms (Last 5)</h3>
-          {formBalances.length > 0 ? (
-            formBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
-          ) : (
-            <div className="text-gray-500 text-sm">No form data available</div>
-          )}
+      <h2 className="text-xl font-bold mb-4 text-gray-800">Shift Summary</h2>
+      <div className="max-w-md">
+        {posBalances.length > 0 ? (
+          posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
+        ) : (
+          <div className="text-gray-500 text-sm">No shift data available</div>
+        )}
+        <div className="mt-4 text-xs text-gray-500">
+          Note: Green boxes indicate register difference within ฿50 (acceptable range). Red boxes indicate difference exceeding ฿50 (requires attention).
         </div>
       </div>
     </div>
