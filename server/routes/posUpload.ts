@@ -31,4 +31,17 @@ router.get("/summary/:date", async (req, res) => {
   }
 });
 
+router.get("/shifts", async (req, res) => {
+  try {
+    const { db } = await import("../db");
+    const { loyverse_shifts } = await import("../../shared/schema");
+    const { desc } = await import("drizzle-orm");
+    
+    const shifts = await db.select().from(loyverse_shifts).orderBy(desc(loyverse_shifts.shiftDate)).limit(50);
+    res.json({ shifts });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to fetch shifts" });
+  }
+});
+
 export default router;

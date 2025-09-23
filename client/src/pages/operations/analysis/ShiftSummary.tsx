@@ -1,8 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ShiftSummary() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [shiftData, setShiftData] = useState<any[]>([]);
+
+  // Fetch uploaded shift data
+  const fetchShiftData = async () => {
+    try {
+      const res = await fetch("/api/pos/shifts");
+      const data = await res.json();
+      setShiftData(data.shifts || []);
+    } catch (err) {
+      console.error("Failed to fetch shift data:", err);
+    }
+  };
+
+  // Load shift data on component mount
+  useEffect(() => {
+    fetchShiftData();
+  }, []);
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -18,6 +35,11 @@ export default function ShiftSummary() {
 
     setResult(data);
     setLoading(false);
+
+    // Refresh shift data after successful upload
+    if (data.status === "ok" && data.rows > 0) {
+      fetchShiftData();
+    }
   };
 
   return (
@@ -40,6 +62,41 @@ export default function ShiftSummary() {
           <p>Status: {result.status}</p>
           <p>Type: {result.type}</p>
           <p>Rows Processed: {result.rows}</p>
+        </div>
+      )}
+
+      {/* Display uploaded shift data */}
+      {shiftData.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-4">Uploaded Shift Data</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-300">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 border-b text-left">Date</th>
+                  <th className="px-4 py-2 border-b text-left">Store</th>
+                  <th className="px-4 py-2 border-b text-left">Shift Number</th>
+                  <th className="px-4 py-2 border-b text-left">Cash Payments</th>
+                  <th className="px-4 py-2 border-b text-left">Expected Cash</th>
+                  <th className="px-4 py-2 border-b text-left">Actual Cash</th>
+                  <th className="px-4 py-2 border-b text-left">Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shiftData.map((shift, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 border-b">{shift.shiftDate}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.Store || '-'}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.['Shift number'] || '-'}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.['Cash payments'] || '-'}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.['Expected cash amount'] || '-'}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.['Actual cash amount'] || '-'}</td>
+                    <td className="px-4 py-2 border-b">{shift.data?.['Difference'] || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
