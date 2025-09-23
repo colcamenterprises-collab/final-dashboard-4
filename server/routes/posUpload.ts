@@ -11,7 +11,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const result = await processPosCsv(req.file.path);
     res.json(result);
   } catch (err) {
-    console.error(err);
+    console.error("POS Upload error:", err);
     res.status(500).json({ error: "Failed to process file" });
   }
 });

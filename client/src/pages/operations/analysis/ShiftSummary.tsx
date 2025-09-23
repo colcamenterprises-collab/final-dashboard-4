@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export default function ShiftSummary() {
-  const [message, setMessage] = useState("");
+  const [result, setResult] = useState<any>(null);
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -11,7 +11,7 @@ export default function ShiftSummary() {
       body: formData,
     });
     const data = await res.json();
-    setMessage(JSON.stringify(data, null, 2));
+    setResult(data);
   };
 
   return (
@@ -26,8 +26,14 @@ export default function ShiftSummary() {
           Upload
         </button>
       </form>
-      {message && (
-        <pre className="mt-4 p-4 bg-gray-100 border rounded">{message}</pre>
+
+      {result && (
+        <div className="mt-4 p-4 bg-gray-100 border rounded">
+          <p className="font-bold">Upload Result</p>
+          <p>Status: {result.status}</p>
+          <p>Type: {result.type}</p>
+          <p>Rows Processed: {result.rows}</p>
+        </div>
       )}
     </div>
   );
