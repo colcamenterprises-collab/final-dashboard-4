@@ -21,6 +21,10 @@ export async function processPosCsv(filePath: string) {
 
   const headers = Object.keys(records[0]);
   const type = detectCsvType(headers);
+  
+  // Debug logging to see what headers we're getting
+  console.log("🔍 CSV Headers:", headers);
+  console.log("🔍 Detected Type:", type);
 
   let inserted = 0;
 
