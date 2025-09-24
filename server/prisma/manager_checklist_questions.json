@@ -1,0 +1,12 @@
+[
+  { "text": "Fryer oil area wiped, no spills or residue", "category": "Hygiene", "enabled": true, "weight": 1 },
+  { "text": "Fridge seals wiped and intact", "category": "Equipment", "enabled": true, "weight": 1 },
+  { "text": "Handwash sink stocked (soap, towels)", "category": "Food Safety", "enabled": true, "weight": 1 },
+  { "text": "All surfaces cleaned and sanitized", "category": "Hygiene", "enabled": true, "weight": 1 },
+  { "text": "Waste bins emptied and lined", "category": "Hygiene", "enabled": true, "weight": 1 },
+  { "text": "Equipment turned off and secured", "category": "Equipment", "enabled": true, "weight": 1 },
+  { "text": "Floor swept and mopped", "category": "Hygiene", "enabled": true, "weight": 1 },
+  { "text": "Temperature logs checked and recorded", "category": "Food Safety", "enabled": true, "weight": 1 },
+  { "text": "Cash register balanced and secured", "category": "Security", "enabled": true, "weight": 1 },
+  { "text": "Doors and windows locked", "category": "Security", "enabled": true, "weight": 1 }
+]

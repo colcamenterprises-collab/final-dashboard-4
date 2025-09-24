@@ -1,0 +1,469 @@
+1) Prisma models (new) — does not touch Fort Knox files
+
+File: prisma/schema.prisma (append this block at the end)
+
+model ManagerCheckQuestion {
+  id          Int       @id @default(autoincrement())
+  text        String
+  category    String?   // e.g., Hygiene, Equipment, Food Safety
+  enabled     Boolean   @default(true)
+  weight      Int       @default(1)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  items       DailyManagerCheckItem[]
+}
+
+model DailyManagerCheck {
+  id           Int       @id @default(autoincrement())
+  salesId      Int       // link to your DailySalesV2 or the ID used to join Form 1 -> Form 2 (shift id)
+  createdAt    DateTime  @default(now())
+  answeredBy   String?
+  managerPin   String?
+  status       String    @default("PENDING") // PENDING | COMPLETED | SKIPPED | UNAVAILABLE
+  skipReason   String?
+  items        DailyManagerCheckItem[]
+}
+
+model DailyManagerCheckItem {
+  id            Int       @id @default(autoincrement())
+  dailyCheckId  Int
+  questionId    Int
+  response      String?   // PASS | FAIL | NA
+  note          String?
+  photoUrl      String?
+
+  ManagerCheckQuestion ManagerCheckQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  DailyManagerCheck    DailyManagerCheck    @relation(fields: [dailyCheckId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyCheckId, questionId])
+}
+
+
+Run:
+
+npx prisma migrate dev -n manager_quick_check_v1
+
+2) Seed V2 questions (imports your “already completed” work)
+
+File: server/prisma/manager_checklist_questions.json
+(Put your V2 question texts here—copy/paste from the old implementation.)
+
+[
+  { "text": "Fryer oil area wiped, no spills or residue", "category": "Hygiene", "enabled": true, "weight": 1 },
+  { "text": "Fridge seals wiped and intact", "category": "Equipment", "enabled": true, "weight": 1 },
+  { "text": "Handwash sink stocked (soap, towels)", "category": "Food Safety", "enabled": true, "weight": 1 }
+]
+
+
+File: server/prisma/seedManagerChecks.ts
+
+import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const file = path.join(__dirname, 'manager_checklist_questions.json');
+  if (!fs.existsSync(file)) {
+    console.log('No manager_checklist_questions.json found. Skipping.');
+    return;
+  }
+  const list = JSON.parse(fs.readFileSync(file, 'utf8')) as Array<{
+    text: string; category?: string; enabled?: boolean; weight?: number;
+  }>;
+  for (const q of list) {
+    await prisma.managerCheckQuestion.upsert({
+      where: { text: q.text },
+      update: { category: q.category ?? null, enabled: q.enabled ?? true, weight: q.weight ?? 1 },
+      create: { text: q.text, category: q.category ?? null, enabled: q.enabled ?? true, weight: q.weight ?? 1 }
+    });
+  }
+  console.log(`Seeded ${list.length} manager check questions.`);
+}
+
+main().finally(() => prisma.$disconnect());
+
+
+Run:
+
+node -e "require('ts-node/register'); require('./server/prisma/seedManagerChecks.ts')"
+# or: ts-node server/prisma/seedManagerChecks.ts
+
+
+Where to pull V2 questions from?
+If they lived in code, search and copy them:
+
+rg -n "checklist|manager.*check|cleaning" client server
+
+
+Paste into the JSON above and seed. That’s your “pull out what’s already been completed.”
+
+3) Backend routes (new)
+
+File: server/routes/managerChecks.ts
+
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
+
+const prisma = new PrismaClient();
+const router = Router();
+
+const REQUIRED = process.env.CHECKLIST_REQUIRED === 'true';
+
+// deterministic sample up to 4 questions by day + salesId
+function pickQuestions(questions: any[], salesId: number) {
+  const day = new Date().toISOString().slice(0, 10);
+  const seed = crypto.createHash('sha256').update(`${day}:${salesId}`).digest('hex');
+  const arr = [...questions].sort((a, b) => {
+    const ha = crypto.createHash('sha256').update(seed + String(a.id)).digest('hex');
+    const hb = crypto.createHash('sha256').update(seed + String(b.id)).digest('hex');
+    return ha.localeCompare(hb);
+  });
+  return arr.slice(0, 4);
+}
+
+// GET /api/manager-check/questions?salesId=123
+router.get('/questions', async (req, res) => {
+  try {
+    const salesId = Number(req.query.salesId);
+    if (!salesId) return res.status(400).json({ error: 'salesId required' });
+
+    const enabled = await prisma.managerCheckQuestion.findMany({ where: { enabled: true } });
+    if (!enabled.length) {
+      const daily = await prisma.dailyManagerCheck.upsert({
+        where: { salesId },
+        update: { status: 'UNAVAILABLE' },
+        create: { salesId, status: 'UNAVAILABLE' }
+      });
+      return res.json({ required: REQUIRED, status: 'UNAVAILABLE', dailyCheckId: daily.id, questions: [] });
+    }
+
+    const chosen = pickQuestions(enabled, salesId);
+    const daily = await prisma.dailyManagerCheck.upsert({
+      where: { salesId },
+      update: {},
+      create: { salesId, status: 'PENDING' }
+    });
+
+    // ensure items exist
+    for (const q of chosen) {
+      await prisma.dailyManagerCheckItem.upsert({
+        where: { dailyCheckId_questionId: { dailyCheckId: daily.id, questionId: q.id } },
+        update: {},
+        create: { dailyCheckId: daily.id, questionId: q.id }
+      });
+    }
+
+    await prisma.managerCheckQuestion.updateMany({
+      where: { id: { in: chosen.map(q => q.id) } },
+      data: { lastUsedAt: new Date() }
+    });
+
+    res.json({
+      required: REQUIRED,
+      status: 'PENDING',
+      dailyCheckId: daily.id,
+      questions: chosen.map(q => ({ id: q.id, text: q.text, category: q.category ?? null }))
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/manager-check/submit
+// body: { dailyCheckId, answeredBy, managerPin?, answers: [{questionId, response, note?, photoUrl?}] }
+router.post('/submit', async (req, res) => {
+  try {
+    const { dailyCheckId, answeredBy, managerPin, answers } = req.body || {};
+    if (!dailyCheckId || !answeredBy || !Array.isArray(answers)) {
+      return res.status(400).json({ error: 'dailyCheckId, answeredBy, answers[] required' });
+    }
+
+    for (const a of answers) {
+      if (!a?.questionId) continue;
+      await prisma.dailyManagerCheckItem.updateMany({
+        where: { dailyCheckId, questionId: Number(a.questionId) },
+        data: { response: a.response ?? null, note: a.note ?? null, photoUrl: a.photoUrl ?? null }
+      });
+    }
+
+    const updated = await prisma.dailyManagerCheck.update({
+      where: { id: Number(dailyCheckId) },
+      data: { answeredBy, managerPin: managerPin ?? null, status: 'COMPLETED' }
+    });
+
+    res.json({ ok: true, dailyCheckId: updated.id, status: updated.status });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/manager-check/skip
+// body: { salesId, reason }
+router.post('/skip', async (req, res) => {
+  try {
+    const { salesId, reason } = req.body || {};
+    if (!salesId || !reason) return res.status(400).json({ error: 'salesId and reason required' });
+
+    const daily = await prisma.dailyManagerCheck.upsert({
+      where: { salesId: Number(salesId) },
+      update: { status: 'SKIPPED', skipReason: reason },
+      create: { salesId: Number(salesId), status: 'SKIPPED', skipReason: reason }
+    });
+
+    res.json({ ok: true, dailyCheckId: daily.id, status: daily.status });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+export default router;
+
+
+Wire it up (safe file): server/routes.ts
+(Add two lines—doesn’t touch Fort Knox server/routes/forms.ts.)
+
+import managerCheckRouter from './routes/managerChecks';
+// …
+app.use('/api/manager-check', managerCheckRouter);
+
+
+ENV (optional strict mode):
+
+CHECKLIST_REQUIRED=true
+
+4) Frontend modal + wiring (edits only in safe files)
+
+File (new): client/src/components/ManagerQuickCheck.tsx
+
+import React, { useEffect, useState } from 'react';
+
+type Question = { id:number; text:string; category?:string|null };
+type Props = {
+  salesId: number;
+  onDone: (result: {status: 'COMPLETED'|'SKIPPED'|'UNAVAILABLE'}) => void;
+  onCancel: () => void;
+};
+
+export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) {
+  const [loading, setLoading] = useState(true);
+  const [required, setRequired] = useState(false);
+  const [status, setStatus] = useState<'PENDING'|'UNAVAILABLE'|'COMPLETED'|'SKIPPED'>('PENDING');
+  const [dailyCheckId, setDailyCheckId] = useState<number| null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<number, {response:string; note?:string}>>({});
+  const [answeredBy, setAnsweredBy] = useState('');
+  const [managerPin, setManagerPin] = useState('');
+  const [skipReason, setSkipReason] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const r = await fetch(`/api/manager-check/questions?salesId=${salesId}`);
+        const data = await r.json();
+        setRequired(!!data.required);
+        setStatus(data.status);
+        setDailyCheckId(data.dailyCheckId ?? null);
+        setQuestions(data.questions ?? []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [salesId]);
+
+  const setAns = (qid:number, field:'response'|'note', val:string) => {
+    setAnswers(p => ({ ...p, [qid]: { ...p[qid], [field]: val } }));
+  };
+
+  const submit = async () => {
+    if (!dailyCheckId) return;
+    const payload = {
+      dailyCheckId,
+      answeredBy,
+      managerPin: managerPin || undefined,
+      answers: Object.entries(answers).map(([qid, v]) => ({
+        questionId: Number(qid), response: v.response || null, note: v.note || null
+      }))
+    };
+    const r = await fetch('/api/manager-check/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if (data.ok) onDone({ status: 'COMPLETED' });
+  };
+
+  const skip = async () => {
+    if (!skipReason.trim()) return;
+    const r = await fetch('/api/manager-check/skip', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ salesId, reason: skipReason })
+    });
+    const data = await r.json();
+    if (data.ok) onDone({ status: 'SKIPPED' });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-2xl p-6">
+        <div className="text-xl font-semibold mb-2">Manager Quick Check</div>
+
+        {loading ? (
+          <div>Loading…</div>
+        ) : status === 'UNAVAILABLE' ? (
+          <div className="space-y-4">
+            <div className="p-3 bg-yellow-100 rounded">Checklist unavailable. Submission will be allowed but flagged.</div>
+            <div className="flex gap-2 justify-end">
+              <button className="px-4 py-2 rounded border" onClick={() => onDone({ status: 'UNAVAILABLE' })}>Continue</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4">
+              {questions.map(q => (
+                <div key={q.id} className="border rounded-xl p-3">
+                  <div className="font-medium">{q.text}</div>
+                  <div className="mt-2 flex gap-3">
+                    {['PASS','FAIL','NA'].map(opt => (
+                      <label key={opt} className="flex items-center gap-2">
+                        <input type="radio" name={`q-${q.id}`}
+                               onChange={() => setAns(q.id, 'response', opt)}
+                               checked={answers[q.id]?.response === opt}/>
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea className="mt-2 w-full border rounded p-2"
+                            placeholder="Note (optional)"
+                            value={answers[q.id]?.note ?? ''}
+                            onChange={(e) => setAns(q.id, 'note', e.target.value)} />
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input className="border rounded p-2" placeholder="Manager name (required)"
+                     value={answeredBy} onChange={(e)=>setAnsweredBy(e.target.value)} />
+              <input className="border rounded p-2" placeholder="Manager PIN (optional)"
+                     value={managerPin} onChange={(e)=>setManagerPin(e.target.value)} />
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-gray-500">
+                {required ? 'Checklist is required before final submit.' : 'Checklist is recommended. You can skip with a reason.'}
+              </div>
+              <div className="flex gap-2">
+                {!required && (
+                  <>
+                    <input className="border rounded p-2" placeholder="Skip reason (required to skip)"
+                           value={skipReason} onChange={(e)=>setSkipReason(e.target.value)} />
+                    <button className="px-4 py-2 border rounded" onClick={skip}>Skip</button>
+                  </>
+                )}
+                <button className="px-4 py-2 border rounded" onClick={onCancel}>Cancel</button>
+                <button className="px-4 py-2 rounded bg-black text-white"
+                        onClick={submit}
+                        disabled={required && (!answeredBy || questions.some(q => !answers[q.id]?.response))}>
+                  Submit Check
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+Wire into Form 2 only (safe): client/src/pages/operations/DailyStock.tsx
+(Hook into your existing “Submit All” or final submit path.)
+
+import React, { useState } from 'react';
+import ManagerQuickCheck from '@/components/ManagerQuickCheck';
+
+// … inside component
+const [showCheck, setShowCheck] = useState(false);
+const [checkStatus, setCheckStatus] = useState<'COMPLETED'|'SKIPPED'|'UNAVAILABLE'|null>(null);
+
+// Replace your final submit button handler with:
+const handleFinalSubmitClick = () => {
+  // open checklist before actual submission
+  setShowCheck(true);
+};
+
+// When the checklist is done, continue your existing submit flow:
+const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAILABLE'}) => {
+  setShowCheck(false);
+  setCheckStatus(status);
+
+  // Attach the status to your existing payload if you want it in emails/reports
+  // await submitDailyStock({ ...payload, managerCheckStatus: status });
+
+  // If your submit function is named differently, just call it here:
+  await onSubmitAll(); // <— your existing final submission function
+};
+
+// In JSX where your final button lives:
+<button onClick={handleFinalSubmitClick} className="btn btn-primary">Submit All</button>
+
+{showCheck && (
+  <ManagerQuickCheck
+    salesId={salesId /* you already carry this from Form 1 (?shift=) */}
+    onDone={handleCheckDone}
+    onCancel={() => setShowCheck(false)}
+  />
+)}
+
+
+Note: We only touch DailyStock.tsx. We do not touch Fort Knox UI files (Form 1) and we don’t alter the core data structure—just gate the “final submit” behind a tiny modal.
+
+5) Email summary (safe)
+
+In your existing email builder/service (not Fort Knox), add:
+
+const dailyCheck = await prisma.dailyManagerCheck.findFirst({
+  where: { salesId },
+  include: { items: { include: { ManagerCheckQuestion: true } } }
+});
+
+if (!dailyCheck) {
+  addSection('Manager Quick Check', 'No record.');
+} else if (dailyCheck.status === 'UNAVAILABLE') {
+  addSection('Manager Quick Check', 'Checklist unavailable (system).');
+} else if (dailyCheck.status === 'SKIPPED') {
+  addSection('Manager Quick Check', `SKIPPED. Reason: ${dailyCheck.skipReason ?? '—'}`);
+} else {
+  addSection('Manager Quick Check',
+    [
+      `Manager: ${dailyCheck.answeredBy ?? '—'}`,
+      ...dailyCheck.items.map(i =>
+        `• ${i.ManagerCheckQuestion.text} — ${i.response ?? '—'}${i.note ? ` (note: ${i.note})` : ''}`
+      )
+    ].join('\n')
+  );
+}
+
+6) Config
+
+Hard-enforce checklist before submit:
+
+CHECKLIST_REQUIRED=true
+
+
+Soft mode (allow skip with reason):
+
+CHECKLIST_REQUIRED=false
+
+7) Zero-Migration Fallback (if you don’t want DB changes yet)
+
+If you want to avoid any DB migration right now:
+
+Keep the frontend modal exactly the same.
+
+Replace the backend file with a JSON-store version that writes to server/data/managerChecks.json keyed by salesId. I’ve got that ready if you want it; it mirrors the same endpoints and you can swap later to Prisma with no frontend changes.

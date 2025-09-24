@@ -1,0 +1,118 @@
+Cleanup plan (staged, zero-downtime)
+Phase 0 — Safety nets
+
+Git tag + DB backup.
+
+Turn on soft-mode for the checklist first: CHECKLIST_REQUIRED=false.
+
+Phase 1 — Quarantine legacy files (no code changes needed)
+
+Run these in repo root to move backups/dormant into an archive that the build ignores:
+
+# 1) Create archive folder
+mkdir -p archive/_legacy
+
+# 2) Move obvious backups
+rg -n --glob '!archive/**' '\.bak(\.\d+)?$|\.backup$' -S \
+  | cut -d: -f1 | sort -u | xargs -I{} mkdir -p "archive/_legacy/$(dirname {})" && \
+    rg -n --glob '!archive/**' '\.bak(\.\d+)?$|\.backup$' -S | cut -d: -f1 | sort -u \
+    | xargs -I{} git mv "{}" "archive/_legacy/{}"
+
+# 3) Move known redundant/dormant pages you listed
+git mv client/src/pages/operations/DailySalesLibrary.tsx archive/_legacy/ || true
+git mv client/src/pages/operations/DailySalesStock.tsx archive/_legacy/ || true
+git mv client/src/pages/DailySales.legacy.tsx archive/_legacy/ || true
+git mv client/src/pages/daily-stock.tsx archive/_legacy/ || true
+git mv client/src/pages/DailyStock.tsx archive/_legacy/ || true
+git mv client/src/pages/DailySalesStock.tsx archive/_legacy/ || true
+git mv client/src/pages/Analysis.tsx archive/_legacy/ || true
+git mv client/src/pages/AnalysisTabbed.tsx archive/_legacy/ || true
+
+# 4) Move debug + standalone
+git mv debug_files archive/_legacy/debug_files || true
+git mv client/public/daily_sales_form_locked.html archive/_legacy/ || true
+
+# 5) Move redundant backend dirs you flagged
+git mv routes.ts archive/_legacy/routes.ts_legacy_dir || true
+git mv server/forms/dailySalesV2.ts.backup archive/_legacy/ || true
+
+
+Add to .eslintignore and tsconfig.build.json (or Vite build) so archive is never compiled:
+
+archive/**
+
+Phase 2 — Route hygiene (no breaking changes)
+
+Keep only these routes active in server/routes.ts:
+
+/api/forms/*, /api/balance/*, /api/shopping-list/*, /api/receipts/*, plus /api/manager-check/ (new).
+
+Do not delete dormant routers yet—just ensure they’re not mounted.
+
+In client/src/router/RouteRegistry.ts, ensure only:
+
+/operations/daily-sales-v2/library, /operations/daily-stock, /operations/analysis, /operations/shopping-list
+are exported. Remove/disable DAILY_SALES_STOCK, SHIFT_SUMMARY.
+
+Phase 3 — “No legacy drift” guard (CI check)
+
+Create tools/verify-clean.js:
+
+const { globby } = require('globby');
+const fs = require('fs');
+
+(async () => {
+  const banned = [
+    'client/src/pages/**/**.bak*',
+    'client/src/pages/**/**.backup*',
+    'debug_files/**',
+    'routes.ts/**',
+    'client/public/daily_sales_form_locked.html'
+  ];
+  const found = (await globby(banned)).filter(p => !p.startsWith('archive/'));
+  if (found.length) {
+    console.error('❌ Legacy files detected outside archive:\n' + found.map(f => ' - ' + f).join('\n'));
+    process.exit(1);
+  }
+  console.log('✅ No legacy drift.');
+})();
+
+
+Add an npm script + (optional) prebuild hook:
+
+"scripts": {
+  "verify:clean": "node tools/verify-clean.js",
+  "build": "npm run verify:clean && vite build"
+}
+
+Phase 4 — DB safety (no Fort Knox edits)
+
+Do not alter shared/schema.ts now.
+
+If you approved the Prisma models for the checklist, they live in the parallel Prisma track only.
+
+Leave legacy tables (e.g., dailySales, inventory, menuItems) in place and untouched.
+Later (when convenient), we can:
+
+Export them to JSON (for archive),
+
+Then drop them with a migration in the non-Fort Knox track—separately, when you say go.
+
+Phase 5 — Reference scan (guard against accidental imports)
+
+Quick search to ensure app doesn’t still import archived files:
+
+rg -n "DailySalesLibrary|DailySalesStock|ShiftSummary|daily-sales.legacy|db-health" client server -S
+
+
+If anything shows up, remove those imports or replace with current modules.
+
+Phase 6 — Manager Quick Check add (already safe)
+
+New backend router: server/routes/managerChecks.ts (mounted in server/routes.ts).
+
+New component: client/src/components/ManagerQuickCheck.tsx.
+
+One small edit to DailyStock.tsx to open the modal before final submit.
+
+Email summary: add “Manager Quick Check” section (in your existing mail builder).
