@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { StockGrid } from "../../components/StockGrid";
 import { queryClient } from "@/lib/queryClient";
+// === BEGIN MANAGER QUICK CHECK: imports ===
+import ManagerQuickCheck from '@/components/ManagerQuickCheck';
+// === END MANAGER QUICK CHECK: imports ===
 
 // Server ingredient catalog from CSV import
 type IngredientItem = {
@@ -55,6 +58,21 @@ const DailyStock: React.FC = () => {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [lang, setLang] = useState<'en' | 'th'>('en');
+// === BEGIN MANAGER QUICK CHECK: state & handlers ===
+const [showCheck, setShowCheck] = useState(false);
+
+const onFinalSubmitClick = () => {
+  // instead of immediately submitting, open checklist
+  setShowCheck(true);
+};
+
+// call your existing final submit here after checklist completes
+const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAILABLE'}) => {
+  setShowCheck(false);
+  // If you want to attach the status to your payload, do it here.
+  await handleSubmit(); // <-- call your real final submit function
+};
+// === END MANAGER QUICK CHECK: state & handlers ===
 
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
 
@@ -396,13 +414,21 @@ const DailyStock: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={onFinalSubmitClick}
           disabled={submitting}
           className="rounded-md bg-emerald-600 px-5 py-2 text-white text-[14px] hover:bg-emerald-700 disabled:opacity-60"
         >
-          {submitting ? "Submitting…" : "Submit"}
+          {submitting ? "Submitting…" : "Submit All"}
         </button>
       </div>
+
+{showCheck && (
+  <ManagerQuickCheck
+    salesId={Number(shiftId) /* already available from ?shift= or props */}
+    onDone={handleCheckDone}
+    onCancel={() => setShowCheck(false)}
+  />
+)}
     </div>
   );
 };
