@@ -14,7 +14,7 @@ export default function BalanceCard({ date, expected, actual, difference, status
       data-testid={`balance-card-${date}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-blue-400">{new Date(date).toLocaleDateString()}</span>
+        <span className="text-sm font-medium text-white">{new Date(date).toLocaleDateString()}</span>
         <span className={`px-2 py-1 rounded-md text-xs font-medium ${
           isBalanced ? "bg-green-500 text-white" : "bg-red-500 text-white"
         }`}>
