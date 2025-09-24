@@ -3,6 +3,38 @@ import { db } from '../db';
 import { dailyStockSales, shoppingList, aiInsights } from '../../shared/schema';
 import { desc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
+import { sql } from 'drizzle-orm';
+
+// === BEGIN MANAGER QUICK CHECK: email helper ===
+export async function renderManagerQuickCheckSection(salesId: number): Promise<string> {
+  // header
+  const [check] = await db.execute(sql`
+    SELECT id, status, answeredBy, skipReason
+    FROM DailyManagerCheck
+    WHERE salesId = ${salesId}
+    LIMIT 1;
+  `) as any[];
+
+  if (!check) return 'No record.';
+  if (check.status === 'UNAVAILABLE') return 'Checklist unavailable (system).';
+  if (check.status === 'SKIPPED') return `SKIPPED. Reason: ${check.skipReason || '—'}`;
+
+  // items
+  const items = await db.execute(sql`
+    SELECT i.response, i.note, q.text
+    FROM DailyManagerCheckItem i
+    JOIN ManagerCheckQuestion q ON q.id = i.questionId
+    WHERE i.dailyCheckId = ${check.id}
+    ORDER BY q.id;
+  `) as any[];
+
+  const lines = [
+    `Manager: ${check.answeredBy || '—'}`,
+    ...items.map((i:any) => `• ${i.text} — ${i.response || '—'}${i.note ? ` (note: ${i.note})` : ''}`)
+  ];
+  return lines.join('\n');
+}
+// === END MANAGER QUICK CHECK: email helper ===
 
 export class CronEmailService {
   private isScheduled = false;
@@ -74,8 +106,12 @@ export class CronEmailService {
 
       const analysisData = insight.length > 0 ? insight[0] : null;
 
+// === BEGIN MANAGER QUICK CHECK: email section insert ===
+const managerCheck = await renderManagerQuickCheckSection(formData.id);
+// === END MANAGER QUICK CHECK: email section insert ===
+
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients, managerCheck);
 
       // Send email using Gmail API
       await this.sendEmail(htmlContent, lastShiftDate || '');
@@ -89,7 +125,7 @@ export class CronEmailService {
   /**
    * Generate HTML email content
    */
-  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = []): string {
+  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = [], managerCheck: string = ''): string {
     const balanceStatus = analysisData?.description?.includes('No anomalies') ? 'Yes' : 'No';
     const anomalies = analysisData?.description || 'No analysis available';
 
@@ -143,6 +179,11 @@ export class CronEmailService {
             </span>
           </p>
           <p><strong>Analysis:</strong> ${anomalies}</p>
+        </div>
+
+        <div class="section">
+          <h2>✅ Manager Quick Check</h2>
+          <pre style="white-space: pre-wrap; font-family: Arial, sans-serif;">${managerCheck}</pre>
         </div>
 
         <div class="section">
