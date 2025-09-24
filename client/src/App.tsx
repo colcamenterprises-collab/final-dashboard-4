@@ -10,7 +10,7 @@ import NotFound from "./pages/NotFound";
 // Pages
 import Home from "./pages/Home";
 import { Analysis } from "./pages/operations/Analysis";
-import DailySalesStock from "./pages/operations/DailySalesStock";
+// Legacy component moved to archive
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import ShoppingList from "./pages/ShoppingList";
 import Receipts from "./pages/Receipts";
@@ -36,7 +36,7 @@ import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
-import ShiftSummary from "./pages/operations/analysis/ShiftSummary";
+// Legacy component moved to archive
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -120,7 +120,7 @@ export default function App() {
 
                   {/* All Analysis Pages */}
                   <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
-                  <Route path="/analysis/shift-summary" element={<ShiftSummary />} />
+                  {/* Legacy route disabled - component moved to archive */}
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
