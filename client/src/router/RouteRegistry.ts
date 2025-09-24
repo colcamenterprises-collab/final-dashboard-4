@@ -2,11 +2,11 @@ export const ROUTES = {
   // Home
   HOME: "/",
 
-  // Operations
-  DAILY_SALES_STOCK: "/operations/stock",
+  // Operations (Core active routes only)
   DAILY_STOCK: "/operations/daily-stock",
   DAILY_SALES_LIBRARY: "/operations/daily-sales-v2/library",
   ANALYSIS: "/operations/analysis",
+  SHOPPING_LIST: "/operations/shopping-list",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   LOYVERSE_REPORTS: "/operations/analysis/loyverse",
@@ -14,9 +14,6 @@ export const ROUTES = {
   STOCK_REVIEW: "/operations/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
-
-  // Legacy routes for compatibility
-  SHIFT_SUMMARY: "/operations/shift-summary",
 
   // Finance
   FINANCE: "/finance",
@@ -33,7 +30,6 @@ export const ROUTES = {
   MENU_MGR: "/menu/manager",
   MENU_IMPORT: "/menu/import",
   MENU_DESC_TOOL: "/menu/description-tool",
-  SHOPPING_LIST: "/operations/shopping-list",
 
   // Managers
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
