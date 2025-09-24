@@ -1,3 +1,7 @@
+0) New (or replace) component — client/src/components/ManagerQuickCheck.tsx
+
+If you already added this, you can skip; otherwise paste this whole file.
+
 import React, { useEffect, useState } from 'react';
 
 type Question = { id:number; text:string; category?:string|null };
@@ -135,3 +139,121 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
     </div>
   );
 }
+
+1) Wire it into Form 2 final submit — client/src/pages/operations/DailyStock.tsx
+
+Paste these BEGIN/END blocks in your active Form 2 file. They won’t collide with your existing logic.
+
+// === BEGIN MANAGER QUICK CHECK: imports ===
+import React, { useState } from 'react';
+import ManagerQuickCheck from '@/components/ManagerQuickCheck';
+// === END MANAGER QUICK CHECK: imports ===
+
+
+Inside your component body:
+
+// === BEGIN MANAGER QUICK CHECK: state & handlers ===
+const [showCheck, setShowCheck] = useState(false);
+
+const onFinalSubmitClick = () => {
+  // instead of immediately submitting, open checklist
+  setShowCheck(true);
+};
+
+// call your existing final submit here after checklist completes
+const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAILABLE'}) => {
+  setShowCheck(false);
+  // If you want to attach the status to your payload, do it here.
+  await submitAll(); // <-- call your real final submit function
+};
+// === END MANAGER QUICK CHECK: state & handlers ===
+
+
+In your JSX, replace your final button’s onClick with onFinalSubmitClick, and add the modal:
+
+<button onClick={onFinalSubmitClick} className="btn btn-primary">Submit All</button>
+
+{showCheck && (
+  <ManagerQuickCheck
+    salesId={salesId /* already available from ?shift= or props */}
+    onDone={handleCheckDone}
+    onCancel={() => setShowCheck(false)}
+  />
+)}
+
+
+That’s it for the UI. Staff flow remains identical—just a 4-question popup before submit.
+
+2) Add to the management email (append-only)
+
+If your email builder is server/services/email.ts or server/services/reportEmail.ts, add this helper and call it where you assemble the daily report for a given salesId.
+
+// === BEGIN MANAGER QUICK CHECK: email helper ===
+import { db } from '../db'; // your Drizzle db import
+import { sql } from 'drizzle-orm';
+
+export async function renderManagerQuickCheckSection(salesId: number): Promise<string> {
+  // header
+  const [check] = await db.execute(sql`
+    SELECT id, status, answeredBy, skipReason
+    FROM DailyManagerCheck
+    WHERE salesId = ${salesId}
+    LIMIT 1;
+  `) as any[];
+
+  if (!check) return 'No record.';
+  if (check.status === 'UNAVAILABLE') return 'Checklist unavailable (system).';
+  if (check.status === 'SKIPPED') return `SKIPPED. Reason: ${check.skipReason || '—'}`;
+
+  // items
+  const items = await db.execute(sql`
+    SELECT i.response, i.note, q.text
+    FROM DailyManagerCheckItem i
+    JOIN ManagerCheckQuestion q ON q.id = i.questionId
+    WHERE i.dailyCheckId = ${check.id}
+    ORDER BY q.id;
+  `) as any[];
+
+  const lines = [
+    `Manager: ${check.answeredBy || '—'}`,
+    ...items.map((i:any) => `• ${i.text} — ${i.response || '—'}${i.note ? ` (note: ${i.note})` : ''}`)
+  ];
+  return lines.join('\n');
+}
+// === END MANAGER QUICK CHECK: email helper ===
+
+
+Where you build the email body:
+
+// === BEGIN MANAGER QUICK CHECK: email section insert ===
+const managerCheck = await renderManagerQuickCheckSection(salesId);
+addSection('Manager Quick Check', managerCheck); // use your existing addSection helper
+// === END MANAGER QUICK CHECK: email section insert ===
+
+
+If your email builder file name/path is different, paste the helper there; the code is self-contained.
+
+3) Smoke tests (API + UI)
+
+API quick check
+
+curl -s "http://localhost:5000/api/manager-check/questions?salesId=123" | jq
+# copy dailyCheckId from above:
+curl -s -X POST http://localhost:5000/api/manager-check/submit \
+  -H "Content-Type: application/json" \
+  -d '{"dailyCheckId":999,"answeredBy":"Ael","answers":[{"questionId":1,"response":"PASS"}]}'
+
+
+UI
+
+Open Form 2 → click Submit All → confirm modal appears.
+
+In soft mode, try Skip with reason; in strict mode, confirm you must answer + enter manager name.
+
+4) Ops toggle (soft vs strict)
+
+Soft (recommended first week): allow skip with reason
+CHECKLIST_REQUIRED=false
+
+Strict: enforce answers before submit
+CHECKLIST_REQUIRED=true
