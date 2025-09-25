@@ -55,18 +55,19 @@ export default function IngredientManagement() {
     portion: ''
   });
 
-  // Data queries - Using new ingredients API
-  const { data: rawIngredients = [], isLoading, refetch, error } = useQuery({
+  // Data queries - Using enhanced database API
+  const { data: apiResponse = { items: [] }, isLoading, refetch, error } = useQuery({
     queryKey: ['/api/ingredients'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Transform the new API data to match the expected format
+  // Transform the enhanced API data (items array contains enriched ingredients)
+  const rawIngredients = apiResponse.items || apiResponse || []; // Handle both {items:[]} and array formats
   const ingredients = rawIngredients.map((x: any) => {
-    // Calculate costs using utility functions  
-    const costDisplay = `฿${Number(x.purchaseCost || 0).toFixed(2)}`;
-    const packageSizeText = (x.purchaseQty && x.purchaseUnit) ? `${x.purchaseQty} ${x.purchaseUnit}` : 'N/A';
-    const portionSizeText = (x.portionUnit && x.portionsPerPurchase) ? `${x.portionsPerPurchase} ${x.portionUnit}` : '';
+    // Enhanced API returns: supplierName, packageCost, packageQty, packageUnit, etc.
+    const costDisplay = `฿${Number(x.packageCost || 0).toFixed(2)}`;
+    const packageSizeText = (x.packageQty && x.packageUnit) ? `${x.packageQty} ${x.packageUnit}` : 'N/A';
+    const portionSizeText = (x.portionQty && x.portionUnit) ? `${x.portionQty} ${x.portionUnit}` : '';
     
     const calculations = calculateIngredientCosts(
       costDisplay,
@@ -77,16 +78,16 @@ export default function IngredientManagement() {
     return {
       id: x.id,
       name: x.name,
-      category: x.category,
-      supplier: x.supplier || '',
+      category: x.categoryId || x.category,
+      supplier: x.supplierName || x.supplier || 'N/A',
       brand: x.brand || '',
-      cost: Number(x.purchaseCost || 0),
+      cost: Number(x.packageCost || 0),
       costDisplay: costDisplay,
-      unit: x.purchaseUnit || 'unit',
+      unit: x.packageUnit || 'unit',
       packageSize: packageSizeText,
       portionSize: portionSizeText,
-      unitPrice: calculations.unitPrice,
-      costPerPortion: x.portionCost ? Number(x.portionCost) : calculations.costPerPortion,
+      unitPrice: x.unitPrice || calculations.unitPrice,
+      costPerPortion: x.costPerPortion || calculations.costPerPortion,
       lastReview: x.lastReview || '',
       source: 'api', // From new API
       calculations

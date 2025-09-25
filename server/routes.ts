@@ -2344,39 +2344,39 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get all ingredients with full CSV data
-  app.get("/api/ingredients", async (req: Request, res: Response) => {
-    try {
-      const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
-      const catalogItems = loadCatalogFromCSV();
-      
-      const ingredients = catalogItems.map(item => {
-        const raw = item.raw || {};
-        return {
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          supplier: raw['Supplier'] || 'N/A',
-          brand: raw['Brand'] || null,
-          packagingQty: raw['Packaging Qty'] || null,
-          cost: raw['Cost'] || null,
-          averageMenuPortion: raw['Average Menu Portion'] || null,
-          lastReviewDate: raw['Last Review Date'] || null,
-          unit: 'each', // Default unit
-          unitPrice: raw['Cost']?.replace('฿', '').replace(',', '') || '0',
-          packageSize: raw['Packaging Qty'] || null,
-          portionSize: raw['Average Menu Portion'] || null,
-          lastReview: raw['Last Review Date'] || null,
-          notes: null
-        };
-      });
-      
-      res.json(ingredients);
-    } catch (error) {
-      console.error("Error fetching ingredients:", error);
-      res.status(500).json({ error: "Failed to fetch ingredients" });
-    }
-  });
+  // Get all ingredients with full CSV data (DISABLED - now using enhanced database route)
+  // app.get("/api/ingredients", async (req: Request, res: Response) => {
+  //   try {
+  //     const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
+  //     const catalogItems = loadCatalogFromCSV();
+  //     
+  //     const ingredients = catalogItems.map(item => {
+  //       const raw = item.raw || {};
+  //       return {
+  //         id: item.id,
+  //         name: item.name,
+  //         category: item.category,
+  //         supplier: raw['Supplier'] || 'N/A',
+  //         brand: raw['Brand'] || null,
+  //         packagingQty: raw['Packaging Qty'] || null,
+  //         cost: raw['Cost'] || null,
+  //         averageMenuPortion: raw['Average Menu Portion'] || null,
+  //         lastReviewDate: raw['Last Review Date'] || null,
+  //         unit: 'each', // Default unit
+  //         unitPrice: raw['Cost']?.replace('฿', '').replace(',', '') || '0',
+  //         packageSize: raw['Packaging Qty'] || null,
+  //         portionSize: raw['Average Menu Portion'] || null,
+  //         lastReview: raw['Last Review Date'] || null,
+  //         notes: null
+  //       };
+  //     });
+  //     
+  //     res.json(ingredients);
+  //   } catch (error) {
+  //     console.error("Error fetching ingredients:", error);
+  //     res.status(500).json({ error: "Failed to fetch ingredients" });
+  //   }
+  // });
 
   // Print ingredients endpoint (MUST come before /:id route)
   app.get("/api/ingredients/print", async (req: Request, res: Response) => {
@@ -3170,15 +3170,15 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Ingredients Management Routes
-  app.get("/api/ingredients", async (req: Request, res: Response) => {
-    try {
-      const ingredients = await storage.getIngredients();
-      res.json(ingredients);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch ingredients", details: (error as Error).message });
-    }
-  });
+  // Ingredients Management Routes (DISABLED - now using enhanced database route)
+  // app.get("/api/ingredients", async (req: Request, res: Response) => {
+  //   try {
+  //     const ingredients = await storage.getIngredients();
+  //     res.json(ingredients);
+  //   } catch (error) {
+  //     res.status(500).json({ error: "Failed to fetch ingredients", details: (error as Error).message });
+  //   }
+  // });
 
   app.post("/api/ingredients", async (req: Request, res: Response) => {
     try {
