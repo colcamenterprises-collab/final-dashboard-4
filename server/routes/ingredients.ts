@@ -1,149 +1,67 @@
-import { Router } from "express";
-import {
-  getAllIngredients,
-  getIngredientById,
-  createIngredient,
-  updateIngredient,
-  updateIngredientPortion,
-  deleteIngredient
-} from "../services/ingredientService";
-import { createInsertSchema } from "drizzle-zod";
-import { ingredients } from "../../shared/schema";
-import { z } from "zod";
+import { Router } from 'express';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { toBase } from '../lib/uom';
 
 const router = Router();
 
-// Create insert schema for validation
-const insertIngredientSchema = createInsertSchema(ingredients, {
-  purchaseQty: z.coerce.number().positive(),
-  purchaseCost: z.coerce.number().positive(),
-  portionsPerPurchase: z.coerce.number().positive().optional(),
-}).omit({ id: true, createdAt: true, updatedAt: true, lastReview: true });
-
-// GET /api/ingredients - Get all ingredients
-router.get("/", async (req, res) => {
+/**
+ * GET /api/ingredients
+ * Returns enriched rows with supplierName, unitPrice, costPerPortion, etc.
+ */
+router.get('/', async (req, res) => {
   try {
-    const ingredients = await getAllIngredients();
-    res.json(ingredients);
-  } catch (error) {
-    console.error("Error fetching ingredients:", error);
-    res.status(500).json({ error: "Failed to fetch ingredients" });
-  }
-});
+    const limit = Math.min(Number(req.query.limit ?? 2000), 5000);
 
-// GET /api/ingredients/:id - Get ingredient by ID
-router.get("/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid ingredient ID" });
-    }
+    // Pull raw fields. Adjust table/column names to your Drizzle schema if needed.
+    const rows: any[] = await db.execute(sql`
+      SELECT
+        i.id,
+        i.name,
+        i.category_id,
+        i.supplier_id,
+        s.name AS supplier_name,
+        i.brand,
+        i.package_cost,
+        i.package_qty,
+        i.package_unit,
+        i.portion_qty,
+        i.portion_unit
+      FROM ingredients i
+      LEFT JOIN suppliers s ON s.id = i.supplier_id
+      ORDER BY i.name ASC
+      LIMIT ${limit};
+    `);
 
-    const ingredient = await getIngredientById(id);
-    if (!ingredient) {
-      return res.status(404).json({ error: "Ingredient not found" });
-    }
+    const enriched = rows.map(r => {
+      const packageBase = toBase(r.package_qty, r.package_unit);
+      const unitPrice = r.package_cost && packageBase > 0 ? r.package_cost / packageBase : null;
 
-    res.json(ingredient);
-  } catch (error) {
-    console.error("Error fetching ingredient:", error);
-    res.status(500).json({ error: "Failed to fetch ingredient" });
-  }
-});
+      // For UI only (display). Shopping estimator will compute per request.
+      const portionBase = toBase(r.portion_qty, r.portion_unit);
+      const costPerPortion = unitPrice && portionBase ? unitPrice * portionBase : null;
 
-// POST /api/ingredients - Create new ingredient
-router.post("/", async (req, res) => {
-  try {
-    const validatedData = insertIngredientSchema.parse(req.body);
-    const ingredient = await createIngredient(validatedData);
-    res.status(201).json(ingredient);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: "Validation failed", 
-        details: error.errors 
-      });
-    }
-    console.error("Error creating ingredient:", error);
-    res.status(500).json({ error: "Failed to create ingredient" });
-  }
-});
+      return {
+        id: r.id,
+        name: r.name,
+        categoryId: r.category_id,
+        supplierId: r.supplier_id,
+        supplierName: r.supplier_name || null,
+        brand: r.brand || null,
+        packageCost: r.package_cost ?? null,
+        packageQty: r.package_qty ?? null,
+        packageUnit: r.package_unit ?? 'each',
+        portionQty: r.portion_qty ?? null,
+        portionUnit: r.portion_unit ?? null,
+        unitPrice,
+        costPerPortion
+      };
+    });
 
-// PUT /api/ingredients/:id - Update ingredient
-router.put("/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid ingredient ID" });
-    }
-
-    const validatedData = insertIngredientSchema.partial().parse(req.body);
-    const ingredient = await updateIngredient(id, validatedData);
-    
-    if (!ingredient) {
-      return res.status(404).json({ error: "Ingredient not found" });
-    }
-
-    res.json(ingredient);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: "Validation failed", 
-        details: error.errors 
-      });
-    }
-    console.error("Error updating ingredient:", error);
-    res.status(500).json({ error: "Failed to update ingredient" });
-  }
-});
-
-// PUT /api/ingredients/:id/portion - Update ingredient portion info
-router.put("/:id/portion", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid ingredient ID" });
-    }
-
-    const { portionUnit, portionsPerPurchase } = req.body;
-    
-    if (!portionUnit || !portionsPerPurchase) {
-      return res.status(400).json({ 
-        error: "portionUnit and portionsPerPurchase are required" 
-      });
-    }
-
-    const ingredient = await updateIngredientPortion(id, portionUnit, Number(portionsPerPurchase));
-    
-    if (!ingredient) {
-      return res.status(404).json({ error: "Ingredient not found" });
-    }
-
-    res.json(ingredient);
-  } catch (error) {
-    console.error("Error updating ingredient portion:", error);
-    res.status(500).json({ error: "Failed to update ingredient portion" });
-  }
-});
-
-// DELETE /api/ingredients/:id - Delete ingredient
-router.delete("/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid ingredient ID" });
-    }
-
-    const deletedIngredient = await deleteIngredient(id);
-    
-    if (!deletedIngredient) {
-      return res.status(404).json({ error: "Ingredient not found" });
-    }
-
-    res.json({ message: "Ingredient deleted successfully", ingredient: deletedIngredient });
-  } catch (error) {
-    console.error("Error deleting ingredient:", error);
-    res.status(500).json({ error: "Failed to delete ingredient" });
+    res.json({ items: enriched, count: enriched.length });
+  } catch (e: any) {
+    console.error('ingredients.list error', e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
