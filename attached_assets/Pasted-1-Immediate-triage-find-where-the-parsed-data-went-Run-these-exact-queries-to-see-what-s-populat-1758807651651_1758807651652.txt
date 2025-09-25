@@ -1,0 +1,222 @@
+1) Immediate triage — find where the parsed data went
+
+Run these exact queries to see what’s populated vs empty:
+
+-- A) What % of ingredients still lack pricing?
+SELECT
+  SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END) AS no_price,
+  COUNT(*) AS total
+FROM ingredients;
+
+-- B) Spot a few that should have suppliers/costs but don't
+SELECT id, name, supplier_id, package_cost, package_qty, package_unit, portion_qty, portion_unit
+FROM ingredients
+ORDER BY name
+LIMIT 30;
+
+-- C) Do we have any "staging/import" tables from the parser?
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema='public'
+  AND (table_name ILIKE '%ingredient%' OR table_name ILIKE '%import%' OR table_name ILIKE '%staging%')
+ORDER BY table_name;
+
+-- D) Peek into likely staging tables (run whichever exists)
+-- choose any that show up from (C), e.g.:
+SELECT * FROM ingredients_staging LIMIT 20;
+SELECT * FROM ingredients_import LIMIT 20;
+SELECT * FROM ingredient_csv LIMIT 20;
+
+-- E) Check for legacy columns carrying values that weren't copied
+SELECT
+  SUM(CASE WHEN purchase_qty      IS NOT NULL THEN 1 ELSE 0 END) AS has_purchase_qty,
+  SUM(CASE WHEN purchase_unit     IS NOT NULL THEN 1 ELSE 0 END) AS has_purchase_unit,
+  SUM(CASE WHEN purchase_cost     IS NOT NULL THEN 1 ELSE 0 END) AS has_purchase_cost,
+  SUM(CASE WHEN serving_qty       IS NOT NULL THEN 1 ELSE 0 END) AS has_serving_qty,
+  SUM(CASE WHEN serving_unit      IS NOT NULL THEN 1 ELSE 0 END) AS has_serving_unit,
+  SUM(CASE WHEN supplier          IS NOT NULL AND TRIM(supplier)<>'' THEN 1 ELSE 0 END) AS has_supplier_text
+FROM ingredients;
+
+
+👉 If (C) shows a staging/import table with supplier/cost data, we’ll upsert from there.
+👉 If (E) shows legacy columns are populated, we’ll copy into the new columns.
+
+2) One-shot reconciliation — move parsed/imported data into live columns
+
+Run whichever block applies (safe to run all; they only fill NULLs).
+
+2.1 From staging/import tables → ingredients (choose actual table name)
+-- Example assumes a table "ingredients_import" with columns:
+-- name, supplier_name, package_cost, package_qty, package_unit, portion_qty, portion_unit, brand
+-- Adjust names if your staging table differs.
+
+BEGIN;
+
+-- Ensure suppliers exist
+INSERT INTO suppliers (name)
+SELECT DISTINCT TRIM(supplier_name)
+FROM ingredients_import
+WHERE supplier_name IS NOT NULL AND TRIM(supplier_name) <> ''
+ON CONFLICT (name) DO NOTHING;
+
+-- Link supplier_id on import table (optional if table has no such column)
+-- (Skip if not needed.)
+
+-- Upsert into ingredients by name (or your unique key)
+-- Fill only NULL/zero target fields to keep any existing vetted values.
+WITH src AS (
+  SELECT
+    ii.name,
+    s.id AS supplier_id,
+    ii.package_cost,
+    ii.package_qty,
+    ii.package_unit,
+    ii.portion_qty,
+    ii.portion_unit,
+    ii.brand
+  FROM ingredients_import ii
+  LEFT JOIN suppliers s ON s.name = TRIM(ii.supplier_name)
+)
+UPDATE ingredients i
+SET
+  supplier_id  = COALESCE(i.supplier_id, src.supplier_id),
+  package_cost = CASE WHEN (i.package_cost IS NULL OR i.package_cost=0) THEN src.package_cost ELSE i.package_cost END,
+  package_qty  = COALESCE(i.package_qty,  src.package_qty),
+  package_unit = COALESCE(i.package_unit, src.package_unit),
+  portion_qty  = COALESCE(i.portion_qty,  src.portion_qty),
+  portion_unit = COALESCE(i.portion_unit, src.portion_unit),
+  brand        = COALESCE(i.brand,        src.brand)
+FROM src
+WHERE TRIM(i.name) = TRIM(src.name);
+
+COMMIT;
+
+2.2 From legacy columns inside ingredients → modern columns
+BEGIN;
+
+-- Copy legacy → modern ONLY where modern is NULL/0
+UPDATE ingredients
+SET package_qty = COALESCE(package_qty, NULLIF(purchase_qty, 0))
+WHERE package_qty IS NULL;
+
+UPDATE ingredients
+SET package_unit = COALESCE(package_unit, NULLIF(TRIM(purchase_unit), ''))
+WHERE package_unit IS NULL;
+
+UPDATE ingredients
+SET package_cost = CASE WHEN (package_cost IS NULL OR package_cost=0) THEN purchase_cost
+                        ELSE package_cost END
+WHERE purchase_cost IS NOT NULL;
+
+UPDATE ingredients
+SET portion_qty = COALESCE(portion_qty, NULLIF(serving_qty, 0))
+WHERE portion_qty IS NULL;
+
+UPDATE ingredients
+SET portion_unit = COALESCE(portion_unit, NULLIF(TRIM(serving_unit), ''))
+WHERE portion_unit IS NULL;
+
+-- Normalize supplier text → suppliers table + link supplier_id
+INSERT INTO suppliers (name)
+SELECT DISTINCT TRIM(supplier)
+FROM ingredients
+WHERE supplier IS NOT NULL AND TRIM(supplier) <> ''
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE ingredients i
+SET supplier_id = s.id
+FROM suppliers s
+WHERE i.supplier_id IS NULL
+  AND i.supplier IS NOT NULL
+  AND TRIM(i.supplier) <> ''
+  AND s.name = TRIM(i.supplier);
+
+COMMIT;
+
+3) Make sure the estimate route isn’t shadowed
+
+The agent found a conflict: a generic GET /api/shopping-list/:id route before GET /api/shopping-list/:id/estimate. Fix by registering estimate first:
+
+// server/routes.ts (order matters)
+
+// 1) Specific route FIRST
+app.get('/api/shopping-list/:id/estimate', async (req, res) => {
+  try {
+    const listId = String(req.params.id); // UUID-safe
+    const result = await estimateShoppingList(listId); // make signature accept string
+    return res.json(result);
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// 2) Generic route AFTER
+app.get('/api/shopping-list/:id', async (req, res) => {
+  // existing handler…
+});
+
+
+And in server/services/shoppingList.ts, make the function accept string IDs if your shopping_list.id is UUID/text:
+
+export async function estimateShoppingList(listId: string) {
+  // use listId as string in SQL, not Number()
+  const items: any[] = await db.execute(sql`
+    SELECT ... FROM shopping_list_items WHERE list_id = ${listId}
+  `);
+  ...
+}
+
+4) Confirm the estimator joins use your real column names
+
+From the agent’s notes, your actual columns are shopping_list_id and ingredient_name (not list_id / ingredient_id). Here’s a compatible version:
+
+// server/services/shoppingList.ts (alternate join)
+const items: any[] = await db.execute(sql`
+  SELECT
+    sli.id,
+    sli.ingredient_name,                 -- TEXT
+    sli.requested_qty,
+    COALESCE(sli.requested_unit,'each') AS requested_unit,
+    i.id          AS ingredient_id,
+    i.name        AS ingredient_name_db,
+    i.category_id,
+    i.supplier_id,
+    i.package_cost,
+    i.package_qty,
+    i.package_unit
+  FROM shopping_list_items sli
+  JOIN ingredients i ON TRIM(i.name) = TRIM(sli.ingredient_name) -- name match
+  WHERE sli.shopping_list_id = ${listId}
+  ORDER BY i.name ASC;
+`);
+
+
+If you also have ingredient_id on the line item, prefer that join; but the above name-join will work today.
+
+5) Smoke tests (copy/paste)
+# A) Re-check pricing coverage
+psql "$DATABASE_URL" -c "SELECT SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END) AS no_price, COUNT(*) AS total FROM ingredients;"
+
+# B) Estimate API (use a real list UUID/id)
+curl -s "http://localhost:5000/api/shopping-list/<LIST_ID>/estimate" | jq
+
+# C) Ingredient API
+curl -s "http://localhost:5000/api/ingredients?limit=5" | jq
+
+
+Expected:
+
+Ingredient API now returns supplierName, packageCost/Qty/Unit, unitPrice, costPerPortion populated.
+
+Estimate API returns per-line estimated and a non-zero total. Any items still missing price show under missingPricing (and will be flagged in the email).
+
+6) If the parser writes to a file (not DB)
+
+Some earlier “Patch Ingredient Sync” flows write a JSON/CSV to disk. Quick grep:
+
+rg -n "ingredients\.csv|parsed.*ingredients|writeFile.*ingredients|ingredients_staging|ingredients_import" server -S
+
+
+If you find a disk write (e.g., /server/data/ingredients_import.json), either:
+
+Import it into a staging table and run 2.1, or
+
+Modify the parser to upsert directly into ingredients + suppliers (preferred). I can give you that patch if needed.
