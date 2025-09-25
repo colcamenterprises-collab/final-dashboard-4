@@ -34,6 +34,7 @@ import partnersRouter from "./routes/partners";
 import balanceRoutes from "./routes/balance";
 import ingredientsRoutes from "./routes/ingredients";
 import managerCheckRouter from './routes/managerChecks';
+import shoppingListRouter from './routes/shoppingList';
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -2799,6 +2800,7 @@ export function registerRoutes(app: express.Application): Server {
   // Ingredients API routes
   app.use('/api/ingredients', ingredientsRoutes);
   app.use('/api/manager-check', managerCheckRouter);
+  app.use('/api/shopping-list', shoppingListRouter);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
