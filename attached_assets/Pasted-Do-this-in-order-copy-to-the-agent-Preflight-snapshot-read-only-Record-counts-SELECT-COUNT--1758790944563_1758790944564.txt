@@ -1,0 +1,108 @@
+Do this in order (copy to the agent)
+
+Preflight snapshot (read-only)
+
+Record counts:
+
+SELECT COUNT(*) FROM ingredients;
+SELECT COUNT(*) FROM shopping_list_items;
+SELECT COUNT(*) FROM suppliers;
+SELECT COUNT(*) FROM dailySalesV2;
+SELECT COUNT(*) FROM dailyStockSales;
+
+
+Full backups (Neon/Postgres):
+
+# replace with your prod DATABASE_URL
+pg_dump "$DATABASE_URL" -Fc -f backup_pre_patch.dump
+# table-only safety copies
+pg_dump "$DATABASE_URL" -t ingredients -t suppliers -t shopping_list_items -t dailySalesV2 -t dailyStockSales -f backup_tables_pre_patch.sql
+
+
+Set soft/compat flags (no downtime)
+
+In env (or runtime config):
+
+CHECKLIST_REQUIRED=false
+LEGACY_API_PROXY=true
+BLOCK_LEGACY_INGREDIENTS=true
+
+
+Restart the server so flags apply.
+
+Run the migration script exactly once
+
+Use the SQL I provided (2025-09-align-ingredients-for-estimator.sql). It:
+
+ADD COLUMN IF NOT EXISTS only,
+
+backfills NULL fields from legacy columns if present,
+
+creates suppliers if missing,
+
+ensures shopping_list_items.requested_unit exists,
+
+adds helpful indexes,
+
+all inside a BEGIN…COMMIT transaction.
+
+Command:
+
+psql "$DATABASE_URL" -f sql_migrations/2025-09-align-ingredients-for-estimator.sql
+
+
+Post-migration checks
+
+Re-run counts (should be unchanged except suppliers may increase if legacy names were normalized):
+
+SELECT
+  SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END) AS no_price,
+  COUNT(*) AS total
+FROM ingredients;
+
+SELECT COUNT(*) FROM shopping_list_items WHERE requested_unit IS NULL;
+
+
+Spot check a few rows:
+
+SELECT name, supplier_id, package_cost, package_qty, package_unit, portion_qty, portion_unit
+FROM ingredients ORDER BY name LIMIT 20;
+
+
+Estimator + email smoke test
+
+API:
+
+curl -s http://localhost:5000/api/shopping-list/<LIST_ID>/estimate | jq
+
+
+Expect non-zero line totals where ingredients have prices; any missing prices should be listed in missingPricing.
+
+Trigger a test management email; confirm the “Shopping List — Estimated Cost” section shows per-line costs and a total.
+
+Ingredient UI check
+
+Open Ingredient Management and confirm Supplier, Package Cost/Size, Unit Price, Cost/Portion now render.
+
+If some show “—”, that item needs pricing; the estimator will flag it but still compute a total using fallbacks.
+
+Rollback/exit plan (unlikely needed)
+
+If anything looks off, do not drop new columns. Instead:
+
+Turn off blockers: set BLOCK_LEGACY_INGREDIENTS=false, keep LEGACY_API_PROXY=true.
+
+Restore from backup only if truly required:
+
+pg_restore -c -d "$DATABASE_URL" backup_pre_patch.dump
+
+
+Otherwise we can simply fix mappings and re-run; the migration is idempotent.
+
+Risk assessment
+
+Data loss risk: Very low (no deletes/renames; adds columns and inserts suppliers).
+
+Operational risk: Low (flags keep legacy callers working via proxy; staff forms unaffected).
+
+Downtime: None expected.
