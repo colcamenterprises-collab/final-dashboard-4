@@ -104,6 +104,23 @@ export class CronEmailService {
         shoppingCostData = { total: 0, breakdown: [], missingPricing: [] };
       }
 
+      // Pricing completeness diagnostic
+      let pricingCompleteness = '';
+      try {
+        const pricingRows: any[] = await db.execute(sql`
+          SELECT
+            SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END)::int AS missing,
+            COUNT(*)::int AS total
+          FROM ingredients;
+        `);
+        const { missing, total } = pricingRows[0];
+        if (missing / total > 0.1) {
+          pricingCompleteness = `⚠️ Warning: ${missing}/${total} ingredients missing prices (>10%)`;
+        }
+      } catch (e) {
+        console.error('Pricing completeness check error:', e);
+      }
+
       // Get ingredients data for drinks cost calculation
       const { pool } = await import('../db');
       const ingredientsQuery = await pool.query('SELECT name, "unitCost", category FROM ingredient_v2');
@@ -124,7 +141,7 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
 // === END MANAGER QUICK CHECK: email section insert ===
 
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients, managerCheck, shoppingCostData);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients, managerCheck, shoppingCostData, pricingCompleteness);
 
       // Send email using Gmail API
       await this.sendEmail(htmlContent, lastShiftDate || '');
@@ -138,7 +155,7 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
   /**
    * Generate HTML email content
    */
-  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = [], managerCheck: string = '', shoppingCostData: any = null): string {
+  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = [], managerCheck: string = '', shoppingCostData: any = null, pricingCompleteness: string = ''): string {
     const balanceStatus = analysisData?.description?.includes('No anomalies') ? 'Yes' : 'No';
     const anomalies = analysisData?.description || 'No analysis available';
 
@@ -293,6 +310,7 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
           <h2>📝 Additional Notes</h2>
           <p><strong>Expense Description:</strong> ${formData.expenseDescription || 'None'}</p>
           <p><strong>Draft Status:</strong> ${formData.isDraft ? 'Draft' : 'Submitted'}</p>
+          ${pricingCompleteness ? `<p style="color: #856404; font-weight: bold;">${pricingCompleteness}</p>` : ''}
         </div>
 
         <hr>
