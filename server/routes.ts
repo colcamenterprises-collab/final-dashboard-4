@@ -3453,14 +3453,14 @@ export function registerRoutes(app: express.Application): Server {
   // Shopping list estimate endpoint (must come before generic /:id route)
   app.get('/api/shopping-list/:id/estimate', async (req: Request, res: Response) => {
     try {
-      const id = req.params.id;
-      console.log('Shopping list estimate request - id:', id, 'type:', typeof id);
-      if (!id || id.trim() === '') return res.status(400).json({ error: 'list id required' });
-      const result = await estimateShoppingList(id);
-      res.json(result);
+      const listId = String(req.params.id); // UUID-safe
+      console.log('Shopping list estimate request - listId:', listId);
+      if (!listId || listId.trim() === '') return res.status(400).json({ error: 'list id required' });
+      const result = await estimateShoppingList(listId);
+      return res.json(result);
     } catch (e: any) {
       console.error('shopping-list.estimate error', e);
-      res.status(500).json({ error: 'Server error' });
+      return res.status(500).json({ error: 'Server error' });
     }
   });
   

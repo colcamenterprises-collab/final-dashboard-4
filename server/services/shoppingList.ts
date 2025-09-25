@@ -58,7 +58,7 @@ async function getCategoryAvgUnitPrice(category: string | null): Promise<number 
  * Expects shopping_list_items with: ingredient_id, requested_qty, requested_unit
  */
 export async function estimateShoppingList(listId: string | number) {
-  const items: any[] = await db.execute(sql`
+  const result = await db.execute(sql`
     SELECT
       sli.id,
       sli.ingredient_name,
@@ -76,6 +76,7 @@ export async function estimateShoppingList(listId: string | number) {
     ORDER BY COALESCE(i.name, sli.ingredient_name) ASC;
   `);
 
+  const items = result.rows || result;
   let total = 0;
   const breakdown: Breakdown[] = [];
   const missingPricing: string[] = [];

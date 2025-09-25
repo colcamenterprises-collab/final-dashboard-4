@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     const limit = Math.min(Number(req.query.limit ?? 2000), 5000);
 
     // Pull raw fields. Adjust table/column names to your Drizzle schema if needed.
-    const rows: any[] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT
         i.id,
         i.name,
@@ -33,6 +33,7 @@ router.get('/', async (req, res) => {
       LIMIT ${limit};
     `);
 
+    const rows = result.rows || result;
     const enriched = rows.map(r => {
       const packageBase = toBase(r.package_qty, r.package_unit);
       const unitPrice = r.package_cost && packageBase > 0 ? r.package_cost / packageBase : null;
