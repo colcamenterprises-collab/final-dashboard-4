@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
       SELECT
         i.id,
         i.name,
-        i.category_id,
+        i.category,
         i.supplier_id,
         s.name AS supplier_name,
         i.brand,
@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
       return {
         id: r.id,
         name: r.name,
-        categoryId: r.category_id,
+        category: r.category,
         supplierId: r.supplier_id,
         supplierName: r.supplier_name || null,
         brand: r.brand || null,
