@@ -1,38 +1,124 @@
-import { db } from '../lib/prisma';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { toBase } from '../lib/uom';
 
-type ReqItem = { name: string; category: string; unit: string; qty: number; costPerUnit: number };
+type Breakdown = {
+  name: string;
+  supplierId: number | null;
+  requested: string;
+  unitPrice: number;
+  estimated: number;
+  priceSource: 'package' | 'last_purchase' | 'category_avg' | 'missing';
+};
 
-export async function generateShoppingListFromStock(stockId: string) {
-  const stock = await db().dailyStock.findUnique({ where: { id: stockId } });
-  if (!stock) return null;
+async function getLastPurchaseUnitPrice(ingredientId: number): Promise<number | null> {
+  // Optional fallback: derive unit price from last purchase if you track purchases
+  const rows: any[] = await db.execute(sql`
+    SELECT p.total_cost, p.package_qty, p.package_unit
+    FROM purchases p
+    WHERE p.ingredient_id = ${ingredientId}
+    ORDER BY p.purchased_at DESC
+    LIMIT 1;
+  `);
+  const r = rows[0];
+  if (!r) return null;
+  const base = toBase(r.package_qty, r.package_unit);
+  if (!r.total_cost || !base) return null;
+  return Number(r.total_cost) / base;
+}
 
-  const req: ReqItem[] = (stock.requisitionJson as any[]) || [];
+async function getCategoryAvgUnitPrice(categoryId: number | null): Promise<number | null> {
+  if (!categoryId) return null;
+  const rows: any[] = await db.execute(sql`
+    SELECT AVG(i.package_cost / NULLIF( (CASE
+      WHEN LOWER(i.package_unit) IN ('kg','l','l','each','pc','g','ml') THEN 1
+      ELSE 1
+    END) * 1.0 *
+      CASE
+        WHEN LOWER(i.package_unit) = 'kg' THEN 1
+        WHEN LOWER(i.package_unit) = 'g' THEN 0.001
+        WHEN LOWER(i.package_unit) IN ('l','L') THEN 1
+        WHEN LOWER(i.package_unit) = 'ml' THEN 0.001
+        ELSE 1
+      END
+    ,0)) AS avg_unit_price
+    FROM ingredients i
+    WHERE i.category_id = ${categoryId}
+      AND i.package_cost IS NOT NULL
+      AND i.package_cost > 0
+      AND i.package_qty IS NOT NULL
+      AND i.package_qty > 0;
+  `);
+  const v = rows?.[0]?.avg_unit_price;
+  return v != null ? Number(v) : null;
+}
 
-  const drinksCounts = req
-    .filter(r => (r.category || '').toLowerCase() === 'drinks' && Number(r.qty) > 0)
-    .map(r => ({ name: r.name, qty: Number(r.qty) }));
+/**
+ * Estimate a shopping list by listId.
+ * Expects shopping_list_items with: ingredient_id, requested_qty, requested_unit
+ */
+export async function estimateShoppingList(listId: number) {
+  const items: any[] = await db.execute(sql`
+    SELECT
+      sli.id,
+      sli.ingredient_id,
+      sli.requested_qty,
+      COALESCE(sli.requested_unit, 'each') AS requested_unit,
+      i.name,
+      i.category_id,
+      i.supplier_id,
+      i.package_cost,
+      i.package_qty,
+      i.package_unit
+    FROM shopping_list_items sli
+    JOIN ingredients i ON i.id = sli.ingredient_id
+    WHERE sli.list_id = ${listId}
+    ORDER BY i.name ASC;
+  `);
 
-  const items = req
-    .filter(r => Number(r.qty) > 0)
-    .map(r => ({
-      name: r.name,
-      unit: r.unit,
-      qty: Number(r.qty),
-      costPerUnit: Number(r.costPerUnit || 0),
-      category: r.category
-    }));
+  let total = 0;
+  const breakdown: Breakdown[] = [];
+  const missingPricing: string[] = [];
 
-  const list = await db().shoppingList.create({
-    data: {
-      salesFormId: stock.salesFormId ?? null,
-      stockFormId: stock.id,
-      rollsCount: Number(stock.rollsCount || 0),
-      meatWeightGrams: Number(stock.meatWeightGrams || 0),
-      drinksCounts,
-      items,
-      totalItems: items.length
-    }
-  });
+  for (const row of items) {
+    const packageBase = toBase(row.package_qty, row.package_unit);
+    const unitPriceFromPkg = row.package_cost && packageBase > 0
+      ? Number(row.package_cost) / packageBase
+      : null;
 
-  return list;
+    const unitPriceFromLast = unitPriceFromPkg ? null : await getLastPurchaseUnitPrice(row.ingredient_id);
+    const unitPriceFromCat = unitPriceFromPkg || unitPriceFromLast ? null : await getCategoryAvgUnitPrice(row.category_id);
+
+    const unitPrice =
+      unitPriceFromPkg ??
+      unitPriceFromLast ??
+      unitPriceFromCat ??
+      0;
+
+    const priceSource: Breakdown['priceSource'] =
+      unitPriceFromPkg ? 'package' :
+      unitPriceFromLast ? 'last_purchase' :
+      unitPriceFromCat ? 'category_avg' : 'missing';
+
+    if (!unitPrice) missingPricing.push(row.name);
+
+    const reqBase = toBase(row.requested_qty, row.requested_unit);
+
+    // If requesting by full packs, buy whole packages; else use unit pricing
+    const estimated = row.requested_unit.toLowerCase() === 'pack' && row.package_cost && packageBase > 0
+      ? Math.ceil(reqBase / packageBase) * Number(row.package_cost)
+      : reqBase * unitPrice;
+
+    total += estimated;
+    breakdown.push({
+      name: row.name,
+      supplierId: row.supplier_id ?? null,
+      requested: `${row.requested_qty} ${row.requested_unit}`,
+      unitPrice,
+      estimated,
+      priceSource
+    });
+  }
+
+  return { total, breakdown, missingPricing };
 }
