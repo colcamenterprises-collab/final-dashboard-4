@@ -1,0 +1,101 @@
+Yes—go ahead and set the flags exactly as the agent requested:
+
+LEGACY_API_PROXY=true
+BLOCK_LEGACY_INGREDIENTS=true
+CHECKLIST_REQUIRED=false
+
+
+Then continue with the plan. Here’s the exact next sequence to finish safely, given the counts they reported.
+
+Next steps (no data loss)
+3) Run the alignment migration (one file, one run)
+
+Execute the SQL we prepared:
+
+psql "$DATABASE_URL" -f sql_migrations/2025-09-align-ingredients-for-estimator.sql
+
+
+If their information_schema queries errored earlier, that’s fine—this script is self-guarded (IF NOT EXISTS) and runs inside a transaction.
+
+4) Post-migration checks (copy/paste)
+Pricing completeness
+SELECT
+  SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END) AS no_price,
+  COUNT(*) AS total
+FROM ingredients;
+
+Spot check a few rows
+SELECT name, supplier_id, package_cost, package_qty, package_unit, portion_qty, portion_unit
+FROM ingredients
+ORDER BY name
+LIMIT 20;
+
+Shopping list units defaulted
+SELECT COUNT(*) AS null_units
+FROM shopping_list_items
+WHERE requested_unit IS NULL;
+
+
+(Expect null_units = 0 after the migration.)
+
+5) Estimator + email smoke test
+API estimate
+# Replace <LIST_ID> with your active shopping list id (agent said one list exists)
+curl -s http://localhost:5000/api/shopping-list/<LIST_ID>/estimate | jq
+
+
+You should see line items with estimated values and a non-zero total (unless a specific item still has no pricing, which will be listed under missingPricing).
+
+Management email
+
+Trigger the daily email (however you normally do). Confirm the section:
+“Shopping List — Estimated Cost” appears with per-line costs and the total. If prices are still missing for some items, the email will include a “Missing Prices” section and tag the subject.
+
+6) UI verification
+
+Open Ingredient Management and confirm the table now shows:
+
+Supplier
+
+Package Cost/Size
+
+Unit Price
+
+Cost/Portion
+
+If any show “—”, that item needs a price; the estimator will still compute using last-purchase or category-average fallbacks, and will flag what’s missing.
+
+If the agent hits issues
+A) Env not applying
+
+Restart the app after setting the three flags above.
+
+B) “column does not exist” after migration
+
+Run this quick introspection to see actual column names:
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'ingredients'
+ORDER BY column_name;
+
+
+If your legacy columns use different names, re-run the migration after changing the source names in the “3) Legacy → modern mapping” blocks (only the UPDATE statements that copy into NULLs).
+
+C) No shopping list items found
+
+Confirm table is shopping_list_items (not shopping_list_line_items). If yours differs, update the estimator queries to the real table name and re-run.
+
+Success criteria (green lights)
+
+/api/shopping-list/<id>/estimate returns a non-zero total.
+
+Email includes “Shopping List — Estimated Cost”.
+
+Ingredient page shows supplier and pricing columns populated.
+
+No CSV/“God File” reads (BLOCK_LEGACY_INGREDIENTS prevents it).
+
+Legacy endpoints still work (proxied), so no staff disruption.
+
+That’s it—safe to proceed.
