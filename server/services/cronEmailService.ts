@@ -4,6 +4,7 @@ import { dailyStockSales, shoppingList, aiInsights } from '../../shared/schema';
 import { desc, eq } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { sql } from 'drizzle-orm';
+import { estimateShoppingList } from '../services/shoppingList';
 
 // === BEGIN MANAGER QUICK CHECK: email helper ===
 export async function renderManagerQuickCheckSection(salesId: number): Promise<string> {
@@ -91,6 +92,18 @@ export class CronEmailService {
       const shoppingData = await shoppingResponse.json();
       const { groupedList = {}, totalItems = 0 } = shoppingData;
 
+      // Add shopping list cost estimation
+      let shoppingCostData = null;
+      try {
+        // Get the shopping list ID (assuming it's available from formData or create a mock ID)
+        const listId = formData.shoppingListId || 1; // Use actual list ID from your data
+        const { total, breakdown, missingPricing } = await estimateShoppingList(listId);
+        shoppingCostData = { total, breakdown, missingPricing };
+      } catch (e) {
+        console.error('Shopping list estimation error:', e);
+        shoppingCostData = { total: 0, breakdown: [], missingPricing: [] };
+      }
+
       // Get ingredients data for drinks cost calculation
       const { pool } = await import('../db');
       const ingredientsQuery = await pool.query('SELECT name, "unitCost", category FROM ingredient_v2');
@@ -111,7 +124,7 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
 // === END MANAGER QUICK CHECK: email section insert ===
 
       // Generate email content
-      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients, managerCheck);
+      const htmlContent = this.generateEmailHTML(lastShiftDate || '', formData, { groupedList, totalItems }, analysisData, ingredients, managerCheck, shoppingCostData);
 
       // Send email using Gmail API
       await this.sendEmail(htmlContent, lastShiftDate || '');
@@ -125,7 +138,7 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
   /**
    * Generate HTML email content
    */
-  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = [], managerCheck: string = ''): string {
+  private generateEmailHTML(date: string, formData: any, shoppingData: { groupedList: any, totalItems: number }, analysisData: any, ingredients: any[] = [], managerCheck: string = '', shoppingCostData: any = null): string {
     const balanceStatus = analysisData?.description?.includes('No anomalies') ? 'Yes' : 'No';
     const anomalies = analysisData?.description || 'No analysis available';
 
@@ -215,6 +228,28 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
             : '<p>No shopping items generated from this form.</p>'
           }
         </div>
+
+        ${shoppingCostData ? `
+          <div class="section">
+            <h2>💰 Shopping List — Estimated Cost</h2>
+            ${shoppingCostData.breakdown.map(b => `
+              <p>• ${b.name}: ~฿${b.estimated.toFixed(2)} (${b.priceSource})</p>
+            `).join('')}
+            <p></p>
+            <p><strong>Estimated Total: ~฿${shoppingCostData.total.toFixed(2)}</strong></p>
+            ${shoppingCostData.missingPricing.length > 0 ? `
+              <div style="margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+                <h3 style="color: #856404; margin-top: 0;">Missing Prices (needs update)</h3>
+                <p style="color: #856404;">${shoppingCostData.missingPricing.join(', ')}</p>
+              </div>
+            ` : ''}
+          </div>
+        ` : `
+          <div class="section">
+            <h2>💰 Shopping List — Estimated Cost</h2>
+            <p>Unavailable (estimator error)</p>
+          </div>
+        `}
 
         ${(() => {
           // Drinks are now properly categorized in the shopping list above
