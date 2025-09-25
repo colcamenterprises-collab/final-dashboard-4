@@ -4,6 +4,7 @@ import { bankUploadRouter } from "../src/server/bank/upload";
 import { loyverseGet, getShiftUtcRange, filterByExactShift } from './utils/loyverse';
 import express, { Request, Response, NextFunction } from "express";
 import { blockLegacyIngredients } from './middleware/blockLegacyIngredients';
+import { proxyDailyStockSales } from './middleware/legacyProxies';
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -1544,7 +1545,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Daily Stock Sales endpoints - all active forms
-  app.get("/api/daily-stock-sales", async (req: Request, res: Response) => {
+  app.get("/api/daily-stock-sales", proxyDailyStockSales, async (req: Request, res: Response) => {
     try {
       const forms = await storage.getAllDailyStockSales();
       // Return all active forms (deleted_at IS NULL already filtered in storage)
@@ -1609,7 +1610,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // POST endpoint for Fort Knox Daily Stock Sales form submission with validation
-  app.post("/api/daily-stock-sales", validateDailySalesForm, async (req: Request, res: Response) => {
+  app.post("/api/daily-stock-sales", proxyDailyStockSales, validateDailySalesForm, async (req: Request, res: Response) => {
     try {
       const data = req.body; // Now validated and sanitized by middleware
       console.log("✅ Validated Fort Knox Daily Stock Sales form submission:", data);
