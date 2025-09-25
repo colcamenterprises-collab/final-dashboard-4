@@ -36,6 +36,7 @@ import balanceRoutes from "./routes/balance";
 import ingredientsRoutes from "./routes/ingredients";
 import managerCheckRouter from './routes/managerChecks';
 import shoppingListRouter from './routes/shoppingList';
+import { estimateShoppingList } from './services/shoppingList';
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
@@ -3446,6 +3447,20 @@ export function registerRoutes(app: express.Application): Server {
     } catch (error) {
       console.error('Shopping list error:', error);
       res.status(500).json({ ok: false, error: 'Failed to retrieve shopping list' });
+    }
+  });
+
+  // Shopping list estimate endpoint (must come before generic /:id route)
+  app.get('/api/shopping-list/:id/estimate', async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id;
+      console.log('Shopping list estimate request - id:', id, 'type:', typeof id);
+      if (!id || id.trim() === '') return res.status(400).json({ error: 'list id required' });
+      const result = await estimateShoppingList(id);
+      res.json(result);
+    } catch (e: any) {
+      console.error('shopping-list.estimate error', e);
+      res.status(500).json({ error: 'Server error' });
     }
   });
   

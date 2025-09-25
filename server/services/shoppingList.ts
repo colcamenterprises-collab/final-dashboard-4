@@ -11,12 +11,12 @@ type Breakdown = {
   priceSource: 'package' | 'last_purchase' | 'category_avg' | 'missing';
 };
 
-async function getLastPurchaseUnitPrice(ingredientId: number): Promise<number | null> {
+async function getLastPurchaseUnitPrice(ingredientName: string): Promise<number | null> {
   // Optional fallback: derive unit price from last purchase if you track purchases
   const rows: any[] = await db.execute(sql`
     SELECT p.total_cost, p.package_qty, p.package_unit
     FROM purchases p
-    WHERE p.ingredient_id = ${ingredientId}
+    WHERE p.ingredient_name = ${ingredientName}
     ORDER BY p.purchased_at DESC
     LIMIT 1;
   `);
@@ -27,8 +27,8 @@ async function getLastPurchaseUnitPrice(ingredientId: number): Promise<number | 
   return Number(r.total_cost) / base;
 }
 
-async function getCategoryAvgUnitPrice(categoryId: number | null): Promise<number | null> {
-  if (!categoryId) return null;
+async function getCategoryAvgUnitPrice(category: string | null): Promise<number | null> {
+  if (!category) return null;
   const rows: any[] = await db.execute(sql`
     SELECT AVG(i.package_cost / NULLIF( (CASE
       WHEN LOWER(i.package_unit) IN ('kg','l','l','each','pc','g','ml') THEN 1
@@ -43,7 +43,7 @@ async function getCategoryAvgUnitPrice(categoryId: number | null): Promise<numbe
       END
     ,0)) AS avg_unit_price
     FROM ingredients i
-    WHERE i.category_id = ${categoryId}
+    WHERE i.category = ${category}
       AND i.package_cost IS NOT NULL
       AND i.package_cost > 0
       AND i.package_qty IS NOT NULL
@@ -57,23 +57,23 @@ async function getCategoryAvgUnitPrice(categoryId: number | null): Promise<numbe
  * Estimate a shopping list by listId.
  * Expects shopping_list_items with: ingredient_id, requested_qty, requested_unit
  */
-export async function estimateShoppingList(listId: number) {
+export async function estimateShoppingList(listId: string | number) {
   const items: any[] = await db.execute(sql`
     SELECT
       sli.id,
-      sli.ingredient_id,
+      sli.ingredient_name,
       sli.requested_qty,
       COALESCE(sli.requested_unit, 'each') AS requested_unit,
       i.name,
-      i.category_id,
+      i.category,
       i.supplier_id,
       i.package_cost,
       i.package_qty,
       i.package_unit
     FROM shopping_list_items sli
-    JOIN ingredients i ON i.id = sli.ingredient_id
-    WHERE sli.list_id = ${listId}
-    ORDER BY i.name ASC;
+    LEFT JOIN ingredients i ON i.name = sli.ingredient_name
+    WHERE sli.shopping_list_id = ${listId}
+    ORDER BY COALESCE(i.name, sli.ingredient_name) ASC;
   `);
 
   let total = 0;
@@ -86,8 +86,8 @@ export async function estimateShoppingList(listId: number) {
       ? Number(row.package_cost) / packageBase
       : null;
 
-    const unitPriceFromLast = unitPriceFromPkg ? null : await getLastPurchaseUnitPrice(row.ingredient_id);
-    const unitPriceFromCat = unitPriceFromPkg || unitPriceFromLast ? null : await getCategoryAvgUnitPrice(row.category_id);
+    const unitPriceFromLast = unitPriceFromPkg ? null : await getLastPurchaseUnitPrice(row.name);
+    const unitPriceFromCat = unitPriceFromPkg || unitPriceFromLast ? null : await getCategoryAvgUnitPrice(row.category);
 
     const unitPrice =
       unitPriceFromPkg ??
@@ -100,7 +100,7 @@ export async function estimateShoppingList(listId: number) {
       unitPriceFromLast ? 'last_purchase' :
       unitPriceFromCat ? 'category_avg' : 'missing';
 
-    if (!unitPrice) missingPricing.push(row.name);
+    if (!unitPrice) missingPricing.push(row.name || row.ingredient_name);
 
     const reqBase = toBase(row.requested_qty, row.requested_unit);
 

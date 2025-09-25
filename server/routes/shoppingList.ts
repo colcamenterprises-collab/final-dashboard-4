@@ -9,8 +9,9 @@ const router = Router();
  */
 router.get('/:id/estimate', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'list id required' });
+    const id = req.params.id;
+    console.log('Shopping list estimate request - id:', id, 'type:', typeof id);
+    if (!id || id.trim() === '') return res.status(400).json({ error: 'list id required' });
     const result = await estimateShoppingList(id);
     res.json(result);
   } catch (e: any) {
