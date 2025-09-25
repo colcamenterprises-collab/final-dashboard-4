@@ -3,6 +3,7 @@ import { uploadIngredientsCSV, getShoppingListByDate } from "./forms/ingredients
 import { bankUploadRouter } from "../src/server/bank/upload";
 import { loyverseGet, getShiftUtcRange, filterByExactShift } from './utils/loyverse';
 import express, { Request, Response, NextFunction } from "express";
+import { blockLegacyIngredients } from './middleware/blockLegacyIngredients';
 import { createServer } from "http";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -2782,6 +2783,9 @@ export function registerRoutes(app: express.Application): Server {
     app.get('/api/forms/:id', formsModule.getForm);
     app.post('/api/forms/:id/email', formsModule.emailForm);
   }).catch(err => console.error('Failed to load forms API:', err));
+
+  // Mount middleware
+  app.use(blockLegacyIngredients);
 
   // Golden Patch - Expenses Import & Approval Routes
   app.use('/api/expenses', expensesImportRouter);
