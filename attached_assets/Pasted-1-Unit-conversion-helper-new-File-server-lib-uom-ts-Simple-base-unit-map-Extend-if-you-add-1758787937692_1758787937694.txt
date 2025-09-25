@@ -1,0 +1,438 @@
+1) Unit conversion helper (new)
+
+File: server/lib/uom.ts
+
+// Simple base-unit map. Extend if you add more UOMs.
+export const UOM: Record<string, number> = {
+  each: 1,
+  pc: 1,
+  g: 0.001,
+  kg: 1,
+  ml: 0.001,
+  l: 1,
+  L: 1,
+};
+
+export function toBase(qty: number | null | undefined, unit: string | null | undefined) {
+  const q = Number(qty ?? 0);
+  const u = String(unit ?? 'each').toLowerCase();
+  const f = UOM[u] ?? 1;
+  return q * f;
+}
+
+2) Legacy ingredient reads blocker (new; dev/prod toggle)
+
+File: server/middleware/blockLegacyIngredients.ts
+
+import type { Request, Response, NextFunction } from 'express';
+
+const ENABLED = process.env.BLOCK_LEGACY_INGREDIENTS === 'true';
+
+const legacyPatterns = [
+  /ingredients\.csv/i,
+  /god.*file/i,
+  /legacyIngredients/i,
+  /ingredients_legacy/i
+];
+
+export function blockLegacyIngredients(req: Request, res: Response, next: NextFunction) {
+  if (!ENABLED) return next();
+  const path = (req.path || '') + ' ' + (req.url || '');
+  if (legacyPatterns.some(rx => rx.test(path))) {
+    res.setHeader('X-Legacy-Blocked', 'true');
+    return res.status(410).json({ error: 'Legacy ingredient source blocked. Use DB.' });
+  }
+  return next();
+}
+
+
+Wire it: in server/routes.ts (or your main app bootstrap), before route mounts:
+
+import { blockLegacyIngredients } from './middleware/blockLegacyIngredients';
+// ...
+app.use(blockLegacyIngredients);
+
+
+Set in .env (safe default false):
+
+BLOCK_LEGACY_INGREDIENTS=true
+
+3) Ingredient Mgmt API (join supplier + compute prices)
+
+File: server/routes/ingredients.ts (new or replace existing list handler)
+
+import { Router } from 'express';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { toBase } from '../lib/uom';
+
+const router = Router();
+
+/**
+ * GET /api/ingredients
+ * Returns enriched rows with supplierName, unitPrice, costPerPortion, etc.
+ */
+router.get('/', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit ?? 2000), 5000);
+
+    // Pull raw fields. Adjust table/column names to your Drizzle schema if needed.
+    const rows: any[] = await db.execute(sql`
+      SELECT
+        i.id,
+        i.name,
+        i.category_id,
+        i.supplier_id,
+        s.name AS supplier_name,
+        i.brand,
+        i.package_cost,
+        i.package_qty,
+        i.package_unit,
+        i.portion_qty,
+        i.portion_unit
+      FROM ingredients i
+      LEFT JOIN suppliers s ON s.id = i.supplier_id
+      ORDER BY i.name ASC
+      LIMIT ${limit};
+    `);
+
+    const enriched = rows.map(r => {
+      const packageBase = toBase(r.package_qty, r.package_unit);
+      const unitPrice = r.package_cost && packageBase > 0 ? r.package_cost / packageBase : null;
+
+      // For UI only (display). Shopping estimator will compute per request.
+      const portionBase = toBase(r.portion_qty, r.portion_unit);
+      const costPerPortion = unitPrice && portionBase ? unitPrice * portionBase : null;
+
+      return {
+        id: r.id,
+        name: r.name,
+        categoryId: r.category_id,
+        supplierId: r.supplier_id,
+        supplierName: r.supplier_name || null,
+        brand: r.brand || null,
+        packageCost: r.package_cost ?? null,
+        packageQty: r.package_qty ?? null,
+        packageUnit: r.package_unit ?? 'each',
+        portionQty: r.portion_qty ?? null,
+        portionUnit: r.portion_unit ?? null,
+        unitPrice,
+        costPerPortion
+      };
+    });
+
+    res.json({ items: enriched, count: enriched.length });
+  } catch (e: any) {
+    console.error('ingredients.list error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+export default router;
+
+
+Wire it: in server/routes.ts
+
+import ingredientsRouter from './routes/ingredients';
+// ...
+app.use('/api/ingredients', ingredientsRouter);
+
+4) Shopping List cost estimator service (new)
+
+File: server/services/shoppingList.ts
+
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { toBase } from '../lib/uom';
+
+type Breakdown = {
+  name: string;
+  supplierId: number | null;
+  requested: string;
+  unitPrice: number;
+  estimated: number;
+  priceSource: 'package' | 'last_purchase' | 'category_avg' | 'missing';
+};
+
+async function getLastPurchaseUnitPrice(ingredientId: number): Promise<number | null> {
+  // Optional fallback: derive unit price from last purchase if you track purchases
+  const rows: any[] = await db.execute(sql`
+    SELECT p.total_cost, p.package_qty, p.package_unit
+    FROM purchases p
+    WHERE p.ingredient_id = ${ingredientId}
+    ORDER BY p.purchased_at DESC
+    LIMIT 1;
+  `);
+  const r = rows[0];
+  if (!r) return null;
+  const base = toBase(r.package_qty, r.package_unit);
+  if (!r.total_cost || !base) return null;
+  return Number(r.total_cost) / base;
+}
+
+async function getCategoryAvgUnitPrice(categoryId: number | null): Promise<number | null> {
+  if (!categoryId) return null;
+  const rows: any[] = await db.execute(sql`
+    SELECT AVG(i.package_cost / NULLIF( (CASE
+      WHEN LOWER(i.package_unit) IN ('kg','l','l','each','pc','g','ml') THEN 1
+      ELSE 1
+    END) * 1.0 *
+      CASE
+        WHEN LOWER(i.package_unit) = 'kg' THEN 1
+        WHEN LOWER(i.package_unit) = 'g' THEN 0.001
+        WHEN LOWER(i.package_unit) IN ('l','L') THEN 1
+        WHEN LOWER(i.package_unit) = 'ml' THEN 0.001
+        ELSE 1
+      END
+    ,0)) AS avg_unit_price
+    FROM ingredients i
+    WHERE i.category_id = ${categoryId}
+      AND i.package_cost IS NOT NULL
+      AND i.package_cost > 0
+      AND i.package_qty IS NOT NULL
+      AND i.package_qty > 0;
+  `);
+  const v = rows?.[0]?.avg_unit_price;
+  return v != null ? Number(v) : null;
+}
+
+/**
+ * Estimate a shopping list by listId.
+ * Expects shopping_list_items with: ingredient_id, requested_qty, requested_unit
+ */
+export async function estimateShoppingList(listId: number) {
+  const items: any[] = await db.execute(sql`
+    SELECT
+      sli.id,
+      sli.ingredient_id,
+      sli.requested_qty,
+      COALESCE(sli.requested_unit, 'each') AS requested_unit,
+      i.name,
+      i.category_id,
+      i.supplier_id,
+      i.package_cost,
+      i.package_qty,
+      i.package_unit
+    FROM shopping_list_items sli
+    JOIN ingredients i ON i.id = sli.ingredient_id
+    WHERE sli.list_id = ${listId}
+    ORDER BY i.name ASC;
+  `);
+
+  let total = 0;
+  const breakdown: Breakdown[] = [];
+  const missingPricing: string[] = [];
+
+  for (const row of items) {
+    const packageBase = toBase(row.package_qty, row.package_unit);
+    const unitPriceFromPkg = row.package_cost && packageBase > 0
+      ? Number(row.package_cost) / packageBase
+      : null;
+
+    const unitPriceFromLast = unitPriceFromPkg ? null : await getLastPurchaseUnitPrice(row.ingredient_id);
+    const unitPriceFromCat = unitPriceFromPkg || unitPriceFromLast ? null : await getCategoryAvgUnitPrice(row.category_id);
+
+    const unitPrice =
+      unitPriceFromPkg ??
+      unitPriceFromLast ??
+      unitPriceFromCat ??
+      0;
+
+    const priceSource: Breakdown['priceSource'] =
+      unitPriceFromPkg ? 'package' :
+      unitPriceFromLast ? 'last_purchase' :
+      unitPriceFromCat ? 'category_avg' : 'missing';
+
+    if (!unitPrice) missingPricing.push(row.name);
+
+    const reqBase = toBase(row.requested_qty, row.requested_unit);
+
+    // If requesting by full packs, buy whole packages; else use unit pricing
+    const estimated = row.requested_unit.toLowerCase() === 'pack' && row.package_cost && packageBase > 0
+      ? Math.ceil(reqBase / packageBase) * Number(row.package_cost)
+      : reqBase * unitPrice;
+
+    total += estimated;
+    breakdown.push({
+      name: row.name,
+      supplierId: row.supplier_id ?? null,
+      requested: `${row.requested_qty} ${row.requested_unit}`,
+      unitPrice,
+      estimated,
+      priceSource
+    });
+  }
+
+  return { total, breakdown, missingPricing };
+}
+
+5) Shopping List estimate endpoint (new)
+
+File: server/routes/shoppingList.ts (augment or create)
+
+import { Router } from 'express';
+import { estimateShoppingList } from '../services/shoppingList';
+
+const router = Router();
+
+/**
+ * GET /api/shopping-list/:id/estimate
+ * Returns per-line estimate + total + missing pricing list.
+ */
+router.get('/:id/estimate', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'list id required' });
+    const result = await estimateShoppingList(id);
+    res.json(result);
+  } catch (e: any) {
+    console.error('shopping-list.estimate error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+export default router;
+
+
+Wire it: in server/routes.ts
+
+import shoppingListRouter from './routes/shoppingList';
+// ...
+app.use('/api/shopping-list', shoppingListRouter);
+
+6) Add to management email (append-only)
+
+In your email builder (e.g., server/services/cronEmailService.ts or server/services/email.ts), inject this when you already compute the shopping list:
+
+import { estimateShoppingList } from '../services/shoppingList';
+
+// inside your daily email composition function:
+try {
+  const { total, breakdown, missingPricing } = await estimateShoppingList(listId);
+
+  addSection(
+    'Shopping List — Estimated Cost',
+    [
+      ...breakdown.map(b => `• ${b.name}: ~฿${b.estimated.toFixed(2)} (${b.priceSource})`),
+      '',
+      `Estimated Total: ~฿${total.toFixed(2)}`
+    ].join('\n')
+  );
+
+  if (missingPricing.length) {
+    addSection('Missing Prices (needs update)', missingPricing.join(', '));
+    tagSubject?.('[PRICE MISSING]');
+  }
+} catch (e) {
+  addSection('Shopping List — Estimated Cost', 'Unavailable (estimator error)');
+}
+
+
+This is read-only; it doesn’t change how lists are created.
+
+7) Legacy route proxies (feature-flagged, safe)
+
+File: server/middleware/legacyProxies.ts
+
+import type { Request, Response, NextFunction } from 'express';
+import fetch from 'node-fetch';
+
+const ENABLED = process.env.LEGACY_API_PROXY === 'true';
+
+export async function proxyDailyStockSales(req: Request, res: Response, next: NextFunction) {
+  if (!ENABLED) return next();
+  try {
+    // Map body if legacy shape differs. Here we forward as-is to canonical.
+    const target = `${req.protocol}://${req.get('host')}/api/daily-stock`;
+    const r = await fetch(target, {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json' },
+      body: ['POST','PATCH','PUT'].includes(req.method) ? JSON.stringify(req.body) : undefined
+    });
+    const data = await r.json();
+    return res.status(r.status).json(data);
+  } catch (e) {
+    return next(e);
+  }
+}
+
+
+Wire where the legacy routes are defined:
+
+import { proxyDailyStockSales } from './middleware/legacyProxies';
+
+// legacy route mounts:
+app.post('/api/daily-stock-sales', proxyDailyStockSales, (req,res)=>res.status(410).json({error:'Legacy disabled'}));
+app.get('/api/daily-stock-sales', proxyDailyStockSales, (req,res)=>res.status(410).json({error:'Legacy disabled'}));
+
+
+Flags:
+
+LEGACY_API_PROXY=true
+
+8) Ingredient Mgmt UI — show supplier & costs (minimal changes)
+
+If your page is client/src/pages/ingredients/Management.tsx or /ingredients-table, update the table’s data fetch to call /api/ingredients and render these fields: supplierName, packageCost, packageQty, packageUnit, unitPrice, costPerPortion.
+
+Example column renderers:
+
+// columns example
+{
+  header: 'Supplier',
+  cell: ({ row }) => row.original.supplierName || '—'
+},
+{
+  header: 'Package Cost',
+  cell: ({ row }) => row.original.packageCost != null ? `฿${row.original.packageCost.toFixed(2)}` : '—'
+},
+{
+  header: 'Package Size',
+  cell: ({ row }) => {
+    const q = row.original.packageQty;
+    const u = row.original.packageUnit;
+    return q ? `${q} ${u}` : '—';
+  }
+},
+{
+  header: 'Unit Price',
+  cell: ({ row }) => row.original.unitPrice != null ? `฿${row.original.unitPrice.toFixed(3)}` : '—'
+},
+{
+  header: 'Cost/Portion',
+  cell: ({ row }) => row.original.costPerPortion != null ? `฿${row.original.costPerPortion.toFixed(2)}` : '—'
+}
+
+
+Make sure the fetch points to the enriched endpoint:
+
+const r = await fetch('/api/ingredients');
+const { items } = await r.json();
+setData(items);
+
+9) Safety & diagnostics
+
+Add to your daily ops email (or a small admin widget):
+
+Pricing completeness:
+
+SELECT
+  SUM(CASE WHEN package_cost IS NULL OR package_cost=0 THEN 1 ELSE 0 END)::int AS missing,
+  COUNT(*)::int AS total
+FROM ingredients;
+
+
+If missing / total > 0.1, add a warning line: “>10% ingredients missing prices”.
+
+Environment flags summary
+BLOCK_LEGACY_INGREDIENTS=true   # blocks any CSV / God File reads at runtime
+LEGACY_API_PROXY=true           # proxies legacy endpoints to new canonical routes
+
+What to expect after applying
+
+Ingredient page shows Supplier, Package Cost/Size, Unit Price, Cost/Portion.
+
+/api/shopping-list/:id/estimate returns a non-zero total (unless every item lacks pricing).
+
+Daily email includes the estimated per-line costs and total, plus a section listing items that need pricing.
+
+Any code still trying to read the CSV (God File) will be blocked (410) when the flag is on—useful to catch stragglers without breaking staff flow.
