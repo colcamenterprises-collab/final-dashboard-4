@@ -74,10 +74,12 @@ export default function IngredientManagement() {
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
 
   // Queries
-  const { data: ingredients = [], isLoading } = useQuery({
+  const { data: ingredientsResponse, isLoading } = useQuery({
     queryKey: ['/api/ingredients'],
     queryFn: () => apiRequest('/api/ingredients'),
   });
+  
+  const ingredients = ingredientsResponse?.items || [];
 
   // Mutations
   const createIngredientMutation = useMutation({
@@ -489,10 +491,10 @@ export default function IngredientManagement() {
               <TableHead>Category</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Brand</TableHead>
-              <TableHead>Packaging Qty</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Average Menu Portion</TableHead>
-              <TableHead>Last Review Date</TableHead>
+              <TableHead>Package Cost</TableHead>
+              <TableHead>Package Size</TableHead>
+              <TableHead>Unit Price</TableHead>
+              <TableHead>Cost/Portion</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -505,14 +507,15 @@ export default function IngredientManagement() {
                     {ingredient.category}
                   </Badge>
                 </TableCell>
-                <TableCell>{ingredient.supplier}</TableCell>
-                <TableCell>{(ingredient as any).brand || '-'}</TableCell>
-                <TableCell>{ingredient.packageSize || '-'} {ingredient.unit}</TableCell>
-                <TableCell className="font-semibold text-green-600">
-                  {formatPrice(ingredient.unitPrice)}
+                <TableCell>{(ingredient as any).supplierName || '—'}</TableCell>
+                <TableCell>{(ingredient as any).brand || '—'}</TableCell>
+                <TableCell>{(ingredient as any).packageCost != null ? `฿${(ingredient as any).packageCost.toFixed(2)}` : '—'}</TableCell>
+                <TableCell>
+                  {(ingredient as any).packageQty && (ingredient as any).packageUnit ? 
+                    `${(ingredient as any).packageQty} ${(ingredient as any).packageUnit}` : '—'}
                 </TableCell>
-                <TableCell>{(ingredient as any).portionSize || '-'}</TableCell>
-                <TableCell>{(ingredient as any).lastReview || '-'}</TableCell>
+                <TableCell>{(ingredient as any).unitPrice != null ? `฿${(ingredient as any).unitPrice.toFixed(3)}` : '—'}</TableCell>
+                <TableCell>{(ingredient as any).costPerPortion != null ? `฿${(ingredient as any).costPerPortion.toFixed(2)}` : '—'}</TableCell>
                 <TableCell>
                   <div className="flex space-x-1">
                     <Button
