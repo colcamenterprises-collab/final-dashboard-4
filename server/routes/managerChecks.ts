@@ -19,25 +19,35 @@ function pickQuestions(questions: any[], salesId: number) {
 }
 
 // Simplified version using existing manager checklist system
-// GET /api/manager-check/questions?salesId=123
+// GET /api/manager-check/questions?salesId=123&lang=en
 router.get('/questions', async (req, res) => {
   try {
     const salesId = Number(req.query.salesId);
+    const lang = (req.query.lang as string) || 'en';
     if (!salesId) return res.status(400).json({ error: 'salesId required' });
 
-    // Sample questions for Manager Quick Check
-    const sampleQuestions = [
-      { id: 1, text: "Fryer oil area wiped, no spills or residue", category: "Hygiene" },
-      { id: 2, text: "Fridge seals wiped and intact", category: "Equipment" },
-      { id: 3, text: "Handwash sink stocked (soap, towels)", category: "Food Safety" },
-      { id: 4, text: "Cash register balanced and secured", category: "Security" }
-    ];
+    // Fetch questions from database with language support
+    const allQuestions = await db.query(`
+      SELECT 
+        id, 
+        CASE 
+          WHEN $1 = 'th' AND text_th IS NOT NULL THEN text_th
+          ELSE COALESCE(text_en, text)
+        END as text,
+        category
+      FROM "ManagerCheckQuestion" 
+      WHERE enabled = true 
+      ORDER BY id
+    `, [lang]);
+
+    // Pick deterministic subset of questions
+    const selectedQuestions = pickQuestions(allQuestions.rows, salesId);
 
     res.json({
       required: REQUIRED,
       status: 'PENDING',
       dailyCheckId: salesId, // Use salesId as dailyCheckId for simplicity
-      questions: sampleQuestions
+      questions: selectedQuestions
     });
   } catch (e) {
     console.error(e);
