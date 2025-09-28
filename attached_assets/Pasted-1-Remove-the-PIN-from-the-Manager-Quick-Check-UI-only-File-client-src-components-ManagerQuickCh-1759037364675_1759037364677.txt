@@ -1,0 +1,240 @@
+1) Remove the PIN from the Manager Quick Check (UI only)
+
+File: client/src/components/ManagerQuickCheck.tsx
+
+Delete the PIN state + input.
+
+Do not change the API; it already treats managerPin as optional.
+
+
+-  const [managerPin, setManagerPin] = useState('');
+...
+-  const payload = {
+-    dailyCheckId,
+-    answeredBy,
+-    managerPin: managerPin || undefined,
++  const payload = {
++    dailyCheckId,
++    answeredBy,
+     answers: Object.entries(answers).map(([qid, v]) => ({
+       questionId: Number(qid), response: v.response || null, note: v.note || null
+     }))
+   };
+...
+-  <input
+-    className="border rounded p-2"
+-    placeholder="Manager PIN (optional)"
+-    value={managerPin}
+-    onChange={(e) => setManagerPin(e.target.value)}
+-  />
+
+
+---
+
+2) Add Thai/English toggle (same pattern as daily forms)
+
+2.1 UI i18n hooks for the checklist
+
+Assuming you already use i18n (e.g., react-i18next) in Sales/Stock, wire the checklist the same way:
+
++ import { useTranslation } from 'react-i18next';
+
+ export default function ManagerQuickCheck(...) {
++  const { t, i18n } = useTranslation();
+...
+-  const [skipReason, setSkipReason] = useState('');
++  const [skipReason, setSkipReason] = useState('');
++
++  const lang = (i18n?.language || 'en').startsWith('th') ? 'th' : 'en';
+...
+-  const r = await fetch(`/api/manager-check/questions?salesId=${salesId}`);
++  const r = await fetch(`/api/manager-check/questions?salesId=${salesId}&lang=${lang}`);
+...
+-  <div className="text-xl font-semibold mb-2">Manager Quick Check</div>
++  <div className="text-xl font-semibold mb-2">{t('managerCheck.title')}</div>
+...
+-  {['PASS','FAIL','NA'].map(opt => (
++  {(['PASS','FAIL','NA'] as const).map(opt => (
+      <label ...>
+        <input ... />
+-       <span>{opt}</span>
++       <span>{t(`managerCheck.${opt.toLowerCase()}`)}</span>
+      </label>
+    ))}
+...
+-  placeholder="Manager name (required)"
++  placeholder={t('managerCheck.managerName')}
+...
+-  placeholder="Skip reason (required to skip)"
++  placeholder={t('managerCheck.skipReason')}
+...
+-  {required ? 'Checklist is required before final submit.' : 'Checklist is recommended. You can skip with a reason.'}
++  {required ? t('managerCheck.required') : t('managerCheck.optional')}
+...
+-  Submit Check
++  {t('managerCheck.submit')}
+
+2.2 Translation strings
+
+File: client/src/i18n/en.json
+
+{
+  "managerCheck": {
+    "title": "Manager Quick Check",
+    "pass": "Pass",
+    "fail": "Fail",
+    "na": "N/A",
+    "managerName": "Manager name (required)",
+    "skipReason": "Skip reason (required to skip)",
+    "required": "Checklist is required before final submit.",
+    "optional": "Checklist is recommended. You can skip with a reason.",
+    "submit": "Submit Check",
+    "continue": "Continue",
+    "unavailable": "Checklist unavailable. Submission will be allowed but flagged."
+  }
+}
+
+File: client/src/i18n/th.json
+
+{
+  "managerCheck": {
+    "title": "แบบตรวจสอบของผู้จัดการ",
+    "pass": "ผ่าน",
+    "fail": "ไม่ผ่าน",
+    "na": "ไม่ระบุ",
+    "managerName": "ชื่อผู้จัดการ (จำเป็น)",
+    "skipReason": "เหตุผลในการข้าม (จำเป็นหากข้าม)",
+    "required": "ต้องทำแบบตรวจสอบก่อนส่งแบบฟอร์ม",
+    "optional": "แนะนำให้ทำแบบตรวจสอบ สามารถข้ามได้พร้อมเหตุผล",
+    "submit": "ยืนยันแบบตรวจสอบ",
+    "continue": "ดำเนินการต่อ",
+    "unavailable": "ไม่สามารถใช้แบบตรวจสอบได้ ระบบจะอนุญาตให้ส่งและทำเครื่องหมายไว้"
+  }
+}
+
+(If your app uses a different i18n hook, swap useTranslation calls accordingly—the keys above stay the same.)
+
+
+---
+
+3) Localize question text from the backend (English/Thai)
+
+3.1 DB (add Thai/English fields for questions)
+
+Run once (Postgres):
+
+ALTER TABLE "ManagerCheckQuestion"
+  ADD COLUMN IF NOT EXISTS text_en text,
+  ADD COLUMN IF NOT EXISTS text_th text;
+
+-- Backfill English from existing text so nothing is blank
+UPDATE "ManagerCheckQuestion" SET text_en = COALESCE(text_en, text);
+
+3.2 API: choose text by ?lang=en|th
+
+File: server/routes/managerChecks.ts (GET /questions):
+
+- router.get('/questions', async (req, res) => {
++ router.get('/questions', async (req, res) => {
+    ...
+-   const enabledQs = await prisma.managerCheckQuestion.findMany({ where: { enabled: true } });
++   const enabledQs = await prisma.managerCheckQuestion.findMany({ where: { enabled: true } });
++   const lang = String(req.query.lang || 'en').startsWith('th') ? 'th' : 'en';
+    ...
+    res.json({
+      required,
+      status: 'PENDING',
+      dailyCheckId: daily.id,
+-     questions: picked.map(q => ({ id: q.id, text: q.text, category: q.category ?? null }))
++     questions: picked.map(q => ({
++       id: q.id,
++       text: lang === 'th' ? (q.text_th || q.text_en || q.text) : (q.text_en || q.text || q.text_th),
++       text_en: q.text_en ?? null,
++       text_th: q.text_th ?? null,
++       category: q.category ?? null
++     }))
+    });
+
+(If you’re on Drizzle not Prisma, the same logic applies—just adjust the query call.)
+
+
+---
+
+4) List all questions so you can review/amend
+
+Add a read-only admin endpoint:
+
+File: server/routes/managerChecks.ts
+
+// GET /api/manager-check/list (admin/read-only)
+router.get('/list', async (_req, res) => {
+  const rows = await prisma.managerCheckQuestion.findMany({
+    orderBy: [{ category: 'asc' }, { id: 'asc' }]
+  });
+  res.json(rows.map(r => ({
+    id: r.id,
+    enabled: r.enabled,
+    category: r.category,
+    text_en: r.text_en ?? r.text ?? '',
+    text_th: r.text_th ?? '',
+    weight: r.weight ?? 1
+  })));
+});
+
+Quick review command:
+
+curl -s http://localhost:5000/api/manager-check/list | jq
+
+> Send me the output and I’ll prepare a clean bilingual set (or you can edit directly in DB with the two columns).
+
+
+
+
+---
+
+5) Fix email: include rolls (buns) and drinks stock counts
+
+Likely cause: we added v2/legacy side-by-side tables and the email query only reads one shape. Use a resilient COALESCE across both schemas.
+
+File: your daily summary email service (e.g., server/services/cronEmailService.ts)
+
+// helper: read buns & drinks for a shift (works with both v2 + legacy)
+async function getRollsAndDrinksForShift(shiftIdOrSalesId: number | string) {
+  // Try v2 by shiftId first, then legacy; fields may vary
+  const [row] = await db.execute(sql`
+    SELECT
+      COALESCE(dsv2.buns, dsv2.burger_buns_stock, 0) AS buns,
+      COALESCE(dsv2.drinks, dsv2.drinks_count, 0)     AS drinks
+    FROM dailySalesV2 dsv2
+    WHERE dsv2.shiftId = ${shiftIdOrSalesId}
+    LIMIT 1;
+  `) as any[];
+
+  if (row) return { buns: Number(row.buns || 0), drinks: Number(row.drinks || 0) };
+
+  const [legacy] = await db.execute(sql`
+    SELECT
+      COALESCE(ds.buns, ds.burger_buns_stock, 0)   AS buns,
+      COALESCE(ds.drinks, ds.drinks_count, 0)      AS drinks
+    FROM dailyStockSales ds
+    WHERE ds.shiftId = ${shiftIdOrSalesId}
+    LIMIT 1;
+  `) as any[];
+
+  return {
+    buns: Number(legacy?.buns || 0),
+    drinks: Number(legacy?.drinks || 0)
+  };
+}
+
+Then, when composing the email (in the same function you already extend with the Manager Check section):
+
+const { buns, drinks } = await getRollsAndDrinksForShift(shiftId);
+addSection('Stock Snapshot', `Rolls/Buns: ${buns}\nDrinks: ${drinks}`);
+
+> This reads whichever table/column exists and never breaks the email.
+
+
+
+
+---

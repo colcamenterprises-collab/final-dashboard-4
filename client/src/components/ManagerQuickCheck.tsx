@@ -15,7 +15,6 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, {response:string; note?:string}>>({});
   const [answeredBy, setAnsweredBy] = useState('');
-  const [managerPin, setManagerPin] = useState('');
   const [skipReason, setSkipReason] = useState('');
 
   useEffect(() => {
@@ -43,7 +42,6 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
     const payload = {
       dailyCheckId,
       answeredBy,
-      managerPin: managerPin || undefined,
       answers: Object.entries(answers).map(([qid, v]) => ({
         questionId: Number(qid), response: v.response || null, note: v.note || null
       }))
@@ -105,11 +103,9 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
               ))}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <input className="border-2 rounded-lg p-4 text-lg min-h-[56px]" placeholder="Manager name (required)"
                      value={answeredBy} onChange={(e)=>setAnsweredBy(e.target.value)} />
-              <input className="border-2 rounded-lg p-4 text-lg min-h-[56px]" placeholder="Manager PIN (optional)"
-                     value={managerPin} onChange={(e)=>setManagerPin(e.target.value)} />
             </div>
 
             <div className="space-y-4">
