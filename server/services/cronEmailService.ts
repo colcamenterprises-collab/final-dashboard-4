@@ -269,10 +269,16 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
         `}
 
         ${(() => {
-          // Drinks are now properly categorized in the shopping list above
+          // Get items from shopping list categories
           const drinksItems = shoppingData.groupedList['Drinks'] || [];
           const meatItems = shoppingData.groupedList['Meat'] || [];
-          const bakeryItems = shoppingData.groupedList['Bakery'] || [];
+          const breadItems = shoppingData.groupedList['Bread'] || [];
+          const freshFoodItems = (shoppingData.groupedList['Fresh Food'] || []).filter(item => 
+            item.name.toLowerCase().includes('bun') || item.name.toLowerCase().includes('roll') || item.name.toLowerCase().includes('bread')
+          );
+          
+          // Combine bread and fresh food rolls/buns
+          const allRollsAndBuns = [...breadItems, ...freshFoodItems];
           
           let specialSections = '';
           
@@ -280,7 +286,10 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
             specialSections += `
               <div class="section">
                 <h2>🥤 Drinks Summary</h2>
-                <p><strong>${drinksItems.length} drinks items</strong> are included in the shopping list above with cost tracking.</p>
+                <p><strong>${drinksItems.length} drinks items</strong> are included in the shopping list above with cost tracking:</p>
+                <ul>
+                  ${drinksItems.map(item => `<li>${item.name} x${item.qty}</li>`).join('')}
+                </ul>
               </div>
             `;
           }
@@ -289,16 +298,22 @@ const managerCheck = await renderManagerQuickCheckSection(formData.id);
             specialSections += `
               <div class="section">
                 <h2>🥩 Meat Summary</h2>
-                <p><strong>${meatItems.length} meat items</strong> are included in the shopping list above.</p>
+                <p><strong>${meatItems.length} meat items</strong> are included in the shopping list above:</p>
+                <ul>
+                  ${meatItems.map(item => `<li>${item.name} x${item.qty}</li>`).join('')}
+                </ul>
               </div>
             `;
           }
           
-          if (bakeryItems.length > 0) {
+          if (allRollsAndBuns.length > 0) {
             specialSections += `
               <div class="section">
-                <h2>🍞 Bakery/Roll Summary</h2>
-                <p><strong>${bakeryItems.length} bakery items</strong> are included in the shopping list above.</p>
+                <h2>🍞 Rolls & Buns Summary</h2>
+                <p><strong>${allRollsAndBuns.length} rolls/buns items</strong> are included in the shopping list above:</p>
+                <ul>
+                  ${allRollsAndBuns.map(item => `<li>${item.name} x${item.qty}</li>`).join('')}
+                </ul>
               </div>
             `;
           }

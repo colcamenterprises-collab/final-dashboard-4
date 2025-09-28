@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
 const router = Router();
@@ -27,21 +28,21 @@ router.get('/questions', async (req, res) => {
     if (!salesId) return res.status(400).json({ error: 'salesId required' });
 
     // Fetch questions from database with language support
-    const allQuestions = await db.query(`
+    const allQuestions = await db.execute(sql`
       SELECT 
         id, 
         CASE 
-          WHEN $1 = 'th' AND text_th IS NOT NULL THEN text_th
+          WHEN ${lang} = 'th' AND text_th IS NOT NULL THEN text_th
           ELSE COALESCE(text_en, text)
         END as text,
         category
       FROM "ManagerCheckQuestion" 
       WHERE enabled = true 
       ORDER BY id
-    `, [lang]);
+    `);
 
     // Pick deterministic subset of questions
-    const selectedQuestions = pickQuestions(allQuestions.rows, salesId);
+    const selectedQuestions = pickQuestions(allQuestions.rows || allQuestions, salesId);
 
     res.json({
       required: REQUIRED,
@@ -93,7 +94,7 @@ router.post('/skip', async (req, res) => {
 // GET /api/manager-check/admin/questions - List all questions for admin management
 router.get('/admin/questions', async (req, res) => {
   try {
-    const questions = await db.query(`
+    const questions = await db.execute(sql`
       SELECT 
         id, 
         text, 
@@ -109,8 +110,8 @@ router.get('/admin/questions', async (req, res) => {
     `);
 
     res.json({
-      questions: questions.rows,
-      total: questions.rows.length
+      questions: questions.rows || questions,
+      total: (questions.rows || questions).length
     });
   } catch (e) {
     console.error(e);
