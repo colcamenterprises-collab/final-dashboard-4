@@ -1,0 +1,15 @@
+{
+  "managerCheck": {
+    "title": "Manager Quick Check",
+    "pass": "Pass",
+    "fail": "Fail",
+    "na": "N/A",
+    "managerName": "Manager name (required)",
+    "skipReason": "Skip reason (required to skip)",
+    "required": "Checklist is required before final submit.",
+    "optional": "Checklist is recommended. You can skip with a reason.",
+    "submit": "Submit Check",
+    "continue": "Continue",
+    "unavailable": "Checklist unavailable. Submission will be allowed but flagged."
+  }
+}
