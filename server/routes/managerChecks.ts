@@ -90,4 +90,32 @@ router.post('/skip', async (req, res) => {
   }
 });
 
+// GET /api/manager-check/admin/questions - List all questions for admin management
+router.get('/admin/questions', async (req, res) => {
+  try {
+    const questions = await db.query(`
+      SELECT 
+        id, 
+        text, 
+        text_en, 
+        text_th, 
+        category, 
+        enabled, 
+        weight,
+        created_at,
+        updated_at
+      FROM "ManagerCheckQuestion" 
+      ORDER BY category, id
+    `);
+
+    res.json({
+      questions: questions.rows,
+      total: questions.rows.length
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
