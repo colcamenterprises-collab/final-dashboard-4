@@ -35,44 +35,66 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
         setLoading(false);
       }
     })();
-  }, [salesId]);
+  }, [salesId, lang]);
 
   const setAns = (qid:number, field:'response'|'note', val:string) => {
     setAnswers(p => ({ ...p, [qid]: { ...p[qid], [field]: val } }));
   };
 
+  const handleResponseClick = (qid: number, response: string) => {
+    setAns(qid, 'response', response);
+  };
+
   const submit = async () => {
     if (!dailyCheckId) return;
+    if (!answeredBy.trim()) {
+      alert(t('managerCheck.managerNameRequired') || 'Manager name is required');
+      return;
+    }
+    
     const payload = {
       dailyCheckId,
-      answeredBy,
+      answeredBy: answeredBy.trim(),
       answers: Object.entries(answers).map(([qid, v]) => ({
-        questionId: Number(qid), response: v.response || null, note: v.note || null
+        questionId: Number(qid), 
+        response: v.response || 'NA', 
+        note: v.note || null
       }))
     };
+    
     const r = await fetch('/api/manager-check/submit', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify(payload)
     });
     const data = await r.json();
     if (data.ok) onDone({ status: 'COMPLETED' });
   };
 
   const skip = async () => {
-    if (!skipReason.trim()) return;
+    const reason = skipReason.trim();
+    if (!reason) {
+      alert(t('managerCheck.skipReasonRequired') || 'Please provide a reason to skip');
+      return;
+    }
+    
     const r = await fetch('/api/manager-check/skip', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ salesId, reason: skipReason })
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ salesId, reason })
     });
     const data = await r.json();
     if (data.ok) onDone({ status: 'SKIPPED' });
   };
 
-  // Language Toggle Component (inline)
   const LanguageToggle = () => (
     <div className="mb-4 flex items-center justify-center gap-3">
       <span className={`text-sm font-medium ${lang === 'en' ? 'text-blue-600' : 'text-gray-500'}`}>EN</span>
       <button 
+        type="button"
         className={`relative w-12 h-6 rounded-full border-2 transition-all duration-300 ${lang === 'en' ? 'bg-blue-500 border-blue-500' : 'bg-emerald-500 border-emerald-500'}`}
         onClick={() => i18n.changeLanguage(lang === 'en' ? 'th' : 'en')}
+        data-testid="language-toggle"
       >
         <div className={`absolute top-0 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${lang === 'en' ? 'left-0' : 'left-6'}`} />
       </button>
@@ -80,9 +102,12 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
     </div>
   );
 
+  const allAnswered = questions.every(q => answers[q.id]?.response);
+  const canSubmit = answeredBy.trim() && (!required || allAnswered);
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-4xl my-4 p-6 md:p-8">
         <LanguageToggle />
         <div className="text-2xl md:text-3xl font-semibold mb-6 text-center">{t('managerCheck.title')}</div>
 
@@ -92,8 +117,14 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
           <div className="space-y-6">
             <div className="p-4 bg-yellow-100 rounded-lg text-center text-lg">{t('managerCheck.unavailable')}</div>
             <div className="flex justify-center">
-              <button className="px-8 py-4 text-lg rounded-lg border-2 bg-gray-100 hover:bg-gray-200 min-h-[48px]" 
-                      onClick={() => onDone({ status: 'UNAVAILABLE' })}>{t('managerCheck.continue')}</button>
+              <button 
+                type="button"
+                className="px-8 py-4 text-lg rounded-lg border-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 min-h-[48px]" 
+                onClick={() => onDone({ status: 'UNAVAILABLE' })}
+                data-testid="button-continue"
+              >
+                {t('managerCheck.continue')}
+              </button>
             </div>
           </div>
         ) : (
@@ -101,53 +132,119 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             <div className="grid gap-6">
               {questions.map(q => (
                 <div key={q.id} className="border-2 rounded-xl p-4 md:p-6 bg-gray-50">
-                  <div className="font-semibold text-lg md:text-xl mb-4">{q.text}</div>
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    {(['PASS','FAIL','NA'] as const).map(opt => (
-                      <label key={opt} className="flex items-center justify-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-100 min-h-[56px]"
-                             style={{ backgroundColor: answers[q.id]?.response === opt ? '#e3f2fd' : 'white' }}>
-                        <input type="radio" name={`q-${q.id}`}
-                               className="w-5 h-5"
-                               onChange={() => setAns(q.id, 'response', opt)}
-                               checked={answers[q.id]?.response === opt}/>
-                        <span className="text-lg font-medium">{t(`managerCheck.${opt.toLowerCase()}`)}</span>
-                      </label>
-                    ))}
+                  <div className="font-semibold text-base md:text-lg mb-4">{q.text}</div>
+                  
+                  {/* Touch-friendly button group for responses */}
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {(['PASS','FAIL','NA'] as const).map(opt => {
+                      const isSelected = answers[q.id]?.response === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => handleResponseClick(q.id, opt)}
+                          className={`
+                            flex items-center justify-center gap-2 p-3 md:p-4 
+                            border-2 rounded-lg cursor-pointer 
+                            min-h-[56px] md:min-h-[64px]
+                            transition-all duration-200
+                            active:scale-95
+                            ${isSelected 
+                              ? 'bg-blue-100 border-blue-500 shadow-md' 
+                              : 'bg-white border-gray-300 hover:bg-gray-50 active:bg-gray-100'
+                            }
+                          `}
+                          data-testid={`response-${q.id}-${opt.toLowerCase()}`}
+                        >
+                          <div className={`
+                            w-5 h-5 rounded-full border-2 flex items-center justify-center
+                            ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-400'}
+                          `}>
+                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                          <span className={`text-base md:text-lg font-medium ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                            {t(`managerCheck.${opt.toLowerCase()}`)}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <textarea className="w-full border-2 rounded-lg p-4 text-lg min-h-[80px]"
-                            placeholder="Note (optional)"
-                            value={answers[q.id]?.note ?? ''}
-                            onChange={(e) => setAns(q.id, 'note', e.target.value)} />
+
+                  {/* Optional note */}
+                  <textarea 
+                    className="w-full border-2 rounded-lg p-3 md:p-4 text-base md:text-lg min-h-[80px] focus:outline-none focus:border-blue-500"
+                    placeholder={t('managerCheck.noteOptional') || "Note (optional)"}
+                    value={answers[q.id]?.note ?? ''}
+                    onChange={(e) => setAns(q.id, 'note', e.target.value)}
+                    data-testid={`note-${q.id}`}
+                  />
                 </div>
               ))}
             </div>
 
+            {/* Manager name input */}
             <div className="grid grid-cols-1 gap-4">
-              <input className="border-2 rounded-lg p-4 text-lg min-h-[56px]" placeholder={t('managerCheck.managerName')}
-                     value={answeredBy} onChange={(e)=>setAnsweredBy(e.target.value)} />
+              <input 
+                type="text"
+                className="border-2 rounded-lg p-3 md:p-4 text-base md:text-lg min-h-[56px] focus:outline-none focus:border-blue-500" 
+                placeholder={t('managerCheck.managerName')}
+                value={answeredBy} 
+                onChange={(e)=>setAnsweredBy(e.target.value)}
+                data-testid="input-manager-name"
+              />
             </div>
 
+            {/* Status message */}
+            <div className="text-sm md:text-base text-gray-600 text-center p-3 md:p-4 bg-blue-50 rounded-lg">
+              {required ? t('managerCheck.required') : t('managerCheck.optional')}
+            </div>
+            
+            {/* Action buttons */}
             <div className="space-y-4">
-              <div className="text-base md:text-lg text-gray-600 text-center p-4 bg-blue-50 rounded-lg">
-                {required ? t('managerCheck.required') : t('managerCheck.optional')}
-              </div>
-              
-              <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
-                {!required && (
-                  <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                    <input className="border-2 rounded-lg p-4 text-lg min-h-[56px] md:min-w-[300px]" 
-                           placeholder={t('managerCheck.skipReason')}
-                           value={skipReason} onChange={(e)=>setSkipReason(e.target.value)} />
-                    <button className="px-6 py-4 text-lg border-2 rounded-lg bg-red-100 hover:bg-red-200 min-h-[56px] min-w-[120px]" 
-                            onClick={skip}
-                            disabled={!skipReason.trim()}>Skip</button>
-                  </div>
-                )}
-                <button className="px-6 py-4 text-lg border-2 rounded-lg bg-gray-100 hover:bg-gray-200 min-h-[56px] min-w-[120px]" 
-                        onClick={onCancel}>Cancel</button>
-                <button className="px-8 py-4 text-lg rounded-lg bg-black text-white hover:bg-gray-800 min-h-[56px] min-w-[160px] font-semibold"
-                        onClick={submit}
-                        disabled={required && (!answeredBy || questions.some(q => !answers[q.id]?.response))}>
+              {/* Skip section (only if not required) */}
+              {!required && (
+                <div className="flex flex-col gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                  <label className="text-sm font-medium text-red-700">
+                    {t('managerCheck.skipSection') || 'Skip Checklist'}
+                  </label>
+                  <input 
+                    type="text"
+                    className="border-2 border-red-300 rounded-lg p-3 text-base min-h-[48px] focus:outline-none focus:border-red-500" 
+                    placeholder={t('managerCheck.skipReason') || 'Reason for skipping...'}
+                    value={skipReason} 
+                    onChange={(e)=>setSkipReason(e.target.value)}
+                    data-testid="input-skip-reason"
+                  />
+                  <button 
+                    type="button"
+                    className="w-full px-6 py-3 text-base md:text-lg border-2 border-red-500 rounded-lg bg-red-100 hover:bg-red-200 active:bg-red-300 min-h-[56px] font-medium text-red-700 transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    onClick={skip}
+                    disabled={!skipReason.trim()}
+                    data-testid="button-skip"
+                  >
+                    {t('managerCheck.skipButton') || 'Skip Checklist'}
+                  </button>
+                </div>
+              )}
+
+              {/* Main action buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center">
+                <button 
+                  type="button"
+                  className="px-6 py-3 text-base md:text-lg border-2 border-gray-300 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[56px] font-medium transition-all active:scale-98" 
+                  onClick={onCancel}
+                  data-testid="button-cancel"
+                >
+                  {t('managerCheck.cancel') || 'Cancel'}
+                </button>
+                
+                <button 
+                  type="button"
+                  className="px-8 py-3 text-base md:text-lg rounded-lg bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[56px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  onClick={submit}
+                  disabled={!canSubmit}
+                  data-testid="button-submit"
+                >
                   {t('managerCheck.submit')}
                 </button>
               </div>
