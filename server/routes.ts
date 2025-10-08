@@ -4261,5 +4261,16 @@ app.use("/api/bank-imports", bankUploadRouter);
   //   }
   // });
 
+  // Download endpoint for architecture report
+  app.get('/api/download/architecture-report', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'DAILY_SALES_STOCK_ARCHITECTURE_REPORT.md');
+    res.download(filePath, 'Daily_Sales_Stock_Architecture_Report.txt', (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ error: 'Failed to download report' });
+      }
+    });
+  });
+
   return server;
 }
