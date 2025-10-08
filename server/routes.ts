@@ -4272,5 +4272,16 @@ app.use("/api/bank-imports", bankUploadRouter);
     });
   });
 
+  // Download endpoint for ground-zero schema
+  app.get('/api/download/ground-zero-schema', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'ground-zero-schema.md');
+    res.download(filePath, 'Ground_Zero_Schema.md', (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ error: 'Failed to download schema report' });
+      }
+    });
+  });
+
   return server;
 }
