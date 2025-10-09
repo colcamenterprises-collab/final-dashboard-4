@@ -2598,11 +2598,11 @@ export function registerRoutes(app: express.Application): Server {
       const data = {
         completedBy: payload.completedBy || 'Unknown',
         shiftDate: payload.shiftDate ? new Date(payload.shiftDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
-        startingCash: Math.round(Number(payload.cashStart) * 100) || 0, // Convert to satang
+        startingCash: Math.round(Number(payload.cashStart || payload.startingCash) * 100) || 0, // Convert to satang
         cashSales: Math.round(Number(payload.cashSales) * 100) || 0,
         qrSales: Math.round(Number(payload.qrSales) * 100) || 0,
         grabSales: Math.round(Number(payload.grabSales) * 100) || 0,
-        otherSales: Math.round(Number(payload.otherSales || payload.aroiDeeSales) * 100) || 0, // Updated from aroiSales to otherSales
+        aroiSales: Math.round(Number(payload.otherSales || payload.aroiDeeSales || payload.aroiSales) * 100) || 0, // Maps otherSales to aroiSales for Prisma
         totalSales: Math.round(Number(payload.totalSales) * 100) || Math.round((Number(payload.cashSales || 0) + Number(payload.qrSales || 0) + Number(payload.grabSales || 0) + Number(payload.otherSales || payload.aroiDeeSales || 0)) * 100), // Fixed to include otherSales fallback
         totalExpenses: Math.round(Number(payload.totalExpenses) * 100) || 0,
         closingCash: Math.round(Number(payload.endingCash) * 100) || 0,
