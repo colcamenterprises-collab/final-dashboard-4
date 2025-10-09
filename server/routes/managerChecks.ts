@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { prisma } from "../../lib/prisma";
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -65,10 +66,17 @@ router.post('/submit', async (req, res) => {
       return res.status(400).json({ error: 'dailyCheckId, answeredBy, answers[] required' });
     }
 
-    // For now, just log the submission and return success
-    console.log('Manager Check submitted:', { dailyCheckId, answeredBy, answers: answers.length });
-
-    res.json({ ok: true, dailyCheckId, status: 'COMPLETED' });
+    // Save manager checklist to database
+    const record = await prisma.managerChecklist.create({
+      data: {
+        shiftId: String(dailyCheckId),
+        managerName: answeredBy,
+        tasksAssigned: answers.map((a: any) => ({ questionId: a.questionId })),
+        tasksCompleted: answers,
+        signedAt: new Date()
+      }
+    });
+    return res.json({ ok: true, id: record.id, status: "COMPLETED" });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });

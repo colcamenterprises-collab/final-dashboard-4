@@ -497,5 +497,8 @@ router.post("/:id/complete", async (req, res) => {
   }
 });
 
-
 export default router;
+/** Guard legacy daily-sales endpoints to prevent loops/freestyle */
+app.all(["/api/daily-sales","/api/forms/daily-sales"], (_req, res) => {
+  res.status(410).json({ error: "Gone: use /api/forms/daily-sales-v2" });
+});

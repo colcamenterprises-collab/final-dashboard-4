@@ -73,3 +73,14 @@ export async function sendDailyReportEmail(opts: {
   console.log(`📧 Daily report email sent: ${info.messageId}`);
   return info;
 }
+// --- Patch MEGA V3: Stock Counts in email ---
+export function renderStockCountsEmailBlock(stock: any) {
+  const drinks = stock?.drinksJson ? Object.entries(stock.drinksJson as Record<string, number>) : [];
+  const drinksLines = drinks.map(([n, q]) => `• ${n}: ${q}`).join('<br/>');
+  return `
+  <h3>Stock Counts</h3>
+  <p>Rolls: ${stock?.burgerBuns ?? 0}<br/>
+     Meat (g): ${stock?.meatWeightG ?? 0}</p>
+  ${drinks.length ? `<p><strong>Drinks</strong><br/>${drinksLines}</p>` : ''}
+  `;
+}
