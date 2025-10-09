@@ -139,6 +139,6 @@ export async function buildDailyReportPDF(opts: {
   }
 
   doc.end();
-  await new Promise(resolve => stream.on("finish", resolve));
+  await new Promise<void>(resolve => stream.on("finish", () => resolve()));
   return file;
 }

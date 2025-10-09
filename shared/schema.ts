@@ -1254,15 +1254,15 @@ export const cleaningTasks = pgTable("cleaning_tasks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Manager Checklists table - stores completed checklist records
+// Manager Checklists table - stores completed checklist records (uses camelCase from Prisma)
 export const managerChecklists = pgTable("manager_checklists", {
   id: serial("id").primaryKey(),
-  shiftId: text("shift_id").notNull(),
-  managerName: text("manager_name").notNull(),
-  tasksAssigned: jsonb("tasks_assigned").notNull(), // Array of task objects
-  tasksCompleted: jsonb("tasks_completed").notNull(), // Array of completed task objects
-  createdAt: timestamp("created_at").defaultNow(),
-  signedAt: timestamp("signed_at").defaultNow(),
+  shiftId: text("shiftId").notNull(),
+  managerName: text("managerName").notNull(),
+  tasksAssigned: jsonb("tasksAssigned").notNull(), // Array of task objects
+  tasksCompleted: jsonb("tasksCompleted").notNull(), // Array of completed task objects
+  createdAt: timestamp("createdAt").defaultNow(),
+  signedAt: timestamp("signedAt").defaultNow(),
 });
 
 // Checklist Assignments table - Fort Knox security for server-side task binding

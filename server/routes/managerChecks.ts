@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { prisma } from "../../lib/prisma";
 import { db } from '../db';
+import { managerChecklists } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
@@ -66,16 +66,15 @@ router.post('/submit', async (req, res) => {
       return res.status(400).json({ error: 'dailyCheckId, answeredBy, answers[] required' });
     }
 
-    // Save manager checklist to database
-    const record = await prisma.managerChecklist.create({
-      data: {
-        shiftId: String(dailyCheckId),
-        managerName: answeredBy,
-        tasksAssigned: answers.map((a: any) => ({ questionId: a.questionId })),
-        tasksCompleted: answers,
-        signedAt: new Date()
-      }
-    });
+    // Save manager checklist to database using Drizzle
+    const [record] = await db.insert(managerChecklists).values({
+      shiftId: String(dailyCheckId),
+      managerName: answeredBy,
+      tasksAssigned: answers.map((a: any) => ({ questionId: a.questionId })),
+      tasksCompleted: answers,
+      signedAt: new Date()
+    }).returning();
+    
     return res.json({ ok: true, id: record.id, status: "COMPLETED" });
   } catch (e) {
     console.error(e);
