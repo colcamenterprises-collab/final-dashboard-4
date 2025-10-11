@@ -188,11 +188,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Drinks Stock</h3>
       ${
-        (finalDrinkStock || []).length === 0
-          ? '<p style="color: #6c757d;">No drinks counted.</p>'
-          : `<ul>
-               ${(finalDrinkStock || []).map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+        typeof finalDrinkStock === 'object' && !Array.isArray(finalDrinkStock) && Object.keys(finalDrinkStock).length > 0
+          ? `<ul>
+               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<li><strong>${name}</strong>: ${qty}</li>`).join('')}
              </ul>`
+          : Array.isArray(finalDrinkStock) && finalDrinkStock.length > 0
+          ? `<ul>
+               ${finalDrinkStock.map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+             </ul>`
+          : '<p style="color: #6c757d;">No drinks counted.</p>'
       }
 
       <h3>Shopping List - Items to Purchase</h3>
@@ -365,11 +369,15 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
       <h3>Drinks Stock</h3>
       ${
-        (finalDrinkStock || []).length === 0
-          ? '<p style="color: #6c757d;">No drinks counted.</p>'
-          : `<ul>
-               ${(finalDrinkStock || []).map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+        typeof finalDrinkStock === 'object' && !Array.isArray(finalDrinkStock) && Object.keys(finalDrinkStock).length > 0
+          ? `<ul>
+               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<li><strong>${name}</strong>: ${qty}</li>`).join('')}
              </ul>`
+          : Array.isArray(finalDrinkStock) && finalDrinkStock.length > 0
+          ? `<ul>
+               ${finalDrinkStock.map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
+             </ul>`
+          : '<p style="color: #6c757d;">No drinks counted.</p>'
       }
 
       <h3>Shopping List - Items to Purchase</h3>
