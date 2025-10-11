@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../lib/prisma";
 import { db as drizzleDb } from "../db"; // MEGA PATCH V3: Import Drizzle for payload support
 import { dailySalesV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema
+import { sql } from "drizzle-orm"; // MEGA V3: For SQL operations
 import { buildDailyReportPDF } from "../lib/pdf";
 import { sendDailyReportEmail } from "../lib/email";
 import fs from "fs";
@@ -35,33 +36,34 @@ router.get("/", async (req, res) => {
 // GET /api/forms/library - Get forms library (MUST be before /:id to avoid shadowing)
 router.get("/library", async (req, res) => {
   try {
-    const forms = await db().dailySalesV2.findMany({
-      where: { deletedAt: null },
-      include: {
-        shopping: true,
-        wages: true,
-        others: true,
-        stock: true
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20
+    // MEGA V3: Use Drizzle to get payload data
+    const forms = await drizzleDb
+      .select()
+      .from(dailySalesV2)
+      .where(sql`deleted_at IS NULL`)
+      .orderBy(sql`created_at DESC`)
+      .limit(20);
+
+    // Normalize for frontend compatibility with payload support
+    const normalized = forms.map(form => {
+      const payload = form.payload || {};
+      return {
+        id: form.id,
+        shiftDate: form.shiftDate,
+        completedBy: form.completedBy,
+        createdAt: form.createdAt,
+        totalSales: form.totalSales || 0,
+        balanced: form.balanced || false,
+        // V3 payload fields
+        rollsEnd: payload.rollsEnd,
+        meatEnd: payload.meatEnd,
+        drinkStock: payload.drinkStock || {},
+        requisition: payload.requisition || [],
+        payload // Include full payload for debugging
+      };
     });
 
-    // Normalize for frontend compatibility
-    const normalized = forms.map(form => ({
-      id: form.id,
-      shiftDate: form.shiftDate,
-      completedBy: form.completedBy,
-      createdAt: form.createdAt,
-      drinksEnd: form.stock?.map((s: any) => s.drinkData) || [],
-      requisition: form.shopping?.filter((s: any) => (s.qty || 0) > 0) || [],
-      expenses: form.shopping || [],
-      wages: form.wages || [],
-      totalSales: form.totalSales || 0,
-      balanced: form.balanced || false
-    }));
-
-    console.log(`[GET /api/forms/library] Returning ${normalized.length} forms`);
+    console.log(`[GET /api/forms/library] Returning ${normalized.length} forms with payload`);
     res.json(normalized);
   } catch (error) {
     console.error('Forms library error:', error);
@@ -72,21 +74,22 @@ router.get("/library", async (req, res) => {
 // GET /api/forms/:id - Get specific form with all details
 router.get("/:id", async (req, res) => {
   try {
-    const form = await db().dailySalesV2.findUnique({
-      where: { id: req.params.id },
-      include: {
-        shopping: true,
-        wages: true,
-        others: true,
-        stock: true
-      }
-    });
+    // MEGA V3: Use Drizzle to get payload data
+    const [form] = await drizzleDb
+      .select()
+      .from(dailySalesV2)
+      .where(sql`id = ${req.params.id}`)
+      .limit(1);
 
     if (!form) {
       return res.status(404).json({ error: "Form not found" });
     }
 
-    res.json(form);
+    // Return form with payload included
+    res.json({
+      ...form,
+      payload: form.payload || {}
+    });
   } catch (error) {
     console.error("Error fetching form:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -98,26 +101,28 @@ router.post("/daily-sales", (req, res) => {
   res.redirect(307, "/api/daily-sales");
 });
 
-// FORT KNOX FIX: Add POST /api/forms/daily-stock endpoint with strong validation
+// MEGA V3 PATCH: POST /api/forms/daily-stock with drinkStock object support
 router.post("/daily-stock", async (req, res) => {
   try {
-    const { rollsEnd, meatCount, drinksEnd, requisition } = req.body;
+    const { salesId, rollsEnd, meatEnd, drinkStock, requisition } = req.body;
     
-    // Strong validation - reject negative values and invalid data types
+    // Strong validation
     const errors = [];
+    
+    if (!salesId) {
+      errors.push('salesId: required');
+    }
     
     if (rollsEnd == null || isNaN(Number(rollsEnd)) || Number(rollsEnd) < 0) {
       errors.push('rollsEnd: must be a non-negative number');
     }
     
-    if (meatCount == null || isNaN(Number(meatCount)) || Number(meatCount) < 0) {
-      errors.push('meatCount: must be a non-negative number');
+    if (meatEnd == null || isNaN(Number(meatEnd)) || Number(meatEnd) < 0) {
+      errors.push('meatEnd: must be a non-negative number');
     }
     
-    if (!Array.isArray(drinksEnd)) {
-      errors.push('drinksEnd: must be an array');
-    } else if (drinksEnd.length === 0) {
-      errors.push('drinksEnd: must contain at least one drink entry');
+    if (!drinkStock || typeof drinkStock !== 'object') {
+      errors.push('drinkStock: must be an object');
     }
     
     if (!Array.isArray(requisition)) {
@@ -131,22 +136,31 @@ router.post("/daily-stock", async (req, res) => {
       });
     }
     
-    // If validation passes, create stock record
-    const stockData = {
-      rollsEnd: Number(rollsEnd),
-      meatCount: Number(meatCount),
-      drinksEnd,
-      requisition: requisition.filter((r: any) => (r.qty || 0) > 0), // Only non-zero requisitions
-      createdAt: new Date()
-    };
+    // Update DailySalesV2 payload with stock data
+    const [updated] = await drizzleDb
+      .update(dailySalesV2)
+      .set({
+        payload: sql`payload || ${JSON.stringify({
+          rollsEnd: Number(rollsEnd),
+          meatEnd: Number(meatEnd),
+          drinkStock,
+          requisition: requisition.filter((r: any) => (r.qty || 0) > 0)
+        })}`
+      })
+      .where(sql`id = ${salesId}`)
+      .returning();
     
-    console.log(`[POST /api/forms/daily-stock] Valid stock data: rolls=${stockData.rollsEnd}, meat=${stockData.meatCount}, drinks=${stockData.drinksEnd.length}`);
+    if (!updated) {
+      return res.status(404).json({ error: 'Sales record not found' });
+    }
+    
+    console.log(`[POST /api/forms/daily-stock] Stock saved: rolls=${rollsEnd}, meat=${meatEnd}, drinks=${Object.keys(drinkStock).length}`);
     
     res.json({ 
       ok: true, 
       success: true,
-      message: 'Stock data validated and saved successfully',
-      data: stockData
+      message: 'Stock data saved successfully',
+      salesId
     });
   } catch (error) {
     console.error('Stock validation error:', error);
@@ -166,11 +180,11 @@ router.post("/daily-sales-v2", async (req, res) => {
     const wageItems = body.expenses?.wages || [];
     const otherItems = body.expenses?.others || [];
 
-    const shoppingTotal = shoppingItems.reduce((sum: number, item: any) => sum + (item.cost || 0), 0);
-    const wagesTotal = wageItems.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
-    const othersTotal = otherItems.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
+    const shoppingTotal = Math.round(shoppingItems.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0));
+    const wagesTotal = Math.round(wageItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0));
+    const othersTotal = Math.round(otherItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0));
     const totalExpenses = shoppingTotal + wagesTotal + othersTotal;
-    const totalSales = body.sales?.totalSales || 0;
+    const totalSales = Math.round(Number(body.sales?.totalSales) || 0);
 
     // MEGA PATCH V3: Build payload with stock data
     const payload = deepMergePayload({}, {
@@ -221,7 +235,7 @@ router.post("/daily-sales-v2", async (req, res) => {
       await db().shoppingPurchaseV2.createMany({
         data: shoppingItems.map((item: any) => ({
           item: item.item,
-          cost: item.cost,
+          cost: Math.round(Number(item.cost) || 0),
           shop: item.shop,
           salesId: form.id
         }))
@@ -232,7 +246,7 @@ router.post("/daily-sales-v2", async (req, res) => {
       await db().wageEntryV2.createMany({
         data: wageItems.map((item: any) => ({
           staff: item.staff,
-          amount: item.amount,
+          amount: Math.round(Number(item.amount) || 0),
           type: item.type,
           salesId: form.id
         }))
@@ -243,7 +257,7 @@ router.post("/daily-sales-v2", async (req, res) => {
       await db().otherExpenseV2.createMany({
         data: otherItems.map((item: any) => ({
           label: item.label,
-          amount: item.amount,
+          amount: Math.round(Number(item.amount) || 0),
           salesId: form.id
         }))
       });

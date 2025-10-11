@@ -24,9 +24,8 @@ function pickQuestions(questions: any[], salesId: number) {
 // GET /api/manager-check/questions?salesId=123&lang=en
 router.get('/questions', async (req, res) => {
   try {
-    const salesId = Number(req.query.salesId);
+    const salesId = Number(req.query.salesId) || Math.floor(Date.now() / 1000); // Use timestamp if no salesId
     const lang = (req.query.lang as string) || 'en';
-    if (!salesId) return res.status(400).json({ error: 'salesId required' });
 
     // Fetch questions from database with language support
     const allQuestions = await db.execute(sql`
@@ -82,21 +81,8 @@ router.post('/submit', async (req, res) => {
   }
 });
 
-// POST /api/manager-check/skip
-// body: { salesId, reason }
-router.post('/skip', async (req, res) => {
-  try {
-    const { salesId, reason } = req.body || {};
-    if (!salesId || !reason) return res.status(400).json({ error: 'salesId and reason required' });
-
-    console.log('Manager Check skipped:', { salesId, reason });
-
-    res.json({ ok: true, dailyCheckId: salesId, status: 'SKIPPED' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+// MEGA PATCH: disable skipping
+router.all('/skip', (_req, res) => res.status(410).json({ error: "Gone: manager check cannot be skipped" }));
 
 // GET /api/manager-check/admin/questions - List all questions for admin management
 router.get('/admin/questions', async (req, res) => {
