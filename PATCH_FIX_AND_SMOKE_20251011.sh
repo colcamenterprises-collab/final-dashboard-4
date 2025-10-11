@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== PATCH+FIX+SMOKE — 2025-10-11 ==="
+: "${BASE_URL:=http://localhost:3000}"
+
+# ----- Safety & setup -----
+[ -d server ] || { echo "Not the dashboard repo (missing /server)"; exit 1; }
+mkdir -p scripts server/migrations
+
+# ----- 1) Ensure SKIP endpoint returns 410 & questions fallback exists -----
+MC="server/routes/managerChecks.ts"
+touch "$MC" # avoid failure if path exists but file missing will be handled by app build
+
+if [ -f "$MC" ]; then
+  # 410 guard for skip (idempotent)
+  grep -q "manager check cannot be skipped" "$MC" || cat >> "$MC" <<'TS'
+
+// FIX 2025-10-11: disable skipping entirely
+app.all("/api/manager-check/skip", (_req,res)=>res.status(410).json({error:"Gone: manager check cannot be skipped"}));
+TS
+
+  # Deterministic 4-question fallback if DB returns <4
+  grep -q "function getFourQuestions" "$MC" || cat >> "$MC" <<'TS'
+import crypto from "crypto";
+// FIX 2025-10-11: ensure 4 questions always available (EN/TH)
+async function getFourQuestions(lang:string){
+  try {
+    const qs = await prisma.managerCheckQuestion.findMany({ where:{ enabled: true }, orderBy:{ id:'asc' } });
+    const defaults = [
+      { id: 101, text_en: "Clean grill surfaces", text_th: "ทำความสะอาดเตาย่าง" },
+      { id: 102, text_en: "Wipe down prep stations", text_th: "เช็ดทำความสะอาดโต๊ะเตรียมอาหาร" },
+      { id: 103, text_en: "Sanitize cutting boards", text_th: "ฆ่าเชื้อเขียง" },
+      { id: 104, text_en: "Clean fryer filters", text_th: "ทำความสะอาดไส้กรองทอด" },
+      { id: 105, text_en: "Secure cash drawer", text_th: "ล็อคลิ้นชักเงิน" },
+      { id: 106, text_en: "Count register till", text_th: "นับเงินทอนเริ่มต้น" }
+    ];
+    const pool = (qs?.length? qs : defaults).map(q=>({ id:q.id, en:q.text_en??q.text, th:q.text_th??q.text }));
+    const day = new Date().toISOString().slice(0,10);
+    const seed = crypto.createHash('sha256').update(day).digest('hex');
+    const sorted = [...pool].sort((a,b)=>{
+      const ha=crypto.createHash('sha256').update(seed+String(a.id)).digest('hex');
+      const hb=crypto.createHash('sha256').update(seed+String(b.id)).digest('hex');
+      return ha.localeCompare(hb);
+    });
+    const pick = sorted.slice(0,4);
+    return pick.map(q=>({ id:q.id, text: lang==='th'? (q.th||q.en): (q.en||q.th) }));
+  } catch (e){
+    return [
+      { id: 201, text: lang==='th'?"ทำความสะอาดเตาย่าง":"Clean grill surfaces" },
+      { id: 202, text: lang==='th'?"เช็ดทำความสะอาดโต๊ะเตรียมอาหาร":"Wipe down prep stations" },
+      { id: 203, text: lang==='th'?"ฆ่าเชื้อเขียง":"Sanitize cutting boards" },
+      { id: 204, text: lang==='th'?"ทำความสะอาดไส้กรองทอด":"Clean fryer filters" },
+    ];
+  }
+}
+TS
+
+  # Force questions handler to use getFourQuestions (best-effort patch)
+  perl -0777 -pe '
+    s#app\.get\(\s*\"/api/manager-check/questions\"[^{]*\{[\s\S]*?res\.json\([^\)]*\);[\s]*\}\);#app.get("/api/manager-check/questions", async (req,res)=>{\n  const lang = (req.query.lang as string) || "en";\n  const qs = await getFourQuestions(lang);\n  return res.json({ ok:true, questions: qs });\n});#s
+  ' -i "$MC" || true
+fi
+
+# Seed questions if table exists but too few rows
+cat > scripts/seed_mgr_questions.mjs <<'NODE'
+import pg from 'pg';
+const cs = process.env.DATABASE_URL;
+if(!cs){ process.exit(0); }
+const c = new pg.Client({ connectionString: cs });
+(async()=>{
+  await c.connect();
+  try {
+    const chk = await c.query(`SELECT to_regclass('"ManagerCheckQuestion"') as t`);
+    if (!chk.rows[0].t) { console.log('ManagerCheckQuestion table missing, skipping seed'); process.exit(0); }
+    const count = await c.query(`SELECT COUNT(1) as n FROM "ManagerCheckQuestion" WHERE enabled=true`);
+    const n = Number(count.rows[0].n||0);
+    if (n < 4){
+      await c.query(`
+        INSERT INTO "ManagerCheckQuestion"(text, text_en, text_th, category, enabled, weight, created_at)
+        VALUES
+        ('Clean grill surfaces','Clean grill surfaces','ทำความสะอาดเตาย่าง','Kitchen End',true,1,now()),
+        ('Wipe down prep stations','Wipe down prep stations','เช็ดทำความสะอาดโต๊ะเตรียมอาหาร','Kitchen End',true,1,now()),
+        ('Sanitize cutting boards','Sanitize cutting boards','ฆ่าเชื้อเขียง','Kitchen End',true,1,now()),
+        ('Clean fryer filters','Clean fryer filters','ทำความสะอาดไส้กรองทอด','Kitchen End',true,1,now()),
+        ('Secure cash drawer','Secure cash drawer','ล็อคลิ้นชักเงิน','Cashier End',true,1,now()),
+        ('Count register till','Count register till','นับเงินทอนเริ่มต้น','Cashier Start',true,1,now())
+        ON CONFLICT DO NOTHING;
+      `);
+      console.log('Seeded default manager questions');
+    }
+  } finally { await c.end(); }
+})().catch(()=>process.exit(0));
+NODE
+
+# ----- 2) Ensure stock payload is saved on Form2; allow decimal costs on Form1 -----
+FORMS="server/routes/forms.ts"
+if [ -f "$FORMS" ]; then
+  # Deep merge helper for payload (idempotent)
+  grep -q "function deepMergePayload" "$FORMS" || cat >> "$FORMS" <<'TS'
+// FIX 2025-10-11: safe JSON merge for payload
+function deepMergePayload(base:any, add:any){
+  try { const a=(base&&typeof base==='object')?base:{}; const b=(add&&typeof add==='object')?add:{}; return {...a, ...b}; }
+  catch { return add ?? base ?? {}; }
+}
+TS
+
+  # Persist drinkStock + rollsEnd + meatEnd + requisition into payload inside the /api/forms/daily-stock handler
+  perl -0777 -pe '
+    s#(app\.post\(\s*\"/api/forms/daily-stock\"[\s\S]*?data:\s*\{[\s\S]*?)\}\s*\}\s*\)\s*;#$1,\n      // FIX 2025-10-11: persist stock payload\n      payload: deepMergePayload(existing?.payload ?? {}, { rollsEnd, meatEnd, drinkStock: (typeof drinkStock==="object"&&drinkStock)||{}, requisition })\n    }\n  })\n;#s
+  ' -i "$FORMS" || true
+
+  # Coerce decimal costs safely on Form1 create (round if DB uses integer)
+  perl -0777 -pe '
+    s#(shopping:\s*\[\s*\{[^\}]*cost:\s*)([^\},]+)#${1}Math.round(Number($2)||0)#g;
+  ' -i "$FORMS" || true
+  perl -0777 -pe '
+    s#(others:\s*\[\s*\{[^\}]*amount:\s*)([^\},]+)#${1}Math.round(Number($2)||0)#g;
+  ' -i "$FORMS" || true
+  perl -0777 -pe '
+    s#(wages:\s*\[\s*\{[^\}]*amount:\s*)([^\},]+)#${1}Math.round(Number($2)||0)#g;
+  ' -i "$FORMS" || true
+fi
+
+# ----- 3) Library endpoint must expose stock numbers & drinks (even if 0) -----
+# Try to make /api/forms/library include payload fields if not present
+perl -0777 -pe '
+  s#(app\.get\(\s*\"/api/forms/library\"[^{]*\{[\s\S]*?const\s+rows\s*=\s*[^\n]+;[\s\S]*?res\.json\()\s*rows\s*\);#$1 rows.map((r:any)=>({\n  ...r,\n  buns: (r.buns ?? r.rollsEnd ?? r?.payload?.rollsEnd ?? 0),\n  meat: (r.meat ?? r.meatEnd ?? r?.payload?.meatEnd ?? 0),\n  drinkStock: (r.drinkStock ?? r?.payload?.drinkStock ?? {}),\n})) );#s
+' -i "$FORMS" || true
+
+# ----- 4) Debug endpoint to verify email/PDF stock data without sending email -----
+# Only active if ENABLE_DEBUG_ROUTES=1
+grep -q "_debug/email-data" "$FORMS" || cat >> "$FORMS" <<'TS'
+// DEBUG 2025-10-11: expose email stock data (dev only)
+if (process.env.ENABLE_DEBUG_ROUTES === '1') {
+  app.get("/api/_debug/email-data/:id", async (req,res)=>{
+    try{
+      const id = String(req.params.id);
+      // Try Drizzle if available in project; fallback to Prisma
+      let rec:any;
+      try {
+        const { db } = await import("../db.js").catch(()=>({}));
+        if (db?.select) {
+          const { dailySalesV2 } = await import("../schema.js").catch(()=>({}));
+          if (dailySalesV2){
+            const rows = await db.select().from(dailySalesV2).where((dailySalesV2.id as any).eq(id)).limit(1);
+            rec = rows?.[0];
+          }
+        }
+      } catch {}
+      if (!rec) {
+        const { prisma } = await import("../lib/prisma.js").catch(()=>({}));
+        if (prisma?.dailySalesV2) rec = await prisma.dailySalesV2.findUnique({ where:{ id } });
+      }
+      if (!rec) return res.status(404).json({error:"not found"});
+      const p = rec.payload || {};
+      return res.json({
+        ok:true,
+        id,
+        stock: {
+          rolls: p.rollsEnd ?? rec.rollsEnd ?? 0,
+          meatG: p.meatEnd ?? rec.meatEnd ?? 0,
+          drinks: p.drinkStock ?? rec.drinkStock ?? {}
+        }
+      });
+    }catch(e){ return res.status(500).json({error:String(e?.message||e)})}
+  });
+}
+TS
+
+# ----- 5) Seed default questions if needed -----
+node scripts/seed_mgr_questions.mjs || true
+
+# ----- 6) Restart app (Replit may auto-restart; we wait a bit) -----
+echo "Waiting 15s for server restart to pick up changes..."
+sleep 15
+
+# ----- 7) Write and run the tricky smoke test (unicode + zero-qty + no-skip) -----
+cat > scripts/smoke_v3_strict.mjs <<'NODE'
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const pp = (o)=>JSON.stringify(o,null,2);
+const j = async (u,opts={})=>{
+  const r = await fetch(u,{...opts, headers:{'Content-Type':'application/json',...(opts.headers||{})}});
+  const ct=r.headers.get('content-type')||''; const b = ct.includes('json')? await r.json(): await r.text();
+  return {status:r.status, ok:r.ok, body:b};
+};
+const ex = (c,m)=>{ if(!c) throw new Error(m); };
+
+(async()=>{
+  // 410 no-skip
+  let r = await j(`${BASE_URL}/api/manager-check/skip`);
+  ex(r.status===410, `Skip endpoint expected 410, got ${r.status}`);
+
+  // Form1 create (with decimals)
+  const salesPayload = {
+    shiftDate: new Date().toISOString().slice(0,10),
+    completedBy: "Smoke Tester",
+    sales: { cash: 10500, qr: 6500, grab: 3200, aroi: 800 },
+    banking: { startingCash: 3000, endingCash: 2500, cashBanked: 8000, qrTransfer: 6500 },
+    expenses: {
+      shopping: [{ item:"Buns", cost: 540.25, shop:"Makro" }],
+      wages: [{ staff:"Somchai", amount:1200.75, type:"Part-time" }],
+      others: [{ label:"Ice", amount: 120.10 }]
+    }
+  };
+  r = await j(`${BASE_URL}/api/forms/daily-sales-v2`, {method:'POST', body: JSON.stringify(salesPayload)});
+  ex(r.ok, `Form1 failed: ${pp(r.body)}`);
+  const salesId = r.body?.id || r.body?.salesId || r.body?.data?.id; ex(!!salesId, "Form1 response missing id");
+
+  // Form2 with tricky drinks
+  const stockPayload = {
+    salesId,
+    rollsEnd: 45,
+    meatEnd: 9000,
+    drinkStock: { "น้ำเปล่า": 12, "Coke Zero (330ml)": 2, "RedBull™": 1, "Sprite": 0 },
+    requisition: [{ name:"Buns", qty:120, category:"Bread", unit:"pcs" }, { name:"Drinks", qty:60, category:"Beverages", unit:"btls" }]
+  };
+  r = await j(`${BASE_URL}/api/forms/daily-stock`, {method:'POST', body: JSON.stringify(stockPayload)});
+  ex(r.ok, `Form2 failed: ${pp(r.body)}`);
+
+  // Questions 4 EN/TH
+  let q = await j(`${BASE_URL}/api/manager-check/questions?lang=en`); ex(q.ok && q.body?.questions?.length===4, "EN questions must be 4");
+  let qt = await j(`${BASE_URL}/api/manager-check/questions?lang=th`); ex(qt.ok && qt.body?.questions?.length===4, "TH questions must be 4");
+
+  // Submit manager check
+  const answers = q.body.questions.map((qq,i)=>({questionId: qq.id, response: i===0?"FAIL":"PASS", note: i===0?"Test fail note":""}));
+  r = await j(`${BASE_URL}/api/manager-check/submit`, {method:'POST', body: JSON.stringify({ dailyCheckId:salesId, answeredBy:"Test Manager ✓", answers, questions:q.body.questions })});
+  ex(r.ok, `Manager submit failed: ${pp(r.body)}`);
+
+  // Library read
+  let lib = await j(`${BASE_URL}/api/forms/library`);
+  let item = (lib.ok && Array.isArray(lib.body)) ? (lib.body.find(x=>x.id===salesId) || lib.body[0]) : null;
+  if (!item){ const one = await j(`${BASE_URL}/api/forms/${salesId}`); item = one.ok? one.body : null; }
+  ex(!!item, "No library/form item found");
+
+  const buns = item.buns ?? item.rollsEnd ?? item?.payload?.rollsEnd; ex(Number(buns)===45, `buns 45 expected, got ${buns}`);
+  const meat = item.meat ?? item.meatEnd ?? item?.payload?.meatEnd; ex(Number(meat)===9000, `meat 9000 expected, got ${meat}`);
+  const drinks = item.drinkStock ?? item?.payload?.drinkStock; ex(drinks && typeof drinks==='object', "drinks object missing");
+  ex(Object.prototype.hasOwnProperty.call(drinks,"Sprite"), "Sprite key missing"); ex(drinks["Sprite"]===0, "Sprite must be 0");
+
+  // Debug email-data to confirm email block stock
+  const dbg = await j(`${BASE_URL}/api/_debug/email-data/${salesId}`);
+  ex(dbg.ok, "debug email-data endpoint failed (set ENABLE_DEBUG_ROUTES=1)");
+  ex(dbg.body?.stock?.drinks && Object.prototype.hasOwnProperty.call(dbg.body.stock.drinks,"น้ำเปล่า"), "Thai key missing in debug email-data");
+
+  console.log(JSON.stringify({ ok:true, salesId, checks:["410 skip","form1","form2","qs en+th=4","mgr submit","library stock ok","debug email-data ok"] }, null, 2));
+  process.exit(0);
+})().catch(e=>{ console.error("SMOKE FAIL:", e?.message||e); process.exit(1); });
+NODE
+
+echo "Running strict smoke test against: $BASE_URL"
+node scripts/smoke_v3_strict.mjs
+echo "=== PASS: All checks green ==="

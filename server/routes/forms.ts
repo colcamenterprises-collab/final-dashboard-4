@@ -36,24 +36,37 @@ router.get("/", async (req, res) => {
 // GET /api/forms/library - Get forms library (MUST be before /:id to avoid shadowing)
 router.get("/library", async (req, res) => {
   try {
-    // MEGA V3: Use Drizzle to get payload data
-    const forms = await drizzleDb
-      .select()
-      .from(dailySalesV2)
-      .where(sql`deleted_at IS NULL`)
-      .orderBy(sql`created_at DESC`)
-      .limit(20);
+    // MEGA V3: Use Drizzle to get payload data with raw SQL for testing
+    const forms = await drizzleDb.execute<{
+      id: string;
+      shiftDate: string | null;
+      completedBy: string | null;
+      createdAt: Date | null;
+      totalSales: number | null;
+      payload: any;
+    }>(sql`
+      SELECT id, "shiftDate", "completedBy", "createdAt", "totalSales", payload
+      FROM daily_sales_v2
+      WHERE "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
+      LIMIT 20
+    `);
 
+    // Extract rows from result
+    const rows = (forms as any).rows || forms;
+    console.log(`[GET /api/forms/library] Query returned ${rows.length} rows`);
+    console.log(`[GET /api/forms/library] First row payload:`, rows[0]?.payload);
+    
     // Normalize for frontend compatibility with payload support
-    const normalized = forms.map(form => {
-      const payload = form.payload || {};
+    const normalized = rows.map((form: any) => {
+      const payload = (form.payload as any) || {};
       return {
         id: form.id,
         shiftDate: form.shiftDate,
         completedBy: form.completedBy,
         createdAt: form.createdAt,
         totalSales: form.totalSales || 0,
-        balanced: form.balanced || false,
+        balanced: (form as any).balanced || false,
         // V3 payload fields
         rollsEnd: payload.rollsEnd,
         meatEnd: payload.meatEnd,
@@ -63,7 +76,7 @@ router.get("/library", async (req, res) => {
       };
     });
 
-    console.log(`[GET /api/forms/library] Returning ${normalized.length} forms with payload`);
+    console.log(`[GET /api/forms/library] Returning ${normalized.length} forms, first payload:`, normalized[0]?.payload);
     res.json(normalized);
   } catch (error) {
     console.error('Forms library error:', error);
@@ -137,15 +150,17 @@ router.post("/daily-stock", async (req, res) => {
     }
     
     // Update DailySalesV2 payload with stock data
+    const stockData = {
+      rollsEnd: Number(rollsEnd),
+      meatEnd: Number(meatEnd),
+      drinkStock,
+      requisition: requisition.filter((r: any) => (r.qty || 0) > 0)
+    };
+    
     const [updated] = await drizzleDb
       .update(dailySalesV2)
       .set({
-        payload: sql`payload || ${JSON.stringify({
-          rollsEnd: Number(rollsEnd),
-          meatEnd: Number(meatEnd),
-          drinkStock,
-          requisition: requisition.filter((r: any) => (r.qty || 0) > 0)
-        })}`
+        payload: sql`COALESCE(payload, '{}'::jsonb) || ${JSON.stringify(stockData)}::jsonb`
       })
       .where(sql`id = ${salesId}`)
       .returning();

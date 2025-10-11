@@ -3608,39 +3608,43 @@ app.use("/api/bank-imports", bankUploadRouter);
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
   
-  // FORT KNOX FIX: Add GET /api/forms/library endpoint 
+  // MEGA V3 PATCH: GET /api/forms/library - properly return payload for library display
   app.get('/api/forms/library', async (req: Request, res: Response) => {
     try {
       const { pool } = await import('./db');
       
-      // Get recent form submissions from daily_sales_v2
+      // Get recent form submissions - include all records even without payload
       const formsQuery = await pool.query(`
-        SELECT id, "shiftDate", "completedBy", "createdAt", payload
+        SELECT id, "shiftDate", "completedBy", "createdAt", "totalSales", payload
         FROM daily_sales_v2 
-        WHERE payload IS NOT NULL 
+        WHERE "deletedAt" IS NULL
         ORDER BY "createdAt" DESC 
         LIMIT 20
       `);
       
-      const forms = formsQuery.rows.map(form => ({
-        id: form.id,
-        shiftDate: form.shiftDate,
-        completedBy: form.completedBy,
-        createdAt: form.createdAt,
-        // Normalize jsonb fields to arrays for frontend compatibility
-        drinksEnd: form.payload?.drinkStock || [],
-        requisition: form.payload?.requisition?.filter((r: any) => r.qty > 0) || [],
-        expenses: form.payload?.expenses || [],
-        wages: form.payload?.wages || [],
-        totalSales: form.payload?.totalSales || 0,
-        balanced: form.payload?.balanced || false
-      }));
+      const forms = formsQuery.rows.map((form: any) => {
+        const payload = form.payload || {};
+        return {
+          id: form.id,
+          shiftDate: form.shiftDate,
+          completedBy: form.completedBy,
+          createdAt: form.createdAt,
+          totalSales: form.totalSales || 0,
+          balanced: payload.balanced || false,
+          // V3 payload fields for stock tracking
+          rollsEnd: payload.rollsEnd,
+          meatEnd: payload.meatEnd,
+          drinkStock: payload.drinkStock || {},
+          requisition: payload.requisition || [],
+          payload // Include full payload for debugging
+        };
+      });
       
-      console.log(`Forms library: returning ${forms.length} recent submissions`);
+      console.log(`[MEGA V3 LIBRARY] Returning ${forms.length} forms, first has payload:`, !!forms[0]?.payload);
       res.json(forms);
     } catch (error) {
       console.error('Forms library error:', error);
-      res.status(500).json({ error: 'Failed to fetch forms library: ' + error.message });
+      res.status(500).json({ error: 'Failed to fetch forms library: ' + (error as Error).message });
     }
   });
 
