@@ -113,35 +113,3 @@ router.get('/admin/questions', async (req, res) => {
 });
 
 export default router;
-import crypto from "crypto";
-// FIX 2025-10-11: ensure 4 questions always available (EN/TH)
-async function getFourQuestions(lang:string){
-  try {
-    const qs = await prisma.managerCheckQuestion.findMany({ where:{ enabled: true }, orderBy:{ id:'asc' } });
-    const defaults = [
-      { id: 101, text_en: "Clean grill surfaces", text_th: "ทำความสะอาดเตาย่าง" },
-      { id: 102, text_en: "Wipe down prep stations", text_th: "เช็ดทำความสะอาดโต๊ะเตรียมอาหาร" },
-      { id: 103, text_en: "Sanitize cutting boards", text_th: "ฆ่าเชื้อเขียง" },
-      { id: 104, text_en: "Clean fryer filters", text_th: "ทำความสะอาดไส้กรองทอด" },
-      { id: 105, text_en: "Secure cash drawer", text_th: "ล็อคลิ้นชักเงิน" },
-      { id: 106, text_en: "Count register till", text_th: "นับเงินทอนเริ่มต้น" }
-    ];
-    const pool = (qs?.length? qs : defaults).map(q=>({ id:q.id, en:q.text_en??q.text, th:q.text_th??q.text }));
-    const day = new Date().toISOString().slice(0,10);
-    const seed = crypto.createHash('sha256').update(day).digest('hex');
-    const sorted = [...pool].sort((a,b)=>{
-      const ha=crypto.createHash('sha256').update(seed+String(a.id)).digest('hex');
-      const hb=crypto.createHash('sha256').update(seed+String(b.id)).digest('hex');
-      return ha.localeCompare(hb);
-    });
-    const pick = sorted.slice(0,4);
-    return pick.map(q=>({ id:q.id, text: lang==='th'? (q.th||q.en): (q.en||q.th) }));
-  } catch (e){
-    return [
-      { id: 201, text: lang==='th'?"ทำความสะอาดเตาย่าง":"Clean grill surfaces" },
-      { id: 202, text: lang==='th'?"เช็ดทำความสะอาดโต๊ะเตรียมอาหาร":"Wipe down prep stations" },
-      { id: 203, text: lang==='th'?"ฆ่าเชื้อเขียง":"Sanitize cutting boards" },
-      { id: 204, text: lang==='th'?"ทำความสะอาดไส้กรองทอด":"Clean fryer filters" },
-    ];
-  }
-}

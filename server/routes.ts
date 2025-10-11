@@ -3648,6 +3648,28 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
 
+  // V3.1 TIDY: Canonical route for daily sales v3 (must be before router mounting)
+  app.post("/api/forms/daily-sales/v3", async (req, res) => {
+    // Delegate to the v2 handler (aliasing v2 as v3 for canonicalization)
+    try {
+      const { createDailySalesV2 } = await import("./forms/dailySalesV2.js");
+      return createDailySalesV2(req, res);
+    } catch (error) {
+      console.error("V3 route error:", error);
+      res.status(500).json({ error: "Failed to process v3 request" });
+    }
+  });
+  
+  // V3.1 TIDY: Block legacy endpoints with 410 Gone (must be before router mounting)
+  app.all([
+    "/api/forms/daily-sales-v2",      // dash version
+    "/api/forms/daily-sales/v2",      // slash version (from dailySalesV2Router)
+    "/api/daily-sales",
+    "/api/forms/daily-sales"
+  ], (_req, res) => {
+    res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
+  });
+  
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);
   app.use('/api/forms', formsRouter);
