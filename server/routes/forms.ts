@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { db } from "../lib/prisma";
+import { db as drizzleDb } from "../db"; // MEGA PATCH V3: Import Drizzle for payload support
+import { dailySalesV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema
 import { buildDailyReportPDF } from "../lib/pdf";
 import { sendDailyReportEmail } from "../lib/email";
 import fs from "fs";
+import crypto from "crypto"; // MEGA PATCH V3: For UUID generation
 
 const router = Router();
 
@@ -169,31 +172,49 @@ router.post("/daily-sales-v2", async (req, res) => {
     const totalExpenses = shoppingTotal + wagesTotal + othersTotal;
     const totalSales = body.sales?.totalSales || 0;
 
-    const form = await db().dailySalesV2.create({
-      data: {
-        shiftDate: body.shiftDate || new Date().toISOString().split('T')[0],
-        submittedAtISO: new Date(),
-        completedBy: body.completedBy,
-        startingCash: body.cashManagement?.startingCash || 0,
-        // Map closingCash from banking section to endingCash
-        endingCash: Number(
-          body.banking?.closingCash ??
-          body.cashManagement?.endingCash ??
-          0
-        ),
-        cashBanked: body.banking?.cashBanked || 0,
-        cashSales: body.sales?.cashSales || 0,
-        qrSales: body.sales?.qrSales || 0,
-        grabSales: body.sales?.grabSales || 0,
-        aroiSales: body.sales?.aroiSales || 0,
-        totalSales,
-        shoppingTotal,
-        wagesTotal,
-        othersTotal,
-        totalExpenses,
-        qrTransfer: body.banking?.qrTransfer || 0
-      }
+    // MEGA PATCH V3: Build payload with stock data
+    const payload = deepMergePayload({}, {
+      rollsEnd: body.rollsEnd || 0,
+      meatEnd: body.meatEnd || 0,
+      drinkStock: (typeof body.drinkStock === "object" && body.drinkStock) || {},
+      requisition: Array.isArray(body.requisition) ? body.requisition : [],
+      cashSales: body.cashSales || 0,
+      qrSales: body.qrSales || 0,
+      grabSales: body.grabSales || 0,
+      otherSales: body.otherSales || 0,
+      totalSales: body.totalSales || 0,
+      startingCash: body.startingCash || 0,
+      closingCash: body.closingCash || 0,
+      cashBanked: body.cashBanked || 0,
+      qrTransfer: body.qrTransfer || 0,
+      completedBy: body.completedBy
     });
+
+    // MEGA PATCH V3: Use Drizzle to insert with payload support
+    const [form] = await drizzleDb.insert(dailySalesV2).values({
+      id: crypto.randomUUID(),
+      shiftDate: body.shiftDate || new Date().toISOString().split('T')[0],
+      submittedAtISO: new Date(),
+      completedBy: body.completedBy,
+      startingCash: body.cashManagement?.startingCash || 0,
+      endingCash: Number(
+        body.banking?.closingCash ??
+        body.cashManagement?.endingCash ??
+        0
+      ),
+      cashBanked: body.banking?.cashBanked || 0,
+      cashSales: body.sales?.cashSales || 0,
+      qrSales: body.sales?.qrSales || 0,
+      grabSales: body.sales?.grabSales || 0,
+      aroiSales: body.sales?.aroiSales || 0,
+      totalSales,
+      shoppingTotal,
+      wagesTotal,
+      othersTotal,
+      totalExpenses,
+      qrTransfer: body.banking?.qrTransfer || 0,
+      payload // MEGA PATCH V3: Save payload as JSONB
+    }).returning();
 
     // Create related records
     if (shoppingItems.length > 0) {
@@ -497,5 +518,16 @@ router.post("/:id/complete", async (req, res) => {
   }
 });
 
+
+// MEGA PATCH: safe JSON merge
+function deepMergePayload(base:any, add:any){
+  try { const a = (base&&typeof base==='object')?base:{}; const b=(add&&typeof add==='object')?add:{}; return {...a,...b}; }
+  catch { return add ?? base ?? {}; }
+}
+
+/** MEGA PATCH: guard legacy daily-sales endpoints */
+router.all(["/daily-sales","/api/forms/daily-sales"], (_req, res) => {
+  res.status(410).json({ error: "Gone: use /api/forms/daily-sales-v2" });
+});
 
 export default router;

@@ -12,6 +12,10 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Eye, Printer, Download } from 'lucide-react';
 
+// MEGA PATCH V3: Safe number helpers
+const safeNumber = (v: any) => (v === 0 || typeof v === "number") ? v : (Number(v) || 0);
+const sumDrinks = (m: any) => Object.values(m || {}).map(Number).reduce((a, b) => a + (b || 0), 0);
+
 // THB formatting helper
 const thb = (v: unknown): string => {
   const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;

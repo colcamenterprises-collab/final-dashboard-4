@@ -84,3 +84,10 @@ export function renderStockCountsEmailBlock(stock: any) {
   ${drinks.length ? `<p><strong>Drinks</strong><br/>${drinksLines}</p>` : ''}
   `;
 }
+
+// MEGA PATCH: Stock block & drinks helper (for summary emails)
+export function renderDrinksEmailLines(drinks:any){
+  if (!drinks || typeof drinks !== 'object') return '';
+  const lines = Object.entries(drinks).map(([n,q])=>`• ${n}: ${q}`).join('<br/>');
+  return lines ? `<p><strong>Drinks</strong><br/>${lines}</p>` : '';
+}

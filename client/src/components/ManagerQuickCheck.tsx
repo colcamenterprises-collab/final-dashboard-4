@@ -20,6 +20,10 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
   const [skipReason, setSkipReason] = useState('');
 
   const lang = (i18n?.language || 'en').startsWith('th') ? 'th' : 'en';
+  
+  // MEGA PATCH V3: Validation helpers
+  const allAnswered = questions && questions.length > 0 && questions.every(q => answers?.[q.id]?.response);
+  const managerOk = (answeredBy || "").trim().length > 0;
 
   useEffect(() => {
     (async () => {
@@ -102,7 +106,6 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
     </div>
   );
 
-  const allAnswered = questions.every(q => answers[q.id]?.response);
   const canSubmit = answeredBy.trim() && (!required || allAnswered);
 
   return (

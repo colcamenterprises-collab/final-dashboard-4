@@ -138,6 +138,26 @@ export async function buildDailyReportPDF(opts: {
     doc.moveDown();
   }
 
+  // MEGA PATCH: Enhanced Stock Counts section
+  if (stock) {
+    try {
+      doc.moveDown().fontSize(12).text("Stock Counts (Enhanced)", { underline: true });
+      doc.fontSize(10);
+      doc.text(`Rolls: ${stock?.burgerBuns ?? 0}`);
+      doc.text(`Meat (g): ${stock?.meatWeightG ?? 0}`);
+      const _drinks = stock?.drinksJson ? Object.entries(stock.drinksJson as Record<string, number>) : [];
+      if (_drinks.length) { 
+        doc.text("Drinks:"); 
+        for (const [n,q] of _drinks) { 
+          doc.text(` • ${n}: ${q}`); 
+        } 
+      }
+      doc.moveDown();
+    } catch(e) { 
+      doc.moveDown().fontSize(10).text("Stock counts unavailable."); 
+    }
+  }
+
   doc.end();
   await new Promise<void>(resolve => stream.on("finish", () => resolve()));
   return file;
