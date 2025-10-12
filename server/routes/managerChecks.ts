@@ -6,7 +6,8 @@ import crypto from 'crypto';
 
 const router = Router();
 
-const REQUIRED = process.env.CHECKLIST_REQUIRED === 'true';
+// V3.1 TIDY: Manager check always required (no skipping allowed)
+const REQUIRED = true;
 
 // deterministic sample up to 4 questions by day + salesId
 function pickQuestions(questions: any[], salesId: number) {
