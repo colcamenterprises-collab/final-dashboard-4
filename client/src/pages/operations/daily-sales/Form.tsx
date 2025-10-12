@@ -186,8 +186,8 @@ export default function DailySales() {
         status: 'submitted'
       };
 
-      // Always call the canonical endpoint
-      const res = await fetch("/api/forms/daily-sales/v2", {
+      // Always call the canonical V3 endpoint
+      const res = await fetch("/api/forms/daily-sales/v3", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),
