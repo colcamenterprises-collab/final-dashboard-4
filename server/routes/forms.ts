@@ -49,7 +49,7 @@ router.get("/library", async (req, res) => {
       FROM daily_sales_v2
       WHERE "deletedAt" IS NULL
       ORDER BY "createdAt" DESC
-      LIMIT 20
+      LIMIT 500
     `);
 
     // Extract rows from result

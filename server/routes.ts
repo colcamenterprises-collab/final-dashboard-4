@@ -3660,13 +3660,25 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
   
-  // V3.1 TIDY: Block legacy endpoints with 410 Gone (must be before router mounting)
-  app.all([
+  // V3.1 TIDY: Block legacy WRITE endpoints with 410 Gone (allow GET for library compatibility)
+  const legacyRoutes = [
     "/api/forms/daily-sales-v2",      // dash version
     "/api/forms/daily-sales/v2",      // slash version (from dailySalesV2Router)
     "/api/daily-sales",
     "/api/forms/daily-sales"
-  ], (_req, res) => {
+  ];
+  
+  // Block POST/PUT/PATCH/DELETE but allow GET for backwards compatibility
+  app.post(legacyRoutes, (_req, res) => {
+    res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
+  });
+  app.put(legacyRoutes, (_req, res) => {
+    res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
+  });
+  app.patch(legacyRoutes, (_req, res) => {
+    res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
+  });
+  app.delete(legacyRoutes, (_req, res) => {
     res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
   });
   
