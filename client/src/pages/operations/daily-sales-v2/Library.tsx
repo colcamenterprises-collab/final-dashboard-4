@@ -406,15 +406,11 @@ export default function DailySalesV2Library() {
                   <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">M:{rec.meat}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {/* Balance Status - Prominent Box */}
+                  {/* Balance Status - Styled Badge like Home Screen */}
                   {rec.payload?.balanced ? (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded flex items-center justify-center">
-                      <span className="text-white font-bold text-sm sm:text-base">✓</span>
-                    </div>
+                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-green-500 text-white whitespace-nowrap">Balanced</span>
                   ) : (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 rounded flex items-center justify-center">
-                      <span className="text-white font-bold text-sm sm:text-base">✗</span>
-                    </div>
+                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-red-500 text-white whitespace-nowrap">Unbalanced</span>
                   )}
                   {/* Only show Draft status - submitted is default */}
                   {rec.deletedAt ? (
