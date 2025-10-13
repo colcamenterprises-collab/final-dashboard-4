@@ -61,9 +61,8 @@ export default function DailySalesAnalysis() {
 
       {/* Desktop Table */}
       {!isLoading && rows.length > 0 && (
-        <div className="overflow-x-auto -mx-4 sm:-mx-6" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-          <div className="inline-block min-w-full align-middle px-4 sm:px-6">
-            <table className="min-w-full border-collapse text-xs sm:text-sm">
+        <div className="overflow-x-scroll" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' } as React.CSSProperties}>
+          <table style={{ minWidth: '1400px' }} className="border-collapse text-xs sm:text-sm">
             <thead>
               <tr className="bg-gray-100 border-b">
                 <th className="px-2 py-2 text-left">Date</th>
@@ -112,7 +111,6 @@ export default function DailySalesAnalysis() {
               ))}
             </tbody>
           </table>
-          </div>
         </div>
       )}
     </div>
