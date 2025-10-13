@@ -966,8 +966,18 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // CSV export disabled - daily_shift_summary table does not exist
-  // app.use('/api/analysis/daily-sales', analysisDailySales);
+  // CSV export disabled - stub endpoint returns error message
+  app.get("/api/analysis/daily-sales", (req, res) => {
+    return res.status(503).json({ 
+      error: "CSV export not available - daily_shift_summary table does not exist" 
+    });
+  });
+
+  app.get("/api/analysis/daily-sales/export.csv", (req, res) => {
+    return res.status(503).json({ 
+      error: "CSV export not available - daily_shift_summary table does not exist" 
+    });
+  });
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
