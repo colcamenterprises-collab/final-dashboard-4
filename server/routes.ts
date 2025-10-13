@@ -12,7 +12,8 @@ import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import analyticsRoutes from "./routes/analytics";
 import analysisShift from "./routes/analysisShift";
-import analysisDailySales from "./routes/analysisDailySales";
+// CSV export disabled - daily_shift_summary table does not exist
+// import analysisDailySales from "./routes/analysisDailySales";
 import posLive from "./routes/posLive";
 import posItems from "./routes/posItems";
 import posUsage from "./routes/posUsage";
@@ -965,8 +966,8 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Mount daily-sales analysis router BEFORE generic :date route to avoid conflicts
-  app.use('/api/analysis/daily-sales', analysisDailySales);
+  // CSV export disabled - daily_shift_summary table does not exist
+  // app.use('/api/analysis/daily-sales', analysisDailySales);
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {

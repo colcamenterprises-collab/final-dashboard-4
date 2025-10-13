@@ -36,7 +36,6 @@ import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
-import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 // Legacy component moved to archive
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
@@ -121,8 +120,7 @@ export default function App() {
 
                   {/* All Analysis Pages */}
                   <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
-                  <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
-                  {/* Legacy route disabled - component moved to archive */}
+                  {/* CSV export disabled - daily_shift_summary table does not exist */}
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>

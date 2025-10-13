@@ -52,7 +52,6 @@ const navigationGroups: NavGroup[] = [
         subItems: [
           { to: "/operations/analysis/loyverse", label: "Loyverse Reports", icon: BarChart3, testId: "nav-loyverse" },
           { to: "/operations/analysis/daily-shift-analysis", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-daily-shift-analysis" },
-          { to: "/analysis/daily-sales", label: "Daily Sales Analysis", icon: BarChart3, testId: "nav-daily-sales-analysis" },
           { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-shift-summary" },
           { to: "/operations/analysis/stock-review", label: "Stock Review", icon: BarChart3, testId: "nav-stock-review" }
         ]
