@@ -965,6 +965,9 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
+  // Mount daily-sales analysis router BEFORE generic :date route to avoid conflicts
+  app.use('/api/analysis/daily-sales', analysisDailySales);
+
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
     const date = req.params.date;
@@ -3199,7 +3202,6 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
-  app.use('/api/analysis/daily-sales', analysisDailySales);
   
   // Register Daily Sales Library routes
   app.use('/api/daily-sales', dailySalesLibrary);
