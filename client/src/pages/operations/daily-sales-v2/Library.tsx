@@ -408,9 +408,9 @@ export default function DailySalesV2Library() {
                 <div className="flex items-center gap-1.5">
                   {/* Balance Status - Styled Badge like Home Screen */}
                   {rec.payload?.balanced ? (
-                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-green-500 text-white whitespace-nowrap">Balanced</span>
+                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-green-500 text-white whitespace-nowrap w-[85px] sm:w-[95px] text-center">Balanced</span>
                   ) : (
-                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-red-500 text-white whitespace-nowrap">Unbalanced</span>
+                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-red-500 text-white whitespace-nowrap w-[85px] sm:w-[95px] text-center">Unbalanced</span>
                   )}
                   {/* Only show Draft status - submitted is default */}
                   {rec.deletedAt ? (
