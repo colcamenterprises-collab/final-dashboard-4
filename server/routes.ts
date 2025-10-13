@@ -966,11 +966,48 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // CSV export disabled - stub endpoint returns error message
-  app.get("/api/analysis/daily-sales", (req, res) => {
-    return res.status(503).json({ 
-      error: "CSV export not available - daily_shift_summary table does not exist" 
-    });
+  // Daily Sales Analysis - Pull data from daily_sales_v2
+  app.get("/api/analysis/daily-sales", async (req, res) => {
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const forms = await prisma.dailySalesV2.findMany({
+        where: {
+          deletedAt: null
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 50
+      });
+
+      const rows = forms.map((f: any) => {
+        const payload = f.payload || {};
+        return {
+          id: f.id,
+          shift_date: f.shiftDate || 'N/A',
+          completed_by: f.completedBy || 'Unknown',
+          total_sales: f.totalSales || 0,
+          cash_sales: f.cashSales || 0,
+          qr_sales: f.qrSales || 0,
+          grab_sales: f.grabSales || 0,
+          aroi_sales: f.aroiSales || 0,
+          shopping_total: f.shoppingTotal || 0,
+          wages_total: f.wagesTotal || 0,
+          others_total: f.othersTotal || 0,
+          total_expenses: f.totalExpenses || 0,
+          rolls_end: payload?.cash_management?.burger_buns_end || 0,
+          meat_end_g: payload?.cash_management?.meat_count_end_g || 0
+        };
+      });
+
+      await prisma.$disconnect();
+      return res.json(rows);
+    } catch (error: any) {
+      console.error('Error fetching daily sales:', error);
+      return res.status(500).json({ error: error.message });
+    }
   });
 
   app.get("/api/analysis/daily-sales/export.csv", (req, res) => {
