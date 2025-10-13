@@ -254,12 +254,12 @@ export default function DailySalesV2Library() {
   return (
     <div className="p-3 md:p-6">
       {/* Header - Mobile Responsive */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
         <h1 className="text-xl md:text-2xl font-extrabold font-[Poppins]">
           Daily Sales Library (V2)
         </h1>
         <button
-          className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm sm:text-base w-full sm:w-auto"
+          className="px-2 py-1 sm:px-3 sm:py-2 bg-gray-200 hover:bg-gray-300 rounded text-xs sm:text-sm"
           onClick={() => setShowArchived(!showArchived)}
         >
           {showArchived ? "Show Active" : "Show Archived"}
@@ -396,26 +396,32 @@ export default function DailySalesV2Library() {
             <div key={rec.id} className="bg-white border border-gray-200 rounded-lg p-2 sm:p-3 shadow-sm">
               {/* Compact Info Row */}
               <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                   <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
                     {new Date(rec.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
                   </span>
                   <span className="text-gray-600 text-xs truncate">{rec.staff}</span>
                   <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">{thb(rec.totalSales)}</span>
-                  <span className="text-gray-500 text-xs whitespace-nowrap">R:{rec.buns}</span>
-                  <span className="text-gray-500 text-xs whitespace-nowrap">M:{rec.meat}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">R:{rec.buns}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">M:{rec.meat}</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  {/* Balance Status - Prominent Box */}
                   {rec.payload?.balanced ? (
-                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-green-100 text-green-700 whitespace-nowrap">✓</span>
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded flex items-center justify-center">
+                      <span className="text-white font-bold text-sm sm:text-base">✓</span>
+                    </div>
                   ) : (
-                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700 whitespace-nowrap">✗</span>
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 rounded flex items-center justify-center">
+                      <span className="text-white font-bold text-sm sm:text-base">✗</span>
+                    </div>
                   )}
+                  {/* Only show Draft status - submitted is default */}
                   {rec.deletedAt ? (
                     <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">Arc</span>
-                  ) : (
-                    <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">{rec.status}</span>
-                  )}
+                  ) : rec.status === 'Draft' ? (
+                    <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">Draft</span>
+                  ) : null}
                 </div>
               </div>
 
