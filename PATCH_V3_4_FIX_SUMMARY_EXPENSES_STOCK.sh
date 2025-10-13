@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== V3.4: Fix summary builder for expenses + rolls/meat & backfill ==="
+
+# 1) SQL: make sure summary columns exist (idempotent) -------------------------
+cat > server/migrations/20251014_fix_summary_columns.sql <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='shopping_total'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN shopping_total DECIMAL(10,2) DEFAULT 0; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='wages_total'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN wages_total DECIMAL(10,2) DEFAULT 0; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='others_total'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN others_total DECIMAL(10,2) DEFAULT 0; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='total_expenses'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN total_expenses DECIMAL(10,2) DEFAULT 0; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='rolls_end'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN rolls_end INTEGER DEFAULT 0; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='daily_shift_summary' AND column_name='meat_end_g'
+  ) THEN ALTER TABLE daily_shift_summary ADD COLUMN meat_end_g INTEGER DEFAULT 0; END IF;
+END $$;
+SQL
+
+# run migrations (your repo already has a runner; fall back to psql if needed)
+if [ -f scripts/run-migrations.mjs ]; then
+  node scripts/run-migrations.mjs
+else
+  echo "!! No migration runner found; skipping (DB may already be correct)"
+fi
+
+# 2) Robust summary extractor --------------------------------------------------
+# Reads from daily_sales_v2.payload and normalizes keys/types across V2/V3
+mkdir -p server/services
+cat > server/services/summaryExtract.ts <<'TS'
+import { z } from "zod";
+
+const Num = (v:any) => {
+  if (v === null || v === undefined) return 0;
+  const n = Number(String(v).replace(/[^0-9.-]/g,""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+export type SummaryPick = {
+  totalSales: number;
+  cashSales: number;
+  qrSales: number;
+  grabSales: number;
+  otherSales: number;        // payments: "Other (Sales)"
+  shoppingTotal: number;     // expenses
+  wagesTotal: number;
+  othersTotal: number;
+  totalExpenses: number;
+  rollsEnd: number;
+  meatEnd: number;
+};
+
+export function extractSummary(payload:any): SummaryPick {
+  const p = payload || {};
+
+  // tolerate legacy/typos/case
+  const get = (keys:string[], fallback=0) => {
+    for (const k of keys) if (p[k] !== undefined) return Num(p[k]);
+    return fallback;
+  };
+
+  const totalSales    = get(["totalSales","total_sales"], 0);
+  const cashSales     = get(["cashSales","cash_sales"], 0);
+  const qrSales       = get(["qrSales","qr_sales"], 0);
+  const grabSales     = get(["grabSales","grab_sales"], 0);
+  const otherSales    = get(["otherSales","aroiSales","other_sales"], 0);
+
+  const shoppingTotal = get(["shoppingTotal","shopping_total"], 0);
+  const wagesTotal    = get(["wagesTotal","wages_total"], 0);
+  const othersTotal   = get(["othersTotal","other_expenses","others_total"], 0);
+
+  // prefer provided total; else recompute
+  const totalExpenses = get(["totalExpenses","total_expenses"], shoppingTotal + wagesTotal + othersTotal);
+
+  const rollsEnd      = Math.max(0, Math.trunc(get(["rollsEnd","buns","burgerBuns","rolls_end"], 0)));
+  const meatEnd       = Math.max(0, Math.trunc(get(["meatEnd","meatWeightG","meat_end_g"], 0)));
+
+  return { totalSales, cashSales, qrSales, grabSales, otherSales,
+           shoppingTotal, wagesTotal, othersTotal, totalExpenses,
+           rollsEnd, meatEnd };
+}
+TS
+
+# 3) Wire extractor into the summary builder/upserter --------------------------
+# (works for both backfill and live write)
+if grep -q "upsertDailyShiftSummary" server/services/shiftSummary.ts 2>/dev/null; then
+  perl -0777 -pe '
+    s#(import .*? from .*?;[\r\n]*)#${1}import { extractSummary } from "./summaryExtract.js";\n#s;
+    s#const payload\s*=([\s\S]*?);#const payload = $1;#s;
+
+    # Replace any ad-hoc mapping with normalized extract
+    s#(const\s+summary\s*=\s*\{)[\s\S]*?(\};)#const summary = ((): any => {\n  const pick = extractSummary(payload);\n  return {\n    total_sales: pick.totalSales,\n    cash_sales: pick.cashSales,\n    qr_sales: pick.qrSales,\n    grab_sales: pick.grabSales,\n    other_sales: pick.otherSales,\n    shopping_total: pick.shoppingTotal,\n    wages_total: pick.wagesTotal,\n    others_total: pick.othersTotal,\n    total_expenses: pick.totalExpenses,\n    rolls_end: pick.rollsEnd,\n    meat_end_g: pick.meatEnd\n  };\n})()#s;
+  ' -i server/services/shiftSummary.ts || true
+fi
+
+# 4) Backfill recent data from daily_sales_v2 ----------------------------------
+mkdir -p scripts
+cat > scripts/rebuild_shift_summary_last_60d.mjs <<'JS'
+import { db } from "../server/db.js";
+import { sql } from "drizzle-orm";
+import { extractSummary } from "../server/services/summaryExtract.js";
+
+const res = await db.execute(sql.raw(`
+  SELECT id, "shiftDate", payload, "completedBy", "createdAt"
+  FROM daily_sales_v2
+  WHERE "createdAt" >= NOW() - INTERVAL '60 days'
+    AND "deletedAt" IS NULL
+  ORDER BY "createdAt" ASC
+`));
+const rows = res.rows || [];
+let up = 0;
+
+for (const r of rows) {
+  const p = r.payload || {};
+  const pick = extractSummary(p);
+  await db.execute(sql.raw(`
+    INSERT INTO daily_shift_summary AS s
+      (id, shift_date, completed_by, created_at,
+       total_sales, cash_sales, qr_sales, grab_sales, other_sales,
+       shopping_total, wages_total, others_total, total_expenses,
+       rolls_end, meat_end_g, deleted_at)
+    VALUES
+      ($1,$2,$3,$4,
+       $5,$6,$7,$8,$9,
+       $10,$11,$12,$13,
+       $14,$15,NULL)
+    ON CONFLICT (id) DO UPDATE SET
+       shift_date      = EXCLUDED.shift_date,
+       completed_by    = EXCLUDED.completed_by,
+       created_at      = EXCLUDED.created_at,
+       total_sales     = EXCLUDED.total_sales,
+       cash_sales      = EXCLUDED.cash_sales,
+       qr_sales        = EXCLUDED.qr_sales,
+       grab_sales      = EXCLUDED.grab_sales,
+       other_sales     = EXCLUDED.other_sales,
+       shopping_total  = EXCLUDED.shopping_total,
+       wages_total     = EXCLUDED.wages_total,
+       others_total    = EXCLUDED.others_total,
+       total_expenses  = EXCLUDED.total_expenses,
+       rolls_end       = EXCLUDED.rolls_end,
+       meat_end_g      = EXCLUDED.meat_end_g,
+       deleted_at      = NULL
+  `), [
+    r.id,
+    r.shiftDate,
+    r.completedBy,
+    r.createdAt,
+    pick.totalSales, pick.cashSales, pick.qrSales, pick.grabSales, pick.otherSales,
+    pick.shoppingTotal, pick.wagesTotal, pick.othersTotal, pick.totalExpenses,
+    pick.rollsEnd, pick.meatEnd
+  ]);
+  up++;
+}
+console.log(`Backfill complete: ${up} rows updated`);
+process.exit(0);
+JS
+
+# run backfill
+node scripts/rebuild_shift_summary_last_60d.mjs || true
+
+# 5) Frontend: ensure columns are present (tiny guard; idempotent) -------------
+PAGE="client/src/pages/analysis/DailySalesAnalysis.tsx"
+if [ -f "$PAGE" ]; then
+  # headers for rolls/meat/expenses
+  perl -0777 -pe '
+    s#(<th className="px-2 py-2 text-right">Grab</th>)#${1}\n              <th className="px-2 py-2 text-right">Other (Sales)</th># unless /Other \(Sales\)<\/th>/;
+    s#(>Other \(Sales\)<\/th>)#${1}\n              <th className="px-2 py-2 text-right">Shopping</th>\n              <th className="px-2 py-2 text-right">Wages</th>\n              <th className="px-2 py-2 text-right">Other</th>\n              <th className="px-2 py-2 text-right">Expenses</th>\n              <th className="px-2 py-2 text-right">Rolls</th>\n              <th className="px-2 py-2 text-right">Meat (g)</th># unless /Shopping<\/th>[\s\S]*Meat \(g\)<\/th>/s;
+
+    # row cells (after grab)
+    s#(\{fmt\(r\.grab_sales\)\}\)<\/td>\n)#${1}                <td className="px-2 py-2 text-right">{fmt(r.other_sales)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.shopping_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.wages_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.others_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.total_expenses)}</td>\n                <td className="px-2 py-2 text-right">{r.rolls_end}</td>\n                <td className="px-2 py-2 text-right">{r.meat_end_g}</td>\n# unless /fmt\(r\.other_sales\)/;
+  ' -i "$PAGE" || true
+fi
+
+# 6) Quick smoke via API -------------------------------------------------------
+echo "— API sample:"
+curl -s "${BASE_URL:-http://localhost:5000}/api/analysis/daily-sales?limit=3" | jq '[.[0] | {date: .shift_date, total: .total_sales, shopping: .shopping_total, wages: .wages_total, otherSales: .other_sales, rolls: .rolls_end, meat_g: .meat_end_g}]'
+
+echo "=== V3.4 applied. Refresh the page; values should be populated. ==="

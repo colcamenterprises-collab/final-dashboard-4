@@ -984,6 +984,18 @@ export function registerRoutes(app: express.Application): Server {
 
       const rows = forms.map((f: any) => {
         const payload = f.payload || {};
+        
+        // Calculate totals from arrays if direct values not available
+        const calculateTotal = (arr: any[], field = 'amount') => {
+          if (!Array.isArray(arr)) return 0;
+          return arr.reduce((sum, item) => sum + (Number(item[field]) || 0), 0);
+        };
+        
+        const shoppingTotal = payload.shoppingTotal || calculateTotal(payload.expenses, 'cost') || f.shoppingTotal || 0;
+        const wagesTotal = payload.wagesTotal || calculateTotal(payload.wages) || f.wagesTotal || 0;
+        const othersTotal = payload.othersTotal || f.othersTotal || 0;
+        const totalExpenses = payload.totalExpenses || shoppingTotal + wagesTotal + othersTotal || f.totalExpenses || 0;
+        
         return {
           id: f.id,
           shift_date: f.shiftDate || 'N/A',
@@ -993,10 +1005,10 @@ export function registerRoutes(app: express.Application): Server {
           qr_sales: payload.qrSales || f.qrSales || 0,
           grab_sales: payload.grabSales || f.grabSales || 0,
           aroi_sales: payload.otherSales || f.aroiSales || 0,
-          shopping_total: payload.shoppingTotal || f.shoppingTotal || 0,
-          wages_total: payload.wagesTotal || f.wagesTotal || 0,
-          others_total: payload.othersTotal || f.othersTotal || 0,
-          total_expenses: payload.totalExpenses || f.totalExpenses || 0,
+          shopping_total: shoppingTotal,
+          wages_total: wagesTotal,
+          others_total: othersTotal,
+          total_expenses: totalExpenses,
           rolls_end: payload.rollsEnd || 0,
           meat_end_g: payload.meatEnd || 0
         };

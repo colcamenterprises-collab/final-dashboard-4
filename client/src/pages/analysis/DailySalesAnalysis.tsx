@@ -71,6 +71,11 @@ export default function DailySalesAnalysis() {
                 <th className="px-2 py-2 text-right">Cash</th>
                 <th className="px-2 py-2 text-right">QR</th>
                 <th className="px-2 py-2 text-right">Grab</th>
+                <th className="px-2 py-2 text-right">Other</th>
+                <th className="px-2 py-2 text-right">Shopping</th>
+                <th className="px-2 py-2 text-right">Wages</th>
+                <th className="px-2 py-2 text-right">Other Exp</th>
+                <th className="px-2 py-2 text-right">Tot Exp</th>
                 <th className="px-2 py-2 text-right">Rolls</th>
                 <th className="px-2 py-2 text-right">Meat (g)</th>
                 <th className="px-2 py-2 text-right">Export</th>
@@ -85,6 +90,11 @@ export default function DailySalesAnalysis() {
                   <td className="px-2 py-2 text-right">{r.cash_sales.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right">{r.qr_sales.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right">{r.grab_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{r.aroi_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{r.shopping_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{r.wages_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{r.others_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{r.total_expenses.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right">{r.rolls_end}</td>
                   <td className="px-2 py-2 text-right">{r.meat_end_g}</td>
                   <td className="px-2 py-2 text-right">
