@@ -12,6 +12,7 @@ import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import analyticsRoutes from "./routes/analytics";
 import analysisShift from "./routes/analysisShift";
+import analysisDailySales from "./routes/analysisDailySales";
 import posLive from "./routes/posLive";
 import posItems from "./routes/posItems";
 import posUsage from "./routes/posUsage";
@@ -3198,6 +3199,7 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
+  app.use('/api/analysis/daily-sales', analysisDailySales);
   
   // Register Daily Sales Library routes
   app.use('/api/daily-sales', dailySalesLibrary);

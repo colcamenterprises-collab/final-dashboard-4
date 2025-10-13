@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+: "${BASE_URL:=http://localhost:3000}"
+
+echo "=== V3.3A: CSV export for Daily Shift Summary (by id / by date) ==="
+
+[ -d server ] || { echo "Run this from repo root (missing /server)"; exit 1; }
+
+# 1) Extend analysis route with CSV export
+ANAL="server/routes/analysisDailySales.ts"
+if ! grep -q "export.csv" "$ANAL"; then
+  cat >> "$ANAL" <<'TS'
+
+// ---------- CSV EXPORT ----------
+// GET /api/analysis/daily-sales/export.csv?id=<uuid>
+// GET /api/analysis/daily-sales/export.csv?date=YYYY-MM-DD
+import { db } from "../db.js";
+import { sql } from "drizzle-orm";
+
+function csvEscape(v:any){
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+
+router.get("/export.csv", async (req, res) => {
+  const id = (req.query.id as string) || "";
+  const date = (req.query.date as string) || "";
+
+  if (!id && !date) {
+    return res.status(400).json({ error: "Provide id or date (YYYY-MM-DD)" });
+  }
+
+  // 1) Load drink label map (stable order)
+  const lblRows = await db.execute(sql.raw(`
+    SELECT col_name, label FROM daily_shift_drink_labels ORDER BY label ASC, col_name ASC
+  `));
+  const labels = (lblRows as any).rows || [];
+
+  // 2) Build fixed columns (in order)
+  const fixedCols = [
+    "shift_date","completed_by","total_sales",
+    "cash_sales","qr_sales","grab_sales","aroi_sales",
+    "shopping_total","wages_total","others_total","total_expenses",
+    "rolls_end","meat_end_g"
+  ];
+
+  // Build SELECT column list dynamically: fixed + drink cols
+  const drinkCols = labels.map((l:any)=>l.col_name);
+  const selectCols = ["id", ...fixedCols, ...drinkCols];
+
+  // 3) Fetch rows
+  let qText = `SELECT ${selectCols.map(c=>`"${c}"`).join(",")}
+               FROM daily_shift_summary
+               WHERE deleted_at IS NULL `;
+  const args:any[] = [];
+  if (id) { qText += ` AND id = $1`; args.push(id); }
+  if (date) { qText += id ? ` AND shift_date = $2` : ` AND shift_date = $1`; args.push(date); }
+  qText += ` ORDER BY shift_date DESC, created_at DESC`;
+
+  const resRows = await db.execute(sql.raw(qText), args as any);
+  const rows = (resRows as any).rows || [];
+  if (!rows.length) {
+    return res.status(404).json({ error: "No matching rows" });
+  }
+
+  // 4) CSV header: friendly labels
+  const header = [
+    "ID","Date","Completed By","Total",
+    "Cash","QR","Grab","Aroi",
+    "Shopping","Wages","Other","Expenses",
+    "Rolls","Meat (g)",
+    ...labels.map((l:any)=> l.label)
+  ];
+
+  // 5) Build CSV lines
+  const out: string[] = [];
+  out.push(header.map(csvEscape).join(","));
+
+  for (const r of rows) {
+    const line = [
+      r.id,
+      r.shift_date,
+      r.completed_by,
+      r.total_sales,
+      r.cash_sales,
+      r.qr_sales,
+      r.grab_sales,
+      r.aroi_sales,
+      r.shopping_total,
+      r.wages_total,
+      r.others_total,
+      r.total_expenses,
+      r.rolls_end,
+      r.meat_end_g,
+      ...drinkCols.map(c => r[c] ?? 0)
+    ];
+    out.push(line.map(csvEscape).join(","));
+  }
+
+  const csv = out.join("\n");
+  const fname = id ? `daily_shift_${id}.csv` : `daily_shift_${date}.csv`;
+  res.setHeader("Content-Type","text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+  return res.send(csv);
+});
+TS
+fi
+
+# 2) Add Export UI to analysis page (row-level link + date export)
+PAGE="client/src/pages/analysis/DailySalesAnalysis.tsx"
+if [ -f "$PAGE" ]; then
+  # Insert Export column if not already present
+  if ! grep -q "Export CSV" "$PAGE"; then
+    perl -0777 -pe '
+      s#(<thead[^>]*>[\s\S]*?<tr[^>]*>)([\s\S]*?</tr>)([\s\S]*?</thead>)#${1}$2<th class="px-2 py-2 text-right">Export</th>${3}#s;
+      s#(<tbody>[\s\S]*?{rows\.map\([^)]*\)\s*=>\s*\()(<tr[^>]*>)([\s\S]*?</tr>)#${1}$2$3<td class="px-2 py-2 text-right"><a class="underline text-xs" href={"/api/analysis/daily-sales/export.csv?id="+r.id} target="_blank" rel="noreferrer">Export CSV</a></td></tr>#s;
+    ' -i "$PAGE" || true
+
+    # Add date export control near header if not present
+    if ! grep -q "export-by-date" "$PAGE"; then
+      perl -0777 -pe '
+        s#(<h1[^>]*>Daily Sales Analysis</h1>)#${1}\n<div className="mt-2 mb-3 flex items-center gap-2 text-xs"><input id="export-by-date" type="date" className="border rounded px-2 py-1" /><button onClick={() => { const v=(document.getElementById("export-by-date") as HTMLInputElement)?.value; if(v){ window.open(`/api/analysis/daily-sales/export.csv?date=${v}`,"_blank"); } }} className="border rounded px-2 py-1">Export by Date (CSV)</button></div>#;
+      ' -i "$PAGE" || true
+    fi
+  fi
+fi
+
+# 3) Quick sanity checks (optional)
+echo "— Row export (if any rows exist)…"
+curl -s "$BASE_URL/api/analysis/daily-sales?limit=1" | jq -r '.[0].id' 2>/dev/null | while read -r ID; do
+  [ -n "$ID" ] && curl -sI "$BASE_URL/api/analysis/daily-sales/export.csv?id=$ID" | grep -i content-disposition || true
+done
+
+echo "— Date export (if a recent date exists)…"
+curl -s "$BASE_URL/api/analysis/daily-sales?limit=1" | jq -r '.[0].shift_date' 2>/dev/null | while read -r ID; do
+  [ -n "$ID" ] && curl -sI "$BASE_URL/api/analysis/daily-sales/export.csv?date=$ID" | grep -i content-disposition || true
+done
+
+echo "=== CSV export endpoints & UI added. ==="
