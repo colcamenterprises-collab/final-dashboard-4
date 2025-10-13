@@ -110,19 +110,19 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl my-2 sm:my-4 p-4 sm:p-6 md:p-8 max-h-[95vh] overflow-y-auto">
+      <div className="bg-white rounded-xl sm:rounded-2xl w-full max-w-4xl my-2 sm:my-4 p-3 sm:p-4 md:p-6 max-h-[95vh] overflow-y-auto">
         <LanguageToggle />
-        <div className="text-lg sm:text-xl md:text-2xl font-semibold mb-4 sm:mb-6 text-center">{t('managerCheck.title')}</div>
+        <div className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-center">{t('managerCheck.title')}</div>
 
         {loading ? (
-          <div className="text-center text-lg py-8">Loading…</div>
+          <div className="text-center text-sm py-4">Loading…</div>
         ) : status === 'UNAVAILABLE' ? (
-          <div className="space-y-6">
-            <div className="p-4 bg-yellow-100 rounded-lg text-center text-lg">{t('managerCheck.unavailable')}</div>
+          <div className="space-y-3">
+            <div className="p-3 bg-yellow-100 rounded-lg text-center text-sm">{t('managerCheck.unavailable')}</div>
             <div className="flex justify-center">
               <button 
                 type="button"
-                className="px-8 py-4 text-lg rounded-lg border-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 min-h-[48px]" 
+                className="px-6 py-2 text-sm rounded-lg border-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 min-h-[44px]" 
                 onClick={() => onDone({ status: 'UNAVAILABLE' })}
                 data-testid="button-continue"
               >
@@ -131,11 +131,11 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             </div>
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-4 md:space-y-6">
-            <div className="grid gap-3 sm:gap-4 md:gap-6">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="grid gap-3 sm:gap-4">
               {questions.map(q => (
-                <div key={q.id} className="border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 bg-gray-50">
-                  <div className="font-semibold text-sm sm:text-base md:text-lg mb-2 sm:mb-3 md:mb-4">{q.text}</div>
+                <div key={q.id} className="border-2 rounded-lg p-3 sm:p-4 bg-gray-50">
+                  <div className="font-semibold text-sm sm:text-base mb-2 sm:mb-3">{q.text}</div>
                   
                   {/* Touch-friendly button group for responses */}
                   <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -165,7 +165,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                           `}>
                             {isSelected && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full" />}
                           </div>
-                          <span className={`text-sm sm:text-base md:text-lg font-medium ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                          <span className={`text-xs sm:text-sm font-medium ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
                             {t(`managerCheck.${opt.toLowerCase()}`)}
                           </span>
                         </button>
@@ -175,7 +175,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
 
                   {/* Optional note */}
                   <textarea 
-                    className="w-full border-2 rounded-lg p-2 sm:p-3 md:p-4 text-sm sm:text-base md:text-lg min-h-[60px] sm:min-h-[70px] md:min-h-[80px] focus:outline-none focus:border-blue-500"
+                    className="w-full border-2 rounded-lg p-2 sm:p-3 text-xs sm:text-sm min-h-[60px] focus:outline-none focus:border-blue-500"
                     placeholder={t('managerCheck.noteOptional') || "Note (optional)"}
                     value={answers[q.id]?.note ?? ''}
                     onChange={(e) => setAns(q.id, 'note', e.target.value)}
@@ -189,7 +189,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             <div className="grid grid-cols-1 gap-3 sm:gap-4">
               <input 
                 type="text"
-                className="border-2 rounded-lg p-2 sm:p-3 md:p-4 text-sm sm:text-base md:text-lg min-h-[48px] sm:min-h-[52px] md:min-h-[56px] focus:outline-none focus:border-blue-500" 
+                className="border-2 rounded-lg p-2 sm:p-3 text-sm sm:text-base min-h-[44px] focus:outline-none focus:border-blue-500" 
                 placeholder={t('managerCheck.managerName')}
                 value={answeredBy} 
                 onChange={(e)=>setAnsweredBy(e.target.value)}
@@ -198,7 +198,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             </div>
 
             {/* Status message */}
-            <div className="text-xs sm:text-sm md:text-base text-gray-600 text-center p-2 sm:p-3 md:p-4 bg-blue-50 rounded-lg">
+            <div className="text-xs sm:text-sm text-gray-600 text-center p-2 sm:p-3 bg-blue-50 rounded-lg">
               {required ? t('managerCheck.required') : t('managerCheck.optional')}
             </div>
             
@@ -212,7 +212,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                   </label>
                   <input 
                     type="text"
-                    className="border-2 border-red-300 rounded-lg p-2 sm:p-3 text-sm sm:text-base min-h-[44px] sm:min-h-[48px] focus:outline-none focus:border-red-500" 
+                    className="border-2 border-red-300 rounded-lg p-2 sm:p-3 text-xs sm:text-sm min-h-[44px] focus:outline-none focus:border-red-500" 
                     placeholder={t('managerCheck.skipReason') || 'Reason for skipping...'}
                     value={skipReason} 
                     onChange={(e)=>setSkipReason(e.target.value)}
@@ -220,7 +220,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                   />
                   <button 
                     type="button"
-                    className="w-full px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base md:text-lg border-2 border-red-500 rounded-lg bg-red-100 hover:bg-red-200 active:bg-red-300 min-h-[44px] sm:min-h-[48px] md:min-h-[56px] font-medium text-red-700 transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    className="w-full px-4 py-2 text-xs sm:text-sm border-2 border-red-500 rounded-lg bg-red-100 hover:bg-red-200 active:bg-red-300 min-h-[44px] font-medium text-red-700 transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed" 
                     onClick={skip}
                     disabled={!skipReason.trim()}
                     data-testid="button-skip"
@@ -234,7 +234,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center items-stretch sm:items-center">
                 <button 
                   type="button"
-                  className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base md:text-lg border-2 border-gray-300 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] sm:min-h-[48px] md:min-h-[56px] font-medium transition-all active:scale-98" 
+                  className="px-4 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] font-medium transition-all active:scale-98" 
                   onClick={onCancel}
                   data-testid="button-cancel"
                 >
@@ -243,7 +243,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                 
                 <button 
                   type="button"
-                  className="px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base md:text-lg rounded-lg bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] sm:min-h-[48px] md:min-h-[56px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  className="px-6 py-2 text-xs sm:text-sm rounded-lg bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                   onClick={submit}
                   disabled={!canSubmit}
                   data-testid="button-submit"
