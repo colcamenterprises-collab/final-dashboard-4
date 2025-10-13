@@ -988,17 +988,17 @@ export function registerRoutes(app: express.Application): Server {
           id: f.id,
           shift_date: f.shiftDate || 'N/A',
           completed_by: f.completedBy || 'Unknown',
-          total_sales: f.totalSales || 0,
-          cash_sales: f.cashSales || 0,
-          qr_sales: f.qrSales || 0,
-          grab_sales: f.grabSales || 0,
-          aroi_sales: f.aroiSales || 0,
-          shopping_total: f.shoppingTotal || 0,
-          wages_total: f.wagesTotal || 0,
-          others_total: f.othersTotal || 0,
-          total_expenses: f.totalExpenses || 0,
-          rolls_end: payload?.cash_management?.burger_buns_end || 0,
-          meat_end_g: payload?.cash_management?.meat_count_end_g || 0
+          total_sales: payload.totalSales || f.totalSales || 0,
+          cash_sales: payload.cashSales || f.cashSales || 0,
+          qr_sales: payload.qrSales || f.qrSales || 0,
+          grab_sales: payload.grabSales || f.grabSales || 0,
+          aroi_sales: payload.otherSales || f.aroiSales || 0,
+          shopping_total: payload.shoppingTotal || f.shoppingTotal || 0,
+          wages_total: payload.wagesTotal || f.wagesTotal || 0,
+          others_total: payload.othersTotal || f.othersTotal || 0,
+          total_expenses: payload.totalExpenses || f.totalExpenses || 0,
+          rolls_end: payload.rollsEnd || 0,
+          meat_end_g: payload.meatEnd || 0
         };
       });
 

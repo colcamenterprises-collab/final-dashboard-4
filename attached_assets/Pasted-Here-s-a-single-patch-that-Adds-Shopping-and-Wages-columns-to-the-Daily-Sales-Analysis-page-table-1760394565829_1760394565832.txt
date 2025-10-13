@@ -1,0 +1,124 @@
+Here’s a single patch that:
+
+Adds Shopping and Wages columns to the Daily Sales Analysis page (tablet-sized).
+
+Keeps Other + Expenses total (useful for finance).
+
+Hardens the CSV endpoint (works even if the drink label table is empty).
+
+Enables the Export by Date button only when a date is picked.
+
+Re-runs a safe backfill so rows get real numbers (not zeros).
+
+
+
+---
+
+How to apply
+
+Save this as PATCH_V3_3B_EXPENSES_AND_CSV_FIX.sh at the repo root, then run:
+
+BASE_URL="http://localhost:5000" bash PATCH_V3_3B_EXPENSES_AND_CSV_FIX.sh
+
+PATCH_V3_3B_EXPENSES_AND_CSV_FIX.sh
+
+#!/usr/bin/env bash
+set -euo pipefail
+: "${BASE_URL:=http://localhost:3000}"
+
+echo "=== V3.3B: Expenses columns + CSV hardening + backfill ==="
+
+# 1) Harden CSV endpoint (works without drink labels; stable headers)
+ANAL="server/routes/analysisDailySales.ts"
+if [ -f "$ANAL" ]; then
+  perl -0777 -pe '
+    # If drink label query returns empty, ensure labels=[]
+    s/const labels = \(lblRows as any\)\.rows \|\| \[\];/const labels = ((lblRows as any).rows || []);/;
+
+    # Ensure fixedCols include expenses & stock (already there; keep as-is). No-op if present.
+  ' -i "$ANAL"
+
+  # Make sure route exists; if not, append (safe idempotent – you already had it from 3.3A)
+  grep -q 'router.get\("/export.csv"' "$ANAL" || cat >> "$ANAL" <<'TS'
+
+// (safety) CSV endpoint definition (added if missing by patch)
+import { db } from "../db.js";
+import { sql } from "drizzle-orm";
+function csvEscape(v:any){ if(v==null) return ""; const s=String(v); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }
+router.get("/export.csv", async (req, res) => {
+  const id = (req.query.id as string) || "";
+  const date = (req.query.date as string) || "";
+  if (!id && !date) return res.status(400).json({ error: "Provide id or date (YYYY-MM-DD)" });
+
+  const lblRows = await db.execute(sql.raw(`SELECT col_name, label FROM daily_shift_drink_labels ORDER BY label ASC, col_name ASC`));
+  const labels = ((lblRows as any).rows || []);
+  const fixedCols = ["shift_date","completed_by","total_sales","cash_sales","qr_sales","grab_sales","aroi_sales","shopping_total","wages_total","others_total","total_expenses","rolls_end","meat_end_g"];
+  const drinkCols = labels.map((l:any)=>l.col_name);
+  const selectCols = ["id", ...fixedCols, ...drinkCols];
+
+  let qText = `SELECT ${selectCols.map(c=>`"${c}"`).join(",")} FROM daily_shift_summary WHERE deleted_at IS NULL`;
+  const args:any[]=[];
+  if (id) { qText += ` AND id = $1`; args.push(id); }
+  if (date){ qText += id ? ` AND shift_date = $2` : ` AND shift_date = $1`; args.push(date); }
+  qText += ` ORDER BY shift_date DESC, created_at DESC`;
+
+  const resRows = await db.execute(sql.raw(qText), args as any);
+  const rows = ((resRows as any).rows || []);
+  if (!rows.length) return res.status(404).json({ error: "No matching rows" });
+
+  const header = ["ID","Date","Completed By","Total","Cash","QR","Grab","Aroi","Shopping","Wages","Other","Expenses","Rolls","Meat (g)", ...labels.map((l:any)=> l.label)];
+  const out: string[] = [ header.map(csvEscape).join(",") ];
+  for (const r of rows){
+    out.push([
+      r.id, r.shift_date, r.completed_by, r.total_sales, r.cash_sales, r.qr_sales, r.grab_sales, r.aroi_sales,
+      r.shopping_total, r.wages_total, r.others_total, r.total_expenses, r.rolls_end, r.meat_end_g,
+      ...drinkCols.map(c => r[c] ?? 0)
+    ].map(csvEscape).join(","));
+  }
+  const csv = out.join("\n");
+  const fname = id ? `daily_shift_${id}.csv` : `daily_shift_${date}.csv`;
+  res.setHeader("Content-Type","text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+  return res.send(csv);
+});
+TS
+fi
+
+# 2) Add expenses columns to the Daily Sales Analysis page (tablet-friendly)
+PAGE="client/src/pages/analysis/DailySalesAnalysis.tsx"
+if [ -f "$PAGE" ]; then
+  # Insert Shopping/Wages/Other/Expenses headers if missing
+  perl -0777 -pe '
+    s#(<th className="px-2 py-2 text-right">Grab</th>)#${1}\n              <th className="px-2 py-2 text-right">Shopping</th>\n              <th className="px-2 py-2 text-right">Wages</th>\n              <th className="px-2 py-2 text-right">Other</th>\n              <th className="px-2 py-2 text-right">Expenses</th># unless /Shopping<\/th>.*Wages<\/th>.*Other<\/th>.*Expenses<\/th>/s;
+    # Add row cells for those columns after Grab
+    s#(\{fmt\(r\.grab_sales\)\}\)<\/td>\n)#${1}                <td className="px-2 py-2 text-right">{fmt(r.shopping_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.wages_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.others_total)}</td>\n                <td className="px-2 py-2 text-right">{fmt(r.total_expenses)}</td>\n# unless /shopping_total\).*wages_total\).*others_total\).*total_expenses/s;
+  ' -i "$PAGE"
+
+  # Enable export-by-date button only when date is selected; keep compact size
+  perl -0777 -pe '
+    s#(<input id="export-by-date"[^>]*type="date"[^>]* />)#${1}\n<button onClick={() => { const el=document.getElementById("export-by-date") as HTMLInputElement; if(el?.value){ window.open(`/api/analysis/daily-sales/export.csv?date=${el.value}`,"_blank"); } }} className="border rounded px-2 py-1 text-xs disabled:opacity-50" disabled={!(document?.getElementById && (document.getElementById("export-by-date") as HTMLInputElement)?.value)}>Export by Date (CSV)</button># unless /Export by Date \(CSV\)/s;
+  ' -i "$PAGE" || true
+fi
+
+# 3) Re-run backfill so summary has non-zero expenses
+node scripts/backfill_daily_shift_summary.mjs || true
+
+# 4) Quick smoke
+echo "— CSV by date (if a row exists)…"
+DT=$(curl -s "$BASE_URL/api/analysis/daily-sales?limit=1" | jq -r '.[0].shift_date' 2>/dev/null || true)
+if [ -n "${DT:-}" ] && [ "$DT" != "null" ]; then
+  curl -sI "$BASE_URL/api/analysis/daily-sales/export.csv?date=$DT" | grep -i content-disposition || true
+fi
+
+echo "=== Patch 3.3B applied. Refresh the page and test CSV again. ==="
+
+
+---
+
+What to expect after running it
+
+Page: you’ll now see Shopping, Wages, Other, and Expenses columns (compact, tablet-first).
+
+CSV: per-row Export CSV links still work; Export by Date works even if no drink labels are configured.
+
+Data: backfill re-pulls totals from each form’s JSON payload (shoppingTotal, wagesTotal, othersTotal, totalExpenses). If a day still shows 0, it means that form’s payload didn’t have those fields—submit a fresh V3 form and it will populate automatically via the hook.

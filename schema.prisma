@@ -582,6 +582,9 @@ model DailySalesV2 {
   othersTotal    Int      @default(0)
   totalExpenses  Int      @default(0)
   qrTransfer     Int      @default(0)
+  payload        Json?
+  staff          String?
+  shift_date     DateTime? @db.Date
   shopping       ShoppingPurchaseV2[]
   wages          WageEntryV2[]
   others         OtherExpenseV2[]
