@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { v4 as uuid } from "uuid";
 import { insertDirectExpensesFromShift } from "../utils/expenseLedger";
 import { computeBankingAuto } from "../services/bankingAuto.js";
+import { validateStockRequired } from "../services/stockRequired.js";
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
@@ -117,6 +118,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       requisition,
       rollsEnd,
       meatEnd,
+      drinkStock: finalDrinkStock,
     };
 
     const __bankingAuto = computeBankingAuto({
@@ -126,6 +128,16 @@ export async function createDailySalesV2(req: Request, res: Response) {
       othersTotal
     });
     payload.bankingAuto = __bankingAuto;
+
+    // __stock_required_guard__
+    const stockValidation = validateStockRequired(payload);
+    if (!stockValidation.ok) {
+      return res.status(422).json({ 
+        ok: false, 
+        error: "STOCK_REQUIRED", 
+        details: stockValidation.errors 
+      });
+    }
 
     await pool.query(
       `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)

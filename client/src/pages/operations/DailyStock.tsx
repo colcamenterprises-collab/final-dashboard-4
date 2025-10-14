@@ -57,7 +57,9 @@ const DailyStock: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<any>({});
   const [lang, setLang] = useState<'en' | 'th'>('en');
+  const requiredDrinks = ["Coke (330ml)", "Sprite", "Water (500ml)", "Fanta Orange", "Pepsi", "Red Bull"];
 // === BEGIN MANAGER QUICK CHECK: state & handlers ===
 const [showCheck, setShowCheck] = useState(false);
 
@@ -188,22 +190,41 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
   const handleSubmit = async () => {
     if (submitting) return;
     
-    // EXACT VALIDATION from consolidated patch - FIXED to allow zero values
-    const errors = [];
-    if (rolls == null || isNaN(Number(rolls)) || Number(rolls) < 0) errors.push('rollsEnd');
-    if (meatGrams == null || isNaN(Number(meatGrams)) || Number(meatGrams) < 0) errors.push('meatCount');
+    // V3.2A Stock validation
+    const validationErrs: any = {};
+    const N = (v: any) => {
+      if (v === null || v === undefined) return NaN;
+      const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
+      return Number.isFinite(n) ? n : NaN;
+    };
     
-    // Allow zero counts but ensure forms are at least attempted (not completely untouched)
-    const drinksEnd = buildDrinksFromState();
-    // Don't require drinks - zero counts are valid
+    const rollsNum = N(rolls);
+    const meatNum = N(meatGrams);
     
-    const requisition = buildItemsFromState();  
-    // Don't require requisition items - zero purchases are valid
+    if (Number.isNaN(rollsNum) || rollsNum < 0) {
+      validationErrs.rollsEnd = "Rolls count is required (0 allowed).";
+    }
+    if (Number.isNaN(meatNum) || meatNum < 0) {
+      validationErrs.meatEnd = "Meat count (grams) is required (0 allowed).";
+    }
     
-    setErrors(errors);
-    if (errors.length) {
-      setMessage({ type: "error", text: "Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas." });
-      return; // Block submission
+    // Check drinks - all required drinks must have valid counts (0 allowed)
+    const missingDrinks: string[] = [];
+    for (const drink of requiredDrinks) {
+      const qty = drinkQuantities[drink];
+      const n = N(qty);
+      if (Number.isNaN(n) || n < 0) {
+        missingDrinks.push(drink);
+      }
+    }
+    if (missingDrinks.length > 0) {
+      validationErrs.drinkStock = `Missing drink counts: ${missingDrinks.join(', ')}`;
+    }
+    
+    setValidationErrors(validationErrs);
+    if (Object.keys(validationErrs).length > 0) {
+      setMessage({ type: "error", text: "Please complete rolls, meat, and all drinks (0 allowed for each)." });
+      return;
     }
     
     setSubmitting(true);
@@ -217,13 +238,17 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       unit: item.unit
     }));
 
-    const drinkStock = buildDrinksFromState();
+    // Build drinkStock as object with all required drinks
+    const drinkStockObj: Record<string, number> = {};
+    for (const drink of requiredDrinks) {
+      drinkStockObj[drink] = drinkQuantities[drink] || 0;
+    }
     
     // Update the existing Form 1 record with stock data
     const payload = {
       rollsEnd: rolls,
       meatEnd: meatGrams,
-      drinkStock: drinkStock,
+      drinkStock: drinkStockObj,
       requisition: requisitionItems,
       notes: notes.trim()
     };
@@ -285,32 +310,32 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       <section className="space-y-6">
         <div className="rounded-xl border p-4">
           <h2 className="text-[14px] font-semibold mb-4">End-of-Shift Counts</h2>
+          {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
+          {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[14px] mb-1 font-medium">{labels[lang].rollsEnd}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.includes('rollsEnd') ? 'border-red-500' : ''}`}
+                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.rollsEnd ? 'border-red-500' : ''}`}
                 value={rolls || ''}
                 onChange={(e) => setRolls(safeInt(e.target.value))}
                 placeholder=""
                 aria-label="Rolls quantity"
               />
-              {errors.includes('rollsEnd') && <p className="text-red-500 text-sm">Rolls count required, non-negative for theft prevention.</p>}
             </div>
             <div>
               <label className="block text-[14px] mb-1 font-medium">{labels[lang].meatCount}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.includes('meatCount') ? 'border-red-500' : ''}`}
+                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.meatEnd ? 'border-red-500' : ''}`}
                 value={meatGrams || ''}
                 onChange={(e) => setMeatGrams(safeInt(e.target.value))}
                 placeholder=""
                 aria-label="Meat quantity in grams"
               />
-              {errors.includes('meatCount') && <p className="text-red-500 text-sm">Meat count required, non-negative for theft prevention.</p>}
               {meatGrams > 0 && (
                 <div className="text-xs text-gray-500 mt-1">
                   {(meatGrams / 1000).toFixed(1)}kg or {meatGrams.toLocaleString()} grams
@@ -325,6 +350,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       <section className="space-y-6">
         <div className="rounded-xl border p-4">
           <h2 className="text-[14px] font-semibold mb-4">Drinks Stock Count</h2>
+          {validationErrors?.drinkStock && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.drinkStock}</div>}
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {drinkItems.length === 0 ? (
               <div className="text-gray-500 text-xs">No drink items available</div>
