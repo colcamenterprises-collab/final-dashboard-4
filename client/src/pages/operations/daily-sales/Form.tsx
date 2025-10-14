@@ -96,8 +96,6 @@ export default function DailySales() {
   
   // Banking state
   const [closingCash, setClosingCash] = useState(0);
-  const [cashBanked, setCashBanked] = useState(0);
-  const [qrTransfer, setQrTransfer] = useState(0);
   
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -171,17 +169,15 @@ export default function DailySales() {
     try {
       const submitData = {
         completedBy,
-        startingCash: cashStart,  // Fix field name mismatch
+        startingCash: cashStart,
         cashSales: cash,
         qrSales: qr,
         grabSales: grab,
         otherSales: aroi,
         totalSales: cash + qr + grab + aroi,
-        expenses: shiftExpenses,  // Fix field name mismatch
-        wages: staffWages,        // Fix field name mismatch
+        expenses: shiftExpenses,
+        wages: staffWages,
         closingCash,
-        cashBanked,
-        qrTransfer,
         shiftDate: new Date().toISOString(),
         status: 'submitted'
       };
@@ -243,9 +239,7 @@ export default function DailySales() {
     aroi,
     shiftExpenses,
     staffWages,
-    closingCash,
-    cashBanked,
-    qrTransfer
+    closingCash
   });
 
   const handleSaveDraft = () => {
@@ -555,24 +549,23 @@ export default function DailySales() {
                   className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Cash Banked (฿)</label>
-                <input 
-                  type="number" 
-                  value={cashBanked} 
-                  onChange={e=>setCashBanked(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">QR Transfer Amount (฿)</label>
-                <input 
-                  type="number" 
-                  value={qrTransfer} 
-                  onChange={e=>setQrTransfer(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
-                />
-              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
+              <div className="text-xs text-gray-500">Expected Cash to Bank</div>
+              <div className="text-right font-semibold">฿{(() => {
+                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
+                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
+                return expectedCashBank.toLocaleString();
+              })()}</div>
+              <div className="text-xs text-gray-500">Expected QR to Bank</div>
+              <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
+              <div className="text-xs text-gray-500">Expected Total to Bank</div>
+              <div className="text-right font-semibold">฿{(() => {
+                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
+                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
+                const expectedQRBank = qr;
+                return (expectedCashBank + expectedQRBank).toLocaleString();
+              })()}</div>
             </div>
           </section>
 

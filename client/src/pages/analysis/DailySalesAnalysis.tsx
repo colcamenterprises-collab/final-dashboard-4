@@ -16,6 +16,9 @@ interface DailySalesRow {
   total_expenses: number;
   rolls_end: number;
   meat_end_g: number;
+  expected_cash_bank: number;
+  expected_qr_bank: number;
+  expected_total_bank: number;
 }
 
 export default function DailySalesAnalysis() {
@@ -73,6 +76,9 @@ export default function DailySalesAnalysis() {
                 <th className="px-3 py-2 text-right whitespace-nowrap">QR</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Grab</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Other</th>
+                <th className="px-3 py-2 text-right whitespace-nowrap">Exp Cash</th>
+                <th className="px-3 py-2 text-right whitespace-nowrap">Exp QR</th>
+                <th className="px-3 py-2 text-right whitespace-nowrap">Exp Total</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Shopping</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Wages</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Other Exp</th>
@@ -87,17 +93,20 @@ export default function DailySalesAnalysis() {
                 <tr key={r.id} className="border-b hover:bg-gray-50">
                   <td className="px-3 py-2 whitespace-nowrap">{r.shift_date}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.completed_by}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.total_sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.cash_sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.qr_sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.grab_sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.aroi_sales.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.shopping_total.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.wages_total.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.others_total.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.total_expenses.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.rolls_end}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.meat_end_g}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_sales || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.cash_sales || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.qr_sales || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.grab_sales || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.aroi_sales || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_cash_bank || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_qr_bank || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_total_bank || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.shopping_total || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.wages_total || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.others_total || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_expenses || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.rolls_end || 0}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.meat_end_g || 0}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <a
                       className="underline text-xs text-emerald-600 hover:text-emerald-700"

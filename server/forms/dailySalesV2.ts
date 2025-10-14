@@ -5,9 +5,9 @@ import { Request, Response } from "express";
 import { pool } from "../db";
 import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
-import db from "../db";
 import { v4 as uuid } from "uuid";
 import { insertDirectExpensesFromShift } from "../utils/expenseLedger";
+import { computeBankingAuto } from "../services/bankingAuto.js";
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
@@ -94,7 +94,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const cashBanked = closingCashTHB - toTHB(startingCash);
     const qrTransfer = toTHB(qrSales);
 
-    const payload = {
+    const shoppingTotal = (expenses || []).reduce((s: number, e: any) => s + toTHB(e.cost), 0);
+    const wagesTotal = (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
+    const othersTotal = 0;
+    
+    const payload: any = {
       completedBy,
       startingCash: toTHB(startingCash),
       cashSales: toTHB(cashSales),
@@ -114,6 +118,14 @@ export async function createDailySalesV2(req: Request, res: Response) {
       rollsEnd,
       meatEnd,
     };
+
+    const __bankingAuto = computeBankingAuto({
+      ...payload,
+      shoppingTotal,
+      wagesTotal,
+      othersTotal
+    });
+    payload.bankingAuto = __bankingAuto;
 
     await pool.query(
       `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
@@ -179,6 +191,15 @@ export async function createDailySalesV2(req: Request, res: Response) {
         <li>Cash to Bank: ฿${formatTHB(cashBanked)}</li>
         <li>QR to Bank: ฿${formatTHB(qrTransfer)}</li>
       </ul>
+
+      <h3>Expected Bank Deposits (Auto)</h3>
+      ${payload.bankingAuto 
+        ? `<ul>
+            <li>Cash to bank: ฿${Number(payload.bankingAuto.expectedCashBank).toLocaleString()}</li>
+            <li>QR to bank: ฿${Number(payload.bankingAuto.expectedQRBank).toLocaleString()}</li>
+            <li><strong>Total to bank: ฿${Number(payload.bankingAuto.expectedTotalBank).toLocaleString()}</strong></li>
+          </ul>`
+        : '<p style="color:#6b7280">No auto-banking data</p>'}
 
       <h3>Stock Levels</h3>
       <ul>
