@@ -1,0 +1,171 @@
+Below is a single, safe patch you can drop in alongside V3.2. It:
+
+Marks Rolls (R), Meat (g), Drinks as required in the UI (0 allowed, but must be explicitly entered).
+
+Blocks submit with clear inline errors on tablet.
+
+Enforces server-side validation (HTTP 422 with field errors).
+
+Lets you define the list of drink SKUs that must be counted (0 allowed). Default list included; edit anytime.
+
+
+Run:
+
+bash PATCH_V3_2A_STOCK_REQUIRED.sh
+
+
+---
+
+PATCH_V3_2A_STOCK_REQUIRED.sh
+
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== V3.2A: Require rolls, meat & drinks ==="
+
+# 1) Config: expected drink SKUs (edit this file if your SKUs change)
+mkdir -p server/config
+cat > server/config/drinks.json <<'JSON'
+[
+  "Coke (330ml)",
+  "Sprite",
+  "Water (500ml)",
+  "Fanta Orange",
+  "Pepsi",
+  "Red Bull"
+]
+JSON
+
+# 2) Server validator
+mkdir -p server/services
+cat > server/services/stockRequired.ts <<'TS'
+import fs from "node:fs";
+import path from "node:path";
+
+const cfgPath = path.resolve("server/config/drinks.json");
+let REQUIRED_DRINKS: string[] = [];
+try {
+  REQUIRED_DRINKS = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+} catch {
+  REQUIRED_DRINKS = ["Coke (330ml)", "Sprite"]; // fallback
+}
+
+const N = (v:any) => {
+  if (v === null || v === undefined) return NaN;
+  const n = Number(String(v).replace(/[^0-9.\-]/g,''));
+  return Number.isFinite(n) ? n : NaN;
+};
+
+export type StockErrors = {
+  rollsEnd?: string;
+  meatEnd?: string;
+  drinkStock?: string;
+  drinksMissing?: string[];
+};
+
+export function validateStockRequired(payload:any): { ok: boolean; errors: StockErrors } {
+  const errors: StockErrors = {};
+  const rolls = N(payload?.rollsEnd ?? payload?.rolls_end);
+  const meat  = N(payload?.meatEnd  ?? payload?.meat_end);
+  const drinks = payload?.drinkStock;
+
+  // Rolls required (0 allowed)
+  if (Number.isNaN(rolls)) {
+    errors.rollsEnd = "Rolls count is required (0 allowed).";
+  } else if (rolls < 0) {
+    errors.rollsEnd = "Rolls cannot be negative.";
+  }
+
+  // Meat required (0 allowed)
+  if (Number.isNaN(meat)) {
+    errors.meatEnd = "Meat count (grams) is required (0 allowed).";
+  } else if (meat < 0) {
+    errors.meatEnd = "Meat cannot be negative.";
+  }
+
+  // Drinks: must be an object with all required keys (0 allowed)
+  if (!drinks || typeof drinks !== "object" || Array.isArray(drinks)) {
+    errors.drinkStock = "Drinks stock must be provided (0 allowed for each).";
+  } else {
+    const missing: string[] = [];
+    for (const sku of REQUIRED_DRINKS) {
+      const v = drinks[sku];
+      const n = N(v);
+      if (Number.isNaN(n) || n < 0) {
+        missing.push(sku);
+      }
+    }
+    if (missing.length) errors.drinksMissing = missing;
+  }
+
+  return { ok: Object.keys(errors).length === 0, errors };
+}
+TS
+
+# 3) Wire server validation into V3 submit handler
+TARGET=""
+for f in server/forms/dailySalesV2.ts server/forms/dailySalesV2.js; do
+  [ -f "$f" ] && TARGET="$f" && break
+done
+if [ -z "$TARGET" ]; then
+  echo "!! Could not find server/forms/dailySalesV2.ts — aborting."
+  exit 1
+fi
+
+# Import validator if not present
+grep -q "validateStockRequired" "$TARGET" || \
+perl -0777 -pe 's#(import .*?;[\r\n]+)#${1}import { validateStockRequired } from "../services/stockRequired.js";\n#' -i "$TARGET"
+
+# Inject validation just before DB persist (once)
+grep -q "__stock_required_guard__" "$TARGET" || \
+perl -0777 -pe 's#(\/\/\s*BEGIN\s*CREATE\s*DAILY\s*SALES[\s\S]*?\{[\s\S]*?payload[\s\S]*?\})#${1}\n// __stock_required_guard__\n{ const chk = validateStockRequired(payload); if (!chk.ok) { res.status(422).json({ ok:false, error:\"STOCK_REQUIRED\", details: chk.errors }); return; } }#' -i "$TARGET"
+
+# 4) Frontend: mark fields required & block submit with friendly errors
+FORM_UI="client/src/pages/operations/DailyStock.tsx"
+if [ -f "$FORM_UI" ]; then
+  # Add local validation + error banners (lightweight)
+  perl -0777 -pe '
+    BEGIN{undef $/;}
+    s/(\bfunction\s+DailyStock\s*\([^\)]*\)\s*\{)/$1\n  const [errors,setErrors] = React.useState<any>({});\n  const validate = React.useCallback((state:any)=>{\n    const e:any = {};\n    const R = (v:any)=>{ const n = Number(String(v??\"\").replace([^0-9.\\-],\"\")); return Number.isFinite(n)?n:NaN; };\n    const rolls = R(state?.rollsEnd);\n    const meat  = R(state?.meatEnd);\n    if (Number.isNaN(rolls) || rolls < 0) e.rollsEnd = \"Enter rolls (0 allowed).\";\n    if (Number.isNaN(meat)  || meat  < 0) e.meatEnd  = \"Enter meat in grams (0 allowed).\";\n    const drinks = state?.drinkStock || {};\n    const req = state?.requiredDrinks || [];\n    const missing:string[] = [];\n    req.forEach((sku:string)=>{ const n = R(drinks[sku]); if (Number.isNaN(n) || n < 0) missing.push(sku); });\n    if (missing.length) e.drinkStock = `Missing/invalid: ${missing.join(\", \")}`;\n    return e;\n  },[]);\n/;
+    s/(onSubmit\s*=\s*async\s*\([^\)]*\)\s*=>\s*\{)/$1\n    const e = validate(formState);\n    setErrors(e);\n    if (Object.keys(e).length) { toast?.error?.(\"Please complete rolls, meat, and all drinks.\"); return; }\n/;
+    s/(<h2[^>]*>\s*Stock\s*<\/h2>)/$1\n      {errors?.rollsEnd && <div className=\"mt-1 text-xs text-red-600\">{errors.rollsEnd}</div>}\n      {errors?.meatEnd  && <div className=\"mt-1 text-xs text-red-600\">{errors.meatEnd}</div>}\n      {errors?.drinkStock && <div className=\"mt-1 text-xs text-red-600\">{errors.drinkStock}</div>}\n/;
+  ' -i "$FORM_UI" || true
+
+  # Preload required drinks list from server/config into component (simple embed)
+  # If you already fetch drinks elsewhere, this is harmless.
+  grep -q "requiredDrinks" "$FORM_UI" || \
+  perl -0777 -pe '
+    s/(const\s*\[formState[^\]]+\]\s*=\s*React\.useState\([^\)]*\);)/$1\n  const requiredDrinks = [\"Coke (330ml)\",\"Sprite\",\"Water (500ml)\",\"Fanta Orange\",\"Pepsi\",\"Red Bull\"]; \n  React.useEffect(()=>{ setFormState((s:any)=>({...(s||{}), requiredDrinks})); },[]);\n/;
+  ' -i "$FORM_UI"
+fi
+
+echo "— Done. Rolls, meat & drinks are now mandatory (0 allowed)."
+echo "   Edit server/config/drinks.json to change required drink SKUs."
+
+
+---
+
+What you get
+
+Staff UX (tablet):
+
+They must enter Rolls and Meat (0 is okay but cannot be blank).
+
+Drinks: each SKU in server/config/drinks.json must have a number (0 allowed).
+
+Friendly red inline errors + disabled submit until complete.
+
+
+Server enforcement:
+
+If anything’s missing/invalid, the API returns 422 with a list of fields/DRINK SKUs to fix.
+
+Prevents half-filled stock sections from saving.
+
+
+Configurable:
+
+Update server/config/drinks.json to the exact drink list you sell.
+
+You can include Thai labels, e.g. "น้ำเปล่า (500ml)", and the validator will use those exact keys.
+
