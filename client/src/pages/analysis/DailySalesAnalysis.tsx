@@ -59,52 +59,52 @@ export default function DailySalesAnalysis() {
         <p className="text-sm text-gray-500">No data available</p>
       )}
 
-      {/* Desktop Table */}
+      {/* Table - Scrollable on tablet */}
       {!isLoading && rows.length > 0 && (
-        <div className="overflow-x-scroll" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' } as React.CSSProperties}>
-          <table style={{ minWidth: '1400px' }} className="border-collapse text-xs sm:text-sm">
+        <div className="w-full overflow-auto" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+          <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: '1400px' }}>
             <thead>
               <tr className="bg-gray-100 border-b">
-                <th className="px-2 py-2 text-left">Date</th>
-                <th className="px-2 py-2 text-left">Completed By</th>
-                <th className="px-2 py-2 text-right">Total</th>
-                <th className="px-2 py-2 text-right">Cash</th>
-                <th className="px-2 py-2 text-right">QR</th>
-                <th className="px-2 py-2 text-right">Grab</th>
-                <th className="px-2 py-2 text-right">Other</th>
-                <th className="px-2 py-2 text-right">Shopping</th>
-                <th className="px-2 py-2 text-right">Wages</th>
-                <th className="px-2 py-2 text-right">Other Exp</th>
-                <th className="px-2 py-2 text-right">Tot Exp</th>
-                <th className="px-2 py-2 text-right">Rolls</th>
-                <th className="px-2 py-2 text-right">Meat (g)</th>
-                <th className="px-2 py-2 text-right">Export</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">Date</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">Completed By</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Total</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Cash</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">QR</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Grab</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Other</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Shopping</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Wages</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Other Exp</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Tot Exp</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Rolls</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Meat (g)</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">Export</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b hover:bg-gray-50">
-                  <td className="px-2 py-2">{r.shift_date}</td>
-                  <td className="px-2 py-2">{r.completed_by}</td>
-                  <td className="px-2 py-2 text-right">{r.total_sales.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.cash_sales.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.qr_sales.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.grab_sales.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.aroi_sales.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.shopping_total.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.wages_total.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.others_total.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.total_expenses.toLocaleString()}</td>
-                  <td className="px-2 py-2 text-right">{r.rolls_end}</td>
-                  <td className="px-2 py-2 text-right">{r.meat_end_g}</td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-2 py-2 whitespace-nowrap">{r.shift_date}</td>
+                  <td className="px-2 py-2 whitespace-nowrap">{r.completed_by}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.total_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.cash_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.qr_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.grab_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.aroi_sales.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.shopping_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.wages_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.others_total.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.total_expenses.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.rolls_end}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{r.meat_end_g}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">
                     <a
                       className="underline text-xs text-emerald-600 hover:text-emerald-700"
                       href={`/api/analysis/daily-sales/export.csv?id=${r.id}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Export CSV
+                      Export
                     </a>
                   </td>
                 </tr>
