@@ -32,13 +32,12 @@ export default function DailySalesAnalysis() {
   };
 
   return (
-    <div>
-      {/* Header with padding */}
-      <div className="px-4 sm:px-6 lg:px-8">
+    <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+      {/* Header */}
+      <div className="px-4 sm:px-6 lg:px-8 mb-4">
         <h1 className="text-xl sm:text-2xl font-bold mb-4">Daily Sales Analysis</h1>
         
-        {/* Date Export Control */}
-        <div className="mt-2 mb-4 flex items-center gap-2 text-xs sm:text-sm">
+        <div className="flex items-center gap-2 text-xs sm:text-sm">
           <input
             id="export-by-date"
             type="date"
@@ -55,20 +54,19 @@ export default function DailySalesAnalysis() {
           </button>
         </div>
 
-        {isLoading && <p className="text-sm">Loading...</p>}
-
+        {isLoading && <p className="text-sm mt-4">Loading...</p>}
         {!isLoading && rows.length === 0 && (
-          <p className="text-sm text-gray-500">No data available</p>
+          <p className="text-sm text-gray-500 mt-4">No data available</p>
         )}
       </div>
 
-      {/* Table - Full width, breaks out of padding */}
+      {/* Scrollable Table - breaks out of padding */}
       {!isLoading && rows.length > 0 && (
-        <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-          <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: '1400px', width: '100%' }}>
+        <div className="overflow-x-auto px-4 sm:px-6 lg:px-8" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+          <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: '1400px' }}>
             <thead>
               <tr className="bg-gray-100 border-b">
-                <th className="px-3 py-2 text-left whitespace-nowrap sticky left-0 bg-gray-100">Date</th>
+                <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Completed By</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Total</th>
                 <th className="px-3 py-2 text-right whitespace-nowrap">Cash</th>
@@ -87,7 +85,7 @@ export default function DailySalesAnalysis() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b hover:bg-gray-50">
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-white">{r.shift_date}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{r.shift_date}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.completed_by}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{r.total_sales.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{r.cash_sales.toLocaleString()}</td>
