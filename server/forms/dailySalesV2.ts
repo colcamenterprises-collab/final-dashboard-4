@@ -129,16 +129,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
     });
     payload.bankingAuto = __bankingAuto;
 
-    // __stock_required_guard__
-    const stockValidation = validateStockRequired(payload);
-    if (!stockValidation.ok) {
-      return res.status(422).json({ 
-        ok: false, 
-        error: "STOCK_REQUIRED", 
-        details: stockValidation.errors 
-      });
-    }
-
     await pool.query(
       `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -334,6 +324,17 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { rollsEnd, meatEnd, requisition, drinkStock } = req.body;
+
+    // __stock_required_guard__
+    const stockPayload = { rollsEnd, meatEnd, drinkStock };
+    const stockValidation = validateStockRequired(stockPayload);
+    if (!stockValidation.ok) {
+      return res.status(422).json({ 
+        ok: false, 
+        error: "STOCK_REQUIRED", 
+        details: stockValidation.errors 
+      });
+    }
 
     // Update the existing record with stock data including drinks
     const result = await pool.query(
