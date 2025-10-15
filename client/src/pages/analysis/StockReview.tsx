@@ -90,29 +90,21 @@ export default function StockReview(){
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
           <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
             ["Prev End", "prev_end"],
             ["Purchased", "purchased"],
             ["Burgers Sold", "sold"],
             ["Expected", "expected", true],
-            ["Actual", "actual"],
-            ["Paid", "paid"]
+            ["Actual", "actual"]
           ].map(([label, key, ro]:any)=>(
             <label key={String(key)} className="text-[12px] text-slate-600">
               <div className="mb-1">{label}</div>
-              {key==="paid" ? (
-                <select value={rolls.paid} onChange={e=>setRolls({...rolls, paid: yn(e.target.value)})}
-                        className="h-10 w-full rounded-xl border px-2 text-base">
-                  <option value="N">N</option><option value="Y">Y</option>
-                </select>
-              ) : (
-                <input inputMode="numeric" pattern="[0-9]*"
-                       value={String((rolls as any)[key])}
-                       onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
-                       readOnly={!!ro}
-                       className="h-10 w-full rounded-xl border px-3 text-sm"/>
-              )}
+              <input inputMode="numeric" pattern="[0-9]*"
+                     value={String((rolls as any)[key])}
+                     onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
+                     readOnly={!!ro}
+                     className="h-10 w-full rounded-xl border px-3 text-sm"/>
             </label>
           ))}
         </div>
@@ -124,29 +116,21 @@ export default function StockReview(){
           <h2 className="text-base font-medium">Meat (grams)</h2>
           <span className={pill(meatVar)}>Variance: {meatVar} g</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
             ["Prev End (g)", "prev_end"],
             ["Purchased (g)", "purchased"],
             ["Sold (g)", "sold"],
             ["Expected (g)", "expected", true],
-            ["Actual (g)", "actual"],
-            ["Paid", "paid"]
+            ["Actual (g)", "actual"]
           ].map(([label, key, ro]:any)=>(
             <label key={String(key)} className="text-[12px] text-slate-600">
               <div className="mb-1">{label}</div>
-              {key==="paid" ? (
-                <select value={meat.paid} onChange={e=>setMeat({...meat, paid: yn(e.target.value)})}
-                        className="h-10 w-full rounded-xl border px-2 text-base">
-                  <option value="N">N</option><option value="Y">Y</option>
-                </select>
-              ) : (
-                <input inputMode="numeric" pattern="[0-9]*"
-                       value={String((meat as any)[key])}
-                       onChange={e=> setMeat({...meat, [key]: nz(e.target.value)})}
-                       readOnly={!!ro}
-                       className="h-10 w-full rounded-xl border px-3 text-sm"/>
-              )}
+              <input inputMode="numeric" pattern="[0-9]*"
+                     value={String((meat as any)[key])}
+                     onChange={e=> setMeat({...meat, [key]: nz(e.target.value)})}
+                     readOnly={!!ro}
+                     className="h-10 w-full rounded-xl border px-3 text-sm"/>
             </label>
           ))}
         </div>
@@ -161,7 +145,7 @@ export default function StockReview(){
           <table className="w-full text-sm">
             <thead className="bg-slate-50">
               <tr className="text-left">
-                {["Brand","Prev","Purch","Sold","Exp","Act","Var","Paid"].map(h=>(
+                {["Brand","Prev","Purch","Sold","Exp","Act","Var"].map(h=>(
                   <th key={h} className="px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
@@ -192,13 +176,6 @@ export default function StockReview(){
                       className="h-10 w-24 rounded-xl border px-2 text-sm"/>
                   </td>
                   <td className={`px-3 py-2 ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
-                  <td className="px-3 py-2">
-                    <select value={d.paid}
-                      onChange={e=> setDrinks(s => s.map((r,i)=> i===idx ? {...r, paid: (e.target.value as YN)} : r))}
-                      className="h-10 w-16 rounded-xl border px-2 text-base">
-                      <option value="N">N</option><option value="Y">Y</option>
-                    </select>
-                  </td>
                 </tr>
               ))}
             </tbody>
