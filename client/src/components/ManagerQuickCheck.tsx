@@ -118,11 +118,11 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
           <div className="text-center text-sm py-4">Loading…</div>
         ) : status === 'UNAVAILABLE' ? (
           <div className="space-y-3">
-            <div className="p-3 bg-yellow-100 rounded-lg text-center text-sm">{t('managerCheck.unavailable')}</div>
+            <div className="p-3 bg-yellow-100 rounded-[8px] text-center text-sm">{t('managerCheck.unavailable')}</div>
             <div className="flex justify-center">
               <button 
                 type="button"
-                className="px-6 py-2 text-sm rounded-lg border-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 min-h-[44px]" 
+                className="px-6 py-2 text-sm rounded-[8px] border-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 min-h-[44px]" 
                 onClick={() => onDone({ status: 'UNAVAILABLE' })}
                 data-testid="button-continue"
               >
@@ -134,7 +134,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
           <div className="space-y-3 sm:space-y-4">
             <div className="grid gap-3 sm:gap-4">
               {questions.map(q => (
-                <div key={q.id} className="border-2 rounded-lg p-3 sm:p-4 bg-gray-50">
+                <div key={q.id} className="border-2 rounded-[8px] p-3 sm:p-4 bg-gray-50">
                   <div className="font-semibold text-sm sm:text-base mb-2 sm:mb-3">{q.text}</div>
                   
                   {/* Touch-friendly button group for responses */}
@@ -148,7 +148,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                           onClick={() => handleResponseClick(q.id, opt)}
                           className={`
                             flex items-center justify-center gap-1 sm:gap-2 p-2 sm:p-3 md:p-4 
-                            border-2 rounded-lg cursor-pointer 
+                            border-2 rounded-[8px] cursor-pointer 
                             min-h-[48px] sm:min-h-[56px] md:min-h-[64px]
                             transition-all duration-200
                             active:scale-95
@@ -175,7 +175,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
 
                   {/* Optional note */}
                   <textarea 
-                    className="w-full border-2 rounded-lg p-2 sm:p-3 text-xs sm:text-sm min-h-[60px] focus:outline-none focus:border-blue-500"
+                    className="w-full border-2 rounded-[8px] p-2 sm:p-3 text-[12px] min-h-[60px] focus:outline-none focus:border-blue-500 placeholder:text-[12px]"
                     placeholder={t('managerCheck.noteOptional') || "Note (optional)"}
                     value={answers[q.id]?.note ?? ''}
                     onChange={(e) => setAns(q.id, 'note', e.target.value)}
@@ -189,7 +189,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             <div className="grid grid-cols-1 gap-3 sm:gap-4">
               <input 
                 type="text"
-                className="border-2 rounded-lg p-2 sm:p-3 text-sm sm:text-base min-h-[44px] focus:outline-none focus:border-blue-500" 
+                className="border-2 rounded-[8px] p-2 sm:p-3 text-[12px] min-h-[44px] focus:outline-none focus:border-blue-500 placeholder:text-[12px]" 
                 placeholder={t('managerCheck.managerName')}
                 value={answeredBy} 
                 onChange={(e)=>setAnsweredBy(e.target.value)}
@@ -198,7 +198,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             </div>
 
             {/* Status message */}
-            <div className="text-xs sm:text-sm text-gray-600 text-center p-2 sm:p-3 bg-blue-50 rounded-lg">
+            <div className="text-xs sm:text-sm text-gray-600 text-center p-2 sm:p-3 bg-blue-50 rounded-[8px]">
               {required ? t('managerCheck.required') : t('managerCheck.optional')}
             </div>
             
