@@ -262,6 +262,19 @@ router.get("/export.csv", async (req,res) => {
   }
 });
 
+// Health endpoint for monitoring
+router.get("/health", (req, res) => {
+  try {
+    return res.json({ 
+      ok: true, 
+      scope: "stock-review", 
+      routes: ["refresh-meat", "refresh-rolls", "save", "get"] 
+    });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // [MEAT-AUTO] --- begin meat autofill helpers
 type ColHint = { table:string, cols:string[] };
 

@@ -14,6 +14,11 @@ const nz = (v:any)=> Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(
 const yn = (v:any):YN => v==="Y" ? "Y" : "N";
 
 export default function StockReview(){
+  /* [SR-TOAST] */
+  const [busyMeat,setBusyMeat] = useState(false);
+  const [busyRolls,setBusyRolls] = useState(false);
+  function toast(msg:string){ try{ alert(msg); }catch{} }
+
   const today = new Date().toISOString().slice(0,10);
   const [day, setDay] = useState<string>(today);
   const [loading, setLoading] = useState(false);
@@ -271,17 +276,33 @@ export default function StockReview(){
           <button
             onClick={async ()=>{
               try{
-                const res = await fetch(`/api/stock-review/manual-ledger/refresh-rolls?date=${day}`, { method:"POST" });
-                const j = await res.json();
-                if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
-                const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+                setBusyRolls(true);
+                const q = encodeURIComponent(day);
+                const res = await fetch(`/api/stock-review/manual-ledger/refresh-rolls?date=${q}`, { 
+                  method:"POST",
+                  headers:{ "Content-Type":"application/json" },
+                  body: JSON.stringify({ day })
+                });
+                const j = await res.json().catch(()=>({ok:false,error:"Bad JSON"}));
+                if(!j?.ok){ toast(j?.error ? `Rolls auto failed: ${j.error}` : `Rolls auto failed`); return; }
+                const r = await fetch(`/api/stock-review/manual-ledger?date=${q}`);
                 const d = await r.json();
-                if(d?.ok){ setRolls(d.rolls); }
-              }catch(e){ alert("Auto-fill failed"); }
+                if(d?.ok){ 
+                  setRolls(d.rolls); 
+                  toast(`Rolls auto-filled for ${day}`);
+                } else {
+                  toast("Reload failed");
+                }
+              }catch(e:any){ 
+                toast(`Rolls auto error: ${e?.message||e}`); 
+              } finally { 
+                setBusyRolls(false); 
+              }
             }}
-            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
+            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60"
+            disabled={busyRolls}
             title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
-          >Auto</button>
+          >{busyRolls ? "..." : "Auto"}</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
@@ -322,17 +343,33 @@ export default function StockReview(){
           <button
             onClick={async ()=>{
               try{
-                const res = await fetch(`/api/stock-review/manual-ledger/refresh-meat?date=${day}`, { method:"POST" });
-                const j = await res.json();
-                if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
-                const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+                setBusyMeat(true);
+                const q = encodeURIComponent(day);
+                const res = await fetch(`/api/stock-review/manual-ledger/refresh-meat?date=${q}`, { 
+                  method:"POST",
+                  headers:{ "Content-Type":"application/json" },
+                  body: JSON.stringify({ day })
+                });
+                const j = await res.json().catch(()=>({ok:false,error:"Bad JSON"}));
+                if(!j?.ok){ toast(j?.error ? `Meat auto failed: ${j.error}` : `Meat auto failed`); return; }
+                const r = await fetch(`/api/stock-review/manual-ledger?date=${q}`);
                 const d = await r.json();
-                if(d?.ok){ setMeat(d.meat); }
-              }catch(e){ alert("Auto-fill failed"); }
+                if(d?.ok){ 
+                  setMeat(d.meat); 
+                  toast(`Meat auto-filled for ${day}`);
+                } else {
+                  toast("Reload failed");
+                }
+              }catch(e:any){ 
+                toast(`Meat auto error: ${e?.message||e}`); 
+              } finally { 
+                setBusyMeat(false); 
+              }
             }}
-            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
+            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60"
+            disabled={busyMeat}
             title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
-          >Auto</button>
+          >{busyMeat ? "..." : "Auto"}</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+echo "== Hardening Stock Review auto endpoints + UI feedback =="
+
+# 1) Backend: add health + accept date in body or query for both autos
+cat > server/routes/stockReviewManual_harden.mjs <<'JS'
+import fs from "fs";
+
+const file = "server/routes/stockReviewManual.ts";
+let src = fs.readFileSync(file, "utf8");
+
+// Health endpoint
+if (!src.includes("/* [SRV-HEALTH] */")) {
+  src = src.replace(
+    /router\.get\([^]*?\);\s*\/\/ end base get/m,
+    `$&
+
+/* [SRV-HEALTH] */
+router.get("/manual-ledger/health", (req,res)=>{
+  try { return res.json({ ok:true, scope:"stock-review", routes:["refresh-meat","refresh-rolls","save","get"] }); }
+  catch(e){ return res.status(500).json({ ok:false, error:String(e?.message||e) }); }
+});
+`
+  );
+}
+
+// Make refresh endpoints accept date in body as fallback
+const ensureDateFlex = (name) => {
+  const rx = new RegExp(String.raw`router\.post\("/manual-ledger/${name}".+?{[\s\S]*?}\);`, "m");
+  if (!src.match(rx)) return;
+  src = src.replace(rx, (block) => {
+    if (block.includes("const bodyDay")) return block; // already patched
+    return block.replace(
+      /const day = dayStr\(.+?\);/,
+      `const bodyDay = String(req.body?.day||"").slice(0,10);
+  const queryDay = String(req.query.date||"").slice(0,10);
+  const day = dayStr(queryDay || bodyDay);`
+    );
+  });
+};
+
+if (src.includes('/manual-ledger/refresh-meat')) ensureDateFlex('refresh-meat');
+if (src.includes('/manual-ledger/refresh-rolls')) ensureDateFlex('refresh-rolls');
+
+fs.writeFileSync(file, src, "utf8");
+console.log("Backend hardened: health + flexible date ✅")
+JS
+node server/routes/stockReviewManual_harden.mjs
+
+# 2) Frontend: make Auto buttons loud + resilient (send date in query AND body), show spinner/toast
+cat > client/src/pages/analysis/StockReview_autobtn_harden.mjs <<'JS'
+import fs from "fs";
+const file = "client/src/pages/analysis/StockReview.tsx";
+let src = fs.readFileSync(file, "utf8");
+
+function injectHelpers() {
+  if (src.includes("/* [SR-TOAST] */")) return;
+  src = src.replace(
+    /export default function StockReview\([^\)]*\)\s*{/,
+    (m)=> m + `
+  /* [SR-TOAST] */
+  const [busyMeat,setBusyMeat] = React.useState(false);
+  const [busyRolls,setBusyRolls] = React.useState(false);
+  function toast(msg:string){ try{ alert(msg); }catch{} }
+`
+  );
+}
+
+function patchBtn(label, path, busyState) {
+  const marker = label === "Rolls" ? "/* [ROLLS-AUTO-BTN] */" : "/* [MEAT-AUTO-BTN] */";
+  if (!src.includes(marker)) return; // button not present
+  src = src.replace(
+    new RegExp(String.raw`${marker}[\s\S]*?onClick=\{async \(\)=>\{[\s\S]*?\}\}`, "m"),
+    `${marker}
+<div className="flex items-center gap-2 mb-2">
+  <button
+    onClick={async ()=>{
+      try{
+        ${busyState}(true);
+        const q = encodeURIComponent(day);
+        const res = await fetch(\`${path}?date=\${q}\`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ day })
+        });
+        const j = await res.json().catch(()=>({ok:false,error:"Bad JSON"}));
+        if(!j?.ok){ toast(j?.error ? \`${label} auto failed: \${j.error}\` : \`${label} auto failed\`); return; }
+        const r = await fetch(\`/api/stock-review/manual-ledger?date=\${q}\`);
+        const d = await r.json();
+        if(d?.ok){
+          ${label==="Rolls" ? "setRolls(d.rolls);" : "setMeat(d.meat);"}
+          toast(\`${label} auto-filled for \${day}\`);
+        } else {
+          toast("Reload failed");
+        }
+      }catch(e:any){
+        toast(\`${label} auto error: \${e?.message||e}\`);
+      } finally { ${busyState}(false); }
+    }}
+    className="h-9 rounded-xl border px-3 text-sm disabled:opacity-60"
+    disabled={${busyState.replace("set","")}}
+    title="Auto-fill from Expenses & Form 2"
+  >{${busyState.replace("set","")}} ? "..." : "Auto"}</button>
+</div>`
+  );
+}
+
+injectHelpers();
+patchBtn("Rolls", "/api/stock-review/manual-ledger/refresh-rolls", "setBusyRolls");
+patchBtn("Meat",  "/api/stock-review/manual-ledger/refresh-meat",  "setBusyMeat");
+
+fs.writeFileSync(file, src, "utf8");
+console.log("Frontend hardened: Auto buttons show progress + errors ✅");
+JS
+node client/src/pages/analysis/StockReview_autobtn_harden.mjs
+
+echo "== Done. Restart the server. Then test the health endpoint =="
+echo "curl -s http://localhost:5000/api/stock-review/manual-ledger/health | jq ."
