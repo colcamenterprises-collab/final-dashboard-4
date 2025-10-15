@@ -37,6 +37,7 @@ import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
+import StockReview from "./pages/analysis/StockReview";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -78,11 +79,7 @@ export default function App() {
                     <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
                     <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
-                    <Route path="stock-review" element={<div className="p-4">
-                      <h2 className="text-xl font-semibold mb-4">Stock Review</h2>
-                      <p className="text-slate-600">Buns, Meat & Drinks Analysis</p>
-                      <p className="text-slate-600 mt-2">Coming soon: Buns, meat & drinks analysis with usage vs recipes variance detection.</p>
-                    </div>} />
+                    <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                   </Route>
                   
                   {/* Legacy analysis routes */}
