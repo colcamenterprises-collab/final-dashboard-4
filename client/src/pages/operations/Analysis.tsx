@@ -145,11 +145,13 @@ export const Analysis = () => {
 
   return (
     <div className="p-6 space-y-6" data-testid="analysis-page">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Analysis Dashboard</h1>
-        <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
-      </div>
+      {/* Header - Show only on main route */}
+      {isMainRoute && (
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Analysis Dashboard</h1>
+          <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
+        </div>
+      )}
 
       {/* 🚨 Fort Knox: Always show Jussi report at top of Analysis page */}
       {isMainRoute && (
@@ -292,7 +294,8 @@ export const Analysis = () => {
         </Card>
       )}
       
-      {/* Summary Stats Cards (Sleek Tailwind styling) */}
+      {/* Summary Stats Cards (Sleek Tailwind styling) - Show only on main route */}
+      {isMainRoute && (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <Card className="bg-white p-4 rounded shadow">
           <CardContent className="p-0">
@@ -350,6 +353,7 @@ export const Analysis = () => {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Upload Section - Show only on main route */}
       {isMainRoute && (
