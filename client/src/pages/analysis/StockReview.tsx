@@ -142,18 +142,18 @@ export default function StockReview(){
           <h2 className="text-base font-medium">Drinks (Cans)</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full">
             <thead className="bg-slate-50">
               <tr className="text-left">
                 {["Brand","Prev","Purch","Sold","Exp","Act","Var"].map(h=>(
-                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
+                  <th key={h} className="px-3 py-2 font-medium text-[12px] text-slate-600">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {drinks.map((d, idx)=>(
                 <tr key={d.brand} className="border-t">
-                  <td className="px-3 py-2">{d.brand}</td>
+                  <td className="px-3 py-2 text-sm">{d.brand}</td>
                   {(["prev_end","purchased","sold"] as const).map(k=>(
                     <td key={k} className="px-3 py-2">
                       <input inputMode="numeric" pattern="[0-9]*"
@@ -165,7 +165,7 @@ export default function StockReview(){
                         className="h-10 w-24 rounded border px-2 text-sm"/>
                     </td>
                   ))}
-                  <td className="px-3 py-2 text-slate-500">{d.expected}</td>
+                  <td className="px-3 py-2 text-sm text-slate-500">{d.expected}</td>
                   <td className="px-3 py-2">
                     <input inputMode="numeric" pattern="[0-9]*"
                       value={String(d.actual)}
@@ -175,7 +175,7 @@ export default function StockReview(){
                       }}
                       className="h-10 w-24 rounded border px-2 text-sm"/>
                   </td>
-                  <td className={`px-3 py-2 ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
+                  <td className={`px-3 py-2 text-sm ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
                 </tr>
               ))}
             </tbody>
