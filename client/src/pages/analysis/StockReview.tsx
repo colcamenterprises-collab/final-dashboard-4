@@ -111,7 +111,7 @@ export default function StockReview(){
                        value={String((rolls as any)[key])}
                        onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
                        readOnly={!!ro}
-                       className="h-10 w-full rounded-xl border px-3 text-base"/>
+                       className="h-10 w-full rounded-xl border px-3 text-sm"/>
               )}
             </label>
           ))}
@@ -145,7 +145,7 @@ export default function StockReview(){
                        value={String((meat as any)[key])}
                        onChange={e=> setMeat({...meat, [key]: nz(e.target.value)})}
                        readOnly={!!ro}
-                       className="h-10 w-full rounded-xl border px-3 text-base"/>
+                       className="h-10 w-full rounded-xl border px-3 text-sm"/>
               )}
             </label>
           ))}
@@ -178,7 +178,7 @@ export default function StockReview(){
                           const v = nz(e.target.value);
                           setDrinks(s => s.map((r,i)=> i===idx ? {...r, [k]: v} : r));
                         }}
-                        className="h-10 w-24 rounded-xl border px-2 text-base"/>
+                        className="h-10 w-24 rounded-xl border px-2 text-sm"/>
                     </td>
                   ))}
                   <td className="px-3 py-2 text-slate-500">{d.expected}</td>
@@ -189,7 +189,7 @@ export default function StockReview(){
                         const v = nz(e.target.value);
                         setDrinks(s => s.map((r,i)=> i===idx ? {...r, actual: v, variance: v - (r.expected ?? 0)} : r));
                       }}
-                      className="h-10 w-24 rounded-xl border px-2 text-base"/>
+                      className="h-10 w-24 rounded-xl border px-2 text-sm"/>
                   </td>
                   <td className={`px-3 py-2 ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
                   <td className="px-3 py-2">
