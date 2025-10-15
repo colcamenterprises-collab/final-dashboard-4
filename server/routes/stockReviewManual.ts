@@ -94,11 +94,12 @@ router.get("/", async (req, res) => {
     res.json({
       ok: true,
       day,
+      submitted: base.rowCount ? base.rows[0].submitted : null,
       rolls: base.rowCount
         ? {
             prev_end: base.rows[0].rolls_prev_end,
             purchased: base.rows[0].rolls_purchased,
-            sold: base.rows[0].burgers_sold,
+            sold: base.rows[0].rolls_sold,
             expected: base.rows[0].rolls_expected,
             actual: base.rows[0].rolls_actual,
             paid: base.rows[0].rolls_paid
@@ -504,11 +505,11 @@ router.post("/save", async (req,res)=>{
 
     const setNum = (col:string, val:any)=>{
       if (val===undefined || val===null || Number.isNaN(Number(val))) return;
-      sets.push(`${col}=${++i}`); vals.push(Number(val));
+      sets.push(`${col}=$${++i}`); vals.push(Number(val));
     };
     const setStr = (col:string, val:any)=>{
       if (val===undefined) return;
-      sets.push(`${col}=${++i}`); vals.push(String(val));
+      sets.push(`${col}=$${++i}`); vals.push(String(val));
     };
 
     const m=body.meat||{};
@@ -529,16 +530,17 @@ router.post("/save", async (req,res)=>{
 
     if (status==='submit') { sets.push("submitted=true"); } else { sets.push("submitted=false"); }
 
-    // Upsert
-    const sql = `
-      INSERT INTO stock_ledger_day(day, updated_at)
-      VALUES ($1, NOW())
-      ON CONFLICT (day) DO NOTHING;
-      UPDATE stock_ledger_day SET ${sets.join(", ")} WHERE day=$1
-      RETURNING *;
-    `;
-    const rdb = await pool.query(sql, [day, ...vals]);
-    res.json({ok:true, day, rows:rdb.rows?.length||0});
+    // First ensure row exists
+    await pool.query(`INSERT INTO stock_ledger_day(day) VALUES ($1) ON CONFLICT (day) DO NOTHING`, [day]);
+    
+    // Then update with dynamic fields
+    if (sets.length > 0) {
+      const updateSQL = `UPDATE stock_ledger_day SET ${sets.join(", ")} WHERE day=$1 RETURNING *`;
+      const rdb = await pool.query(updateSQL, [day, ...vals]);
+      res.json({ok:true, day, rows:rdb.rows?.length||0});
+    } else {
+      res.json({ok:true, day, rows:0});
+    }
   }catch(e:any){ res.status(400).json({ok:false, error:e.message}); }
 });
 
