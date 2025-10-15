@@ -72,9 +72,9 @@ export default function StockReview(){
   const pill = (n:number)=> `text-xs px-2 py-1 rounded-full ${n===0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`;
 
   return (
-    <div className="mx-auto max-w-5xl p-3 md:p-6">
+    <div className="mx-auto max-w-5xl p-3 md:p-6 bg-white min-h-screen">
       {/* Sticky toolbar */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur pb-2">
+      <div className="sticky top-0 z-10 bg-white pb-2">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold flex-1">Stock Review</h1>
           <input type="date" className="h-10 rounded border px-3 text-sm"
@@ -85,7 +85,7 @@ export default function StockReview(){
       </div>
 
       {/* Rolls */}
-      <section className="mt-3 rounded border p-3 md:p-4">
+      <section className="mt-3 rounded border p-3 md:p-4 shadow-md">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
           <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
@@ -111,7 +111,7 @@ export default function StockReview(){
       </section>
 
       {/* Meat */}
-      <section className="mt-3 rounded border p-3 md:p-4">
+      <section className="mt-3 rounded border p-3 md:p-4 shadow-md">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Meat (grams)</h2>
           <span className={pill(meatVar)}>Variance: {meatVar} g</span>
@@ -137,7 +137,7 @@ export default function StockReview(){
       </section>
 
       {/* Drinks */}
-      <section className="mt-3 rounded border p-0 overflow-hidden">
+      <section className="mt-3 rounded border p-0 overflow-hidden shadow-md">
         <div className="flex items-center justify-between p-3 md:p-4">
           <h2 className="text-base font-medium">Drinks (Cans)</h2>
         </div>
