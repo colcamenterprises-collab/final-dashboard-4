@@ -17,6 +17,7 @@ export default function StockReview(){
   const today = new Date().toISOString().slice(0,10);
   const [day, setDay] = useState<string>(today);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [rolls, setRolls] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
   const [meat, setMeat] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
@@ -54,15 +55,43 @@ export default function StockReview(){
 
   useEffect(()=>{ load(); }, [day]);
 
-  async function save(){
-    const body = { day, rolls, meat, drinks };
-    const res = await fetch(`/api/stock-review/manual-ledger`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(body)
-    });
-    const j = await res.json();
-    if (!j.ok) alert(j.error || "Save failed");
+  async function saveData(status:'draft'|'submit'){
+    if(status==='submit'){
+      const rOk = Number(rolls?.actual ?? 0) >= 0;
+      const mOk = Number(meat?.actual ?? 0) >= 0;
+      if(!rOk || !mOk){ alert("Please fill actual counts for Rolls and Meat before submit."); return; }
+    }
+    setSaving(true);
+    try{
+      const body:any = { day, status };
+      if(rolls) body.rolls = {
+        prev_end: Number(rolls.prev_end||0),
+        purchased: Number(rolls.purchased||0),
+        sold: Number(rolls.sold||0),
+        expected: Number(rolls.expected||0),
+        actual: Number(rolls.actual||0),
+        paid: String(rolls.paid||'N')
+      };
+      if(meat) body.meat = {
+        prev_end: Number(meat.prev_end||0),
+        purchased: Number(meat.purchased||0),
+        sold: Number(meat.sold||0),
+        expected: Number(meat.expected||0),
+        actual: Number(meat.actual||0),
+        paid: String(meat.paid||'N')
+      };
+      const res = await fetch('/api/stock-review/manual-ledger/save', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const j = await res.json();
+      if(!j.ok) throw new Error(j.error||'Save failed');
+      alert(status==='submit' ? 'Submitted successfully!' : 'Draft saved!');
+    }catch(e:any){ 
+      alert(e.message||'Save failed'); 
+    } finally{ 
+      setSaving(false); 
+    }
   }
 
   function exportCSV(){
@@ -79,7 +108,6 @@ export default function StockReview(){
           <h1 className="text-xl font-semibold flex-1">Stock Review</h1>
           <input type="date" className="h-10 rounded border px-3 text-sm"
             value={day} onChange={e=>setDay(e.target.value)} />
-          <button onClick={save} className="h-10 rounded bg-slate-900 text-white px-4 text-sm">Save</button>
           <button onClick={exportCSV} className="h-10 rounded border px-4 text-sm">CSV (Day)</button>
         </div>
       </div>
@@ -89,6 +117,22 @@ export default function StockReview(){
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
           <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            onClick={async ()=>{
+              try{
+                const res = await fetch(`/api/stock-review/manual-ledger/refresh-rolls?date=${day}`, { method:"POST" });
+                const j = await res.json();
+                if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
+                const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+                const d = await r.json();
+                if(d?.ok){ setRolls(d.rolls); }
+              }catch(e){ alert("Auto-fill failed"); }
+            }}
+            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
+            title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
+          >Auto</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
@@ -204,6 +248,31 @@ export default function StockReview(){
       </section>
 
       {loading && <div className="mt-3 text-sm text-slate-500">Loading…</div>}
+
+      {/* Sticky footer with Save Draft and Submit */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+        <div className="mx-auto max-w-5xl px-3 md:px-6 py-3">
+          <div className="flex gap-3 justify-end">
+            <button 
+              disabled={saving} 
+              onClick={()=>saveData('draft')} 
+              className="h-10 px-6 rounded border text-sm bg-white hover:bg-slate-50 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Draft'}
+            </button>
+            <button 
+              disabled={saving} 
+              onClick={()=>saveData('submit')} 
+              className="h-10 px-6 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {saving ? 'Submitting...' : 'Submit'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom padding to prevent content from being hidden behind sticky footer */}
+      <div className="h-20"></div>
     </div>
   );
 }
