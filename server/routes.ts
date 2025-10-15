@@ -62,6 +62,7 @@ import { importPosBundle } from "../src/server/pos/uploadBundle";
 import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
+import stockReviewManual from "./routes/stockReviewManual";
 // Email functionality will be added when needed
 
 
@@ -1030,7 +1031,7 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Stock Review Manual Ledger - mounted before :date route to avoid conflicts
-  app.use("/api/stock-review/manual-ledger", analysisManualLedgerRouter);
+  app.use("/api/stock-review/manual-ledger", stockReviewManual);
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {

@@ -1,164 +1,202 @@
 import { useEffect, useMemo, useState } from "react";
 
-const card = "rounded-2xl shadow-sm border border-gray-200 p-3 mb-4";
-const label = "text-xs text-gray-600";
-const input = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm";
-const badge = (v:number)=> v===0 ? "inline-block px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs"
-                                : "inline-block px-2 py-1 rounded-full bg-rose-100 text-rose-700 text-xs";
+type YN = "Y"|"N";
 
-type Shift = any;
-type DrinkRow = { name:string; prev_end:number; purchased:number; sold:number; expected:number; actual:number; variance:number; paid:boolean; };
+const BRANDS = [
+  "Coke","Coke Zero","Sprite","Schweppes Manow",
+  "Red Fanta","Orange Fanta","Red Singha","Yellow Singha","Pink Singha"
+];
 
-async function api<T=any>(path:string, init?:RequestInit):Promise<T>{
-  const r = await fetch(path, { headers: { "Content-Type":"application/json" }, ...init });
-  return r.json();
-}
+type RollsMeat = { prev_end:number; purchased:number; sold:number; expected:number; actual:number; paid:YN };
+type Drink = { brand:string; prev_end:number; purchased:number; sold:number; expected:number; actual:number; variance:number; paid:YN };
+
+const nz = (v:any)=> Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0;
+const yn = (v:any):YN => v==="Y" ? "Y" : "N";
 
 export default function StockReview(){
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
-  const [shift, setShift] = useState<Shift|null>(null);
-  const [drinks, setDrinks] = useState<DrinkRow[]>([]);
-  const [saving, setSaving] = useState(false);
+  const today = new Date().toISOString().slice(0,10);
+  const [day, setDay] = useState<string>(today);
+  const [loading, setLoading] = useState(false);
 
-  const brands = useMemo(()=> drinks.map(d=>d.name), [drinks]);
+  const [rolls, setRolls] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
+  const [meat, setMeat] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
+  const [drinks, setDrinks] = useState<Drink[]>(BRANDS.map(b => ({brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N"})));
 
-  useEffect(() => {
-    (async () => {
-      const res = await api<{ok:boolean; item:Shift|null; drinks:DrinkRow[]}>(`/api/stock-review/manual-ledger?date=${date}`);
-      if (res.ok){
-        setShift(res.item || {
-          shift_date: date, rolls_prev_end:0, rolls_purchased:0, burgers_sold:0, rolls_actual:0, rolls_paid:false,
-          meat_prev_end_g:0, meat_purchased_g:0, meat_sold_g:0, meat_actual_g:0, meat_paid:false
-        });
-        setDrinks(res.drinks || []);
-      }
-    })();
-  }, [date]);
+  const rollsVar = useMemo(()=> nz(rolls.actual) - nz(rolls.expected), [rolls]);
+  const meatVar = useMemo(()=> nz(meat.actual) - nz(meat.expected), [meat]);
 
-  const rollsExpected = (Number(shift?.rolls_prev_end||0)+Number(shift?.rolls_purchased||0)-Number(shift?.burgers_sold||0))|0;
-  const rollsVariance = (Number(shift?.rolls_actual||0)-rollsExpected)|0;
+  // recompute exp/variance on edit
+  useEffect(()=>{
+    setRolls(r => ({...r, expected: nz(r.prev_end) + nz(r.purchased) - nz(r.sold)}));
+  }, [rolls.prev_end, rolls.purchased, rolls.sold]);
+  useEffect(()=>{
+    setMeat(m => ({...m, expected: nz(m.prev_end) + nz(m.purchased) - nz(m.sold)}));
+  }, [meat.prev_end, meat.purchased, meat.sold]);
+  useEffect(()=>{
+    setDrinks(ds => ds.map(d => {
+      const expected = nz(d.prev_end) + nz(d.purchased) - nz(d.sold);
+      return {...d, expected, variance: nz(d.actual) - expected};
+    }));
+  }, [JSON.stringify(drinks.map(d=>[d.prev_end,d.purchased,d.sold,d.actual]))]);
 
-  const meatExpected  = (Number(shift?.meat_prev_end_g||0)+Number(shift?.meat_purchased_g||0)-Number(shift?.meat_sold_g||0))|0;
-  const meatVariance  = (Number(shift?.meat_actual_g||0)-meatExpected)|0;
-
-  async function saveBase(){
-    setSaving(true);
-    const body = JSON.stringify({ ...shift,
-      roll_expected: rollsExpected, meat_expected_g: meatExpected
-    });
-    const method = shift?.id ? "PUT" : "POST";
-    const url = shift?.id ? `/api/stock-review/manual-ledger/${shift.id}` : "/api/stock-review/manual-ledger";
-    const res = await api<{ok:boolean; item:any}>(url,{ method, body});
-    if (res.ok){
-      setShift(res.item);
+  async function load(){
+    setLoading(true);
+    const res = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+    const data = await res.json();
+    if (data?.ok){
+      setRolls(data.rolls);
+      setMeat(data.meat);
+      const map = new Map(data.drinks.map((r:Drink)=>[r.brand,r]));
+      setDrinks(BRANDS.map(b => map.get(b) || {brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N"}));
     }
-    setSaving(false);
+    setLoading(false);
   }
 
-  async function saveDrinks(){
-    if (!shift?.id) { await saveBase(); }
-    const id = shift?.id;
-    if (!id) return;
-    const body = JSON.stringify(drinks.map(d=>({ brand:d.name, prev_end:d.prev_end, purchased:d.purchased, sold:d.sold, actual:d.actual, paid:d.paid })));
-    await api(`/api/stock-review/manual-ledger/${id}/drinks`, { method:"PUT", body });
-  }
+  useEffect(()=>{ load(); }, [day]);
 
-  async function saveAll(){
-    await saveBase();
-    await saveDrinks();
-    alert("Saved!");
-  }
-
-  function updateShift(k:string, v:any){
-    setShift((s:any)=> ({...s, [k]:v}));
-  }
-
-  function editDrink(idx:number, k:keyof DrinkRow, v:any){
-    setDrinks(ds=>{
-      const copy = [...ds];
-      const d = {...copy[idx]};
-      (d as any)[k] = k==="paid" ? !!v : Number(v||0);
-      d.expected = (Number(d.prev_end||0)+Number(d.purchased||0)-Number(d.sold||0))|0;
-      d.variance = (Number(d.actual||0)-d.expected)|0;
-      copy[idx]=d;
-      return copy;
+  async function save(){
+    const body = { day, rolls, meat, drinks };
+    const res = await fetch(`/api/stock-review/manual-ledger`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(body)
     });
+    const j = await res.json();
+    if (!j.ok) alert(j.error || "Save failed");
   }
+
+  function exportCSV(){
+    window.open(`/api/stock-review/manual-ledger/export.csv?date=${day}`, "_blank");
+  }
+
+  const pill = (n:number)=> `text-xs px-2 py-1 rounded-full ${n===0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`;
 
   return (
-    <div className="max-w-screen-xl mx-auto p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold">Stock Review</h1>
-        <div className="flex gap-2">
-          <input type="date" className={input} value={date} onChange={e=>setDate(e.target.value)} />
-          <button onClick={saveAll} disabled={saving} className="px-3 py-2 rounded-xl bg-black text-white text-sm">{saving ? "Saving..." : "Save"}</button>
-          <a className="px-3 py-2 rounded-xl border text-sm" href={`/api/stock-review/manual-ledger/export.csv?from=${date}&to=${date}`} target="_blank" rel="noreferrer">Export CSV (Day)</a>
+    <div className="mx-auto max-w-5xl p-3 md:p-6">
+      {/* Sticky toolbar */}
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur pb-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold flex-1">Stock Review</h1>
+          <input type="date" className="h-10 rounded-xl border px-3 text-sm"
+            value={day} onChange={e=>setDay(e.target.value)} />
+          <button onClick={save} className="h-10 rounded-xl bg-slate-900 text-white px-4 text-sm">Save</button>
+          <button onClick={exportCSV} className="h-10 rounded-xl border px-4 text-sm">CSV (Day)</button>
         </div>
       </div>
 
-      <div className={card}>
+      {/* Rolls */}
+      <section className="mt-3 rounded-2xl border p-3 md:p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
-          <span className={badge(rollsVariance)}>Variance: {rollsVariance}</span>
+          <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-          <div><div className={label}>Prev End</div><input className={input} type="number" value={shift?.rolls_prev_end||0} onChange={e=>updateShift("rolls_prev_end", Number(e.target.value))}/></div>
-          <div><div className={label}>Purchased</div><input className={input} type="number" value={shift?.rolls_purchased||0} onChange={e=>updateShift("rolls_purchased", Number(e.target.value))}/></div>
-          <div><div className={label}>Burgers Sold</div><input className={input} type="number" value={shift?.burgers_sold||0} onChange={e=>updateShift("burgers_sold", Number(e.target.value))}/></div>
-          <div><div className={label}>Expected</div><input className={input+" bg-gray-50"} readOnly value={rollsExpected}/></div>
-          <div><div className={label}>Actual</div><input className={input} type="number" value={shift?.rolls_actual||0} onChange={e=>updateShift("rolls_actual", Number(e.target.value))}/></div>
-          <div><div className={label}>Paid</div>
-            <select className={input} value={shift?.rolls_paid ? "Y":"N"} onChange={e=>updateShift("rolls_paid", e.target.value==="Y")}><option>N</option><option>Y</option></select>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+          {[
+            ["Prev End", "prev_end"],
+            ["Purchased", "purchased"],
+            ["Burgers Sold", "sold"],
+            ["Expected", "expected", true],
+            ["Actual", "actual"],
+            ["Paid", "paid"]
+          ].map(([label, key, ro]:any)=>(
+            <label key={String(key)} className="text-[12px] text-slate-600">
+              <div className="mb-1">{label}</div>
+              {key==="paid" ? (
+                <select value={rolls.paid} onChange={e=>setRolls({...rolls, paid: yn(e.target.value)})}
+                        className="h-10 w-full rounded-xl border px-2 text-base">
+                  <option value="N">N</option><option value="Y">Y</option>
+                </select>
+              ) : (
+                <input inputMode="numeric" pattern="[0-9]*"
+                       value={String((rolls as any)[key])}
+                       onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
+                       readOnly={!!ro}
+                       className="h-10 w-full rounded-xl border px-3 text-base"/>
+              )}
+            </label>
+          ))}
         </div>
-      </div>
+      </section>
 
-      <div className={card}>
+      {/* Meat */}
+      <section className="mt-3 rounded-2xl border p-3 md:p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Meat (grams)</h2>
-          <span className={badge(meatVariance)}>Variance: {meatVariance} g</span>
+          <span className={pill(meatVar)}>Variance: {meatVar} g</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-          <div><div className={label}>Prev End (g)</div><input className={input} type="number" value={shift?.meat_prev_end_g||0} onChange={e=>updateShift("meat_prev_end_g", Number(e.target.value))}/></div>
-          <div><div className={label}>Purchased (g)</div><input className={input} type="number" value={shift?.meat_purchased_g||0} onChange={e=>updateShift("meat_purchased_g", Number(e.target.value))}/></div>
-          <div><div className={label}>Sold (g)</div><input className={input} type="number" value={shift?.meat_sold_g||0} onChange={e=>updateShift("meat_sold_g", Number(e.target.value))}/></div>
-          <div><div className={label}>Expected (g)</div><input className={input+" bg-gray-50"} readOnly value={meatExpected}/></div>
-          <div><div className={label}>Actual (g)</div><input className={input} type="number" value={shift?.meat_actual_g||0} onChange={e=>updateShift("meat_actual_g", Number(e.target.value))}/></div>
-          <div><div className={label}>Paid</div>
-            <select className={input} value={shift?.meat_paid ? "Y":"N"} onChange={e=>updateShift("meat_paid", e.target.value==="Y")}><option>N</option><option>Y</option></select>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
+          {[
+            ["Prev End (g)", "prev_end"],
+            ["Purchased (g)", "purchased"],
+            ["Sold (g)", "sold"],
+            ["Expected (g)", "expected", true],
+            ["Actual (g)", "actual"],
+            ["Paid", "paid"]
+          ].map(([label, key, ro]:any)=>(
+            <label key={String(key)} className="text-[12px] text-slate-600">
+              <div className="mb-1">{label}</div>
+              {key==="paid" ? (
+                <select value={meat.paid} onChange={e=>setMeat({...meat, paid: yn(e.target.value)})}
+                        className="h-10 w-full rounded-xl border px-2 text-base">
+                  <option value="N">N</option><option value="Y">Y</option>
+                </select>
+              ) : (
+                <input inputMode="numeric" pattern="[0-9]*"
+                       value={String((meat as any)[key])}
+                       onChange={e=> setMeat({...meat, [key]: nz(e.target.value)})}
+                       readOnly={!!ro}
+                       className="h-10 w-full rounded-xl border px-3 text-base"/>
+              )}
+            </label>
+          ))}
         </div>
-      </div>
+      </section>
 
-      <div className={card}>
-        <h2 className="text-base font-medium mb-2">Drinks (Cans)</h2>
+      {/* Drinks */}
+      <section className="mt-3 rounded-2xl border p-0 overflow-hidden">
+        <div className="flex items-center justify-between p-3 md:p-4">
+          <h2 className="text-base font-medium">Drinks (Cans)</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2">Brand</th>
-                <th className="text-left py-2">Prev</th>
-                <th className="text-left py-2">Purch</th>
-                <th className="text-left py-2">Sold</th>
-                <th className="text-left py-2 bg-gray-50">Exp</th>
-                <th className="text-left py-2">Act</th>
-                <th className="text-left py-2">Var</th>
-                <th className="text-left py-2">Paid</th>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr className="text-left">
+                {["Brand","Prev","Purch","Sold","Exp","Act","Var","Paid"].map(h=>(
+                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {drinks.map((d,i)=>(
-                <tr key={d.name} className="border-b">
-                  <td className="py-2 font-medium">{d.name}</td>
-                  <td><input type="number" className="w-16 border px-1 py-1 text-xs rounded" value={d.prev_end||0} onChange={e=>editDrink(i,'prev_end',e.target.value)}/></td>
-                  <td><input type="number" className="w-16 border px-1 py-1 text-xs rounded" value={d.purchased||0} onChange={e=>editDrink(i,'purchased',e.target.value)}/></td>
-                  <td><input type="number" className="w-16 border px-1 py-1 text-xs rounded" value={d.sold||0} onChange={e=>editDrink(i,'sold',e.target.value)}/></td>
-                  <td className="bg-gray-50">{d.expected}</td>
-                  <td><input type="number" className="w-16 border px-1 py-1 text-xs rounded" value={d.actual||0} onChange={e=>editDrink(i,'actual',e.target.value)}/></td>
-                  <td><span className={badge(d.variance)}>{d.variance}</span></td>
-                  <td>
-                    <select className="border px-1 py-1 text-xs rounded" value={d.paid?"Y":"N"} onChange={e=>editDrink(i,'paid',e.target.value==="Y")}>
-                      <option>N</option><option>Y</option>
+              {drinks.map((d, idx)=>(
+                <tr key={d.brand} className="border-t">
+                  <td className="px-3 py-2">{d.brand}</td>
+                  {(["prev_end","purchased","sold"] as const).map(k=>(
+                    <td key={k} className="px-3 py-2">
+                      <input inputMode="numeric" pattern="[0-9]*"
+                        value={String((d as any)[k])}
+                        onChange={e=>{
+                          const v = nz(e.target.value);
+                          setDrinks(s => s.map((r,i)=> i===idx ? {...r, [k]: v} : r));
+                        }}
+                        className="h-10 w-24 rounded-xl border px-2 text-base"/>
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-slate-500">{d.expected}</td>
+                  <td className="px-3 py-2">
+                    <input inputMode="numeric" pattern="[0-9]*"
+                      value={String(d.actual)}
+                      onChange={e=>{
+                        const v = nz(e.target.value);
+                        setDrinks(s => s.map((r,i)=> i===idx ? {...r, actual: v, variance: v - (r.expected ?? 0)} : r));
+                      }}
+                      className="h-10 w-24 rounded-xl border px-2 text-base"/>
+                  </td>
+                  <td className={`px-3 py-2 ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
+                  <td className="px-3 py-2">
+                    <select value={d.paid}
+                      onChange={e=> setDrinks(s => s.map((r,i)=> i===idx ? {...r, paid: (e.target.value as YN)} : r))}
+                      className="h-10 w-16 rounded-xl border px-2 text-base">
+                      <option value="N">N</option><option value="Y">Y</option>
                     </select>
                   </td>
                 </tr>
@@ -166,7 +204,9 @@ export default function StockReview(){
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
+
+      {loading && <div className="mt-3 text-sm text-slate-500">Loading…</div>}
     </div>
   );
 }
