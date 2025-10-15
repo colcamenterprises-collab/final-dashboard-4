@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { pool } from "../lib/db.js";
+import { pool } from "../db.js";
 import { Parser } from "json2csv";
 
 export const analysisManualLedgerRouter = Router();

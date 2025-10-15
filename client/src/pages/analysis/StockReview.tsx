@@ -24,7 +24,7 @@ export default function StockReview(){
 
   useEffect(() => {
     (async () => {
-      const res = await api<{ok:boolean; item:Shift|null; drinks:DrinkRow[]}>(`/api/analysis/manual-ledger?date=${date}`);
+      const res = await api<{ok:boolean; item:Shift|null; drinks:DrinkRow[]}>(`/api/stock-review/manual-ledger?date=${date}`);
       if (res.ok){
         setShift(res.item || {
           shift_date: date, rolls_prev_end:0, rolls_purchased:0, burgers_sold:0, rolls_actual:0, rolls_paid:false,
@@ -47,7 +47,7 @@ export default function StockReview(){
       roll_expected: rollsExpected, meat_expected_g: meatExpected
     });
     const method = shift?.id ? "PUT" : "POST";
-    const url = shift?.id ? `/api/analysis/manual-ledger/${shift.id}` : "/api/analysis/manual-ledger";
+    const url = shift?.id ? `/api/stock-review/manual-ledger/${shift.id}` : "/api/stock-review/manual-ledger";
     const res = await api<{ok:boolean; item:any}>(url,{ method, body});
     if (res.ok){
       setShift(res.item);
@@ -60,7 +60,7 @@ export default function StockReview(){
     const id = shift?.id;
     if (!id) return;
     const body = JSON.stringify(drinks.map(d=>({ brand:d.name, prev_end:d.prev_end, purchased:d.purchased, sold:d.sold, actual:d.actual, paid:d.paid })));
-    await api(`/api/analysis/manual-ledger/${id}/drinks`, { method:"PUT", body });
+    await api(`/api/stock-review/manual-ledger/${id}/drinks`, { method:"PUT", body });
   }
 
   async function saveAll(){
@@ -92,7 +92,7 @@ export default function StockReview(){
         <div className="flex gap-2">
           <input type="date" className={input} value={date} onChange={e=>setDate(e.target.value)} />
           <button onClick={saveAll} disabled={saving} className="px-3 py-2 rounded-xl bg-black text-white text-sm">{saving ? "Saving..." : "Save"}</button>
-          <a className="px-3 py-2 rounded-xl border text-sm" href={`/api/analysis/manual-ledger/export.csv?from=${date}&to=${date}`} target="_blank" rel="noreferrer">Export CSV (Day)</a>
+          <a className="px-3 py-2 rounded-xl border text-sm" href={`/api/stock-review/manual-ledger/export.csv?from=${date}&to=${date}`} target="_blank" rel="noreferrer">Export CSV (Day)</a>
         </div>
       </div>
 

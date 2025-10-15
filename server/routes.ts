@@ -1029,6 +1029,9 @@ export function registerRoutes(app: express.Application): Server {
     });
   });
 
+  // Stock Review Manual Ledger - mounted before :date route to avoid conflicts
+  app.use("/api/stock-review/manual-ledger", analysisManualLedgerRouter);
+
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
     const date = req.params.date;
