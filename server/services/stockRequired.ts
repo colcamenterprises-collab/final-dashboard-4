@@ -1,13 +1,9 @@
-import fs from "node:fs";
-import path from "node:path";
+import { foodCostings } from "../data/foodCostings.js";
 
-const cfgPath = path.resolve("server/config/drinks.json");
-let REQUIRED_DRINKS: string[] = [];
-try {
-  REQUIRED_DRINKS = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
-} catch {
-  REQUIRED_DRINKS = ["Coke (330ml)", "Sprite"]; // fallback
-}
+// Dynamically get all drink names from foodCostings database
+const REQUIRED_DRINKS: string[] = foodCostings
+  .filter(item => item.category === "Drinks")
+  .map(item => item.item);
 
 const N = (v:any) => {
   if (v === null || v === undefined) return NaN;

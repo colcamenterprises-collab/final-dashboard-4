@@ -59,7 +59,6 @@ const DailyStock: React.FC = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<any>({});
   const [lang, setLang] = useState<'en' | 'th'>('en');
-  const requiredDrinks = ["Coke (330ml)", "Sprite", "Water (500ml)", "Fanta Orange", "Pepsi", "Red Bull"];
 // === BEGIN MANAGER QUICK CHECK: state & handlers ===
 const [showCheck, setShowCheck] = useState(false);
 
