@@ -77,15 +77,15 @@ export default function StockReview(){
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur pb-2">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold flex-1">Stock Review</h1>
-          <input type="date" className="h-10 rounded-lg border px-3 text-sm"
+          <input type="date" className="h-10 rounded border px-3 text-sm"
             value={day} onChange={e=>setDay(e.target.value)} />
-          <button onClick={save} className="h-10 rounded-lg bg-slate-900 text-white px-4 text-sm">Save</button>
-          <button onClick={exportCSV} className="h-10 rounded-lg border px-4 text-sm">CSV (Day)</button>
+          <button onClick={save} className="h-10 rounded bg-slate-900 text-white px-4 text-sm">Save</button>
+          <button onClick={exportCSV} className="h-10 rounded border px-4 text-sm">CSV (Day)</button>
         </div>
       </div>
 
       {/* Rolls */}
-      <section className="mt-3 rounded-lg border p-3 md:p-4">
+      <section className="mt-3 rounded border p-3 md:p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
           <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
@@ -104,14 +104,14 @@ export default function StockReview(){
                      value={String((rolls as any)[key])}
                      onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
                      readOnly={!!ro}
-                     className="h-10 w-full rounded-lg border px-3 text-sm"/>
+                     className="h-10 w-full rounded border px-3 text-sm"/>
             </label>
           ))}
         </div>
       </section>
 
       {/* Meat */}
-      <section className="mt-3 rounded-lg border p-3 md:p-4">
+      <section className="mt-3 rounded border p-3 md:p-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Meat (grams)</h2>
           <span className={pill(meatVar)}>Variance: {meatVar} g</span>
@@ -130,14 +130,14 @@ export default function StockReview(){
                      value={String((meat as any)[key])}
                      onChange={e=> setMeat({...meat, [key]: nz(e.target.value)})}
                      readOnly={!!ro}
-                     className="h-10 w-full rounded-lg border px-3 text-sm"/>
+                     className="h-10 w-full rounded border px-3 text-sm"/>
             </label>
           ))}
         </div>
       </section>
 
       {/* Drinks */}
-      <section className="mt-3 rounded-lg border p-0 overflow-hidden">
+      <section className="mt-3 rounded border p-0 overflow-hidden">
         <div className="flex items-center justify-between p-3 md:p-4">
           <h2 className="text-base font-medium">Drinks (Cans)</h2>
         </div>
@@ -162,7 +162,7 @@ export default function StockReview(){
                           const v = nz(e.target.value);
                           setDrinks(s => s.map((r,i)=> i===idx ? {...r, [k]: v} : r));
                         }}
-                        className="h-10 w-24 rounded-lg border px-2 text-sm"/>
+                        className="h-10 w-24 rounded border px-2 text-sm"/>
                     </td>
                   ))}
                   <td className="px-3 py-2 text-slate-500">{d.expected}</td>
@@ -173,7 +173,7 @@ export default function StockReview(){
                         const v = nz(e.target.value);
                         setDrinks(s => s.map((r,i)=> i===idx ? {...r, actual: v, variance: v - (r.expected ?? 0)} : r));
                       }}
-                      className="h-10 w-24 rounded-lg border px-2 text-sm"/>
+                      className="h-10 w-24 rounded border px-2 text-sm"/>
                   </td>
                   <td className={`px-3 py-2 ${d.variance===0?"text-green-600":"text-red-600"}`}>{d.variance}</td>
                 </tr>
