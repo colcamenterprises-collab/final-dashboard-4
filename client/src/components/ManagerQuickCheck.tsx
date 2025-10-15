@@ -206,13 +206,13 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
             <div className="space-y-3 sm:space-y-4">
               {/* Skip section (only if not required) */}
               {!required && (
-                <div className="flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                <div className="flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-[8px]">
                   <label className="text-xs sm:text-sm font-medium text-red-700">
                     {t('managerCheck.skipSection') || 'Skip Checklist'}
                   </label>
                   <input 
                     type="text"
-                    className="border-2 border-red-300 rounded-lg p-2 sm:p-3 text-xs sm:text-sm min-h-[44px] focus:outline-none focus:border-red-500" 
+                    className="border-2 border-red-300 rounded-[8px] p-2 sm:p-3 text-[12px] min-h-[44px] focus:outline-none focus:border-red-500 placeholder:text-[12px]" 
                     placeholder={t('managerCheck.skipReason') || 'Reason for skipping...'}
                     value={skipReason} 
                     onChange={(e)=>setSkipReason(e.target.value)}
@@ -220,7 +220,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                   />
                   <button 
                     type="button"
-                    className="w-full px-4 py-2 text-xs sm:text-sm border-2 border-red-500 rounded-lg bg-red-100 hover:bg-red-200 active:bg-red-300 min-h-[44px] font-medium text-red-700 transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    className="w-full px-4 py-2 text-xs sm:text-sm border-2 border-red-500 rounded-[8px] bg-red-100 hover:bg-red-200 active:bg-red-300 min-h-[44px] font-medium text-red-700 transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed" 
                     onClick={skip}
                     disabled={!skipReason.trim()}
                     data-testid="button-skip"
@@ -234,7 +234,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center items-stretch sm:items-center">
                 <button 
                   type="button"
-                  className="px-4 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] font-medium transition-all active:scale-98" 
+                  className="px-4 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-[8px] bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] font-medium transition-all active:scale-98" 
                   onClick={onCancel}
                   data-testid="button-cancel"
                 >
@@ -243,7 +243,7 @@ export default function ManagerQuickCheck({ salesId, onDone, onCancel }: Props) 
                 
                 <button 
                   type="button"
-                  className="px-6 py-2 text-xs sm:text-sm rounded-lg bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  className="px-6 py-2 text-xs sm:text-sm rounded-[8px] bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                   onClick={submit}
                   disabled={!canSubmit}
                   data-testid="button-submit"
