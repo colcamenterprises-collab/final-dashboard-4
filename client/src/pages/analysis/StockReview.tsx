@@ -17,7 +17,9 @@ export default function StockReview(){
   const today = new Date().toISOString().slice(0,10);
   const [day, setDay] = useState<string>(today);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<string>("");
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState<any[]>([]);
 
   const [rolls, setRolls] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
   const [meat, setMeat] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
@@ -47,24 +49,75 @@ export default function StockReview(){
     if (data?.ok){
       setRolls(data.rolls);
       setMeat(data.meat);
-      const map = new Map(data.drinks.map((r:Drink)=>[r.brand,r]));
-      setDrinks(BRANDS.map(b => map.get(b) || {brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N"}));
+      const map = new Map<string, Drink>(data.drinks.map((r:Drink)=>[r.brand,r]));
+      const drinksData: Drink[] = BRANDS.map(b => 
+        map.get(b) || {brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N" as YN}
+      );
+      setDrinks(drinksData);
     }
     setLoading(false);
   }
 
   useEffect(()=>{ load(); }, [day]);
 
-  async function saveData(status:'draft'|'submit'){
+  async function saveSectionDraft(section:'rolls'|'meat'|'drinks'){
+    setSavingSection(section);
+    try{
+      const body:any = { day, status: 'draft' };
+      if(section === 'rolls'){
+        body.rolls = {
+          prev_end: Number(rolls.prev_end||0),
+          purchased: Number(rolls.purchased||0),
+          sold: Number(rolls.sold||0),
+          expected: Number(rolls.expected||0),
+          actual: Number(rolls.actual||0),
+          paid: String(rolls.paid||'N')
+        };
+      } else if(section === 'meat'){
+        body.meat = {
+          prev_end: Number(meat.prev_end||0),
+          purchased: Number(meat.purchased||0),
+          sold: Number(meat.sold||0),
+          expected: Number(meat.expected||0),
+          actual: Number(meat.actual||0),
+          paid: String(meat.paid||'N')
+        };
+      } else if(section === 'drinks'){
+        body.drinks = drinks.map(d => ({
+          brand: d.brand,
+          prev_end: Number(d.prev_end||0),
+          purchased: Number(d.purchased||0),
+          sold: Number(d.sold||0),
+          expected: Number(d.expected||0),
+          actual: Number(d.actual||0),
+          variance: Number(d.variance||0),
+          paid: String(d.paid||'N')
+        }));
+      }
+      const res = await fetch('/api/stock-review/manual-ledger/save', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const j = await res.json();
+      if(!j.ok) throw new Error(j.error||'Save failed');
+      alert(`${section.charAt(0).toUpperCase() + section.slice(1)} saved as draft!`);
+    }catch(e:any){ 
+      alert(e.message||'Save failed'); 
+    } finally{ 
+      setSavingSection(""); 
+    }
+  }
+
+  async function saveAll(status:'draft'|'submit'){
     if(status==='submit'){
       const rOk = Number(rolls?.actual ?? 0) >= 0;
       const mOk = Number(meat?.actual ?? 0) >= 0;
       if(!rOk || !mOk){ alert("Please fill actual counts for Rolls and Meat before submit."); return; }
     }
-    setSaving(true);
+    setSavingSection('all');
     try{
       const body:any = { day, status };
-      if(rolls) body.rolls = {
+      body.rolls = {
         prev_end: Number(rolls.prev_end||0),
         purchased: Number(rolls.purchased||0),
         sold: Number(rolls.sold||0),
@@ -72,7 +125,7 @@ export default function StockReview(){
         actual: Number(rolls.actual||0),
         paid: String(rolls.paid||'N')
       };
-      if(meat) body.meat = {
+      body.meat = {
         prev_end: Number(meat.prev_end||0),
         purchased: Number(meat.purchased||0),
         sold: Number(meat.sold||0),
@@ -86,11 +139,40 @@ export default function StockReview(){
       });
       const j = await res.json();
       if(!j.ok) throw new Error(j.error||'Save failed');
-      alert(status==='submit' ? 'Submitted successfully!' : 'Draft saved!');
+      alert(status==='submit' ? 'Submitted successfully!' : 'All sections saved as draft!');
     }catch(e:any){ 
       alert(e.message||'Save failed'); 
     } finally{ 
-      setSaving(false); 
+      setSavingSection(''); 
+    }
+  }
+
+  async function loadSummary(){
+    setLoading(true);
+    try{
+      // Fetch last 30 days of data
+      const promises: Promise<any>[] = [];
+      const dates: string[] = [];
+      for(let i=0; i<30; i++){
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().slice(0,10);
+        dates.push(dateStr);
+        promises.push(fetch(`/api/stock-review/manual-ledger?date=${dateStr}`).then(r => r.json()));
+      }
+      const results = await Promise.all(promises);
+      const summary = results
+        .map((data, idx) => ({date: dates[idx], data}))
+        .filter(item => item.data?.ok && (
+          item.data.rolls?.actual > 0 || 
+          item.data.meat?.actual > 0
+        ));
+      setSummaryData(summary);
+      setShowSummary(true);
+    }catch(e){
+      alert("Failed to load summary");
+    }finally{
+      setLoading(false);
     }
   }
 
@@ -100,6 +182,63 @@ export default function StockReview(){
 
   const pill = (n:number)=> `text-xs px-2 py-1 rounded-full ${n===0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`;
 
+  if(showSummary){
+    return (
+      <div className="mx-auto max-w-5xl p-3 md:p-6 bg-white min-h-screen">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Stock Review Summary</h1>
+          <button onClick={()=>setShowSummary(false)} className="h-10 rounded border px-4 text-sm">Back to Entry</button>
+        </div>
+        
+        {summaryData.length === 0 ? (
+          <div className="text-center py-10 text-slate-500">No saved entries found</div>
+        ) : (
+          <div className="space-y-3">
+            {summaryData.map(item => (
+              <div key={item.date} className="rounded border p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-base">{item.date}</h3>
+                  <button 
+                    onClick={()=>{ setDay(item.date); setShowSummary(false); }} 
+                    className="text-sm text-emerald-600 hover:underline"
+                  >View/Edit</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="font-medium text-slate-600 mb-1">Rolls (Buns)</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>Prev: {item.data.rolls?.prev_end || 0}</div>
+                      <div>Purchased: {item.data.rolls?.purchased || 0}</div>
+                      <div>Sold: {item.data.rolls?.sold || 0}</div>
+                      <div>Expected: {item.data.rolls?.expected || 0}</div>
+                      <div>Actual: {item.data.rolls?.actual || 0}</div>
+                      <div className={item.data.rolls?.actual - item.data.rolls?.expected === 0 ? "text-green-600" : "text-red-600"}>
+                        Variance: {(item.data.rolls?.actual || 0) - (item.data.rolls?.expected || 0)}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-slate-600 mb-1">Meat (grams)</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>Prev: {item.data.meat?.prev_end || 0}g</div>
+                      <div>Purchased: {item.data.meat?.purchased || 0}g</div>
+                      <div>Sold: {item.data.meat?.sold || 0}g</div>
+                      <div>Expected: {item.data.meat?.expected || 0}g</div>
+                      <div>Actual: {item.data.meat?.actual || 0}g</div>
+                      <div className={item.data.meat?.actual - item.data.meat?.expected === 0 ? "text-green-600" : "text-red-600"}>
+                        Variance: {(item.data.meat?.actual || 0) - (item.data.meat?.expected || 0)}g
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-5xl p-3 md:p-6 bg-white min-h-screen">
       {/* Sticky toolbar */}
@@ -108,15 +247,25 @@ export default function StockReview(){
           <h1 className="text-xl font-semibold flex-1">Stock Review</h1>
           <input type="date" className="h-10 rounded border px-3 text-sm"
             value={day} onChange={e=>setDay(e.target.value)} />
-          <button onClick={exportCSV} className="h-10 rounded border px-4 text-sm">CSV (Day)</button>
+          <button onClick={loadSummary} className="h-10 rounded border px-4 text-sm bg-blue-50 hover:bg-blue-100">View Summary</button>
+          <button onClick={exportCSV} className="h-10 rounded border px-4 text-sm">CSV</button>
         </div>
       </div>
 
       {/* Rolls */}
       <section className="mt-3 rounded border p-3 md:p-4 shadow-md">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-medium">Rolls (Buns)</h2>
-          <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-medium">Rolls (Buns)</h2>
+            <span className={pill(rollsVar)}>Variance: {rollsVar}</span>
+          </div>
+          <button
+            disabled={savingSection === 'rolls'}
+            onClick={()=>saveSectionDraft('rolls')}
+            className="h-8 px-4 rounded text-xs bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
+          >
+            {savingSection === 'rolls' ? 'Saving...' : 'Save Draft'}
+          </button>
         </div>
         <div className="flex items-center gap-2 mb-2">
           <button
@@ -157,29 +306,34 @@ export default function StockReview(){
       {/* Meat */}
       <section className="mt-3 rounded border p-3 md:p-4 shadow-md">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-medium">Meat (grams)</h2>
-          <span className={pill(meatVar)}>Variance: {meatVar} g</span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-medium">Meat (grams)</h2>
+            <span className={pill(meatVar)}>Variance: {meatVar} g</span>
+          </div>
+          <button
+            disabled={savingSection === 'meat'}
+            onClick={()=>saveSectionDraft('meat')}
+            className="h-8 px-4 rounded text-xs bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
+          >
+            {savingSection === 'meat' ? 'Saving...' : 'Save Draft'}
+          </button>
         </div>
-{/* [MEAT-AUTO-BTN] */}
-<div className="flex items-center gap-2 mb-2">
-  <button
-    onClick={async ()=>{
-      try{
-        const res = await fetch(`/api/stock-review/manual-ledger/refresh-meat?date=${day}`, { method:"POST" });
-        const j = await res.json();
-        if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
-        // Pull fresh state
-        const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
-        const d = await r.json();
-        if(d?.ok){
-          setMeat(d.meat);
-        }
-      }catch(e){ alert("Auto-fill failed"); }
-    }}
-    className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
-    title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
-  >Auto</button>
-</div>
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            onClick={async ()=>{
+              try{
+                const res = await fetch(`/api/stock-review/manual-ledger/refresh-meat?date=${day}`, { method:"POST" });
+                const j = await res.json();
+                if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
+                const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+                const d = await r.json();
+                if(d?.ok){ setMeat(d.meat); }
+              }catch(e){ alert("Auto-fill failed"); }
+            }}
+            className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
+            title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
+          >Auto</button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
             ["Prev End (g)", "prev_end"],
@@ -204,6 +358,13 @@ export default function StockReview(){
       <section className="mt-3 rounded border p-0 overflow-hidden shadow-md">
         <div className="flex items-center justify-between p-3 md:p-4">
           <h2 className="text-base font-medium">Drinks (Cans)</h2>
+          <button
+            disabled={savingSection === 'drinks'}
+            onClick={()=>saveSectionDraft('drinks')}
+            className="h-8 px-4 rounded text-xs bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
+          >
+            {savingSection === 'drinks' ? 'Saving...' : 'Save Draft'}
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -249,23 +410,23 @@ export default function StockReview(){
 
       {loading && <div className="mt-3 text-sm text-slate-500">Loading…</div>}
 
-      {/* Sticky footer with Save Draft and Submit */}
+      {/* Sticky footer with Save All Draft and Submit */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
         <div className="mx-auto max-w-5xl px-3 md:px-6 py-3">
           <div className="flex gap-3 justify-end">
             <button 
-              disabled={saving} 
-              onClick={()=>saveData('draft')} 
+              disabled={savingSection === 'all'} 
+              onClick={()=>saveAll('draft')} 
               className="h-10 px-6 rounded border text-sm bg-white hover:bg-slate-50 disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save Draft'}
+              {savingSection === 'all' ? 'Saving...' : 'Save All as Draft'}
             </button>
             <button 
-              disabled={saving} 
-              onClick={()=>saveData('submit')} 
+              disabled={savingSection === 'all'} 
+              onClick={()=>saveAll('submit')} 
               className="h-10 px-6 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
             >
-              {saving ? 'Submitting...' : 'Submit'}
+              {savingSection === 'all' ? 'Submitting...' : 'Submit All'}
             </button>
           </div>
         </div>
