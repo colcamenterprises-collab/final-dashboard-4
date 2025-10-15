@@ -61,6 +61,7 @@ import { generateAndEmailDailyReport } from "../src/server/report";
 import { importPosBundle } from "../src/server/pos/uploadBundle";
 import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
+import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 // Email functionality will be added when needed
 
 

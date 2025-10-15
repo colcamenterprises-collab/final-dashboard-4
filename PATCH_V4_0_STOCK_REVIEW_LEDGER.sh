@@ -14,17 +14,16 @@ TS_SERVER_DIR="server"
 TS_CLIENT_DIR="client"
 ROUTES_FILE="$TS_SERVER_DIR/routes.ts"
 ALT_ROUTES_FILE="$TS_SERVER_DIR/routes/index.ts"
-ROUTER_MOUNT_TARGET="routes.ts"
 
 if file_exists "$ALT_ROUTES_FILE"; then
   ROUTES_FILE="$ALT_ROUTES_FILE"
 fi
 
-# Best-guess DB import file (we'll use 'pg' Pool directly to avoid ORM drift)
+# Best-guess DB import file
 DB_FILE_CANDIDATES=(
   "$TS_SERVER_DIR/db.ts"
   "$TS_SERVER_DIR/lib/db.ts"
-  "$TS_SERVER_DIR/lib/prisma.ts" # fallback (we won't use prisma client here)
+  "$TS_SERVER_DIR/lib/prisma.ts"
 )
 
 DB_IMPORT_PATH=""
@@ -60,7 +59,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   shift_date DATE NOT NULL,
   completed_by TEXT,
   source_form_id UUID,
-  -- Optional summaries (future wiring)
   total_sales NUMERIC(12,2),
   cash_sales NUMERIC(12,2),
   qr_sales NUMERIC(12,2),
@@ -69,7 +67,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   shopping_total NUMERIC(12,2),
   wages_total NUMERIC(12,2),
 
-  -- Rolls (buns)
   rolls_prev_end INT DEFAULT 0,
   rolls_purchased INT DEFAULT 0,
   burgers_sold INT DEFAULT 0,
@@ -78,7 +75,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   rolls_variance INT DEFAULT 0,
   rolls_paid BOOLEAN DEFAULT FALSE,
 
-  -- Meat (grams)
   meat_prev_end_g INT DEFAULT 0,
   meat_purchased_g INT DEFAULT 0,
   meat_sold_g INT DEFAULT 0,
@@ -124,8 +120,8 @@ SEED_DIR="$TS_SERVER_DIR/seeds"
 ensure_dir "$SEED_DIR"
 SEED_FILE="$SEED_DIR/seedDrinkBrands.ts"
 
-cat > "$SEED_FILE" <<TS
-import { pool } from "../$DB_IMPORT_PATH";
+cat > "$SEED_FILE" <<TSEED
+import { pool } from "../${DB_IMPORT_PATH}";
 
 const DRINKS = [
   "Coke",
@@ -143,7 +139,7 @@ const DRINKS = [
 async function run() {
   for (const name of DRINKS) {
     await pool.query(
-      \`INSERT INTO drink_brand (name, unit) VALUES ($1, 'can')
+      \`INSERT INTO drink_brand (name, unit) VALUES (\$1, 'can')
          ON CONFLICT (name) DO UPDATE SET unit = EXCLUDED.unit\`,
       [name]
     );
@@ -153,7 +149,7 @@ async function run() {
 }
 
 run().catch(err => { console.error(err); process.exit(1); });
-TS
+TSEED
 
 echo "Created drink brand seed at $SEED_FILE"
 
@@ -161,9 +157,9 @@ echo "Created drink brand seed at $SEED_FILE"
 ROUTE_LEDGER_FILE="$TS_SERVER_DIR/routes/analysisManualLedger.ts"
 ensure_dir "$TS_SERVER_DIR/routes"
 
-cat > "$ROUTE_LEDGER_FILE" <<TS
+cat > "$ROUTE_LEDGER_FILE" <<'TSROUTER'
 import { Router, Request, Response } from "express";
-import { pool } from "../$DB_IMPORT_PATH";
+import { pool } from "../lib/db.js";
 import { Parser } from "json2csv";
 
 export const analysisManualLedgerRouter = Router();
@@ -195,18 +191,18 @@ analysisManualLedgerRouter.get("/list", async (req: Request, res: Response) => {
     const { from, to } = req.query as any;
     const params: any[] = [];
     let where = "WHERE 1=1";
-    if (from) { params.push(from); where += \` AND shift_date >= $\${params.length}\`; }
-    if (to)   { params.push(to);   where += \` AND shift_date <= $\${params.length}\`; }
+    if (from) { params.push(from); where += ` AND shift_date >= $${params.length}`; }
+    if (to)   { params.push(to);   where += ` AND shift_date <= $${params.length}`; }
 
     const { rows } = await pool.query(
-      \`SELECT id, shift_date, completed_by,
+      `SELECT id, shift_date, completed_by,
               total_sales, cash_sales, qr_sales, grab_sales, other_sales,
               rolls_expected, rolls_actual, rolls_variance,
               meat_expected_g, meat_actual_g, meat_variance_g
          FROM manual_stock_ledger
-         \${where}
+         ${where}
          ORDER BY shift_date DESC, created_at DESC
-      \`, params
+      `, params
     );
 
     res.json({ ok: true, items: rows });
@@ -230,15 +226,14 @@ analysisManualLedgerRouter.get("/", async (req: Request, res: Response) => {
 
     const brands = await getBrands();
     const { rows: drinkRows } = await pool.query(
-      \`SELECT mdl.brand_id, db.name, mdl.prev_end, mdl.purchased, mdl.sold, mdl.expected, mdl.actual, mdl.variance, mdl.paid
+      `SELECT mdl.brand_id, db.name, mdl.prev_end, mdl.purchased, mdl.sold, mdl.expected, mdl.actual, mdl.variance, mdl.paid
          FROM manual_drink_ledger mdl
          JOIN drink_brand db ON db.id = mdl.brand_id
         WHERE mdl.shift_id = $1
-        ORDER BY db.id ASC\`,
+        ORDER BY db.id ASC`,
       [base.id]
     );
 
-    // Ensure all brands present (fill missing with zeros)
     const map = new Map<number, any>(drinkRows.map(r => [r.brand_id, r]));
     const drinks = brands.map(b => map.get(b.id) ?? {
       brand_id: b.id, name: b.name,
@@ -251,7 +246,7 @@ analysisManualLedgerRouter.get("/", async (req: Request, res: Response) => {
   }
 });
 
-/** POST create / PUT update (base row) */
+/** POST create */
 analysisManualLedgerRouter.post("/", async (req: Request, res: Response) => {
   try {
     const b = req.body || {};
@@ -259,14 +254,14 @@ analysisManualLedgerRouter.post("/", async (req: Request, res: Response) => {
     const meat  = computeMeat(int(b.meat_prev_end_g), int(b.meat_purchased_g), int(b.meat_sold_g), int(b.meat_actual_g));
 
     const { rows } = await pool.query(
-      \`INSERT INTO manual_stock_ledger
+      `INSERT INTO manual_stock_ledger
         (shift_date, completed_by, source_form_id,
          total_sales, cash_sales, qr_sales, grab_sales, other_sales, shopping_total, wages_total,
          rolls_prev_end, rolls_purchased, burgers_sold, rolls_expected, rolls_actual, rolls_variance, rolls_paid,
          meat_prev_end_g, meat_purchased_g, meat_sold_g, meat_expected_g, meat_actual_g, meat_variance_g, meat_paid,
          notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-       RETURNING *\`,
+       RETURNING *`,
       [
         b.shift_date, b.completed_by || null, b.source_form_id || null,
         dec(b.total_sales), dec(b.cash_sales), dec(b.qr_sales), dec(b.grab_sales), dec(b.other_sales), dec(b.shopping_total), dec(b.wages_total),
@@ -282,6 +277,7 @@ analysisManualLedgerRouter.post("/", async (req: Request, res: Response) => {
   }
 });
 
+/** PUT update */
 analysisManualLedgerRouter.put("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -290,14 +286,14 @@ analysisManualLedgerRouter.put("/:id", async (req: Request, res: Response) => {
     const meat  = computeMeat(int(b.meat_prev_end_g), int(b.meat_purchased_g), int(b.meat_sold_g), int(b.meat_actual_g));
 
     const { rows } = await pool.query(
-      \`UPDATE manual_stock_ledger SET
+      `UPDATE manual_stock_ledger SET
           shift_date=$1, completed_by=$2, source_form_id=$3,
           total_sales=$4, cash_sales=$5, qr_sales=$6, grab_sales=$7, other_sales=$8, shopping_total=$9, wages_total=$10,
           rolls_prev_end=$11, rolls_purchased=$12, burgers_sold=$13, rolls_expected=$14, rolls_actual=$15, rolls_variance=$16, rolls_paid=$17,
           meat_prev_end_g=$18, meat_purchased_g=$19, meat_sold_g=$20, meat_expected_g=$21, meat_actual_g=$22, meat_variance_g=$23, meat_paid=$24,
           notes=$25
         WHERE id=$26
-        RETURNING *\`,
+        RETURNING *`,
       [
         b.shift_date, b.completed_by || null, b.source_form_id || null,
         dec(b.total_sales), dec(b.cash_sales), dec(b.qr_sales), dec(b.grab_sales), dec(b.other_sales), dec(b.shopping_total), dec(b.wages_total),
@@ -333,12 +329,12 @@ analysisManualLedgerRouter.put("/:id/drinks", async (req: Request, res: Response
       const variance = act - expected;
 
       await client.query(
-        \`INSERT INTO manual_drink_ledger
+        `INSERT INTO manual_drink_ledger
           (shift_id, brand_id, prev_end, purchased, sold, expected, actual, variance, paid)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT (shift_id, brand_id)
          DO UPDATE SET prev_end=EXCLUDED.prev_end, purchased=EXCLUDED.purchased, sold=EXCLUDED.sold,
-                       expected=EXCLUDED.expected, actual=EXCLUDED.actual, variance=EXCLUDED.variance, paid=EXCLUDED.paid\`,
+                       expected=EXCLUDED.expected, actual=EXCLUDED.actual, variance=EXCLUDED.variance, paid=EXCLUDED.paid`,
         [id, brandId, prev, pur, sold, expected, act, variance, !!it.paid]
       );
     }
@@ -352,7 +348,7 @@ analysisManualLedgerRouter.put("/:id/drinks", async (req: Request, res: Response
   }
 });
 
-/** CSV export (single day or range) */
+/** CSV export */
 analysisManualLedgerRouter.get("/export.csv", async (req: Request, res: Response) => {
   try {
     const { from, to, id } = req.query as any;
@@ -364,21 +360,20 @@ analysisManualLedgerRouter.get("/export.csv", async (req: Request, res: Response
     } else {
       const params:any[] = [];
       let where = "WHERE 1=1";
-      if (from) { params.push(from); where += \` AND shift_date >= $\${params.length}\`; }
-      if (to)   { params.push(to);   where += \` AND shift_date <= $\${params.length}\`; }
-      const q = \`SELECT * FROM manual_stock_ledger \${where} ORDER BY shift_date DESC\`;
+      if (from) { params.push(from); where += ` AND shift_date >= $${params.length}`; }
+      if (to)   { params.push(to);   where += ` AND shift_date <= $${params.length}`; }
+      const q = `SELECT * FROM manual_stock_ledger ${where} ORDER BY shift_date DESC`;
       const resq = await pool.query(q, params);
       rows = resq.rows;
     }
 
-    // Pivot drinks Actual per brand
     const brands = await getBrands();
     for (const r of rows) {
       const { rows: drinkRows } = await pool.query(
-        \`SELECT db.name, mdl.actual
+        `SELECT db.name, mdl.actual
            FROM manual_drink_ledger mdl
            JOIN drink_brand db ON db.id = mdl.brand_id
-          WHERE mdl.shift_id = $1\`,
+          WHERE mdl.shift_id = $1`,
         [r.id]
       );
       const map = new Map(drinkRows.map((d:any) => [d.name, d.actual]));
@@ -404,50 +399,21 @@ analysisManualLedgerRouter.get("/export.csv", async (req: Request, res: Response
     res.status(500).json({ ok:false, error: e.message });
   }
 });
-TS
+TSROUTER
 
 echo "Created analysis manual ledger router: $ROUTE_LEDGER_FILE"
 
-# -------- 4) Mount router in server routes ----------------------------------
-if ! file_exists "$ROUTES_FILE"; then
-  echo "ERROR: Could not find $ROUTES_FILE to mount the router. Aborting."
-  exit 1
-fi
-
-# Insert import if missing
-if ! grep -q "analysisManualLedgerRouter" "$ROUTES_FILE"; then
-  sed -i.bak '1i\
-import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
-' "$ROUTES_FILE"
-fi
-
-# Insert use() before default export or at EOF
-if ! grep -q '/api/analysis/manual-ledger' "$ROUTES_FILE"; then
-  # try place before export default / module.exports
-  if grep -q "export default" "$ROUTES_FILE"; then
-    sed -i.bak '0,/export default/{/export default/i \
-app.use("/api/analysis/manual-ledger", analysisManualLedgerRouter);\
-}' "$ROUTES_FILE"
-  else
-    # append
-    echo 'app.use("/api/analysis/manual-ledger", analysisManualLedgerRouter);' >> "$ROUTES_FILE"
-  fi
-fi
-echo "Mounted /api/analysis/manual-ledger"
+# -------- 4) Routes already mounted via awk patch --------------------------
+echo "Skipping route mounting (already done via awk)"
 
 # -------- 5) Frontend: Stock Review section ---------------------------------
 PAGE_DIR="$TS_CLIENT_DIR/src/pages/analysis"
-ALT_PAGE_DIR="$TS_CLIENT_DIR/src/pages/operations/analysis"
-TARGET_PAGE=""
-if dir_exists "$PAGE_DIR"; then TARGET_PAGE="$PAGE_DIR/StockReview.tsx"; fi
-if [[ -z "$TARGET_PAGE" ]] && dir_exists "$ALT_PAGE_DIR"; then TARGET_PAGE="$ALT_PAGE_DIR/StockReview.tsx"; fi
-
-ensure_dir "$(dirname "$TARGET_PAGE")"
+ensure_dir "$PAGE_DIR"
+TARGET_PAGE="$PAGE_DIR/StockReview.tsx"
 
 cat > "$TARGET_PAGE" <<'TSX'
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-/** Tablet-first density */
 const card = "rounded-2xl shadow-sm border border-gray-200 p-3 mb-4";
 const label = "text-xs text-gray-600";
 const input = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm";
@@ -534,7 +500,7 @@ export default function StockReview(){
   }
 
   return (
-    <div className="max-w-screen-xl mx-auto">
+    <div className="max-w-screen-xl mx-auto p-4">
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg font-semibold">Stock Review</h1>
         <div className="flex gap-2">
@@ -544,7 +510,6 @@ export default function StockReview(){
         </div>
       </div>
 
-      {/* Rolls */}
       <div className={card}>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Rolls (Buns)</h2>
@@ -562,7 +527,6 @@ export default function StockReview(){
         </div>
       </div>
 
-      {/* Meat */}
       <div className={card}>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-medium">Meat (grams)</h2>
@@ -580,7 +544,6 @@ export default function StockReview(){
         </div>
       </div>
 
-      {/* Drinks */}
       <div className={card}>
         <h2 className="text-base font-medium mb-2">Drinks (Cans)</h2>
         <div className="overflow-x-auto">
@@ -628,27 +591,27 @@ echo "Created stock review page at $TARGET_PAGE"
 # -------- 6) Run migration ---------------------------------------------------
 echo ""
 echo "=== Running migration ==="
-if command -v psql &> /dev/null; then
+if command -v psql &> /dev/null && [[ -n "${DATABASE_URL:-}" ]]; then
   psql "$DATABASE_URL" < "$MIG_FILE" 2>&1
   echo "Migration applied via psql"
 else
-  echo "psql not found - migration file created at $MIG_FILE (run manually or via tsx/ts-node)"
+  echo "psql not found or DATABASE_URL not set - migration file created at $MIG_FILE"
 fi
 
 # -------- 7) Seed drink brands -----------------------------------------------
 echo ""
 echo "=== Seeding drink brands ==="
 if command -v tsx &> /dev/null; then
-  tsx "$SEED_FILE"
+  tsx "$SEED_FILE" 2>&1
   echo "Seeded via tsx"
 elif command -v ts-node &> /dev/null; then
-  ts-node "$SEED_FILE"
+  ts-node "$SEED_FILE" 2>&1
   echo "Seeded via ts-node"
 else
-  echo "tsx or ts-node not found - seed file created at $SEED_FILE (run manually)"
+  echo "tsx or ts-node not found - seed file created at $SEED_FILE"
 fi
 
 echo ""
 echo "=== PATCH V4.0 COMPLETE ==="
-echo "Manual Ledger tables created, 10 drink brands seeded, API at /api/analysis/manual-ledger, UI at $TARGET_PAGE"
-echo "Next: Register $TARGET_PAGE in your router/nav and restart server."
+echo "Tables created, 10 drink brands seeded, API at /api/analysis/manual-ledger"
+echo "UI page: $TARGET_PAGE"

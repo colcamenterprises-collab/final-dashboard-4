@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   shift_date DATE NOT NULL,
   completed_by TEXT,
   source_form_id UUID,
-  -- Optional summaries (future wiring)
   total_sales NUMERIC(12,2),
   cash_sales NUMERIC(12,2),
   qr_sales NUMERIC(12,2),
@@ -14,7 +13,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   shopping_total NUMERIC(12,2),
   wages_total NUMERIC(12,2),
 
-  -- Rolls (buns)
   rolls_prev_end INT DEFAULT 0,
   rolls_purchased INT DEFAULT 0,
   burgers_sold INT DEFAULT 0,
@@ -23,7 +21,6 @@ CREATE TABLE IF NOT EXISTS manual_stock_ledger (
   rolls_variance INT DEFAULT 0,
   rolls_paid BOOLEAN DEFAULT FALSE,
 
-  -- Meat (grams)
   meat_prev_end_g INT DEFAULT 0,
   meat_purchased_g INT DEFAULT 0,
   meat_sold_g INT DEFAULT 0,
