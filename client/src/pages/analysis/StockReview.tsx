@@ -116,6 +116,26 @@ export default function StockReview(){
           <h2 className="text-base font-medium">Meat (grams)</h2>
           <span className={pill(meatVar)}>Variance: {meatVar} g</span>
         </div>
+{/* [MEAT-AUTO-BTN] */}
+<div className="flex items-center gap-2 mb-2">
+  <button
+    onClick={async ()=>{
+      try{
+        const res = await fetch(`/api/stock-review/manual-ledger/refresh-meat?date=${day}`, { method:"POST" });
+        const j = await res.json();
+        if(!j.ok){ alert(j.error || "Auto-fill failed"); return; }
+        // Pull fresh state
+        const r = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+        const d = await r.json();
+        if(d?.ok){
+          setMeat(d.meat);
+        }
+      }catch(e){ alert("Auto-fill failed"); }
+    }}
+    className="h-9 rounded border px-3 text-sm bg-emerald-50 hover:bg-emerald-100"
+    title="Auto-fill Prev/Purchased/Actual from Expenses & Form 2"
+  >Auto</button>
+</div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
             ["Prev End (g)", "prev_end"],
