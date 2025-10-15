@@ -3,8 +3,9 @@
 ## Overview
 This comprehensive restaurant management dashboard streamlines operations with AI-powered analytics and real-time insights. It integrates with external POS systems, AI services, and provides automated sales analysis, inventory management, and marketing. The business vision is to enhance operational efficiency and profitability for restaurants by providing a centralized system for data-driven decision making.
 
-## Recent Changes (September 2025)
-- **TypeScript Ingredient System**: Migrated from CSV to TypeScript data format with enhanced fields (brand, packageSize, portionSize, lastReview). Database sync endpoint created for seamless updates. 66 ingredients now available (upgraded from 59).
+## Recent Changes (October 2025)
+- **V3.2A Stock Validation Fix (Oct 15, 2025)**: CRITICAL FIX - Replaced static drinks.json validation with dynamic foodCostings.ts import. Backend now validates all 13 drinks from database (Coke, Coke Zero, Fanta Orange, Fanta Strawberry, Schweppes Manow, Kids Juice Orange/Apple, Sprite, Singha Red/Pink/Yellow Soda, Soda Water, Bottled Water). Frontend and backend now use single source of truth. Validation correctly placed in PATCH /stock endpoint only.
+- **TypeScript Ingredient System**: Migrated from CSV to TypeScript data format with enhanced fields (brand, packageSize, portionSize, lastReview). Database sync endpoint created for seamless updates. 70 ingredients now available.
 - **Balanced Badge System**: Added visual balance indicators (green/red badges) to Library table and email templates for instant cash reconciliation status visibility
 - **Daily Sales V2 Enhancements**: Implemented proper UUID generation, banking calculations with ±30 THB tolerance, and "Other Sales" terminology update (renamed from "Aroi Dee Sales")  
 - **Mobile & Tablet Optimization**: Completed comprehensive responsive testing with enhanced touch interactions, auto-calculations, and navigation behavior across all devices
