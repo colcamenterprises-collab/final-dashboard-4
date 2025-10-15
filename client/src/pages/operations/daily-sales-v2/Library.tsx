@@ -11,6 +11,7 @@ import React, { useEffect, useState } from "react";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Eye, Printer, Download } from 'lucide-react';
+import { ConfirmDialog, SuccessDialog } from '@/components/ui/confirm-dialog';
 
 // MEGA PATCH V3: Safe number helpers
 const safeNumber = (v: any) => (v === 0 || typeof v === "number") ? v : (Number(v) || 0);
@@ -103,6 +104,11 @@ export default function DailySalesV2Library() {
   const [error, setError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selected, setSelected] = useState<FullRecord | null>(null);
+  
+  // Dialog states
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
+  const [successDialog, setSuccessDialog] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
+  const [errorDialog, setErrorDialog] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
 
   async function fetchRecords() {
     setLoading(true);
@@ -125,15 +131,18 @@ export default function DailySalesV2Library() {
     fetchRecords();
   }, []);
 
-  async function deleteRecord(id: string) {
-    if (window.confirm('Are you sure you want to delete this record?')) {
-      try {
-        await fetch(`/api/forms/daily-sales/v2/${id}`, { method: "DELETE" });
-        fetchRecords();
-        alert('Record deleted successfully');
-      } catch (err) {
-        alert('Failed to delete record');
-      }
+  async function confirmDeleteRecord(id: string) {
+    setDeleteDialog({ isOpen: true, id });
+  }
+
+  async function deleteRecord() {
+    if (!deleteDialog.id) return;
+    try {
+      await fetch(`/api/forms/daily-sales/v2/${deleteDialog.id}`, { method: "DELETE" });
+      await fetchRecords();
+      setSuccessDialog({ isOpen: true, message: 'Record deleted successfully' });
+    } catch (err) {
+      setErrorDialog({ isOpen: true, message: 'Failed to delete record. Please try again.' });
     }
   }
   
@@ -148,7 +157,7 @@ export default function DailySalesV2Library() {
       const data = await response.json();
       
       if (!data.ok) {
-        alert('Failed to fetch record data');
+        setErrorDialog({ isOpen: true, message: 'Failed to fetch record data' });
         return;
       }
       
@@ -195,7 +204,7 @@ export default function DailySalesV2Library() {
       console.log(`PDF generated with content length: ${JSON.stringify(p).length}`);
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('Failed to generate PDF');
+      setErrorDialog({ isOpen: true, message: 'Failed to generate PDF. Please try again.' });
     }
   }
 
@@ -362,7 +371,7 @@ export default function DailySalesV2Library() {
                           </button>
                           <button
                             className="px-1.5 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 font-[Poppins] rounded text-[10px] md:text-xs"
-                            onClick={() => deleteRecord(rec.id)}
+                            onClick={() => confirmDeleteRecord(rec.id)}
                           >
                             Delete
                           </button>
@@ -459,7 +468,7 @@ export default function DailySalesV2Library() {
                     </button>
                     <button
                       className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-[10px] sm:text-xs"
-                      onClick={() => deleteRecord(rec.id)}
+                      onClick={() => confirmDeleteRecord(rec.id)}
                     >
                       Delete
                     </button>
@@ -655,6 +664,34 @@ export default function DailySalesV2Library() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null })}
+        onConfirm={deleteRecord}
+        title="Delete Record"
+        message="Are you sure you want to delete this daily sales record? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      <SuccessDialog
+        isOpen={successDialog.isOpen}
+        onClose={() => setSuccessDialog({ isOpen: false, message: '' })}
+        title="Success!"
+        message={successDialog.message}
+        buttonText="OK"
+      />
+
+      <SuccessDialog
+        isOpen={errorDialog.isOpen}
+        onClose={() => setErrorDialog({ isOpen: false, message: '' })}
+        title="Error"
+        message={errorDialog.message}
+        buttonText="OK"
+      />
     </div>
   );
 }
