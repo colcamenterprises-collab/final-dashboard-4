@@ -101,6 +101,11 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     return ingredients.filter(item => item.category === 'Drinks');
   }, [ingredients]);
 
+  // Extract drink names for validation
+  const requiredDrinks: string[] = useMemo(() => {
+    return drinkItems.map(d => d.name);
+  }, [drinkItems]);
+
   // Group all ingredients by category with custom order (EXCLUDING drinks and meat)
   const blocks: CategoryBlock[] = useMemo(() => {
     if (!Array.isArray(ingredients)) return [];
