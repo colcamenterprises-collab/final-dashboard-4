@@ -1,6 +1,5 @@
 // client/src/pages/ReceiptsBurgerCounts.tsx
-import { useEffect, useMemo, useState } from "react";
-import { DateTime } from "luxon";
+import { useEffect, useState } from "react";
 
 type ProductRow = {
   normalizedName: string;
@@ -31,13 +30,6 @@ export default function ReceiptsBurgerCounts() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [date, setDate] = useState("");
-
-  const title = useMemo(() => {
-    if (!metrics) return "Last Shift — Burger Counts";
-    const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
-    const to = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
-    return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
-  }, [metrics]);
 
   async function load() {
     setLoading(true);
@@ -102,8 +94,6 @@ export default function ReceiptsBurgerCounts() {
           Export CSV
         </button>
       </div>
-
-      <h2 className="text-xl font-bold">{title}</h2>
 
       <div className="overflow-x-auto border-2 rounded-[8px] shadow-md">
         <table className="min-w-full">
