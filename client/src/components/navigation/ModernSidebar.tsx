@@ -61,7 +61,6 @@ const navigationGroups: NavGroup[] = [
           },
           { to: "/operations/analysis/daily-shift-analysis", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-daily-shift-analysis" },
           { to: "/analysis/daily-sales", label: "Daily Sales Analysis", icon: BarChart3, testId: "nav-daily-sales-analysis" },
-          { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-shift-summary" },
           { to: "/operations/analysis/stock-review", label: "Stock Review", icon: BarChart3, testId: "nav-stock-review" }
         ]
       }
