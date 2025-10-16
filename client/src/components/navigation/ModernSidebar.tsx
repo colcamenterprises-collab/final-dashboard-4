@@ -50,7 +50,15 @@ const navigationGroups: NavGroup[] = [
         icon: BarChart3, 
         testId: "nav-analysis",
         subItems: [
-          { to: "/operations/analysis/loyverse", label: "Loyverse Reports", icon: BarChart3, testId: "nav-loyverse" },
+          { 
+            to: "/operations/analysis/loyverse", 
+            label: "POS Reporting", 
+            icon: BarChart3, 
+            testId: "nav-pos-reporting",
+            subItems: [
+              { to: "/operations/analysis/receipts/burgers", label: "Receipt Analysis", icon: Receipt, testId: "nav-receipt-analysis" }
+            ]
+          },
           { to: "/operations/analysis/daily-shift-analysis", label: "Daily Shift Analysis", icon: BarChart3, testId: "nav-daily-shift-analysis" },
           { to: "/analysis/daily-sales", label: "Daily Sales Analysis", icon: BarChart3, testId: "nav-daily-sales-analysis" },
           { to: "/analysis/shift-summary", label: "Shift Summary", icon: BarChart3, testId: "nav-shift-summary" },
@@ -270,24 +278,55 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                 const subActive = isActive(subItem.to);
                                 
                                 return (
-                                  <NavLink
-                                    key={subItem.to}
-                                    to={subItem.to}
-                                    onClick={onClose}
-                                    className={cn(
-                                      "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
-                                      subActive
-                                        ? "bg-black text-white rounded-[9px]"
-                                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                                  <div key={subItem.to}>
+                                    <NavLink
+                                      to={subItem.to}
+                                      onClick={onClose}
+                                      className={cn(
+                                        "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                        subActive
+                                          ? "bg-black text-white rounded-[9px]"
+                                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                                      )}
+                                      data-testid={subItem.testId}
+                                    >
+                                      <subItem.icon className={cn(
+                                        "h-3 w-3 transition-colors",
+                                        subActive ? "text-white" : "text-slate-400"
+                                      )} />
+                                      <span className="truncate">{subItem.label}</span>
+                                    </NavLink>
+                                    
+                                    {/* Nested sub-items (third level) */}
+                                    {subItem.subItems && (
+                                      <div className="ml-6 mt-1 space-y-1">
+                                        {subItem.subItems.map((nestedItem) => {
+                                          const nestedActive = isActive(nestedItem.to);
+                                          
+                                          return (
+                                            <NavLink
+                                              key={nestedItem.to}
+                                              to={nestedItem.to}
+                                              onClick={onClose}
+                                              className={cn(
+                                                "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                                nestedActive
+                                                  ? "bg-black text-white rounded-[9px]"
+                                                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                                              )}
+                                              data-testid={nestedItem.testId}
+                                            >
+                                              <nestedItem.icon className={cn(
+                                                "h-3 w-3 transition-colors",
+                                                nestedActive ? "text-white" : "text-slate-400"
+                                              )} />
+                                              <span className="truncate">{nestedItem.label}</span>
+                                            </NavLink>
+                                          );
+                                        })}
+                                      </div>
                                     )}
-                                    data-testid={subItem.testId}
-                                  >
-                                    <subItem.icon className={cn(
-                                      "h-3 w-3 transition-colors",
-                                      subActive ? "text-white" : "text-slate-400"
-                                    )} />
-                                    <span className="truncate">{subItem.label}</span>
-                                  </NavLink>
+                                  </div>
                                 );
                               })}
                             </div>
