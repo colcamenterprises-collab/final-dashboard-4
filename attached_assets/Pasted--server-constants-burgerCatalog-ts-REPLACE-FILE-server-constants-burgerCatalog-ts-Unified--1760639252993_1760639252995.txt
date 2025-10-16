@@ -1,0 +1,520 @@
+) server/constants/burgerCatalog.ts (REPLACE FILE)
+
+// server/constants/burgerCatalog.ts
+// Unified catalog for burger-line items (beef + chicken).
+// Match EXACT POS names (case-insensitive compare done in service).
+
+export type CatalogItem = {
+  normalizedName: string;
+  itemNames: string[];        // all raw POS names that should map here
+  countsRoll: boolean;        // consumes one bun
+  pattiesPerItem: number;     // beef patties (0 if chicken)
+  gramsPerPatty: number;      // 95 for beef
+  chickenGramsPerItem: number;// 100 for chicken burgers (0 if beef)
+};
+
+const BEEF_G_PER_PATTY = 95;
+const CHICKEN_PER_BURGER = 100;
+
+// ---- BEEF BURGERS (red meat grams counted) ----
+const BEEF: CatalogItem[] = [
+  {
+    normalizedName: "Single Smash Burger",
+    itemNames: [
+      "Single Smash Burger (ซิงเกิ้ล)",
+      "Single Smash Burger",
+      "ซิงเกิ้ล",
+      "Single Meal Set (Meal Deal)",           // set prints as burger line; still counts beef+roll
+      "Kids Single Cheeseburger",
+      "Kids Single Meal Set (Burger Fries Drink)",
+      "Super Single Bacon & Cheese",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 1,
+    gramsPerPatty: BEEF_G_PER_PATTY,
+    chickenGramsPerItem: 0,
+  },
+  {
+    normalizedName: "Ultimate Double",
+    itemNames: [
+      "Ultimate Double (คู่)",
+      "คู่",
+      "Double Set (Meal Deal)",                // meal deal variant
+      "Kids Double Cheeseburger",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 2,
+    gramsPerPatty: BEEF_G_PER_PATTY,
+    chickenGramsPerItem: 0,
+  },
+  {
+    normalizedName: "Super Double Bacon & Cheese",
+    itemNames: [
+      "Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน)",
+      "Super Double Bacon & Cheese",
+      "Super Double Bacon & Cheese Set (Meal Deal)",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 2,
+    gramsPerPatty: BEEF_G_PER_PATTY,
+    chickenGramsPerItem: 0,
+  },
+  {
+    normalizedName: "Triple Smash Burger",
+    itemNames: [
+      "Triple Smash Burger (สาม)",
+      "Triple Smash Burger",
+      "สาม",
+      "Triple Smash Set (Meal Deal)",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 3,
+    gramsPerPatty: BEEF_G_PER_PATTY,
+    chickenGramsPerItem: 0,
+  },
+];
+
+// ---- CHICKEN BURGERS (red meat grams = 0; chicken grams counted) ----
+const CHICKEN: CatalogItem[] = [
+  {
+    normalizedName: "Crispy Chicken Fillet Burger",
+    itemNames: [
+      "Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น)",
+      "Crispy Chicken Fillet Burger",
+      "เบอร์เกอร์ไก่ชิ้น",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 0,
+    gramsPerPatty: 0,
+    chickenGramsPerItem: CHICKEN_PER_BURGER,
+  },
+  {
+    normalizedName: "Karaage Chicken Burger",
+    itemNames: [
+      "Karaage Chicken Burger",
+      "Karaage Chicken (Meal Deal) เบอร์เกอร์ไก่คาราอาเกะ",
+      "เบอร์เกอร์ไก่คาราอาเกะ",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 0,
+    gramsPerPatty: 0,
+    chickenGramsPerItem: CHICKEN_PER_BURGER,
+  },
+  {
+    normalizedName: "Big Rooster Sriracha Chicken",
+    itemNames: [
+      "🐔 Big Rooster Sriracha Chicken ไก่ศรีราชาตัวใหญ่",
+      "Big Rooster Sriracha Chicken",
+      "ไก่ศรีราชาตัวใหญ่",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 0,
+    gramsPerPatty: 0,
+    chickenGramsPerItem: CHICKEN_PER_BURGER,
+  },
+  {
+    normalizedName: "El Smasho Grande Chicken Burger",
+    itemNames: [
+      "🐔 El Smasho Grande Chicken Burger (แกรนด์ชิกเก้น)",
+      "El Smasho Grande Chicken Burger",
+      "แกรนด์ชิกเก้น",
+    ],
+    countsRoll: true,
+    pattiesPerItem: 0,
+    gramsPerPatty: 0,
+    chickenGramsPerItem: CHICKEN_PER_BURGER,
+  },
+];
+
+export const CATALOG: CatalogItem[] = [...BEEF, ...CHICKEN];
+
+// For quick case-insensitive lookups:
+export const ALL_ITEM_NAME_VARIANTS = CATALOG.flatMap(c =>
+  c.itemNames.map(n => n.toLowerCase().trim())
+);
+
+
+---
+
+2) server/services/burgerMetrics.ts (REPLACE FILE)
+
+// server/services/burgerMetrics.ts
+import { PrismaClient } from "@prisma/client";
+import { CATALOG, ALL_ITEM_NAME_VARIANTS, CatalogItem } from "../constants/burgerCatalog";
+
+const prisma = new PrismaClient();
+
+export type ProductRow = {
+  normalizedName: string;
+  rawHits: string[];      // which raw strings matched
+  qty: number;
+  patties: number;        // beef patties
+  redMeatGrams: number;   // beef grams only
+  chickenGrams: number;   // chicken grams
+  rolls: number;          // buns
+};
+
+export type BurgerMetrics = {
+  shiftDate: string;
+  fromISO: string;
+  toISO: string;
+  products: ProductRow[];
+  totals: {
+    burgers: number;
+    patties: number;        // beef patties
+    redMeatGrams: number;
+    chickenGrams: number;
+    rolls: number;
+  };
+  unmapped: Record<string, number>; // raw item names that looked like burgers but not mapped
+};
+
+function matchCatalog(rawName: string): CatalogItem | undefined {
+  const l = rawName.toLowerCase().trim();
+  return CATALOG.find(c => c.itemNames.map(x => x.toLowerCase().trim()).includes(l));
+}
+
+// Prefer Prisma receipt_items if present, fall back to pos_receipt.items_json
+async function fetchCounts(fromISO: string, toISO: string) {
+  // Try receipt_items + receipts
+  try {
+    const items = await prisma.$queryRaw<{ name: string; qty: number }[]>`
+      SELECT ri.name, SUM(ri.quantity)::int AS qty
+      FROM receipt_items ri
+      JOIN receipts r ON r.id = ri.receipt_id
+      WHERE r.timestamp >= ${fromISO}::timestamptz
+        AND r.timestamp < ${toISO}::timestamptz
+        AND LOWER(ri.name) = ANY(${ALL_ITEM_NAME_VARIANTS})
+      GROUP BY ri.name
+    `;
+    if (items?.length) return items.map(r => ({ itemName: r.name, qty: Number(r.qty) || 0 }));
+  } catch {}
+
+  // Fallback: scan pos_receipt.items_json
+  const rows = await prisma.$queryRaw<{ item_name: string; qty: number }[]>`
+    SELECT (item->>'name') AS item_name,
+           SUM((item->>'quantity')::int) AS qty
+    FROM pos_receipt pr,
+         LATERAL jsonb_array_elements(pr.items_json) AS item
+    WHERE pr.datetime >= ${fromISO}::timestamptz
+      AND pr.datetime < ${toISO}::timestamptz
+      AND LOWER(item->>'name') = ANY(${ALL_ITEM_NAME_VARIANTS})
+    GROUP BY item_name
+  `;
+  return rows.map(r => ({ itemName: r.item_name, qty: Number(r.qty) || 0 }));
+}
+
+export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string): Promise<BurgerMetrics> {
+  const hits = await fetchCounts(fromISO, toISO);
+
+  // Build per-product aggregations
+  const map = new Map<string, ProductRow>();
+  for (const cat of CATALOG) {
+    map.set(cat.normalizedName, {
+      normalizedName: cat.normalizedName,
+      rawHits: [],
+      qty: 0,
+      patties: 0,
+      redMeatGrams: 0,
+      chickenGrams: 0,
+      rolls: 0,
+    });
+  }
+
+  const unmapped: Record<string, number> = {};
+  for (const { itemName, qty } of hits) {
+    const cat = matchCatalog(itemName);
+    if (!cat) {
+      unmapped[itemName] = (unmapped[itemName] ?? 0) + qty;
+      continue;
+    }
+    const row = map.get(cat.normalizedName)!;
+    row.qty += qty;
+    row.rawHits.push(itemName);
+
+    // buns
+    if (cat.countsRoll) row.rolls += qty;
+
+    // beef pats & grams
+    if (cat.pattiesPerItem > 0) {
+      const pats = qty * cat.pattiesPerItem;
+      row.patties += pats;
+      row.redMeatGrams += pats * cat.gramsPerPatty;
+    }
+
+    // chicken grams
+    if (cat.chickenGramsPerItem > 0) {
+      row.chickenGrams += qty * cat.chickenGramsPerItem;
+    }
+  }
+
+  const products = Array.from(map.values());
+
+  const totals = products.reduce((acc, r) => {
+    acc.burgers += r.qty;
+    acc.patties += r.patties;
+    acc.redMeatGrams += r.redMeatGrams;
+    acc.chickenGrams += r.chickenGrams;
+    acc.rolls += r.rolls;
+    return acc;
+  }, { burgers: 0, patties: 0, redMeatGrams: 0, chickenGrams: 0, rolls: 0 });
+
+  return {
+    shiftDate: shiftDateLabel,
+    fromISO,
+    toISO,
+    products,
+    totals,
+    unmapped,
+  };
+}
+
+
+---
+
+3) server/routes/receiptsBurgers.ts (REPLACE FILE)
+
+// server/routes/receiptsBurgers.ts
+import { Router } from "express";
+import { DateTime } from "luxon";
+import { computeMetrics } from "../services/burgerMetrics";
+
+const router = Router();
+const TZ = "Asia/Bangkok";
+
+// Shift window helper (18:00 → 03:00 next day)
+function getWindow(dateISO?: string, from?: string, to?: string) {
+  if (from && to) {
+    return {
+      fromISO: from,
+      toISO: to,
+      label: DateTime.fromISO(from, { zone: TZ }).toISODate()!,
+    };
+  }
+  if (dateISO) {
+    const d = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
+    return {
+      fromISO: d.plus({ hours: 18 }).toISO(),
+      toISO: d.plus({ days: 1, hours: 3 }).toISO(),
+      label: d.toISODate()!,
+    };
+  }
+  const now = DateTime.now().setZone(TZ);
+  const today = now.startOf("day");
+  const start = today.plus({ hours: 18 });
+  const end = today.plus({ days: 1, hours: 3 });
+  if (now < start) {
+    const y = today.minus({ days: 1 });
+    return {
+      fromISO: y.plus({ hours: 18 }).toISO(),
+      toISO: today.plus({ hours: 3 }).toISO(),
+      label: y.toISODate()!,
+    };
+  }
+  return { fromISO: start.toISO(), toISO: end.toISO(), label: today.toISODate()! };
+}
+
+/**
+ * GET /api/receipts/shift/burgers
+ * Query:
+ *  - date=YYYY-MM-DD (optional)
+ *  - from, to (ISO) optional
+ */
+router.get("/shift/burgers", async (req, res) => {
+  try {
+    const { date, from, to } = req.query as { date?: string; from?: string; to?: string };
+    const w = getWindow(date, from, to);
+    const metrics = await computeMetrics(w.fromISO, w.toISO, w.label);
+    res.json({ ok: true, data: metrics });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: e?.message ?? "Unknown error" });
+  }
+});
+
+export default router;
+
+> Mount (if not already):
+
+
+
+// server/routes.ts
+import receiptsBurgers from "./routes/receiptsBurgers";
+app.use("/api/receipts", receiptsBurgers);
+
+
+---
+
+4) Frontend page update (REPLACE FILE)
+
+// client/src/pages/ReceiptsBurgerCounts.tsx
+import { useEffect, useMemo, useState } from "react";
+import { DateTime } from "luxon";
+
+type ProductRow = {
+  normalizedName: string;
+  rawHits: string[];
+  qty: number;
+  patties: number;       // beef
+  redMeatGrams: number;  // beef grams
+  chickenGrams: number;  // chicken grams
+  rolls: number;
+};
+
+type Metrics = {
+  shiftDate: string;
+  fromISO: string;
+  toISO: string;
+  products: ProductRow[];
+  totals: {
+    burgers: number;
+    patties: number;
+    redMeatGrams: number;
+    chickenGrams: number;
+    rolls: number;
+  };
+  unmapped: Record<string, number>;
+};
+
+export default function ReceiptsBurgerCounts() {
+  const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [date, setDate] = useState("");
+
+  const title = useMemo(() => {
+    if (!metrics) return "Last Shift — Burger Counts";
+    const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
+    const to = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
+    return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
+  }, [metrics]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const url = new URL("/api/receipts/shift/burgers", window.location.origin);
+      if (date) url.searchParams.set("date", date);
+      const r = await fetch(url.toString());
+      const j = await r.json();
+      if (j.ok) setMetrics(j.data);
+      else throw new Error(j.error || "Failed to fetch");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to load burger counts");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  function exportCSV() {
+    if (!metrics) return;
+    const rows = [
+      ["Burger", "Qty", "Beef Patties", "Red Meat (g)", "Chicken (g)", "Rolls"],
+      ...metrics.products.map(p => [
+        p.normalizedName, p.qty, p.patties, p.redMeatGrams, p.chickenGrams, p.rolls
+      ]),
+      ["TOTAL", metrics.totals.burgers, metrics.totals.patties, metrics.totals.redMeatGrams, metrics.totals.chickenGrams, metrics.totals.rolls],
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `burger_counts_${metrics.shiftDate}.csv`;
+    a.click();
+  }
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-end gap-3">
+        <div>
+          <label className="block text-sm font-medium">Shift date (YYYY-MM-DD)</label>
+          <input value={date} onChange={e => setDate(e.target.value)} placeholder="2025-10-15" className="border rounded-md px-3 py-2" />
+        </div>
+        <button onClick={load} disabled={loading} className="px-4 py-2 rounded-xl shadow border">
+          {loading ? "Loading…" : "Load shift"}
+        </button>
+        <button onClick={exportCSV} disabled={!metrics} className="px-4 py-2 rounded-xl shadow border">
+          Export CSV
+        </button>
+      </div>
+
+      <h2 className="text-xl font-bold">{title}</h2>
+
+      <div className="overflow-x-auto border rounded-xl">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left p-3">Burger</th>
+              <th className="text-right p-3">Qty</th>
+              <th className="text-right p-3">Beef Patties</th>
+              <th className="text-right p-3">Red Meat (g)</th>
+              <th className="text-right p-3">Chicken (g)</th>
+              <th className="text-right p-3">Rolls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics?.products.map((p) => (
+              <tr key={p.normalizedName} className="border-t">
+                <td className="p-3">{p.normalizedName}</td>
+                <td className="p-3 text-right">{p.qty}</td>
+                <td className="p-3 text-right">{p.patties}</td>
+                <td className="p-3 text-right">{p.redMeatGrams}</td>
+                <td className="p-3 text-right">{p.chickenGrams}</td>
+                <td className="p-3 text-right">{p.rolls}</td>
+              </tr>
+            ))}
+            {metrics && (
+              <tr className="border-t font-semibold">
+                <td className="p-3">TOTAL</td>
+                <td className="p-3 text-right">{metrics.totals.burgers}</td>
+                <td className="p-3 text-right">{metrics.totals.patties}</td>
+                <td className="p-3 text-right">{metrics.totals.redMeatGrams}</td>
+                <td className="p-3 text-right">{metrics.totals.chickenGrams}</td>
+                <td className="p-3 text-right">{metrics.totals.rolls}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {metrics && Object.keys(metrics.unmapped).length > 0 && (
+        <div className="text-sm">
+          <div className="font-semibold">Unmapped burger-like items (add to catalog):</div>
+          <ul className="list-disc ml-6">
+            {Object.entries(metrics.unmapped).map(([name, qty]) => (
+              <li key={name}>{name}: {qty}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+> Route (if missing):
+
+
+
+// e.g. App.tsx / RouteRegistry
+import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
+<Route path="/operations/analysis/receipts/burgers" element={<Guard><ReceiptsBurgerCounts /></Guard>} />
+
+
+---
+
+5) What you get now
+
+Counts each burger sold (beef + chicken), last shift or by date.
+
+Rolls = 1 per burger.
+
+Red meat grams (beef patties × 95 g).
+
+Chicken grams (100 g per chicken burger).
+
+CSV export.
+
+No double-count issues with sets: burger line is authoritative; drink lines are ignored for burger counts.
+
+

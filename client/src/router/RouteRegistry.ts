@@ -9,6 +9,7 @@ export const ROUTES = {
   SHOPPING_LIST: "/operations/shopping-list",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
+  RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
   LOYVERSE_REPORTS: "/operations/analysis/loyverse",
   DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis",
   STOCK_REVIEW: "/operations/analysis/stock-review",

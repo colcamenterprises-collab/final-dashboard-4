@@ -63,6 +63,7 @@ import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 import stockReviewManual from "./routes/stockReviewManual";
+import receiptsBurgers from "./routes/receiptsBurgers";
 // Email functionality will be added when needed
 
 
@@ -1032,6 +1033,9 @@ export function registerRoutes(app: express.Application): Server {
 
   // Stock Review Manual Ledger - mounted before :date route to avoid conflicts
   app.use("/api/stock-review/manual-ledger", stockReviewManual);
+  
+  // Burger metrics from receipts
+  app.use("/api/receipts", receiptsBurgers);
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
