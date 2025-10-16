@@ -79,12 +79,12 @@ export default function ReceiptsBurgerCounts() {
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
         <div className="w-full sm:w-auto">
-          <label className="block text-[12px] font-medium mb-1">Shift date (YYYY-MM-DD)</label>
+          <label className="block text-[12px] font-medium mb-1">Shift date</label>
           <input 
+            type="date"
             value={date} 
             onChange={e => setDate(e.target.value)} 
-            placeholder="2025-10-15" 
-            className="w-full border-2 rounded-[8px] px-3 py-2 text-[12px] placeholder:text-[12px] min-h-[44px] focus:outline-none focus:border-blue-500" 
+            className="w-full border-2 rounded-[8px] px-3 py-2 text-[12px] min-h-[44px] focus:outline-none focus:border-blue-500" 
           />
         </div>
         <button 
