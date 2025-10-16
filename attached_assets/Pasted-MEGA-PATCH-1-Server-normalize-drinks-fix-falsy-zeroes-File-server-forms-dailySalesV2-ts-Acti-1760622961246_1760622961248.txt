@@ -1,0 +1,196 @@
+MEGA-PATCH
+
+1) Server — normalize drinks + fix falsy zeroes
+
+File: server/forms/dailySalesV2.ts
+Action: Replace your row-mapping block with the version below. If you don’t have a dedicated mapper, add this helper and use it wherever you build rows for the Sales/Forms Library.
+
+// ---------- server/forms/dailySalesV2.ts ----------
+
+// (Keep your existing imports)
+import type { Request, Response } from "express";
+
+// Add near the top (once per file)
+type DrinkStockObject = Record<string, number | null | undefined>;
+
+function normalizeDrinkStock(stock: unknown): Array<{ name: string; quantity: number }> {
+  if (!stock || typeof stock !== "object") return [];
+  const obj = stock as DrinkStockObject;
+  return Object.entries(obj)
+    .filter(([_, v]) => typeof v === "number" && Number.isFinite(v))
+    .map(([name, quantity]) => ({ name, quantity: quantity as number }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function mapLibraryRow(row: any) {
+  // Preserve zeros with ?? instead of ||
+  const rollsEnd = row?.payload?.rollsEnd ?? null;
+  const meatEnd  = row?.payload?.meatEnd  ?? null;
+
+  // Always deliver drinks as an array
+  const drinks = normalizeDrinkStock(row?.payload?.drinkStock);
+  const drinksCount = drinks.reduce((sum, d) => sum + d.quantity, 0);
+
+  return {
+    // keep your existing identifiers/metadata:
+    id: row?.id,
+    date: row?.date,
+    shift: row?.shift,
+    // library fields we display:
+    buns: rollsEnd ?? "-",   // 0 shows as 0
+    meat: meatEnd  ?? "-",   // 0 shows as 0
+    drinks,
+    drinksCount,
+    // ...include any other fields you already surface
+  };
+}
+
+// Wherever you currently build the list/response for the Sales Library:
+export async function getSalesLibrary(req: Request, res: Response) {
+  try {
+    // Your existing fetch:
+    const rows = await fetchDailySalesRowsFromDBOrService(); // <-- your existing call
+
+    // Map with the safe mapper
+    const mapped = (rows ?? []).map(mapLibraryRow);
+
+    res.json({ ok: true, data: mapped });
+  } catch (err) {
+    console.error("getSalesLibrary error", err);
+    res.status(500).json({ ok: false, error: "Failed to load sales library" });
+  }
+}
+
+// NOTE: If you already had a mapper around lines ~270–280 doing:
+//   buns: row.payload?.rollsEnd || "-",
+//   meat: row.payload?.meatEnd  || "-",
+//   drinks: row.payload?.drinkStock,
+// replace it with the `mapLibraryRow` above.
+
+
+---
+
+2) Types — tighten DTO to prevent regressions (recommended)
+
+File: server/forms/types.ts (or wherever you define API shapes)
+
+// ---------- server/forms/types.ts ----------
+export type DrinkItem = { name: string; quantity: number };
+
+export type LibraryRow = {
+  id: string | number;
+  date: string;           // or Date if you serialize
+  shift?: string | null;
+  buns: number | "-";
+  meat: number | "-";
+  drinks: DrinkItem[];
+  drinksCount: number;
+};
+
+If you already export a type, extend it to match the above (don’t remove existing fields you need).
+
+
+---
+
+3) Frontend — render with ?? and accept array drinks
+
+File: src/components/SalesLibraryTable.tsx (adjust path if different)
+
+// ---------- src/components/SalesLibraryTable.tsx ----------
+import React from "react";
+
+type DrinkItem = { name: string; quantity: number };
+type LibraryRow = {
+  id: string | number;
+  date: string;
+  shift?: string | null;
+  buns: number | "-";
+  meat: number | "-";
+  drinks: DrinkItem[];
+  drinksCount: number;
+  // ...any other fields you show
+};
+
+// tiny util so 0 renders correctly
+const show = <T,>(v: T | null | undefined, fallback: React.ReactNode = "-") => (v ?? fallback);
+
+export default function SalesLibraryTable({ rows }: { rows: LibraryRow[] }) {
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="min-w-[900px] w-full text-sm">
+        <thead>
+          <tr className="text-left border-b">
+            <th className="py-2 pr-4">Date</th>
+            <th className="py-2 pr-4">Shift</th>
+            <th className="py-2 pr-4">Buns (End)</th>
+            <th className="py-2 pr-4">Meat (g End)</th>
+            <th className="py-2 pr-4">Drinks</th>
+            <th className="py-2 pr-4">Drinks (Total)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows?.length ? rows.map((r) => (
+            <tr key={r.id} className="border-b hover:bg-neutral-50">
+              <td className="py-2 pr-4">{show(r.date)}</td>
+              <td className="py-2 pr-4">{show(r.shift)}</td>
+              <td className="py-2 pr-4">{show(r.buns)}</td>
+              <td className="py-2 pr-4">{show(r.meat)}</td>
+              <td className="py-2 pr-4">
+                {Array.isArray(r.drinks) && r.drinks.length
+                  ? r.drinks.map(d => `${d.name} x ${d.quantity}`).join(", ")
+                  : "-"}
+              </td>
+              <td className="py-2 pr-4">{show(r.drinksCount)}</td>
+            </tr>
+          )) : (
+            <tr><td colSpan={6} className="py-6 text-center text-neutral-500">No rows</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+If your table uses a column config (e.g., TanStack Table), port the show() usage and the drinks cell logic into your column renderers.
+
+
+---
+
+4) Optional — client fallback normalizer (only if some endpoints still return objects)
+
+If any legacy endpoint still returns drinkStock as an object, you can defensively normalize on the client too (recommended only during transition):
+
+export function normalizeDrinkStockClient(stock: unknown) {
+  if (!stock || typeof stock !== "object") return [];
+  return Object.entries(stock as Record<string, number | null | undefined>)
+    .filter(([_, v]) => typeof v === "number" && Number.isFinite(v))
+    .map(([name, quantity]) => ({ name, quantity: quantity as number }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+Call this wherever you transform API data into rows.
+
+
+---
+
+Deploy & Smoke-Test
+
+1. Server: paste the mapper + helpers, ensure getSalesLibrary uses mapLibraryRow.
+
+
+2. Types: update/export LibraryRow, DrinkItem.
+
+
+3. Frontend: ensure the table uses ?? and reads drinks: DrinkItem[].
+
+
+4. Rebuild your app.
+
+
+5. Test with Form 2 & 3 having rollsEnd = 0, meatEnd = 0, drinks like { "Coke": 5, "Sprite": 3 }.
+
+Sales Library should show 0 (not “-”) for buns & meat.
+
+Drinks should show Coke x 5, Sprite x 3.
+
+Drinks (Total) should equal 8.
