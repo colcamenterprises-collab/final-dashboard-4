@@ -69,6 +69,8 @@ export default function ReceiptsBurgerCounts() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
+      <h1 className="text-xl font-bold">Receipt Analysis</h1>
+      
       <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
         <div className="w-full sm:w-auto">
           <label className="block text-[12px] font-medium mb-1">Shift date</label>
