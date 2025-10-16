@@ -249,7 +249,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                             to={item.to}
                             onClick={onClose}
                             className={cn(
-                              "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-all duration-200",
+                              "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                               active
                                 ? "bg-black text-white rounded-[9px]"
                                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -275,7 +275,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                     to={subItem.to}
                                     onClick={onClose}
                                     className={cn(
-                                      "flex items-center gap-3 px-3 py-2 text-sm font-medium transition-all duration-200",
+                                      "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                                       subActive
                                         ? "bg-black text-white rounded-[9px]"
                                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -286,7 +286,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                       "h-3 w-3 transition-colors",
                                       subActive ? "text-white" : "text-slate-400"
                                     )} />
-                                    <span className="truncate text-xs">{subItem.label}</span>
+                                    <span className="truncate">{subItem.label}</span>
                                   </NavLink>
                                 );
                               })}
