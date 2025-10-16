@@ -1,0 +1,255 @@
+1) Install (server + frontend)
+
+npm i -D vitest @vitest/coverage-v8 ts-node @types/node jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @types/react @types/react-dom
+
+
+---
+
+2) Vitest config (root)
+
+vitest.config.ts
+
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./vitest.setup.ts"],
+    include: ["server/**/__tests__/**/*.test.ts", "src/**/__tests__/**/*.test.tsx"],
+    coverage: {
+      reporter: ["text", "html"],
+      include: ["server/**/*.ts", "src/**/*.tsx", "src/**/*.ts"],
+      exclude: ["**/*.d.ts", "**/node_modules/**"],
+    },
+  },
+});
+
+vitest.setup.ts
+
+import "@testing-library/jest-dom";
+
+package.json (scripts)
+
+{
+  "scripts": {
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:cov": "vitest run --coverage"
+  }
+}
+
+
+---
+
+3) Export the helpers you’ll test
+
+In server/forms/dailySalesV2.ts, make sure these are exported:
+
+export type DrinkStockObject = Record<string, number | null | undefined>;
+
+export function normalizeDrinkStock(stock: unknown): Array<{ name: string; quantity: number }> {
+  // ...as in the patch...
+}
+
+export function mapLibraryRow(row: any) {
+  // ...as in the patch...
+}
+
+
+---
+
+4) Tests — Server
+
+A) Normalize drinks
+
+server/forms/__tests__/normalizeDrinkStock.test.ts
+
+import { describe, it, expect } from "vitest";
+import { normalizeDrinkStock } from "../../forms/dailySalesV2";
+
+describe("normalizeDrinkStock", () => {
+  it("returns empty array for null/undefined/non-object", () => {
+    expect(normalizeDrinkStock(null)).toEqual([]);
+    expect(normalizeDrinkStock(undefined)).toEqual([]);
+    expect(normalizeDrinkStock(123 as any)).toEqual([]);
+    expect(normalizeDrinkStock("x" as any)).toEqual([]);
+  });
+
+  it("filters out non-numeric and non-finite values", () => {
+    const input = { Coke: 5, Sprite: "x", Fanta: NaN, Zero: 0, None: null } as any;
+    const out = normalizeDrinkStock(input);
+    expect(out).toEqual([{ name: "Coke", quantity: 5 }, { name: "Zero", quantity: 0 }]);
+  });
+
+  it("sorts by name ascending", () => {
+    const input = { Sprite: 3, Coke: 5, Pepsi: 2 };
+    const out = normalizeDrinkStock(input);
+    expect(out.map(x => x.name)).toEqual(["Coke", "Pepsi", "Sprite"]);
+  });
+});
+
+B) Map library row (zeros preserved + drinksCount)
+
+server/forms/__tests__/mapLibraryRow.test.ts
+
+import { describe, it, expect } from "vitest";
+import { mapLibraryRow } from "../../forms/dailySalesV2";
+
+describe("mapLibraryRow", () => {
+  it("preserves zero with nullish coalescing and shows '-' only for null/undefined", () => {
+    const base = { id: 1, date: "2025-10-16", shift: "Night" };
+
+    const r1 = mapLibraryRow({ ...base, payload: { rollsEnd: 0, meatEnd: 0, drinkStock: { Coke: 1 } } });
+    expect(r1.buns).toBe(0);
+    expect(r1.meat).toBe(0);
+
+    const r2 = mapLibraryRow({ ...base, payload: { rollsEnd: null, meatEnd: undefined, drinkStock: {} } });
+    expect(r2.buns).toBe("-");
+    expect(r2.meat).toBe("-");
+  });
+
+  it("normalizes drinks to array and computes drinksCount", () => {
+    const row = mapLibraryRow({
+      id: "abc",
+      date: "2025-10-16",
+      shift: "Evening",
+      payload: { drinkStock: { Coke: 5, Sprite: 3, Bad: "x" } }
+    });
+
+    expect(Array.isArray(row.drinks)).toBe(true);
+    expect(row.drinks).toEqual([
+      { name: "Coke", quantity: 5 },
+      { name: "Sprite", quantity: 3 }
+    ]);
+    expect(row.drinksCount).toBe(8);
+  });
+
+  it("handles missing drinkStock gracefully", () => {
+    const row = mapLibraryRow({ id: 1, date: "2025-10-16", payload: {} });
+    expect(row.drinks).toEqual([]);
+    expect(row.drinksCount).toBe(0);
+  });
+});
+
+
+---
+
+5) Tests — Frontend (Sales Library table)
+
+src/components/__tests__/SalesLibraryTable.test.tsx
+
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import React from "react";
+import SalesLibraryTable from "../SalesLibraryTable";
+
+describe("SalesLibraryTable", () => {
+  it("renders 0 (not '-') for buns/meat when values are zero", () => {
+    render(
+      <SalesLibraryTable
+        rows={[
+          {
+            id: 1,
+            date: "2025-10-16",
+            shift: "Night",
+            buns: 0,
+            meat: 0,
+            drinks: [],
+            drinksCount: 0,
+          },
+        ]}
+      />
+    );
+    // should show '0' (string) somewhere in buns/meat cells
+    expect(screen.getByText("0")).toBeInTheDocument(); // buns
+    // There are two zeros (buns and meat). One assertion is enough to prove at least one shows.
+  });
+
+  it("renders '-' when buns/meat are '-' (nullish upstream)", () => {
+    render(
+      <SalesLibraryTable
+        rows={[
+          {
+            id: 2,
+            date: "2025-10-16",
+            shift: "Evening",
+            buns: "-",
+            meat: "-",
+            drinks: [],
+            drinksCount: 0,
+          },
+        ]}
+      />
+    );
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  it("renders drinks list and total correctly", () => {
+    render(
+      <SalesLibraryTable
+        rows={[
+          {
+            id: 3,
+            date: "2025-10-16",
+            shift: "Evening",
+            buns: 12,
+            meat: 900,
+            drinks: [
+              { name: "Coke", quantity: 5 },
+              { name: "Sprite", quantity: 3 },
+            ],
+            drinksCount: 8,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText(/Coke x 5, Sprite x 3/)).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument(); // total
+  });
+
+  it("shows '-' when drinks array is empty", () => {
+    render(
+      <SalesLibraryTable
+        rows={[
+          {
+            id: 4,
+            date: "2025-10-16",
+            shift: "Day",
+            buns: 5,
+            meat: 450,
+            drinks: [],
+            drinksCount: 0,
+          },
+        ]}
+      />
+    );
+    // There will be at least one '-' for drinks column
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  });
+});
+
+> These tests assume the exact table component from the patch. If your table path/name differs, adjust imports/paths.
+
+
+
+
+---
+
+6) Run
+
+npm run test
+# or
+npm run test:watch
+# coverage
+npm run test:cov
+
+
+---
+
+Notes
+
+If TypeScript complains about JSX in tests, ensure your tsconfig.json has "jsx": "react-jsx" (or appropriate).
+
+If your server folder is ESM, Vitest handles it; otherwise add "type": "module" as needed or use proper imports.

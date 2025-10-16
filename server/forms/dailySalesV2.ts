@@ -14,6 +14,43 @@ import { validateStockRequired } from "../services/stockRequired.js";
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
 const formatTHB = (thb: number) => thb.toLocaleString();
 
+// MEGA-PATCH: Normalize drinks + fix falsy zeroes
+export type DrinkStockObject = Record<string, number | null | undefined>;
+
+export function normalizeDrinkStock(stock: unknown): Array<{ name: string; quantity: number }> {
+  if (!stock || typeof stock !== "object") return [];
+  const obj = stock as DrinkStockObject;
+  return Object.entries(obj)
+    .filter(([_, v]) => typeof v === "number" && Number.isFinite(v))
+    .map(([name, quantity]) => ({ name, quantity: quantity as number }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mapLibraryRow(row: any) {
+  // Preserve zeros with ?? instead of ||
+  const rollsEnd = row?.payload?.rollsEnd ?? null;
+  const meatEnd = row?.payload?.meatEnd ?? null;
+
+  // Always deliver drinks as an array
+  const drinks = normalizeDrinkStock(row?.payload?.drinkStock);
+  const drinksCount = drinks.reduce((sum, d) => sum + d.quantity, 0);
+
+  return {
+    id: row.id,
+    date: row.shiftDate || row.createdAt,
+    staff: row.completedBy,
+    cashStart: row.payload?.startingCash || 0,
+    cashEnd: row.payload?.closingCash || 0,
+    totalSales: row.payload?.totalSales || 0,
+    buns: rollsEnd ?? "-",   // 0 shows as 0, not "-"
+    meat: meatEnd ?? "-",    // 0 shows as 0, not "-"
+    drinks,                  // normalized array
+    drinksCount,             // sum of all drink quantities
+    status: "Submitted",
+    payload: row.payload || {}
+  };
+}
+
 // TODO: Restore logDirectExpenses function when schema import is fixed
 // async function logDirectExpenses(shiftDate: Date, expenses: any[]) {
 //   for (const e of expenses) {
@@ -263,18 +300,8 @@ export async function getDailySalesV2(_req: Request, res: Response) {
        ORDER BY "createdAt" DESC`
     );
 
-    const records = result.rows.map((row: any) => ({
-      id: row.id,
-      date: row.shiftDate || row.createdAt,
-      staff: row.completedBy,
-      cashStart: row.payload?.startingCash || 0,
-      cashEnd: row.payload?.closingCash || 0,
-      totalSales: row.payload?.totalSales || 0,
-      buns: row.payload?.rollsEnd || "-",
-      meat: row.payload?.meatEnd || "-",
-      status: "Submitted",
-      payload: row.payload || {}
-    }));
+    // MEGA-PATCH: Use safe mapper that preserves zeros and normalizes drinks
+    const records = result.rows.map(mapLibraryRow);
 
     res.json({ ok: true, records });
   } catch (err) {

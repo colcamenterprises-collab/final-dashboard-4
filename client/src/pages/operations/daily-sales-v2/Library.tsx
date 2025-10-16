@@ -28,12 +28,14 @@ type RecordType = {
   date: string;
   staff: string;
   totalSales: number;
-  buns: string;
-  meat: string;
+  buns: number | string;
+  meat: number | string;
+  drinks?: { name: string; quantity: number }[];
+  drinksCount?: number;
   status: string;
   payload?: { 
     balanced?: boolean;
-    drinkStock?: { name: string; quantity: number; unit: string }[];
+    drinkStock?: { name: string; quantity: number; unit: string }[] | Record<string, number>;
   };
   deletedAt?: string | null;
 };
@@ -309,11 +311,11 @@ export default function DailySalesV2Library() {
                   </td>
                   <td className="px-2 py-1 border-b">{rec.staff}</td>
                   <td className="px-2 py-1 border-b whitespace-nowrap">{thb(rec.totalSales)}</td>
-                  <td className="px-2 py-1 border-b">{rec.buns}</td>
-                  <td className="px-2 py-1 border-b">{rec.meat}</td>
+                  <td className="px-2 py-1 border-b">{rec.buns ?? "-"}</td>
+                  <td className="px-2 py-1 border-b">{rec.meat ?? "-"}</td>
                   <td className="px-2 py-1 border-b">
-                    {(rec.payload?.drinkStock || []).length > 0 
-                      ? `${(rec.payload?.drinkStock || []).reduce((sum, d) => sum + (d.quantity || 0), 0)} items`
+                    {(rec.drinksCount ?? 0) > 0 
+                      ? `${rec.drinksCount} items`
                       : "-"}
                   </td>
                   <td className="px-2 py-1 border-b">
@@ -411,8 +413,8 @@ export default function DailySalesV2Library() {
                   </span>
                   <span className="text-gray-600 text-xs truncate">{rec.staff}</span>
                   <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">{thb(rec.totalSales)}</span>
-                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">R:{rec.buns}</span>
-                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">M:{rec.meat}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">R:{rec.buns ?? "-"}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">M:{rec.meat ?? "-"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {/* Balance Status - Styled Badge like Home Screen */}
