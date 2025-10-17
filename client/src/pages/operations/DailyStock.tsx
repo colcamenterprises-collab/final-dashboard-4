@@ -266,6 +266,11 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       const data = await res.json();
 
       if (!res.ok || data?.ok === false) {
+        // Show detailed error if drinks are missing
+        if (data?.error === "STOCK_REQUIRED" && data?.details?.drinksMissing) {
+          const missing = data.details.drinksMissing.join(', ');
+          throw new Error(`Missing drink counts: ${missing}. Please enter 0 if none remaining.`);
+        }
         throw new Error(data?.error || "Unable to submit stock.");
       }
 
