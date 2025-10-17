@@ -48,7 +48,7 @@ router.get("/shift/burgers", async (req, res) => {
   try {
     const { date, from, to } = req.query as { date?: string; from?: string; to?: string };
     const w = getWindow(date, from, to);
-    const metrics = await computeMetrics(w.fromISO, w.toISO, w.label);
+    const metrics = await computeMetrics(w.fromISO, w.toISO, w.label || 'unknown');
     res.json({ ok: true, data: metrics });
   } catch (e: any) {
     console.error(e);

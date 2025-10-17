@@ -38,11 +38,11 @@ function matchCatalog(rawName: string): CatalogItem | undefined {
 async function fetchCounts(fromISO: string, toISO: string) {
   try {
     const items = await prisma.$queryRaw<{ name: string; qty: number }[]>`
-      SELECT ri.name, SUM(ri.quantity)::int AS qty
+      SELECT ri.name, SUM(ri.qty)::int AS qty
       FROM receipt_items ri
-      JOIN receipts r ON r.id = ri.receipt_id
-      WHERE r.timestamp >= ${fromISO}::timestamptz
-        AND r.timestamp < ${toISO}::timestamptz
+      JOIN receipts r ON r.id = ri."receiptId"
+      WHERE r."closedAtUTC" >= ${fromISO}::timestamptz
+        AND r."closedAtUTC" < ${toISO}::timestamptz
         AND LOWER(ri.name) = ANY(${ALL_ITEM_NAME_VARIANTS})
       GROUP BY ri.name
     `;
