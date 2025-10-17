@@ -4,6 +4,16 @@ import { queryClient } from "@/lib/queryClient";
 // === BEGIN MANAGER QUICK CHECK: imports ===
 import ManagerQuickCheck from '@/components/ManagerQuickCheck';
 // === END MANAGER QUICK CHECK: imports ===
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 
 // Server ingredient catalog from CSV import
 type IngredientItem = {
@@ -59,6 +69,12 @@ const DailyStock: React.FC = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<any>({});
   const [lang, setLang] = useState<'en' | 'th'>('en');
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validationDetails, setValidationDetails] = useState<{
+    rolls?: string;
+    meat?: string;
+    drinks?: string[];
+  }>({});
 // === BEGIN MANAGER QUICK CHECK: state & handlers ===
 const [showCheck, setShowCheck] = useState(false);
 
@@ -196,6 +212,8 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     
     // V3.2A Stock validation
     const validationErrs: any = {};
+    const details: { rolls?: string; meat?: string; drinks?: string[] } = {};
+    
     const N = (v: any) => {
       if (v === null || v === undefined) return NaN;
       const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
@@ -207,9 +225,11 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     
     if (Number.isNaN(rollsNum) || rollsNum < 0) {
       validationErrs.rollsEnd = "Rolls count is required (0 allowed).";
+      details.rolls = "Burger rolls count is missing or invalid";
     }
     if (Number.isNaN(meatNum) || meatNum < 0) {
       validationErrs.meatEnd = "Meat count (grams) is required (0 allowed).";
+      details.meat = "Meat count (grams) is missing or invalid";
     }
     
     // Check drinks - all required drinks must have valid counts (0 allowed)
@@ -223,11 +243,13 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     }
     if (missingDrinks.length > 0) {
       validationErrs.drinkStock = `Missing drink counts: ${missingDrinks.join(', ')}`;
+      details.drinks = missingDrinks;
     }
     
     setValidationErrors(validationErrs);
     if (Object.keys(validationErrs).length > 0) {
-      setMessage({ type: "error", text: "Please complete rolls, meat, and all drinks (0 allowed for each)." });
+      setValidationDetails(details);
+      setShowValidationDialog(true);
       return;
     }
     
@@ -298,6 +320,65 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
 
   return (
     <div className="p-6 space-y-8 text-[14px]">
+      {/* Validation Warning Dialog */}
+      <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-lg font-semibold text-red-900">
+                Incomplete Stock Data
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[14px] text-gray-700 space-y-3">
+              <p className="font-medium">Please complete the following required fields:</p>
+              <ul className="space-y-2 ml-4">
+                {validationDetails.rolls && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 mt-0.5">•</span>
+                    <span>{validationDetails.rolls}</span>
+                  </li>
+                )}
+                {validationDetails.meat && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 mt-0.5">•</span>
+                    <span>{validationDetails.meat}</span>
+                  </li>
+                )}
+                {validationDetails.drinks && validationDetails.drinks.length > 0 && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 mt-0.5">•</span>
+                    <div>
+                      <p className="font-medium mb-1">Missing drink counts:</p>
+                      <div className="ml-2 space-y-1">
+                        {validationDetails.drinks.map(drink => (
+                          <div key={drink} className="text-[13px] text-gray-600">
+                            → {drink}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </li>
+                )}
+              </ul>
+              <p className="text-[13px] text-gray-600 pt-2 border-t">
+                💡 <strong>Tip:</strong> Enter 0 if any item has zero stock remaining.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              onClick={() => setShowValidationDialog(false)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg"
+            >
+              Got it, I'll fix this
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">Daily Stock</h1>
         <div className="text-[12px] text-gray-600">
