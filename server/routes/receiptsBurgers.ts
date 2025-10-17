@@ -39,6 +39,14 @@ function getWindow(dateISO?: string, from?: string, to?: string) {
 }
 
 /**
+ * GET /api/receipts/shift/burgers/ping
+ * Health check endpoint
+ */
+router.get("/shift/burgers/ping", (_req, res) => {
+  res.json({ ok: true, message: "receipts burgers endpoint alive" });
+});
+
+/**
  * GET /api/receipts/shift/burgers
  * Query:
  *  - date=YYYY-MM-DD (optional)

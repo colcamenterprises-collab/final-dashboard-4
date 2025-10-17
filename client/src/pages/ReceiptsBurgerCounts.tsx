@@ -1,13 +1,13 @@
-// client/src/pages/ReceiptsBurgerCounts.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { DateTime } from "luxon";
 
 type ProductRow = {
   normalizedName: string;
   rawHits: string[];
   qty: number;
-  patties: number;       // beef
-  redMeatGrams: number;  // beef grams
-  chickenGrams: number;  // chicken grams
+  patties: number;
+  redMeatGrams: number;
+  chickenGrams: number;
   rolls: number;
 };
 
@@ -26,29 +26,62 @@ type Metrics = {
   unmapped: Record<string, number>;
 };
 
+function getApiBase() {
+  // Prefer relative /api when the dev proxy is active; otherwise fall back to explicit base
+  const envBase = (import.meta as any).env?.VITE_API_BASE?.trim();
+  if (envBase) return envBase.replace(/\/+$/, "");
+  return ""; // relative (proxy)
+}
+
 export default function ReceiptsBurgerCounts() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [date, setDate] = useState("");
+  const [error, setError] = useState<string>("");
+  const [rawResponse, setRawResponse] = useState<any>(null);
+
+  // default the date to a valid YYYY-MM-DD (shows a value and avoids format issues)
+  const [date, setDate] = useState<string>("2025-10-15");
+
+  const title = useMemo(() => {
+    if (!metrics) return "Last Shift — Burger Counts";
+    const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
+    const to = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
+    return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
+  }, [metrics]);
 
   async function load() {
     setLoading(true);
+    setError("");
+    setRawResponse(null);
+    setMetrics(null);
+
     try {
-      const url = new URL("/api/receipts/shift/burgers", window.location.origin);
+      const base = getApiBase();
+      const url = new URL(`${base}/api/receipts/shift/burgers`, window.location.origin);
       if (date) url.searchParams.set("date", date);
-      const r = await fetch(url.toString());
-      const j = await r.json();
-      if (j.ok) setMetrics(j.data);
-      else throw new Error(j.error || "Failed to fetch");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to load burger counts");
+
+      // If using relative base, rebuild without origin to keep it relative
+      const finalUrl = base ? url.toString() : `/api/receipts/shift/burgers?date=${encodeURIComponent(date)}`;
+      const r = await fetch(finalUrl, { headers: { "Accept": "application/json" } });
+      const j = await r.json().catch(() => ({}));
+      setRawResponse({ status: r.status, ok: r.ok, body: j });
+
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!j?.ok) throw new Error(j?.error || "API returned ok=false");
+
+      setMetrics(j.data);
+    } catch (e: any) {
+      setError(e?.message || String(e));
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    // auto-load once so you see something immediately
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function exportCSV() {
     if (!metrics) return;
@@ -68,82 +101,87 @@ export default function ReceiptsBurgerCounts() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <h1 className="text-xl font-bold">Receipt Analysis</h1>
-      
-      <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
-        <div className="w-full sm:w-auto">
-          <label className="block text-[12px] font-medium mb-1">Shift date</label>
-          <input 
+    <div className="p-6 space-y-4">
+      <div className="flex items-end gap-3 flex-wrap">
+        <div>
+          <label className="block text-sm font-medium">Shift date</label>
+          <input
             type="date"
-            value={date} 
-            onChange={e => setDate(e.target.value)} 
-            className="w-full border-2 rounded-[8px] px-3 py-2 text-[12px] min-h-[44px] focus:outline-none focus:border-blue-500" 
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="border rounded-md px-3 py-2"
           />
         </div>
-        <button 
-          onClick={load} 
-          disabled={loading} 
-          className="w-full sm:w-auto px-6 py-2 text-xs sm:text-sm rounded-[8px] border-2 border-gray-300 bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] font-medium transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <button onClick={load} disabled={loading} className="px-4 py-2 rounded-xl shadow border">
           {loading ? "Loading…" : "Load shift"}
         </button>
-        <button 
-          onClick={exportCSV} 
-          disabled={!metrics} 
-          className="w-full sm:w-auto px-6 py-2 text-xs sm:text-sm rounded-[8px] bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 min-h-[44px] font-semibold transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
-        >
+        <button onClick={exportCSV} disabled={!metrics} className="px-4 py-2 rounded-xl shadow border">
           Export CSV
         </button>
       </div>
 
-      <div className="overflow-x-auto border-2 rounded-[8px] shadow-md">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left p-3 text-sm font-semibold">Burger</th>
-              <th className="text-right p-3 text-sm font-semibold">Qty</th>
-              <th className="text-right p-3 text-sm font-semibold">Beef Patties</th>
-              <th className="text-right p-3 text-sm font-semibold">Red Meat (g)</th>
-              <th className="text-right p-3 text-sm font-semibold">Chicken (g)</th>
-              <th className="text-right p-3 text-sm font-semibold">Rolls</th>
-            </tr>
-          </thead>
-          <tbody>
-            {metrics?.products.map((p) => (
-              <tr key={p.normalizedName} className="border-t">
-                <td className="p-3 text-sm">{p.normalizedName}</td>
-                <td className="p-3 text-sm text-right">{p.qty}</td>
-                <td className="p-3 text-sm text-right">{p.patties}</td>
-                <td className="p-3 text-sm text-right">{p.redMeatGrams}</td>
-                <td className="p-3 text-sm text-right">{p.chickenGrams}</td>
-                <td className="p-3 text-sm text-right">{p.rolls}</td>
-              </tr>
-            ))}
-            {metrics && (
-              <tr className="border-t bg-gray-50 font-bold">
-                <td className="p-3 text-sm">TOTAL</td>
-                <td className="p-3 text-sm text-right">{metrics.totals.burgers}</td>
-                <td className="p-3 text-sm text-right">{metrics.totals.patties}</td>
-                <td className="p-3 text-sm text-right">{metrics.totals.redMeatGrams}</td>
-                <td className="p-3 text-sm text-right">{metrics.totals.chickenGrams}</td>
-                <td className="p-3 text-sm text-right">{metrics.totals.rolls}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {metrics && Object.keys(metrics.unmapped).length > 0 && (
-        <div className="rounded-[8px] border-2 border-yellow-300 bg-yellow-50 p-3">
-          <div className="text-sm font-semibold text-yellow-800 mb-2">Unmapped burger-like items (add to catalog):</div>
-          <ul className="list-disc ml-6 text-sm text-yellow-700">
-            {Object.entries(metrics.unmapped).map(([name, qty]) => (
-              <li key={name}>{name}: {qty}</li>
-            ))}
-          </ul>
+      {error && (
+        <div className="p-3 border rounded bg-red-50 text-red-700">
+          <div className="font-semibold mb-1">Error</div>
+          <div>{error}</div>
         </div>
       )}
+
+      <h2 className="text-xl font-bold">{title}</h2>
+
+      {!metrics && !error && !loading && (
+        <div className="text-sm text-gray-500">No data yet — pick a date and click "Load shift".</div>
+      )}
+
+      {metrics && metrics.products.filter(p => p.qty > 0).length === 0 && (
+        <div className="text-sm text-gray-500">No burger items found for this shift window.</div>
+      )}
+
+      {metrics && metrics.products.filter(p => p.qty > 0).length > 0 && (
+        <div className="overflow-x-auto border rounded-xl">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left p-3">Burger</th>
+                <th className="text-right p-3">Qty</th>
+                <th className="text-right p-3">Beef Patties</th>
+                <th className="text-right p-3">Red Meat (g)</th>
+                <th className="text-right p-3">Chicken (g)</th>
+                <th className="text-right p-3">Rolls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.products.filter(p => p.qty > 0).map((p) => (
+                <tr key={p.normalizedName} className="border-t">
+                  <td className="p-3">{p.normalizedName}</td>
+                  <td className="p-3 text-right">{p.qty}</td>
+                  <td className="p-3 text-right">{p.patties}</td>
+                  <td className="p-3 text-right">{p.redMeatGrams}</td>
+                  <td className="p-3 text-right">{p.chickenGrams}</td>
+                  <td className="p-3 text-right">{p.rolls}</td>
+                </tr>
+              ))}
+              <tr className="border-t font-semibold">
+                <td className="p-3">TOTAL</td>
+                <td className="p-3 text-right">{metrics.totals.burgers}</td>
+                <td className="p-3 text-right">{metrics.totals.patties}</td>
+                <td className="p-3 text-right">{metrics.totals.redMeatGrams}</td>
+                <td className="p-3 text-right">{metrics.totals.chickenGrams}</td>
+                <td className="p-3 text-right">{metrics.totals.rolls}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Debug panel so we can *see* what the API returns */}
+      <details className="border rounded p-3">
+        <summary className="cursor-pointer select-none">Debug (raw API response)</summary>
+        <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(rawResponse, null, 2)}</pre>
+        <div className="text-xs mt-2 text-gray-500">
+          API Base: {(import.meta as any).env?.VITE_API_BASE || "(relative /api)"}
+        </div>
+      </details>
     </div>
   );
 }
