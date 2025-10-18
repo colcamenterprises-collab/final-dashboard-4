@@ -22,6 +22,7 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   testId: string;
   subItems?: NavItem[];
+  external?: boolean;
 };
 
 type NavGroup = {
@@ -92,7 +93,7 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Customer Ordering",
     items: [
-      { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" }
+      { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true }
     ]
   }
 ];
@@ -259,6 +260,22 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                       return (
                         <div key={item.to}>
                           {/* Main item */}
+                          {item.external ? (
+                            <a
+                              href={item.to}
+                              onClick={onClose}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
+                              )}
+                              data-testid={item.testId}
+                            >
+                              <item.icon className="h-4 w-4 transition-colors text-slate-500" />
+                              <span className="truncate">{item.label}</span>
+                            </a>
+                          ) : (
                           <NavLink
                             to={item.to}
                             onClick={onClose}
@@ -276,6 +293,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                             )} />
                             <span className="truncate">{item.label}</span>
                           </NavLink>
+                          )}
                           
                           {/* Sub-items if they exist */}
                           {item.subItems && (
