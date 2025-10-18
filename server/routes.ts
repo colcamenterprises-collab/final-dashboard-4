@@ -1041,6 +1041,49 @@ export function registerRoutes(app: express.Application): Server {
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);
 
+  // Online Ordering API (namespaced to avoid conflicts)
+  app.get("/api/ordering/menu", (_, res) => {
+    const p = path.join(process.cwd(), "online-ordering/server/data/menu.json");
+    try {
+      res.json(JSON.parse(fs.readFileSync(p, "utf8")));
+    } catch (e) {
+      res.status(500).json({ error: "Menu not found" });
+    }
+  });
+
+  app.post("/api/ordering/orders", (req, res) => {
+    const p = path.join(process.cwd(), "online-ordering/server/data/orders.json");
+    try {
+      const orders = JSON.parse(fs.readFileSync(p, "utf8"));
+      const id = "ORD_" + Math.random().toString(36).slice(2, 10).toUpperCase();
+      const createdAt = new Date().toISOString();
+      orders.push({ id, createdAt, status: "RECEIVED", ...req.body });
+      fs.writeFileSync(p, JSON.stringify(orders, null, 2));
+      res.json({ ok: true, id, createdAt });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create order" });
+    }
+  });
+
+  app.get("/api/ordering/orders", (_, res) => {
+    const p = path.join(process.cwd(), "online-ordering/server/data/orders.json");
+    try {
+      const orders = JSON.parse(fs.readFileSync(p, "utf8"));
+      res.json(orders.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt)));
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  // Serve the online ordering SPA
+  const orderingDist = path.join(process.cwd(), "online-ordering/client/dist");
+  if (fs.existsSync(orderingDist)) {
+    app.use("/online-ordering", express.static(orderingDist));
+    app.get("/online-ordering/*", (_, res) =>
+      res.sendFile(path.join(orderingDist, "index.html"))
+    );
+  }
+
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
     const date = req.params.date;
