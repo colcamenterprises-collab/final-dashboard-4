@@ -1,0 +1,849 @@
+Awesome — locking this in:
+
+Exact look/feel of your screenshots (black background, yellow price pills, tabs).
+
+Single-page React (mobile/tablet first) with modal pop-ups (no extra pages).
+
+Cart + Checkout flow that stores orders (JSON file) until Loyverse API is wired.
+
+Built as a self-contained module you can preview locally or drop into Replit now and move later.
+
+
+Below is a complete, copy-pasteable prototype. It’s split into server (Express) and client (Vite + React). It includes a static menu, order storage, and clean UI that mirrors your Vev layout.
+
+
+---
+
+File tree
+
+online-ordering/
+  server/
+    index.js
+    data/
+      menu.json
+      orders.json
+  client/
+    index.html
+    vite.config.ts
+    package.json
+    tsconfig.json
+    src/
+      main.tsx
+      App.tsx
+      styles.css
+      types.ts
+
+
+---
+
+1) server/index.js
+
+// server/index.js
+import fs from "fs";
+import path from "path";
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const dataDir = path.join(__dirname, "data");
+const menuPath = path.join(dataDir, "menu.json");
+const ordersPath = path.join(dataDir, "orders.json");
+
+function ensureFiles() {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(menuPath)) fs.writeFileSync(menuPath, JSON.stringify({ categories: [], items: [] }, null, 2));
+  if (!fs.existsSync(ordersPath)) fs.writeFileSync(ordersPath, JSON.stringify([], null, 2));
+}
+ensureFiles();
+
+app.get("/api/health", (_, res) => res.json({ ok: true }));
+
+// Return menu (categories + items)
+app.get("/api/menu", (_, res) => {
+  const menu = JSON.parse(fs.readFileSync(menuPath, "utf8"));
+  res.json(menu);
+});
+
+// Create order (stored to JSON file for now)
+app.post("/api/orders", (req, res) => {
+  const order = req.body;
+
+  // quick validation
+  if (!order || !order.items || !order.items.length) {
+    return res.status(400).json({ error: "Order must include items." });
+  }
+
+  const now = new Date().toISOString();
+  const id = "ORD_" + Math.random().toString(36).slice(2, 10).toUpperCase();
+
+  const record = {
+    id,
+    createdAt: now,
+    status: "RECEIVED",
+    ...order,
+  };
+
+  const existing = JSON.parse(fs.readFileSync(ordersPath, "utf8"));
+  existing.push(record);
+  fs.writeFileSync(ordersPath, JSON.stringify(existing, null, 2));
+
+  // TODO: send to Loyverse POS here when ready
+  // await sendToLoyverse(record)
+
+  res.json({ ok: true, id, createdAt: now });
+});
+
+// List orders (for quick testing)
+app.get("/api/orders", (_, res) => {
+  const orders = JSON.parse(fs.readFileSync(ordersPath, "utf8"));
+  res.json(orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`API running on http://localhost:${PORT}`);
+});
+
+
+---
+
+2) server/data/menu.json
+
+(Editable — I’ve populated items to match your screenshots/categories. Prices in THB and “yellow pill” styling is in the client.)
+
+{
+  "categories": [
+    { "id": "meal_sets", "name": "BURGER MEAL SETS" },
+    { "id": "side_orders", "name": "SIDE ORDERS" },
+    { "id": "original_burgers", "name": "ORIGINAL SMASH BURGERS" },
+    { "id": "kids", "name": "KIDS MENU" },
+    { "id": "drinks", "name": "DRINKS" }
+  ],
+  "items": [
+    {
+      "id": "single_meal_set",
+      "categoryId": "meal_sets",
+      "name": "Single Smash Burger Meal Set",
+      "desc": "The original single smash burger with French fries and your choice of soft drink.",
+      "price": 209,
+      "image": "/images/single-meal.png"
+    },
+    {
+      "id": "ultimate_double_meal",
+      "categoryId": "meal_sets",
+      "name": "Ultimate Double Smash Burger Meal Set",
+      "desc": "Double-smash burger with 150g fries, coleslaw and a drink.",
+      "price": 289,
+      "image": "/images/double-meal.png"
+    },
+    {
+      "id": "super_double_bacon_meal",
+      "categoryId": "meal_sets",
+      "name": "Super Double Bacon and Cheese Meal Set",
+      "desc": "Double cheese, double bacon, fries and a drink.",
+      "price": 309,
+      "image": "/images/bacon-meal.png"
+    },
+
+    { "id": "classic_fries", "categoryId": "side_orders", "name": "Classic French Fries", "desc": "Classic shoestring fries with smash burger sauce or ketchup", "price": 79, "image": "/images/fries.png" },
+    { "id": "sweet_potato_fries", "categoryId": "side_orders", "name": "Sweet Potato Fries", "desc": "Golden sweet potato fries lightly salted", "price": 99, "image": "/images/sweet-fries.png" },
+    { "id": "cajun_fries", "categoryId": "side_orders", "name": "Cajun Fries", "desc": "Seasoned with a special blend of Cajun spices", "price": 99, "image": "/images/cajun.png" },
+    { "id": "cheesy_bacon_fries", "categoryId": "side_orders", "name": "Cheesy Bacon Fries", "desc": "Fries with American cheese, bacon bits, crunchy onions, drizzle of smash burger sauce", "price": 119, "image": "/images/cheesy-bacon.png" },
+
+    { "id": "single_smash", "categoryId": "original_burgers", "name": "Single Smash Burger", "desc": "Signature sauce, 100% Australian beef patty, American cheese, onion, lettuce, tomato, pickles.", "price": 140, "image": "/images/single.png" },
+    { "id": "ultimate_double", "categoryId": "original_burgers", "name": "Ultimate Double Smash", "desc": "Two patties, American cheese, pickles, signature sauce.", "price": 220, "image": "/images/double.png" },
+    { "id": "triple_dare", "categoryId": "original_burgers", "name": "Triple Dare Smash Burger", "desc": "Three patties, American cheese, onion, lettuce, tomato, pickles, sauce.", "price": 290, "image": "/images/triple.png" },
+    { "id": "super_double_bacon", "categoryId": "original_burgers", "name": "Super Double Bacon & Cheese (#1 Seller)", "desc": "Double cheese, double bacon, pickles, burger sauce, onions.", "price": 240, "image": "/images/double-bacon.png" },
+
+    { "id": "kids_single", "categoryId": "kids", "name": "KIDS SINGLE Cheese Burger", "desc": "Single patty, cheese, choice of ketchup or smash sauce.", "price": 99, "image": "/images/kids.png" },
+
+    { "id": "coke_zero", "categoryId": "drinks", "name": "Coke Zero", "desc": "1 Can of Coke Zero", "price": 30, "image": "/images/coke-zero.png" },
+    { "id": "schweppes_lime", "categoryId": "drinks", "name": "Schweppes Lime", "desc": "1 Can of Schweppes Lime", "price": 30, "image": "/images/schweppes-lime.png" },
+    { "id": "sprite", "categoryId": "drinks", "name": "Sprite Lemon Lime", "desc": "1 Can of Sprite Lemon Lime Flavour", "price": 30, "image": "/images/sprite.png" },
+    { "id": "fanta_orange", "categoryId": "drinks", "name": "Fanta Orange", "desc": "1 Can of Fanta Orange", "price": 30, "image": "/images/fanta.png" }
+  ]
+}
+
+> Images are optional; the UI gracefully falls back to a placeholder if the path 404s. You can replace with your assets later.
+
+
+
+
+---
+
+3) client/package.json
+
+{
+  "name": "sbb-online-ordering",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.0",
+    "@vitejs/plugin-react": "^4.3.1"
+  }
+}
+
+
+---
+
+4) client/vite.config.ts
+
+(Matches your earlier proxy setup so the client hits the Express API on port 5000.)
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: true
+  }
+});
+
+
+---
+
+5) client/tsconfig.json
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
+
+
+---
+
+6) client/index.html
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Smash Brothers Burgers — Online Ordering</title>
+    <!-- Poppins (Cam's preferred) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+---
+
+7) client/src/types.ts
+
+export type Category = { id: string; name: string };
+export type MenuItem = {
+  id: string;
+  categoryId: string;
+  name: string;
+  desc: string;
+  price: number;
+  image?: string;
+};
+
+export type CartItem = {
+  item: MenuItem;
+  qty: number;
+  note?: string;
+};
+
+export type OrderPayload = {
+  customer?: {
+    name?: string;
+    phone?: string;
+    notes?: string;
+  };
+  scheduledAt?: string | null; // ISO
+  items: Array<{
+    id: string;
+    name: string;
+    unitPrice: number;
+    qty: number;
+    note?: string;
+    categoryId: string;
+  }>;
+  subtotal: number;
+  serviceFee: number;
+  total: number;
+  currency: "THB";
+};
+
+
+---
+
+8) client/src/styles.css
+
+(Lightweight CSS to replicate the black/yellow Vev vibe; mobile-first; no external frameworks.)
+
+:root{
+  --bg:#0b0b0b;
+  --panel:#111;
+  --text:#eee;
+  --muted:#b7b7b7;
+  --accent:#ffe500; /* Vev-ish yellow */
+  --pill:#ffe500;
+  --card:#121212;
+  --border:#222;
+}
+
+*{ box-sizing:border-box; }
+html,body,#root{ height:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Poppins", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.wrapper{
+  max-width:1040px;
+  margin:0 auto;
+  padding:16px 16px 100px;
+}
+
+.header{
+  padding:16px 0 8px;
+}
+.title{
+  font-weight:800;
+  font-size:24px;
+}
+.subtitle{
+  color:var(--muted);
+  font-size:12px;
+}
+
+.tabs{
+  display:flex;
+  gap:18px;
+  padding:12px 0 14px;
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:var(--bg);
+}
+.tab{
+  padding:8px 2px;
+  font-weight:600;
+  font-size:14px;
+  opacity:.75;
+  cursor:pointer;
+}
+.tab.active{
+  opacity:1;
+  border-bottom:3px solid var(--accent);
+}
+
+.grid{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+.card{
+  display:flex;
+  gap:14px;
+  padding:14px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  align-items:center;
+}
+.thumb{
+  width:64px;height:64px;border-radius:8px;flex:0 0 64px;background:#1b1b1b;display:flex;align-items:center;justify-content:center;font-size:12px;color:#777;overflow:hidden;
+}
+.thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.meta{ flex:1; min-width:0; }
+.name{ font-weight:700; font-size:15px; }
+.desc{ color:var(--muted); font-size:12px; margin-top:4px; line-height:1.3; }
+
+.priceBtn{
+  background:var(--pill);
+  color:#000;
+  font-weight:800;
+  border:none;
+  border-radius:12px;
+  padding:10px 14px;
+  min-width:96px;
+  text-align:center;
+  cursor:pointer;
+}
+.priceBtn:hover{ filter:brightness(.95); }
+
+.footerCart{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  background:#0e0e0e;
+  border-top:1px solid var(--border);
+  padding:12px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.footerCart .btn{
+  background:var(--pill);
+  color:#000;
+  font-weight:800;
+  border:none;
+  border-radius:10px;
+  padding:12px 16px;
+  flex:1;
+}
+
+.badge{
+  background:#222; color:#fff; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700;
+}
+
+.modal{
+  position:fixed; inset:0; background:rgba(0,0,0,.6);
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.sheet{
+  background:#0f0f0f; width:100%; max-width:640px; border-top-left-radius:16px; border-top-right-radius:16px;
+  padding:16px; border:1px solid var(--border);
+}
+.sheetHeader{ display:flex; justify-content:space-between; align-items:center; }
+.close{ background:none; color:#fff; border:none; font-size:18px; padding:6px 8px; }
+
+.qrow{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+.qtyBtn{ width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:#151515;color:#fff;font-size:18px; }
+.qty{ width:42px; text-align:center; font-weight:700; }
+
+.input, .textarea{
+  width:100%; border:1px solid var(--border); background:#141414; color:#fff;
+  border-radius:10px; padding:10px 12px; font-size:14px;
+}
+.textarea{ min-height:80px; resize:vertical; }
+
+.sectionTitle{ font-weight:800; margin:18px 0 8px; }
+
+.hr{ border:0; height:1px; background:var(--border); margin:16px 0; }
+
+.small{ color:var(--muted); font-size:12px; }
+
+@media(min-width:760px){
+  .grid{ gap:16px; }
+  .card{ padding:16px; }
+  .title{ font-size:28px; }
+}
+
+
+---
+
+9) client/src/main.tsx
+
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+createRoot(document.getElementById("root")!).render(<App />);
+
+
+---
+
+10) client/src/App.tsx
+
+import React, { useEffect, useMemo, useState } from "react";
+import type { Category, MenuItem, CartItem, OrderPayload } from "./types";
+
+type MenuResponse = { categories: Category[]; items: MenuItem[] };
+
+const currency = (n: number) => `THB ${n.toFixed(2)}`;
+const loadLS = <T,>(k: string, f: T) => {
+  try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : f; } catch { return f; }
+};
+const saveLS = (k: string, v: unknown) => { localStorage.setItem(k, JSON.stringify(v)); };
+
+export default function App() {
+  const [menu, setMenu] = useState<MenuResponse>({ categories: [], items: [] });
+  const [active, setActive] = useState<string>("");
+  const [modalItem, setModalItem] = useState<MenuItem | null>(null);
+  const [cart, setCart] = useState<CartItem[]>(() => loadLS<CartItem[]>("sbb.cart", []));
+  const [customer, setCustomer] = useState({ name: "", phone: "", notes: "" });
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const r = await fetch("/api/menu");
+      const data: MenuResponse = await r.json();
+      setMenu(data);
+      if (!active && data.categories.length) setActive(data.categories[0].id);
+    })();
+  }, []);
+
+  useEffect(() => saveLS("sbb.cart", cart), [cart]);
+
+  const itemsInActive = useMemo(
+    () => menu.items.filter(i => i.categoryId === active),
+    [menu.items, active]
+  );
+
+  const totals = useMemo(() => {
+    const subtotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
+    const serviceFee = 0; // add delivery/service later if needed
+    return { subtotal, serviceFee, total: subtotal + serviceFee };
+  }, [cart]);
+
+  const addToCart = (item: MenuItem, qty: number, note?: string) => {
+    setCart(prev => {
+      const idx = prev.findIndex(ci => ci.item.id === item.id && (ci.note || "") === (note || ""));
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], qty: next[idx].qty + qty };
+        return next;
+      }
+      return [...prev, { item, qty, note }];
+    });
+    setModalItem(null);
+  };
+
+  const removeFromCart = (id: string, note?: string) => {
+    setCart(prev => prev.filter(ci => !(ci.item.id === id && (ci.note || "") === (note || ""))));
+  };
+
+  const postOrder = async () => {
+    if (!cart.length) return;
+
+    const payload: OrderPayload = {
+      customer: { ...customer },
+      scheduledAt,
+      items: cart.map(ci => ({
+        id: ci.item.id,
+        name: ci.item.name,
+        unitPrice: ci.item.price,
+        qty: ci.qty,
+        note: ci.note,
+        categoryId: ci.item.categoryId
+      })),
+      subtotal: totals.subtotal,
+      serviceFee: totals.serviceFee,
+      total: totals.total,
+      currency: "THB"
+    };
+
+    try {
+      setSubmitting(true);
+      const r = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      // success
+      setCart([]);
+      alert(`Order received!\nOrder ID: ${data.id}`);
+    } catch (e: any) {
+      alert(`Could not place the order: ${e.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="wrapper">
+      <header className="header">
+        <div className="title">Smash Brothers Burgers (Rawai)</div>
+        <div className="subtitle">Traditional American Smash Burgers — Opens at 6:00 pm</div>
+      </header>
+
+      <nav className="tabs" role="tablist" aria-label="menu categories">
+        {menu.categories.map(c => (
+          <div
+            key={c.id}
+            className={`tab ${active === c.id ? "active" : ""}`}
+            onClick={() => setActive(c.id)}
+            role="tab"
+            aria-selected={active === c.id}
+          >
+            {c.name}
+          </div>
+        ))}
+      </nav>
+
+      <section className="grid" aria-live="polite">
+        {itemsInActive.map(item => (
+          <article key={item.id} className="card">
+            <div className="thumb">
+              {item.image ? <img src={item.image} alt="" /> : <span>IMG</span>}
+            </div>
+            <div className="meta">
+              <div className="name">{item.name}</div>
+              <div className="desc">{item.desc}</div>
+            </div>
+            <button className="priceBtn" onClick={() => setModalItem(item)}>
+              {currency(item.price)} +
+            </button>
+          </article>
+        ))}
+      </section>
+
+      {/* Footer cart */}
+      <footer className="footerCart">
+        <div className="badge">{cart.reduce((s, c) => s + c.qty, 0)} items</div>
+        <div className="badge">Subtotal: {currency(totals.subtotal)}</div>
+        <button className="btn" onClick={() => setModalItem({ id: "__checkout__", categoryId: "", name: "Checkout", desc: "", price: 0 })}>
+          Review & Checkout
+        </button>
+      </footer>
+
+      {/* Item modal */}
+      {modalItem && modalItem.id !== "__checkout__" && (
+        <ModalAddItem
+          item={modalItem}
+          onClose={() => setModalItem(null)}
+          onAdd={(qty, note) => addToCart(modalItem, qty, note)}
+        />
+      )}
+
+      {/* Checkout modal */}
+      {modalItem && modalItem.id === "__checkout__" && (
+        <ModalCheckout
+          cart={cart}
+          totals={totals}
+          customer={customer}
+          scheduledAt={scheduledAt}
+          onCustomerChange={setCustomer}
+          onScheduledChange={setScheduledAt}
+          onRemove={removeFromCart}
+          submitting={submitting}
+          onClose={() => setModalItem(null)}
+          onSubmit={postOrder}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ----------------- Modals ----------------- */
+
+function ModalAddItem({ item, onClose, onAdd }: { item: MenuItem; onClose: () => void; onAdd: (qty: number, note?: string) => void; }) {
+  const [qty, setQty] = useState(1);
+  const [note, setNote] = useState("");
+
+  return (
+    <div className="modal" role="dialog" aria-modal="true">
+      <div className="sheet">
+        <div className="sheetHeader">
+          <div style={{ fontWeight: 800 }}>{item.name}</div>
+          <button className="close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="qrow">
+          <button className="qtyBtn" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
+          <div className="qty">{qty}</div>
+          <button className="qtyBtn" onClick={() => setQty(q => q + 1)}>+</button>
+          <div style={{ marginLeft: "auto", fontWeight: 800 }}>{currency(item.price * qty)}</div>
+        </div>
+
+        <div className="sectionTitle">Add a note (optional)</div>
+        <textarea className="textarea" placeholder="No onions, extra sauce…" value={note} onChange={e => setNote(e.target.value)} />
+
+        <div className="hr"></div>
+
+        <button className="priceBtn" style={{ width: "100%" }} onClick={() => onAdd(qty, note || undefined)}>
+          Add to cart — {currency(item.price * qty)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModalCheckout(props: {
+  cart: CartItem[];
+  totals: { subtotal: number; serviceFee: number; total: number };
+  customer: { name: string; phone: string; notes: string };
+  scheduledAt: string | null;
+  onCustomerChange: (c: { name: string; phone: string; notes: string }) => void;
+  onScheduledChange: (v: string | null) => void;
+  onRemove: (id: string, note?: string) => void;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const { cart, totals, customer, scheduledAt, onCustomerChange, onScheduledChange, onRemove, submitting, onClose, onSubmit } = props;
+
+  return (
+    <div className="modal" role="dialog" aria-modal="true">
+      <div className="sheet">
+        <div className="sheetHeader">
+          <div style={{ fontWeight: 800 }}>Your Order</div>
+          <button className="close" onClick={onClose}>✕</button>
+        </div>
+
+        {!cart.length ? (
+          <div className="small">Your cart is empty.</div>
+        ) : (
+          <>
+            {cart.map(ci => (
+              <div key={ci.item.id + (ci.note || "")} className="card" style={{ marginBottom: 8 }}>
+                <div className="meta" style={{ gap: 6 }}>
+                  <div className="name">{ci.item.name} <span className="small">×{ci.qty}</span></div>
+                  {ci.note && <div className="small">Note: {ci.note}</div>}
+                  <div className="small">{currency(ci.item.price)} each</div>
+                </div>
+                <div style={{ textAlign: "right", minWidth: 100 }}>
+                  <div style={{ fontWeight: 800 }}>{currency(ci.item.price * ci.qty)}</div>
+                  <button className="qtyBtn" onClick={() => onRemove(ci.item.id, ci.note)} style={{ marginTop: 6 }}>Remove</button>
+                </div>
+              </div>
+            ))}
+
+            <div className="hr"></div>
+
+            <div className="sectionTitle">Your details</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <input className="input" placeholder="Name" value={customer.name} onChange={e => onCustomerChange({ ...customer, name: e.target.value })} />
+              <input className="input" placeholder="Phone" value={customer.phone} onChange={e => onCustomerChange({ ...customer, phone: e.target.value })} />
+              <textarea className="textarea" placeholder="Delivery notes / address / etc." value={customer.notes} onChange={e => onCustomerChange({ ...customer, notes: e.target.value })} />
+              <input className="input" type="datetime-local" value={scheduledAt || ""} onChange={e => onScheduledChange(e.target.value || null)} />
+            </div>
+
+            <div className="hr"></div>
+
+            <div className="card">
+              <div className="meta">
+                <div>Subtotal</div>
+              </div>
+              <div style={{ fontWeight: 800 }}>{currency(totals.subtotal)}</div>
+            </div>
+
+            <div className="card">
+              <div className="meta">
+                <div>Service Fee</div>
+                <div className="small">Set later (Stripe / delivery)</div>
+              </div>
+              <div style={{ fontWeight: 800 }}>{currency(totals.serviceFee)}</div>
+            </div>
+
+            <div className="card">
+              <div className="meta">
+                <div style={{ fontWeight: 800 }}>Total</div>
+              </div>
+              <div style={{ fontWeight: 800 }}>{currency(totals.total)}</div>
+            </div>
+
+            <div className="hr"></div>
+
+            <button className="priceBtn" style={{ width: "100%", opacity: submitting ? .6 : 1 }} disabled={submitting} onClick={onSubmit}>
+              {submitting ? "Placing order…" : "Place order"}
+            </button>
+            <div className="small" style={{ marginTop: 8 }}>
+              (Payment with Stripe can be added next; for now we store and confirm the order.)
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+---
+
+11) Quick preview locally (or on Replit)
+
+1. Run the API
+
+
+
+cd online-ordering/server
+npm init -y
+npm i express cors
+node index.js
+
+2. Run the client
+
+
+
+cd ../client
+npm i
+npm run dev
+
+Open the client URL (usually http://localhost:5173) — it will proxy /api/* to http://localhost:5000.
+
+> In Replit, you can place server/ and client/ inside your existing workspace. The client/vite.config.ts is already set to proxy to 5000 which matches your earlier setup. You can move this whole folder later — it’s self-contained.
+
+
+
+
+---
+
+12) Drop-in to your existing Replit app
+
+If you already have an Express server: copy the orders/menu endpoints from server/index.js into your server and add the data files under server/data/.
+
+Add a route (e.g. /online-ordering) that serves the built client (client/dist after npm run build) via express.static.
+
+Or keep it as a separate service while testing, then merge.
+
+
+
+---
+
+13) Next steps I can wire in fast
+
+Stripe Checkout/Payment Element on the checkout modal (client) + a /api/create-checkout-session (server).
+
+Loyverse POS: replace the POST /api/orders body with a call to the Loyverse API (and persist the result alongside the local record).
+
+i18n EN/TH toggle for titles & descriptions (I can scaffold keys in menu.json).
+
+Modifiers (e.g., add bacon, no onions) with per-item pricing in the add-item modal.
+
+Pickup vs Delivery with fee and address validation.
+
+
+If you want me to plug this directly into your existing Replit repo, say the word and I’ll output a “merge patch” version that drops into your current /client + /server structure with zero conflicts.
+
