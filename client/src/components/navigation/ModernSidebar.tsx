@@ -33,11 +33,11 @@ type NavGroup = {
 
 const navigationGroups: NavGroup[] = [
   {
-    title: "Dashboard",
+    title: "",
     defaultOpen: true,
     items: [
       { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true },
-      { to: "/", label: "Home", icon: Home, testId: "nav-home" }
+      { to: "/", label: "Dashboard Home", icon: Home, testId: "nav-home" }
     ]
   },
   {
