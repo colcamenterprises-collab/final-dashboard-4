@@ -1,0 +1,84 @@
+To-do (copy/paste steps)
+
+1. Add the module
+
+
+
+Create online-ordering/server/ and online-ordering/client/.
+
+Paste in the full files I gave you (server index.js, data/menu.json, data/orders.json; client Vite + React app).
+
+
+2. Run it for preview
+
+
+
+Terminal A:
+
+cd online-ordering/server && npm i express cors && node index.js
+
+
+Terminal B:
+
+cd online-ordering/client && npm i && npm run dev
+
+
+Open the client URL (5173). It proxies /api/* to the server on 5000.
+
+
+3. Expose it from your main app (optional, keeps it “inside Replit”)
+
+
+
+Build the client: cd online-ordering/client && npm run build
+
+In your existing Express server, add:
+
+
+// mount the ordering API (either copy endpoints or proxy)
+// simplest: copy these two lines verbatim into your main server file
+import path from "path";
+import fs from "fs";
+
+// --- MENU + ORDERS (namespaced to avoid conflicts) ---
+app.get("/api/ordering/menu", (_, res) => {
+  const p = path.join(process.cwd(), "online-ordering/server/data/menu.json");
+  res.json(JSON.parse(fs.readFileSync(p, "utf8")));
+});
+
+app.post("/api/ordering/orders", express.json(), (req, res) => {
+  const p = path.join(process.cwd(), "online-ordering/server/data/orders.json");
+  const orders = JSON.parse(fs.readFileSync(p, "utf8"));
+  const id = "ORD_" + Math.random().toString(36).slice(2, 10).toUpperCase();
+  const createdAt = new Date().toISOString();
+  orders.push({ id, createdAt, status: "RECEIVED", ...req.body });
+  fs.writeFileSync(p, JSON.stringify(orders, null, 2));
+  res.json({ ok: true, id, createdAt });
+});
+
+// --- Serve the built SPA at /online-ordering ---
+const orderingDist = path.join(process.cwd(), "online-ordering/client/dist");
+app.use("/online-ordering", express.static(orderingDist));
+app.get("/online-ordering/*", (_, res) =>
+  res.sendFile(path.join(orderingDist, "index.html"))
+);
+
+Then, in online-ordering/client/src/App.tsx, change the two fetches:
+
+/api/menu → /api/ordering/menu
+
+/api/orders → /api/ordering/orders
+
+
+Rebuild the client: npm run build (inside online-ordering/client).
+
+Now your users can visit: https://<your-app>/online-ordering.
+
+
+4. Ready for Loyverse later
+
+
+
+We’ll swap the POST /api/ordering/orders body to call Loyverse and keep our local JSON as backup/audit.
+
+Stripe can be added by inserting a create-checkout-session endpoint and a Payment Element in the checkout modal.

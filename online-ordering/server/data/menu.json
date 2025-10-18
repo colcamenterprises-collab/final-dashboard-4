@@ -1,0 +1,48 @@
+{
+  "categories": [
+    { "id": "meal_sets", "name": "BURGER MEAL SETS" },
+    { "id": "side_orders", "name": "SIDE ORDERS" },
+    { "id": "original_burgers", "name": "ORIGINAL SMASH BURGERS" },
+    { "id": "kids", "name": "KIDS MENU" },
+    { "id": "drinks", "name": "DRINKS" }
+  ],
+  "items": [
+    {
+      "id": "single_meal_set",
+      "categoryId": "meal_sets",
+      "name": "Single Smash Burger Meal Set",
+      "desc": "The original single smash burger with French fries and your choice of soft drink.",
+      "price": 209,
+      "image": "/images/single-meal.png"
+    },
+    {
+      "id": "ultimate_double_meal",
+      "categoryId": "meal_sets",
+      "name": "Ultimate Double Smash Burger Meal Set",
+      "desc": "Double-smash burger with 150g fries, coleslaw and a drink.",
+      "price": 289,
+      "image": "/images/double-meal.png"
+    },
+    {
+      "id": "super_double_bacon_meal",
+      "categoryId": "meal_sets",
+      "name": "Super Double Bacon and Cheese Meal Set",
+      "desc": "Double cheese, double bacon, fries and a drink.",
+      "price": 309,
+      "image": "/images/bacon-meal.png"
+    },
+    { "id": "classic_fries", "categoryId": "side_orders", "name": "Classic French Fries", "desc": "Classic shoestring fries with smash burger sauce or ketchup", "price": 79, "image": "/images/fries.png" },
+    { "id": "sweet_potato_fries", "categoryId": "side_orders", "name": "Sweet Potato Fries", "desc": "Golden sweet potato fries lightly salted", "price": 99, "image": "/images/sweet-fries.png" },
+    { "id": "cajun_fries", "categoryId": "side_orders", "name": "Cajun Fries", "desc": "Seasoned with a special blend of Cajun spices", "price": 99, "image": "/images/cajun.png" },
+    { "id": "cheesy_bacon_fries", "categoryId": "side_orders", "name": "Cheesy Bacon Fries", "desc": "Fries with American cheese, bacon bits, crunchy onions, drizzle of smash burger sauce", "price": 119, "image": "/images/cheesy-bacon.png" },
+    { "id": "single_smash", "categoryId": "original_burgers", "name": "Single Smash Burger", "desc": "Signature sauce, 100% Australian beef patty, American cheese, onion, lettuce, tomato, pickles.", "price": 140, "image": "/images/single.png" },
+    { "id": "ultimate_double", "categoryId": "original_burgers", "name": "Ultimate Double Smash", "desc": "Two patties, American cheese, pickles, signature sauce.", "price": 220, "image": "/images/double.png" },
+    { "id": "triple_dare", "categoryId": "original_burgers", "name": "Triple Dare Smash Burger", "desc": "Three patties, American cheese, onion, lettuce, tomato, pickles, sauce.", "price": 290, "image": "/images/triple.png" },
+    { "id": "super_double_bacon", "categoryId": "original_burgers", "name": "Super Double Bacon & Cheese (#1 Seller)", "desc": "Double cheese, double bacon, pickles, burger sauce, onions.", "price": 240, "image": "/images/double-bacon.png" },
+    { "id": "kids_single", "categoryId": "kids", "name": "KIDS SINGLE Cheese Burger", "desc": "Single patty, cheese, choice of ketchup or smash sauce.", "price": 99, "image": "/images/kids.png" },
+    { "id": "coke_zero", "categoryId": "drinks", "name": "Coke Zero", "desc": "1 Can of Coke Zero", "price": 30, "image": "/images/coke-zero.png" },
+    { "id": "schweppes_lime", "categoryId": "drinks", "name": "Schweppes Lime", "desc": "1 Can of Schweppes Lime", "price": 30, "image": "/images/schweppes-lime.png" },
+    { "id": "sprite", "categoryId": "drinks", "name": "Sprite Lemon Lime", "desc": "1 Can of Sprite Lemon Lime Flavour", "price": 30, "image": "/images/sprite.png" },
+    { "id": "fanta_orange", "categoryId": "drinks", "name": "Fanta Orange", "desc": "1 Can of Fanta Orange", "price": 30, "image": "/images/fanta.png" }
+  ]
+}
