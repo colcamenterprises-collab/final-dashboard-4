@@ -1094,7 +1094,6 @@ export function registerRoutes(app: express.Application): Server {
   });
 
   // Serve the online ordering SPA
-  const orderingDist = path.join(process.cwd(), "online-ordering/client/dist");
   if (fs.existsSync(orderingDist)) {
     app.use("/online-ordering", express.static(orderingDist));
     app.get("/online-ordering/*", (_, res) =>
