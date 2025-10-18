@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "ORD_BPQRGM4Q",
+    "createdAt": "2025-10-18T13:22:02.152Z",
+    "status": "RECEIVED",
+    "customer": {
+      "name": "Test Customer",
+      "phone": "081-234-5678"
+    },
+    "items": [
+      {
+        "id": "single_smash",
+        "name": "Single Smash Burger",
+        "unitPrice": 140,
+        "qty": 2,
+        "categoryId": "original_burgers"
+      },
+      {
+        "id": "coke_zero",
+        "name": "Coke Zero",
+        "unitPrice": 30,
+        "qty": 2,
+        "categoryId": "drinks"
+      }
+    ],
+    "subtotal": 340,
+    "serviceFee": 0,
+    "total": 340,
+    "currency": "THB"
+  }
+]
