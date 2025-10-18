@@ -10,7 +10,8 @@ import {
   ChefHat,
   Bot,
   ChevronDown,
-  X
+  X,
+  ShoppingBag
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ModernButton } from "@/components/ui";
@@ -86,6 +87,12 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/ai/jussi-ops", label: "Jussi (Operations)", icon: Bot, testId: "nav-jussi" },
       { to: "/ai/jane-accounts", label: "Jane (Accounting)", icon: Bot, testId: "nav-jane" }
+    ]
+  },
+  {
+    title: "Customer Ordering",
+    items: [
+      { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" }
     ]
   }
 ];
