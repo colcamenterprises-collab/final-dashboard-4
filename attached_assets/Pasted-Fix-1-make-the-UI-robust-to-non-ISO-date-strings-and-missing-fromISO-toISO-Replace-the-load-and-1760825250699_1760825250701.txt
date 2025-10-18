@@ -1,0 +1,157 @@
+Fix 1 — make the UI robust to non-ISO date strings and missing fromISO/toISO
+
+Replace the load() and title logic in client/src/pages/ReceiptsBurgerCounts.tsx with this safer version (only the changed bits):
+
+import { DateTime } from "luxon";
+
+function toISODateSafe(s: string) {
+  // Accept both "YYYY-MM-DD" and "MM/DD/YYYY"
+  if (!s) return "";
+  const d1 = DateTime.fromISO(s);
+  if (d1.isValid) return d1.toISODate();
+  const d2 = DateTime.fromFormat(s, "MM/dd/yyyy");
+  if (d2.isValid) return d2.toISODate();
+  return "";
+}
+
+...
+
+const [date, setDate] = useState<string>(""); // leave empty by default
+
+const title = useMemo(() => {
+  if (!metrics) return "Burger Counts";
+  const fromOk = DateTime.fromISO(metrics.fromISO || "").isValid;
+  const toOk   = DateTime.fromISO(metrics.toISO   || "").isValid;
+  if (fromOk && toOk) {
+    const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
+    const to   = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
+    return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
+  }
+  // Fallback: compute the shift window locally for the chosen date
+  const iso = toISODateSafe(date) || metrics.shiftDate;
+  const base = DateTime.fromISO(iso).startOf("day");
+  const from = base.plus({ hours: 18 }).toFormat("dd LLL yyyy HH:mm");
+  const to   = base.plus({ days: 1, hours: 3 }).toFormat("dd LLL yyyy HH:mm");
+  return `Burger Counts — Shift ${iso} (${from} → ${to})`;
+}, [metrics, date]);
+
+async function load() {
+  setLoading(true);
+  setError("");
+  setRawResponse(null);
+  setMetrics(null);
+
+  try {
+    const base = (import.meta as any).env?.VITE_API_BASE?.trim() || "";
+    const iso = toISODateSafe(date);
+    const qs  = iso ? `?date=${encodeURIComponent(iso)}` : "";
+    const url = base ? `${base}/api/receipts/shift/burgers${qs}` : `/api/receipts/shift/burgers${qs}`;
+
+    const r = await fetch(url, { headers: { "Accept": "application/json" } });
+    const j = await r.json().catch(() => ({}));
+    setRawResponse({ status: r.status, ok: r.ok, body: j });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!j?.ok) throw new Error(j?.error || "API returned ok=false");
+
+    // Ensure fromISO/toISO fallback so UI never shows "Invalid DateTime"
+    const d = j.data || {};
+    if (!d.fromISO || !d.toISO) {
+      const lbl = d.shiftDate || iso;
+      const baseDay = DateTime.fromISO(lbl).startOf("day");
+      d.fromISO = baseDay.plus({ hours: 18 }).toISO();
+      d.toISO   = baseDay.plus({ days: 1, hours: 3 }).toISO();
+    }
+    setMetrics(d);
+  } catch (e: any) {
+    setError(e?.message || String(e));
+  } finally {
+    setLoading(false);
+  }
+}
+
+This removes the “Invalid DateTime” title and guarantees the request always uses an ISO date (even if the picker shows 10/17/2025 on iPad).
+
+
+---
+
+Fix 2 — verify whether receipts exist for 17th (and pull if they don’t)
+
+Run these in your DB console; they’ll tell us immediately if anything is stored for that shift window:
+
+-- Count stored receipts for the window (Bangkok time)
+SELECT COUNT(*) AS receipts_found,
+       MIN(datetime) AS first,
+       MAX(datetime) AS last
+FROM pos_receipt
+WHERE datetime >= '2025-10-17 18:00:00+07'
+  AND datetime <  '2025-10-18 03:00:00+07';
+
+-- If >0, list top item names the API sees for that window
+SELECT item->>'name' AS item_name, SUM((item->>'quantity')::int) AS qty
+FROM pos_receipt, LATERAL jsonb_array_elements(items_json) AS item
+WHERE datetime >= '2025-10-17 18:00:00+07'
+  AND datetime <  '2025-10-18 03:00:00+07'
+GROUP BY item_name
+ORDER BY qty DESC
+LIMIT 25;
+
+If receipts_found = 0: the ingestion hasn’t stored that day yet. Pull it (below).
+
+If receipts_found > 0: storage is fine; mapping would be the only remaining cause (and the fuzzy matcher I provided should already fix most variants).
+
+
+Backfill 1 day from Loyverse and store (Bangkok-safe):
+
+curl -X POST "<your-server>/api/loyverse/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"from":"2025-10-17","to":"2025-10-17"}'
+
+Then click Load shift again.
+
+
+---
+
+Fix 3 — make the API always include fromISO/toISO
+
+In server/routes/receiptsBurgers.ts, ensure the handler builds the window up front and always returns it (even if there are zero items):
+
+const { date, source } = req.query as { date?: string; source?: "cache" | "live" };
+const { shiftDateLabel, fromISO, toISO } = windowFromDate(date ?? DateTime.now().setZone(TZ).toISODate()!);
+
+if (source !== "live") {
+  const cached = await readBurgerShiftCache(shiftDateLabel, null);
+  if (cached) return res.json({ ok:true, data: cached }); // cached already contains from/to
+  const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+  // metrics already includes from/to — return as is
+  return res.json({ ok:true, data: metrics, cached:false, saved:true });
+} else {
+  const metrics = await computeMetrics(fromISO, toISO, shiftDateLabel);
+  return res.json({ ok:true, data: metrics, cached:false, saved:false });
+}
+
+(If your current code might return a summary without from/to when zero, this removes that edge case.)
+
+
+---
+
+What to do right now (fast path)
+
+1. Paste the UI patch (Fix 1), reload the page.
+
+
+2. Run the receipts count query above for 2025-10-17.
+
+If 0: run the sync POST for that day.
+
+
+
+3. Click Load shift again.
+
+
+4. If still blank, click Show raw items and send me the first 5–10 names — I’ll expand the mapping immediately.
+
+
+
+This gets us from “blank” to “real burger counts” and ensures your date input & API payload can’t break the UI again.
+

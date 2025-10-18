@@ -33,6 +33,16 @@ function getApiBase() {
   return ""; // relative (proxy)
 }
 
+function toISODateSafe(s: string) {
+  // Accept both "YYYY-MM-DD" and "MM/DD/YYYY"
+  if (!s) return "";
+  const d1 = DateTime.fromISO(s);
+  if (d1.isValid) return d1.toISODate();
+  const d2 = DateTime.fromFormat(s, "MM/dd/yyyy");
+  if (d2.isValid) return d2.toISODate();
+  return "";
+}
+
 export default function ReceiptsBurgerCounts() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -40,15 +50,25 @@ export default function ReceiptsBurgerCounts() {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [rawItems, setRawItems] = useState<any[]>([]);
 
-  // default the date to a valid YYYY-MM-DD (shows a value and avoids format issues)
-  const [date, setDate] = useState<string>("2025-10-15");
+  // leave empty by default
+  const [date, setDate] = useState<string>("");
 
   const title = useMemo(() => {
-    if (!metrics) return "Last Shift — Burger Counts";
-    const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
-    const to = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
-    return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
-  }, [metrics]);
+    if (!metrics) return "Burger Counts";
+    const fromOk = DateTime.fromISO(metrics.fromISO || "").isValid;
+    const toOk   = DateTime.fromISO(metrics.toISO   || "").isValid;
+    if (fromOk && toOk) {
+      const from = DateTime.fromISO(metrics.fromISO).toFormat("dd LLL yyyy HH:mm");
+      const to   = DateTime.fromISO(metrics.toISO).toFormat("dd LLL yyyy HH:mm");
+      return `Burger Counts — Shift ${metrics.shiftDate} (${from} → ${to})`;
+    }
+    // Fallback: compute the shift window locally for the chosen date
+    const iso = toISODateSafe(date) || metrics.shiftDate;
+    const base = DateTime.fromISO(iso).startOf("day");
+    const from = base.plus({ hours: 18 }).toFormat("dd LLL yyyy HH:mm");
+    const to   = base.plus({ days: 1, hours: 3 }).toFormat("dd LLL yyyy HH:mm");
+    return `Burger Counts — Shift ${iso} (${from} → ${to})`;
+  }, [metrics, date]);
 
   async function load() {
     setLoading(true);
@@ -57,20 +77,27 @@ export default function ReceiptsBurgerCounts() {
     setMetrics(null);
 
     try {
-      const base = getApiBase();
-      const url = new URL(`${base}/api/receipts/shift/burgers`, window.location.origin);
-      if (date) url.searchParams.set("date", date);
+      const base = (import.meta as any).env?.VITE_API_BASE?.trim() || "";
+      const iso = toISODateSafe(date);
+      const qs  = iso ? `?date=${encodeURIComponent(iso)}` : "";
+      const url = base ? `${base}/api/receipts/shift/burgers${qs}` : `/api/receipts/shift/burgers${qs}`;
 
-      // If using relative base, rebuild without origin to keep it relative
-      const finalUrl = base ? url.toString() : `/api/receipts/shift/burgers?date=${encodeURIComponent(date)}`;
-      const r = await fetch(finalUrl, { headers: { "Accept": "application/json" } });
+      const r = await fetch(url, { headers: { "Accept": "application/json" } });
       const j = await r.json().catch(() => ({}));
       setRawResponse({ status: r.status, ok: r.ok, body: j });
 
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       if (!j?.ok) throw new Error(j?.error || "API returned ok=false");
 
-      setMetrics(j.data);
+      // Ensure fromISO/toISO fallback so UI never shows "Invalid DateTime"
+      const d = j.data || {};
+      if (!d.fromISO || !d.toISO) {
+        const lbl = d.shiftDate || iso;
+        const baseDay = DateTime.fromISO(lbl).startOf("day");
+        d.fromISO = baseDay.plus({ hours: 18 }).toISO();
+        d.toISO   = baseDay.plus({ days: 1, hours: 3 }).toISO();
+      }
+      setMetrics(d);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
@@ -87,10 +114,12 @@ export default function ReceiptsBurgerCounts() {
   async function loadRaw() {
     setRawItems([]);
     try {
-      const base = getApiBase();
+      const base = (import.meta as any).env?.VITE_API_BASE?.trim() || "";
+      const iso = toISODateSafe(date);
+      const qs = iso ? `?date=${encodeURIComponent(iso)}` : "";
       const url = base 
-        ? `${base}/api/receipts/debug/items?date=${encodeURIComponent(date)}`
-        : `/api/receipts/debug/items?date=${encodeURIComponent(date)}`;
+        ? `${base}/api/receipts/debug/items${qs}`
+        : `/api/receipts/debug/items${qs}`;
       const r = await fetch(url);
       const j = await r.json();
       setRawItems(j.items || []);
