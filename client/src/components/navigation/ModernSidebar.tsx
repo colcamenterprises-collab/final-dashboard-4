@@ -38,17 +38,13 @@ const navigationGroups: NavGroup[] = [
     title: "Dashboard Home",
     isStandalone: true,
     defaultOpen: true,
-    items: [
-      { to: "/", label: "Dashboard Home", icon: Home, testId: "nav-home", isButton: false }
-    ]
+    items: []
   },
   {
     title: "Online Ordering",
     isStandalone: true,
     defaultOpen: true,
-    items: [
-      { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true, isButton: true }
-    ]
+    items: []
   },
   {
     title: "Operations",
@@ -236,8 +232,30 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
             
             return (
               <div key={group.title} className="space-y-1">
-                {/* Group header - only show toggle button if not standalone */}
-                {!group.isStandalone && (
+                {/* Standalone clickable heading */}
+                {group.isStandalone && group.items.length === 0 ? (
+                  group.title === "Dashboard Home" ? (
+                    <NavLink
+                      to="/"
+                      onClick={onClose}
+                      className="w-full flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                      data-testid="nav-dashboard-home"
+                    >
+                      <span className="uppercase tracking-wider">{group.title}</span>
+                    </NavLink>
+                  ) : group.title === "Online Ordering" ? (
+                    <a
+                      href="/online-ordering"
+                      onClick={onClose}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center px-3 py-2 text-xs font-medium bg-black text-white hover:bg-gray-800 rounded-[9px] transition-colors"
+                      data-testid="nav-online-ordering"
+                    >
+                      <span className="uppercase tracking-wider">{group.title}</span>
+                    </a>
+                  ) : null
+                ) : !group.isStandalone && (
                   <button
                     onClick={() => toggleGroup(group.title)}
                     className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
@@ -256,9 +274,9 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                 )}
 
                 {/* Group items */}
-                {(group.isStandalone || isGroupOpen) && (
+                {!group.isStandalone && isGroupOpen && (
                   <div 
-                    className={cn("space-y-1", !group.isStandalone && "ml-2")}
+                    className="space-y-1 ml-2"
                     id={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     {group.items.map((item) => {
