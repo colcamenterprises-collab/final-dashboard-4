@@ -787,13 +787,9 @@ export default function Expenses() {
   async function fetchExpenses() {
     try {
       const now = new Date();
-      // Fetch both DIRECT expenses and STOCK_LODGMENT (rolls) - no source filter
-      const { data } = await axios.get("/api/expensesV2");
-      // Filter to only show DIRECT and STOCK_LODGMENT, exclude SHIFT_FORM
-      const filtered = (data || []).filter((e: any) => 
-        e.source === 'DIRECT' || e.source === 'STOCK_LODGMENT'
-      );
-      setExpenses(filtered);
+      // Fetch ONLY DIRECT expenses for monthly expenses table (excludes stock tracking and shift form entries)
+      const { data } = await axios.get("/api/expensesV2?source=DIRECT");
+      setExpenses(data || []);
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
     }
@@ -1118,61 +1114,71 @@ export default function Expenses() {
           </table>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="lg:hidden space-y-4">
-          {expenses.map((exp,i)=>(
-            <div key={i} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <h3 className="font-medium text-base text-gray-900">{exp.description}</h3>
-                  <p className="text-sm text-gray-600">{exp.supplier} • {exp.category}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-gray-900">{formatCurrency(exp.amount || 0)}</div>
-                  <div className="text-sm text-gray-500">{new Date(exp.date).toLocaleDateString()}</div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingExpense(exp)}
-                  className="min-h-[44px] px-4 flex items-center gap-2 text-sm"
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="min-h-[44px] px-4 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 flex items-center gap-2 text-sm"
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="mx-4">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete "{exp.description}"? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                      <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteMutation.mutate(exp.id)}
-                        className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+        {/* Mobile Compact Table View */}
+        <div className="lg:hidden">
+          <table className="w-full border text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-2 border text-left">Date</th>
+                <th className="p-2 border text-left">Details</th>
+                <th className="p-2 border text-right">Amount</th>
+                <th className="p-2 border text-center w-20">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map((exp,i)=>(
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                  <td className="border p-2">
+                    <div className="text-sm font-medium">{exp.description}</div>
+                    <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
+                  </td>
+                  <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
+                  <td className="border p-2 text-center">
+                    <div className="flex gap-1 justify-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingExpense(exp)}
+                        className="h-8 w-8 p-0"
                       >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          ))}
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-red-600"
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="mx-4 max-w-sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-base">Delete Expense</AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm">
+                              Delete "{exp.description}"?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex-row gap-2">
+                            <AlertDialogCancel className="flex-1 m-0">Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(exp.id)}
+                              className="bg-red-600 hover:bg-red-700 flex-1"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {expenses.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               No expenses recorded this month
