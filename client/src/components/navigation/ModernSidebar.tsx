@@ -30,14 +30,23 @@ type NavGroup = {
   title: string;
   items: NavItem[];
   defaultOpen?: boolean;
+  isStandalone?: boolean;
 };
 
 const navigationGroups: NavGroup[] = [
   {
-    title: "",
+    title: "Dashboard Home",
+    isStandalone: true,
     defaultOpen: true,
     items: [
-      { to: "/", label: "Dashboard Home", icon: Home, testId: "nav-home" },
+      { to: "/", label: "Dashboard Home", icon: Home, testId: "nav-home" }
+    ]
+  },
+  {
+    title: "Online Ordering",
+    isStandalone: true,
+    defaultOpen: true,
+    items: [
       { to: "/online-ordering", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true, isButton: true }
     ]
   },
@@ -227,27 +236,29 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
             
             return (
               <div key={group.title} className="space-y-1">
-                {/* Group header */}
-                <button
-                  onClick={() => toggleGroup(group.title)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
-                  aria-expanded={isGroupOpen}
-                  aria-controls={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  data-testid={`group-toggle-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <span className="uppercase tracking-wider">
-                    {group.title}
-                  </span>
-                  <ChevronDown className={cn(
-                    "h-3 w-3 transition-transform duration-200",
-                    isGroupOpen ? "rotate-180" : "rotate-0"
-                  )} />
-                </button>
+                {/* Group header - only show toggle button if not standalone */}
+                {!group.isStandalone && (
+                  <button
+                    onClick={() => toggleGroup(group.title)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                    aria-expanded={isGroupOpen}
+                    aria-controls={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`group-toggle-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <span className="uppercase tracking-wider">
+                      {group.title}
+                    </span>
+                    <ChevronDown className={cn(
+                      "h-3 w-3 transition-transform duration-200",
+                      isGroupOpen ? "rotate-180" : "rotate-0"
+                    )} />
+                  </button>
+                )}
 
                 {/* Group items */}
-                {isGroupOpen && (
+                {(group.isStandalone || isGroupOpen) && (
                   <div 
-                    className="space-y-1 ml-2"
+                    className={cn("space-y-1", !group.isStandalone && "ml-2")}
                     id={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     {group.items.map((item) => {
