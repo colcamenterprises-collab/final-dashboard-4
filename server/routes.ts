@@ -53,6 +53,7 @@ import xlsx from 'xlsx';
 import csv from 'csv-parser';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { supplierService } from "./supplierService";
 import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shiftTimeCalculator';
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -71,6 +72,23 @@ import loyverseSync from "./routes/loyverseSync";
 const upload = multer({ storage: multer.memoryStorage() });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Auto-build ordering client if dist missing
+const orderingClientDir = path.join(process.cwd(), "online-ordering", "client");
+const orderingDist = path.join(orderingClientDir, "dist");
+const distIndex = path.join(orderingDist, "index.html");
+
+try {
+  if (!fs.existsSync(distIndex)) {
+    console.log("[ordering] No dist found. Building client...");
+    execSync("npm install", { cwd: orderingClientDir, stdio: "inherit" });
+    execSync("npm run build", { cwd: orderingClientDir, stdio: "inherit" });
+    console.log("[ordering] Build complete.");
+  } else {
+    console.log("[ordering] Client already built.");
+  }
+} catch (e) {
+  console.error("[ordering] Auto-build failed:", e);
+}
 
 // Safe JSON for BigInt values
 function safeJson(res: any, data: any, status = 200) {

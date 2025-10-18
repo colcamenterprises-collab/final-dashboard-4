@@ -1,0 +1,90 @@
+Do this now (one-shot)
+
+1. Build the client
+
+
+
+cd online-ordering/client
+npm install
+npm run build
+
+2. Restart your server (so it serves online-ordering/client/dist).
+
+
+3. Visit /online-ordering — it should load.
+
+
+
+Verify the API + page
+
+# menu
+curl http://localhost:5000/api/ordering/menu
+# place a test order
+curl -X POST http://localhost:5000/api/ordering/orders \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"id":"single_smash","name":"Single Smash Burger","unitPrice":140,"qty":1,"categoryId":"original_burgers"}],"subtotal":140,"serviceFee":0,"total":140,"currency":"THB"}'
+
+
+---
+
+Make it bulletproof (optional but recommended)
+
+Add a tiny auto-build block so the server builds the SPA if dist/ is missing. Paste this near the top of your main Express server (where you mounted /online-ordering):
+
+// --- Auto-build ordering client if dist missing ---
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+
+const orderingClientDir = path.join(process.cwd(), "online-ordering", "client");
+const orderingDist = path.join(orderingClientDir, "dist");
+const distIndex = path.join(orderingDist, "index.html");
+
+try {
+  if (!fs.existsSync(distIndex)) {
+    console.log("[ordering] No dist found. Building client...");
+    execSync("npm install", { cwd: orderingClientDir, stdio: "inherit" });
+    execSync("npm run build", { cwd: orderingClientDir, stdio: "inherit" });
+    console.log("[ordering] Build complete.");
+  }
+} catch (e) {
+  console.error("[ordering] Auto-build failed:", e);
+}
+
+And ensure the static hosting stays as we set earlier:
+
+// Serve the built SPA at /online-ordering
+app.use("/online-ordering", express.static(orderingDist));
+app.get("/online-ordering/*", (_, res) =>
+  res.sendFile(path.join(orderingDist, "index.html"))
+);
+
+> Note: if you followed my earlier namespacing, the client fetches should be:
+
+/api/ordering/menu
+
+/api/ordering/orders
+
+
+
+
+
+---
+
+Optional convenience scripts (root package.json)
+
+Add these so you can rebuild with one command:
+
+{
+  "scripts": {
+    "ordering:build": "cd online-ordering/client && npm i && npm run build"
+  }
+}
+
+Run: npm run ordering:build
+
+
+---
+
+If anything still 404s after the build, tell me the server file name you’re using and I’ll output a drop-in patch with the exact imports and routes wired.
+
