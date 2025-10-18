@@ -1403,3 +1403,46 @@ export const dailySalesV2 = pgTable("daily_sales_v2", {
   shift_date: date("shift_date"),
   payload: jsonb("payload"),
 });
+
+// Burger Metrics Analytics Tables
+export const analyticsShiftBurgerItem = pgTable("analytics_shift_burger_item", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id"),
+  shiftDate: date("shift_date").notNull(),
+  fromTs: timestamp("from_ts").notNull(),
+  toTs: timestamp("to_ts").notNull(),
+  normalizedName: text("normalized_name").notNull(),
+  qty: integer("qty").notNull().default(0),
+  patties: integer("patties").notNull().default(0),
+  redMeatG: integer("red_meat_g").notNull().default(0),
+  chickenG: integer("chicken_g").notNull().default(0),
+  rolls: integer("rolls").notNull().default(0),
+  rawHits: jsonb("raw_hits").notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const analyticsShiftBurgerSummary = pgTable("analytics_shift_burger_summary", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: text("restaurant_id"),
+  shiftDate: date("shift_date").notNull().unique(),
+  fromTs: timestamp("from_ts").notNull(),
+  toTs: timestamp("to_ts").notNull(),
+  burgersTotal: integer("burgers_total").notNull().default(0),
+  pattiesTotal: integer("patties_total").notNull().default(0),
+  redMeatGTotal: integer("red_meat_g_total").notNull().default(0),
+  chickenGTotal: integer("chicken_g_total").notNull().default(0),
+  rollsTotal: integer("rolls_total").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Burger Analytics Insert Schemas
+export const insertAnalyticsShiftBurgerItemSchema = createInsertSchema(analyticsShiftBurgerItem).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAnalyticsShiftBurgerSummarySchema = createInsertSchema(analyticsShiftBurgerSummary).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Burger Analytics Types
+export type AnalyticsShiftBurgerItem = typeof analyticsShiftBurgerItem.$inferSelect;
+export type InsertAnalyticsShiftBurgerItem = z.infer<typeof insertAnalyticsShiftBurgerItemSchema>;
+export type AnalyticsShiftBurgerSummary = typeof analyticsShiftBurgerSummary.$inferSelect;
+export type InsertAnalyticsShiftBurgerSummary = z.infer<typeof insertAnalyticsShiftBurgerSummarySchema>;

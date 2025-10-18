@@ -898,3 +898,41 @@ model DailyManagerCheckItem {
   @@unique([dailyCheckId, questionId])
 }
 
+// Burger Metrics Analytics Tables
+model AnalyticsShiftBurgerItem {
+  id            String   @id @default(uuid())
+  restaurantId  String?
+  shiftDate     DateTime
+  fromTs        DateTime
+  toTs          DateTime
+  normalizedName String
+  qty           Int      @default(0)
+  patties       Int      @default(0)
+  redMeatG      Int      @default(0)
+  chickenG      Int      @default(0)
+  rolls         Int      @default(0)
+  rawHits       Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@unique([restaurantId, shiftDate, normalizedName])
+  @@map("analytics_shift_burger_item")
+}
+
+model AnalyticsShiftBurgerSummary {
+  id              String   @id @default(uuid())
+  restaurantId    String?
+  shiftDate       DateTime @unique
+  fromTs          DateTime
+  toTs            DateTime
+  burgersTotal    Int      @default(0)
+  pattiesTotal    Int      @default(0)
+  redMeatGTotal   Int      @default(0)
+  chickenGTotal   Int      @default(0)
+  rollsTotal      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@map("analytics_shift_burger_summary")
+}
+

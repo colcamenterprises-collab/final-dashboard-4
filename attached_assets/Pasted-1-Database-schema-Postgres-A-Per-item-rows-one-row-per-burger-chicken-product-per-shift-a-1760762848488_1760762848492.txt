@@ -1,0 +1,342 @@
+1) Database schema (Postgres)
+
+A) Per-item rows (one row per burger/chicken product per shift)
+
+-- analytics_shift_burger_item
+CREATE TABLE IF NOT EXISTS analytics_shift_burger_item (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id text NULL,                       -- keep if multi-restaurant
+  shift_date    date NOT NULL,                   -- labeled by shift start day
+  from_ts       timestamptz NOT NULL,
+  to_ts         timestamptz NOT NULL,
+  normalized_name text NOT NULL,                 -- e.g. "Single Smash Burger"
+  qty           integer NOT NULL DEFAULT 0,
+  patties       integer NOT NULL DEFAULT 0,      -- beef patties
+  red_meat_g    integer NOT NULL DEFAULT 0,      -- beef grams
+  chicken_g     integer NOT NULL DEFAULT 0,      -- chicken grams
+  rolls         integer NOT NULL DEFAULT 0,
+  raw_hits      jsonb NOT NULL DEFAULT '[]',     -- optional: evidence strings
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (restaurant_id, shift_date, normalized_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asbi_shift ON analytics_shift_burger_item (shift_date);
+
+B) Shift summary (totals for that shift)
+
+-- analytics_shift_burger_summary
+CREATE TABLE IF NOT EXISTS analytics_shift_burger_summary (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id   text NULL,
+  shift_date      date NOT NULL UNIQUE,
+  from_ts         timestamptz NOT NULL,
+  to_ts           timestamptz NOT NULL,
+  burgers_total   integer NOT NULL DEFAULT 0,
+  patties_total   integer NOT NULL DEFAULT 0,
+  red_meat_g_total integer NOT NULL DEFAULT 0,
+  chicken_g_total integer NOT NULL DEFAULT 0,
+  rolls_total     integer NOT NULL DEFAULT 0,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+> If you prefer Drizzle/Prisma migrations, keep the DDL above as the source of truth and mirror it in your ORM.
+
+
+
+
+---
+
+2) Prisma models (optional, if you’re using Prisma)
+
+model AnalyticsShiftBurgerItem {
+  id            String   @id @default(uuid())
+  restaurantId  String?
+  shiftDate     DateTime
+  fromTs        DateTime
+  toTs          DateTime
+  normalizedName String
+  qty           Int      @default(0)
+  patties       Int      @default(0)
+  redMeatG      Int      @default(0)
+  chickenG      Int      @default(0)
+  rolls         Int      @default(0)
+  rawHits       Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@unique([restaurantId, shiftDate, normalizedName])
+  @@map("analytics_shift_burger_item")
+}
+
+model AnalyticsShiftBurgerSummary {
+  id              String   @id @default(uuid())
+  restaurantId    String?
+  shiftDate       DateTime @unique
+  fromTs          DateTime
+  toTs            DateTime
+  burgersTotal    Int      @default(0)
+  pattiesTotal    Int      @default(0)
+  redMeatGTotal   Int      @default(0)
+  chickenGTotal   Int      @default(0)
+  rollsTotal      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@map("analytics_shift_burger_summary")
+}
+
+Run prisma migrate after adding.
+
+
+---
+
+3) Service to compute and persist (idempotent)
+
+server/services/shiftBurgerCache.ts
+
+import { PrismaClient } from "@prisma/client";
+import { computeMetrics } from "./burgerMetrics"; // your existing compute-from-receipts fn
+
+const prisma = new PrismaClient();
+
+// Upserts the cache for a given window/date; returns the metrics
+export async function buildAndSaveBurgerShiftCache(opts: {
+  fromISO: string;
+  toISO: string;
+  shiftDateLabel: string;
+  restaurantId?: string | null;
+}) {
+  const { fromISO, toISO, shiftDateLabel, restaurantId = null } = opts;
+
+  // 1) Compute from live receipts (pos_receipt/receipt_items)
+  const metrics = await computeMetrics(fromISO, toISO, shiftDateLabel);
+
+  // 2) Transaction: replace that shift’s cache
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      DELETE FROM analytics_shift_burger_item
+      WHERE shift_date = ${shiftDateLabel}::date
+        AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId})`;
+
+    // insert per-product rows
+    for (const p of metrics.products) {
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_burger_item
+          (restaurant_id, shift_date, from_ts, to_ts, normalized_name,
+           qty, patties, red_meat_g, chicken_g, rolls, raw_hits, created_at, updated_at)
+        VALUES
+          (${restaurantId}, ${shiftDateLabel}::date, ${metrics.fromISO}::timestamptz, ${metrics.toISO}::timestamptz,
+           ${p.normalizedName}, ${p.qty}, ${p.patties}, ${p.redMeatGrams}, ${p.chickenGrams}, ${p.rolls},
+           ${JSON.stringify(p.rawHits || [])}::jsonb, now(), now())
+        ON CONFLICT (restaurant_id, shift_date, normalized_name)
+        DO UPDATE SET
+          qty = EXCLUDED.qty,
+          patties = EXCLUDED.patties,
+          red_meat_g = EXCLUDED.red_meat_g,
+          chicken_g = EXCLUDED.chicken_g,
+          rolls = EXCLUDED.rolls,
+          raw_hits = EXCLUDED.raw_hits,
+          from_ts = EXCLUDED.from_ts,
+          to_ts = EXCLUDED.to_ts,
+          updated_at = now()`;
+    }
+
+    // upsert summary
+    await tx.$executeRaw`
+      INSERT INTO analytics_shift_burger_summary
+        (restaurant_id, shift_date, from_ts, to_ts,
+         burgers_total, patties_total, red_meat_g_total, chicken_g_total, rolls_total,
+         created_at, updated_at)
+      VALUES
+        (${restaurantId}, ${shiftDateLabel}::date, ${metrics.fromISO}::timestamptz, ${metrics.toISO}::timestamptz,
+         ${metrics.totals.burgers}, ${metrics.totals.patties}, ${metrics.totals.redMeatGrams},
+         ${metrics.totals.chickenGrams}, ${metrics.totals.rolls}, now(), now())
+      ON CONFLICT (shift_date)
+      DO UPDATE SET
+        from_ts = EXCLUDED.from_ts,
+        to_ts = EXCLUDED.to_ts,
+        burgers_total = EXCLUDED.burgers_total,
+        patties_total = EXCLUDED.patties_total,
+        red_meat_g_total = EXCLUDED.red_meat_g_total,
+        chicken_g_total = EXCLUDED.chicken_g_total,
+        rolls_total = EXCLUDED.rolls_total,
+        updated_at = now()`;
+  });
+
+  return metrics;
+}
+
+// Read from cache
+export async function readBurgerShiftCache(shiftDateLabel: string, restaurantId?: string | null) {
+  const [summary, items] = await Promise.all([
+    prisma.$queryRaw<
+      { shift_date: string; from_ts: string; to_ts: string; burgers_total: number; patties_total: number; red_meat_g_total: number; chicken_g_total: number; rolls_total: number }[]
+    >`
+      SELECT shift_date::text, from_ts::text, to_ts::text,
+             burgers_total, patties_total, red_meat_g_total, chicken_g_total, rolls_total
+      FROM analytics_shift_burger_summary
+      WHERE shift_date = ${shiftDateLabel}::date
+        AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId})
+      LIMIT 1`,
+    prisma.$queryRaw<
+      { normalized_name: string; qty: number; patties: number; red_meat_g: number; chicken_g: number; rolls: number; raw_hits: any }[]
+    >`
+      SELECT normalized_name, qty, patties, red_meat_g, chicken_g, rolls, raw_hits
+      FROM analytics_shift_burger_item
+      WHERE shift_date = ${shiftDateLabel}::date
+        AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId})
+      ORDER BY normalized_name ASC`
+  ]);
+
+  if (!summary.length) return null;
+
+  return {
+    shiftDate: shiftDateLabel,
+    fromISO: summary[0].from_ts,
+    toISO: summary[0].to_ts,
+    totals: {
+      burgers: summary[0].burgers_total,
+      patties: summary[0].patties_total,
+      redMeatGrams: summary[0].red_meat_g_total,
+      chickenGrams: summary[0].chicken_g_total,
+      rolls: summary[0].rolls_total,
+    },
+    products: items.map(r => ({
+      normalizedName: r.normalized_name,
+      qty: r.qty,
+      patties: r.patties,
+      redMeatGrams: r.red_meat_g,
+      chickenGrams: r.chicken_g,
+      rolls: r.rolls,
+      rawHits: r.raw_hits ?? [],
+    })),
+  };
+}
+
+
+---
+
+4) Endpoints — prefer cache, allow rebuild
+
+server/routes/receiptsBurgers.ts (additions)
+
+import { buildAndSaveBurgerShiftCache, readBurgerShiftCache } from "../services/shiftBurgerCache";
+import { DateTime } from "luxon";
+const TZ = "Asia/Bangkok";
+
+function windowFromDate(dateISO?: string) {
+  const d = DateTime.fromISO(dateISO!, { zone: TZ }).startOf("day");
+  return {
+    shiftDateLabel: d.toISODate()!,
+    fromISO: d.plus({ hours: 18 }).toISO(),
+    toISO: d.plus({ days: 1, hours: 3 }).toISO(),
+  };
+}
+
+/**
+ * GET /api/receipts/shift/burgers
+ * Query: date=YYYY-MM-DD (optional), source=cache|live (default cache)
+ * - cache: read from analytics tables; if missing, compute+save then return
+ * - live : compute from receipts directly (does NOT save)
+ */
+router.get("/shift/burgers", async (req, res) => {
+  try {
+    const { date, source } = req.query as { date?: string; source?: "cache" | "live" };
+    const { shiftDateLabel, fromISO, toISO } = date ? windowFromDate(date) : windowFromDate(DateTime.now().setZone(TZ).toISODate()!);
+
+    if (source !== "live") {
+      // prefer cache
+      const cached = await readBurgerShiftCache(shiftDateLabel, null);
+      if (cached) return res.json({ ok: true, data: cached });
+
+      // build cache if missing
+      const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+      return res.json({ ok: true, data: metrics, cached: false, saved: true });
+    } else {
+      // compute-only
+      const metrics = await computeMetrics(fromISO, toISO, shiftDateLabel);
+      return res.json({ ok: true, data: metrics, cached: false, saved: false });
+    }
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: e?.message ?? "Unknown error" });
+  }
+});
+
+/**
+ * POST /api/receipts/shift/burgers/rebuild
+ * Query: date=YYYY-MM-DD
+ * - recompute from receipts and persist to cache
+ */
+router.post("/shift/burgers/rebuild", async (req, res) => {
+  try {
+    const { date } = req.query as { date: string };
+    const { shiftDateLabel, fromISO, toISO } = windowFromDate(date);
+    const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+    res.json({ ok: true, data: metrics, rebuilt: true });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: e?.message ?? "Unknown error" });
+  }
+});
+
+
+---
+
+5) Cron (so it always saves after a shift)
+
+You can run a lightweight job daily ~03:10 Bangkok:
+
+Using node-cron
+
+// server/cron.ts
+import cron from "node-cron";
+import { DateTime } from "luxon";
+import { buildAndSaveBurgerShiftCache } from "./services/shiftBurgerCache";
+const TZ = "Asia/Bangkok";
+
+cron.schedule("10 3 * * *", async () => {
+  const d = DateTime.now().setZone(TZ).minus({ days: 1 }).startOf("day");
+  const shiftDateLabel = d.toISODate()!;
+  const fromISO = d.plus({ hours: 18 }).toISO();
+  const toISO = d.plus({ days: 1, hours: 3 }).toISO();
+  try {
+    await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+    console.log(`[burger-cache] saved for shift ${shiftDateLabel}`);
+  } catch (e) {
+    console.error(`[burger-cache] failed for ${shiftDateLabel}`, e);
+  }
+}, { timezone: TZ });
+
+Add import "./cron"; once in your server bootstrap so it attaches.
+
+
+---
+
+6) Frontend (tiny tweak, optional)
+
+Default source=cache; add a “Rebuild from live” button that hits:
+
+POST /api/receipts/shift/burgers/rebuild?date=YYYY-MM-DD
+
+After POST, re-fetch the GET to show the cached result.
+
+
+
+---
+
+7) How this fixes your current gap
+
+You’re receiving receipts but not storing extracted metrics → now you do, per shift.
+
+The GET endpoint now prefers cache, so operators always see a fast, stable answer.
+
+If a shift’s cache is missing, the GET will compute-and-save once, then serve.
+
+You still have a live compute mode for debugging (source=live) and a rebuild route.
+
+
+
+---
