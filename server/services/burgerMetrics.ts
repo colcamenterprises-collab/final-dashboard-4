@@ -97,8 +97,8 @@ async function fetchCounts(fromISO: string, toISO: string) {
       SELECT ri.name, SUM(ri.qty)::int AS qty
       FROM receipt_items ri
       JOIN receipts r ON r.id = ri."receiptId"
-      WHERE r."closedAtUTC" >= ${fromISO}::timestamptz
-        AND r."closedAtUTC" < ${toISO}::timestamptz
+      WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${fromISO}::timestamptz
+        AND COALESCE(r."closedAtUTC", r."createdAtUTC") < ${toISO}::timestamptz
         AND LOWER(ri.name) = ANY(${ALL_ITEM_NAME_VARIANTS})
       GROUP BY ri.name
     `;

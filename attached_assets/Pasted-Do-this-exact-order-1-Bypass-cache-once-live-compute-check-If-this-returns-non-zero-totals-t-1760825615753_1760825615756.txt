@@ -1,0 +1,94 @@
+Do this (exact order)
+
+1) Bypass cache once (live compute check)
+
+If this returns non-zero totals, the data is stored and only the cache is stale.
+
+GET /api/receipts/shift/burgers?date=2025-10-18&source=live
+
+If you see non-zeros → go to step 3.
+
+If still zeros → receipts for that window aren’t stored yet → step 2.
+
+
+2) Store the receipts for that day (Loyverse backfill)
+
+Run the one-day sync (Bangkok-safe) to write into pos_receipt:
+
+curl -X POST "$SERVER/api/loyverse/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"from":"2025-10-18","to":"2025-10-18"}'
+
+Optional quick DB sanity (either table, depending on your schema):
+
+SELECT COUNT(*) AS receipts_found
+FROM pos_receipt
+WHERE datetime >= '2025-10-18 18:00:00+07'
+  AND datetime <  '2025-10-19 03:00:00+07';
+
+If receipts_found = 0, the sync didn’t write — check LOYVERSE_TOKEN and server logs.
+If >0, proceed.
+
+3) Rebuild that shift’s cache (overwrite the zeros)
+
+This recomputes from stored receipts and saves:
+
+POST /api/receipts/shift/burgers/rebuild?date=2025-10-18
+
+(If you don’t have this route yet, use source=live once and the GET handler that “compute-and-save when missing” will need a tiny tweak to “compute-and-save when stale”. For now the rebuild endpoint is the clean hammer.)
+
+4) Reload the page (now from cache)
+
+GET /api/receipts/shift/burgers?date=2025-10-18
+
+You should now see non-zero products and totals. The UI will stop saying “No burger items” for that shift.
+
+
+---
+
+Quick diagonostics if it still shows zeros
+
+Check raw items we stored for that window (proves ingestion vs mapping):
+
+GET /api/receipts/debug/items?date=2025-10-18
+
+If the list is empty ⇒ ingestion problem (go back to step 2).
+
+If the list is non-empty but burgers still zero ⇒ mapping issue. Send the top 10 item names from this endpoint; I’ll add them to the matcher so they count toward buns/meat.
+
+
+Manually nuke the bad cache (optional; rebuild also overwrites):
+
+DELETE FROM analytics_shift_burger_item    WHERE shift_date = '2025-10-18';
+DELETE FROM analytics_shift_burger_summary WHERE shift_date = '2025-10-18';
+
+
+
+---
+
+Weekly backfill + auto-save (once)
+
+To load a full week and ensure everything is cached for the app:
+
+curl -X POST "$SERVER/api/loyverse/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"from":"2025-10-12","to":"2025-10-18"}'
+
+This will:
+
+1. Pull each day from Loyverse,
+
+
+2. Store into pos_receipt (Bangkok timestamps),
+
+
+3. Build the burger cache per shift so the UI is instant.
+
+
+
+Then spot-check any day:
+
+GET /api/receipts/shift/burgers?date=YYYY-MM-DD&source=live   ← live numbers
+GET /api/receipts/shift/burgers?date=YYYY-MM-DD               ← cached numbers
+
+They should match.
