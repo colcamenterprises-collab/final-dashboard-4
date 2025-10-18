@@ -295,15 +295,13 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                               "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                               item.isButton
                                 ? "bg-black text-white hover:bg-gray-800 rounded-[9px]"
-                                : active
-                                ? "bg-black text-white rounded-[9px]"
                                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
                             )}
                             data-testid={item.testId}
                           >
                             <item.icon className={cn(
                               "h-4 w-4 transition-colors",
-                              item.isButton || active ? "text-white" : "text-slate-500"
+                              item.isButton ? "text-white" : "text-slate-500"
                             )} />
                             <span className="truncate">{item.label}</span>
                           </NavLink>
