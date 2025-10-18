@@ -47,6 +47,12 @@ const groups: Group[] = [
       { to: "/membership", label: "Membership" },
     ],
   },
+  {
+    title: "Customer Ordering",
+    items: [
+      { to: "/online-ordering", label: "Online Ordering" },
+    ],
+  },
 ];
 
 function useLockBody(lock: boolean) {
