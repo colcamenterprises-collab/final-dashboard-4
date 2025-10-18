@@ -29,6 +29,62 @@ export type BurgerMetrics = {
   unmapped: Record<string, number>; // raw item names that looked like burgers but not mapped
 };
 
+// Fuzzy matching helpers
+function simplifyName(s: string) {
+  // lower, strip emoji/punctuation, collapse spaces, drop common wrappers
+  return s
+    .toLowerCase()
+    .replace(/[(){}\[\]•★☆🐔🔥✨™®©\-\–\—_,.]/g, " ")
+    .replace(/\b(meal|deal|set|combo|คอมโบ|มิ้ล|มื้อ|เซ็ต)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const FUZZY_ALIASES: Record<string,string[]> = {
+  "single smash burger": [
+    "single smash burger", "single smash", "single burger",
+    "kids single cheeseburger", "single meal set", "super single bacon & cheese",
+  ],
+  "ultimate double": [
+    "ultimate double", "double smash burger", "double set", "kids double cheeseburger",
+  ],
+  "super double bacon & cheese": [
+    "super double bacon and cheese", "super double bacon & cheese",
+    "super double bacon & cheese set",
+  ],
+  "triple smash burger": [
+    "triple smash burger", "triple smash set",
+  ],
+  "crispy chicken fillet burger": [
+    "crispy chicken fillet burger", "เบอร์เกอร์ไก่ชิ้น",
+  ],
+  "karaage chicken burger": [
+    "karaage chicken burger", "karaage chicken meal", "เบอร์เกอร์ไก่คาราอาเกะ",
+  ],
+  "big rooster sriracha chicken": [
+    "big rooster sriracha chicken", "ไก่ศรีราชาตัวใหญ่",
+  ],
+  "el smasho grande chicken burger": [
+    "el smasho grande chicken burger", "แกรนด์ชิกเก้น",
+  ],
+};
+
+// Build reverse index once
+const FUZZY_INDEX: Array<{norm: string; key: string}> = [];
+for (const [norm, arr] of Object.entries(FUZZY_ALIASES)) {
+  for (const a of arr) FUZZY_INDEX.push({ norm, key: simplifyName(a) });
+}
+
+function matchFuzzy(raw: string): string | undefined {
+  const k = simplifyName(raw);
+  // exact simplified hit
+  const exact = FUZZY_INDEX.find(e => e.key === k);
+  if (exact) return exact.norm;
+  // contains hit (last resort)
+  const contains = FUZZY_INDEX.find(e => k.includes(e.key));
+  return contains?.norm;
+}
+
 function matchCatalog(rawName: string): CatalogItem | undefined {
   const l = rawName.toLowerCase().trim();
   return CATALOG.find(c => c.itemNames.map(x => x.toLowerCase().trim()).includes(l));
@@ -72,7 +128,20 @@ export async function computeMetrics(fromISO: string, toISO: string, shiftDateLa
 
   const unmapped: Record<string, number> = {};
   for (const { itemName, qty } of hits) {
-    const cat = matchCatalog(itemName);
+    // Try fuzzy match first
+    const normName = matchFuzzy(itemName);
+    let cat: CatalogItem | undefined;
+    
+    if (normName) {
+      // Find catalog item by normalized name
+      cat = CATALOG.find(c => c.normalizedName.toLowerCase() === normName);
+    }
+    
+    // Fallback to exact match
+    if (!cat) {
+      cat = matchCatalog(itemName);
+    }
+    
     if (!cat) {
       unmapped[itemName] = (unmapped[itemName] ?? 0) + qty;
       continue;

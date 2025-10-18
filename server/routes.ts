@@ -65,6 +65,7 @@ import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 import stockReviewManual from "./routes/stockReviewManual";
 import receiptsBurgers from "./routes/receiptsBurgers";
+import receiptsDebug from "./routes/receiptsDebug";
 import loyverseSync from "./routes/loyverseSync";
 // Email functionality will be added when needed
 
@@ -1055,6 +1056,7 @@ export function registerRoutes(app: express.Application): Server {
   
   // Burger metrics from receipts
   app.use("/api/receipts", receiptsBurgers);
+  app.use("/api/receipts", receiptsDebug);
 
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);

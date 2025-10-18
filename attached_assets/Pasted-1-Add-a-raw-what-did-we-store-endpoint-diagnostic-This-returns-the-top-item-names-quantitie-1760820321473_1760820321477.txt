@@ -1,0 +1,208 @@
+1) Add a raw “what did we store?” endpoint (diagnostic)
+
+This returns the top item names & quantities for a shift window straight from pos_receipt.items_json. If this shows data, storage is fine and the problem is mapping; if it shows zero, the problem is ingestion/time-window.
+
+server/routes/receiptsDebug.ts (NEW)
+
+import { Router } from "express";
+import { DateTime } from "luxon";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+const router = Router();
+const TZ = "Asia/Bangkok";
+
+function window(dateISO: string) {
+  const d = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
+  return {
+    fromISO: d.plus({ hours: 18 }).toISO(),
+    toISO: d.plus({ days: 1, hours: 3 }).toISO(),
+    label: d.toISODate()!,
+  };
+}
+
+/** GET /api/receipts/debug/items?date=YYYY-MM-DD&limit=50 */
+router.get("/debug/items", async (req, res) => {
+  try {
+    const { date, limit } = req.query as { date: string; limit?: string };
+    if (!date) return res.status(400).json({ ok:false, error:"date required" });
+    const w = window(date);
+    const rows = await prisma.$queryRaw<
+      { item_name: string; qty: number }[]
+    >`
+      SELECT (item->>'name') AS item_name,
+             SUM((item->>'quantity')::int) AS qty
+      FROM pos_receipt pr,
+           LATERAL jsonb_array_elements(pr.items_json) AS item
+      WHERE pr.datetime >= ${w.fromISO}::timestamptz
+        AND pr.datetime <  ${w.toISO}::timestamptz
+        AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+      GROUP BY item_name
+      ORDER BY qty DESC
+      LIMIT ${Number(limit ?? 50)}
+    `;
+    res.json({ ok:true, date: w.label, from: w.fromISO, to: w.toISO, items: rows });
+  } catch(e:any) {
+    console.error(e);
+    res.status(500).json({ ok:false, error:e?.message || "debug failed" });
+  }
+});
+
+export default router;
+
+Mount it:
+
+// server/routes.ts
+import receiptsDebug from "./routes/receiptsDebug";
+app.use("/api/receipts", receiptsDebug);
+
+How to use (for the 17th):
+
+curl -s "http://localhost:5000/api/receipts/debug/items?date=2025-10-17" | jq
+
+If you see items: storage is OK → we fix mapping next.
+
+If it’s empty: run the Loyverse sync for that week/day (see step 4).
+
+
+
+---
+
+2) Make mapping much harder to miss (fuzzy aliases)
+
+Replace the matching in your metrics service so we catch common variants like “(Meal Deal)”, Thai in parentheses, emojis, etc.
+
+server/services/burgerMetrics.ts — add helpers & swap matcher
+
+// Add near the top
+function simplifyName(s: string) {
+  // lower, strip emoji/punctuation, collapse spaces, drop common wrappers
+  return s
+    .toLowerCase()
+    .replace(/[(){}\[\]•★☆🐔🔥✨™®©\-\–\—_,.]/g, " ")
+    .replace(/\b(meal|deal|set|combo|คอมโบ|มิ้ล|มื้อ|เซ็ต)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const FUZZY_ALIASES: Record<string,string[]> = {
+  "single smash burger": [
+    "single smash burger", "single smash", "single burger",
+    "kids single cheeseburger", "single meal set", "super single bacon & cheese",
+  ],
+  "ultimate double": [
+    "ultimate double", "double smash burger", "double set", "kids double cheeseburger",
+  ],
+  "super double bacon & cheese": [
+    "super double bacon and cheese", "super double bacon & cheese",
+    "super double bacon & cheese set",
+  ],
+  "triple smash burger": [
+    "triple smash burger", "triple smash set",
+  ],
+  "crispy chicken fillet burger": [
+    "crispy chicken fillet burger", "เบอร์เกอร์ไก่ชิ้น",
+  ],
+  "karaage chicken burger": [
+    "karaage chicken burger", "karaage chicken meal", "เบอร์เกอร์ไก่คาราอาเกะ",
+  ],
+  "big rooster sriracha chicken": [
+    "big rooster sriracha chicken", "ไก่ศรีราชาตัวใหญ่",
+  ],
+  "el smasho grande chicken burger": [
+    "el smasho grande chicken burger", "แกรนด์ชิกเก้น",
+  ],
+};
+
+// Build reverse index once
+const FUZZY_INDEX: Array<{norm: string; key: string}> = [];
+for (const [norm, arr] of Object.entries(FUZZY_ALIASES)) {
+  for (const a of arr) FUZZY_INDEX.push({ norm, key: simplifyName(a) });
+}
+
+function matchFuzzy(raw: string) {
+  const k = simplifyName(raw);
+  // exact simplified hit
+  const exact = FUZZY_INDEX.find(e => e.key === k);
+  if (exact) return exact.norm;
+  // contains hit (last resort)
+  const contains = FUZZY_INDEX.find(e => k.includes(e.key));
+  return contains?.norm;
+}
+
+Then, inside your loop that reads aggregated rows (for (const { itemName, qty } of hits)), replace the catalog lookup:
+
+const normName = matchFuzzy(itemName);
+if (!normName) { unmapped[itemName] = (unmapped[itemName] ?? 0) + qty; continue; }
+// find CatalogItem by normalizedName to get patties/grams/rolls setup
+const cat = CATALOG.find(c => c.normalizedName.toLowerCase() === normName);
+
+(Keep your existing grams/patties logic — this only improves the name match.)
+
+This change alone usually flips “no items” → populated for real shifts.
+
+
+---
+
+3) Add a “Show raw items” button in the UI (quick visibility)
+
+On the burger page, add a small button to fetch the debug endpoint and render the top 50 names. (You already have a Debug panel—wire this JSON into it.)
+
+// In ReceiptsBurgerCounts.tsx, near other buttons:
+const [rawItems, setRawItems] = useState<any[]>([]);
+
+async function loadRaw() {
+  setRawItems([]);
+  const base = (import.meta as any).env?.VITE_API_BASE?.trim() || "";
+  const url = base ? `${base}/api/receipts/debug/items?date=${encodeURIComponent(date)}` 
+                   : `/api/receipts/debug/items?date=${encodeURIComponent(date)}`;
+  const r = await fetch(url); const j = await r.json();
+  setRawItems(j.items || []);
+}
+...
+<button onClick={loadRaw} className="px-4 py-2 rounded-xl shadow border">Show raw items</button>
+
+{rawItems.length > 0 && (
+  <details className="border rounded p-3">
+    <summary>Raw items (top)</summary>
+    <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(rawItems, null, 2)}</pre>
+  </details>
+)}
+
+Now you can see exactly what the API is reading for that shift and whether names align with your catalog.
+
+
+---
+
+4) Backfill a week (store + cache) so all dates work
+
+If the 17th has nothing stored, pull from Loyverse for the last week and save:
+
+curl -X POST http://localhost:5000/api/loyverse/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"2025-10-11","to":"2025-10-17"}'
+
+Then load each date in the UI. If a date is still blank:
+
+Click Show raw items → if non-empty, it’s mapping (step 2).
+
+If empty, ingestion didn’t store that day—check server logs for the sync.
+
+
+
+---
+
+5) Quick “does it work now?” checklist (use the 17th)
+
+1. GET /api/receipts/debug/items?date=2025-10-17 returns a list (not empty).
+
+
+2. /operations/analysis/receipts/burgers → select 2025-10-17 → Load shift → rows appear.
+
+
+3. “Unmapped” list in the API payload is empty or tiny — if any names show there, send them and I’ll add to FUZZY_ALIASES immediately.
+
+
+4. Totals match what you see in Loyverse report for that shift (spot-check Singles/Double/Chicken lines).
+
+
+

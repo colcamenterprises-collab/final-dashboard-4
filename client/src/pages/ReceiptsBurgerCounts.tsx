@@ -38,6 +38,7 @@ export default function ReceiptsBurgerCounts() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [error, setError] = useState<string>("");
   const [rawResponse, setRawResponse] = useState<any>(null);
+  const [rawItems, setRawItems] = useState<any[]>([]);
 
   // default the date to a valid YYYY-MM-DD (shows a value and avoids format issues)
   const [date, setDate] = useState<string>("2025-10-15");
@@ -83,6 +84,22 @@ export default function ReceiptsBurgerCounts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadRaw() {
+    setRawItems([]);
+    try {
+      const base = getApiBase();
+      const url = base 
+        ? `${base}/api/receipts/debug/items?date=${encodeURIComponent(date)}`
+        : `/api/receipts/debug/items?date=${encodeURIComponent(date)}`;
+      const r = await fetch(url);
+      const j = await r.json();
+      setRawItems(j.items || []);
+    } catch (e) {
+      console.error("Failed to load raw items:", e);
+      setRawItems([]);
+    }
+  }
+
   function exportCSV() {
     if (!metrics) return;
     const rows = [
@@ -118,7 +135,34 @@ export default function ReceiptsBurgerCounts() {
         <button onClick={exportCSV} disabled={!metrics} className="px-4 py-2 rounded-xl shadow border">
           Export CSV
         </button>
+        <button onClick={loadRaw} className="px-4 py-2 rounded-xl shadow border bg-blue-50 hover:bg-blue-100">
+          Show raw items
+        </button>
       </div>
+
+      {rawItems.length > 0 && (
+        <details className="border rounded-xl p-4 bg-gray-50">
+          <summary className="font-semibold cursor-pointer mb-2">Raw items from database (top {rawItems.length})</summary>
+          <div className="overflow-x-auto mt-2">
+            <table className="min-w-full text-xs">
+              <thead className="bg-white">
+                <tr>
+                  <th className="text-left p-2 border">Item Name</th>
+                  <th className="text-right p-2 border">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rawItems.map((item, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="p-2 border">{item.item_name}</td>
+                    <td className="p-2 border text-right">{item.qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
 
       {error && (
         <div className="p-3 border rounded bg-red-50 text-red-700">
