@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-const thb = (amount: number) => `฿${amount.toLocaleString()}`;
+const thb = (amount: number | undefined) => `฿${(amount || 0).toLocaleString()}`;
 
 interface FinanceSummary {
   sales: number;
@@ -18,11 +18,24 @@ interface FinanceSummary {
 
 export default function FinancePage() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/finance/summary").then((res) => res.json()).then(setSummary);
+    fetch("/api/finance/summary")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(setSummary)
+      .catch((err) => {
+        console.error("Failed to fetch finance summary:", err);
+        setError("This feature requires authentication. Please contact support.");
+      });
   }, []);
 
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
   if (!summary) return <div className="p-6">Loading finance data…</div>;
 
   return (
