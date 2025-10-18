@@ -1,0 +1,296 @@
+A) Ingestion — pull & store receipts
+
+Route (callable from the app or a cron)
+
+server/routes/loyverseSync.ts (NEW)
+
+import { Router } from "express";
+import { DateTime, Interval } from "luxon";
+import { loyverseImportRange } from "../services/loyverseImport";
+import { buildAndSaveBurgerShiftCache } from "../services/shiftBurgerCache";
+
+const router = Router();
+const TZ = "Asia/Bangkok";
+
+/**
+ * POST /api/loyverse/sync
+ * Body: { from: "YYYY-MM-DD", to: "YYYY-MM-DD" }  (inclusive to)
+ * - Pulls receipts for [from..to], stores them in pos_receipt.
+ * - Builds burger cache per shift date in that range.
+ */
+router.post("/sync", async (req, res) => {
+  try {
+    const { from, to } = req.body as { from: string; to: string };
+    if (!from || !to) return res.status(400).json({ ok: false, error: "from/to required" });
+
+    const start = DateTime.fromISO(from, { zone: TZ }).startOf("day");
+    const end   = DateTime.fromISO(to,   { zone: TZ }).startOf("day");
+    if (!start.isValid || !end.isValid || end < start) {
+      return res.status(400).json({ ok: false, error: "invalid date range" });
+    }
+
+    // 1) Import receipts for each calendar day (Bangkok)
+    const days: string[] = [];
+    for (let d = start; d <= end; d = d.plus({ days: 1 })) days.push(d.toISODate()!);
+    const imported: Record<string, number> = {};
+
+    for (const day of days) {
+      imported[day] = await loyverseImportRange(day, day); // store in pos_receipt
+    }
+
+    // 2) Build caches per shift (18:00 -> 03:00 next day) for each day
+    const caches: Record<string, { burgers: number }> = {};
+    for (const day of days) {
+      const d = DateTime.fromISO(day, { zone: TZ }).startOf("day");
+      const fromISO = d.plus({ hours: 18 }).toISO();
+      const toISO   = d.plus({ days: 1, hours: 3 }).toISO();
+      const metrics = await buildAndSaveBurgerShiftCache({
+        fromISO, toISO, shiftDateLabel: day, restaurantId: null
+      });
+      caches[day] = { burgers: metrics.totals.burgers };
+    }
+
+    res.json({ ok: true, imported, caches });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: e?.message ?? "sync failed" });
+  }
+});
+
+export default router;
+
+Mount it in server/routes.ts:
+
+import loyverseSync from "./routes/loyverseSync";
+app.use("/api/loyverse", loyverseSync);
+
+Service that actually talks to Loyverse & stores
+
+server/services/loyverseImport.ts (NEW)
+
+import axios from "axios";
+import { PrismaClient } from "@prisma/client";
+import { DateTime } from "luxon";
+
+const prisma = new PrismaClient();
+const TZ = "Asia/Bangkok";
+const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN!;
+const LOYVERSE_API = "https://api.loyverse.com/v1.0/receipts"; // adjust version if needed
+
+type LoyverseReceipt = {
+  receipt_number: string;
+  receipt_date: string; // ISO (usually UTC)
+  total_money: { amount: number; currency: string };
+  line_items: Array<{ name: string; quantity: number; price: number }>;
+  payment_type?: string;
+};
+
+async function fetchReceiptsDay(dayISO: string): Promise<LoyverseReceipt[]> {
+  // Pull by day in UTC window that corresponds to Asia/Bangkok day
+  // We’ll fetch a generous UTC window and filter after conversion
+  const day = DateTime.fromISO(dayISO, { zone: TZ }).startOf("day");
+  const utcFrom = day.toUTC().toISO();
+  const utcTo   = day.plus({ days: 1 }).toUTC().toISO();
+
+  const out: LoyverseReceipt[] = [];
+  let url = `${LOYVERSE_API}?from=${encodeURIComponent(utcFrom!)}&to=${encodeURIComponent(utcTo!)}`;
+  let tries = 0;
+
+  while (url && tries < 50) {
+    const r = await axios.get(url, {
+      headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
+      timeout: 30000,
+    });
+    const data = r.data;
+    if (Array.isArray(data.receipts)) {
+      out.push(...data.receipts);
+    }
+    url = data?.links?.next ?? null; // pagination
+    tries++;
+  }
+  return out;
+}
+
+// Upsert into pos_receipt (JSONB) with Bangkok timestamps
+export async function loyverseImportRange(fromISODate: string, toISODate: string): Promise<number> {
+  const days: string[] = [];
+  const start = DateTime.fromISO(fromISODate, { zone: TZ }).startOf("day");
+  const end   = DateTime.fromISO(toISODate,   { zone: TZ }).startOf("day");
+  for (let d = start; d <= end; d = d.plus({ days: 1 })) days.push(d.toISODate()!);
+
+  let inserted = 0;
+
+  for (const day of days) {
+    const receipts = await fetchReceiptsDay(day);
+
+    // Delete any prior sync for this “batch” so re-runs are idempotent
+    const batchId = `LOYVERSE_${day.replace(/-/g, "")}`;
+    await prisma.$executeRaw`DELETE FROM pos_receipt WHERE batch_id = ${batchId}`;
+
+    for (const rc of receipts) {
+      // Convert API timestamp to Bangkok timestamptz
+      const bangkokTs = DateTime.fromISO(rc.receipt_date).setZone(TZ).toISO();
+
+      // Prepare items_json in our expected shape
+      const items = (rc.line_items || []).map(li => ({
+        name: li.name,
+        quantity: Number(li.quantity || 0),
+        price: Number(li.price || 0),
+      }));
+
+      // Insert
+      await prisma.$executeRaw`
+        INSERT INTO pos_receipt (id, batch_id, receipt_id, datetime, total, items_json, payment, created_at)
+        VALUES (gen_random_uuid(), ${batchId}, ${rc.receipt_number}, ${bangkokTs}::timestamptz,
+                ${(rc.total_money?.amount ?? 0) / 100.0}, ${JSON.stringify(items)}::jsonb,
+                ${rc.payment_type ?? null}, now())`;
+      inserted++;
+    }
+  }
+  return inserted;
+}
+
+Why this fixes the 17th “no items” case:
+If Loyverse’s receipt_date is UTC and we previously stored it as-is, many receipts would fall outside the Bangkok shift window. Here we convert to Asia/Bangkok before storing, so the shift filter 18:00 → 03:00 hits the right rows.
+
+
+---
+
+B) Shift endpoint — read stored data and save cache
+
+You already have /api/receipts/shift/burgers. Keep it as we set earlier:
+
+Compute from pos_receipt.items_json for the given date’s window in Bangkok.
+
+Save cache to analytics_shift_burger_* tables (so it’s instant next time).
+
+Exclude batch_id LIKE 'TEST_%'.
+
+
+(You have the code from earlier steps; no changes needed beyond making sure the time zone math uses Asia/Bangkok.)
+
+
+---
+
+C) One-week backfill + cache in one call
+
+Use the route we added:
+
+curl -X POST http://localhost:5000/api/loyverse/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"2025-10-11","to":"2025-10-17"}'
+
+This will:
+
+Pull each day from the Loyverse API,
+
+Store in pos_receipt with Bangkok timestamps,
+
+Build burger caches for each shift.
+
+
+
+---
+
+D) Week validator (sanity tests)
+
+server/scripts/validate_week_burgers.ts (NEW)
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fetch from 'node-fetch';
+import { DateTime } from 'luxon';
+
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const TZ = 'Asia/Bangkok';
+
+async function day(label: string) {
+  const q = `?date=${label}&source=live`;
+  const live = await (await fetch(`${SERVER}/api/receipts/shift/burgers${q}`)).json();
+  const cache = await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${label}`)).json(); // default cache
+
+  if (!live.ok) throw new Error(`live failed for ${label}`);
+  if (!cache.ok) throw new Error(`cache failed for ${label}`);
+
+  const a = live.data.totals;
+  const b = cache.data.totals;
+
+  const same = (x: any, y: any) =>
+    x.burgers === y.burgers &&
+    x.patties === y.patties &&
+    x.redMeatGrams === y.redMeatGrams &&
+    x.chickenGrams === y.chickenGrams &&
+    x.rolls === y.rolls;
+
+  const ok = same(a, b);
+  console.log(`${ok ? '✅' : '❌'} ${label} — live ${JSON.stringify(a)} vs cache ${JSON.stringify(b)}`);
+  if (!ok) throw new Error(`Mismatch on ${label}`);
+}
+
+(async () => {
+  try {
+    const start = DateTime.fromISO(process.env.WEEK_FROM || '2025-10-11', { zone: TZ });
+    const end   = DateTime.fromISO(process.env.WEEK_TO   || '2025-10-17', { zone: TZ });
+    for (let d = start; d <= end; d = d.plus({ days: 1 })) {
+      await day(d.toISODate()!);
+    }
+    console.log('\n🎉 Week validation passed (live == cache for all days).');
+    process.exit(0);
+  } catch (e: any) {
+    console.error('\n💥 Week validation FAILED:', e?.message || e);
+    process.exit(1);
+  }
+})();
+
+Add scripts:
+
+{
+  "scripts": {
+    "sync:week": "tsx server/scripts/curl_sync_week.ts",      // or call the curl manually as above
+    "validate:week": "tsx server/scripts/validate_week_burgers.ts"
+  }
+}
+
+(You can also just run the POST sync and then npm run validate:week.)
+
+
+---
+
+How to run (today)
+
+1. Backfill a week from Loyverse:
+
+
+
+curl -X POST http://localhost:5000/api/loyverse/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"2025-10-11","to":"2025-10-17"}'
+
+2. Open the UI → /operations/analysis/receipts/burgers, set a date in that range → Load shift. You should see real counts.
+
+
+3. Validate week (optional):
+
+
+
+npm run validate:week
+
+
+---
+
+If the 17th still shows empty
+
+Run:
+
+
+SELECT COUNT(*) FROM pos_receipt
+WHERE datetime >= '2025-10-17 18:00:00+07'
+  AND datetime <  '2025-10-18 03:00:00+07';
+
+If 0, receipts weren’t stored — re-run the sync for that day and watch server logs.
+
+If >0, then item names likely don’t match our burger catalog; give me 5–10 of the item->>'name' values from that window and I’ll add them immediately so they’re counted toward buns/meat.
+
+
+
+---
