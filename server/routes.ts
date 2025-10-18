@@ -1947,33 +1947,50 @@ export function registerRoutes(app: express.Application): Server {
 
   // ===== EXPENSE MANAGEMENT API ROUTES =====
   
-  // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM
+  // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM/STOCK_LODGMENT
   app.get("/api/expensesV2", async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
     try {
-      // Default to DIRECT (business expenses) unless specified
-      const source = (req.query.source as string) ?? 'DIRECT';
+      // If source is specified, filter by it; otherwise return ALL expenses
+      const source = req.query.source as string | undefined;
       
-      // Query with source filtering
-      const expenses = await prisma.$queryRaw<Array<{
-        id: string,
-        item: string,
-        costCents: number,
-        supplier: string,
-        shiftDate: Date,
-        expenseType: string,
-        createdAt: Date,
-        source: string,
-        meta: any
-      }>>`
-        SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
-        FROM expenses 
-        WHERE source = ${source}
-        ORDER BY "createdAt" DESC
-        LIMIT 200
-      `;
+      // Query with optional source filtering
+      const expenses = source 
+        ? await prisma.$queryRaw<Array<{
+            id: string,
+            item: string,
+            costCents: number,
+            supplier: string,
+            shiftDate: Date,
+            expenseType: string,
+            createdAt: Date,
+            source: string,
+            meta: any
+          }>>`
+            SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
+            FROM expenses 
+            WHERE source = ${source}
+            ORDER BY "createdAt" DESC
+            LIMIT 200
+          `
+        : await prisma.$queryRaw<Array<{
+            id: string,
+            item: string,
+            costCents: number,
+            supplier: string,
+            shiftDate: Date,
+            expenseType: string,
+            createdAt: Date,
+            source: string,
+            meta: any
+          }>>`
+            SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
+            FROM expenses 
+            ORDER BY "createdAt" DESC
+            LIMIT 200
+          `;
 
       // Format for UI with source information
       const formattedExpenses = expenses.map((expense: any) => ({

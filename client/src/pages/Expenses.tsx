@@ -787,8 +787,13 @@ export default function Expenses() {
   async function fetchExpenses() {
     try {
       const now = new Date();
-      const { data } = await axios.get("/api/expensesV2?source=DIRECT");
-      setExpenses(data || []);
+      // Fetch both DIRECT expenses and STOCK_LODGMENT (rolls) - no source filter
+      const { data } = await axios.get("/api/expensesV2");
+      // Filter to only show DIRECT and STOCK_LODGMENT, exclude SHIFT_FORM
+      const filtered = (data || []).filter((e: any) => 
+        e.source === 'DIRECT' || e.source === 'STOCK_LODGMENT'
+      );
+      setExpenses(filtered);
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
     }
