@@ -45,9 +45,15 @@ export class SchedulerService {
       this.runFinanceCalculations();
     }, 3, 35); // 3:35 AM Bangkok time
 
+    // Schedule burger metrics cache at 3:10 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.cacheBurgerMetrics();
+    }, 3, 10); // 3:10 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
     console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
+    console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
   }
 
   stop() {
@@ -468,6 +474,26 @@ export class SchedulerService {
       console.log('✅ Finance calculations completed');
     } catch (error) {
       console.error('❌ Failed to run finance calculations:', error);
+    }
+  }
+
+  private async cacheBurgerMetrics() {
+    try {
+      console.log('🍔 Caching burger metrics for previous shift...');
+      
+      const { DateTime } = await import('luxon');
+      const { buildAndSaveBurgerShiftCache } = await import('./shiftBurgerCache');
+      
+      const now = DateTime.now().setZone('Asia/Bangkok');
+      const d = now.minus({ days: 1 }).startOf('day');
+      const shiftDateLabel = d.toISODate()!;
+      const fromISO = d.plus({ hours: 18 }).toISO()!;
+      const toISO = d.plus({ days: 1, hours: 3 }).toISO()!;
+      
+      await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+      console.log(`✅ Burger metrics cached for shift ${shiftDateLabel}`);
+    } catch (error) {
+      console.error('❌ Failed to cache burger metrics:', error);
     }
   }
 }
