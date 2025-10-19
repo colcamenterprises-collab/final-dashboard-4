@@ -1,0 +1,367 @@
+---
+
+0) What this patch delivers
+
+Catalog import from your uploaded file (Item and SKU List - Latest) — CSV or XLSX supported.
+
+SKU-first burgers: rules (patties/grams/rolls, kind) come from item_catalog, not hardcoded.
+
+Items-by-category cache (burgers/drinks/sides/modifiers/bundles) — exact items sold per shift.
+
+Historical rebuild for a date range (backfills caches straight from pos_receipt).
+
+
+> After this, your flow is:
+Upload/update SKU list → run importer → rebuild history → UI is correct.
+
+
+
+
+---
+
+1) Migration — catalog + caches (idempotent)
+
+server/migrations/2025-10-19_item_catalog.sql
+
+CREATE TABLE IF NOT EXISTS item_catalog (
+  sku         text PRIMARY KEY,
+  name        text NOT NULL,
+  category    text NOT NULL CHECK (category IN ('burger','drink','side','modifier','bundle')),
+  -- for burgers only:
+  kind        text NULL CHECK (kind IN ('beef','chicken')),
+  patties_per int  NULL,
+  grams_per   int  NULL,
+  rolls_per   int  NOT NULL DEFAULT 1,
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_catalog_category ON item_catalog (category);
+CREATE INDEX IF NOT EXISTS idx_item_catalog_kind ON item_catalog (kind);
+
+-- Per-item shift cache (all categories)
+CREATE TABLE IF NOT EXISTS analytics_shift_item (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date date NOT NULL,
+  from_ts    timestamptz NOT NULL,
+  to_ts      timestamptz NOT NULL,
+  sku        text,
+  name       text NOT NULL,
+  category   text NOT NULL CHECK (category IN ('burger','drink','side','modifier','bundle')),
+  qty        int NOT NULL DEFAULT 0,
+  raw_hits   jsonb NOT NULL DEFAULT '[]',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, category, COALESCE(sku, name))
+);
+CREATE INDEX IF NOT EXISTS idx_asi_shift ON analytics_shift_item (shift_date, category);
+
+-- Per-category summary
+CREATE TABLE IF NOT EXISTS analytics_shift_category_summary (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date  date NOT NULL,
+  from_ts     timestamptz NOT NULL,
+  to_ts       timestamptz NOT NULL,
+  category    text NOT NULL CHECK (category IN ('burger','drink','side','modifier','bundle')),
+  items_total int NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, category)
+);
+
+Run it:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-19_item_catalog.sql
+
+
+---
+
+2) Catalog Importer — from your master file (CSV or XLSX)
+
+server/scripts/catalog_import_from_file.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { parse as parseCsv } from 'csv-parse/sync';
+import * as XLSX from 'xlsx';
+import { PrismaClient } from '@prisma/client';
+
+const db = new PrismaClient();
+
+// CONFIG
+const INPUT_PATH = process.env.CATALOG_PATH || './Item and SKU List - Latest';
+const DEFAULT_BURGER_CHICKEN_GRAMS = 100; // per your rule
+const DEFAULT_BURGER_BEEF_PATTY_GRAMS = 95; // informational; not saved here
+
+type Row = {
+  SKU: string;
+  'Item name'?: string; Name?: string;
+  Category?: string;
+  Kind?: string;          // beef | chicken (optional)
+  PattiesPer?: string;    // optional
+  GramsPer?: string;      // optional
+  RollsPer?: string;      // optional
+};
+
+function loadRows(p: string): Row[] {
+  const ext = path.extname(p).toLowerCase();
+  if (!fs.existsSync(p)) throw new Error(`Catalog file not found at: ${p}`);
+  if (ext === '.csv') {
+    const raw = fs.readFileSync(p, 'utf8');
+    return parseCsv(raw, { columns: true, skip_empty_lines: true }) as Row[];
+  }
+  // assume Excel if not CSV
+  const wb = XLSX.read(fs.readFileSync(p));
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json<Row>(ws, { defval: '' });
+}
+
+function normCategory(x?: string): 'burger'|'drink'|'side'|'modifier'|'bundle' {
+  const v = (x || '').toLowerCase().trim();
+  if (['burger','burgers'].includes(v)) return 'burger';
+  if (['drink','drinks','beverage','beverages'].includes(v)) return 'drink';
+  if (['side','sides'].includes(v)) return 'side';
+  if (['modifier','modifiers','add-on','addon','add on'].includes(v)) return 'modifier';
+  if (['bundle','deal','set','meal','combo','mix and match'].includes(v)) return 'bundle';
+  // default safe bucket
+  return 'side';
+}
+
+function inferBurgerKind(name: string): 'beef'|'chicken'|null {
+  const n = name.toLowerCase();
+  if (/(chicken|karaage|rooster|grande|ไก่|คาราอาเกะ)/i.test(n)) return 'chicken';
+  if (/burger|smash|double|triple|ซิงเกิ้ล|ดับเบิ้ล|ทริเปิล|คู่/i.test(n)) return 'beef';
+  return null;
+}
+
+(async () => {
+  const rows = loadRows(INPUT_PATH);
+  console.log(`Loaded ${rows.length} catalog rows from: ${INPUT_PATH}`);
+
+  let upserts = 0;
+  for (const r of rows) {
+    const sku = String(r.SKU || '').trim();
+    const name = String(r['Item name'] ?? r.Name ?? '').trim();
+    if (!sku || !name) continue;
+
+    const category = normCategory(r.Category);
+    let kind: 'beef'|'chicken'|null = r.Kind ? (r.Kind.toLowerCase() as any) : null;
+    let patties = r.PattiesPer ? Number(r.PattiesPer) : null;
+    let grams   = r.GramsPer ? Number(r.GramsPer) : null;
+    const rolls = r.RollsPer ? Number(r.RollsPer) : 1;
+
+    // For burgers: fill defaults if not provided
+    if (category === 'burger') {
+      if (!kind) kind = inferBurgerKind(name);
+      if (kind === 'chicken' && !grams) grams = DEFAULT_BURGER_CHICKEN_GRAMS;
+      if (kind === 'beef' && !patties) {
+        // derive very conservatively from name if missing
+        const n = name.toLowerCase();
+        patties = /triple|สาม/i.test(n) ? 3 : /double|คู่/i.test(n) ? 2 : 1;
+      }
+    } else {
+      // Non-burger: null out burger-only fields
+      kind = null; patties = null; grams = null;
+    }
+
+    await db.$executeRaw`
+      INSERT INTO item_catalog (sku, name, category, kind, patties_per, grams_per, rolls_per)
+      VALUES (${sku}, ${name}, ${category}, ${kind}, ${patties}, ${grams}, ${rolls})
+      ON CONFLICT (sku)
+      DO UPDATE SET name=EXCLUDED.name, category=EXCLUDED.category, kind=EXCLUDED.kind,
+                    patties_per=EXCLUDED.patties_per, grams_per=EXCLUDED.grams_per,
+                    rolls_per=EXCLUDED.rolls_per, updated_at=now()`;
+    upserts++;
+  }
+
+  console.log(`Catalog upsert complete: ${upserts} items.`);
+  await db.$disconnect();
+})().catch(e => { console.error(e); process.exit(1); });
+
+Run it (points at your uploaded file):
+
+# If your file is CSV:
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" tsx server/scripts/catalog_import_from_file.ts
+
+# If Excel, give the .xlsx full path instead (same script works).
+
+
+---
+
+3) Burger metrics — build rules from catalog (no hardcoding)
+
+server/services/burgerMetrics.ts (key changes only)
+
+import { PrismaClient } from "@prisma/client";
+import { DateTime } from "luxon";
+const prisma = new PrismaClient();
+const BEEF_G = 95;
+const BURGER_SOURCE = process.env.BURGER_SOURCE || "pos";
+
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: "Asia/Bangkok" }).startOf("day");
+  return { shiftDateLabel: base.toISODate()!, fromISO: base.plus({ hours: 18 }).toISO(), toISO: base.plus({ days: 1, hours: 3 }).toISO() };
+}
+
+async function hasPosData(fromISO: string, toISO: string) {
+  const r = await prisma.$queryRaw<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM pos_receipt
+    WHERE datetime >= ${fromISO}::timestamptz AND datetime < ${toISO}::timestamptz
+      AND COALESCE(batch_id,'') NOT LIKE 'TEST_%'`;
+  return (r?.[0]?.n ?? 0) > 0;
+}
+
+async function loadShiftItems(fromISO: string, toISO: string) {
+  const preferPos = BURGER_SOURCE === "pos" || (BURGER_SOURCE === "auto" && await hasPosData(fromISO, toISO));
+  if (preferPos) {
+    const rows = await prisma.$queryRaw<{ sku: string|null; item_name: string; qty: number }[]>`
+      SELECT (item->>'sku') AS sku, (item->>'name') AS item_name,
+             SUM((item->>'quantity')::int) AS qty
+      FROM pos_receipt pr, LATERAL jsonb_array_elements(pr.items_json) AS item
+      WHERE pr.datetime >= ${fromISO}::timestamptz AND pr.datetime < ${toISO}::timestamptz
+        AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+      GROUP BY sku, item_name`;
+    return { sourceUsed: "pos" as const, rows };
+  }
+  const rows = await prisma.$queryRaw<{ sku: null; item_name: string; qty: number }[]>`
+    SELECT NULL::text AS sku, ri."name" AS item_name, SUM(ri."qty")::int AS qty
+    FROM "receipt_items" ri JOIN "receipts" r ON r.id = ri."receiptId"
+    WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${fromISO}::timestamptz
+      AND COALESCE(r."closedAtUTC", r."createdAtUTC") < ${toISO}::timestamptz
+    GROUP BY ri."name"`;
+  return { sourceUsed: "legacy" as const, rows };
+}
+
+// NEW: pull burger rules & names from catalog
+async function loadBurgerRulesFromCatalog() {
+  const rows = await prisma.$queryRaw<{
+    sku:string; name:string; kind: 'beef'|'chicken'|null; patties_per:number|null; grams_per:number|null; rolls_per:number;
+  }[]>`SELECT sku, name, kind, patties_per, grams_per, rolls_per FROM item_catalog WHERE category='burger'`;
+  const rules = new Map<string, { name:string; kind:'beef'|'chicken'; patties?:number; grams?:number; rolls:number }>();
+  for (const r of rows) {
+    if (!r.kind) continue; // must be beef or chicken
+    rules.set(r.sku, {
+      name: r.name,
+      kind: r.kind,
+      patties: r.kind === 'beef' ? (r.patties_per ?? 1) : undefined,
+      grams:   r.kind === 'chicken' ? (r.grams_per ?? 100) : undefined,
+      rolls: r.rolls_per ?? 1,
+    });
+  }
+  return rules;
+}
+
+export async function computeMetrics(dateISO: string) {
+  const { shiftDateLabel, fromISO, toISO } = shiftWindow(dateISO);
+  const { sourceUsed, rows } = await loadShiftItems(fromISO!, toISO!);
+  const rules = await loadBurgerRulesFromCatalog();
+
+  const perSku = new Map<string, { name:string; qty:number; patties:number; red:number; chick:number; rolls:number; hits:Set<string> }>();
+  const unmapped: Record<string, number> = {};
+
+  for (const r of rows) {
+    const qty = Number(r.qty || 0);
+    const sku = r.sku?.trim() || null;
+    if (sku && rules.has(sku)) {
+      const rule = rules.get(sku)!;
+      if (!perSku.has(sku)) perSku.set(sku, { name: rule.name, qty:0, patties:0, red:0, chick:0, rolls:0, hits:new Set() });
+      const p = perSku.get(sku)!;
+      p.qty += qty;
+      p.rolls += rule.rolls * qty;
+      p.hits.add(`${sku} :: ${r.item_name}`);
+      if (rule.kind === 'beef') { p.patties += (rule.patties ?? 1) * qty; p.red += (rule.patties ?? 1) * BEEF_G * qty; }
+      else { p.chick += (rule.grams ?? 100) * qty; }
+    } else {
+      // Not a catalog burger: ignore here; may be side/drink or bundle
+      if (/burger|meal|set/i.test(r.item_name || "")) unmapped[r.item_name] = (unmapped[r.item_name] ?? 0) + qty;
+    }
+  }
+
+  const products = Array.from(perSku.entries()).map(([sku, v]) => ({
+    sku,
+    normalizedName: v.name,
+    qty: v.qty,
+    patties: v.patties,
+    redMeatGrams: v.red,
+    chickenGrams: v.chick,
+    rolls: v.rolls,
+    rawHits: Array.from(v.hits),
+  })).sort((a,b)=>a.normalizedName.localeCompare(b.normalizedName));
+
+  const totals = products.reduce((t, r) => ({
+    burgers: t.burgers + r.qty,
+    patties: t.patties + r.patties,
+    redMeatGrams: t.redMeatGrams + r.redMeatGrams,
+    chickenGrams: t.chickenGrams + r.chickenGrams,
+    rolls: t.rolls + r.rolls,
+  }), { burgers:0, patties:0, redMeatGrams:0, chickenGrams:0, rolls:0 });
+
+  return { shiftDate: shiftDateLabel, fromISO, toISO, sourceUsed, products, totals, unmapped };
+}
+
+> This removes any hardcoded burger SKU map. It always uses your latest catalog.
+
+
+
+
+---
+
+4) Generic Items Cache (drinks/sides/modifiers/bundles)
+
+server/services/shiftItemCache.ts (unchanged from prior message, works with item_catalog to classify everything by SKU) — keep as-is if you already added it. Otherwise, include it now (I can re-send if you need).
+
+Routes to mount:
+
+import shiftItems from "./routes/shiftItems";
+app.use("/api/receipts", shiftItems);
+
+POST /api/receipts/shift/items/rebuild?date=YYYY-MM-DD → builds cache from pos_receipt
+
+GET  /api/receipts/shift/items?date=YYYY-MM-DD&category=side|drink|modifier|bundle|burger → exact items + SKUs + qty
+
+
+
+---
+
+5) Runbook — import catalog and rebuild history
+
+# 1) Migrate
+psql "$DATABASE_URL" -f server/migrations/2025-10-19_item_catalog.sql
+
+# 2) Import your master Item/SKU list (CSV or XLSX path)
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts
+
+# 3) Rebuild BURGER cache for a week (SKU-first via catalog)
+for d in 2025-10-12 2025-10-13 2025-10-14 2025-10-15 2025-10-16 2025-10-17 2025-10-18; do
+  GH_DAY=$d tsx server/scripts/golden_rebuild_day.ts
+done
+
+# 4) Build generic items cache for the same dates (drinks/sides/modifiers/bundles)
+for d in 2025-10-12 2025-10-13 2025-10-14 2025-10-15 2025-10-16 2025-10-17 2025-10-18; do
+  curl -s -X POST "http://localhost:5000/api/receipts/shift/items/rebuild?date=$d" > /dev/null
+done
+
+# 5) Verify source + values (should say sourceUsed=pos and show SKU lines)
+curl -s "/api/receipts/shift/burgers?date=2025-10-15&source=live" | jq
+curl -s "/api/receipts/shift/items?date=2025-10-15&category=side" | jq
+curl -s "/api/receipts/shift/items?date=2025-10-15&category=drink" | jq
+
+> UI: ensure your burgers table shows the SKU column (we added it).
+New endpoints let you list exact items per category for any shift (perfect for ingredients next).
+
+
+
+
+---
+
+Notes / gotchas
+
+“Mix & Match” or other bundle SKUs should be category='bundle' in item_catalog. They will show in the generic items cache but do not contribute to burgers/meat unless their component burger SKUs are separate line items (as per Loyverse receipts).
+
+If any burger shows in unmapped from /api/receipts/shift/burgers, it means its SKU exists in receipts but is missing in item_catalog or lacks kind/patties/grams. Add/update it in your master file and rerun the import.
+
+
+
+---
