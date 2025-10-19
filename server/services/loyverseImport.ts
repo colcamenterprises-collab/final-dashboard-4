@@ -54,6 +54,12 @@ export async function loyverseImportRange(fromISO: string, toISO: string): Promi
         VALUES (gen_random_uuid(), ${batchId}, ${rc.receipt_number}, ${bangkokTs}::timestamptz,
                 ${(rc.total_money?.amount ?? 0) / 100.0}, ${JSON.stringify(items)}::jsonb,
                 ${rc.payment_type ?? null}, now())
+        ON CONFLICT (receipt_id) DO UPDATE
+          SET total = EXCLUDED.total,
+              items_json = EXCLUDED.items_json,
+              payment = EXCLUDED.payment,
+              datetime = EXCLUDED.datetime,
+              batch_id = EXCLUDED.batch_id
       `;
       inserted++;
     }
