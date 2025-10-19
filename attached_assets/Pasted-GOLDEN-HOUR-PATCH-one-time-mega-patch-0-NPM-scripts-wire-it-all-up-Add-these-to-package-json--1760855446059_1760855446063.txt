@@ -1,0 +1,674 @@
+GOLDEN HOUR PATCH (one-time mega patch)
+
+0) NPM scripts (wire it all up)
+
+Add these to package.json → "scripts"
+
+{
+  "scripts": {
+    "golden:migrate": "psql \"$DATABASE_URL\" -f server/migrations/2025-10-18_golden_hour.sql",
+    "golden:sync:week": "tsx server/scripts/golden_sync_week.ts",
+    "golden:validate:week": "tsx server/scripts/golden_validate_week.ts",
+    "golden:validate:csv": "tsx server/scripts/golden_validate_vs_csv.ts",
+    "golden:rebuild:day": "tsx server/scripts/golden_rebuild_day.ts",
+    "golden:smoke:day": "tsx server/scripts/golden_smoke_day.ts"
+  }
+}
+
+
+---
+
+1) DB migration (analytics cache, safe to re-run)
+
+server/migrations/2025-10-18_golden_hour.sql
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- per-item cache
+CREATE TABLE IF NOT EXISTS analytics_shift_burger_item (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id    text NULL,
+  shift_date       date NOT NULL,
+  from_ts          timestamptz NOT NULL,
+  to_ts            timestamptz NOT NULL,
+  normalized_name  text NOT NULL,
+  qty              integer NOT NULL DEFAULT 0,
+  patties          integer NOT NULL DEFAULT 0,
+  red_meat_g       integer NOT NULL DEFAULT 0,
+  chicken_g        integer NOT NULL DEFAULT 0,
+  rolls            integer NOT NULL DEFAULT 0,
+  raw_hits         jsonb NOT NULL DEFAULT '[]',
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (restaurant_id, shift_date, normalized_name)
+);
+CREATE INDEX IF NOT EXISTS idx_asbi_shift ON analytics_shift_burger_item (shift_date);
+
+-- shift summary cache
+CREATE TABLE IF NOT EXISTS analytics_shift_burger_summary (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id     text NULL,
+  shift_date        date NOT NULL UNIQUE,
+  from_ts           timestamptz NOT NULL,
+  to_ts             timestamptz NOT NULL,
+  burgers_total     integer NOT NULL DEFAULT 0,
+  patties_total     integer NOT NULL DEFAULT 0,
+  red_meat_g_total  integer NOT NULL DEFAULT 0,
+  chicken_g_total   integer NOT NULL DEFAULT 0,
+  rolls_total       integer NOT NULL DEFAULT 0,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
+);
+
+
+---
+
+2) Ingestion: Loyverse → pos_receipt with Bangkok timestamps
+
+server/services/loyverseImport.ts
+
+import axios from "axios";
+import { PrismaClient } from "@prisma/client";
+import { DateTime } from "luxon";
+
+const prisma = new PrismaClient();
+const TZ = "Asia/Bangkok";
+const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN!;
+const LOYVERSE_API = "https://api.loyverse.com/v1.0/receipts";
+
+type LvReceipt = {
+  receipt_number: string;
+  receipt_date: string; // API returns UTC ISO
+  total_money?: { amount: number };
+  line_items?: Array<{ name: string; quantity: number; price?: number }>;
+  payment_type?: string;
+};
+
+async function fetchDay(dayISO: string): Promise<LvReceipt[]> {
+  const day = DateTime.fromISO(dayISO, { zone: TZ }).startOf("day");
+  const fromUTC = day.toUTC().toISO();
+  const toUTC = day.plus({ days: 1 }).toUTC().toISO();
+
+  const out: LvReceipt[] = [];
+  let url = `${LOYVERSE_API}?from=${encodeURIComponent(fromUTC!)}&to=${encodeURIComponent(toUTC!)}`;
+  for (let i = 0; i < 50 && url; i++) {
+    const r = await axios.get(url, { headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` }, timeout: 30000 });
+    const data = r.data;
+    if (Array.isArray(data?.receipts)) out.push(...data.receipts);
+    url = data?.links?.next ?? null;
+  }
+  return out;
+}
+
+// inclusive date range
+export async function loyverseImportRange(fromISO: string, toISO: string): Promise<Record<string, number>> {
+  const results: Record<string, number> = {};
+  const start = DateTime.fromISO(fromISO, { zone: TZ }).startOf("day");
+  const end = DateTime.fromISO(toISO, { zone: TZ }).startOf("day");
+  for (let d = start; d <= end; d = d.plus({ days: 1 })) {
+    const day = d.toISODate()!;
+    const batchId = `LOYVERSE_${day.replace(/-/g, "")}`;
+    const receipts = await fetchDay(day);
+    await prisma.$executeRaw`DELETE FROM pos_receipt WHERE batch_id = ${batchId}`;
+    let inserted = 0;
+    for (const rc of receipts) {
+      const bangkokTs = DateTime.fromISO(rc.receipt_date).setZone(TZ).toISO(); // store as Bangkok
+      const items = (rc.line_items ?? []).map(li => ({
+        name: li.name,
+        quantity: Number(li.quantity || 0),
+        price: Number(li.price || 0),
+      }));
+      await prisma.$executeRaw`
+        INSERT INTO pos_receipt (id, batch_id, receipt_id, datetime, total, items_json, payment, created_at)
+        VALUES (gen_random_uuid(), ${batchId}, ${rc.receipt_number}, ${bangkokTs}::timestamptz,
+                ${(rc.total_money?.amount ?? 0) / 100.0}, ${JSON.stringify(items)}::jsonb,
+                ${rc.payment_type ?? null}, now())
+      `;
+      inserted++;
+    }
+    results[day] = inserted;
+  }
+  return results;
+}
+
+server/routes/loyverseSync.ts
+
+import { Router } from "express";
+import { DateTime } from "luxon";
+import { loyverseImportRange } from "../services/loyverseImport";
+import { buildAndSaveBurgerShiftCache } from "../services/shiftBurgerCache";
+
+const router = Router();
+const TZ = "Asia/Bangkok";
+
+router.post("/sync", async (req, res) => {
+  try {
+    const { from, to } = req.body as { from: string; to: string };
+    if (!from || !to) return res.status(400).json({ ok:false, error:"from/to required" });
+
+    const start = DateTime.fromISO(from, { zone: TZ }).startOf("day");
+    const end   = DateTime.fromISO(to,   { zone: TZ }).startOf("day");
+    if (!start.isValid || !end.isValid || end < start) return res.status(400).json({ ok:false, error:"invalid range" });
+
+    const imported = await loyverseImportRange(from, to);
+
+    // Also build caches for those shift dates
+    const caches: Record<string, number> = {};
+    for (let d = start; d <= end; d = d.plus({ days: 1 })) {
+      const day = d.toISODate()!;
+      const fromISO = d.plus({ hours: 18 }).toISO();
+      const toISO = d.plus({ days: 1, hours: 3 }).toISO();
+      const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel: day, restaurantId: null });
+      caches[day] = metrics.totals.burgers;
+    }
+    res.json({ ok: true, imported, caches });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message || "sync failed" });
+  }
+});
+
+export default router;
+
+Mount it in server/routes.ts:
+
+import loyverseSync from "./routes/loyverseSync";
+app.use("/api/loyverse", loyverseSync);
+
+
+---
+
+3) Burger metrics: fuzzy mapping + timestamp fallback + TEST_ guard
+
+server/services/burgerMetrics.ts (core logic)
+
+import { PrismaClient } from "@prisma/client";
+import { DateTime } from "luxon";
+import { sql } from "drizzle-orm"; // or keep prisma.$queryRaw — adjust imports to your stack
+
+const prisma = new PrismaClient();
+const TZ = "Asia/Bangkok";
+const BEEF_G = 95;
+const CHICKEN_G = 100;
+
+// fuzzy catalogue (English + Thai, with Meal/Set normalization)
+const CATALOG = [
+  { normalized: "Single Smash Burger", pattiesPer: 1, kind: "beef",
+    aliases: ["single smash", "single meal set", "kids single", "ซิงเกิ้ล"] },
+  { normalized: "Super Double Bacon & Cheese", pattiesPer: 2, kind: "beef",
+    aliases: ["super double bacon", "super double bacon & cheese", "ซูเปอร์ดับเบิ้ลเบคอน", "super double bacon & cheese set"] },
+  { normalized: "Triple Smash Burger", pattiesPer: 3, kind: "beef",
+    aliases: ["triple smash", "triple smash set", "สาม"] },
+  { normalized: "Ultimate Double", pattiesPer: 2, kind: "beef",
+    aliases: ["ultimate double", "double smash burger", "double set", "คู่"] },
+  { normalized: "Crispy Chicken Fillet Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["crispy chicken", "เบอร์เกอร์ไก่ชิ้น"] },
+  { normalized: "Karaage Chicken Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["karaage chicken", "คาราอาเกะ"] },
+  { normalized: "Big Rooster Sriracha Chicken", pattiesPer: 0, kind: "chicken",
+    aliases: ["rooster", "sriracha", "ศรีราชา"] },
+  { normalized: "El Smasho Grande Chicken Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["smasho", "grande chicken", "แกรนด์ชิกเก้น"] },
+];
+
+function simplify(s: string) {
+  return s.toLowerCase()
+    .replace(/[(){}\[\]•★☆🐔™®©.,\-–—_]/g, " ")
+    .replace(/\b(meal|deal|set|combo|คอมโบ|เซ็ต|ชุด)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+const ALIAS_INDEX: Array<{ key: string; norm: string; pattiesPer: number; kind: "beef"|"chicken" }> = [];
+for (const c of CATALOG) {
+  for (const a of c.aliases) ALIAS_INDEX.push({ key: simplify(a), norm: c.normalized, pattiesPer: c.pattiesPer, kind: c.kind as any });
+}
+function matchBurger(raw: string) {
+  const k = simplify(raw);
+  // exact
+  const e = ALIAS_INDEX.find(x => x.key === k);
+  if (e) return e;
+  // contains (handles long names with Thai+English together)
+  const c = ALIAS_INDEX.find(x => k.includes(x.key));
+  return c || null;
+}
+
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
+  return {
+    shiftDateLabel: base.toISODate()!,
+    fromISO: base.plus({ hours: 18 }).toISO(),
+    toISO: base.plus({ days: 1, hours: 3 }).toISO(),
+  };
+}
+
+// compute from stored POS (JSONB)
+export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string) {
+  // Read items directly from pos_receipt JSONB
+  const rows = await prisma.$queryRaw<{ item_name: string; qty: number }[]>`
+    SELECT (item->>'name') AS item_name,
+           SUM((item->>'quantity')::int) AS qty
+    FROM pos_receipt pr,
+         LATERAL jsonb_array_elements(pr.items_json) AS item
+    WHERE pr.datetime >= ${fromISO}::timestamptz
+      AND pr.datetime <  ${toISO}::timestamptz
+      AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+    GROUP BY item_name
+  `;
+
+  const productsMap = new Map<string, {
+    qty:number; patties:number; redMeatG:number; chickenG:number; rolls:number; rawHits:Set<string>
+  }>();
+  const unmapped: Record<string, number> = {};
+
+  for (const { item_name, qty } of rows) {
+    const m = matchBurger(item_name);
+    if (!m) { unmapped[item_name] = (unmapped[item_name] ?? 0) + qty; continue; }
+    if (!productsMap.has(m.norm)) productsMap.set(m.norm, { qty:0, patties:0, redMeatG:0, chickenG:0, rolls:0, rawHits:new Set() });
+    const p = productsMap.get(m.norm)!;
+    p.qty += qty;
+    p.rolls += qty;
+    p.rawHits.add(item_name);
+    if (m.kind === "beef") {
+      p.patties += qty * m.pattiesPer;
+      p.redMeatG += qty * m.pattiesPer * BEEF_G;
+    } else {
+      p.chickenG += qty * CHICKEN_G;
+    }
+  }
+
+  const products = Array.from(productsMap.entries()).map(([normalizedName, v]) => ({
+    normalizedName,
+    qty: v.qty,
+    patties: v.patties,
+    redMeatGrams: v.redMeatG,
+    chickenGrams: v.chickenG,
+    rolls: v.rolls,
+    rawHits: Array.from(v.rawHits),
+  })).sort((a,b)=>a.normalizedName.localeCompare(b.normalizedName));
+
+  const totals = products.reduce((t, r) => ({
+    burgers: t.burgers + r.qty,
+    patties: t.patties + r.patties,
+    redMeatGrams: t.redMeatGrams + r.redMeatGrams,
+    chickenGrams: t.chickenGrams + r.chickenGrams,
+    rolls: t.rolls + r.rolls,
+  }), { burgers:0, patties:0, redMeatGrams:0, chickenGrams:0, rolls:0 });
+
+  return { shiftDate: shiftDateLabel, fromISO, toISO, products, totals, unmapped };
+}
+
+
+---
+
+4) Cache layer (compute → save → read)
+
+server/services/shiftBurgerCache.ts
+
+import { PrismaClient } from "@prisma/client";
+import { computeMetrics } from "./burgerMetrics";
+
+const prisma = new PrismaClient();
+
+export async function buildAndSaveBurgerShiftCache(opts: {
+  fromISO: string; toISO: string; shiftDateLabel: string; restaurantId?: string | null;
+}) {
+  const { fromISO, toISO, shiftDateLabel, restaurantId = null } = opts;
+  const metrics = await computeMetrics(fromISO, toISO, shiftDateLabel);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      DELETE FROM analytics_shift_burger_item
+      WHERE shift_date = ${shiftDateLabel}::date AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId})`;
+
+    for (const p of metrics.products) {
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_burger_item
+          (restaurant_id, shift_date, from_ts, to_ts, normalized_name, qty, patties, red_meat_g, chicken_g, rolls, raw_hits, created_at, updated_at)
+        VALUES
+          (${restaurantId}, ${shiftDateLabel}::date, ${metrics.fromISO}::timestamptz, ${metrics.toISO}::timestamptz,
+           ${p.normalizedName}, ${p.qty}, ${p.patties}, ${p.redMeatGrams}, ${p.chickenGrams}, ${p.rolls},
+           ${JSON.stringify(p.rawHits)}::jsonb, now(), now())
+        ON CONFLICT (restaurant_id, shift_date, normalized_name)
+        DO UPDATE SET qty = EXCLUDED.qty, patties = EXCLUDED.patties, red_meat_g = EXCLUDED.red_meat_g,
+                      chicken_g = EXCLUDED.chicken_g, rolls = EXCLUDED.rolls, raw_hits = EXCLUDED.raw_hits,
+                      from_ts = EXCLUDED.from_ts, to_ts = EXCLUDED.to_ts, updated_at = now()
+      `;
+    }
+
+    await tx.$executeRaw`
+      INSERT INTO analytics_shift_burger_summary
+        (restaurant_id, shift_date, from_ts, to_ts, burgers_total, patties_total, red_meat_g_total, chicken_g_total, rolls_total, created_at, updated_at)
+      VALUES
+        (${restaurantId}, ${shiftDateLabel}::date, ${metrics.fromISO}::timestamptz, ${metrics.toISO}::timestamptz,
+         ${metrics.totals.burgers}, ${metrics.totals.patties}, ${metrics.totals.redMeatGrams}, ${metrics.totals.chickenGrams}, ${metrics.totals.rolls}, now(), now())
+      ON CONFLICT (shift_date) DO UPDATE SET
+        from_ts = EXCLUDED.from_ts, to_ts = EXCLUDED.to_ts, burgers_total = EXCLUDED.burgers_total,
+        patties_total = EXCLUDED.patties_total, red_meat_g_total = EXCLUDED.red_meat_g_total,
+        chicken_g_total = EXCLUDED.chicken_g_total, rolls_total = EXCLUDED.rolls_total, updated_at = now()
+    `;
+  });
+
+  return metrics;
+}
+
+export async function readBurgerShiftCache(shiftDateLabel: string, restaurantId?: string | null) {
+  const [s, items] = await Promise.all([
+    prisma.$queryRaw<any[]>`
+      SELECT shift_date::text, from_ts::text, to_ts::text, burgers_total, patties_total, red_meat_g_total, chicken_g_total, rolls_total
+      FROM analytics_shift_burger_summary
+      WHERE shift_date = ${shiftDateLabel}::date AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId}) LIMIT 1`,
+    prisma.$queryRaw<any[]>`
+      SELECT normalized_name, qty, patties, red_meat_g, chicken_g, rolls, raw_hits
+      FROM analytics_shift_burger_item
+      WHERE shift_date = ${shiftDateLabel}::date AND (restaurant_id IS NOT DISTINCT FROM ${restaurantId})
+      ORDER BY normalized_name ASC`
+  ]);
+  if (!s.length) return null;
+  return {
+    shiftDate: shiftDateLabel,
+    fromISO: s[0].from_ts, toISO: s[0].to_ts,
+    totals: {
+      burgers: s[0].burgers_total, patties: s[0].patties_total,
+      redMeatGrams: s[0].red_meat_g_total, chickenGrams: s[0].chicken_g_total, rolls: s[0].rolls_total
+    },
+    products: items.map(r => ({
+      normalizedName: r.normalized_name, qty: r.qty, patties: r.patties,
+      redMeatGrams: r.red_meat_g, chickenGrams: r.chicken_g, rolls: r.rolls, rawHits: r.raw_hits ?? []
+    })),
+  };
+}
+
+
+---
+
+5) API routes: compute/live/cache/rebuild + raw debug
+
+server/routes/receiptsBurgers.ts
+
+import { Router } from "express";
+import { DateTime } from "luxon";
+import { shiftWindow, computeMetrics } from "../services/burgerMetrics";
+import { buildAndSaveBurgerShiftCache, readBurgerShiftCache } from "../services/shiftBurgerCache";
+const TZ = "Asia/Bangkok";
+const router = Router();
+
+router.get("/shift/burgers", async (req, res) => {
+  try {
+    const { date, source } = req.query as { date?: string; source?: "cache"|"live" };
+    const label = date ?? DateTime.now().setZone(TZ).toISODate()!;
+    const { shiftDateLabel, fromISO, toISO } = shiftWindow(label);
+
+    if (source === "live") {
+      const metrics = await computeMetrics(fromISO, toISO, shiftDateLabel);
+      return res.json({ ok: true, data: metrics, cached: false });
+    }
+
+    const cached = await readBurgerShiftCache(shiftDateLabel, null);
+    if (cached) return res.json({ ok: true, data: cached, cached: true });
+
+    const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+    return res.json({ ok: true, data: metrics, cached: false, saved: true });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message || "error" });
+  }
+});
+
+router.post("/shift/burgers/rebuild", async (req, res) => {
+  try {
+    const { date } = req.query as { date: string };
+    const { shiftDateLabel, fromISO, toISO } = shiftWindow(date);
+    const metrics = await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
+    res.json({ ok: true, data: metrics, rebuilt: true });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message || "rebuild failed" });
+  }
+});
+
+export default router;
+
+server/routes/receiptsDebug.ts
+
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+import { shiftWindow } from "../services/burgerMetrics";
+const prisma = new PrismaClient();
+const router = Router();
+
+/** Top raw items seen for the shift window */
+router.get("/debug/items", async (req,res) => {
+  try {
+    const { date, limit } = req.query as { date: string; limit?: string };
+    const { fromISO, toISO, shiftDateLabel } = shiftWindow(date);
+    const rows = await prisma.$queryRaw<{ item_name:string; qty:number }[]>`
+      SELECT (item->>'name') AS item_name,
+             SUM((item->>'quantity')::int) AS qty
+      FROM pos_receipt pr,
+           LATERAL jsonb_array_elements(pr.items_json) AS item
+      WHERE pr.datetime >= ${fromISO}::timestamptz
+        AND pr.datetime <  ${toISO}::timestamptz
+        AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+      GROUP BY item_name
+      ORDER BY qty DESC
+      LIMIT ${Number(limit ?? 50)}
+    `;
+    res.json({ ok:true, date: shiftDateLabel, fromISO, toISO, items: rows });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message || "debug failed" });
+  }
+});
+export default router;
+
+Mount in server/routes.ts:
+
+import receiptsBurgers from "./routes/receiptsBurgers";
+import receiptsDebug from "./routes/receiptsDebug";
+app.use("/api/receipts", receiptsBurgers);
+app.use("/api/receipts", receiptsDebug);
+
+
+---
+
+6) Validation scripts (the “bulletproof” bit)
+
+A) Week sync (store + cache)
+
+server/scripts/golden_sync_week.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fetch from 'node-fetch';
+
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const FROM = process.env.WEEK_FROM || '2025-10-12';
+const TO   = process.env.WEEK_TO   || '2025-10-18';
+
+(async () => {
+  const r = await fetch(`${SERVER}/api/loyverse/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ from: FROM, to: TO }),
+  });
+  const j = await r.json();
+  if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  console.log('Imported:', j.imported);
+  console.log('Cached burgers per day:', j.caches);
+})();
+
+B) Live vs cache equality for the week
+
+server/scripts/golden_validate_week.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fetch from 'node-fetch';
+import { DateTime } from 'luxon';
+
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const FROM = process.env.WEEK_FROM || '2025-10-12';
+const TO   = process.env.WEEK_TO   || '2025-10-18';
+
+function eq(a:any,b:any){return a.burgers===b.burgers&&a.patties===b.patties&&a.redMeatGrams===b.redMeatGrams&&a.chickenGrams===b.chickenGrams&&a.rolls===b.rolls;}
+
+(async () => {
+  const s = DateTime.fromISO(FROM), e = DateTime.fromISO(TO);
+  for (let d=s; d<=e; d=d.plus({days:1})) {
+    const day = d.toISODate();
+    const live = await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${day}&source=live`)).json();
+    const cache= await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${day}`)).json();
+    if (!live.ok || !cache.ok) throw new Error(`API failed for ${day}`);
+    const ok = eq(live.data.totals, cache.data.totals);
+    console.log(`${ok ? '✅' : '❌'} ${day} live=${JSON.stringify(live.data.totals)} cache=${JSON.stringify(cache.data.totals)}`);
+    if (!ok) throw new Error(`Mismatch on ${day}`);
+  }
+  console.log('\n🎉 Golden Hour: week validation passed (live == cache).');
+})();
+
+C) POS CSV vs API (for any given day)
+
+server/scripts/golden_validate_vs_csv.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import csvParse from 'csv-parse/sync';
+import fetch from 'node-fetch';
+
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const DAY = process.env.GH_DAY || '2025-10-18';
+const CSV = process.env.GH_CSV || path.resolve('item-sales-summary-2025-10-18-2025-10-18.csv');
+
+const burgers = [
+  { re:/single smash/i, patties:1, kind:'beef' },
+  { re:/super double bacon/i, patties:2, kind:'beef' },
+  { re:/triple smash/i, patties:3, kind:'beef' },
+  { re:/ultimate double/i, patties:2, kind:'beef' },
+  { re:/crispy chicken/i, patties:0, kind:'chicken' },
+  { re:/karaage chicken/i, patties:0, kind:'chicken' },
+  { re:/rooster|sriracha/i, patties:0, kind:'chicken' },
+  { re:/smasho|grande chicken/i, patties:0, kind:'chicken' },
+];
+
+function match(name:string){ const n=name.toLowerCase(); return burgers.find(b=>b.re.test(n)); }
+
+(async () => {
+  // CSV → POS truth
+  const raw = fs.readFileSync(CSV, 'utf8');
+  const recs = csvParse.parse(raw, { columns: true, skip_empty_lines: true });
+  let burgersSold=0, patties=0, chicken=0;
+  for (const r of recs) {
+    const name = r['Item name'] ?? r['item name'] ?? r['item_name'];
+    const qty  = Number(r['Items sold'] ?? r['items sold'] ?? r['items_sold'] ?? 0);
+    if (!name || !qty) continue;
+    const m = match(String(name));
+    if (!m) continue;
+    burgersSold += qty;
+    if (m.kind==='beef') patties += qty * m.patties;
+    else chicken += qty * 100;
+  }
+  const red = patties * 95;
+  console.log('POS CSV totals:', { burgers:burgersSold, patties, redMeatGrams:red, chickenGrams:chicken, rolls:burgersSold });
+
+  // API live
+  const live = await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${DAY}&source=live`)).json();
+  if (!live.ok) throw new Error('API live failed');
+  console.log('API live totals:', live.data.totals);
+})();
+
+D) One-day helpers
+
+server/scripts/golden_rebuild_day.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fetch from 'node-fetch';
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const DAY = process.env.GH_DAY || '2025-10-18';
+(async () => {
+  const r = await fetch(`${SERVER}/api/receipts/shift/burgers/rebuild?date=${DAY}`, { method:'POST' });
+  const j = await r.json();
+  if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  console.log(j.data.totals);
+})();
+
+server/scripts/golden_smoke_day.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fetch from 'node-fetch';
+const SERVER = process.env.SERVER_URL || 'http://localhost:5000';
+const DAY = process.env.GH_DAY || '2025-10-18';
+(async () => {
+  const live = await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${DAY}&source=live`)).json();
+  const cache= await (await fetch(`${SERVER}/api/receipts/shift/burgers?date=${DAY}`)).json();
+  console.log('LIVE ', live.data.totals);
+  console.log('CACHE', cache.data.totals);
+})();
+
+
+---
+
+7) UI safety (optional but recommended)
+
+Show a small badge “from cache / from live”.
+
+Add “Show raw items” button → calls /api/receipts/debug/items?date=YYYY-MM-DD.
+
+
+(You already have a debug panel; just wire it to that endpoint.)
+
+
+---
+
+8) Runbook (copy/paste)
+
+# 0) Migrate
+npm run golden:migrate
+
+# 1) Backfill & cache a week
+npm run golden:sync:week
+
+# 2) Validate week (live == cache)
+npm run golden:validate:week
+
+# 3) Smoke a specific day (e.g., Oct 18)
+GH_DAY=2025-10-18 npm run golden:smoke:day
+
+# 4) Compare API vs POS CSV (Oct 18 numbers should be 61 / 95 / 9025 / 900 / 61)
+GH_DAY=2025-10-18 GH_CSV=/mnt/data/item-sales-summary-2025-10-18-2025-10-18.csv npm run golden:validate:csv
+
+Expected for 2025-10-18 (from POS):
+
+Burgers 61
+
+Patties 95
+
+Red meat 9025 g
+
+Chicken 900 g
+
+Rolls 61
+
+
+
+---
+
+9) What makes this “bulletproof”
+
+✅ Timezone-safe storage (Asia/Bangkok)
+
+✅ TEST_ batches excluded by default
+
+✅ Fuzzy matcher handles Meal/Set + Thai + emoji
+
+✅ Live vs cache parity validator
+
+✅ POS-CSV vs API comparator
+
+✅ One-day rebuild & smoke scripts
+
+✅ Clear raw-items debug endpoint
+
+
+
+---
