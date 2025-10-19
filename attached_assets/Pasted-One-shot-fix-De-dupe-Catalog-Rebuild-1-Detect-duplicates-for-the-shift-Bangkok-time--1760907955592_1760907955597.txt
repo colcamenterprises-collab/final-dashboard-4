@@ -1,0 +1,162 @@
+One-shot fix (“De-dupe + Catalog + Rebuild”)
+
+1) Detect duplicates for the shift (Bangkok time)
+
+-- Any duplicate receipt_ids in the shift?
+WITH win AS (
+  SELECT timestamptz '2025-10-19 18:00:00+07' AS from_ts,
+         timestamptz '2025-10-20 03:00:00+07' AS to_ts
+)
+SELECT pr.receipt_id, COUNT(*) AS copies
+FROM pos_receipt pr, win
+WHERE pr.datetime >= win.from_ts
+  AND pr.datetime <  win.to_ts
+  AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+GROUP BY pr.receipt_id
+HAVING COUNT(*) > 1
+ORDER BY copies DESC;
+
+If you see rows here → that’s your 2×.
+
+2) Make dedupe permanent (schema + importer)
+
+Schema guard (idempotent):
+
+-- prevent future duplicates
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pos_receipt_receiptid
+ON pos_receipt (receipt_id);
+
+Importer upsert: In loyverseImport.ts, when inserting each receipt row:
+
+await db.$executeRaw`
+  INSERT INTO pos_receipt (id, batch_id, receipt_id, datetime, total, items_json, payment)
+  VALUES (${id}, ${batchId}, ${rc.receipt_id}, ${bangkokTime}, ${total}, ${JSON.stringify(items)}, ${payment})
+  ON CONFLICT (receipt_id) DO UPDATE
+    SET total = EXCLUDED.total,
+        items_json = EXCLUDED.items_json,
+        payment = EXCLUDED.payment,
+        datetime = EXCLUDED.datetime`;
+
+(If you prefer “insert once only”, change DO UPDATE to DO NOTHING.)
+
+3) Purge duplicates that already snuck in (for that shift)
+
+WITH win AS (
+  SELECT timestamptz '2025-10-19 18:00:00+07' AS from_ts,
+         timestamptz '2025-10-20 03:00:00+07' AS to_ts
+),
+dups AS (
+  SELECT id,
+         ROW_NUMBER() OVER (PARTITION BY receipt_id ORDER BY created_at ASC) AS rn
+  FROM pos_receipt pr, win
+  WHERE pr.datetime >= win.from_ts
+    AND pr.datetime <  win.to_ts
+)
+DELETE FROM pos_receipt
+USING dups
+WHERE pos_receipt.id = dups.id
+  AND dups.rn > 1;
+
+> Run the SELECT from step 1 again; it should return 0 rows now.
+
+
+
+4) Fix the catalog for Kids Single Meal Set (10003)
+
+This must be counted as a burger (beef, 1 patty, 1 roll). Patch it in the catalog:
+
+INSERT INTO item_catalog (sku, name, category, kind, patties_per, grams_per, rolls_per)
+VALUES ('10003', 'Kids Single Meal Set (Burger Fries Drink)', 'burger', 'beef', 1, NULL, 1)
+ON CONFLICT (sku) DO UPDATE
+SET name='Kids Single Meal Set (Burger Fries Drink)',
+    category='burger',
+    kind='beef',
+    patties_per=1,
+    grams_per=NULL,
+    rolls_per=1,
+    updated_at=now();
+
+(If your master file already has 10003 but under “kids …” category, re-import the catalog after normalizing that line to category=burger, kind=beef, patties_per=1.)
+
+5) Nuke stale caches for the 19th and rebuild using SKU/POS
+
+DELETE FROM analytics_shift_burger_item    WHERE shift_date = '2025-10-19';
+DELETE FROM analytics_shift_burger_summary WHERE shift_date = '2025-10-19';
+
+# Force POS source
+export BURGER_SOURCE=pos
+
+# Rebuild the day (SKU-first)
+GH_DAY=2025-10-19 tsx server/scripts/golden_rebuild_day.ts
+
+6) Verify with ground-truth queries
+
+Live API (should now match POS)
+
+curl -s "/api/receipts/shift/burgers?date=2025-10-19&source=live" | jq
+# Expect: ~54 burgers (including Kids 10003 x2), not 92
+# Response should include "sourceUsed":"pos" and per-product "sku"
+
+Direct SQL (what we count from POS)
+
+SELECT item->>'sku' AS sku,
+       SUM((item->>'quantity')::int) AS qty
+FROM pos_receipt pr,
+     LATERAL jsonb_array_elements(pr.items_json) AS item
+WHERE pr.datetime >= '2025-10-19 18:00:00+07'
+  AND pr.datetime <  '2025-10-20 03:00:00+07'
+  AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+GROUP BY sku
+ORDER BY sku;
+
+You should see exactly the SKU tallies from your sheet:
+
+10066: 5
+10070: 1
+10003: 2
+10033: 3
+10004: 10
+10036: 7
+10019: 13
+10009: 2
+10006: 10
+10068: 1
+-- total 54 burgers
+
+
+---
+
+Optional hardening (prevents regressions)
+
+Import guard: before import, call the Loyverse API with a time window that doesn’t overlap runs (or always upsert on receipt_id as above).
+
+Cache invalidation on catalog change: add an analytics_version table and compare updated_at when serving cached results; if catalog is newer, recompute that day.
+
+Debug endpoints:
+
+/api/receipts/debug/source?date=YYYY-MM-DD → shows pos vs legacy
+
+/api/receipts/debug/top?date=YYYY-MM-DD → returns the SQL above as JSON so you can eyeball SKUs/qty quickly.
+
+
+
+
+---
+
+Why the app currently shows "rawHits": ["10068 :: null"]
+
+That just means the importer saved SKU but didn’t include the original item name in items_json (we set name: li.name—if upstream sends null, that’s fine). Accounting is purely SKU-based now, so this is harmless, but you can also store name if available.
+
+
+---
+
+TL;DR
+
+Your 2× discrepancy is duplicate receipts in pos_receipt.
+
+Add a unique index on receipt_id, de-dupe the shift, and rebuild cache.
+
+Mark 10003 as a burger (beef, 1 patty) in the catalog.
+
+After that, Oct 19 will match the POS sheet (≈ 54 burgers), and future days won’t drift.
+
