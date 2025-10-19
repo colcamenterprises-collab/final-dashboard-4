@@ -1,11 +1,107 @@
 import { PrismaClient } from "@prisma/client";
 import { DateTime } from "luxon";
+import { BURGER_SKU_MAP, NAME_BY_SKU } from "./burgerSkuMap";
 
 const prisma = new PrismaClient();
 const TZ = "Asia/Bangkok";
 const BEEF_G = 95;
-const CHICKEN_G = 100;
 
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
+  return {
+    shiftDateLabel: base.toISODate()!,
+    fromISO: base.plus({ hours: 18 }).toISO(),
+    toISO: base.plus({ days: 1, hours: 3 }).toISO(),
+  };
+}
+
+export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string) {
+  // Check if pos_receipt has data (preferred SKU-based source)
+  const posCount = await prisma.$queryRaw<[{ count: bigint }]>`
+    SELECT COUNT(*) as count
+    FROM pos_receipt pr
+    WHERE pr.datetime >= ${fromISO}::timestamptz
+      AND pr.datetime < ${toISO}::timestamptz
+  `;
+  
+  const hasPosData = Number(posCount[0]?.count || 0) > 0;
+
+  if (hasPosData) {
+    return computeFromPosReceipt(fromISO, toISO, shiftDateLabel);
+  } else {
+    return computeFromReceiptItems(fromISO, toISO, shiftDateLabel);
+  }
+}
+
+// SKU-based counting (preferred, accurate)
+async function computeFromPosReceipt(fromISO: string, toISO: string, shiftDateLabel: string) {
+  const rows = await prisma.$queryRaw<{ sku: string | null; item_name: string; qty: number }[]>`
+    SELECT (item->>'sku') AS sku,
+           (item->>'name') AS item_name,
+           SUM((item->>'quantity')::int) AS qty
+    FROM pos_receipt pr,
+         LATERAL jsonb_array_elements(pr.items_json) AS item
+    WHERE pr.datetime >= ${fromISO}::timestamptz
+      AND pr.datetime < ${toISO}::timestamptz
+      AND COALESCE(pr.batch_id, '') NOT LIKE 'TEST_%'
+    GROUP BY sku, item_name
+  `;
+
+  const productsMap = new Map<string, {
+    qty: number; patties: number; redMeatGrams: number; chickenGrams: number; rolls: number; skus: Set<string>
+  }>();
+  const unmapped: Record<string, number> = {};
+
+  for (const row of rows) {
+    const qty = Number(row.qty || 0);
+    const sku = row.sku?.trim() || null;
+    const rule = sku ? BURGER_SKU_MAP[sku] : null;
+
+    if (!rule) {
+      unmapped[row.item_name] = (unmapped[row.item_name] ?? 0) + qty;
+      continue;
+    }
+
+    const productName = NAME_BY_SKU[sku!] || row.item_name;
+    if (!productsMap.has(productName)) {
+      productsMap.set(productName, { qty: 0, patties: 0, redMeatGrams: 0, chickenGrams: 0, rolls: 0, skus: new Set() });
+    }
+
+    const p = productsMap.get(productName)!;
+    p.qty += qty;
+    p.rolls += rule.rollsPer * qty;
+    p.skus.add(sku!);
+
+    if (rule.kind === "beef") {
+      p.patties += rule.pattiesPer * qty;
+      p.redMeatGrams += rule.pattiesPer * BEEF_G * qty;
+    } else {
+      p.chickenGrams += rule.gramsPer * qty;
+    }
+  }
+
+  const products = Array.from(productsMap.entries()).map(([normalizedName, v]) => ({
+    normalizedName,
+    qty: v.qty,
+    patties: v.patties,
+    redMeatGrams: v.redMeatGrams,
+    chickenGrams: v.chickenGrams,
+    rolls: v.rolls,
+    rawHits: Array.from(v.skus),
+  })).sort((a, b) => a.normalizedName.localeCompare(b.normalizedName));
+
+  const totals = products.reduce((t, r) => ({
+    burgers: t.burgers + r.qty,
+    patties: t.patties + r.patties,
+    redMeatGrams: t.redMeatGrams + r.redMeatGrams,
+    chickenGrams: t.chickenGrams + r.chickenGrams,
+    rolls: t.rolls + r.rolls,
+  }), { burgers: 0, patties: 0, redMeatGrams: 0, chickenGrams: 0, rolls: 0 });
+
+  return { shiftDate: shiftDateLabel, fromISO, toISO, products, totals, unmapped };
+}
+
+// Legacy name-based fuzzy matching (fallback for receipt_items)
 const CATALOG = [
   { normalized: "Single Smash Burger", pattiesPer: 1, kind: "beef",
     aliases: ["single smash", "single meal set", "kids single", "ซิงเกิ้ล"] },
@@ -46,16 +142,7 @@ function matchBurger(raw: string) {
   return c || null;
 }
 
-export function shiftWindow(dateISO: string) {
-  const base = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
-  return {
-    shiftDateLabel: base.toISODate()!,
-    fromISO: base.plus({ hours: 18 }).toISO(),
-    toISO: base.plus({ days: 1, hours: 3 }).toISO(),
-  };
-}
-
-export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string) {
+async function computeFromReceiptItems(fromISO: string, toISO: string, shiftDateLabel: string) {
   const fromBkk = DateTime.fromISO(fromISO).toFormat('yyyy-MM-dd HH:mm:ss');
   const toBkk = DateTime.fromISO(toISO).toFormat('yyyy-MM-dd HH:mm:ss');
   
@@ -65,19 +152,19 @@ export async function computeMetrics(fromISO: string, toISO: string, shiftDateLa
     FROM receipt_items ri
     JOIN receipts r ON r.id = ri."receiptId"
     WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${fromBkk}::timestamp
-      AND COALESCE(r."closedAtUTC", r."createdAtUTC") <  ${toBkk}::timestamp
+      AND COALESCE(r."closedAtUTC", r."createdAtUTC") < ${toBkk}::timestamp
     GROUP BY ri.name
   `;
 
   const productsMap = new Map<string, {
-    qty:number; patties:number; redMeatG:number; chickenG:number; rolls:number; rawHits:Set<string>
+    qty: number; patties: number; redMeatG: number; chickenG: number; rolls: number; rawHits: Set<string>
   }>();
   const unmapped: Record<string, number> = {};
 
   for (const { item_name, qty } of rows) {
     const m = matchBurger(item_name);
     if (!m) { unmapped[item_name] = (unmapped[item_name] ?? 0) + qty; continue; }
-    if (!productsMap.has(m.norm)) productsMap.set(m.norm, { qty:0, patties:0, redMeatG:0, chickenG:0, rolls:0, rawHits:new Set() });
+    if (!productsMap.has(m.norm)) productsMap.set(m.norm, { qty: 0, patties: 0, redMeatG: 0, chickenG: 0, rolls: 0, rawHits: new Set() });
     const p = productsMap.get(m.norm)!;
     p.qty += qty;
     p.rolls += qty;
@@ -86,7 +173,7 @@ export async function computeMetrics(fromISO: string, toISO: string, shiftDateLa
       p.patties += qty * m.pattiesPer;
       p.redMeatG += qty * m.pattiesPer * BEEF_G;
     } else {
-      p.chickenG += qty * CHICKEN_G;
+      p.chickenG += 100 * qty; // 100g per chicken burger
     }
   }
 
@@ -98,7 +185,7 @@ export async function computeMetrics(fromISO: string, toISO: string, shiftDateLa
     chickenGrams: v.chickenG,
     rolls: v.rolls,
     rawHits: Array.from(v.rawHits),
-  })).sort((a,b)=>a.normalizedName.localeCompare(b.normalizedName));
+  })).sort((a, b) => a.normalizedName.localeCompare(b.normalizedName));
 
   const totals = products.reduce((t, r) => ({
     burgers: t.burgers + r.qty,
@@ -106,7 +193,7 @@ export async function computeMetrics(fromISO: string, toISO: string, shiftDateLa
     redMeatGrams: t.redMeatGrams + r.redMeatGrams,
     chickenGrams: t.chickenGrams + r.chickenGrams,
     rolls: t.rolls + r.rolls,
-  }), { burgers:0, patties:0, redMeatGrams:0, chickenGrams:0, rolls:0 });
+  }), { burgers: 0, patties: 0, redMeatGrams: 0, chickenGrams: 0, rolls: 0 });
 
   return { shiftDate: shiftDateLabel, fromISO, toISO, products, totals, unmapped };
 }

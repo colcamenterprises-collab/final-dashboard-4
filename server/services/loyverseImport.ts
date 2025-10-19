@@ -11,7 +11,7 @@ type LvReceipt = {
   receipt_number: string;
   receipt_date: string;
   total_money?: { amount: number };
-  line_items?: Array<{ name: string; quantity: number; price?: number }>;
+  line_items?: Array<{ name: string; quantity: number; price?: number; sku?: string }>;
   payment_type?: string;
 };
 
@@ -47,6 +47,7 @@ export async function loyverseImportRange(fromISO: string, toISO: string): Promi
         name: li.name,
         quantity: Number(li.quantity || 0),
         price: Number(li.price || 0),
+        sku: li.sku ? String(li.sku).trim() : null,
       }));
       await prisma.$executeRaw`
         INSERT INTO pos_receipt (id, batch_id, receipt_id, datetime, total, items_json, payment, created_at)

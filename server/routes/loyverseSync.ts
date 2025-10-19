@@ -16,23 +16,18 @@ router.post("/sync", async (req, res) => {
       return res.status(400).json({ ok: false, error: "invalid date range" });
     }
 
-    const { syncReceiptsWindow } = await import("../services/pos-ingestion/ingester.js");
+    const { loyverseImportRange } = await import("../services/loyverseImport.js");
     
-    const days: string[] = [];
-    for (let d = start; d <= end; d = d.plus({ days: 1 })) days.push(d.toISODate()!);
-    
-    const imported: Record<string, number> = {};
+    const imported = await loyverseImportRange(from, to);
     const caches: Record<string, { burgers: number }> = {};
     const errors: string[] = [];
+
+    const days: string[] = [];
+    for (let d = start; d <= end; d = d.plus({ days: 1 })) days.push(d.toISODate()!);
 
     for (const day of days) {
       try {
         const d = DateTime.fromISO(day, { zone: TZ }).startOf("day");
-        const windowStart = d.toJSDate();
-        const windowEnd = d.plus({ days: 1 }).toJSDate();
-
-        const result = await syncReceiptsWindow(windowStart, windowEnd, `manual-sync-${day}`);
-        imported[day] = result.receiptsUpserted || 0;
 
         const fromISO = d.plus({ hours: 18 }).toISO()!;
         const toISO = d.plus({ days: 1, hours: 3 }).toISO()!;

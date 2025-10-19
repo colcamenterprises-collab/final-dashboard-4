@@ -1,0 +1,131 @@
+Golden Hour SKU Patch — Final Map
+
+1) Drop-in file
+
+server/services/burgerSkuMap.ts
+
+export type BurgerRule =
+  | { kind: "beef"; pattiesPer: number; rollsPer: number }
+  | { kind: "chicken"; gramsPer: number; rollsPer: number };
+
+export const BURGER_SKU_MAP: Record<string, BurgerRule> = {
+  // Beef — base
+  "10004": { kind: "beef", pattiesPer: 1, rollsPer: 1 }, // Single Smash Burger (ซิงเกิ้ล)
+  "10019": { kind: "beef", pattiesPer: 2, rollsPer: 1 }, // Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน)
+  "10009": { kind: "beef", pattiesPer: 3, rollsPer: 1 }, // Triple Smash Burger (สาม)
+  "10006": { kind: "beef", pattiesPer: 2, rollsPer: 1 }, // Ultimate Double (คู่)
+
+  // Beef — meal sets
+  "10033": { kind: "beef", pattiesPer: 1, rollsPer: 1 }, // Single Meal Set (Meal Deal)
+  "10032": { kind: "beef", pattiesPer: 2, rollsPer: 1 }, // Double Set (Meal Deal)
+  "10036": { kind: "beef", pattiesPer: 2, rollsPer: 1 }, // Super Double Bacon & Cheese Set (Meal Deal)
+  "10034": { kind: "beef", pattiesPer: 3, rollsPer: 1 }, // Triple Smash Set (Meal Deal)
+
+  // Chicken — base (100 g each)
+  "10066": { kind: "chicken", gramsPer: 100, rollsPer: 1 }, // Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น)
+  "10070": { kind: "chicken", gramsPer: 100, rollsPer: 1 }, // Karaage Chicken Burger
+  "10068": { kind: "chicken", gramsPer: 100, rollsPer: 1 }, // Big Rooster Sriracha Chicken
+  "10037": { kind: "chicken", gramsPer: 100, rollsPer: 1 }, // El Smasho Grande Chicken Burger
+
+  // Chicken — meal deal
+  "10071": { kind: "chicken", gramsPer: 100, rollsPer: 1 }, // Karaage Chicken Meal Deal
+
+  // EXCLUDED composite:
+  // "10069": Mix and Match Meal Deal  ← do NOT count (composite bundle)
+};
+
+export const NAME_BY_SKU: Record<string, string> = {
+  "10004": "Single Smash Burger (ซิงเกิ้ล)",
+  "10019": "Super Double Bacon and Cheese (ซูเปอร์ดับเบิ้ลเบคอน)",
+  "10009": "Triple Smash Burger (สาม)",
+  "10006": "Ultimate Double (คู่)",
+  "10033": "Single Meal Set (Meal Deal)",
+  "10032": "Double Set (Meal Deal)",
+  "10036": "Super Double Bacon & Cheese Set (Meal Deal)",
+  "10034": "Triple Smash Set (Meal Deal)",
+  "10066": "Crispy Chicken Fillet Burger (เบอร์เกอร์ไก่ชิ้น)",
+  "10070": "Karaage Chicken Burger",
+  "10068": "Big Rooster Sriracha Chicken",
+  "10037": "El Smasho Grande Chicken Burger",
+  "10071": "Karaage Chicken Meal Deal",
+};
+
+2) Ensure importer stores SKU
+
+In server/services/loyverseImport.ts, when building items_json:
+
+const items = (rc.line_items ?? []).map(li => ({
+  name: li.name,
+  quantity: Number(li.quantity || 0),
+  price: Number(li.price || 0),
+  sku: li.sku ? String(li.sku).trim() : null, // ← keep SKU
+}));
+
+3) Metrics: SKU-first counting
+
+In server/services/burgerMetrics.ts:
+
+Import the map:
+
+
+import { BURGER_SKU_MAP, NAME_BY_SKU } from "./burgerSkuMap";
+const BEEF_G = 95;
+
+Make sure the POS query returns sku:
+
+
+SELECT (item->>'sku') AS sku,
+       (item->>'name') AS item_name,
+       SUM((item->>'quantity')::int) AS qty
+...
+GROUP BY sku, item_name
+
+Count by SKU:
+
+
+for (const row of rows) {
+  const qty = Number(row.qty || 0);
+  const sku = row.sku?.trim() || null;
+  const rule = sku ? BURGER_SKU_MAP[sku] : null;
+  if (!rule) continue;             // skip non-burgers & composites
+
+  acc.rolls += rule.rollsPer * qty;
+  if (rule.kind === "beef") {
+    acc.patties += rule.pattiesPer * qty;
+    acc.redMeatGrams += rule.pattiesPer * BEEF_G * qty;
+  } else {
+    acc.chickenGrams += rule.gramsPer * qty; // 100 g each
+  }
+  acc.burgers += qty;
+  // aggregate per product keyed by SKU; display with NAME_BY_SKU[sku]
+}
+
+> Leave the legacy fallback (from receipt_items) as-is, but it won’t be used once pos_receipt is populated. If you keep “auto” mode, prefer POS when it has rows.
+
+
+
+4) Re-import & rebuild (once)
+
+# Backfill the week (populates pos_receipt WITH sku)
+WEEK_FROM=2025-10-12 WEEK_TO=2025-10-18 tsx server/scripts/golden_sync_week.ts
+
+# Rebuild daily caches so UI reflects SKU logic
+for d in 2025-10-12 2025-10-13 2025-10-14 2025-10-15 2025-10-16 2025-10-17 2025-10-18; do
+  GH_DAY=$d tsx server/scripts/golden_rebuild_day.ts
+done
+
+5) Quick smoke for a known day
+
+curl -s "http://localhost:5000/api/receipts/shift/burgers?date=2025-10-15&source=live" | jq
+
+Expected: matches POS (e.g., 88 burgers on 2025-10-15 once SKUs are present).
+
+
+---
+
+Notes
+
+Mix & Match (10069) stays excluded (composite). Burgers inside that bundle will still be counted independently by their own SKUs if they appear.
+
+With SKU-first logic, Thai text/emojis in names don’t matter anymore.
+
