@@ -23,13 +23,14 @@ router.get("/debug/items", async (req, res) => {
     const rows = await prisma.$queryRaw<
       { item_name: string; qty: number }[]
     >`
-      SELECT ri.name AS item_name,
-             SUM(ri.qty)::int AS qty
-      FROM receipt_items ri
-      JOIN receipts r ON r.id = ri."receiptId"
-      WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${w.fromISO}::timestamptz
-        AND COALESCE(r."closedAtUTC", r."createdAtUTC") <  ${w.toISO}::timestamptz
-      GROUP BY ri.name
+      SELECT (item->>'name') AS item_name,
+             SUM((item->>'quantity')::int) AS qty
+      FROM pos_receipt pr,
+           LATERAL jsonb_array_elements(pr.items_json) AS item
+      WHERE pr.datetime >= ${w.fromISO}::timestamptz
+        AND pr.datetime <  ${w.toISO}::timestamptz
+        AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+      GROUP BY item_name
       ORDER BY qty DESC
       LIMIT ${Number(limit ?? 50)}
     `;
