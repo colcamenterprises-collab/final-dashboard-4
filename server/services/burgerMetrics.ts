@@ -1,188 +1,110 @@
-// server/services/burgerMetrics.ts
 import { PrismaClient } from "@prisma/client";
-import { CATALOG, ALL_ITEM_NAME_VARIANTS, CatalogItem } from "../constants/burgerCatalog";
+import { DateTime } from "luxon";
 
 const prisma = new PrismaClient();
+const TZ = "Asia/Bangkok";
+const BEEF_G = 95;
+const CHICKEN_G = 100;
 
-export type ProductRow = {
-  normalizedName: string;
-  rawHits: string[];      // which raw strings matched
-  qty: number;
-  patties: number;        // beef patties
-  redMeatGrams: number;   // beef grams only
-  chickenGrams: number;   // chicken grams
-  rolls: number;          // buns
-};
+const CATALOG = [
+  { normalized: "Single Smash Burger", pattiesPer: 1, kind: "beef",
+    aliases: ["single smash", "single meal set", "kids single", "ซิงเกิ้ล"] },
+  { normalized: "Super Double Bacon & Cheese", pattiesPer: 2, kind: "beef",
+    aliases: ["super double bacon", "super double bacon & cheese", "ซูเปอร์ดับเบิ้ลเบคอน", "super double bacon & cheese set"] },
+  { normalized: "Triple Smash Burger", pattiesPer: 3, kind: "beef",
+    aliases: ["triple smash", "triple smash set", "สาม"] },
+  { normalized: "Ultimate Double", pattiesPer: 2, kind: "beef",
+    aliases: ["ultimate double", "double smash burger", "double set", "คู่"] },
+  { normalized: "Crispy Chicken Fillet Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["crispy chicken", "เบอร์เกอร์ไก่ชิ้น"] },
+  { normalized: "Karaage Chicken Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["karaage chicken", "คาราอาเกะ"] },
+  { normalized: "Big Rooster Sriracha Chicken", pattiesPer: 0, kind: "chicken",
+    aliases: ["rooster", "sriracha", "ศรีราชา"] },
+  { normalized: "El Smasho Grande Chicken Burger", pattiesPer: 0, kind: "chicken",
+    aliases: ["smasho", "grande chicken", "แกรนด์ชิกเก้น"] },
+];
 
-export type BurgerMetrics = {
-  shiftDate: string;
-  fromISO: string;
-  toISO: string;
-  products: ProductRow[];
-  totals: {
-    burgers: number;
-    patties: number;        // beef patties
-    redMeatGrams: number;
-    chickenGrams: number;
-    rolls: number;
-  };
-  unmapped: Record<string, number>; // raw item names that looked like burgers but not mapped
-};
-
-// Fuzzy matching helpers
-function simplifyName(s: string) {
-  // lower, strip emoji/punctuation, collapse spaces, drop common wrappers
-  return s
-    .toLowerCase()
-    .replace(/[(){}\[\]•★☆🐔🔥✨™®©\-\–\—_,.]/g, " ")
-    .replace(/\b(meal|deal|set|combo|คอมโบ|มิ้ล|มื้อ|เซ็ต)\b/g, " ")
+function simplify(s: string) {
+  return s.toLowerCase()
+    .replace(/[(){}\[\]•★☆🐔™®©.,\-–—_]/g, " ")
+    .replace(/\b(meal|deal|set|combo|คอมโบ|เซ็ต|ชุด)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-const FUZZY_ALIASES: Record<string,string[]> = {
-  "single smash burger": [
-    "single smash burger", "single smash", "single burger",
-    "kids single cheeseburger", "single meal set", "super single bacon & cheese",
-  ],
-  "ultimate double": [
-    "ultimate double", "double smash burger", "double set", "kids double cheeseburger",
-  ],
-  "super double bacon & cheese": [
-    "super double bacon and cheese", "super double bacon & cheese",
-    "super double bacon & cheese set",
-  ],
-  "triple smash burger": [
-    "triple smash burger", "triple smash set",
-  ],
-  "crispy chicken fillet burger": [
-    "crispy chicken fillet burger", "เบอร์เกอร์ไก่ชิ้น",
-  ],
-  "karaage chicken burger": [
-    "karaage chicken burger", "karaage chicken meal", "เบอร์เกอร์ไก่คาราอาเกะ",
-  ],
-  "big rooster sriracha chicken": [
-    "big rooster sriracha chicken", "ไก่ศรีราชาตัวใหญ่",
-  ],
-  "el smasho grande chicken burger": [
-    "el smasho grande chicken burger", "แกรนด์ชิกเก้น",
-  ],
-};
-
-// Build reverse index once
-const FUZZY_INDEX: Array<{norm: string; key: string}> = [];
-for (const [norm, arr] of Object.entries(FUZZY_ALIASES)) {
-  for (const a of arr) FUZZY_INDEX.push({ norm, key: simplifyName(a) });
+const ALIAS_INDEX: Array<{ key: string; norm: string; pattiesPer: number; kind: "beef"|"chicken" }> = [];
+for (const c of CATALOG) {
+  for (const a of c.aliases) ALIAS_INDEX.push({ key: simplify(a), norm: c.normalized, pattiesPer: c.pattiesPer, kind: c.kind as any });
 }
 
-function matchFuzzy(raw: string): string | undefined {
-  const k = simplifyName(raw);
-  // exact simplified hit
-  const exact = FUZZY_INDEX.find(e => e.key === k);
-  if (exact) return exact.norm;
-  // contains hit (last resort)
-  const contains = FUZZY_INDEX.find(e => k.includes(e.key));
-  return contains?.norm;
+function matchBurger(raw: string) {
+  const k = simplify(raw);
+  const e = ALIAS_INDEX.find(x => x.key === k);
+  if (e) return e;
+  const c = ALIAS_INDEX.find(x => k.includes(x.key));
+  return c || null;
 }
 
-function matchCatalog(rawName: string): CatalogItem | undefined {
-  const l = rawName.toLowerCase().trim();
-  return CATALOG.find(c => c.itemNames.map(x => x.toLowerCase().trim()).includes(l));
-}
-
-// Query receipt_items joined with receipts for burger counts
-async function fetchCounts(fromISO: string, toISO: string) {
-  try {
-    const items = await prisma.$queryRaw<{ name: string; qty: number }[]>`
-      SELECT ri.name, SUM(ri.qty)::int AS qty
-      FROM receipt_items ri
-      JOIN receipts r ON r.id = ri."receiptId"
-      WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${fromISO}::timestamptz
-        AND COALESCE(r."closedAtUTC", r."createdAtUTC") < ${toISO}::timestamptz
-        AND LOWER(ri.name) = ANY(${ALL_ITEM_NAME_VARIANTS})
-      GROUP BY ri.name
-    `;
-    return items.map(r => ({ itemName: r.name, qty: Number(r.qty) || 0 }));
-  } catch (error) {
-    console.error('[burgerMetrics] Error fetching counts:', error);
-    return [];
-  }
-}
-
-export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string): Promise<BurgerMetrics> {
-  const hits = await fetchCounts(fromISO, toISO);
-
-  // Build per-product aggregations
-  const map = new Map<string, ProductRow>();
-  for (const cat of CATALOG) {
-    map.set(cat.normalizedName, {
-      normalizedName: cat.normalizedName,
-      rawHits: [],
-      qty: 0,
-      patties: 0,
-      redMeatGrams: 0,
-      chickenGrams: 0,
-      rolls: 0,
-    });
-  }
-
-  const unmapped: Record<string, number> = {};
-  for (const { itemName, qty } of hits) {
-    // Try fuzzy match first
-    const normName = matchFuzzy(itemName);
-    let cat: CatalogItem | undefined;
-    
-    if (normName) {
-      // Find catalog item by normalized name
-      cat = CATALOG.find(c => c.normalizedName.toLowerCase() === normName);
-    }
-    
-    // Fallback to exact match
-    if (!cat) {
-      cat = matchCatalog(itemName);
-    }
-    
-    if (!cat) {
-      unmapped[itemName] = (unmapped[itemName] ?? 0) + qty;
-      continue;
-    }
-    const row = map.get(cat.normalizedName)!;
-    row.qty += qty;
-    row.rawHits.push(itemName);
-
-    // buns
-    if (cat.countsRoll) row.rolls += qty;
-
-    // beef pats & grams
-    if (cat.pattiesPerItem > 0) {
-      const pats = qty * cat.pattiesPerItem;
-      row.patties += pats;
-      row.redMeatGrams += pats * cat.gramsPerPatty;
-    }
-
-    // chicken grams
-    if (cat.chickenGramsPerItem > 0) {
-      row.chickenGrams += qty * cat.chickenGramsPerItem;
-    }
-  }
-
-  const products = Array.from(map.values());
-
-  const totals = products.reduce((acc, r) => {
-    acc.burgers += r.qty;
-    acc.patties += r.patties;
-    acc.redMeatGrams += r.redMeatGrams;
-    acc.chickenGrams += r.chickenGrams;
-    acc.rolls += r.rolls;
-    return acc;
-  }, { burgers: 0, patties: 0, redMeatGrams: 0, chickenGrams: 0, rolls: 0 });
-
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: TZ }).startOf("day");
   return {
-    shiftDate: shiftDateLabel,
-    fromISO,
-    toISO,
-    products,
-    totals,
-    unmapped,
+    shiftDateLabel: base.toISODate()!,
+    fromISO: base.plus({ hours: 18 }).toISO(),
+    toISO: base.plus({ days: 1, hours: 3 }).toISO(),
   };
+}
+
+export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string) {
+  const rows = await prisma.$queryRaw<{ item_name: string; qty: number }[]>`
+    SELECT (item->>'name') AS item_name,
+           SUM((item->>'quantity')::int) AS qty
+    FROM pos_receipt pr,
+         LATERAL jsonb_array_elements(pr.items_json) AS item
+    WHERE pr.datetime >= ${fromISO}::timestamptz
+      AND pr.datetime <  ${toISO}::timestamptz
+      AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+    GROUP BY item_name
+  `;
+
+  const productsMap = new Map<string, {
+    qty:number; patties:number; redMeatG:number; chickenG:number; rolls:number; rawHits:Set<string>
+  }>();
+  const unmapped: Record<string, number> = {};
+
+  for (const { item_name, qty } of rows) {
+    const m = matchBurger(item_name);
+    if (!m) { unmapped[item_name] = (unmapped[item_name] ?? 0) + qty; continue; }
+    if (!productsMap.has(m.norm)) productsMap.set(m.norm, { qty:0, patties:0, redMeatG:0, chickenG:0, rolls:0, rawHits:new Set() });
+    const p = productsMap.get(m.norm)!;
+    p.qty += qty;
+    p.rolls += qty;
+    p.rawHits.add(item_name);
+    if (m.kind === "beef") {
+      p.patties += qty * m.pattiesPer;
+      p.redMeatG += qty * m.pattiesPer * BEEF_G;
+    } else {
+      p.chickenG += qty * CHICKEN_G;
+    }
+  }
+
+  const products = Array.from(productsMap.entries()).map(([normalizedName, v]) => ({
+    normalizedName,
+    qty: v.qty,
+    patties: v.patties,
+    redMeatGrams: v.redMeatG,
+    chickenGrams: v.chickenG,
+    rolls: v.rolls,
+    rawHits: Array.from(v.rawHits),
+  })).sort((a,b)=>a.normalizedName.localeCompare(b.normalizedName));
+
+  const totals = products.reduce((t, r) => ({
+    burgers: t.burgers + r.qty,
+    patties: t.patties + r.patties,
+    redMeatGrams: t.redMeatGrams + r.redMeatGrams,
+    chickenGrams: t.chickenGrams + r.chickenGrams,
+    rolls: t.rolls + r.rolls,
+  }), { burgers:0, patties:0, redMeatGrams:0, chickenGrams:0, rolls:0 });
+
+  return { shiftDate: shiftDateLabel, fromISO, toISO, products, totals, unmapped };
 }
