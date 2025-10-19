@@ -1,0 +1,155 @@
+Fix & Verify (copy/paste)
+
+1) Hard-force POS/SKU source & show it
+
+Set the env and restart your server:
+
+BURGER_SOURCE=pos
+
+(Our patch exposes sourceUsed in the API; add it if not already.)
+
+Quick check:
+
+curl -s "/api/receipts/shift/burgers?date=2025-10-18&source=live" | jq
+# expect: "sourceUsed":"pos", products include "sku" per line
+
+> If you still see "cached": true and no sourceUsed/no sku, your route is still returning the old shape. Deploy the latest burgerMetrics.ts patch (SKU-first) so the response includes sourceUsed, sku, and rawHits with SKUs.
+
+
+
+
+---
+
+2) Nuke stale caches for 2025-10-18
+
+Clear both burger analytic tables for that date before rebuilding:
+
+-- remove stale cached rows for the day
+DELETE FROM analytics_shift_burger_item    WHERE shift_date = '2025-10-18';
+DELETE FROM analytics_shift_burger_summary WHERE shift_date = '2025-10-18';
+
+Now rebuild using the SKU logic:
+
+GH_DAY=2025-10-18 tsx server/scripts/golden_rebuild_day.ts
+
+Check again (live, not cache):
+
+curl -s "/api/receipts/shift/burgers?date=2025-10-18&source=live" | jq
+
+You should now see 61 burgers with this per-SKU composition:
+
+10066 Crispy Chicken — 6
+
+10070 Karaage Chicken — 2
+
+10033 Single Meal Set — 4
+
+10004 Single Smash — 8
+
+10036 Super Double Set — 8
+
+10019 Super Double — 17
+
+10009 Triple Smash — 2
+
+10034 Triple Smash Set — 1
+
+10006 Ultimate Double — 12
+
+10068 Big Rooster — 1
+
+
+(Totals: 61 burgers, 95 patties, 9025 g red meat, 900 g chicken, 61 rolls.)
+
+
+---
+
+3) Sanity SQL (prove the data in pos_receipt is correct)
+
+Run this read to see exactly what’s stored and being counted:
+
+-- Items we imported for the 18th (Bangkok shift window)
+SELECT
+  item->>'sku'   AS sku,
+  item->>'name'  AS name,
+  SUM((item->>'quantity')::int) AS qty
+FROM pos_receipt pr,
+     LATERAL jsonb_array_elements(pr.items_json) AS item
+WHERE pr.datetime >= '2025-10-18 18:00:00+07'
+  AND pr.datetime <  '2025-10-19 03:00:00+07'
+  AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
+GROUP BY sku, name
+ORDER BY name;
+
+Then, confirm which of those SKUs the burger catalog classifies as category='burger':
+
+SELECT c.sku, c.name, c.category, c.kind, c.patties_per, c.grams_per
+FROM item_catalog c
+WHERE c.sku IN (
+  SELECT DISTINCT item->>'sku'
+  FROM pos_receipt pr, LATERAL jsonb_array_elements(pr.items_json) AS item
+  WHERE pr.datetime >= '2025-10-18 18:00:00+07'
+    AND pr.datetime <  '2025-10-19 03:00:00+07'
+);
+
+If any expected burger SKU is missing or mis-categorized, update item_catalog (or re-run the catalog importer), then rebuild the day again.
+
+
+---
+
+4) Add “cache invalidation by catalog version” (prevents this again)
+
+Whenever the catalog or importer changes, old caches should be invalid:
+
+Create a tiny table:
+
+
+CREATE TABLE IF NOT EXISTS analytics_version (
+  id int PRIMARY KEY DEFAULT 1,
+  catalog_updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO analytics_version (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+After running catalog_import_from_file.ts, bump the version:
+
+
+UPDATE analytics_version SET catalog_updated_at = now() WHERE id = 1;
+
+In burgerMetrics.ts, when loading a day from cache, invalidate if analytics_shift_burger_item.updated_at < analytics_version.catalog_updated_at.
+
+
+This makes the app automatically recompute a day if your catalog changed, so you never see legacy numbers after a SKU update.
+
+
+---
+
+5) Show SKU in the UI (so this is visibly fixed)
+
+Make sure your burger table includes a SKU column (we added this in the patch):
+
+API returns products[].sku
+
+UI column: “SKU” → row.sku
+
+
+Now the burger table will render the exact SKU per line (critical as you expand to sides/drinks).
+
+
+---
+
+Why your current app shows 48 (root cause summary)
+
+The /api/receipts/shift/burgers endpoint returned "cached": true with no SKUs in products → that’s the old cache (legacy name-based logic) from before we flipped to SKU matching.
+
+The new SKU pipeline is correct; you just need to flush and rebuild the day’s cache and ensure the server uses pos_receipt (not legacy) for that window.
+
+
+Do those five steps and the 18th will snap to 61.
+If anything still looks off after the rebuild, paste the output of:
+
+GET /api/receipts/shift/burgers?date=2025-10-18&source=live
+
+The SQL query result above (sku/name/qty from pos_receipt for the window)
+
+
+…and I’ll pinpoint the mismatch line-by-line.
