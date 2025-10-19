@@ -56,15 +56,17 @@ export function shiftWindow(dateISO: string) {
 }
 
 export async function computeMetrics(fromISO: string, toISO: string, shiftDateLabel: string) {
+  const fromBkk = DateTime.fromISO(fromISO).toFormat('yyyy-MM-dd HH:mm:ss');
+  const toBkk = DateTime.fromISO(toISO).toFormat('yyyy-MM-dd HH:mm:ss');
+  
   const rows = await prisma.$queryRaw<{ item_name: string; qty: number }[]>`
-    SELECT (item->>'name') AS item_name,
-           SUM((item->>'quantity')::int) AS qty
-    FROM pos_receipt pr,
-         LATERAL jsonb_array_elements(pr.items_json) AS item
-    WHERE pr.datetime >= ${fromISO}::timestamptz
-      AND pr.datetime <  ${toISO}::timestamptz
-      AND COALESCE(pr.batch_id,'') NOT LIKE 'TEST_%'
-    GROUP BY item_name
+    SELECT ri.name AS item_name,
+           SUM(ri.qty)::int AS qty
+    FROM receipt_items ri
+    JOIN receipts r ON r.id = ri."receiptId"
+    WHERE COALESCE(r."closedAtUTC", r."createdAtUTC") >= ${fromBkk}::timestamp
+      AND COALESCE(r."closedAtUTC", r."createdAtUTC") <  ${toBkk}::timestamp
+    GROUP BY ri.name
   `;
 
   const productsMap = new Map<string, {

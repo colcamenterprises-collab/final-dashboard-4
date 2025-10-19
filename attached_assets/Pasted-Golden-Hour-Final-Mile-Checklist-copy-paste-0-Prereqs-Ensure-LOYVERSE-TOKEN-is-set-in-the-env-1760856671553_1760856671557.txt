@@ -1,0 +1,136 @@
+Golden Hour — Final-Mile Checklist (copy/paste)
+
+0) Prereqs
+
+Ensure LOYVERSE_TOKEN is set in the environment the server uses.
+
+Server is running and exposes the new endpoints.
+
+
+1) Backfill the data (store it in pos_receipt)
+
+# Backfill Oct 12–18 (Bangkok-safe); adjust dates as needed
+WEEK_FROM=2025-10-12 WEEK_TO=2025-10-18 tsx server/scripts/golden_sync_week.ts
+
+Expected JSON includes non-zero counts under "imported" for each day. If any day shows 0, see “Troubleshooting” at the bottom.
+
+2) Verify storage (DB check)
+
+-- Should be > 0 for each shift window (Bangkok time)
+SELECT COUNT(*) AS receipts_found
+FROM pos_receipt
+WHERE datetime >= '2025-10-18 18:00:00+07'
+  AND datetime <  '2025-10-19 03:00:00+07';
+
+3) Spot the raw items the API sees (names → quantities)
+
+curl -s "http://localhost:5000/api/receipts/debug/items?date=2025-10-18" | jq
+
+You should see burger lines like “Single Smash…”, “Super Double…(Set)”, Thai variants, etc.
+
+4) Live-compute totals for the day (bypass any stale cache)
+
+curl -s "http://localhost:5000/api/receipts/shift/burgers?date=2025-10-18&source=live" | jq
+
+Target for 2025-10-18 (from POS CSV):
+
+burgers: 61
+
+patties: 95
+
+redMeatGrams: 9025
+
+chickenGrams: 900
+
+rolls: 61
+
+
+5) Rebuild and pin the cache for that day
+
+GH_DAY=2025-10-18 tsx server/scripts/golden_rebuild_day.ts
+# sanity check (from cache now)
+curl -s "http://localhost:5000/api/receipts/shift/burgers?date=2025-10-18" | jq
+
+Live and cached numbers should match.
+
+6) Week parity test (bulletproof check)
+
+WEEK_FROM=2025-10-12 WEEK_TO=2025-10-18 tsx server/scripts/golden_validate_week.ts
+
+You should see ✅ for every day (live == cache). Any ❌ means rebuild that day and re-run.
+
+7) POS CSV vs API (gold reference)
+
+If you want to prove alignment against your Loyverse export:
+
+GH_DAY=2025-10-18 GH_CSV=/mnt/data/item-sales-summary-2025-10-18-2025-10-18.csv \
+tsx server/scripts/golden_validate_vs_csv.ts
+
+It will print “POS CSV totals” and “API live totals” — they should match the target above.
+
+
+---
+
+One-click commands (for the agent)
+
+# 1) Sync a week (store + auto-cache)
+WEEK_FROM=2025-10-12 WEEK_TO=2025-10-18 tsx server/scripts/golden_sync_week.ts
+
+# 2) Smoke Oct 18 (live vs cache)
+GH_DAY=2025-10-18 tsx server/scripts/golden_smoke_day.ts
+
+# 3) Validate the week (live == cache)
+WEEK_FROM=2025-10-12 WEEK_TO=2025-10-18 tsx server/scripts/golden_validate_week.ts
+
+# 4) Compare API to official POS CSV (gold reference)
+GH_DAY=2025-10-18 GH_CSV=/mnt/data/item-sales-summary-2025-10-18-2025-10-18.csv tsx server/scripts/golden_validate_vs_csv.ts
+
+
+---
+
+What you should see in the dashboard
+
+Go to /operations/analysis/receipts/burgers, pick 2025-10-18, click Load.
+
+The header should show the Bangkok shift window.
+
+The table should list burger types with non-zero quantities.
+
+Totals should be 61 / 95 / 9025 / 900 / 61.
+
+
+
+---
+
+Troubleshooting (fast)
+
+Sync shows 0 imported
+
+Check LOYVERSE_TOKEN is present/valid.
+
+Check network egress from the host to Loyverse API.
+
+If your Loyverse workspace uses stores/locations, ensure the API token has access; if needed, extend the importer to pass store_id filters.
+
+
+/api/receipts/debug/items returns empty, but sync showed imports
+
+Verify timestamps stored as Asia/Bangkok (the patch does this).
+
+Re-run the sync for that day, then recheck.
+
+
+Live shows items, but burgers still 0
+
+That means a mapping miss. With the Golden Hour fuzzy matcher (English/Thai + “(Meal Deal)”/“Set”), this should be rare.
+
+Paste the top 5 names from /debug/items and we’ll add aliases (hotfix is trivial).
+
+
+Old cache shows the wrong numbers
+
+Rebuild the day: GH_DAY=YYYY-MM-DD tsx server/scripts/golden_rebuild_day.ts
+
+Or nuke rows for that date in analytics_shift_burger_* and load the page again.
+
+
