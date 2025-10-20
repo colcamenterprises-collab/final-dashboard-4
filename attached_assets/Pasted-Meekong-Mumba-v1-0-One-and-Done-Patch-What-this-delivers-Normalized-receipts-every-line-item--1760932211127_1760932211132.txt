@@ -1,0 +1,551 @@
+Meekong Mumba v1.0 — One-and-Done Patch
+
+What this delivers
+
+Normalized receipts (every line item + modifiers saved forever).
+
+Master item catalog (all SKUs, categories, burger rules).
+
+Shift analytics (5pm→3am Bangkok), live or cached, per category & per SKU.
+
+De-duplication (no more duplicate receipts).
+
+Simple endpoints for dashboard & CSV export.
+
+
+
+---
+
+0) ENV (set once)
+
+TZ=Asia/Bangkok
+BURGER_SOURCE=pos
+
+
+---
+
+1) Migration — create the schema (single SQL file)
+
+server/migrations/2025-10-20_mm_v1.sql
+
+-- 1) Normalized receipts
+CREATE TABLE IF NOT EXISTS lv_receipt (
+  receipt_id    text PRIMARY KEY,
+  datetime_bkk  timestamptz NOT NULL,
+  staff_name    text,
+  customer_id   text,
+  total_amount  numeric(12,2),
+  payment_json  jsonb DEFAULT '{}'::jsonb,
+  raw_json      jsonb DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS lv_line_item (
+  receipt_id    text NOT NULL,
+  line_no       int  NOT NULL,
+  sku           text,
+  name          text NOT NULL,
+  qty           int  NOT NULL,
+  unit_price    numeric(12,2),
+  category_hint text,
+  raw_json      jsonb DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (receipt_id, line_no),
+  FOREIGN KEY (receipt_id) REFERENCES lv_receipt(receipt_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS lv_modifier (
+  receipt_id    text NOT NULL,
+  line_no       int  NOT NULL,
+  mod_no        int  NOT NULL,
+  sku           text,
+  name          text NOT NULL,
+  qty           int  NOT NULL DEFAULT 1,
+  raw_json      jsonb DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (receipt_id, line_no, mod_no),
+  FOREIGN KEY (receipt_id, line_no) REFERENCES lv_line_item(receipt_id, line_no) ON DELETE CASCADE
+);
+
+-- 2) Catalog
+CREATE TABLE IF NOT EXISTS item_catalog (
+  sku          text PRIMARY KEY,
+  name         text NOT NULL,
+  category     text NOT NULL CHECK (category IN ('burger','side','drink','modifier','bundle','other')),
+  kind         text NULL CHECK (kind IN ('beef','chicken','other')),
+  patties_per  int  NULL,
+  grams_per    int  NULL,
+  rolls_per    int  NOT NULL DEFAULT 1,
+  active       boolean NOT NULL DEFAULT true,
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_item_catalog_category ON item_catalog(category);
+CREATE INDEX IF NOT EXISTS idx_item_catalog_kind ON item_catalog(kind);
+
+-- 3) Shift analytics (generic per SKU, all categories)
+CREATE TABLE IF NOT EXISTS analytics_shift_item (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date  date NOT NULL,
+  from_ts     timestamptz NOT NULL,
+  to_ts       timestamptz NOT NULL,
+  sku         text,
+  name        text NOT NULL,
+  category    text NOT NULL CHECK (category IN ('burger','side','drink','modifier','bundle','other')),
+  qty         int  NOT NULL DEFAULT 0,
+  patties     int  NOT NULL DEFAULT 0,
+  red_meat_g  int  NOT NULL DEFAULT 0,
+  chicken_g   int  NOT NULL DEFAULT 0,
+  rolls       int  NOT NULL DEFAULT 0,
+  raw_hits    jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, COALESCE(sku, name))
+);
+CREATE INDEX IF NOT EXISTS idx_asi_date_cat ON analytics_shift_item(shift_date, category);
+
+-- 4) Shift category summary
+CREATE TABLE IF NOT EXISTS analytics_shift_category_summary (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date  date NOT NULL,
+  from_ts     timestamptz NOT NULL,
+  to_ts       timestamptz NOT NULL,
+  category    text NOT NULL CHECK (category IN ('burger','side','drink','modifier','bundle','other')),
+  items_total int  NOT NULL DEFAULT 0,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, category)
+);
+
+-- 5) Import runs & versioning
+CREATE TABLE IF NOT EXISTS import_log (
+  run_id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider        text NOT NULL,       -- e.g., 'loyverse'
+  from_ts         timestamptz NOT NULL,
+  to_ts           timestamptz NOT NULL,
+  receipts_fetched int NOT NULL DEFAULT 0,
+  receipts_upserted int NOT NULL DEFAULT 0,
+  status          text NOT NULL DEFAULT 'ok',
+  message         text,
+  started_at      timestamptz NOT NULL DEFAULT now(),
+  finished_at     timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS analytics_version (
+  id int PRIMARY KEY DEFAULT 1,
+  catalog_updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO analytics_version (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- 6) Hard de-dupe for legacy table (if still present) and for normalized
+CREATE UNIQUE INDEX IF NOT EXISTS ux_lv_receipt ON lv_receipt(receipt_id);
+-- If you still write to pos_receipt elsewhere, lock it down:
+-- CREATE UNIQUE INDEX IF NOT EXISTS ux_pos_receipt_receiptid ON pos_receipt(receipt_id);
+
+Run:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-20_mm_v1.sql
+
+
+---
+
+2) Shared shift window (5pm→3am Bangkok)
+
+server/services/time/shiftWindow.ts
+
+import { DateTime } from "luxon";
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: "Asia/Bangkok" }).startOf("day");
+  const from = base.plus({ hours: 17 });          // 17:00 BKK
+  const to   = base.plus({ days: 1, hours: 3 });  // 03:00 next day
+  return { shiftDate: base.toISODate()!, fromISO: from.toISO()!, toISO: to.toISO()! };
+}
+
+Use this in all services/routes that compute a shift.
+
+
+---
+
+3) Catalog importer (reads your “Item and SKU List – Latest”)
+
+server/scripts/catalog_import_from_file.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fs from 'fs'; import path from 'path';
+import { parse as parseCsv } from 'csv-parse/sync';
+import * as XLSX from 'xlsx';
+import { PrismaClient } from '@prisma/client';
+const db = new PrismaClient();
+
+const INPUT = process.env.CATALOG_PATH || './Item and SKU List - Latest';
+const DEFAULT_CHICKEN_GRAMS = 100;
+
+function normCategory(v:string) {
+  const s = (v||'').toLowerCase().trim();
+  if (['burger','burgers'].includes(s)) return 'burger';
+  if (['drink','drinks','beverage','beverages'].includes(s)) return 'drink';
+  if (['side','sides'].includes(s)) return 'side';
+  if (['modifier','modifiers','addon','add-on','add on'].includes(s)) return 'modifier';
+  if (['bundle','deal','set','meal','combo','mix and match'].includes(s)) return 'bundle';
+  return 'other';
+}
+
+function inferBurgerKind(name:string) {
+  const n = name.toLowerCase();
+  if (/(chicken|karaage|rooster|grande|ไก่|คาราอาเกะ)/i.test(n)) return 'chicken';
+  return 'beef';
+}
+
+function loadRows(p:string): any[] {
+  const ext = path.extname(p).toLowerCase();
+  if (!fs.existsSync(p)) throw new Error(`Catalog file not found: ${p}`);
+  if (ext === '.csv') {
+    const raw = fs.readFileSync(p, 'utf8');
+    return parseCsv(raw, { columns: true, skip_empty_lines: true });
+  }
+  const wb = XLSX.read(fs.readFileSync(p));
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { defval: '' });
+}
+
+(async () => {
+  const rows = loadRows(INPUT);
+  console.log(`Loaded ${rows.length} catalog rows from ${INPUT}`);
+
+  let n=0;
+  for (const r of rows) {
+    const sku   = String(r.SKU || r['Sku'] || r['sku'] || '').trim();
+    const name  = String(r['Item name'] || r['Name'] || r['Item'] || '').trim();
+    let category = normCategory(String(r['Category'] || r['Group'] || ''));
+    if (!sku || !name || !category) continue;
+
+    // Explicit burger fields (optional in file)
+    let kind:string|null = r['Kind'] ? String(r['Kind']).toLowerCase() : null;
+    let patties = r['PattiesPer'] ? Number(r['PattiesPer']) : null;
+    let grams   = r['GramsPer']   ? Number(r['GramsPer'])   : null;
+    let rolls   = r['RollsPer']   ? Number(r['RollsPer'])   : 1;
+
+    if (category === 'burger') {
+      if (!kind)  kind = inferBurgerKind(name);
+      if (kind === 'chicken' && !grams) grams = DEFAULT_CHICKEN_GRAMS;
+      if (kind === 'beef' && !patties) {
+        const t = name.toLowerCase();
+        patties = /triple|สาม/.test(t) ? 3 : /double|คู่|ดับเบิ้ล/.test(t) ? 2 : 1;
+      }
+    } else {
+      kind = kind ?? null; patties = null; grams = null;
+    }
+
+    await db.$executeRaw`
+      INSERT INTO item_catalog (sku, name, category, kind, patties_per, grams_per, rolls_per, active)
+      VALUES (${sku}, ${name}, ${category}, ${kind}, ${patties}, ${grams}, ${rolls}, true)
+      ON CONFLICT (sku)
+      DO UPDATE SET name=EXCLUDED.name, category=EXCLUDED.category, kind=EXCLUDED.kind,
+                    patties_per=EXCLUDED.patties_per, grams_per=EXCLUDED.grams_per,
+                    rolls_per=EXCLUDED.rolls_per, active=true, updated_at=now()`;
+    n++;
+  }
+  await db.$executeRaw`UPDATE analytics_version SET catalog_updated_at = now() WHERE id=1`;
+  console.log(`Catalog upserted: ${n}`);
+  await db.$disconnect();
+})().catch(e => { console.error(e); process.exit(1); });
+
+Run:
+
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts
+
+
+---
+
+4) Importer V2 — pull receipts → normalized tables
+
+server/services/loyverseImportV2.ts
+
+/* eslint-disable no-console */
+import { DateTime } from 'luxon';
+import { PrismaClient } from '@prisma/client';
+const db = new PrismaClient();
+
+// expects a helper that calls Loyverse receipts API, paginates, yields { receipt, line_items[] }
+async function fetchReceipts(fromISO:string, toISO:string) { /* your existing client */ }
+
+export async function importReceiptsV2(fromISO:string, toISO:string) {
+  const started = new Date();
+  let fetched=0, upserted=0;
+  for await (const rc of fetchReceipts(fromISO, toISO)) {
+    fetched++;
+
+    const dtBkk = DateTime.fromISO(rc.receipt_date, { zone:'Asia/Bangkok' }).toISO();
+    await db.$executeRaw`
+      INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
+      VALUES (${rc.receipt_id}, ${dtBkk}, ${rc.staff_member ?? null}, ${rc.customer_id ?? null},
+              ${rc.total_amount ?? null}, ${JSON.stringify(rc.payments) }::jsonb, ${JSON.stringify(rc)}::jsonb)
+      ON CONFLICT (receipt_id) DO UPDATE
+      SET datetime_bkk=EXCLUDED.datetime_bkk,
+          staff_name=EXCLUDED.staff_name,
+          customer_id=EXCLUDED.customer_id,
+          total_amount=EXCLUDED.total_amount,
+          payment_json=EXCLUDED.payment_json,
+          raw_json=EXCLUDED.raw_json`;
+
+    let lineNo = 0;
+    for (const li of rc.line_items ?? []) {
+      lineNo++;
+      await db.$executeRaw`
+        INSERT INTO lv_line_item (receipt_id, line_no, sku, name, qty, unit_price, category_hint, raw_json)
+        VALUES (${rc.receipt_id}, ${lineNo}, ${li.sku ?? null}, ${li.name ?? 'UNKNOWN'},
+                ${Number(li.quantity||0)}, ${Number(li.price||0)}, ${li.category ?? null},
+                ${JSON.stringify(li)}::jsonb)
+        ON CONFLICT (receipt_id, line_no) DO UPDATE
+        SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, unit_price=EXCLUDED.unit_price,
+            category_hint=EXCLUDED.category_hint, raw_json=EXCLUDED.raw_json`;
+
+      let modNo = 0;
+      for (const m of li.modifiers ?? []) {
+        modNo++;
+        await db.$executeRaw`
+          INSERT INTO lv_modifier (receipt_id, line_no, mod_no, sku, name, qty, raw_json)
+          VALUES (${rc.receipt_id}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${m.name ?? 'MOD'},
+                  ${Number(m.quantity||1)}, ${JSON.stringify(m)}::jsonb)
+          ON CONFLICT (receipt_id, line_no, mod_no) DO UPDATE
+          SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, raw_json=EXCLUDED.raw_json`;
+      }
+    }
+    upserted++;
+  }
+
+  await db.$executeRaw`
+    INSERT INTO import_log (provider, from_ts, to_ts, receipts_fetched, receipts_upserted, status, finished_at)
+    VALUES ('loyverse', ${fromISO}::timestamptz, ${toISO}::timestamptz, ${fetched}, ${upserted}, 'ok', now())`;
+  console.log(`Import complete: fetched=${fetched}, upserted=${upserted}`);
+}
+
+Route: server/routes/loyverseV2.ts
+
+import { Router } from 'express';
+import { DateTime } from 'luxon';
+import { importReceiptsV2 } from '../services/loyverseImportV2';
+const router = Router();
+
+router.post('/loyverse/sync', async (req, res) => {
+  const { from, to } = req.query as { from: string; to: string };
+  const fromISO = DateTime.fromISO(from, { zone:'Asia/Bangkok' }).startOf('day').toISO();
+  const toISO   = DateTime.fromISO(to,   { zone:'Asia/Bangkok' }).endOf('day').toISO();
+  await importReceiptsV2(fromISO!, toISO!);
+  res.json({ ok: true, fromISO, toISO });
+});
+export default router;
+
+Mount it:
+
+import loyverseV2 from './routes/loyverseV2';
+app.use('/api', loyverseV2);
+
+
+---
+
+5) Shift analytics (live & cache)
+
+server/services/shiftItems.ts
+
+import { PrismaClient } from '@prisma/client';
+import { shiftWindow } from './time/shiftWindow';
+const db = new PrismaClient();
+const BEEF_G = 95;
+
+export async function computeShift(dateISO:string) {
+  const { shiftDate, fromISO, toISO } = shiftWindow(dateISO);
+
+  // pull items from normalized table
+  const rows = await db.$queryRaw<{
+    sku: string|null; name: string; qty: number;
+  }[]>`
+    SELECT li.sku, COALESCE(c.name, li.name) AS name, SUM(li.qty)::int AS qty
+    FROM lv_line_item li
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
+    LEFT JOIN item_catalog c ON c.sku = li.sku
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
+    GROUP BY li.sku, COALESCE(c.name, li.name)
+    ORDER BY name`;
+
+  // fetch catalog once
+  const catalog = await db.$queryRaw<{
+    sku:string; name:string; category:string; kind:string|null; patties_per:number|null; grams_per:number|null; rolls_per:number;
+  }[]>`SELECT sku, name, category, kind, patties_per, grams_per, rolls_per FROM item_catalog WHERE active = true`;
+
+  const catBySku = new Map(catalog.map(x => [x.sku, x]));
+
+  // aggregate per SKU -> analytics fields
+  const per = new Map<string, {
+    sku:string|null; name:string; category:string; qty:number; patties:number; red:number; chick:number; rolls:number; hits:Set<string>;
+  }>();
+
+  for (const r of rows) {
+    const sku = r.sku?.trim() || null;
+    const cat = (sku && catBySku.get(sku)?.category) || 'other';
+    const rule = sku ? catBySku.get(sku) || null : null;
+
+    const name = (rule?.name) || r.name || sku || 'UNKNOWN';
+    const key = sku ?? name;
+    if (!per.has(key)) per.set(key, { sku, name, category: cat, qty:0, patties:0, red:0, chick:0, rolls:0, hits:new Set() });
+    const p = per.get(key)!;
+    p.qty += r.qty;
+    p.hits.add(`${sku ?? 'no-sku'} :: ${name}`);
+
+    if (cat === 'burger' && rule) {
+      if (rule.kind === 'beef') {
+        const patties = (rule.patties_per ?? 1) * r.qty;
+        p.patties += patties;
+        p.red += patties * BEEF_G;
+      } else if (rule.kind === 'chicken') {
+        p.chick += (rule.grams_per ?? 100) * r.qty;
+      }
+      p.rolls += (rule.rolls_per ?? 1) * r.qty;
+    }
+  }
+
+  // write cache
+  await db.$transaction(async tx => {
+    await tx.$executeRaw`DELETE FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date`;
+    await tx.$executeRaw`DELETE FROM analytics_shift_category_summary WHERE shift_date = ${shiftDate}::date`;
+
+    const byCat: Record<string, number> = {};
+    for (const v of per.values()) {
+      byCat[v.category] = (byCat[v.category] ?? 0) + v.qty;
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_item (shift_date, from_ts, to_ts, sku, name, category, qty, patties, red_meat_g, chicken_g, rolls, raw_hits, updated_at)
+        VALUES (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz,
+                ${v.sku}, ${v.name}, ${v.category}, ${v.qty}, ${v.patties}, ${v.red}, ${v.chick}, ${v.rolls},
+                ${JSON.stringify(Array.from(v.hits))}::jsonb, now())
+        ON CONFLICT (shift_date, COALESCE(sku, name))
+        DO UPDATE SET qty=EXCLUDED.qty, patties=EXCLUDED.patties, red_meat_g=EXCLUDED.red_meat_g,
+                      chicken_g=EXCLUDED.chicken_g, rolls=EXCLUDED.rolls, raw_hits=EXCLUDED.raw_hits,
+                      from_ts=EXCLUDED.from_ts, to_ts=EXCLUDED.to_ts, updated_at=now()`;
+    }
+    for (const [category, items_total] of Object.entries(byCat)) {
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_category_summary (shift_date, from_ts, to_ts, category, items_total, updated_at)
+        VALUES (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz, ${category}, ${items_total}, now())
+        ON CONFLICT (shift_date, category)
+        DO UPDATE SET items_total=EXCLUDED.items_total, from_ts=EXCLUDED.from_ts, to_ts=EXCLUDED.to_ts, updated_at=now()`;
+    }
+  });
+
+  // response
+  const items = Array.from(per.values())
+    .sort((a,b)=>a.category===b.category ? a.name.localeCompare(b.name) : a.category.localeCompare(b.category))
+    .map(v => ({
+      sku: v.sku, name: v.name, category: v.category,
+      qty: v.qty, patties: v.patties, redMeatGrams: v.red, chickenGrams: v.chick, rolls: v.rolls
+    }));
+  const totalsByCategory = items.reduce((acc:any, it)=>{acc[it.category]=(acc[it.category]??0)+it.qty; return acc;}, {});
+  return { shiftDate, fromISO, toISO, items, totalsByCategory };
+}
+
+Routes (server/routes/shiftAnalysis.ts)
+
+import { Router } from 'express';
+import { shiftWindow } from '../services/time/shiftWindow';
+import { PrismaClient } from '@prisma/client';
+import { computeShift } from '../services/shiftItems';
+const db = new PrismaClient();
+const router = Router();
+
+router.get('/analysis/shift/items', async (req,res)=>{
+  const { date, category } = req.query as { date: string; category?: string };
+  const { shiftDate } = shiftWindow(date);
+  // prefer cache if fresh; otherwise compute live
+  const rows = await db.$queryRaw<any[]>`
+    SELECT sku, name, category, qty, patties, red_meat_g, chicken_g, rolls
+    FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
+    ORDER BY category, name`;
+  if ((rows?.length ?? 0) === 0) {
+    const out = await computeShift(date);
+    return res.json({ ok:true, sourceUsed:'live', ...out, items: category ? out.items.filter(x=>x.category===category) : out.items });
+  }
+  res.json({ ok:true, sourceUsed:'cache', date: shiftDate, items: category ? rows.filter(x=>x.category===category) : rows });
+});
+
+router.post('/analysis/shift/rebuild', async (req,res)=>{
+  const { date } = req.query as { date: string };
+  const out = await computeShift(date);
+  res.json({ ok:true, sourceUsed:'live', ...out });
+});
+
+router.get('/analysis/shift/raw', async (req,res)=>{
+  const { date } = req.query as { date: string };
+  const { fromISO, toISO } = shiftWindow(date);
+  const rows = await db.$queryRaw<any[]>`
+    SELECT li.sku, COALESCE(c.name, li.name) AS name, SUM(li.qty)::int AS qty
+    FROM lv_line_item li
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
+    LEFT JOIN item_catalog c ON c.sku = li.sku
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
+    GROUP BY li.sku, COALESCE(c.name, li.name)
+    ORDER BY name`;
+  res.json({ ok:true, fromISO, toISO, rows });
+});
+
+export default router;
+
+Mount it:
+
+import shiftAnalysis from './routes/shiftAnalysis';
+app.use('/api', shiftAnalysis);
+
+
+---
+
+6) UI (minimal change)
+
+Add a new page/tab: Operations → Analysis → Shift Items calling /api/analysis/shift/items?date=YYYY-MM-DD.
+
+Table columns for all categories: SKU | Item | Category | Qty
+
+If category = burger, show extra columns: Patties | Red Meat (g) | Chicken (g) | Rolls.
+
+Small banner: Shift window: 17:00→03:00 (Asia/Bangkok) • Source: cache/live.
+
+
+
+---
+
+7) Runbook (agent copy-paste)
+
+# 1) Run migration
+psql "$DATABASE_URL" -f server/migrations/2025-10-20_mm_v1.sql
+
+# 2) Import catalog (your file path may differ)
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts
+
+# 3) Backfill Loyverse receipts into normalized tables
+curl -X POST "/api/loyverse/sync?from=2025-10-12&to=2025-10-20"
+
+# 4) Rebuild shifts (choose days you want)
+for d in 2025-10-15 2025-10-16 2025-10-17 2025-10-18 2025-10-19; do
+  curl -X POST "/api/analysis/shift/rebuild?date=$d" | jq '.sourceUsed,.shiftDate'
+done
+
+# 5) Verify vs POS (raw)
+curl -s "/api/analysis/shift/raw?date=2025-10-19" | jq
+curl -s "/api/analysis/shift/items?date=2025-10-19&category=burger" | jq
+
+De-dupe guard (recommended if you still ingest pos_receipt elsewhere):
+
+-- optional, if pos_receipt is still used anywhere:
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pos_receipt_receiptid ON pos_receipt(receipt_id);
+
+
+---
+
+8) How this meets your goals
+
+Every item & modifier saved (forever) → exact per-shift lists, all categories.
+
+SKU-first → no name fuzziness / language issues.
+
+Shift window 17:00→03:00 locked to Bangkok.
+
+Simple drill-downs (burgers today; sides/drinks next; ingredients later).
+
+Cache optional and rebuildable; normalized tables remain the truth.
