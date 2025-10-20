@@ -1,0 +1,142 @@
+Meekong Mumba v1.0 — Backfill + Rebuild + Verify (Agent Runbook)
+
+> Paste this whole message into the Replit agent.
+
+
+
+0) Preconditions
+
+Backend already has MM v1.0 routes mounted:
+
+POST /api/loyverse/sync
+
+POST /api/analysis/shift/rebuild
+
+GET  /api/analysis/shift/items
+
+
+LOYVERSE_TOKEN is set in env.
+
+The SKU catalog file is present at /mnt/data/Item and SKU List - Latest.
+(If missing, ask user to re-upload.)
+
+
+
+---
+
+1) Import the SKU catalog (idempotent)
+
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts
+
+Expect:
+Loaded <N> catalog rows ... and Catalog upserted: <N>.
+
+
+---
+
+2) Backfill historical receipts from Loyverse (choose dates)
+
+> Adjust FROM and TO as needed. Weekly chunks are safest.
+
+
+
+FROM=2025-10-01
+TO=2025-10-19
+
+# Import receipts for the local Bangkok date range
+curl -s -X POST "/api/loyverse/sync?from=$FROM&to=$TO" | jq
+
+Expect: JSON with ok:true and the date window echoed back.
+This writes to lv_receipt, lv_line_item, lv_modifier.
+
+
+---
+
+3) Rebuild per-shift analytics cache (5 PM → 3 AM)
+
+> Recompute and persist the per-SKU/category rows the tablet UI uses.
+
+
+
+# Rebuild each day in the window (Bangkok shift 17:00 → 03:00)
+for d in $(seq -w 01 19); do
+  curl -s -X POST "/api/analysis/shift/rebuild?date=2025-10-$d" \
+  | jq -r '"✅ " + .shiftDate + " • " + (.items|length|tostring) + " items (" + .sourceUsed + ")"'
+done
+
+Expect: One “✅ … items (live)” line per day.
+
+
+---
+
+4) Sanity checks (required)
+
+# 4.1 Confirm line items exist
+psql "$DATABASE_URL" -c "SELECT COUNT(*) AS line_items FROM lv_line_item;"
+
+# 4.2 Confirm cache exists for a spot date (should be > 0 rows)
+psql "$DATABASE_URL" -c "SELECT COUNT(*) AS cached_items FROM analytics_shift_item WHERE shift_date='2025-10-19';"
+
+# 4.3 Confirm no UNKNOWN rows in UI payload (ideally 0)
+curl -s "/api/analysis/shift/items?date=2025-10-19" \
+| jq '[.items[] | select(.name=="UNKNOWN")] | length'
+
+
+---
+
+5) Tablet UI verification
+
+Open: Operations → Analysis → Shift Analytics (MM v1.0)
+
+Pick a date in the backfilled range → Load Shift
+
+You should see real SKU, Item, Category, Qty
+
+For burgers, you’ll also see Patties / Beef(g) / Chicken(g) / Rolls
+
+Badge will show Cached (expected after rebuild)
+
+
+
+---
+
+6) Nightly automation (keeps it up-to-date)
+
+> Run once per night at 03:05 Bangkok (after shift ends). Use Replit’s scheduler/cron.
+
+
+
+# Import yesterday's receipts then rebuild yesterday's shift
+curl -s -X POST "/api/loyverse/sync?from=$(date -d 'yesterday' +%F)&to=$(date -d 'yesterday' +%F)" >/dev/null
+curl -s -X POST "/api/analysis/shift/rebuild?date=$(date -d 'yesterday' +%F)" >/dev/null
+
+
+---
+
+7) Troubleshooting quick commands
+
+# Show raw aggregated SKUs/qty used by analytics for a day (useful if numbers look off)
+curl -s "/api/analysis/shift/raw?date=2025-10-19" | jq
+
+# List any items missing a catalog match (should be none if SKUs present)
+curl -s "/api/analysis/shift/raw?date=2025-10-19" \
+| jq '.rows[] | select(.sku==null or .name=="UNKNOWN")'
+
+# Re-run catalog import after catalog updates
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts && \
+curl -s -X POST "/api/analysis/shift/rebuild?date=2025-10-19" | jq '.shiftDate,.items|length'
+
+
+---
+
+Notes
+
+If UNKNOWN persists for specific lines, Loyverse likely emitted the line without a SKU. Share the exact item name and SKU; we’ll add a hard alias or fix the importer mapping.
+
+Some earlier uploaded CSVs may have expired from the workspace; that does not affect live API backfill.
+
+
+
+---
