@@ -1,0 +1,85 @@
+Meekong Mumba v1.0 — Catalog Import + Refresh (one pass)
+
+1) Import the SKU catalog
+
+Command (copy/paste):
+
+CATALOG_PATH="/mnt/data/Item and SKU List - Latest" \
+tsx server/scripts/catalog_import_from_file.ts
+
+Expected console end lines:
+
+Loaded <N> catalog rows from /mnt/data/Item and SKU List - Latest
+Catalog upserted: <N>
+
+2) Quick sanity checks (SQL)
+
+-- How many items in the catalog now?
+SELECT COUNT(*) AS catalog_count FROM item_catalog;
+
+-- Any burgers missing patties/grams (should be rare after importer)?
+SELECT sku,name,kind,patties_per,grams_per
+FROM item_catalog
+WHERE category='burger' AND ( (kind='beef' AND patties_per IS NULL) OR (kind='chicken' AND grams_per IS NULL) );
+
+-- What % of shift items still show up without a catalog match?
+-- (Before rebuild this might be higher; it should drop after step 3)
+SELECT COUNT(*) FILTER (WHERE sku IS NULL) AS no_sku,
+       COUNT(*) FILTER (WHERE sku IS NOT NULL) AS with_sku
+FROM lv_line_item;
+
+3) Rebuild the latest shifts (uses 5pm→3am window)
+
+Run for the dates you care about (example week):
+
+for d in 2025-10-15 2025-10-16 2025-10-17 2025-10-18 2025-10-19; do
+  curl -s -X POST "/api/analysis/shift/rebuild?date=$d" | jq -r '.shiftDate + " → " + (.items|length|tostring) + " items (" + .sourceUsed + ")"'
+done
+
+Expected: each line prints the shift date and item count with live.
+
+4) Verify UNKNOWN is gone (or near-zero)
+
+# Live raw for a spot check
+curl -s "/api/analysis/shift/raw?date=2025-10-19" | jq '.rows[] | select(.name=="UNKNOWN" or .sku==null)' | wc -l
+
+# From the cache (what the UI shows)
+curl -s "/api/analysis/shift/items?date=2025-10-19" | jq '.items[] | select(.name=="UNKNOWN")' | wc -l
+
+Both numbers should be 0 (or very close if Loyverse sent a truly SKU-less line).
+
+5) Refresh the UI
+
+Open Operations → Analysis → Shift Analytics (MM v1.0), pick the date, and hit Load Shift.
+
+You should see real SKU, Item, Category, Qty (and patties/meat/rolls for burgers).
+
+Status badge shows Cached (after first load). That’s fine.
+
+
+
+---
+
+Notes & guardrails
+
+If any row still shows UNKNOWN after this:
+
+That means the line item has no SKU from Loyverse. We can still force-map by name → SKU with a small “aliases” table, but normally receipts include SKUs. If you spot a specific item, send me its name+SKU and I’ll add a hard map.
+
+
+Modifiers will appear as soon as your catalog marks those SKUs as category=modifier. The importer already supports categories for sides/drinks/modifiers/bundles.
+
+Some of your older uploaded sales CSVs may have expired from the workspace; that doesn’t affect live API data, but if you want me to cross-validate against those CSVs again, just re-upload them and tell me which dates.
+
+
+
+---
+
+What you should see after this pass
+
+The tablet page shows real item names (no UNKNOWN), grouped by category.
+
+Burger counts match Loyverse “Items sold” for the 5pm→3am window.
+
+Export CSV gives an itemized shift list you can share or archive.
+
