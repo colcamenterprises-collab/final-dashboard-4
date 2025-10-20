@@ -12,12 +12,12 @@ export async function computeShift(dateISO: string) {
     name: string;
     qty: number;
   }[]>`
-    SELECT li.sku, COALESCE(c.name, li.name) AS name, SUM(li.qty)::int AS qty
-    FROM lv_line_item li
-    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
-    LEFT JOIN item_catalog c ON c.sku = li.sku
-    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
-    GROUP BY li.sku, COALESCE(c.name, li.name)
+    SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.quantity)::int AS qty
+    FROM receipt_items ri
+    JOIN receipts r ON r.id = ri."receiptId"
+    LEFT JOIN item_catalog c ON c.sku = ri.sku
+    WHERE r."createdAtUTC" >= ${fromISO}::timestamptz AND r."createdAtUTC" < ${toISO}::timestamptz
+    GROUP BY ri.sku, COALESCE(c.name, ri.name)
     ORDER BY name`;
 
   const catalog = await db.$queryRaw<{
