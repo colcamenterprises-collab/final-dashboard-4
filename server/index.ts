@@ -168,6 +168,12 @@ async function checkSchema() {
   const dailyStockRouter = (await import('./api/daily-stock')).default;
   app.use('/api/daily-stock', dailyStockRouter);
 
+  // Mount Meekong Mumba v1.0 routes
+  const loyverseV2Router = (await import('./routes/loyverseV2.js')).default;
+  const shiftAnalysisRouter = (await import('./routes/shiftAnalysis.js')).default;
+  app.use('/api', loyverseV2Router);
+  app.use('/api', shiftAnalysisRouter);
+
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {
       const { salesFormId } = req.params;
