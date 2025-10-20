@@ -1,22 +1,7 @@
 # Restaurant Management Dashboard
 
 ## Overview
-This comprehensive restaurant management dashboard streamlines operations with AI-powered analytics and real-time insights. It integrates with external POS systems, AI services, and provides automated sales analysis, inventory management, and marketing. The business vision is to enhance operational efficiency and profitability for restaurants by providing a centralized system for data-driven decision making.
-
-## Recent Changes (October 2025)
-- **Meekong Mumba v1.0 (Oct 20, 2025)**: COMPLETE NORMALIZED POS SYSTEM - Implemented normalized receipt architecture with lv_receipt, lv_line_item, lv_modifier tables replacing flat pos_receipt structure. Fixed shift window to correct 5 PM start time (17:00→03:00 Bangkok, not 6 PM). Created shiftWindow.ts shared utility for consistent shift calculations. Built loyverseImportV2 service with UPSERT logic preventing duplicates via unique index on receipt_id. Developed shiftItems.ts service supporting live calculation and caching in analytics_shift_item table. Added meat calculations (patties, red_meat_g, chicken_g, rolls) dynamically loaded from item_catalog. Created API routes (/api/loyverse/*, /api/shift-analysis/*) and test suite. System validated with Oct 19 data: 50 receipts, 54 burgers, 81 patties, 7,695g beef, 700g chicken. See MEEKONG_MUMBA_V1_SUMMARY.md for complete documentation.
-- **Catalog-Based Item System (Oct 19, 2025)**: DATABASE-DRIVEN SKU MANAGEMENT - Implemented dynamic item catalog system replacing hardcoded SKU maps. Created `item_catalog` table for flexible SKU management with CSV/XLSX import support. Burger metrics now load rules dynamically from database (13 burger SKUs seeded: 8 beef, 5 chicken). Added `analytics_shift_item` and `analytics_shift_category_summary` cache tables for per-item shift tracking. System validates with 48 burgers, 71 patties, 6,745g beef, 800g chicken on Oct 18. Catalog importer script supports master file updates without code changes.
-- **Golden Hour Patch (Oct 19, 2025)**: BURGER METRICS INFRASTRUCTURE - Fixed critical timestamp handling for Bangkok local time (naive timestamps, not UTC). Implemented dual-path metrics system with SKU-based counting (preferred, via pos_receipt) and name-based fuzzy matching fallback (legacy, via receipt_items). Created analytics cache tables, debug endpoints, validation scripts. Metrics validated with perfect live/cache parity.
-- **V3.2A Tablet-First Design System (Oct 15, 2025)**: COMPREHENSIVE STYLE GUIDE - Created DESIGN_STYLEGUIDE.md documenting tablet-first design approach with 12px font sizes for all inputs/placeholders, 8px border radius for tight corners, and touch-optimized interactions. Manager Quick Check modal and Stock Review system styling frozen. See DESIGN_STYLEGUIDE.md for complete specifications.
-- **V3.2A Stock Validation Fix (Oct 15, 2025)**: CRITICAL FIX - Replaced static drinks.json validation with dynamic foodCostings.ts import. Backend now validates all 13 drinks from database (Coke, Coke Zero, Fanta Orange, Fanta Strawberry, Schweppes Manow, Kids Juice Orange/Apple, Sprite, Singha Red/Pink/Yellow Soda, Soda Water, Bottled Water). Frontend and backend now use single source of truth. Validation correctly placed in PATCH /stock endpoint only.
-- **Manual Stock Review Ledger System**: Individual "Save Draft" buttons for each section (Rolls, Meat, Drinks) with date-based summary view showing last 30 days of saved entries. Backend UPSERT logic fixed for proper draft/submit workflow.
-- **TypeScript Ingredient System**: Migrated from CSV to TypeScript data format with enhanced fields (brand, packageSize, portionSize, lastReview). Database sync endpoint created for seamless updates. 70 ingredients now available.
-- **Balanced Badge System**: Added visual balance indicators (green/red badges) to Library table and email templates for instant cash reconciliation status visibility
-- **Daily Sales V2 Enhancements**: Implemented proper UUID generation, banking calculations with ±30 THB tolerance, and "Other Sales" terminology update (renamed from "Aroi Dee Sales")  
-- **Mobile & Tablet Optimization**: Completed comprehensive responsive testing with enhanced touch interactions, auto-calculations, and navigation behavior across all devices
-- **Email Template Enhancement**: Added colored HTML badges in daily reports for balanced/unbalanced status with bold green/red styling for management visibility
-- **Form Banking Logic**: Real-time balance checking with visual feedback during data entry, auto-calculated cash/QR banking fields with proper float handling
-- **Manager Checklist System (Fort Knox Locked)**: Implemented standalone manager checklist modal with database tables, API endpoints, and React component. System now locked under Cam approval.
+This project is a comprehensive restaurant management dashboard designed to streamline operations, enhance efficiency, and boost profitability through AI-powered analytics and real-time insights. It integrates with external POS systems and AI services to provide automated sales analysis, inventory management, and marketing tools. The core vision is to offer a centralized, data-driven platform for restaurant decision-making.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -25,7 +10,7 @@ Testing requirement: Always test changes in isolation before making additional m
 Documentation requirement: When creating comprehensive project documentation, include all operational details someone would need to rebuild the system from scratch.
 Agent execution policy: CRITICAL - Execute ONLY exact commands provided. NEVER add, remove, or modify features unless explicitly approved with 'Yes, implement [specific change]'. NEVER run database migrations, schema changes, or destructive operations unless specifically instructed. If unsure, ask for clarification. This policy is absolute and non-negotiable.
 **MANDATORY FULL WORKFLOW TESTING**: All changes, enhancements, and modifications MUST be tested through the complete frontend-to-backend workflow before being presented as fixed or solved. No claiming solutions work without conducting actual end-to-end testing. No shortcuts, no assumptions - verify the entire user flow works correctly before marking tasks complete.
-Form 1 → Form 2 Navigation: RESOLVED (Aug 17, 2025) - Fixed Form 1 submit bug with immediate navigation to Form 2. Backend returns consistent `{ ok: true, shiftId }` format, both `/api/daily-sales` and `/api/forms/daily-sales` endpoints work seamlessly with redirect, and success modal replaced with direct navigation for reliability.
+**Date Format Standard (Gradual Migration)**: App standard is DD/MM/YYYY for all displayed dates. Use utilities from `client/src/lib/format.ts`: `formatDateDDMMYYYY()` for dates, `formatDateTimeDDMMYYYY()` for datetime. HTML `<input type="date">` uses browser format but display converted DD/MM/YYYY alongside. New pages must use DD/MM/YYYY format; legacy pages will be migrated gradually.
 Testing requirement: All enhancements must at all times be tested prior to advising a job as completed. Testing includes UI, system files, front end, mobile and tablet responsiveness. All tests must be completed prior to release.
 Data integrity policy: NEVER use fake, mock, placeholder, or synthetic data. Always use authentic data from the database or authorized sources. Creating fake data for testing or demonstrations is strictly prohibited.
 Email automation requirement: Every completed daily shift form must automatically send email to management with PDF attachment.
@@ -45,47 +30,50 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **UI Framework**: shadcn/ui components built on Radix UI primitives.
 - **Styling**: Tailwind CSS with custom restaurant-specific design tokens.
 - **State Management**: TanStack Query (React Query) for server state.
-- **Routing**: React Router (migrated from Wouter) for modern navigation with clean sidebar layout.
+- **Routing**: React Router for modern navigation.
 - **Forms**: React Hook Form with Zod validation.
-- **UI/UX Decisions**: Consistent button styling, responsive design, rounded corners, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
+- **UI/UX Decisions**: Tablet-first design with 12px font sizes, 8px border radius, touch-optimized interactions, consistent button styling, responsive design, rounded corners, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js.
 - **Language**: TypeScript with ES modules.
 - **API Design**: RESTful API with centralized route handling and type-safe endpoints.
-- **Database**: PostgreSQL with Drizzle ORM for type-safe operations. Prisma ORM is also used for specific dual-form system interactions.
+- **Database**: PostgreSQL with Drizzle ORM (primary) and Prisma ORM (specific dual-form interactions).
 - **Session Management**: PostgreSQL-based sessions with connect-pg-simple.
-- **Shift Logic**: Handles 5 PM to 3 AM Bangkok timezone (Asia/Bangkok) shift window.
+- **Shift Logic**: Handles 5 PM to 3 AM Bangkok timezone shift window.
 
 ### Key Features
 - **Daily Shift Form**: Comprehensive form for sales, expenses, cash management, and inventory.
-- **AI-Powered Features**: Multi-agent system (Ollie, Sally, Marlo, Big Boss) leveraging GPT-4o for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
-- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling.
+- **AI-Powered Features**: Multi-agent system leveraging GPT-4o for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
+- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling, with normalized receipt architecture and dynamic catalog-based SKU management.
 - **Recipe Management**: System for ingredient portion selection, cost calculation, and PDF generation.
 - **Inventory Management**: Tracking supplier items, stock levels, and automated shopping list generation.
 - **Sales Heatmap**: Visual analytics for hourly sales patterns.
 - **Email Notifications**: Automated daily management reports.
 - **Form Management**: Soft delete, archived view, and robust validation.
-- **Database-Driven Ingredient System**: Dynamic ingredient management based on TypeScript data sync with enhanced fields and database integration.
+- **Database-Driven Ingredient System**: Dynamic ingredient management based on TypeScript data sync.
 - **Comprehensive Daily Forms System**: Dual-form system (/daily-sales, /daily-stock) with draft/submit status.
-- **POS Ingestion & Analytics System**: Backend modules for POS data ingestion, normalization, analytics (sales, top sellers, stock variance), AI summaries, and scheduled tasks.
+- **POS Ingestion & Analytics System**: Backend modules for POS data ingestion, normalization, analytics, AI summaries, and scheduled tasks.
 - **Production-Grade Security**: Multi-layer security with HTTP method blocking, ORM write protection, database-level constraints, read-only database user, security middleware, and safety script detection.
-- **Layout Integrity Protection**: Automated prebuild check (`scripts/deny-layout-hacks.js`) that prevents margin-left hacks from being reintroduced, ensuring clean flex-based layout architecture.
-- **Source-Based Expense Management**: System for categorizing expenses as direct or shift-related, with tabbed interfaces for separation.
+- **Layout Integrity Protection**: Automated prebuild check to prevent layout hacks.
+- **Source-Based Expense Management**: System for categorizing expenses as direct or shift-related.
 - **Data-Driven Dashboard**: Real-time analytics display showing snapshot data, purchases-aware variance, authentic payment data, and top-selling items.
-- **Purchases + Audit Fields System**: Full implementation with expense types and line items for comprehensive stock accountability and variance analysis.
-- **Restaurant Analytics & AI Summary System**: Integration with Loyverse POS for detailed analytics and automated daily operational reports.
-- **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual green/red badge indicators, and automated cash/QR banking calculations.
-- **Enhanced Email Reporting**: Daily management emails with colored balance status badges, comprehensive sales breakdowns, expense tracking, and shopping list generation.
+- **Purchases + Audit Fields System**: Implementation with expense types and line items for stock accountability.
+- **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual indicators, and automated calculations.
+- **Enhanced Email Reporting**: Daily management emails with colored balance status badges, sales breakdowns, expense tracking, and shopping list generation.
+- **Manager Checklist System**: Standalone modal with database, API, and React component for shift closing procedures.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
 - Restaurant, PosConnection, Receipt, ReceiptItem, ReceiptPayment, MenuItem, Expense, AnalyticsDaily, Job, PosSyncLog, IngestionError for POS, analytics, and job management.
-- **V2 Models Added (Aug 16, 2025)**: DailySalesV2, DailyStockV2, ShoppingPurchaseV2, WageEntryV2, OtherExpenseV2 - additive schema enhancement preserving all existing data.
+- DailySalesV2, DailyStockV2, ShoppingPurchaseV2, WageEntryV2, OtherExpenseV2 for enhanced data models.
+- Normalized POS tables: lv_receipt, lv_line_item, lv_modifier.
+- Item catalog and analytics cache tables: item_catalog, analytics_shift_item, analytics_shift_category_summary.
+- Manager checklist tables: cleaning_tasks, manager_checklists.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
 - **POS Integration**: Loyverse POS.
-- **Database Services**: Neon Database (Serverless PostgreSQL), Drizzle ORM, Prisma ORM.
+- **Database Services**: Neon Database (Serverless PostgreSQL).
 - **Email Service**: Gmail API.
 - **PDF Generation**: jsPDF.

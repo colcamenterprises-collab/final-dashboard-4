@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { formatDateDDMMYYYY, convertFromInputDate } from "@/lib/format";
 
 type ShiftItem = {
   sku: string | null;
@@ -128,7 +129,10 @@ export default function ShiftAnalyticsMM() {
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-xs text-slate-600 min-w-[60px]">Shift date:</label>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-600">Shift date:</label>
+          <span className="text-xs font-medium text-slate-900">{convertFromInputDate(date)}</span>
+        </div>
         <input
           type="date"
           value={date}
