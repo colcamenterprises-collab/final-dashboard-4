@@ -4477,5 +4477,43 @@ app.use("/api/bank-imports", bankUploadRouter);
     });
   });
 
+  // Shift Report Balance Review endpoint
+  app.get("/api/shift-reports/balance-review", async (req: Request, res: Response) => {
+    try {
+      const { loyverseShiftReports } = await import("../shared/schema");
+      const { format } = await import("date-fns");
+      
+      // Get last 5 authentic shift reports from Loyverse data
+      const recentShifts = await db
+        .select()
+        .from(loyverseShiftReports)
+        .orderBy(desc(loyverseShiftReports.shiftDate))
+        .limit(5);
+      
+      const balanceReports = recentShifts.map(shift => {
+        // Extract authentic cash difference from report_data JSON
+        const reportData = shift.reportData as any;
+        const cashDifference = parseFloat(reportData?.cash_difference?.toString() || '0');
+        const isWithinRange = Math.abs(cashDifference) <= 50;
+        
+        // Format date to show actual shift date
+        const shiftDate = shift.shiftDate ? new Date(shift.shiftDate) : new Date();
+        const formattedDate = format(shiftDate, 'dd/MM/yyyy');
+        
+        return {
+          date: formattedDate,
+          balance: cashDifference,
+          status: isWithinRange ? "Balanced" : "Attention",
+          isWithinRange
+        };
+      });
+      
+      res.json(balanceReports);
+    } catch (err) {
+      console.error("Error fetching shift balance review:", err);
+      res.status(500).json({ error: "Failed to fetch shift balance review" });
+    }
+  });
+
   return server;
 }
