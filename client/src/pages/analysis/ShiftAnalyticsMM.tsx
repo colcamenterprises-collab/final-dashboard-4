@@ -64,7 +64,7 @@ export default function ShiftAnalyticsMM() {
     setError("");
     setLoading(true);
     try {
-      const res: ShiftResp = await fetchJSON(`/api/shift-analysis/${date}`);
+      const res: ShiftResp = await fetchJSON(`/api/analysis/shift/items?date=${date}`);
       const used = ("sourceUsed" in res ? res.sourceUsed : "cache") as "live" | "cache";
       setSourceUsed(used);
       if ("shiftDate" in res) {
@@ -80,35 +80,6 @@ export default function ShiftAnalyticsMM() {
       setError(e.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function rebuildShift() {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetchJSON(`/api/shift-analysis/${date}/compute`, { method: "POST" });
-      setSourceUsed("live");
-      setFromISO(res.fromISO);
-      setToISO(res.toISO);
-      setItems(res.items || []);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function showRaw() {
-    try {
-      const res = await fetchJSON(`/api/loyverse/items/${date}`);
-      alert(
-        `Raw line items (${res.length} total):\n\n` +
-          res.slice(0, 20).map((r: any) => `${r.sku ?? "no-sku"}\t${r.name}\t${r.quantity}`).join("\n") +
-          (res.length > 20 ? `\n\n... and ${res.length - 20} more` : "")
-      );
-    } catch (e: any) {
-      alert(`Raw fetch failed: ${e.message}`);
     }
   }
 
