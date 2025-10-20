@@ -12,6 +12,7 @@ import { validateDailySalesForm } from "./middleware/validateDailySalesForm";
 import loyverseEnhancedRoutes from "./routes/loyverseEnhanced";
 import analyticsRoutes from "./routes/analytics";
 import analysisShift from "./routes/analysisShift";
+import shiftAnalysis from "./routes/shiftAnalysis";
 // CSV export disabled - daily_shift_summary table does not exist
 // import analysisDailySales from "./routes/analysisDailySales";
 import posLive from "./routes/posLive";
@@ -3354,6 +3355,9 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
+  
+  // Register shift analysis routes (Mekong Mamba 1.0)
+  app.use('/api', shiftAnalysis);
   
   // Register Daily Sales Library routes
   app.use('/api/daily-sales', dailySalesLibrary);
