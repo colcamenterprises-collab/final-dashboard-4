@@ -139,88 +139,110 @@ export default function ShiftAnalyticsMM() {
   }, [items, tab]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Shift Analytics (MM v1.0)</h1>
-        <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-sm">
-          Window: 17:00 → 03:00 (Asia/Bangkok)
-        </span>
-        {sourceUsed && (
-          <span className={`px-2 py-1 rounded text-sm ${sourceUsed === "live" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-            Source: {sourceUsed.toUpperCase()}
+    <div className="p-4 space-y-4 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-base font-semibold">Shift Analytics</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs">
+            Window: 5 PM → 3 AM (Bangkok)
           </span>
-        )}
+          {sourceUsed && (
+            <span className={`px-2 py-1 rounded-lg text-xs ${sourceUsed === "live" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+              {sourceUsed === "live" ? "Live Data" : "Cached"}
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-slate-600">Shift date:</label>
+        <label className="text-xs text-slate-600 min-w-[60px]">Shift date:</label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border rounded px-2 py-1"
+          className="border rounded-lg px-3 py-2 text-xs min-h-[44px] min-w-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          data-testid="input-shift-date"
         />
-        <button onClick={loadShift} disabled={loading} className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-          {loading ? "Loading…" : "Load shift"}
+        <button 
+          onClick={loadShift} 
+          disabled={loading} 
+          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
+          data-testid="button-load-shift"
+        >
+          {loading ? "Loading…" : "Load Shift"}
         </button>
-        <button onClick={rebuildShift} disabled={loading} className="px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
-          Rebuild cache
-        </button>
-        <button onClick={showRaw} className="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300">
-          Raw items
-        </button>
-        <button onClick={exportCSV} className="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300">
+        <button 
+          onClick={exportCSV} 
+          className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-300 min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
+          data-testid="button-export-csv"
+        >
           Export CSV
         </button>
-        {(fromISO && toISO) ? (
-          <span className="text-sm text-slate-500">[{fromISO} → {toISO}]</span>
-        ) : null}
       </div>
 
-      <div className="flex gap-2">
+      {/* Category Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
         {CATS.map((c) => (
           <button
             key={c}
             onClick={() => setTab(c)}
-            className={`px-3 py-1 rounded border ${tab === c ? "bg-slate-900 text-white" : "bg-white hover:bg-slate-50"}`}
+            className={`px-4 py-2 rounded-lg border text-xs font-medium whitespace-nowrap min-h-[44px] min-w-[44px] active:scale-95 transition-all ${
+              tab === c 
+                ? "bg-slate-900 text-white border-slate-900" 
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+            data-testid={`tab-${c}`}
           >
             {c.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {error && <div className="text-red-600">{error}</div>}
+      {error && (
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+          {error}
+        </div>
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+      {/* Table */}
+      <div className="overflow-x-auto -mx-4 px-4">
+        <table className="min-w-full text-xs">
           <thead>
-            <tr className="border-b">
-              <th className="text-left p-2">SKU</th>
-              <th className="text-left p-2">Item</th>
-              <th className="text-left p-2">Category</th>
-              <th className="text-right p-2">Qty</th>
-              <th className="text-right p-2">Patties</th>
-              <th className="text-right p-2">Red Meat (g)</th>
-              <th className="text-right p-2">Chicken (g)</th>
-              <th className="text-right p-2">Rolls</th>
+            <tr className="border-b-2 border-slate-200">
+              <th className="text-left p-3 font-semibold text-slate-700">SKU</th>
+              <th className="text-left p-3 font-semibold text-slate-700">Item</th>
+              <th className="text-left p-3 font-semibold text-slate-700">Category</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Qty</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Patties</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Beef (g)</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Chicken (g)</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Rolls</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((it, idx) => (
-              <tr key={idx} className="border-b hover:bg-slate-50">
-                <td className="p-2 font-mono">{it.sku ?? ""}</td>
-                <td className="p-2">{it.name}</td>
-                <td className="p-2">{it.category}</td>
-                <td className="p-2 text-right">{fmt(it.qty)}</td>
-                <td className="p-2 text-right">{fmt(it.patties ?? 0)}</td>
-                <td className="p-2 text-right">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
-                <td className="p-2 text-right">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
-                <td className="p-2 text-right">{fmt(it.rolls ?? 0)}</td>
+              <tr 
+                key={idx} 
+                className="border-b border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                data-testid={`row-item-${idx}`}
+              >
+                <td className="p-3 font-mono text-slate-600">{it.sku ?? "—"}</td>
+                <td className="p-3 text-slate-900">{it.name}</td>
+                <td className="p-3 text-slate-600 capitalize">{it.category}</td>
+                <td className="p-3 text-right font-semibold text-slate-900">{fmt(it.qty)}</td>
+                <td className="p-3 text-right text-slate-700">{fmt(it.patties ?? 0)}</td>
+                <td className="p-3 text-right text-slate-700">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
+                <td className="p-3 text-right text-slate-700">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
+                <td className="p-3 text-right text-slate-700">{fmt(it.rolls ?? 0)}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-slate-500">No items for this shift.</td>
+                <td colSpan={8} className="p-8 text-center text-slate-500 text-xs">
+                  No items for this shift. Select a date and click "Load Shift".
+                </td>
               </tr>
             )}
           </tbody>
