@@ -27,5 +27,29 @@
     "serviceFee": 0,
     "total": 340,
     "currency": "THB"
+  },
+  {
+    "id": "ORD_EYSRRUIR",
+    "createdAt": "2025-10-20T11:35:26.835Z",
+    "status": "RECEIVED",
+    "customer": {
+      "name": "",
+      "phone": "",
+      "notes": ""
+    },
+    "scheduledAt": null,
+    "items": [
+      {
+        "id": "coke_zero",
+        "name": "Coke Zero",
+        "unitPrice": 30,
+        "qty": 1,
+        "categoryId": "drinks"
+      }
+    ],
+    "subtotal": 30,
+    "serviceFee": 0,
+    "total": 30,
+    "currency": "THB"
   }
 ]
