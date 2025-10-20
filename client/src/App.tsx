@@ -39,6 +39,7 @@ import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
+import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -81,6 +82,7 @@ export default function App() {
                     <Route path="loyverse" element={<LoyverseReports />} />
                     <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
+                    <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
                   </Route>
                   
                   {/* Legacy analysis routes */}
@@ -90,7 +92,9 @@ export default function App() {
                   {/* Legacy direct routes */}
                   <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
                   <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
-                  <Route path={ROUTES.RECEIPTS_BURGERS} element={<Guard><ReceiptsBurgerCounts /></Guard>} />
+                  {/* Redirect old burger counts to new MM v1.0 page */}
+                  <Route path={ROUTES.RECEIPTS_BURGERS} element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
+                  <Route path="/receipts-burger-counts" element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
                   <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
