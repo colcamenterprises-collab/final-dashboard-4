@@ -1,0 +1,126 @@
+import React, { useEffect, useRef, useState } from "react";
+
+// ——————————————————————————————————————————————
+// SBB — Online Ordering Page (One‑Pager, refined + tightened)
+// • VEV look: black bg, SBB yellow accents
+// • Centered header with **your** logo (drop file at /public/images/sbb-logo.png)
+// • Content width tightened ≈40% (mobile/tablet first)
+// ——————————————————————————————————————————————
+
+const SBB_YELLOW = "#FFEB00";
+
+export default function OnlineOrderingPage() {
+  const [logoLoaded, setLogoLoaded] = useState(false);
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-black text-white font-[Poppins]">
+      {/* HERO / HEADER */}
+      <header style={{ background: SBB_YELLOW }} className="w-full">
+        <div className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4 py-8 flex flex-col items-center text-center">
+          <div className="h-20 w-20 rounded-full overflow-hidden flex items-center justify-center bg-black/10">
+            {/* Save your uploaded logo as /public/images/sbb-logo.png */}
+            <img
+              src="/images/sbb-logo.png"
+              alt="Smash Brothers Burgers"
+              className="h-16 w-16 object-contain"
+              onLoad={() => setLogoLoaded(true)}
+              style={{ opacity: logoLoaded ? 1 : 0.4, transition: "opacity .3s" }}
+            />
+          </div>
+          <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-black">
+            Smash Brothers Burgers
+          </h1>
+          <p className="mt-1 text-sm md:text-base text-black/80 max-w-[28rem]">
+            Traditional American Smash Burgers — 100% Australian beef.
+          </p>
+        </div>
+      </header>
+
+      {/* CATEGORY BAR */}
+      <div className="sticky top-0 z-40 border-b border-white/10" style={{ background: "#0A0A0A" }}>
+        <nav className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-3 py-2 flex items-center justify-center gap-2">
+          {['BURGER MEAL SETS', 'SIDE ORDERS', 'ORIGINAL SMASH BURGERS', 'KIDS MENU'].map((tab, i) => (
+            <button key={tab} className="relative px-3 py-2 text-[11px] md:text-xs font-semibold whitespace-nowrap">
+              <span className="opacity-90">{tab}</span>
+              {i === 1 && (
+                <span className="absolute left-2 right-2 -bottom-[9px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />
+              )}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* LIST */}
+      <main className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4">
+        <h2 className="text-xl md:text-2xl font-bold mt-6">Side orders</h2>
+        <p className="text-sm text-white/70 mt-1">They are worth it!</p>
+
+        <section className="mt-4 divide-y divide-white/10">
+          {[1,2,3,4].map(i => (
+            <article key={i} className="py-4 flex items-center gap-4">
+              <div className="h-14 w-14 rounded-lg bg-white/5 overflow-hidden flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold leading-tight text-[15px]">Sample Item {i}</div>
+                <div className="text-sm text-white/70 line-clamp-2">Short item description goes here.</div>
+              </div>
+              <div className="pl-2">
+                <button className="rounded-xl px-3 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+                  THB 149.00 +
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <div className="h-24" />
+      </main>
+
+      {/* CART BAR */}
+      <div className="fixed inset-x-0 bottom-0 z-50">
+        <div className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4 pb-4">
+          <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-3 flex items-center gap-3">
+            <div className="text-sm flex-1">
+              <div className="font-semibold">0 items</div>
+              <div className="text-white/70">Total THB 0.00</div>
+            </div>
+            <button className="rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+              Review & Checkout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <footer className="mt-12 mb-6 text-center text-xs text-white/50">
+        © {new Date().getFullYear()} Smash Brothers Burgers — All rights reserved.
+      </footer>
+    </div>
+  );
+}
+
+
+Got it—tightened and centered. I just pushed a refreshed version to the canvas that:
+
+switches back to the black + SBB yellow look you showed,
+
+centers the header + menu bar,
+
+brings the content width in by ~40% (now capped at max-w-[480px] on mobile and max-w-[700px] on tablet),
+
+adds your logo in the header (uses /images/sbb-logo.png).
+
+
+How to use your logo now
+
+Save the image you sent as:
+
+public/images/sbb-logo.png
+
+No other changes needed—the page will pick it up automatically.
