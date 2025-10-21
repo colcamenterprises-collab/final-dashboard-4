@@ -41,22 +41,22 @@ function BalanceHero() {
         {/* Quick Actions */}
         <div className="flex gap-3">
           <Link href="/expenses">
-            <button className="bg-white/15 hover:bg-white/25 text-white border border-white/20 rounded-lg px-4 py-2 flex items-center gap-2 transition-colors">
-              <Plus className="h-4 w-4" />
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <Plus className="h-4 w-4 mr-2" />
               Add Expense
-            </button>
+            </ModernButton>
           </Link>
           <Link href="/daily-sales">
-            <button className="bg-white/15 hover:bg-white/25 text-white border border-white/20 rounded-lg px-4 py-2 flex items-center gap-2 transition-colors">
-              <FileText className="h-4 w-4" />
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <FileText className="h-4 w-4 mr-2" />
               Daily Sales & Stock
-            </button>
+            </ModernButton>
           </Link>
           <a href="/ordering" target="_blank" rel="noopener noreferrer">
-            <button className="bg-white/15 hover:bg-white/25 text-white border border-white/20 rounded-lg px-4 py-2 flex items-center gap-2 transition-colors">
-              <Globe className="h-4 w-4" />
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <Globe className="h-4 w-4 mr-2" />
               Online Orders
-            </button>
+            </ModernButton>
           </a>
         </div>
       </div>

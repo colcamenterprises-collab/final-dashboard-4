@@ -30,32 +30,39 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// GET /api/finance/summary/today - Current Month Sales from POS
+// GET /api/finance/summary/today - Current Month Sales from Verified Shift Reports
 // Public endpoint - no auth required for dashboard display
 router.get('/summary/today', async (req: Request, res: Response) => {
   try {
     // Get current month date range
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
     
-    // Get actual sales from lv_receipt table for current month
+    // Get verified sales from loyverse_shifts table for current month
+    // Extract net_sales from each shift in the jsonb data array
     const { rows } = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0) as total_sales,
-        COUNT(*) as receipt_count
-      FROM lv_receipt
-      WHERE created_at >= ${startOfMonth.toISOString()}
-        AND created_at <= ${endOfMonth.toISOString()}
+        COALESCE(
+          SUM(
+            (shift_data->>'net_sales')::decimal
+          ), 0
+        ) as total_sales,
+        COUNT(*) as shift_count
+      FROM loyverse_shifts,
+      jsonb_array_elements(data->'shifts') as shift_data
+      WHERE EXTRACT(YEAR FROM shift_date) = ${year}
+        AND EXTRACT(MONTH FROM shift_date) = ${month}
+        AND jsonb_array_length(data->'shifts') > 0
     `);
     
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');
-    const receiptCount = parseInt(rows[0]?.receipt_count || '0');
+    const shiftCount = parseInt(rows[0]?.shift_count || '0');
     
     res.json({
       sales: currentMonthSales,
       currentMonthSales,
-      receiptCount,
+      shiftCount,
       month: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
       netProfit: currentMonthSales,
       timestamp: new Date().toISOString()
