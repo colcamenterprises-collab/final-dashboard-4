@@ -23,6 +23,9 @@ function BalanceHero() {
     queryKey: ['/api/finance/summary/today'],
   });
 
+  const currentMonthSales = (financeSummary as any)?.currentMonthSales || 0;
+  const month = (financeSummary as any)?.month || '';
+
   return (
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-white shadow-xl">
       {/* Background decoration */}
@@ -30,9 +33,9 @@ function BalanceHero() {
       <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
       
       <div className="relative">
-        <p className="text-emerald-100 text-sm font-medium mb-2">Total Balance</p>
+        <p className="text-emerald-100 text-sm font-medium mb-2">Current Month Sales {month && `(${month})`}</p>
         <h1 className="text-4xl font-bold mb-8">
-          ฿{(financeSummary as any)?.netProfit?.toLocaleString() || "0"}
+          ฿{currentMonthSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h1>
         
         {/* Quick Actions */}
