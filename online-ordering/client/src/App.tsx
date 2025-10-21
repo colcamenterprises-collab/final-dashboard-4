@@ -117,30 +117,28 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-white font-[Poppins]">
-      {/* HERO / HEADER */}
-      <header style={{ background: SBB_YELLOW }} className="w-full">
-        <div className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4 py-8 flex flex-col items-center text-center">
-          <div className="h-20 w-20 rounded-full overflow-hidden flex items-center justify-center bg-black/10">
-            <img
-              src="/images/sbb-logo.png"
-              alt="Smash Brothers Burgers"
-              className="h-16 w-16 object-contain"
-              onLoad={() => setLogoLoaded(true)}
-              style={{ opacity: logoLoaded ? 1 : 0.4, transition: "opacity .3s" }}
-            />
+      {/* HEADER */}
+      <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+        <div className="flex flex-col items-start">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+              <img
+                src="/images/sbb-logo.png"
+                alt="SBB"
+                className="h-8 w-8 object-contain"
+                onLoad={() => setLogoLoaded(true)}
+                style={{ opacity: logoLoaded ? 1 : 0.4, transition: "opacity .3s" }}
+              />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Smash Brothers Burgers (Rawai)</h1>
           </div>
-          <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-black">
-            Smash Brothers Burgers
-          </h1>
-          <p className="mt-1 text-sm md:text-base text-black/80 max-w-[28rem]">
-            Traditional American Smash Burgers — 100% Australian beef.
-          </p>
+          <p className="mt-2 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>
         </div>
-      </header>
+      </div>
 
       {/* CATEGORY BAR */}
       <div className="sticky top-0 z-40 border-b border-white/10" style={{ background: "#0A0A0A" }}>
-        <nav className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-3 py-2 flex items-center justify-start gap-2 overflow-x-auto">
+        <nav className="mx-auto w-full max-w-[700px] px-3 py-2 flex items-center justify-start gap-2 overflow-x-auto">
           {menu.categories.map((cat) => (
             <button
               key={cat.id}
@@ -159,7 +157,7 @@ export default function App() {
       </div>
 
       {/* SECTIONS */}
-      <main className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4">
+      <main className="mx-auto w-full max-w-[700px] px-4">
         {menu.categories.map(c => (
           <section
             key={c.id}
@@ -204,7 +202,7 @@ export default function App() {
 
       {/* CART BAR */}
       <div className="fixed inset-x-0 bottom-0 z-50">
-        <div className="mx-auto w-full max-w-[480px] md:max-w-[700px] px-4 pb-4">
+        <div className="mx-auto w-full max-w-[900px] px-3 pb-4">
           <div className="rounded-2xl border border-white/10 bg-black/80 backdrop-blur p-3 flex items-center gap-3">
             <div className="text-sm flex-1">
               <div className="font-semibold">{cartCount} items</div>
