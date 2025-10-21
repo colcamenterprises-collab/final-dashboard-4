@@ -12,7 +12,7 @@ export async function computeShift(dateISO: string) {
     name: string;
     qty: number;
   }[]>`
-    SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.quantity)::int AS qty
+    SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.qty)::int AS qty
     FROM receipt_items ri
     JOIN receipts r ON r.id = ri."receiptId"
     LEFT JOIN item_catalog c ON c.sku = ri.sku

@@ -54,7 +54,7 @@ router.get("/analysis/shift/raw", async (req, res) => {
     const { date } = req.query as { date: string };
     const { fromISO, toISO } = shiftWindow(date);
     const rows = await db.$queryRaw<any[]>`
-      SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.quantity)::int AS qty
+      SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.qty)::int AS qty
       FROM receipt_items ri
       JOIN receipts r ON r.id = ri."receiptId"
       LEFT JOIN item_catalog c ON c.sku = ri.sku
