@@ -150,12 +150,12 @@ function CashBalanceSnapshot() {
     });
   }, []);
 
-  if (loading) return <div className="bg-white rounded-2xl p-6 shadow-sm border text-gray-500">Loading balances...</div>;
+  if (loading) return <div className="w-1/3 bg-white rounded-2xl p-6 shadow-sm border text-gray-500">Loading balances...</div>;
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border">
+    <div className="w-1/3 bg-white rounded-2xl p-6 shadow-sm border">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Shift Summary</h2>
-      <div className="max-w-md">
+      <div>
         {posBalances.length > 0 ? (
           posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
         ) : (
