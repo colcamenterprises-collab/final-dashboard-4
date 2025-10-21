@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -19,6 +19,7 @@ import {
 
 // Balance Hero Component
 function BalanceHero() {
+  const [, setLocation] = useLocation();
   const { data: financeSummary } = useQuery({
     queryKey: ['/api/finance/summary/today'],
   });
@@ -40,24 +41,27 @@ function BalanceHero() {
         
         {/* Quick Actions */}
         <div className="flex gap-3">
-          <Link href="/expenses">
-            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
-            </ModernButton>
-          </Link>
-          <Link href="/daily-sales">
-            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-              <FileText className="h-4 w-4 mr-2" />
-              Daily Sales & Stock
-            </ModernButton>
-          </Link>
-          <a href="/ordering" target="_blank" rel="noopener noreferrer">
-            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-              <Globe className="h-4 w-4 mr-2" />
-              Online Orders
-            </ModernButton>
-          </a>
+          <ModernButton 
+            onClick={() => setLocation('/expenses')}
+            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Expense
+          </ModernButton>
+          <ModernButton 
+            onClick={() => setLocation('/daily-sales')}
+            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Daily Sales & Stock
+          </ModernButton>
+          <ModernButton 
+            onClick={() => window.open('/ordering', '_blank')}
+            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            Online Orders
+          </ModernButton>
         </div>
       </div>
     </div>
