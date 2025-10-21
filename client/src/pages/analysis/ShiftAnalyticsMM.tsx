@@ -110,6 +110,15 @@ export default function ShiftAnalyticsMM() {
     return items.filter((x) => x.category === tab);
   }, [items, tab]);
 
+  const totals = useMemo(() => {
+    const totalQty = filtered.reduce((sum, it) => sum + (it.qty || 0), 0);
+    const totalPatties = filtered.reduce((sum, it) => sum + (it.patties || 0), 0);
+    const totalBeef = filtered.reduce((sum, it) => sum + getMeat(it, "red_meat_g", "redMeatGrams"), 0);
+    const totalChicken = filtered.reduce((sum, it) => sum + getMeat(it, "chicken_g", "chickenGrams"), 0);
+    const totalRolls = filtered.reduce((sum, it) => sum + (it.rolls || 0), 0);
+    return { totalQty, totalPatties, totalBeef, totalChicken, totalRolls };
+  }, [filtered]);
+
   return (
     <div className="p-2 sm:p-4 space-y-3 sm:space-y-4 max-w-7xl mx-auto">
       {/* Header */}
@@ -181,51 +190,59 @@ export default function ShiftAnalyticsMM() {
         </div>
       )}
 
-      {/* Table - Mobile Optimized */}
-      <div className="w-full overflow-x-auto -mx-2 sm:mx-0">
-        <div className="inline-block min-w-full align-middle">
-          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-            <table className="min-w-full divide-y divide-slate-200 text-xs">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="hidden sm:table-cell px-2 py-2 sm:px-3 sm:py-3 text-left font-semibold text-slate-700">SKU</th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-left font-semibold text-slate-700 sticky left-0 bg-slate-50 z-10">Item</th>
-                  <th className="hidden md:table-cell px-2 py-2 sm:px-3 sm:py-3 text-left font-semibold text-slate-700">Category</th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-700">Qty</th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-700">Patties</th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-700 whitespace-nowrap">Beef<span className="hidden sm:inline"> (g)</span></th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-700 whitespace-nowrap">Chicken<span className="hidden sm:inline"> (g)</span></th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-700">Rolls</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-100">
-                {filtered.map((it, idx) => (
-                  <tr 
-                    key={idx} 
-                    className="hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                    data-testid={`row-item-${idx}`}
-                  >
-                    <td className="hidden sm:table-cell px-2 py-2 sm:px-3 sm:py-3 font-mono text-slate-600 text-[10px] sm:text-xs">{it.sku ?? "—"}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-slate-900 sticky left-0 bg-white z-10 shadow-sm max-w-[120px] sm:max-w-none truncate">{it.name}</td>
-                    <td className="hidden md:table-cell px-2 py-2 sm:px-3 sm:py-3 text-slate-600 capitalize">{it.category}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-right font-semibold text-slate-900">{fmt(it.qty)}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-right text-slate-700">{fmt(it.patties ?? 0)}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-right text-slate-700">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-right text-slate-700">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-3 text-right text-slate-700">{fmt(it.rolls ?? 0)}</td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-2 py-6 sm:px-3 sm:py-8 text-center text-slate-500 text-xs">
-                      No items for this shift. Select a date and click "Load Shift".
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* Table - Scrollable */}
+      <div className="w-full overflow-x-auto bg-white">
+        <table className="min-w-full border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-slate-300">
+              <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">SKU</th>
+              <th className="px-2 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">Item</th>
+              <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">Category</th>
+              <th className="px-2 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">Qty</th>
+              <th className="px-2 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">Patties</th>
+              <th className="px-2 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">Beef (g)</th>
+              <th className="px-2 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">Chicken (g)</th>
+              <th className="px-2 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">Rolls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((it, idx) => (
+              <tr 
+                key={idx} 
+                className="border-b border-slate-200 hover:bg-slate-50"
+                data-testid={`row-item-${idx}`}
+              >
+                <td className="hidden sm:table-cell px-2 py-2 font-mono text-slate-600 text-[10px] sm:text-xs whitespace-nowrap">{it.sku ?? "—"}</td>
+                <td className="px-2 py-2 text-slate-900 whitespace-nowrap">{it.name}</td>
+                <td className="hidden md:table-cell px-2 py-2 text-slate-600 capitalize whitespace-nowrap">{it.category}</td>
+                <td className="px-2 py-2 text-right font-semibold text-slate-900 whitespace-nowrap">{fmt(it.qty)}</td>
+                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.patties ?? 0)}</td>
+                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
+                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
+                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.rolls ?? 0)}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-2 py-8 text-center text-slate-500 text-xs">
+                  No items for this shift. Select a date and click "Load Shift".
+                </td>
+              </tr>
+            )}
+            {filtered.length > 0 && (
+              <tr className="border-t-2 border-slate-400 bg-slate-100 font-semibold">
+                <td className="hidden sm:table-cell px-2 py-2 text-slate-900 whitespace-nowrap">TOTALS</td>
+                <td className="px-2 py-2 text-slate-900 whitespace-nowrap">TOTALS</td>
+                <td className="hidden md:table-cell px-2 py-2"></td>
+                <td className="px-2 py-2 text-right text-slate-900 whitespace-nowrap">{fmt(totals.totalQty)}</td>
+                <td className="px-2 py-2 text-right text-slate-900 whitespace-nowrap">{fmt(totals.totalPatties)}</td>
+                <td className="px-2 py-2 text-right text-slate-900 whitespace-nowrap">{fmt(totals.totalBeef)}</td>
+                <td className="px-2 py-2 text-right text-slate-900 whitespace-nowrap">{fmt(totals.totalChicken)}</td>
+                <td className="px-2 py-2 text-right text-slate-900 whitespace-nowrap">{fmt(totals.totalRolls)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
