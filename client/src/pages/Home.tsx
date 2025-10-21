@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -12,8 +13,8 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownLeft,
-  Send,
-  Wallet
+  FileText,
+  Globe
 } from "lucide-react";
 
 // Balance Hero Component
@@ -36,18 +37,24 @@ function BalanceHero() {
         
         {/* Quick Actions */}
         <div className="flex gap-3">
-          <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-            <Plus className="h-4 w-4 mr-2" />
-            Add
-          </ModernButton>
-          <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-            <Send className="h-4 w-4 mr-2" />
-            Transfer
-          </ModernButton>
-          <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
-            <Wallet className="h-4 w-4 mr-2" />
-            Pay
-          </ModernButton>
+          <Link href="/expenses">
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Expense
+            </ModernButton>
+          </Link>
+          <Link href="/daily-sales">
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <FileText className="h-4 w-4 mr-2" />
+              Daily Sales & Stock
+            </ModernButton>
+          </Link>
+          <Link href="/ordering" target="_blank">
+            <ModernButton className="bg-white/15 hover:bg-white/25 text-white border-white/20">
+              <Globe className="h-4 w-4 mr-2" />
+              Online Orders
+            </ModernButton>
+          </Link>
         </div>
       </div>
     </div>
