@@ -1,0 +1,345 @@
+Meekong Mumba v1.0 — SKU Reconciliation Patch (One & Done)
+
+> Paste this whole message to the Replit agent.
+
+
+
+0) Scope (what this changes)
+
+Enforce SKU-only analytics (no fuzzy names).
+
+Add item_alias table for rare name-only lines → resolves to SKU.
+
+Ensure shift window is 17:00 → 03:00 Asia/Bangkok everywhere.
+
+De-dupe by (receipt_id,line_no) — no double counting.
+
+Rebuild and verify 2025-10-20 against provided POS CSV.
+
+
+
+---
+
+1) Migration — small, additive
+
+Create file: server/migrations/2025-10-21_mm_sku_recon.sql
+
+-- 1) Alias table: map name-only lines to a SKU (manual safety net)
+CREATE TABLE IF NOT EXISTS item_alias (
+  alias_name text PRIMARY KEY,          -- exact match on line-item name from Loyverse
+  sku        text NOT NULL REFERENCES item_catalog(sku) ON UPDATE CASCADE
+);
+
+-- 2) Helpful indexes for normalized tables (if not already present)
+CREATE INDEX IF NOT EXISTS ix_lv_receipt_datetime ON lv_receipt(datetime_bkk);
+CREATE INDEX IF NOT EXISTS ix_lv_line_item_receipt  ON lv_line_item(receipt_id);
+CREATE INDEX IF NOT EXISTS ix_lv_line_item_sku      ON lv_line_item(sku);
+
+-- 3) Reaffirm PK/uniqueness to prevent duplicate lines
+-- lv_line_item already has PRIMARY KEY (receipt_id, line_no)
+-- lv_receipt already has PRIMARY KEY (receipt_id)
+
+-- 4) Guard analytics cache uniqueness (already set, but ensure present)
+-- UNIQUE (shift_date, COALESCE(sku, name)) exists on analytics_shift_item
+
+Run:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-21_mm_sku_recon.sql
+
+
+---
+
+2) Shared shift window (ensure 5pm→3am BKK everywhere)
+
+File: server/services/time/shiftWindow.ts
+(If it already exists, keep as-is; this is the canonical version.)
+
+import { DateTime } from "luxon";
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: "Asia/Bangkok" }).startOf("day");
+  const from = base.plus({ hours: 17 });          // 17:00 (5pm) BKK
+  const to   = base.plus({ days: 1, hours: 3 });  // 03:00 next day
+  return { shiftDate: base.toISODate()!, fromISO: from.toISO()!, toISO: to.toISO()! };
+}
+
+Make sure all shift routes/services import and use this util.
+
+
+---
+
+3) Analytics service — SKU-first + alias fallback
+
+Edit: server/services/shiftItems.ts — replace the live compute with this logic (or patch in the changed WHERE/JOIN parts).
+
+import { PrismaClient } from '@prisma/client';
+import { shiftWindow } from './time/shiftWindow';
+const db = new PrismaClient();
+const BEEF_G = 95;
+
+export async function computeShift(dateISO: string) {
+  const { shiftDate, fromISO, toISO } = shiftWindow(dateISO);
+
+  // 1) Pull rows: use SKU directly; if missing, try alias map to resolve a SKU.
+  //    The alias join ensures name-only lines can still map to a SKU.
+  const rows = await db.$queryRaw<{
+    sku: string|null; name: string; qty: number;
+  }[]>`
+    WITH base AS (
+      SELECT li.sku, li.name, SUM(li.qty)::int AS qty
+      FROM lv_line_item li
+      JOIN lv_receipt r ON r.receipt_id = li.receipt_id
+      WHERE r.datetime_bkk >= ${fromISO}::timestamptz
+        AND r.datetime_bkk <  ${toISO}::timestamptz
+      GROUP BY li.sku, li.name
+    )
+    SELECT COALESCE(base.sku, ia.sku) AS sku,
+           base.name,
+           base.qty
+    FROM base
+    LEFT JOIN item_alias ia ON base.sku IS NULL AND ia.alias_name = base.name
+  `;
+
+  // 2) Load catalog once (active items only)
+  const catalog = await db.$queryRaw<{
+    sku:string; name:string; category:string; kind:string|null; patties_per:number|null; grams_per:number|null; rolls_per:number;
+  }[]>`SELECT sku, name, category, kind, patties_per, grams_per, rolls_per
+       FROM item_catalog
+       WHERE active = true`;
+
+  const bySku = new Map(catalog.map(c => [c.sku, c]));
+
+  // 3) Aggregate strictly by SKU (if SKU still null, keep as 'other' with original name)
+  const acc = new Map<string, {
+    sku: string|null; name:string; category:string; qty:number; patties:number; red:number; chick:number; rolls:number; hits:Set<string>;
+  }>();
+
+  for (const r of rows) {
+    const sku = r.sku ?? null;
+    const rule = sku ? bySku.get(sku) ?? null : null;
+    const name = rule?.name ?? r.name;
+    const category = rule?.category ?? 'other';
+
+    // KEY: use SKU if present, else fallback to the name (so uniqueness holds)
+    const key = sku ?? name;
+    if (!acc.has(key)) acc.set(key, { sku, name, category, qty:0, patties:0, red:0, chick:0, rolls:0, hits:new Set() });
+    const p = acc.get(key)!;
+    p.qty += r.qty;
+    p.hits.add(`${sku ?? 'no-sku'} :: ${name}`);
+
+    if (category === 'burger' && rule) {
+      if (rule.kind === 'beef') {
+        const patties = (rule.patties_per ?? 1) * r.qty;
+        p.patties += patties;
+        p.red     += patties * BEEF_G;
+      } else if (rule.kind === 'chicken') {
+        p.chick += (rule.grams_per ?? 100) * r.qty;
+      }
+      p.rolls += (rule.rolls_per ?? 1) * r.qty;
+    }
+  }
+
+  // 4) Write cache atomically
+  await db.$transaction(async tx => {
+    await tx.$executeRaw`DELETE FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date`;
+    await tx.$executeRaw`DELETE FROM analytics_shift_category_summary WHERE shift_date = ${shiftDate}::date`;
+
+    const byCat: Record<string, number> = {};
+    for (const v of acc.values()) {
+      byCat[v.category] = (byCat[v.category] ?? 0) + v.qty;
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_item
+          (shift_date, from_ts, to_ts, sku, name, category, qty, patties, red_meat_g, chicken_g, rolls, raw_hits, updated_at)
+        VALUES
+          (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz,
+           ${v.sku}, ${v.name}, ${v.category}, ${v.qty}, ${v.patties}, ${v.red}, ${v.chick}, ${v.rolls},
+           ${JSON.stringify(Array.from(v.hits))}::jsonb, now())
+        ON CONFLICT (shift_date, COALESCE(sku, name))
+        DO UPDATE SET
+          qty=EXCLUDED.qty, patties=EXCLUDED.patties, red_meat_g=EXCLUDED.red_meat_g,
+          chicken_g=EXCLUDED.chicken_g, rolls=EXCLUDED.rolls, raw_hits=EXCLUDED.raw_hits,
+          from_ts=EXCLUDED.from_ts, to_ts=EXCLUDED.to_ts, updated_at=now()`;
+    }
+
+    for (const [category, items_total] of Object.entries(byCat)) {
+      await tx.$executeRaw`
+        INSERT INTO analytics_shift_category_summary
+          (shift_date, from_ts, to_ts, category, items_total, updated_at)
+        VALUES
+          (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz, ${category}, ${items_total}, now())
+        ON CONFLICT (shift_date, category)
+        DO UPDATE SET items_total=EXCLUDED.items_total, from_ts=EXCLUDED.from_ts, to_ts=EXCLUDED.to_ts, updated_at=now()`;
+    }
+  });
+
+  // 5) Response
+  const items = Array.from(acc.values())
+    .sort((a,b)=>a.category===b.category ? a.name.localeCompare(b.name) : a.category.localeCompare(b.category))
+    .map(v => ({
+      sku: v.sku, name: v.name, category: v.category,
+      qty: v.qty, patties: v.patties, redMeatGrams: v.red, chickenGrams: v.chick, rolls: v.rolls
+    }));
+  const totalsByCategory = items.reduce((m:any, it)=>{ m[it.category]=(m[it.category]??0)+it.qty; return m; }, {});
+  return { shiftDate, fromISO, toISO, items, totalsByCategory, sourceUsed: 'live' as const };
+}
+
+Why this fixes the anomalies
+
+Quantities are per SKU (no collapsing of sets into regular burgers, no double counting).
+
+Rare name-only lines are resolved through item_alias to the correct SKU.
+
+Anything still without a SKU stays in other (visible, not mixed into burgers).
+
+
+
+---
+
+4) (Optional) seed known aliases (only if your data shows name-only rows)
+
+Example: if you ever see alias_name exactly as a receipt line that lacks sku, map it:
+
+INSERT INTO item_alias (alias_name, sku) VALUES
+  ('Karaage Chicken (Meal Deal) เบอร์เกอร์ไก่คาราอาเกะ', '10071')
+ON CONFLICT (alias_name) DO UPDATE SET sku=EXCLUDED.sku;
+
+(Skip if you don’t have name-only lines.)
+
+
+---
+
+5) Rebuild the target day (Oct 20) and verify
+
+# Rebuild cache for 2025-10-20 using the new SKU-first logic
+curl -s -X POST "/api/analysis/shift/rebuild?date=2025-10-20" | jq '.shiftDate,.sourceUsed,.items|length'
+
+Quick eyeball (burgers only):
+
+curl -s "/api/analysis/shift/items?date=2025-10-20" \
+| jq '[.items[] | select(.category=="burger")] | map({sku,name,qty})'
+
+
+---
+
+6) Reconcile vs your POS CSV (for comparison, not ingestion)
+
+Create script: server/scripts/mm_reconcile_day.ts
+
+/* eslint-disable no-console */
+import 'dotenv/config';
+import fs from 'fs'; import path from 'path';
+import { parse as parseCsv } from 'csv-parse/sync';
+import fetch from 'node-fetch';
+
+function loadCsv(p:string) {
+  const raw = fs.readFileSync(p,'utf8');
+  return parseCsv(raw, { columns:true, skip_empty_lines:true });
+}
+function num(x:any){ if (x==null) return 0; const s=String(x).replace(/,/g,'').trim(); const n=Number(s); return Number.isFinite(n)?n:0; }
+
+async function main() {
+  const date = process.env.MM_DAY || process.argv[2];
+  const csvPath = process.env.MM_CSV || process.argv[3];
+  if (!date || !csvPath) {
+    console.error('Usage: MM_DAY=YYYY-MM-DD MM_CSV=/path/to/file.csv tsx server/scripts/mm_reconcile_day.ts');
+    process.exit(1);
+  }
+
+  const csv = loadCsv(csvPath);
+  // Expect headers: SKU, Item, Category, Qty, Patties, Beef (g), Chicken (g), Rolls
+  const posMap = new Map<string, { sku:string; name:string; qty:number }>();
+  for (const r of csv) {
+    const sku = String(r['SKU']||'').trim();
+    const name = String(r['Item']||'').trim();
+    if (!sku) continue;
+    const qty = num(r['Qty']);
+    posMap.set(sku, { sku, name, qty: (posMap.get(sku)?.qty ?? 0) + qty });
+  }
+
+  const api = await (await fetch(`http://localhost:5000/api/analysis/shift/items?date=${date}`)).json();
+  const mm = new Map<string, { sku:string; name:string; qty:number }>();
+  for (const it of api.items || []) {
+    const sku = it.sku || '';
+    if (!sku) continue; // compare only SKU rows
+    const name = it.name;
+    const qty = it.qty || 0;
+    mm.set(sku, { sku, name, qty: (mm.get(sku)?.qty ?? 0) + qty });
+  }
+
+  const skus = new Set([...posMap.keys(), ...mm.keys()]);
+  const rows = [];
+  for (const sku of skus) {
+    const p = posMap.get(sku);
+    const m = mm.get(sku);
+    const posQty = p?.qty ?? 0;
+    const mmQty  = m?.qty ?? 0;
+    if (posQty !== mmQty) {
+      rows.push({ sku, posQty, mmQty, diff: mmQty - posQty, posName: p?.name ?? '', mmName: m?.name ?? '' });
+    }
+  }
+
+  if (rows.length === 0) {
+    console.log(`✅ ${date}: POS vs MM v1.0 match for all SKUs.`);
+  } else {
+    console.log(`⚠️ ${date}: Found ${rows.length} SKU differences:`);
+    for (const r of rows.sort((a,b)=>a.sku.localeCompare(b.sku))) {
+      console.log(`${r.sku}\tPOS=${r.posQty}\tMM=${r.mmQty}\tΔ=${r.diff}\tPOS:"${r.posName}"  MM:"${r.mmName}"`);
+    }
+  }
+}
+
+main().catch(e=>{ console.error(e); process.exit(1); });
+
+Run reconciliation (your file path may differ):
+
+MM_DAY=2025-10-20 \
+MM_CSV="/mnt/data/item-sales-summary-2025-10-20-2025-10-20.csv" \
+tsx server/scripts/mm_reconcile_day.ts
+
+Expected: either a full match ✅ or a concise diff list by SKU with Δ per item.
+(This script only compares; it does not import CSV into the DB.)
+
+
+---
+
+7) If any diffs remain (playbook)
+
+Δ positive (MM > POS): check for duplicates
+
+-- show any duplicate (receipt_id,line_no) in the window
+WITH win AS (
+  SELECT '2025-10-20 17:00:00+07'::timestamptz AS from_ts,
+         '2025-10-21 03:00:00+07'::timestamptz AS to_ts
+)
+SELECT li.receipt_id, li.line_no, COUNT(*) AS copies
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+GROUP BY li.receipt_id, li.line_no HAVING COUNT(*)>1;
+
+(should be zero; PK prevents it. If you still find dupes, delete rows with rn>1.)
+
+Δ negative (MM < POS): likely a missing SKU in item_catalog or a name-only line → add an item_alias row mapping the exact receipt alias_name to the correct SKU, then rebuild the day.
+
+
+Rebuild after a fix:
+
+curl -s -X POST "/api/analysis/shift/rebuild?date=2025-10-20" | jq '.items|length'
+
+
+---
+
+8) Tablet UI (already live)
+
+Open Operations → Analysis → Shift Analytics (MM v1.0)
+
+Select 2025-10-20 → Load Shift
+
+You should see SKU-first counts matching the CSV and correct burger meat/roll math.
+
+
+
+---
+
+Done
+
+This patch set makes the system SKU-exact, handles rare name-only lines safely, prevents double counts, and gives you a one-command reconciliation to prove Oct 20 (and any day) is correct end-to-end.
