@@ -1,0 +1,312 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+// SBB — Online Ordering (VEV style, tightened)
+// • Back to the working VEV look & flow you had
+// • Centered header with logo
+// • Page width tightened ~40% (max-w-[700px])
+// • Black theme + SBB yellow price pills
+
+const SBB_YELLOW = "#FFEB00";
+
+// ---------- Types ----------
+type ModifierOption = { id: string; name: string; priceDelta: number; defaultSelected?: boolean };
+
+type ModifierGroup = { id: string; name: string; type: "single" | "multi"; required?: boolean; maxSelections?: number; options: ModifierOption[] };
+
+type MenuItem = { id: string; name: string; description?: string; price: number; category: string; image?: string; groups?: ModifierGroup[]; available?: boolean };
+
+type CartLine = { id: string; itemId: string; name: string; basePrice: number; qty: number; modifiers: { groupId: string; groupName: string; optionId: string; optionName: string; priceDelta: number }[]; note?: string };
+
+// ---------- Demo Data (unchanged) ----------
+const CATEGORIES = [
+  { id: "sets", name: "BURGER MEAL SETS" },
+  { id: "sides", name: "SIDE ORDERS" },
+  { id: "burgers", name: "ORIGINAL SMASH BURGERS" },
+  { id: "drinks", name: "DRINKS" },
+] as const;
+
+const MENU: MenuItem[] = [
+  { id: "set-single", name: "Single Smash Burger Meal Set", description: "The original single smash burger with French fries and your choice of soft drink.", price: 209, category: "sets", image: "/images/items/single-set.jpg", groups: [{ id: "drink", name: "Choose Drink", type: "single", required: true, options: [ { id: "coke", name: "Coke", priceDelta: 0, defaultSelected: true }, { id: "sprite", name: "Sprite", priceDelta: 0 }, { id: "water", name: "Water", priceDelta: 0 } ] }] },
+  { id: "set-double", name: "Ultimate Double Smash Burger Meal Set", description: "Double-smash burger with 150g fries, coleslaw and a drink.", price: 289, category: "sets", image: "/images/items/double-set.jpg" },
+  { id: "single-burger", name: "Single Smash Burger", description: "90g patty, cheese, pickles, onions, SBB sauce.", price: 149, category: "burgers", image: "/images/items/single.jpg", groups: [ { id: "patty", name: "Patty", type: "single", required: true, options: [ { id: "single", name: "Single (90g)", priceDelta: 0, defaultSelected: true }, { id: "double", name: "Double (2x90g)", priceDelta: 60 } ] }, { id: "extras", name: "Extras", type: "multi", maxSelections: 3, options: [ { id: "bacon", name: "Bacon", priceDelta: 35 }, { id: "cheese", name: "Extra Cheese", priceDelta: 20 }, { id: "pickle", name: "Extra Pickles", priceDelta: 0 } ] } ] },
+  { id: "fries", name: "Classic French Fries", description: "Classic shoestring fries.", price: 79, category: "sides", image: "/images/items/fries.jpg" },
+  { id: "dirty-fries", name: "Cheesy Bacon Fries", description: "American cheese, bacon bits, crispy onions.", price: 119, category: "sides", image: "/images/items/dirty-fries.jpg" },
+  { id: "coke", name: "Coke Can", price: 35, category: "drinks" },
+  { id: "sprite", name: "Sprite Can", price: 35, category: "drinks" },
+  { id: "water", name: "Water 500ml", price: 20, category: "drinks" },
+];
+
+// ---------- Utils ----------
+const THB = (n: number) => `THB ${n.toFixed(2)}`;
+const uid = (p = "id") => `${p}_${Math.random().toString(36).slice(2, 9)}`;
+const lineTotal = (l: CartLine) => (l.basePrice + l.modifiers.reduce((s, m) => s + m.priceDelta, 0)) * l.qty;
+
+// ---------- Storage ----------
+const LS_CART_KEY = "sbb_ordering_cart_v1";
+
+export default function OnlineOrderingPage() {
+  // State
+  const [activeCat, setActiveCat] = useState<(typeof CATEGORIES)[number]["id"]>("sets");
+  const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    try { const raw = localStorage.getItem(LS_CART_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  });
+  const [checkout, setCheckout] = useState({ name: "", phone: "", type: "Pickup" as "Pickup" | "Delivery", address: "", payment: "Cash" as "Cash" | "QR Code" | "Card", reference: "" });
+  const [itemModal, setItemModal] = useState<{ open: boolean; item?: MenuItem; draft?: CartLine }>({ open: false });
+  const [showCheckout, setShowCheckout] = useState(false);
+
+  // Persist
+  useEffect(() => { localStorage.setItem(LS_CART_KEY, JSON.stringify(cart)); }, [cart]);
+
+  // Fonts
+  const fontInjected = useRef(false);
+  useEffect(() => {
+    if (fontInjected.current) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap";
+    document.head.appendChild(link);
+    fontInjected.current = true;
+  }, []);
+
+  // Derived
+  const filteredMenu = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return MENU.filter((m) => m.category === activeCat && (!q || m.name.toLowerCase().includes(q)));
+  }, [activeCat, search]);
+  const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);
+  const vat = useMemo(() => subtotal - subtotal / 1.07, [subtotal]);
+  const total = subtotal;
+
+  // Actions
+  function openItem(item: MenuItem) {
+    const defaultMods: CartLine["modifiers"] = [];
+    item.groups?.forEach((g) => {
+      if (g.type === "single") {
+        const def = g.options.find((o) => o.defaultSelected) || g.options[0];
+        if (def) defaultMods.push({ groupId: g.id, groupName: g.name, optionId: def.id, optionName: def.name, priceDelta: def.priceDelta });
+      }
+    });
+    setItemModal({ open: true, item, draft: { id: uid("line"), itemId: item.id, name: item.name, basePrice: item.price, qty: 1, modifiers: defaultMods } });
+  }
+  function toggleDraftModifier(group: ModifierGroup, opt: ModifierOption) {
+    if (!itemModal.draft) return;
+    const l = itemModal.draft;
+    if (group.type === "single") {
+      const newMods = l.modifiers.filter((m) => m.groupId !== group.id);
+      newMods.push({ groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta });
+      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });
+    } else {
+      const exists = l.modifiers.find((m) => m.groupId === group.id && m.optionId === opt.id);
+      let newMods = l.modifiers.filter((m) => !(m.groupId === group.id && m.optionId === opt.id));
+      if (!exists) {
+        const count = l.modifiers.filter((m) => m.groupId === group.id).length;
+        if (!group.maxSelections || count < group.maxSelections) {
+          newMods = [...l.modifiers, { groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta }];
+        }
+      }
+      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });
+    }
+  }
+  function commitDraft() { if (!itemModal.draft) return; setCart((p) => [...p, itemModal.draft!]); setItemModal({ open: false }); }
+  function updateQty(id: string, d: number) { setCart((p) => p.map((l) => (l.id === id ? { ...l, qty: Math.max(1, l.qty + d) } : l))); }
+  function removeLine(id: string) { setCart((p) => p.filter((l) => l.id !== id)); }
+
+  async function submitOrder() {
+    // Placeholder — wire to backend later
+    alert("Order submitted. POS hook goes here.");
+    setCart([]);
+    setShowCheckout(false);
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white font-[Poppins]">
+      {/* HEADER */}
+      <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+        <div className="flex flex-col items-start">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+              {/* Put your logo at /public/images/sbb-logo.png */}
+              <img src="/images/sbb-logo.png" alt="SBB" className="h-8 w-8 object-contain" />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Smash Brothers Burgers (Rawai)</h1>
+          </div>
+          <p className="mt-2 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="mt-5">
+          <div className="flex flex-wrap items-center gap-4">
+            {CATEGORIES.map((c) => (
+              <button key={c.id} onClick={() => setActiveCat(c.id)} className="relative pb-2 text-sm font-semibold">
+                <span className="opacity-90">{c.name}</span>
+                {activeCat === c.id && <span className="absolute left-0 right-0 -bottom-[9px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 h-px w-full bg-white/10" />
+        </div>
+      </div>
+
+      {/* SECTION + LIST */}
+      <div className="mx-auto w-full max-w-[700px] px-4">
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-1.5 w-6 rounded-full" style={{ background: SBB_YELLOW }} />
+          <h2 className="text-lg md:text-xl font-extrabold">{CATEGORIES.find(c=>c.id===activeCat)?.name}</h2>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {filteredMenu.map((m) => (
+            <div key={m.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                  {m.image ? <img src={m.image} alt="" className="h-full w-full object-cover" /> : null}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold leading-tight">{m.name}</div>
+                  {m.description && <div className="text-sm text-white/70 line-clamp-2">{m.description}</div>}
+                </div>
+                <button onClick={() => openItem(m)} className="rounded-xl px-3 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+                  {THB(m.price)} +
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-28" />
+      </div>
+
+      {/* CART BAR */}
+      <div className="fixed inset-x-0 bottom-0 z-50">
+        <div className="mx-auto w-full max-w-[900px] px-3 pb-4">
+          <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-2 md:p-3 flex items-center gap-2 md:gap-4">
+            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length!==1?"s":""}</div>
+            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>
+            <button className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => setShowCheckout(true)} disabled={cart.length===0}>Review & Checkout</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ITEM MODAL */}
+      {itemModal.open && itemModal.item && itemModal.draft && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+          <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="font-semibold">{itemModal.item.name}</div>
+              <button className="text-sm underline" onClick={() => setItemModal({ open: false })}>Close</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {itemModal.item.groups?.map(g => (
+                <div key={g.id}>
+                  <div className="text-sm font-semibold">{g.name} {g.required && <span className="text-white/50 text-xs">(required)</span>}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {g.options.map(o => {
+                      const selected = itemModal.draft!.modifiers.some(m => m.groupId === g.id && m.optionId === o.id);
+                      return (
+                        <button key={o.id} onClick={() => toggleDraftModifier(g,o)} className={`px-3 py-2 rounded-xl border text-sm ${selected?"bg-white text-black":"bg-transparent"}`} style={selected?{borderColor:"transparent"}:{borderColor:"rgba(255,255,255,0.15)"}}>
+                          {o.name}{o.priceDelta?` +${THB(o.priceDelta)}`:""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: Math.max(1, itemModal.draft!.qty - 1) } })}>-</button>
+                  <div>{itemModal.draft.qty}</div>
+                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: itemModal.draft!.qty + 1 } })}>+</button>
+                </div>
+                <div className="font-semibold">{THB(lineTotal(itemModal.draft))}</div>
+              </div>
+
+              <button onClick={commitDraft} className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+                Add to order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHECKOUT MODAL */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">
+          <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="font-semibold">Your Order</div>
+              <button className="text-sm underline" onClick={() => setShowCheckout(false)}>Close</button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto">
+              <div className="p-4 space-y-3">
+                {cart.map(l => (
+                  <div key={l.id} className="border border-white/10 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold leading-tight">{l.name}</div>
+                        {l.modifiers.length > 0 && (
+                          <ul className="text-xs text-white/70 list-disc ml-5 mt-1">
+                            {l.modifiers.map(m => (
+                              <li key={`${l.id}_${m.optionId}`}>{m.groupName}: {m.optionName} {m.priceDelta ? `(+${THB(m.priceDelta)})` : ""}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="text-right min-w-[120px]">
+                        <div className="font-semibold">{THB(lineTotal(l))}</div>
+                        <div className="mt-2 inline-flex items-center gap-2">
+                          <button className="border border-white/20 rounded-lg px-2" onClick={() => updateQty(l.id, -1)}>-</button>
+                          <span className="text-sm w-6 text-center">{l.qty}</span>
+                          <button className="border border-white/20 rounded-lg px-2" onClick={() => updateQty(l.id, +1)}>+</button>
+                        </div>
+                        <div>
+                          <button className="mt-2 text-xs underline text-white/70" onClick={() => removeLine(l.id)}>Remove</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="border-t border-white/10 pt-3 text-sm space-y-1">
+                  <div className="flex justify-between"><span>Subtotal</span><span>{THB(subtotal)}</span></div>
+                  <div className="flex justify-between"><span>VAT (inc)</span><span>{THB(vat)}</span></div>
+                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{THB(total)}</span></div>
+                </div>
+
+                <div className="border-t border-white/10 pt-3 grid grid-cols-1 gap-2 text-sm">
+                  <input className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" placeholder="Name" value={checkout.name} onChange={(e) => setCheckout({ ...checkout, name: e.target.value })} />
+                  <input className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" placeholder="Phone" value={checkout.phone} onChange={(e) => setCheckout({ ...checkout, phone: e.target.value })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" value={checkout.type} onChange={(e) => setCheckout({ ...checkout, type: e.target.value as any })}>
+                      <option>Pickup</option>
+                      <option>Delivery</option>
+                    </select>
+                    <select className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" value={checkout.payment} onChange={(e) => setCheckout({ ...checkout, payment: e.target.value as any })}>
+                      <option>Cash</option>
+                      <option>QR Code</option>
+                      <option>Card</option>
+                    </select>
+                  </div>
+                  {checkout.type === "Delivery" && (
+                    <textarea className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 min-h-[80px]" placeholder="Delivery address / notes" value={checkout.address} onChange={(e) => setCheckout({ ...checkout, address: e.target.value })} />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <button className="rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={submitOrder} disabled={cart.length === 0}>
+                    Send to POS
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+{"updates":[{"pattern":"// SBB — Online Ordering \[\s\S]$","multiple":false,"replacement":"// SBB — Online Ordering (VEV style, tightened)\n// • Back to the working VEV look & flow you had\n// • Centered header with logo\n// • Page width tightened ~40% (max-w-[660px])\n// • Black theme + SBB yellow price pills\n\nconst SBB_YELLOW = "#FFEB00";\n\n// ---------- Types ----------\ntype ModifierOption = { id: string; name: string; priceDelta: number; defaultSelected?: boolean };\n\ntype ModifierGroup = { id: string; name: string; type: "single" | "multi"; required?: boolean; maxSelections?: number; options: ModifierOption[] };\n\ntype MenuItem = { id: string; name: string; description?: string; price: number; category: string; image?: string; groups?: ModifierGroup[]; available?: boolean };\n\ntype CartLine = { id: string; itemId: string; name: string; basePrice: number; qty: number; modifiers: { groupId: string; groupName: string; optionId: string; optionName: string; priceDelta: number }[]; note?: string };\n\n// ---------- Demo Data (unchanged) ----------\nconst CATEGORIES = [\n  { id: "sets", name: "BURGER MEAL SETS" },\n  { id: "sides", name: "SIDE ORDERS" },\n  { id: "burgers", name: "ORIGINAL SMASH BURGERS" },\n  { id: "drinks", name: "DRINKS" },\n] as const;\n\nconst MENU: MenuItem[] = [\n  { id: "set-single", name: "Single Smash Burger Meal Set", description: "The original single smash burger with French fries and your choice of soft drink.", price: 209, category: "sets", image: "/images/items/single-set.jpg", groups: [{ id: "drink", name: "Choose Drink", type: "single", required: true, options: [ { id: "coke", name: "Coke", priceDelta: 0, defaultSelected: true }, { id: "sprite", name: "Sprite", priceDelta: 0 }, { id: "water", name: "Water", priceDelta: 0 } ] }] },\n  { id: "set-double", name: "Ultimate Double Smash Burger Meal Set", description: "Double-smash burger with 150g fries, coleslaw and a drink.", price: 289, category: "sets", image: "/images/items/double-set.jpg" },\n  { id: "single-burger", name: "Single Smash Burger", description: "90g patty, cheese, pickles, onions, SBB sauce.", price: 149, category: "burgers", image: "/images/items/single.jpg", groups: [ { id: "patty", name: "Patty", type: "single", required: true, options: [ { id: "single", name: "Single (90g)", priceDelta: 0, defaultSelected: true }, { id: "double", name: "Double (2x90g)", priceDelta: 60 } ] }, { id: "extras", name: "Extras", type: "multi", maxSelections: 3, options: [ { id: "bacon", name: "Bacon", priceDelta: 35 }, { id: "cheese", name: "Extra Cheese", priceDelta: 20 }, { id: "pickle", name: "Extra Pickles", priceDelta: 0 } ] } ] },\n  { id: "fries", name: "Classic French Fries", description: "Classic shoestring fries.", price: 79, category: "sides", image: "/images/items/fries.jpg" },\n  { id: "dirty-fries", name: "Cheesy Bacon Fries", description: "American cheese, bacon bits, crispy onions.", price: 119, category: "sides", image: "/images/items/dirty-fries.jpg" },\n  { id: "coke", name: "Coke Can", price: 35, category: "drinks" },\n  { id: "sprite", name: "Sprite Can", price: 35, category: "drinks" },\n  { id: "water", name: "Water 500ml", price: 20, category: "drinks" },\n];\n\n// ---------- Utils ----------\nconst THB = (n: number) => THB ${n.toFixed(2)};\nconst uid = (p = "id") => ${p}_${Math.random().toString(36).slice(2, 9)};\nconst lineTotal = (l: CartLine) => (l.basePrice + l.modifiers.reduce((s, m) => s + m.priceDelta, 0)) * l.qty;\n\n// ---------- Storage ----------\nconst LS_CART_KEY = "sbb_ordering_cart_v1";\n\nexport default function OnlineOrderingPage() {\n  // State\n  const [activeCat, setActiveCat] = useState<(typeof CATEGORIES)[number]["id"]>("sets");\n  const [search, setSearch] = useState("");\n  const [cart, setCart] = useState<CartLine[]>(() => {\n    try { const raw = localStorage.getItem(LS_CART_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }\n  });\n  const [checkout, setCheckout] = useState({ name: "", phone: "", type: "Pickup" as "Pickup" | "Delivery", address: "", payment: "Cash" as "Cash" | "QR Code" | "Card", reference: "" });\n  const [itemModal, setItemModal] = useState<{ open: boolean; item?: MenuItem; draft?: CartLine }>({ open: false });\n  const [showCheckout, setShowCheckout] = useState(false);\n\n  // Persist\n  useEffect(() => { localStorage.setItem(LS_CART_KEY, JSON.stringify(cart)); }, [cart]);\n\n  // Fonts\n  const fontInjected = useRef(false);\n  useEffect(() => {\n    if (fontInjected.current) return;\n    const link = document.createElement("link");\n    link.rel = "stylesheet";\n    link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap";\n    document.head.appendChild(link);\n    fontInjected.current = true;\n  }, []);\n\n  // Derived\n  const filteredMenu = useMemo(() => {\n    const q = search.trim().toLowerCase();\n    return MENU.filter((m) => m.category === activeCat && (!q || m.name.toLowerCase().includes(q)));\n  }, [activeCat, search]);\n  const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);\n  const vat = useMemo(() => subtotal - subtotal / 1.07, [subtotal]);\n  const total = subtotal;\n\n  // Actions\n  function openItem(item: MenuItem) {\n    const defaultMods: CartLine["modifiers"] = [];\n    item.groups?.forEach((g) => {\n      if (g.type === "single") {\n        const def = g.options.find((o) => o.defaultSelected) || g.options[0];\n        if (def) defaultMods.push({ groupId: g.id, groupName: g.name, optionId: def.id, optionName: def.name, priceDelta: def.priceDelta });\n      }\n    });\n    setItemModal({ open: true, item, draft: { id: uid("line"), itemId: item.id, name: item.name, basePrice: item.price, qty: 1, modifiers: defaultMods } });\n  }\n  function toggleDraftModifier(group: ModifierGroup, opt: ModifierOption) {\n    if (!itemModal.draft) return;\n    const l = itemModal.draft;\n    if (group.type === "single") {\n      const newMods = l.modifiers.filter((m) => m.groupId !== group.id);\n      newMods.push({ groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta });\n      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });\n    } else {\n      const exists = l.modifiers.find((m) => m.groupId === group.id && m.optionId === opt.id);\n      let newMods = l.modifiers.filter((m) => !(m.groupId === group.id && m.optionId === opt.id));\n      if (!exists) {\n        const count = l.modifiers.filter((m) => m.groupId === group.id).length;\n        if (!group.maxSelections || count < group.maxSelections) {\n          newMods = [...l.modifiers, { groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta }];\n        }\n      }\n      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });\n    }\n  }\n  function commitDraft() { if (!itemModal.draft) return; setCart((p) => [...p, itemModal.draft!]); setItemModal({ open: false }); }\n  function updateQty(id: string, d: number) { setCart((p) => p.map((l) => (l.id === id ? { ...l, qty: Math.max(1, l.qty + d) } : l))); }\n  function removeLine(id: string) { setCart((p) => p.filter((l) => l.id !== id)); }\n\n  async function submitOrder() { alert("Order submitted. POS hook goes here."); setCart([]); setShowCheckout(false); }\n\n  return (\n    <div className="min-h-screen bg-black text-white font-[Poppins]">\n      {/ HEADER (centered) /}\n      <div className="mx-auto w-full max-w-[660px] px-4 pt-8 pb-4 text-center">\n        <div className="mx-auto h-14 w-14 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">\n          <img src="/images/sbb-logo.png" alt="SBB" className="h-10 w-10 object-contain" />\n        </div>\n        <h1 className="mt-3 text-3xl md:text-[34px] font-extrabold tracking-tight">Smash Brothers Burgers (Rawai)</h1>\n        <p className="mt-1 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>\n\n        {/ Tabs (centered with yellow underline when active) /}\n        <div className="mt-5">\n          <nav className="flex flex-wrap justify-center gap-5">\n            {CATEGORIES.map((c) => (\n              <button key={c.id} onClick={() => setActiveCat(c.id)} className="relative pb-2 text-sm font-semibold">\n                <span className="opacity-90">{c.name}</span>\n                {activeCat === c.id && <span className="absolute left-0 right-0 -bottom-[10px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />}\n              </button>\n            ))}\n          </nav>\n          <div className="mt-3 h-px w-full bg-white/10" />\n        </div>\n      </div>\n\n      {/ SECTION + LIST (tight width) /}\n      <div className="mx-auto w-full max-w-[660px] px-4">\n        <div className="mt-4 flex items-center gap-3">\n          <div className="h-1.5 w-6 rounded-full" style={{ background: SBB_YELLOW }} />\n          <h2 className="text-lg md:text-xl font-extrabold">{CATEGORIES.find(c=>c.id===activeCat)?.name}</h2>\n        </div>\n\n        <div className="mt-4 space-y-4">\n          {filteredMenu.map((m) => (\n            <div key={m.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">\n              <div className="flex items-center gap-4">\n                <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">\n                  {m.image ? <img src={m.image} alt="" className="h-full w-full object-cover" /> : null}\n                </div>\n                <div className="flex-1 min-w-0">\n                  <div className="font-semibold leading-tight">{m.name}</div>\n                  {m.description && <div className="text-sm text-white/70 line-clamp-2">{m.description}</div>}\n                </div>\n                <button onClick={() => openItem(m)} className="rounded-full px-4 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>\n                  {THB(m.price)} +\n                </button>\n              </div>\n            </div>\n          ))}\n        </div>\n\n        <div className="h-28" />\n      </div>\n\n      {/ CART BAR /}\n      <div className="fixed inset-x-0 bottom-0 z-50">\n        <div className="mx-auto w-full max-w-[900px] px-3 pb-4">\n          <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-2 md:p-3 flex items-center gap-2 md:gap-4">\n            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length!==1?"s":""}</div>\n            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>\n            <button className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => setShowCheckout(true)} disabled={cart.length===0}>Review & Checkout</button>\n          </div>\n        </div>\n      </div>\n\n      {/ ITEM MODAL /}\n      {itemModal.open && itemModal.item && itemModal.draft && (\n        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">\n          <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">\n            <div className="p-4 border-b border-white/10 flex items-center justify-between">\n              <div className="font-semibold">{itemModal.item.name}</div>\n              <button className="text-sm underline" onClick={() => setItemModal({ open: false })}>Close</button>\n            </div>\n            <div className="p-4 space-y-4">\n              {itemModal.item.groups?.map(g => (\n                <div key={g.id}>\n                  <div className="text-sm font-semibold">{g.name} {g.required && <span className="text-white/50 text-xs">(required)</span>}</div>\n                  <div className="mt-2 flex flex-wrap gap-2">\n                    {g.options.map(o => {\n                      const selected = itemModal.draft!.modifiers.some(m => m.groupId === g.id && m.optionId === o.id);\n                      return (\n                        <button key={o.id} onClick={() => toggleDraftModifier(g,o)} className={px-3 py-2 rounded-xl border text-sm ${selected?\"bg-white text-black\":\"bg-transparent\"}} style={selected?{borderColor:"transparent"}:{borderColor:"rgba(255,255,255,0.15)"}}>\n                          {o.name}{o.priceDelta? +${THB(o.priceDelta)}:""}\n                        </button>\n                      );\n                    })}\n                  </div>\n                </div>\n              ))}\n\n              <div className="flex items-center justify-between">\n                <div className="flex items-center gap-3">\n                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: Math.max(1, itemModal.draft!.qty - 1) } })}>-</button>\n                  <div>{itemModal.draft.qty}</div>\n                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: itemModal.draft!.qty + 1 } })}>+</button>\n                </div>\n                <div className="font-semibold">{THB(lineTotal(itemModal.draft))}</div>\n              </div>\n\n              <button onClick={commitDraft} className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>\n                Add to order\n              </button>\n            </div>\n          </div>\n        </div>\n      )}\n\n      {/ CHECKOUT MODAL */}\n      {showCheckout && (\n        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">\n          <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">\n            <div className="p-4 border-b border-white/10 flex items-center justify-between">\n              <div className="font-semibold">Your Order</div>\n              <button className="text-sm underline" onClick={() => setShowCheckout(false)}>Close</button>\n            </div>\n            <div className="max-h-[70vh] overflow-auto">\n              <div className="p-4 space-y-3">\n                {cart.map(l => (\n                  <div key={l.id} className="border border-white/10 rounded-xl p-3">\n                    <div className="flex items-start justify-between gap-3">\n                      <div>\n                        <div className="font-semibold leading-tight">{l.name}</div>\n                        {l.modifiers.length > 0 && (\n                          <ul className="text-xs text-white/70 list-disc ml-5 mt-1">\n                            {l.modifiers.map(m => (\n                              <li key={${l.id}_${m.optionId}}>{m.groupName}: {m.optionName} {m.priceDelta ? `(+${THB(m.price
+
