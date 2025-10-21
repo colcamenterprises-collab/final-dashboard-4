@@ -7,7 +7,7 @@ const BEEF_G = 95;
 export async function computeShift(dateISO: string) {
   const { shiftDate, fromISO, toISO } = shiftWindow(dateISO);
 
-  // 1) Pull rows: use SKU directly; if missing, try alias map to resolve a SKU.
+  // 1) Pull rows from LIVE tables (receipts/receipt_items): use SKU directly; if missing, try alias map to resolve a SKU.
   //    The alias join ensures name-only lines can still map to a SKU.
   const rows = await db.$queryRaw<{
     sku: string | null;
@@ -15,12 +15,12 @@ export async function computeShift(dateISO: string) {
     qty: number;
   }[]>`
     WITH base AS (
-      SELECT li.sku, li.name, SUM(li.qty)::int AS qty
-      FROM lv_line_item li
-      JOIN lv_receipt r ON r.receipt_id = li.receipt_id
-      WHERE r.datetime_bkk >= ${fromISO}::timestamptz
-        AND r.datetime_bkk <  ${toISO}::timestamptz
-      GROUP BY li.sku, li.name
+      SELECT ri.sku, ri.name, SUM(ri.qty)::int AS qty
+      FROM receipt_items ri
+      JOIN receipts r ON r.id = ri."receiptId"
+      WHERE r."createdAtUTC" >= ${fromISO}::timestamptz
+        AND r."createdAtUTC" <  ${toISO}::timestamptz
+      GROUP BY ri.sku, ri.name
     )
     SELECT COALESCE(base.sku, ia.sku) AS sku,
            base.name,
