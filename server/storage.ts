@@ -780,7 +780,7 @@ export class MemStorage implements IStorage {
         ${'cmes916fj0000pio20tvofd44'},
         COALESCE(${expenseDate}::timestamp, NOW()),
         ${expense.description || expense.item || 'Unknown Item'},
-        ${parseFloat(expense.amount) || 0},
+        ${Math.round((parseFloat(expense.amount) || 0) * 100)},
         ${expense.supplier || 'Unknown'},
         ${expense.category || expense.expenseType || 'Shopping'},
         ${JSON.stringify(expense.notes ? { notes: expense.notes } : {})},

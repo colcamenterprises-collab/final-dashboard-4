@@ -2177,7 +2177,23 @@ export function registerRoutes(app: express.Application): Server {
       if (req.body.type === "rolls") {
         const { quantity, cost, paid } = req.body;
         
-        // Always create stock lodgment record
+        // Insert into purchase_tally for rolls count
+        const tallyResult = await db.execute(sql`
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, rolls_pcs)
+          VALUES (
+            gen_random_uuid(),
+            NOW(),
+            NOW(),
+            NULL,
+            ${'Bakery'},
+            ${Number(cost)},
+            ${'Rolls purchase'},
+            ${Number(quantity)}
+          )
+          RETURNING id, created_at as date, rolls_pcs, notes as item
+        `);
+        
+        // Always create stock lodgment record in expenses
         const stockLodgmentId = crypto.randomUUID();
         await db.execute(sql`
           INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
@@ -2186,7 +2202,7 @@ export function registerRoutes(app: express.Application): Server {
             ${'cmes916fj0000pio20tvofd44'},
             NOW(),
             ${'Bakery'},
-            ${Math.round(Number(cost))},
+            ${Math.round(Number(cost) * 100)},
             ${'Rolls Stock Lodgment'},
             ${'Stock'},
             ${JSON.stringify({quantity: quantity, paid: paid, type: 'rolls'})},
@@ -2205,7 +2221,7 @@ export function registerRoutes(app: express.Application): Server {
               ${'cmes916fj0000pio20tvofd44'},
               NOW(),
               ${'Bakery'},
-              ${Math.round(Number(cost))},
+              ${Math.round(Number(cost) * 100)},
               ${'Rolls'},
               ${'Food & Beverage'},
               ${JSON.stringify({quantity: quantity, relatedLodgment: stockLodgmentId})},
@@ -2214,10 +2230,10 @@ export function registerRoutes(app: express.Application): Server {
             )
             RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category
           `);
-          return res.json({ ok: true, expense: expenseResult.rows[0] });
+          return res.json({ ok: true, expense: expenseResult.rows[0], tally: tallyResult.rows[0] });
         }
         
-        return res.json({ ok: true, message: "Rolls lodgment recorded" });
+        return res.json({ ok: true, message: "Rolls lodgment recorded", tally: tallyResult.rows[0] });
       }
 
       if (req.body.type === "meat") {
