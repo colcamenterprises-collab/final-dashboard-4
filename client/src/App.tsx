@@ -40,6 +40,7 @@ import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
+import DailyReview from "./pages/analysis/DailyReview";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -124,6 +125,7 @@ export default function App() {
                   {/* All Analysis Pages */}
                   <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
                   <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
+                  <Route path="/analysis/daily-review" element={<DailyReview />} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>

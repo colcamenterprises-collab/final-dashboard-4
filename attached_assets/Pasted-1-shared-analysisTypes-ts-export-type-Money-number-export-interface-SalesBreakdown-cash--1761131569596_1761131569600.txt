@@ -1,0 +1,311 @@
+1. /shared/analysisTypes.ts
+
+export type Money = number;
+
+export interface SalesBreakdown {
+  cash: Money;
+  qr: Money;
+  grab: Money;
+  other: Money;
+  total: Money;
+}
+
+export interface ExpenseItem {
+  id: string;
+  label: string;
+  amount: Money;
+  category: "shopping" | "wage" | "other";
+}
+
+export interface DailySource {
+  date: string;
+  sales: SalesBreakdown;
+  expenses: {
+    shoppingTotal: Money;
+    wageTotal: Money;
+    otherTotal: Money;
+    items: ExpenseItem[];
+  };
+  banking: {
+    startingCash: Money;
+    cashPayments: Money;
+    qrPayments: Money;
+    expensesTotal: Money;
+    expectedCash: Money;
+    estimatedNetBanked: Money;
+  };
+}
+
+export interface DailyComparisonResponse {
+  date: string;
+  pos: DailySource;
+  form: DailySource;
+  variance: {
+    sales: Record<keyof SalesBreakdown, Money>;
+    expenses: {
+      shoppingTotal: Money;
+      wageTotal: Money;
+      otherTotal: Money;
+      grandTotal: Money;
+    };
+    banking: {
+      expectedCash: Money;
+      estimatedNetBanked: Money;
+    };
+  };
+}
+
+
+---
+
+2. /server/routes/analysisDailyReview.ts
+
+import { Router } from "express";
+import type { DailyComparisonResponse, DailySource, ExpenseItem, SalesBreakdown } from "../../shared/analysisTypes";
+
+export const analysisDailyReviewRouter = Router();
+
+const THB = (n: number) => Number(n.toFixed(2));
+
+async function fetchPosShiftReport(date: string): Promise<DailySource> {
+  const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 13807, other: 0, total: 16851 };
+  const items: ExpenseItem[] = [
+    { id: "s1", label: "Shopping", amount: 661, category: "shopping" },
+    { id: "w1", label: "Wages", amount: 2700, category: "wage" },
+  ];
+  const expensesTotal = 661 + 2700;
+  const banking = {
+    startingCash: 547,
+    cashPayments: sales.cash,
+    qrPayments: sales.qr,
+    expensesTotal,
+    expectedCash: THB(547 + sales.cash - expensesTotal),
+    estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+  };
+  return {
+    date,
+    sales,
+    expenses: { shoppingTotal: 661, wageTotal: 2700, otherTotal: 0, items },
+    banking,
+  };
+}
+
+async function fetchForm1Daily(date: string): Promise<DailySource> {
+  const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 14146, other: 0, total: 17190 };
+  const items: ExpenseItem[] = [
+    { id: "s1", label: "Shopping", amount: 1000, category: "shopping" },
+    { id: "w1", label: "Wages", amount: 2700, category: "wage" },
+  ];
+  const expensesTotal = 1000 + 2700;
+  const banking = {
+    startingCash: 547,
+    cashPayments: sales.cash,
+    qrPayments: sales.qr,
+    expensesTotal,
+    expectedCash: THB(547 + sales.cash - expensesTotal),
+    estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+  };
+  return {
+    date,
+    sales,
+    expenses: { shoppingTotal: 1000, wageTotal: 2700, otherTotal: 0, items },
+    banking,
+  };
+}
+
+function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
+  const diff = (p: number, f: number) => THB(f - p); // Form minus POS (POS is truth)
+  return {
+    sales: {
+      cash: diff(pos.sales.cash, form.sales.cash),
+      qr: diff(pos.sales.qr, form.sales.qr),
+      grab: diff(pos.sales.grab, form.sales.grab),
+      other: diff(pos.sales.other, form.sales.other),
+      total: diff(pos.sales.total, form.sales.total),
+    },
+    expenses: {
+      shoppingTotal: diff(pos.expenses.shoppingTotal, form.expenses.shoppingTotal),
+      wageTotal: diff(pos.expenses.wageTotal, form.expenses.wageTotal),
+      otherTotal: diff(pos.expenses.otherTotal, form.expenses.otherTotal),
+      grandTotal: diff(
+        pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
+        form.expenses.shoppingTotal + form.expenses.wageTotal + form.expenses.otherTotal
+      ),
+    },
+    banking: {
+      expectedCash: diff(pos.banking.expectedCash, form.banking.expectedCash),
+      estimatedNetBanked: diff(pos.banking.estimatedNetBanked, form.banking.estimatedNetBanked),
+    },
+  };
+}
+
+analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
+  const date = String(req.query.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Invalid date" });
+
+  const [pos, form] = await Promise.all([fetchPosShiftReport(date), fetchForm1Daily(date)]);
+  const response: DailyComparisonResponse = { date, pos, form, variance: buildVariance(pos, form) };
+  res.json(response);
+});
+
+
+---
+
+3. /client/src/pages/analysis/DailyReview.tsx
+
+import React, { useState, useEffect } from "react";
+import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
+
+const THRESHOLDS = { sales: 500, expenses: 500, banking: 300 };
+const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+
+function Flag({ val, limit }: { val: number; limit: number }) {
+  const ok = Math.abs(val) < limit;
+  return (
+    <div
+      className={`rounded-lg px-2 py-1 text-center font-semibold ${
+        ok ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
+      }`}
+    >
+      {ok ? "✓" : "⚠"}
+    </div>
+  );
+}
+
+export default function DailyReview() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [data, setData] = useState<DailyComparisonResponse | null>(null);
+  const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
+
+  useEffect(() => {
+    fetch(`/api/analysis/daily-comparison?date=${date}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => setData(null));
+  }, [date]);
+
+  const saveComment = (txt: string) => {
+    setComment(txt);
+    localStorage.setItem("dailyReviewComment", txt);
+  };
+
+  if (!data) return <div className="p-6 text-sm">Loading...</div>;
+
+  const pos = data.pos;
+  const form = data.form;
+  const v = data.variance;
+
+  const Section = ({ title, rows, type }: any) => (
+    <section className="mb-6">
+      <h2 className="text-lg font-bold mb-2">{title}</h2>
+      <div className="grid grid-cols-5 gap-1 text-sm items-center">
+        <div className="font-semibold text-gray-500">Item</div>
+        <div className="font-semibold">POS</div>
+        <div className="font-semibold">Form</div>
+        <div className="font-semibold">Diff</div>
+        <div className="font-semibold text-center">Flag</div>
+        {rows.map((r: any) => (
+          <React.Fragment key={r.label}>
+            <div className="text-gray-600">{r.label}</div>
+            <div>{fmt(r.pos)}</div>
+            <div>{fmt(r.form)}</div>
+            <div className={Math.abs(r.diff) ? "font-semibold" : ""}>
+              {r.diff === 0 ? "—" : fmt(r.diff)}
+            </div>
+            <Flag val={r.diff} limit={THRESHOLDS[type]} />
+          </React.Fragment>
+        ))}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="mx-auto max-w-[980px] p-4 space-y-6">
+      <header className="flex items-center justify-between border-b pb-2">
+        <h1 className="text-xl font-extrabold">Daily Review</h1>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="border rounded-md px-2 py-1 text-sm"
+        />
+      </header>
+
+      <Section
+        title="Sales (Form vs POS)"
+        type="sales"
+        rows={[
+          { label: "Cash", pos: pos.sales.cash, form: form.sales.cash, diff: v.sales.cash },
+          { label: "QR", pos: pos.sales.qr, form: form.sales.qr, diff: v.sales.qr },
+          { label: "Grab", pos: pos.sales.grab, form: form.sales.grab, diff: v.sales.grab },
+          { label: "Total", pos: pos.sales.total, form: form.sales.total, diff: v.sales.total },
+        ]}
+      />
+
+      <Section
+        title="Expenses"
+        type="expenses"
+        rows={[
+          { label: "Shopping", pos: pos.expenses.shoppingTotal, form: form.expenses.shoppingTotal, diff: v.expenses.shoppingTotal },
+          { label: "Wages", pos: pos.expenses.wageTotal, form: form.expenses.wageTotal, diff: v.expenses.wageTotal },
+          { label: "Grand Total",
+            pos: pos.expenses.shoppingTotal + pos.expenses.wageTotal,
+            form: form.expenses.shoppingTotal + form.expenses.wageTotal,
+            diff: v.expenses.grandTotal },
+        ]}
+      />
+
+      <Section
+        title="Banking & Cash"
+        type="banking"
+        rows={[
+          { label: "Expected Cash", pos: pos.banking.expectedCash, form: form.banking.expectedCash, diff: v.banking.expectedCash },
+          { label: "Estimated Net Banked", pos: pos.banking.estimatedNetBanked, form: form.banking.estimatedNetBanked, diff: v.banking.estimatedNetBanked },
+        ]}
+      />
+
+      <section className="border-t pt-3">
+        <h2 className="font-bold mb-2">Manager Comments</h2>
+        <textarea
+          className="w-full border rounded-md p-2 min-h-[100px] text-sm"
+          placeholder="Record findings, explanations, or actions taken..."
+          value={comment}
+          onChange={(e) => saveComment(e.target.value)}
+        />
+      </section>
+    </div>
+  );
+}
+
+
+---
+
+4. Hook it up
+
+In server/routes.ts:
+
+import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
+app.use("/api/analysis", analysisDailyReviewRouter);
+
+In your client router:
+
+<Route path="/analysis/daily-review" element={<DailyReview />} />
+
+
+---
+
+Summary of the upgrade
+
+Feature	Description
+
+Source of Truth	POS (Loyverse) figures anchor all comparisons
+Visual flags	✅ = green if within threshold, ⚠ = red if variance beyond
+Threshold control	Tuned in THRESHOLDS constants
+Manager comments	Saved locally (future option to push to DB)
+Independent module	Zero dependency on legacy forms
+Tablet design	Tight grid, responsive, scroll-safe, minimalistic
+
+
+
+---

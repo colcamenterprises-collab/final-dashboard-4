@@ -64,6 +64,7 @@ import { importPosBundle } from "../src/server/pos/uploadBundle";
 import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
+import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
 import stockReviewManual from "./routes/stockReviewManual";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
@@ -3371,6 +3372,9 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
+  
+  // Register daily review routes
+  app.use('/api/analysis', analysisDailyReviewRouter);
   
   // Register shift analysis routes (Mekong Mamba 1.0)
   app.use('/api', shiftAnalysis);
