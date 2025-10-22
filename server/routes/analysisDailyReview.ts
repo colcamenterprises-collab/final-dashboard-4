@@ -70,18 +70,27 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
   });
   if (!row) return null;
 
-  const cash = row.cashSales ?? 0;
-  const qr = row.qrSales ?? 0;
-  const grab = row.grabSales ?? 0;
-  const other = row.aroiSales ?? 0;
-  const total = row.totalSales ?? (cash + qr + grab + other);
+  // Data is stored in payload JSONB field
+  const payload = row.payload as any;
+  
+  const cash = payload?.cashSales ?? row.cashSales ?? 0;
+  const qr = payload?.qrSales ?? row.qrSales ?? 0;
+  const grab = payload?.grabSales ?? row.grabSales ?? 0;
+  const other = payload?.otherSales ?? row.aroiSales ?? 0;
+  const total = payload?.totalSales ?? row.totalSales ?? (cash + qr + grab + other);
 
-  const shopping = row.shoppingTotal ?? 0;
-  const wages = row.wagesTotal ?? 0;
-  const otherExp = row.othersTotal ?? 0;
-  const expensesTotal = row.totalExpenses ?? (shopping + wages + otherExp);
+  // Calculate shopping total from expenses array in payload
+  const expensesArray = (payload?.expenses || []) as Array<{cost: number}>;
+  const shopping = expensesArray.reduce((sum, exp) => sum + (exp.cost || 0), 0);
+  
+  // Calculate wages total from wages array in payload
+  const wagesArray = (payload?.wages || []) as Array<{amount: number}>;
+  const wages = wagesArray.reduce((sum, w) => sum + (w.amount || 0), 0);
+  
+  const otherExp = 0; // No separate "other" expense in payload
+  const expensesTotal = payload?.totalExpenses ?? shopping + wages;
 
-  const startingCash = row.startingCash ?? 0;
+  const startingCash = payload?.startingCash ?? row.startingCash ?? 0;
 
   const items: ExpenseItem[] = [
     { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
