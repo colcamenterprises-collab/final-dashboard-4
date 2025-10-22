@@ -154,7 +154,7 @@ function CashBalanceSnapshot() {
 
   return (
     <div className="w-1/3 bg-white rounded p-6 shadow-sm border">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Shift Summary</h2>
+      <h2 className="text-sm font-bold mb-4 text-gray-800">Shift Summary</h2>
       <div>
         {posBalances.length > 0 ? (
           posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)

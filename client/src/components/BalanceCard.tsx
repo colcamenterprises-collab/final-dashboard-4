@@ -12,12 +12,12 @@ export default function BalanceCard({ date, expected, actual, difference, status
   const isBalanced = status === "Balanced";
   return (
     <div 
-      className="bg-slate-800 rounded-lg p-4 mb-3 shadow-sm"
+      className="bg-slate-800 rounded p-4 mb-3 shadow-sm"
       data-testid={`balance-card-${date}`}
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-white">{formatDateDDMMYYYY(date)}</span>
-        <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
           isBalanced ? "bg-green-500 text-white" : "bg-red-500 text-white"
         }`}>
           {isBalanced ? "Balanced" : "Unbalanced"}
