@@ -62,9 +62,9 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
 
 async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
   const { start, end } = dayRange(businessDate);
-  const row = await prisma.dailySales.findFirst({
+  const row = await prisma.dailySalesV2.findFirst({
     where: { 
-      businessDate: { gte: start, lt: end },
+      shift_date: { gte: start, lt: end },
       deletedAt: null,
     },
   });
@@ -73,13 +73,13 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
   const cash = row.cashSales ?? 0;
   const qr = row.qrSales ?? 0;
   const grab = row.grabSales ?? 0;
-  const other = row.otherSales ?? 0;
-  const total = cash + qr + grab + other;
+  const other = row.aroiSales ?? 0;
+  const total = row.totalSales ?? (cash + qr + grab + other);
 
   const shopping = row.shoppingTotal ?? 0;
   const wages = row.wagesTotal ?? 0;
-  const otherExp = row.otherExpense ?? 0;
-  const expensesTotal = shopping + wages + otherExp;
+  const otherExp = row.othersTotal ?? 0;
+  const expensesTotal = row.totalExpenses ?? (shopping + wages + otherExp);
 
   const startingCash = row.startingCash ?? 0;
 
@@ -182,7 +182,7 @@ analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
   const { start, end } = dayRange(date);
   const [posCount, formCount] = await Promise.all([
     prisma.posShiftReport.count({ where: { businessDate: { gte: start, lt: end } } }),
-    prisma.dailySales.count({ where: { businessDate: { gte: start, lt: end }, deletedAt: null } }),
+    prisma.dailySalesV2.count({ where: { shift_date: { gte: start, lt: end }, deletedAt: null } }),
   ]);
   res.json({ date, posCount, formCount, start, end });
 });
