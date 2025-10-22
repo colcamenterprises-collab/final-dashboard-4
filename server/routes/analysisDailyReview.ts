@@ -8,10 +8,16 @@ const THB = (n: number) => Number(n.toFixed(2));
 async function fetchPosShiftReport(date: string): Promise<DailySource> {
   const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 13807, other: 0, total: 16851 };
   const items: ExpenseItem[] = [
-    { id: "s1", label: "Shopping", amount: 661, category: "shopping" },
-    { id: "w1", label: "Wages", amount: 2700, category: "wage" },
+    { id: "s1", label: "Tomatoes", amount: 150, category: "shopping" },
+    { id: "s2", label: "Onions", amount: 200, category: "shopping" },
+    { id: "s3", label: "Lettuce", amount: 311, category: "shopping" },
+    { id: "w1", label: "Kitchen Staff", amount: 1500, category: "wage" },
+    { id: "w2", label: "Server", amount: 1200, category: "wage" },
   ];
-  const expensesTotal = 661 + 2700;
+  const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
+  const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
+  const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
+  const expensesTotal = shoppingTotal + wageTotal + otherTotal;
   const banking = {
     startingCash: 547,
     cashPayments: sales.cash,
@@ -23,7 +29,7 @@ async function fetchPosShiftReport(date: string): Promise<DailySource> {
   return {
     date,
     sales,
-    expenses: { shoppingTotal: 661, wageTotal: 2700, otherTotal: 0, items },
+    expenses: { shoppingTotal, wageTotal, otherTotal, items },
     banking,
   };
 }
@@ -31,10 +37,17 @@ async function fetchPosShiftReport(date: string): Promise<DailySource> {
 async function fetchForm1Daily(date: string): Promise<DailySource> {
   const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 14146, other: 0, total: 17190 };
   const items: ExpenseItem[] = [
-    { id: "s1", label: "Shopping", amount: 1000, category: "shopping" },
-    { id: "w1", label: "Wages", amount: 2700, category: "wage" },
+    { id: "s1", label: "Tomatoes", amount: 180, category: "shopping" },
+    { id: "s2", label: "Onions", amount: 200, category: "shopping" },
+    { id: "s3", label: "Lettuce", amount: 320, category: "shopping" },
+    { id: "s4", label: "Bread", amount: 300, category: "shopping" },
+    { id: "w1", label: "Kitchen Staff", amount: 1500, category: "wage" },
+    { id: "w2", label: "Server", amount: 1200, category: "wage" },
   ];
-  const expensesTotal = 1000 + 2700;
+  const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
+  const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
+  const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
+  const expensesTotal = shoppingTotal + wageTotal + otherTotal;
   const banking = {
     startingCash: 547,
     cashPayments: sales.cash,
@@ -46,7 +59,7 @@ async function fetchForm1Daily(date: string): Promise<DailySource> {
   return {
     date,
     sales,
-    expenses: { shoppingTotal: 1000, wageTotal: 2700, otherTotal: 0, items },
+    expenses: { shoppingTotal, wageTotal, otherTotal, items },
     banking,
   };
 }
