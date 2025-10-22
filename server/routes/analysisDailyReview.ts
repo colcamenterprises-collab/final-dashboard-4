@@ -1,85 +1,98 @@
 import { Router } from "express";
-import { db } from "../db";
-import { shiftReports, dailySalesV2 } from "../../shared/schema";
-import { eq } from "drizzle-orm";
-import type { DailyComparisonResponse, DailySource, ExpenseItem, SalesBreakdown } from "../../shared/analysisTypes";
+import { prisma } from "../../lib/prisma";
+import type {
+  DailyComparisonResponse,
+  DailySource,
+  ExpenseItem,
+  SalesBreakdown,
+  Availability,
+} from "../../shared/analysisTypes";
 
 export const analysisDailyReviewRouter = Router();
 
-const THB = (n: number) => Number(n.toFixed(2));
-const satangToTHB = (satang: number | null) => THB((satang || 0) / 100);
+const THB = (n: number) => Number((n ?? 0).toFixed(2));
 
-async function fetchPosShiftReport(date: string): Promise<DailySource> {
-  const sales: SalesBreakdown = {
-    cash: 1967,
-    qr: 1077,
-    grab: 13807,
-    other: 0,
-    total: 16851,
-  };
+async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
+  const row = await prisma.posShiftReport.findFirst({
+    where: { businessDate: new Date(businessDate) },
+  });
+  if (!row) return null;
+
+  const cash = row.cashTotal ?? 0;
+  const qr = row.qrTotal ?? 0;
+  const grab = row.grabTotal ?? 0;
+  const other = row.otherTotal ?? 0;
+  const total = (row.grandTotal ?? (cash + qr + grab + other)) as number;
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = row.startingCash ?? 0;
 
   const items: ExpenseItem[] = [
-    { id: "shopping-pos", label: "Shopping", amount: 661, category: "shopping" },
-    { id: "wages-pos", label: "Wages", amount: 2700, category: "wage" },
+    { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+    { id: "wages", label: "Wages", amount: wages, category: "wage" },
   ];
-
-  const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
-  const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
-  const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
-  const expensesTotal = shoppingTotal + wageTotal + otherTotal;
+  if (otherExp) items.push({ id: "other", label: "Other", amount: otherExp, category: "other" });
 
   return {
-    date,
-    sales,
-    expenses: { shoppingTotal, wageTotal, otherTotal, items },
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: { shoppingTotal: shopping, wageTotal: wages, otherTotal: otherExp, items },
     banking: {
-      startingCash: 547,
-      cashPayments: sales.cash,
-      qrPayments: sales.qr,
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
       expensesTotal,
-      expectedCash: THB(547 + sales.cash - expensesTotal),
-      estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+      expectedCash: THB(startingCash + cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
     },
   };
 }
 
-async function fetchForm1Daily(date: string): Promise<DailySource> {
-  const sales: SalesBreakdown = {
-    cash: 1967,
-    qr: 1077,
-    grab: 14146,
-    other: 0,
-    total: 17190,
-  };
+async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
+  const row = await prisma.dailySales.findFirst({
+    where: { businessDate: new Date(businessDate) },
+  });
+  if (!row) return null;
+
+  const cash = row.cashSales ?? 0;
+  const qr = row.qrSales ?? 0;
+  const grab = row.grabSales ?? 0;
+  const other = row.otherSales ?? 0;
+  const total = cash + qr + grab + other;
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+
+  const startingCash = row.startingCash ?? 0;
 
   const items: ExpenseItem[] = [
-    { id: "shopping-form", label: "Shopping", amount: 1000, category: "shopping" },
-    { id: "wages-form", label: "Wages", amount: 2700, category: "wage" },
+    { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+    { id: "wages", label: "Wages", amount: wages, category: "wage" },
   ];
-
-  const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
-  const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
-  const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
-  const expensesTotal = shoppingTotal + wageTotal + otherTotal;
+  if (otherExp) items.push({ id: "other", label: "Other", amount: otherExp, category: "other" });
 
   return {
-    date,
-    sales,
-    expenses: { shoppingTotal, wageTotal, otherTotal, items },
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: { shoppingTotal: shopping, wageTotal: wages, otherTotal: otherExp, items },
     banking: {
-      startingCash: 547,
-      cashPayments: sales.cash,
-      qrPayments: sales.qr,
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
       expensesTotal,
-      expectedCash: THB(547 + sales.cash - expensesTotal),
-      estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+      expectedCash: THB(startingCash + cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
     },
   };
 }
 
 function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
   const diff = (p: number, f: number) => THB(f - p);
-
   return {
     sales: {
       cash: diff(pos.sales.cash, form.sales.cash),
@@ -104,38 +117,48 @@ function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResp
   };
 }
 
+function availabilityOf(pos: DailySource | null, form: DailySource | null): Availability {
+  if (!pos && !form) return "missing_both";
+  if (!pos) return "missing_pos";
+  if (!form) return "missing_form";
+  return "ok";
+}
+
 analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const date = String(req.query.date || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Invalid date" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
 
-  const [pos, form] = await Promise.all([fetchPosShiftReport(date), fetchForm1Daily(date)]);
-  const response: DailyComparisonResponse = { date, pos, form, variance: buildVariance(pos, form) };
-  res.json(response);
+  const [pos, form] = await Promise.all([fetchPOSFromDB(date), fetchForm1FromDB(date)]);
+  const availability = availabilityOf(pos, form);
+
+  const payload: DailyComparisonResponse = { date, availability };
+  if (pos) payload.pos = pos;
+  if (form) payload.form = form;
+  if (availability === "ok") payload.variance = buildVariance(pos!, form!);
+
+  res.json(payload);
 });
 
 analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
   const month = String(req.query.month || "").trim();
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    return res.status(400).json({ error: "Provide month=YYYY-MM" });
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: "Provide month=YYYY-MM" });
+
+  const [Y, M] = month.split("-").map((x) => parseInt(x, 10));
+  const daysInMonth = new Date(Y, M, 0).getDate();
+
+  const out: DailyComparisonResponse[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${month}-${String(d).padStart(2, "0")}`;
+    const [pos, form] = await Promise.all([fetchPOSFromDB(ds), fetchForm1FromDB(ds)]);
+    const availability = availabilityOf(pos, form);
+
+    const entry: DailyComparisonResponse = { date: ds, availability };
+    if (pos) entry.pos = pos;
+    if (form) entry.form = form;
+    if (availability === "ok") entry.variance = buildVariance(pos!, form!);
+
+    out.push(entry);
   }
 
-  const [year, monthNum] = month.split("-").map((x) => parseInt(x, 10));
-  const daysInMonth = new Date(year, monthNum, 0).getDate();
-  const today = new Date();
-  const currentMonth =
-    today.getFullYear() === year && today.getMonth() + 1 === monthNum
-      ? today.getDate()
-      : daysInMonth;
-
-  const results: DailyComparisonResponse[] = [];
-  for (let day = 1; day <= currentMonth; day++) {
-    const dateStr = `${month}-${String(day).padStart(2, "0")}`;
-    const [pos, form] = await Promise.all([
-      fetchPosShiftReport(dateStr),
-      fetchForm1Daily(dateStr),
-    ]);
-    results.push({ date: dateStr, pos, form, variance: buildVariance(pos, form) });
-  }
-
-  res.json(results);
+  res.json(out);
 });

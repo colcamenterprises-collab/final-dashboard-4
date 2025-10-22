@@ -1,0 +1,524 @@
+) shared/analysisTypes.ts (replace with this)
+
+export type Money = number;
+
+export interface SalesBreakdown {
+  cash: Money;
+  qr: Money;
+  grab: Money;
+  other: Money;
+  total: Money;
+}
+
+export interface ExpenseItem {
+  id: string;
+  label: string;
+  amount: Money;
+  category: "shopping" | "wage" | "other";
+}
+
+export interface BankingCalc {
+  startingCash: Money;
+  cashPayments: Money;
+  qrPayments: Money;
+  expensesTotal: Money;
+  expectedCash: Money;
+  estimatedNetBanked: Money;
+}
+
+export interface DailySource {
+  date: string;
+  sales: SalesBreakdown;
+  expenses: {
+    shoppingTotal: Money;
+    wageTotal: Money;
+    otherTotal: Money;
+    items: ExpenseItem[];
+  };
+  banking: BankingCalc;
+}
+
+export type Availability = "ok" | "missing_pos" | "missing_form" | "missing_both";
+
+export interface DailyComparisonResponse {
+  date: string;
+  availability: Availability; // tells UI if data is missing
+  pos?: DailySource;   // present when availability !== "missing_pos" / "missing_both"
+  form?: DailySource;  // present when availability !== "missing_form" / "missing_both"
+  variance?: {
+    sales: Record<keyof SalesBreakdown, Money>;
+    expenses: {
+      shoppingTotal: Money;
+      wageTotal: Money;
+      otherTotal: Money;
+      grandTotal: Money;
+    };
+    banking: {
+      expectedCash: Money;
+      estimatedNetBanked: Money;
+    };
+  };
+}
+
+
+---
+
+2) Server — server/routes/analysisDailyReview.ts
+
+This version:
+
+Reads POS from pos_shift_reports by business_date.
+
+Reads Form 1 from DailySales by businessDate (rename that model/fields in the mapper at the top if needed).
+
+Returns availability without inventing data.
+
+Provides both /daily-comparison and /daily-comparison-range.
+
+
+import { Router } from "express";
+import { prisma } from "../prisma";
+import type {
+  DailyComparisonResponse,
+  DailySource,
+  ExpenseItem,
+  SalesBreakdown,
+  Availability,
+} from "../../shared/analysisTypes";
+
+export const analysisDailyReviewRouter = Router();
+
+const THB = (n: number) => Number((n ?? 0).toFixed(2));
+
+/** ---------- MAPPERS (edit these if your Prisma model names/fields differ) ---------- */
+
+// POS (Loyverse shift) -> DailySource
+async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
+  const row = await prisma.posShiftReport.findFirst({
+    where: { businessDate: new Date(businessDate) },
+  });
+  if (!row) return null;
+
+  const cash = row.cashTotal ?? 0;
+  const qr = row.qrTotal ?? 0;
+  const grab = row.grabTotal ?? 0;
+  const other = row.otherTotal ?? 0;
+  const total = (row.grandTotal ?? (cash + qr + grab + other)) as number;
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = row.startingCash ?? 0;
+
+  const items: ExpenseItem[] = [
+    { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+    { id: "wages", label: "Wages", amount: wages, category: "wage" },
+  ];
+  if (otherExp) items.push({ id: "other", label: "Other", amount: otherExp, category: "other" });
+
+  return {
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: { shoppingTotal: shopping, wageTotal: wages, otherTotal: otherExp, items },
+    banking: {
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
+      expensesTotal,
+      expectedCash: THB(startingCash + cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
+    },
+  };
+}
+
+// Form 1 (Daily Sales) -> DailySource
+// Adjust model/field names here if yours differ.
+async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
+  const row = await prisma.dailySales.findFirst({
+    where: { businessDate: new Date(businessDate) },
+  });
+  if (!row) return null;
+
+  // If you store sales split by channel in a nested table, sum them here.
+  const cash = row.cashSales ?? 0;
+  const qr = row.qrSales ?? 0;
+  const grab = row.grabSales ?? 0;
+  const other = row.otherSales ?? 0;
+  const total = cash + qr + grab + other;
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+
+  const startingCash = row.startingCash ?? 0;
+
+  const items: ExpenseItem[] = [
+    { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+    { id: "wages", label: "Wages", amount: wages, category: "wage" },
+  ];
+  if (otherExp) items.push({ id: "other", label: "Other", amount: otherExp, category: "other" });
+
+  return {
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: { shoppingTotal: shopping, wageTotal: wages, otherTotal: otherExp, items },
+    banking: {
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
+      expensesTotal,
+      expectedCash: THB(startingCash + cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
+    },
+  };
+}
+
+/** ---------- VARIANCE ---------- */
+
+function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
+  const diff = (p: number, f: number) => THB(f - p); // Form − POS (POS is truth)
+  return {
+    sales: {
+      cash: diff(pos.sales.cash, form.sales.cash),
+      qr: diff(pos.sales.qr, form.sales.qr),
+      grab: diff(pos.sales.grab, form.sales.grab),
+      other: diff(pos.sales.other, form.sales.other),
+      total: diff(pos.sales.total, form.sales.total),
+    },
+    expenses: {
+      shoppingTotal: diff(pos.expenses.shoppingTotal, form.expenses.shoppingTotal),
+      wageTotal: diff(pos.expenses.wageTotal, form.expenses.wageTotal),
+      otherTotal: diff(pos.expenses.otherTotal, form.expenses.otherTotal),
+      grandTotal: diff(
+        pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
+        form.expenses.shoppingTotal + form.expenses.wageTotal + form.expenses.otherTotal
+      ),
+    },
+    banking: {
+      expectedCash: diff(pos.banking.expectedCash, form.banking.expectedCash),
+      estimatedNetBanked: diff(pos.banking.estimatedNetBanked, form.banking.estimatedNetBanked),
+    },
+  };
+}
+
+/** ---------- HELPERS ---------- */
+
+function availabilityOf(pos: DailySource | null, form: DailySource | null): Availability {
+  if (!pos && !form) return "missing_both";
+  if (!pos) return "missing_pos";
+  if (!form) return "missing_form";
+  return "ok";
+}
+
+/** ---------- ROUTES ---------- */
+
+// Single business day
+analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
+  const date = String(req.query.date || "").trim(); // YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
+
+  const [pos, form] = await Promise.all([fetchPOSFromDB(date), fetchForm1FromDB(date)]);
+  const availability = availabilityOf(pos, form);
+
+  const payload: DailyComparisonResponse = { date, availability };
+  if (pos) payload.pos = pos;
+  if (form) payload.form = form;
+  if (availability === "ok") payload.variance = buildVariance(pos!, form!);
+
+  res.json(payload);
+});
+
+// Month range
+analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
+  const month = String(req.query.month || "").trim(); // YYYY-MM
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: "Provide month=YYYY-MM" });
+
+  const [Y, M] = month.split("-").map((x) => parseInt(x, 10));
+  const daysInMonth = new Date(Y, M, 0).getDate();
+
+  const out: DailyComparisonResponse[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${month}-${String(d).padStart(2, "0")}`;
+    const [pos, form] = await Promise.all([fetchPOSFromDB(ds), fetchForm1FromDB(ds)]);
+    const availability = availabilityOf(pos, form);
+
+    const entry: DailyComparisonResponse = { date: ds, availability };
+    if (pos) entry.pos = pos;
+    if (form) entry.form = form;
+    if (availability === "ok") entry.variance = buildVariance(pos!, form!);
+
+    out.push(entry);
+  }
+
+  res.json(out);
+});
+
+> Register once in server/routes.ts:
+
+
+
+import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
+app.use("/api/analysis", analysisDailyReviewRouter);
+
+
+---
+
+3) Client — client/src/pages/analysis/DailyReview.tsx
+
+Updated to:
+
+Grey pills if missing data.
+
+Show “Missing POS/Form” badges; hide flags when either side missing.
+
+No fake fallback.
+
+
+import React, { useEffect, useMemo, useState } from "react";
+import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
+
+const THRESHOLDS = { sales: 500, expenses: 500, banking: 300 };
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const thisMonth = () => todayISO().slice(0, 7);
+const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+
+function Flag({ val, limit }: { val: number; limit: number }) {
+  const ok = Math.abs(val) < limit;
+  return (
+    <div className={`rounded-md px-2 py-1 text-center font-semibold ${ok ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>
+      {ok ? "✓" : "⚠"}
+    </div>
+  );
+}
+
+function DayPill({
+  date,
+  selected,
+  status, // "ok" | "missing_*"
+  onClick,
+}: {
+  date: string;
+  selected: boolean;
+  status: DailyComparisonResponse["availability"];
+  onClick: () => void;
+}) {
+  const flagged = status === "ok"; // only “ok” days are eligible for flags on row level
+  const cls =
+    status === "ok"
+      ? "border-gray-300"
+      : "border-gray-200 bg-gray-100 text-gray-400";
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full border text-sm ${
+        selected ? "bg-black text-white" : "bg-white hover:bg-gray-50"
+      } ${cls}`}
+      title={
+        status === "ok"
+          ? "Data available"
+          : status === "missing_both"
+          ? "Missing POS and Form"
+          : status === "missing_pos"
+          ? "Missing POS"
+          : "Missing Form"
+      }
+    >
+      {date.slice(-2)}
+    </button>
+  );
+}
+
+export default function DailyReview() {
+  const [month, setMonth] = useState(thisMonth());
+  const [all, setAll] = useState<DailyComparisonResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
+        const j = (await r.json()) as DailyComparisonResponse[];
+        if (!alive) return;
+        setAll(j);
+        const latestWithAny = [...j].reverse().find(d => d.availability !== "missing_both");
+        setSelectedDate(latestWithAny?.date || j[j.length - 1]?.date || null);
+      } finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [month]);
+
+  const current = useMemo(() => all.find(d => d.date === selectedDate) || null, [all, selectedDate]);
+
+  const dayHasFlag = (d: DailyComparisonResponse) => {
+    if (d.availability !== "ok" || !d.variance) return false;
+    const S = d.variance.sales, E = d.variance.expenses, B = d.variance.banking;
+    return (
+      Math.abs(S.cash) >= THRESHOLDS.sales ||
+      Math.abs(S.qr) >= THRESHOLDS.sales ||
+      Math.abs(S.grab) >= THRESHOLDS.sales ||
+      Math.abs(S.total) >= THRESHOLDS.sales ||
+      Math.abs(E.grandTotal) >= THRESHOLDS.expenses ||
+      Math.abs(B.expectedCash) >= THRESHOLDS.banking ||
+      Math.abs(B.estimatedNetBanked) >= THRESHOLDS.banking
+    );
+  };
+
+  const saveComment = (txt: string) => {
+    setComment(txt);
+    localStorage.setItem("dailyReviewComment", txt);
+  };
+
+  const Section = ({ title, rows, type }: any) => (
+    <section className="mb-6">
+      <h2 className="text-lg font-bold mb-2">{title}</h2>
+      <div className="grid grid-cols-5 gap-1 text-sm items-center">
+        <div className="font-semibold text-gray-500">Item</div>
+        <div className="font-semibold">POS</div>
+        <div className="font-semibold">Form</div>
+        <div className="font-semibold">Diff (Form−POS)</div>
+        <div className="font-semibold text-center">Flag</div>
+        {rows.map((r: any) => (
+          <React.Fragment key={r.label}>
+            <div className="text-gray-600">{r.label}</div>
+            <div>{r.pos === null ? "—" : fmt(r.pos)}</div>
+            <div>{r.form === null ? "—" : fmt(r.form)}</div>
+            <div>{r.diff === null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}</div>
+            <div>{r.diff === null ? "—" : <Flag val={r.diff} limit={THRESHOLDS[type]} />}</div>
+          </React.Fragment>
+        ))}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="mx-auto max-w-[980px] p-4 space-y-6">
+      <header className="border-b pb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-xl font-extrabold">Daily Review</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Month</label>
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded-md px-2 py-1 text-sm" />
+        </div>
+      </header>
+
+      <div className="flex gap-2 flex-wrap">
+        {all.map((d) => (
+          <DayPill
+            key={d.date}
+            date={d.date}
+            selected={selectedDate === d.date}
+            status={d.availability}
+            onClick={() => setSelectedDate(d.date)}
+          />
+        ))}
+      </div>
+
+      {loading && <div className="text-sm p-4">Loading…</div>}
+      {!loading && !current && <div className="text-sm p-4 text-gray-600">No data for this month.</div>}
+
+      {!loading && current && (
+        <>
+          <div className="rounded-xl border p-3 bg-gray-50">
+            <div className="text-sm">
+              <span className="font-semibold">Business date:</span> {current.date} (18:00→03:00, POS = source of truth)
+              {current.availability !== "ok" && (
+                <span className="ml-2 text-red-700">
+                  — {current.availability === "missing_both" ? "Missing POS & Form" :
+                      current.availability === "missing_pos" ? "Missing POS" : "Missing Form"}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Only render comparisons when we have both sources */}
+          {current.availability === "ok" && current.pos && current.form && current.variance && (
+            <>
+              <Section
+                title="Sales (Form vs POS)"
+                type="sales"
+                rows={[
+                  { label: "Cash", pos: current.pos.sales.cash, form: current.form.sales.cash, diff: current.variance.sales.cash },
+                  { label: "QR", pos: current.pos.sales.qr, form: current.form.sales.qr, diff: current.variance.sales.qr },
+                  { label: "Grab", pos: current.pos.sales.grab, form: current.form.sales.grab, diff: current.variance.sales.grab },
+                  { label: "Total", pos: current.pos.sales.total, form: current.form.sales.total, diff: current.variance.sales.total },
+                ]}
+              />
+
+              <Section
+                title="Expenses"
+                type="expenses"
+                rows={[
+                  { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
+                  { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
+                  {
+                    label: "Grand Total",
+                    pos: current.pos.expenses.shoppingTotal + current.pos.expenses.wageTotal + current.pos.expenses.otherTotal,
+                    form: current.form.expenses.shoppingTotal + current.form.expenses.wageTotal + current.form.expenses.otherTotal,
+                    diff: current.variance.expenses.grandTotal,
+                  },
+                ]}
+              />
+
+              <Section
+                title="Banking & Cash"
+                type="banking"
+                rows={[
+                  { label: "Expected Cash", pos: current.pos.banking.expectedCash, form: current.form.banking.expectedCash, diff: current.variance.banking.expectedCash },
+                  { label: "Estimated Net Banked", pos: current.pos.banking.estimatedNetBanked, form: current.form.banking.estimatedNetBanked, diff: current.variance.banking.estimatedNetBanked },
+                ]}
+              />
+            </>
+          )}
+
+          {/* If one side missing, show what we do have */}
+          {current.availability !== "ok" && (
+            <div className="text-sm text-gray-600">
+              We don’t have both sources to compare for this date. Data present:
+              <ul className="list-disc ml-5 mt-1">
+                {current.pos && <li>POS shift totals</li>}
+                {current.form && <li>Daily Sales & Stock Form</li>}
+                {!current.pos && !current.form && <li>None</li>}
+              </ul>
+            </div>
+          )}
+
+          <section className="border-t pt-3">
+            <h2 className="font-bold mb-2">Manager Comments (local only)</h2>
+            <textarea
+              className="w-full border rounded-md p-2 min-h-[110px] text-sm"
+              placeholder="Record findings, explanations, or actions taken…"
+              value={comment}
+              onChange={(e) => saveComment(e.target.value)}
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              (Comments are saved only on this device. We can wire them to the database per business date later if you’d like.)
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+---
+
+Safety rails (no more fake data)
+
+1. Do not seed: The server never invents numbers—if there’s no row, it returns availability: "missing_*" and no variance.
+
+
+2. UI guards: If either source is missing, day pill is grey; comparisons & flags are suppressed.
+
+
+3. Adapters are the only place to edit mappings to your Prisma models/fields.
+
+
+
+
+---
