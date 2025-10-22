@@ -1,61 +1,103 @@
 import { Router } from "express";
+import { db } from "../db";
+import { shiftReports, dailySalesV2, shiftSales, shiftPurchases } from "../../shared/schema";
+import { eq, and } from "drizzle-orm";
 import type { DailyComparisonResponse, DailySource, ExpenseItem, SalesBreakdown, ExpenseItemVariance } from "../../shared/analysisTypes";
 
 export const analysisDailyReviewRouter = Router();
 
 const THB = (n: number) => Number(n.toFixed(2));
+const satangToTHB = (satang: number | null) => THB((satang || 0) / 100);
 
 async function fetchPosShiftReport(date: string): Promise<DailySource> {
-  const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 13807, other: 0, total: 16851 };
-  const items: ExpenseItem[] = [
-    { id: "s1", label: "Tomatoes", amount: 150, category: "shopping" },
-    { id: "s2", label: "Onions", amount: 200, category: "shopping" },
-    { id: "s3", label: "Lettuce", amount: 311, category: "shopping" },
-    { id: "w1", label: "Kitchen Staff", amount: 1500, category: "wage" },
-    { id: "w2", label: "Server", amount: 1200, category: "wage" },
-  ];
-  const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
-  const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
-  const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
-  const expensesTotal = shoppingTotal + wageTotal + otherTotal;
-  const banking = {
-    startingCash: 547,
-    cashPayments: sales.cash,
-    qrPayments: sales.qr,
-    expensesTotal,
-    expectedCash: THB(547 + sales.cash - expensesTotal),
-    estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+  const shiftReport = await db.select().from(shiftReports).where(eq(shiftReports.reportDate, date)).limit(1);
+  
+  if (!shiftReport || shiftReport.length === 0) {
+    return {
+      date,
+      sales: { cash: 0, qr: 0, grab: 0, other: 0, total: 0 },
+      expenses: { shoppingTotal: 0, wageTotal: 0, otherTotal: 0, items: [] },
+      banking: { startingCash: 0, cashPayments: 0, qrPayments: 0, expensesTotal: 0, expectedCash: 0, estimatedNetBanked: 0 },
+    };
+  }
+
+  const data: any = shiftReport[0].shiftData || {};
+  const sales: SalesBreakdown = {
+    cash: THB(data.cashSales || 0),
+    qr: THB(data.qrSales || 0),
+    grab: THB(data.grabSales || 0),
+    other: THB((data.aroiSales || 0) + (data.otherSales || 0)),
+    total: THB(data.totalSales || 0),
   };
+
   return {
     date,
     sales,
-    expenses: { shoppingTotal, wageTotal, otherTotal, items },
-    banking,
+    expenses: { shoppingTotal: 0, wageTotal: 0, otherTotal: 0, items: [] },
+    banking: {
+      startingCash: THB(data.startingCash || 0),
+      cashPayments: sales.cash,
+      qrPayments: sales.qr,
+      expensesTotal: 0,
+      expectedCash: THB(data.startingCash || 0),
+      estimatedNetBanked: THB(data.startingCash || 0) + sales.qr,
+    },
   };
 }
 
 async function fetchForm1Daily(date: string): Promise<DailySource> {
-  const sales: SalesBreakdown = { cash: 1967, qr: 1077, grab: 14146, other: 0, total: 17190 };
-  const items: ExpenseItem[] = [
-    { id: "s1", label: "Tomatoes", amount: 180, category: "shopping" },
-    { id: "s2", label: "Onions", amount: 200, category: "shopping" },
-    { id: "s3", label: "Lettuce", amount: 320, category: "shopping" },
-    { id: "s4", label: "Bread", amount: 300, category: "shopping" },
-    { id: "w1", label: "Kitchen Staff", amount: 1500, category: "wage" },
-    { id: "w2", label: "Server", amount: 1200, category: "wage" },
-  ];
+  const shiftData = await db.select().from(shiftSales).where(eq(shiftSales.shiftDate, date)).limit(1);
+  
+  if (!shiftData || shiftData.length === 0) {
+    return {
+      date,
+      sales: { cash: 0, qr: 0, grab: 0, other: 0, total: 0 },
+      expenses: { shoppingTotal: 0, wageTotal: 0, otherTotal: 0, items: [] },
+      banking: { startingCash: 0, cashPayments: 0, qrPayments: 0, expensesTotal: 0, expectedCash: 0, estimatedNetBanked: 0 },
+    };
+  }
+
+  const shift = shiftData[0];
+  const purchases = await db.select().from(shiftPurchases).where(eq(shiftPurchases.shiftSalesId, shift.id));
+
+  const items: ExpenseItem[] = purchases.map((p, idx) => {
+    const desc = (p.description || "").toLowerCase();
+    let category: "shopping" | "wage" | "other" = "other";
+    if (desc.includes("wage") || desc.includes("salary") || desc.includes("staff")) {
+      category = "wage";
+    } else if (desc.includes("shopping") || desc.includes("ingredient") || desc.includes("food") || desc.includes("supply")) {
+      category = "shopping";
+    }
+    return {
+      id: `expense-${p.id}`,
+      label: p.description || "Unknown",
+      amount: satangToTHB(p.amountSatang),
+      category,
+    };
+  });
+
   const shoppingTotal = items.filter(x => x.category === "shopping").reduce((sum, x) => sum + x.amount, 0);
   const wageTotal = items.filter(x => x.category === "wage").reduce((sum, x) => sum + x.amount, 0);
   const otherTotal = items.filter(x => x.category === "other").reduce((sum, x) => sum + x.amount, 0);
   const expensesTotal = shoppingTotal + wageTotal + otherTotal;
+
+  const sales: SalesBreakdown = {
+    cash: satangToTHB(shift.cashSatang),
+    qr: satangToTHB(shift.qrSatang),
+    grab: satangToTHB(shift.grabSatang),
+    other: satangToTHB(shift.aroiDeeSatang) + satangToTHB(shift.otherSatang),
+    total: satangToTHB(shift.cashSatang) + satangToTHB(shift.qrSatang) + satangToTHB(shift.grabSatang) + satangToTHB(shift.aroiDeeSatang) + satangToTHB(shift.otherSatang),
+  };
+
   const banking = {
-    startingCash: 547,
+    startingCash: satangToTHB(shift.startingCashSatang),
     cashPayments: sales.cash,
     qrPayments: sales.qr,
     expensesTotal,
-    expectedCash: THB(547 + sales.cash - expensesTotal),
-    estimatedNetBanked: THB(547 + sales.cash - expensesTotal + sales.qr),
+    expectedCash: THB(satangToTHB(shift.startingCashSatang) + sales.cash - expensesTotal),
+    estimatedNetBanked: THB(satangToTHB(shift.startingCashSatang) + sales.cash - expensesTotal + sales.qr),
   };
+
   return {
     date,
     sales,
