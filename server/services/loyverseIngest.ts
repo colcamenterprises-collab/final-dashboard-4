@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 type Totals = { cash: number; qr: number; grab: number; other: number; grand: number };
+type ExpenseTotals = { shopping: number; wages: number; other: number };
 
 interface LoyverseReceipt {
   receipt_number: string;
@@ -15,6 +16,36 @@ interface LoyverseReceipt {
 
 interface LoyverseResponse {
   receipts: LoyverseReceipt[];
+  cursor?: string;
+}
+
+interface LoyverseShift {
+  id: string;
+  store_id: string;
+  opened_at: string;
+  closed_at: string;
+  starting_cash: number;
+  cash_payments: number;
+  cash_refunds: number;
+  paid_in: number;
+  paid_out: number;
+  expected_cash: number;
+  actual_cash: number;
+  gross_sales: number;
+  refunds: number;
+  discounts: number;
+  net_sales: number;
+  cash_movements?: Array<{
+    type: 'PAY_IN' | 'PAY_OUT';
+    money_amount: number;
+    comment?: string;
+    employee_id: string;
+    created_at: string;
+  }>;
+}
+
+interface LoyverseShiftsResponse {
+  shifts: LoyverseShift[];
   cursor?: string;
 }
 
@@ -78,6 +109,82 @@ async function getPaymentTypeMapping(): Promise<Record<string, 'Cash' | 'QR' | '
   return mapping;
 }
 
+function categorizeExpense(comment: string): 'shopping' | 'wages' | 'other' {
+  const lower = comment.toLowerCase();
+  
+  // Shopping indicators (suppliers, stores)
+  const shoppingKeywords = ['makro', 'แม็ก', 'supercheap', '7-11', 'seven', 'lotus', 'tesco', 'big c', 'tops', 'foodland', 'villa', 'gourmet', 'market', 'shop'];
+  if (shoppingKeywords.some(k => lower.includes(k))) {
+    return 'shopping';
+  }
+  
+  // Wage indicators
+  const wageKeywords = ['wage', 'salary', 'เงินเดือน', 'ค่าจ้าง', 'staff', 'employee', 'พนักงาน'];
+  if (wageKeywords.some(k => lower.includes(k))) {
+    return 'wages';
+  }
+  
+  // Default to other
+  return 'other';
+}
+
+async function fetchShiftExpenses(storeId: string, startUtc: string, endUtc: string): Promise<ExpenseTotals> {
+  const token = process.env.LOYVERSE_TOKEN;
+  if (!token) throw new Error('LOYVERSE_TOKEN not set');
+
+  const expenses: ExpenseTotals = { shopping: 0, wages: 0, other: 0 };
+  
+  // Fetch shifts that opened within the business date window
+  const url = new URL('https://api.loyverse.com/v1.0/shifts');
+  url.searchParams.set('store_id', storeId);
+  url.searchParams.set('opening_time_min', startUtc);
+  url.searchParams.set('opening_time_max', endUtc);
+  url.searchParams.set('limit', '10'); // Should only be 1-2 shifts per day
+
+  const r = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!r.ok) {
+    const errorText = await r.text();
+    console.warn(`   ⚠️  Loyverse shifts ${r.status}: ${errorText}`);
+    return expenses; // Return empty expenses if shift data unavailable
+  }
+
+  const data = await r.json() as LoyverseShiftsResponse;
+  
+  if (data.shifts.length === 0) {
+    console.log(`   ℹ️  No shifts found for this date`);
+    return expenses;
+  }
+  
+  console.log(`   📊 Processing ${data.shifts.length} shift(s)`);
+  
+  for (const shift of data.shifts) {
+    if (!shift.cash_movements || shift.cash_movements.length === 0) {
+      console.log(`   ℹ️  No cash movements in shift ${shift.id}`);
+      continue;
+    }
+    
+    console.log(`   💸 Processing ${shift.cash_movements.length} cash movements`);
+    
+    for (const movement of shift.cash_movements) {
+      if (movement.type === 'PAY_OUT') {
+        const amount = Math.round(movement.money_amount || 0);
+        const category = categorizeExpense(movement.comment || '');
+        
+        if (category === 'shopping') expenses.shopping += amount;
+        else if (category === 'wages') expenses.wages += amount;
+        else expenses.other += amount;
+        
+        console.log(`      • ${movement.comment || 'Unnamed'}: ฿${amount} → ${category}`);
+      }
+    }
+  }
+
+  return expenses;
+}
+
 export async function ingestPosForBusinessDate(storeId: string, businessDate: string) {
   console.log(`📥 Ingesting POS data for ${businessDate}...`);
   
@@ -88,6 +195,7 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   const token = process.env.LOYVERSE_TOKEN;
   if (!token) throw new Error('LOYVERSE_TOKEN not set');
 
+  // Fetch sales data
   let cursor: string | undefined;
   const totals: Totals = { cash: 0, qr: 0, grab: 0, other: 0, grand: 0 };
   let receiptCount = 0;
@@ -130,7 +238,12 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   } while (cursor);
 
   console.log(`   Processed ${receiptCount} receipts`);
-  console.log(`   Totals: Cash=${totals.cash}, QR=${totals.qr}, Grab=${totals.grab}, Other=${totals.other}, Grand=${totals.grand}`);
+  console.log(`   Sales: Cash=${totals.cash}, QR=${totals.qr}, Grab=${totals.grab}, Other=${totals.other}, Grand=${totals.grand}`);
+
+  // Fetch expense data
+  console.log(`   📦 Fetching expenses...`);
+  const expenses = await fetchShiftExpenses(storeId, startUtc, endUtc);
+  console.log(`   Expenses: Shopping=${expenses.shopping}, Wages=${expenses.wages}, Other=${expenses.other}`);
 
   const businessDateObj = new Date(businessDate + 'T00:00:00Z');
   const batchId = `LOYVERSE_${businessDate}_${storeId}`;
@@ -164,6 +277,9 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       receiptCount: receiptCount,
       openedAt: new Date(startUtc),
       closedAt: new Date(endUtc),
+      shoppingTotal: expenses.shopping,
+      wagesTotal: expenses.wages,
+      otherExpense: expenses.other,
     },
     create: {
       batchId,
@@ -174,9 +290,9 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       grabTotal: totals.grab,
       otherTotal: totals.other,
       grandTotal: totals.grand,
-      shoppingTotal: 0,
-      wagesTotal: 0,
-      otherExpense: 0,
+      shoppingTotal: expenses.shopping,
+      wagesTotal: expenses.wages,
+      otherExpense: expenses.other,
       startingCash: 0,
       grossSales: totals.grand,
       discounts: 0,
@@ -192,5 +308,10 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   });
 
   console.log(`   ✅ Saved to database`);
-  return totals;
+  return { sales: totals, expenses };
+}
+
+export async function ingestShiftForDate(businessDate: string) {
+  const storeId = 'bcacbb19-db02-4fe8-91fc-e5a9d8116f14';
+  return await ingestPosForBusinessDate(storeId, businessDate);
 }
