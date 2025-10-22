@@ -9,7 +9,7 @@ interface LoyverseReceipt {
   created_at: string;
   payments?: Array<{
     payment_type_id: string;
-    amount: string;
+    money_amount: string;
   }>;
 }
 
@@ -19,18 +19,19 @@ interface LoyverseResponse {
 }
 
 function toUtcWindowForBkkShift(businessDate: string): { startUtc: string; endUtc: string } {
-  const d = new Date(businessDate + 'T00:00:00+07:00');
+  // Bangkok is UTC+7
+  // Business date shift: D 18:00 Bangkok → D+1 03:00 Bangkok
+  const [year, month, day] = businessDate.split('-').map(Number);
   
-  const startBkk = new Date(d);
-  startBkk.setHours(18, 0, 0, 0);
+  // Start: businessDate 18:00 Bangkok = 11:00 UTC same day
+  const startUtc = new Date(Date.UTC(year, month - 1, day, 11, 0, 0));
   
-  const endBkk = new Date(d);
-  endBkk.setDate(endBkk.getDate() + 1);
-  endBkk.setHours(3, 0, 0, 0);
+  // End: businessDate+1 03:00 Bangkok = 20:00 UTC same day  
+  const endUtc = new Date(Date.UTC(year, month - 1, day, 20, 0, 0));
   
   return {
-    startUtc: startBkk.toISOString(),
-    endUtc: endBkk.toISOString(),
+    startUtc: startUtc.toISOString(),
+    endUtc: endUtc.toISOString(),
   };
 }
 
@@ -114,7 +115,7 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       receiptCount++;
       for (const p of (rcpt.payments || [])) {
         const kind = mapping[p.payment_type_id] || 'Other';
-        const amt = Math.round(Number(p.amount) || 0);
+        const amt = Math.round(Number(p.money_amount) || 0);
         
         if (kind === 'Cash') totals.cash += amt;
         else if (kind === 'QR') totals.qr += amt;
