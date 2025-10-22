@@ -132,11 +132,19 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   console.log(`   Totals: Cash=${totals.cash}, QR=${totals.qr}, Grab=${totals.grab}, Other=${totals.other}, Grand=${totals.grand}`);
 
   const businessDateObj = new Date(businessDate + 'T00:00:00Z');
+  const batchId = `LOYVERSE_${businessDate}_${storeId}`;
+
+  await prisma.posBatch.upsert({
+    where: { id: batchId },
+    update: {},
+    create: {
+      id: batchId,
+      title: `Loyverse ${businessDate}`,
+    },
+  });
 
   await prisma.posShiftReport.upsert({
-    where: { 
-      batchId: `LOYVERSE_${businessDate}_${storeId}`,
-    },
+    where: { batchId },
     update: {
       storeId,
       cashTotal: totals.cash,
@@ -145,15 +153,19 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       otherTotal: totals.other,
       grandTotal: totals.grand,
       businessDate: businessDateObj,
+      grossSales: totals.grand,
+      discounts: 0,
+      netSales: totals.grand,
+      cashInDrawer: totals.cash,
+      cashSales: totals.cash,
+      qrSales: totals.qr,
+      otherSales: totals.other,
+      receiptCount: receiptCount,
+      openedAt: new Date(startUtc),
+      closedAt: new Date(endUtc),
     },
     create: {
-      batchId: `LOYVERSE_${businessDate}_${storeId}`,
-      batch: {
-        create: {
-          id: `LOYVERSE_${businessDate}_${storeId}`,
-          title: `Loyverse ${businessDate}`,
-        },
-      },
+      batchId,
       storeId,
       businessDate: businessDateObj,
       cashTotal: totals.cash,
