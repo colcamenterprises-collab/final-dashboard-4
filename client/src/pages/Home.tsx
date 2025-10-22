@@ -42,14 +42,14 @@ function BalanceHero() {
         {/* Quick Actions */}
         <div className="flex gap-3">
           <ModernButton 
-            onClick={() => setLocation('/expenses')}
+            onClick={() => setLocation('/finance/expenses')}
             className="bg-white/15 hover:bg-white/25 text-white border-white/20"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Expense
           </ModernButton>
           <ModernButton 
-            onClick={() => setLocation('/daily-sales')}
+            onClick={() => setLocation('/operations/daily-sales-v2/library')}
             className="bg-white/15 hover:bg-white/25 text-white border-white/20"
           >
             <FileText className="h-4 w-4 mr-2" />
