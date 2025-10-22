@@ -50,10 +50,16 @@ export class SchedulerService {
       this.cacheBurgerMetrics();
     }, 3, 10); // 3:10 AM Bangkok time
 
+    // Schedule Daily Review POS data ingestion at 3:15 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.ingestDailyPOSData();
+    }, 3, 15); // 3:15 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
     console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
     console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
+    console.log('📊 Daily Review POS ingestion scheduled for 3:15am Bangkok time');
   }
 
   stop() {
@@ -494,6 +500,24 @@ export class SchedulerService {
       console.log(`✅ Burger metrics cached for shift ${shiftDateLabel}`);
     } catch (error) {
       console.error('❌ Failed to cache burger metrics:', error);
+    }
+  }
+
+  private async ingestDailyPOSData() {
+    try {
+      console.log('📊 Starting Daily Review POS data ingestion...');
+      
+      const { ingestShiftForDate } = await import('./loyverseIngest');
+      
+      // Get yesterday's date (the shift that just completed)
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const yesterdayStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      await ingestShiftForDate(yesterdayStr);
+      console.log(`✅ Daily Review POS data ingested for ${yesterdayStr}`);
+    } catch (error) {
+      console.error('❌ Failed to ingest Daily Review POS data:', error);
     }
   }
 }
