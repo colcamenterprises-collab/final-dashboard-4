@@ -1,0 +1,230 @@
+1) Prove what data exists (2 quick checks)
+
+A) Does your DB already have anything for those days?
+
+-- POS coverage for the last 14 business dates
+SELECT business_date, COUNT(*) AS pos_rows
+FROM pos_shift_reports
+WHERE business_date BETWEEN (current_date - 14) AND current_date
+GROUP BY business_date ORDER BY business_date;
+
+-- Form-1 coverage for the last 14 business dates
+SELECT business_date, COUNT(*) AS form_rows
+FROM daily_sales
+WHERE business_date BETWEEN (current_date - 14) AND current_date
+GROUP BY business_date ORDER BY business_date;
+
+If a date shows 0 for both → the UI must show “Missing POS & Form” (correct).
+
+B) Add a tiny diagnostic route (temporary)
+
+// server/routes/analysisDailyReview.ts
+analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
+  const date = String(req.query.date || "").trim(); // YYYY-MM-DD
+  const start = new Date(`${date}T00:00:00.000Z`);
+  const end = new Date(start); end.setUTCDate(end.getUTCDate() + 1);
+
+  const [pos, form] = await Promise.all([
+    prisma.posShiftReport.findFirst({ where: { businessDate: { gte: start, lt: end } } }),
+    prisma.dailySales.findFirst({ where: { businessDate: { gte: start, lt: end } } }),
+  ]);
+
+  res.json({ date, hasPOS: !!pos, hasForm: !!form, pos, form });
+});
+
+Hit: /api/analysis/diag/day?date=YYYY-MM-DD — you’ll see exactly what’s missing.
+
+
+---
+
+2) Pull real POS data from Loyverse (receipts API)
+
+A) One-time env + sanity test
+
+Put LOYVERSE_TOKEN and LOYVERSE_STORE_ID into Replit secrets.
+
+Test token with curl:
+
+
+curl -sS "https://api.loyverse.com/v1.0/stores" \
+  -H "Authorization: Bearer $LOYVERSE_TOKEN" | head
+
+You should get JSON. If not, the token is wrong.
+
+B) Add these helpers (server/services/time.ts)
+
+export function bkkWindowToUtcISO(businessDate: string) {
+  // window: D 18:00 → D+1 03:00 (BKK, UTC+7, no DST)
+  const toUTC = (y:number,m:number,d:number,h:number)=>new Date(Date.UTC(y,m,d,h-7,0,0)); // shift -7h
+  const [Y,M,D] = businessDate.split("-").map(Number);
+  const start = toUTC(Y, M-1, D, 18);               // D 18:00 BKK
+  const end   = toUTC(Y, M-1, D+1, 3);              // D+1 03:00 BKK
+  return { startISO: start.toISOString(), endISO: end.toISOString() };
+}
+
+C) Payment type mapping (server/services/loyverse.ts)
+
+export async function getPaymentTypeMap(): Promise<Record<string,"Cash"|"QR"|"Grab"|"Other">> {
+  // If you already maintain this mapping in config/DB, return that instead.
+  const url = "https://api.loyverse.com/v1.0/payment_types";
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${process.env.LOYVERSE_TOKEN}` } });
+  if (!r.ok) throw new Error(`Loyverse payment types ${r.status}`);
+  const data = await r.json(); // { payment_types: [{id,name},...] }
+  const map: Record<string,"Cash"|"QR"|"Grab"|"Other"> = {};
+  for (const pt of (data.payment_types||[])) {
+    const name = String(pt.name || "").toLowerCase();
+    let kind:"Cash"|"QR"|"Grab"|"Other" = "Other";
+    if (name.includes("cash")) kind = "Cash";
+    else if (name.includes("qr")) kind = "QR";
+    else if (name.includes("grab")) kind = "Grab";
+    map[pt.id] = kind;
+  }
+  return map;
+}
+
+D) Receipts puller + DB upsert (server/services/posIngest.ts)
+
+import { prisma } from "../prisma";
+import { bkkWindowToUtcISO } from "./time";
+import { getPaymentTypeMap } from "./loyverse";
+
+export async function ingestPosForBusinessDate(businessDate: string, storeId = process.env.LOYVERSE_STORE_ID!) {
+  const { startISO, endISO } = bkkWindowToUtcISO(businessDate);
+  const map = await getPaymentTypeMap();
+
+  let cursor: string | undefined;
+  const totals = { cash: 0, qr: 0, grab: 0, other: 0, grand: 0 };
+
+  do {
+    const url = new URL("https://api.loyverse.com/v1.0/receipts");
+    url.searchParams.set("store_id", storeId);
+    url.searchParams.set("created_at_min", startISO);
+    url.searchParams.set("created_at_max", endISO);
+    url.searchParams.set("limit", "250");
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${process.env.LOYVERSE_TOKEN}` } });
+    if (!r.ok) throw new Error(`Loyverse receipts ${r.status}`);
+    const data = await r.json(); // { receipts: [...], cursor? }
+
+    for (const rcpt of (data.receipts || [])) {
+      for (const p of (rcpt.payments || [])) {
+        const kind = map[p.payment_type_id] || "Other";
+        const amt = Number(p.amount) || 0;
+        if (kind === "Cash") totals.cash += amt;
+        else if (kind === "QR") totals.qr += amt;
+        else if (kind === "Grab") totals.grab += amt;
+        else totals.other += amt;
+        totals.grand += amt;
+      }
+    }
+    cursor = data.cursor;
+  } while (cursor);
+
+  const dateStart = new Date(`${businessDate}T00:00:00.000Z`);
+  await prisma.posShiftReport.upsert({
+    where: { businessDate: dateStart },
+    update: {
+      storeId,
+      cashTotal: totals.cash,
+      qrTotal: totals.qr,
+      grabTotal: totals.grab,
+      otherTotal: totals.other,
+      grandTotal: totals.grand,
+    },
+    create: {
+      storeId,
+      businessDate: dateStart,
+      cashTotal: totals.cash,
+      qrTotal: totals.qr,
+      grabTotal: totals.grab,
+      otherTotal: totals.other,
+      grandTotal: totals.grand,
+      shoppingTotal: 0,
+      wagesTotal: 0,
+      otherExpense: 0,
+      startingCash: 0,
+      openedAt: dateStart, closedAt: dateStart,
+    },
+  });
+}
+
+E) One-off route to pull yesterday (for quick proof)
+
+analysisDailyReviewRouter.post("/pos/ingest-once", async (req, res) => {
+  const date = String(req.query.date || "").trim(); // YYYY-MM-DD
+  await ingestPosForBusinessDate(date);
+  res.json({ ok: true, date });
+});
+
+Call it:
+
+POST /api/analysis/pos/ingest-once?date=YYYY-MM-DD
+
+Reopen the Daily Review → the POS side should now appear for that date.
+
+
+---
+
+3) Ensure Form-1 is saved with business_date
+
+Wherever you handle the Daily Sales & Stock submit, set business_date at write time:
+
+import { DateTime } from "luxon";
+const submittedAt = new Date();
+const businessDate = DateTime.fromJSDate(submittedAt, { zone: "Asia/Bangkok" })
+  .minus({ hours: 3 }).toISODate(); // YYYY-MM-DD
+
+await prisma.dailySales.create({
+  data: {
+    storeId,
+    submittedAt,
+    businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+    startingCash,
+    cashSales, qrSales, grabSales, otherSales,
+    shoppingTotal, wagesTotal, otherExpense,
+  }
+});
+
+Backfill existing Form rows once (safe to re-run):
+
+UPDATE daily_sales
+SET business_date = (
+  ((submitted_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+)
+WHERE business_date IS NULL;
+
+
+---
+
+4) Make the server lookups tolerant (no date-equality edge cases)
+
+You already have the range-based code, but double-check both fetchers use:
+
+const start = new Date(`${businessDate}T00:00:00.000Z`);
+const end = new Date(start); end.setUTCDate(end.getUTCDate() + 1);
+
+where: { businessDate: { gte: start, lt: end } }
+
+
+---
+
+5) Quick end-to-end test
+
+1. POS ingest once:
+POST /api/analysis/pos/ingest-once?date=YYYY-MM-DD
+
+
+2. Form row present for the same business date (submit a real form or insert one real row).
+
+
+3. Diagnostics:
+/api/analysis/diag/day?date=YYYY-MM-DD → expect hasPOS:true, hasForm:true.
+
+
+4. UI: Open Daily Review on that date → comparisons + flags appear (no “Missing” message).
+
+
+
+
+---
