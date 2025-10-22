@@ -1105,6 +1105,9 @@ export function registerRoutes(app: express.Application): Server {
     );
   }
 
+  // Register daily review routes BEFORE catch-all :date route
+  app.use('/api/analysis', analysisDailyReviewRouter);
+
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {
     const date = req.params.date;
@@ -3372,9 +3375,6 @@ export function registerRoutes(app: express.Application): Server {
   
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
-  
-  // Register daily review routes
-  app.use('/api/analysis', analysisDailyReviewRouter);
   
   // Register shift analysis routes (Mekong Mamba 1.0)
   app.use('/api', shiftAnalysis);
