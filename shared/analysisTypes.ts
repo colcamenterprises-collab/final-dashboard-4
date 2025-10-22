@@ -50,7 +50,6 @@ export interface DailyComparisonResponse {
   variance: {
     sales: Record<keyof SalesBreakdown, Money>;
     expenses: {
-      items: ExpenseItemVariance[];
       shoppingTotal: Money;
       wageTotal: Money;
       otherTotal: Money;

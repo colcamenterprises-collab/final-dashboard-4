@@ -1,270 +1,221 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
-import { formatDateDDMMYYYY, convertFromInputDate } from "@/lib/format";
 
 const THRESHOLDS = { sales: 500, expenses: 500, banking: 300 };
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const thisMonth = () => todayISO().slice(0, 7);
 const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0 });
 
-function Flag({ val }: { val: number }) {
-  const isMatch = val === 0;
+function Flag({ val, limit }: { val: number; limit: number }) {
+  const ok = Math.abs(val) < limit;
   return (
-    <span
-      className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-        isMatch ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+    <div
+      className={`rounded px-2 py-1 text-center font-semibold text-xs ${
+        ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
       }`}
     >
-      {isMatch ? "✓ Match" : "Variance"}
-    </span>
+      {ok ? "✓" : "⚠"}
+    </div>
+  );
+}
+
+function DayPill({
+  date,
+  selected,
+  flagged,
+  onClick,
+}: {
+  date: string;
+  selected: boolean;
+  flagged: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full border text-xs min-h-[44px] min-w-[44px] active:scale-95 transition-transform ${
+        selected ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50 border-slate-300"
+      } ${flagged ? "border-red-400 ring-2 ring-red-200" : ""}`}
+      title={flagged ? "Has anomalies" : "OK"}
+      data-testid={`day-pill-${date}`}
+    >
+      {date.slice(-2)}
+    </button>
   );
 }
 
 export default function DailyReview() {
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
-  const [data, setData] = useState<DailyComparisonResponse | null>(null);
+  const [month, setMonth] = useState(thisMonth());
+  const [all, setAll] = useState<DailyComparisonResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
 
   useEffect(() => {
-    loadData();
-  }, [date]);
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
+        const j = (await r.json()) as DailyComparisonResponse[];
+        if (!alive) return;
+        setAll(j);
+        setSelectedDate(j.length ? j[j.length - 1].date : null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [month]);
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/analysis/daily-comparison?date=${date}`);
-      const result = await response.json();
-      setData(result);
-    } catch (error) {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const current = useMemo(
+    () => all.find((d) => d.date === selectedDate) || null,
+    [all, selectedDate]
+  );
+
+  const dayHasFlag = (d: DailyComparisonResponse) => {
+    const S = d.variance.sales;
+    const E = d.variance.expenses;
+    const B = d.variance.banking;
+    return (
+      Math.abs(S.cash) >= THRESHOLDS.sales ||
+      Math.abs(S.qr) >= THRESHOLDS.sales ||
+      Math.abs(S.grab) >= THRESHOLDS.sales ||
+      Math.abs(S.total) >= THRESHOLDS.sales ||
+      Math.abs(E.grandTotal) >= THRESHOLDS.expenses ||
+      Math.abs(B.expectedCash) >= THRESHOLDS.banking ||
+      Math.abs(B.estimatedNetBanked) >= THRESHOLDS.banking
+    );
+  };
 
   const saveComment = (txt: string) => {
     setComment(txt);
     localStorage.setItem("dailyReviewComment", txt);
   };
 
-  if (!data) return <div className="p-6 text-sm">Loading...</div>;
-
-  const pos = data.pos;
-  const form = data.form;
-  const v = data.variance;
+  const Section = ({ title, rows, type }: { title: string; rows: any[]; type: keyof typeof THRESHOLDS }) => (
+    <section className="mb-6">
+      <h2 className="text-sm font-semibold mb-3 text-slate-900">{title}</h2>
+      <div className="grid grid-cols-5 gap-2 text-xs items-center">
+        <div className="font-semibold text-slate-600">Item</div>
+        <div className="font-semibold text-slate-600">POS</div>
+        <div className="font-semibold text-slate-600">Form</div>
+        <div className="font-semibold text-slate-600">Diff (Form−POS)</div>
+        <div className="font-semibold text-center text-slate-600">Flag</div>
+        {rows.map((r: any) => (
+          <div key={r.label} className="contents">
+            <div className="text-slate-700">{r.label}</div>
+            <div className="text-slate-900">฿{fmt(r.pos)}</div>
+            <div className="text-slate-900">฿{fmt(r.form)}</div>
+            <div className={Math.abs(r.diff) ? "font-semibold text-slate-900" : "text-slate-500"}>
+              {r.diff === 0 ? "—" : `฿${fmt(r.diff)}`}
+            </div>
+            <Flag val={r.diff} limit={THRESHOLDS[type]} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header and Controls */}
-      <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
-        {/* Header */}
-        <div className="flex flex-col gap-2">
-          <h1 className="text-base font-semibold">Daily Review</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs">
-              POS vs Form Comparison
-            </span>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-600">Review date:</label>
-            <span className="text-xs font-medium text-slate-900">{convertFromInputDate(date)}</span>
-          </div>
+    <div className="mx-auto max-w-7xl p-4 space-y-6">
+      <header className="border-b border-slate-200 pb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-lg font-bold text-slate-900">Daily Review</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-600">Month</label>
           <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="border rounded px-2 sm:px-3 py-2 text-xs min-h-[44px] min-w-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            data-testid="input-review-date"
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="border border-slate-300 rounded px-3 py-2 text-xs min-h-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            data-testid="input-month-selector"
           />
-          <button 
-            onClick={loadData} 
-            disabled={loading} 
-            className="px-3 sm:px-4 py-2 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
-            data-testid="button-load-review"
-          >
-            {loading ? "Loading…" : "Load Review"}
-          </button>
         </div>
+      </header>
+
+      {/* Day chooser */}
+      <div className="flex gap-2 flex-wrap">
+        {all.map((d) => (
+          <DayPill
+            key={d.date}
+            date={d.date}
+            selected={selectedDate === d.date}
+            flagged={dayHasFlag(d)}
+            onClick={() => setSelectedDate(d.date)}
+          />
+        ))}
       </div>
 
-      {/* Content Sections */}
-      <div className="p-2 sm:p-4 space-y-6">
-        {/* Sales Section */}
-        <section className="bg-white border border-slate-200 rounded overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900">Sales (Form vs POS)</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Payment Type</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">POS</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Form</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Variance</th>
-                  <th className="px-4 py-2 text-center font-semibold text-slate-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Cash</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.sales.cash)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.sales.cash)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.sales.cash) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.sales.cash === 0 ? "—" : `฿${fmt(v.sales.cash)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.sales.cash} />
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">QR</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.sales.qr)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.sales.qr)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.sales.qr) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.sales.qr === 0 ? "—" : `฿${fmt(v.sales.qr)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.sales.qr} />
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Grab</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.sales.grab)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.sales.grab)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.sales.grab) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.sales.grab === 0 ? "—" : `฿${fmt(v.sales.grab)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.sales.grab} />
-                  </td>
-                </tr>
-                <tr className="bg-slate-100 border-t-2 border-slate-300 font-semibold">
-                  <td className="px-4 py-2 text-slate-900">Total Sales</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(pos.sales.total)}</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(form.sales.total)}</td>
-                  <td className="px-4 py-2 text-right text-slate-900">
-                    {v.sales.total === 0 ? "—" : `฿${fmt(v.sales.total)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.sales.total} />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+      {loading && <div className="text-xs p-4 text-slate-600">Loading…</div>}
+      {!loading && !current && (
+        <div className="text-xs p-4 text-slate-600">No data for this month.</div>
+      )}
 
-        {/* Expenses Section */}
-        <section className="bg-white border border-slate-200 rounded overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900">Money Out (Expenses)</h2>
+      {!loading && current && (
+        <>
+          {/* Context banner */}
+          <div className="rounded border border-slate-300 p-4 bg-slate-50">
+            <div className="text-xs text-slate-700">
+              <span className="font-semibold">Business date:</span> {current.date} (18:00→03:00, POS = source of truth)
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Expense Item</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">POS</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Form</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Variance</th>
-                  <th className="px-4 py-2 text-center font-semibold text-slate-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(v.expenses.items || []).map((item, idx) => (
-                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-2 text-slate-900">{item.label}</td>
-                    <td className="px-4 py-2 text-right text-slate-700">฿{fmt(item.posAmount)}</td>
-                    <td className="px-4 py-2 text-right text-slate-700">฿{fmt(item.formAmount)}</td>
-                    <td className={`px-4 py-2 text-right font-semibold ${Math.abs(item.variance) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                      {item.variance === 0 ? "—" : `฿${fmt(item.variance)}`}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <Flag val={item.variance} />
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-slate-100 border-t-2 border-slate-300 font-semibold">
-                  <td className="px-4 py-2 text-slate-900">Total Expenses</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal)}</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(form.expenses.shoppingTotal + form.expenses.wageTotal + form.expenses.otherTotal)}</td>
-                  <td className="px-4 py-2 text-right text-slate-900">
-                    {v.expenses.grandTotal === 0 ? "—" : `฿${fmt(v.expenses.grandTotal)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.expenses.grandTotal} />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
 
-        {/* Banking Section */}
-        <section className="bg-white border border-slate-200 rounded overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900">Banking & Cash</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Item</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">POS</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Form</th>
-                  <th className="px-4 py-2 text-right font-semibold text-slate-700">Variance</th>
-                  <th className="px-4 py-2 text-center font-semibold text-slate-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Expected Cash</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.banking.expectedCash)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.banking.expectedCash)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.banking.expectedCash) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.banking.expectedCash === 0 ? "—" : `฿${fmt(v.banking.expectedCash)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.banking.expectedCash} />
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Estimated Net Banked</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.banking.estimatedNetBanked)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.banking.estimatedNetBanked)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.banking.estimatedNetBanked) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.banking.estimatedNetBanked === 0 ? "—" : `฿${fmt(v.banking.estimatedNetBanked)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.banking.estimatedNetBanked} />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+          {/* SALES */}
+          <Section
+            title="Sales (Form vs POS)"
+            type="sales"
+            rows={[
+              { label: "Cash", pos: current.pos.sales.cash, form: current.form.sales.cash, diff: current.variance.sales.cash },
+              { label: "QR", pos: current.pos.sales.qr, form: current.form.sales.qr, diff: current.variance.sales.qr },
+              { label: "Grab", pos: current.pos.sales.grab, form: current.form.sales.grab, diff: current.variance.sales.grab },
+              { label: "Total", pos: current.pos.sales.total, form: current.form.sales.total, diff: current.variance.sales.total },
+            ]}
+          />
 
-        {/* Manager Comments */}
-        <section className="bg-white border border-slate-200 rounded overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900">Manager Comments</h2>
-          </div>
-          <div className="p-4">
+          {/* EXPENSES */}
+          <Section
+            title="Money Out (Expenses)"
+            type="expenses"
+            rows={[
+              { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
+              { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
+              {
+                label: "Grand Total",
+                pos: current.pos.expenses.shoppingTotal + current.pos.expenses.wageTotal + current.pos.expenses.otherTotal,
+                form: current.form.expenses.shoppingTotal + current.form.expenses.wageTotal + current.form.expenses.otherTotal,
+                diff: current.variance.expenses.grandTotal,
+              },
+            ]}
+          />
+
+          {/* BANKING */}
+          <Section
+            title="Banking & Cash"
+            type="banking"
+            rows={[
+              { label: "Expected Cash", pos: current.pos.banking.expectedCash, form: current.form.banking.expectedCash, diff: current.variance.banking.expectedCash },
+              { label: "Estimated Net Banked", pos: current.pos.banking.estimatedNetBanked, form: current.form.banking.estimatedNetBanked, diff: current.variance.banking.estimatedNetBanked },
+            ]}
+          />
+
+          {/* COMMENTS */}
+          <section className="border-t border-slate-200 pt-4">
+            <h2 className="font-semibold mb-3 text-sm text-slate-900">Manager Comments (local only)</h2>
             <textarea
-              className="w-full border border-slate-300 rounded px-3 py-2 min-h-[120px] text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="Record findings, explanations, or actions taken..."
+              className="w-full border border-slate-300 rounded px-3 py-2 min-h-[120px] text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="Record findings, explanations, or actions taken…"
               value={comment}
               onChange={(e) => saveComment(e.target.value)}
               data-testid="textarea-manager-comments"
             />
-          </div>
-        </section>
-      </div>
+            <div className="text-xs text-slate-500 mt-2">
+              (Comments are saved only on this device. We can wire them to the database per business date later if you'd like.)
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }

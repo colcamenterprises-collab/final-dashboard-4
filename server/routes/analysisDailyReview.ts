@@ -108,23 +108,6 @@ async function fetchForm1Daily(date: string): Promise<DailySource> {
 
 function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
   const diff = (p: number, f: number) => THB(f - p);
-  
-  // Build itemized expense variance
-  const allExpenseIds = new Set([...pos.expenses.items.map(x => x.id), ...form.expenses.items.map(x => x.id)]);
-  const expenseItems = Array.from(allExpenseIds).map(id => {
-    const posItem = pos.expenses.items.find(x => x.id === id);
-    const formItem = form.expenses.items.find(x => x.id === id);
-    const posAmount = posItem?.amount || 0;
-    const formAmount = formItem?.amount || 0;
-    return {
-      id,
-      label: posItem?.label || formItem?.label || id,
-      category: (posItem?.category || formItem?.category || "other") as "shopping" | "wage" | "other",
-      posAmount,
-      formAmount,
-      variance: diff(posAmount, formAmount),
-    };
-  });
 
   return {
     sales: {
@@ -135,7 +118,6 @@ function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResp
       total: diff(pos.sales.total, form.sales.total),
     },
     expenses: {
-      items: expenseItems,
       shoppingTotal: diff(pos.expenses.shoppingTotal, form.expenses.shoppingTotal),
       wageTotal: diff(pos.expenses.wageTotal, form.expenses.wageTotal),
       otherTotal: diff(pos.expenses.otherTotal, form.expenses.otherTotal),
@@ -158,4 +140,31 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const [pos, form] = await Promise.all([fetchPosShiftReport(date), fetchForm1Daily(date)]);
   const response: DailyComparisonResponse = { date, pos, form, variance: buildVariance(pos, form) };
   res.json(response);
+});
+
+analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
+  const month = String(req.query.month || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: "Provide month=YYYY-MM" });
+  }
+
+  const [year, monthNum] = month.split("-").map((x) => parseInt(x, 10));
+  const daysInMonth = new Date(year, monthNum, 0).getDate();
+  const today = new Date();
+  const currentMonth =
+    today.getFullYear() === year && today.getMonth() + 1 === monthNum
+      ? today.getDate()
+      : daysInMonth;
+
+  const results: DailyComparisonResponse[] = [];
+  for (let day = 1; day <= currentMonth; day++) {
+    const dateStr = `${month}-${String(day).padStart(2, "0")}`;
+    const [pos, form] = await Promise.all([
+      fetchPosShiftReport(dateStr),
+      fetchForm1Daily(dateStr),
+    ]);
+    results.push({ date: dateStr, pos, form, variance: buildVariance(pos, form) });
+  }
+
+  res.json(results);
 });
