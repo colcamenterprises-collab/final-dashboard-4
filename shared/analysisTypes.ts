@@ -34,6 +34,15 @@ export interface DailySource {
   };
 }
 
+export interface ExpenseItemVariance {
+  id: string;
+  label: string;
+  posAmount: Money;
+  formAmount: Money;
+  variance: Money;
+  category: "shopping" | "wage" | "other";
+}
+
 export interface DailyComparisonResponse {
   date: string;
   pos: DailySource;
@@ -41,6 +50,7 @@ export interface DailyComparisonResponse {
   variance: {
     sales: Record<keyof SalesBreakdown, Money>;
     expenses: {
+      items: ExpenseItemVariance[];
       shoppingTotal: Money;
       wageTotal: Money;
       otherTotal: Money;

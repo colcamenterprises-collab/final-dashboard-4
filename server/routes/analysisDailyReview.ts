@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { DailyComparisonResponse, DailySource, ExpenseItem, SalesBreakdown } from "../../shared/analysisTypes";
+import type { DailyComparisonResponse, DailySource, ExpenseItem, SalesBreakdown, ExpenseItemVariance } from "../../shared/analysisTypes";
 
 export const analysisDailyReviewRouter = Router();
 
@@ -53,6 +53,24 @@ async function fetchForm1Daily(date: string): Promise<DailySource> {
 
 function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
   const diff = (p: number, f: number) => THB(f - p);
+  
+  // Build itemized expense variance
+  const allExpenseIds = new Set([...pos.expenses.items.map(x => x.id), ...form.expenses.items.map(x => x.id)]);
+  const expenseItems = Array.from(allExpenseIds).map(id => {
+    const posItem = pos.expenses.items.find(x => x.id === id);
+    const formItem = form.expenses.items.find(x => x.id === id);
+    const posAmount = posItem?.amount || 0;
+    const formAmount = formItem?.amount || 0;
+    return {
+      id,
+      label: posItem?.label || formItem?.label || id,
+      category: (posItem?.category || formItem?.category || "other") as "shopping" | "wage" | "other",
+      posAmount,
+      formAmount,
+      variance: diff(posAmount, formAmount),
+    };
+  });
+
   return {
     sales: {
       cash: diff(pos.sales.cash, form.sales.cash),
@@ -62,6 +80,7 @@ function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResp
       total: diff(pos.sales.total, form.sales.total),
     },
     expenses: {
+      items: expenseItems,
       shoppingTotal: diff(pos.expenses.shoppingTotal, form.expenses.shoppingTotal),
       wageTotal: diff(pos.expenses.wageTotal, form.expenses.wageTotal),
       otherTotal: diff(pos.expenses.otherTotal, form.expenses.otherTotal),

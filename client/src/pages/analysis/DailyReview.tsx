@@ -162,13 +162,13 @@ export default function DailyReview() {
         {/* Expenses Section */}
         <section className="bg-white border border-slate-200 rounded overflow-hidden">
           <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900">Expenses</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Money Out (Expenses)</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Expense Type</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Expense Item</th>
                   <th className="px-4 py-2 text-right font-semibold text-slate-700">POS</th>
                   <th className="px-4 py-2 text-right font-semibold text-slate-700">Form</th>
                   <th className="px-4 py-2 text-right font-semibold text-slate-700">Variance</th>
@@ -176,32 +176,23 @@ export default function DailyReview() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Shopping</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.expenses.shoppingTotal)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.expenses.shoppingTotal)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.expenses.shoppingTotal) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.expenses.shoppingTotal === 0 ? "—" : `฿${fmt(v.expenses.shoppingTotal)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.expenses.shoppingTotal} />
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-900">Wages</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(pos.expenses.wageTotal)}</td>
-                  <td className="px-4 py-2 text-right text-slate-700">฿{fmt(form.expenses.wageTotal)}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${Math.abs(v.expenses.wageTotal) > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                    {v.expenses.wageTotal === 0 ? "—" : `฿${fmt(v.expenses.wageTotal)}`}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <Flag val={v.expenses.wageTotal} />
-                  </td>
-                </tr>
+                {(v.expenses.items || []).map((item, idx) => (
+                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-4 py-2 text-slate-900">{item.label}</td>
+                    <td className="px-4 py-2 text-right text-slate-700">฿{fmt(item.posAmount)}</td>
+                    <td className="px-4 py-2 text-right text-slate-700">฿{fmt(item.formAmount)}</td>
+                    <td className={`px-4 py-2 text-right font-semibold ${Math.abs(item.variance) > 0 ? "text-slate-900" : "text-slate-500"}`}>
+                      {item.variance === 0 ? "—" : `฿${fmt(item.variance)}`}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <Flag val={item.variance} />
+                    </td>
+                  </tr>
+                ))}
                 <tr className="bg-slate-100 border-t-2 border-slate-300 font-semibold">
                   <td className="px-4 py-2 text-slate-900">Total Expenses</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(pos.expenses.shoppingTotal + pos.expenses.wageTotal)}</td>
-                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(form.expenses.shoppingTotal + form.expenses.wageTotal)}</td>
+                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal)}</td>
+                  <td className="px-4 py-2 text-right text-slate-900">฿{fmt(form.expenses.shoppingTotal + form.expenses.wageTotal + form.expenses.otherTotal)}</td>
                   <td className="px-4 py-2 text-right text-slate-900">
                     {v.expenses.grandTotal === 0 ? "—" : `฿${fmt(v.expenses.grandTotal)}`}
                   </td>
