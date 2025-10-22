@@ -1,0 +1,242 @@
+A) Prisma schema (copy/paste)
+
+Add (or update) these models in server/prisma/schema.prisma. If models already exist, keep their existing IDs and add any missing fields exactly as below.
+
+model PosShiftReport {
+  id            String   @id @default(cuid())
+  storeId       String
+  openedAt      DateTime
+  closedAt      DateTime
+
+  // SALES (POS totals by channel)
+  cashTotal     Int       @default(0)
+  qrTotal       Int       @default(0)
+  grabTotal     Int       @default(0)
+  otherTotal    Int       @default(0)
+  grandTotal    Int       @default(0)
+
+  // EXPENSES recorded for the shift (if you track them in POS ingest)
+  shoppingTotal Int       @default(0)
+  wagesTotal    Int       @default(0)
+  otherExpense  Int       @default(0)
+
+  // CASH FLOAT / START
+  startingCash  Int       @default(0)
+
+  // Business date for 18:00 → 03:00 window (Asia/Bangkok)
+  businessDate  DateTime? @db.Date
+
+  @@index([businessDate])
+}
+
+model DailySales {
+  id            String   @id @default(cuid())
+  storeId       String?
+  // raw timestamp when staff submitted the form
+  submittedAt   DateTime @default(now())
+
+  // SALES (Form 1)
+  cashSales     Int       @default(0)
+  qrSales       Int       @default(0)
+  grabSales     Int       @default(0)
+  otherSales    Int       @default(0)
+
+  // EXPENSES (Form 1)
+  shoppingTotal Int       @default(0)
+  wagesTotal    Int       @default(0)
+  otherExpense  Int       @default(0)
+
+  // CASH FLOAT / START
+  startingCash  Int       @default(0)
+
+  // Business date aligned to the same window as POS
+  businessDate  DateTime? @db.Date
+
+  @@index([businessDate])
+}
+
+> If you already have these models with different names, either rename in schema (recommended) or update the server mapper in analysisDailyReview.ts to match your existing names.
+
+
+
+
+---
+
+B) SQL backfill + safe column adds (Postgres)
+
+Create a SQL migration file (e.g. server/prisma/migrations/20251022_daily_review_setup/migration.sql) with the following. This is idempotent (uses IF NOT EXISTS) so it can run on your live DB safely.
+
+-- POS SHIFT REPORTS – ensure required columns exist
+ALTER TABLE pos_shift_reports
+  ADD COLUMN IF NOT EXISTS cash_total       integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS qr_total         integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS grab_total       integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS other_total      integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS grand_total      integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS shopping_total   integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS wages_total      integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS other_expense    integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS starting_cash    integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS business_date    date;
+
+-- If your existing columns use camelCase, create views or update server mapper accordingly.
+-- Backfill business_date from close time (03:00 cutoff rule, Bangkok is UTC+7)
+UPDATE pos_shift_reports
+SET business_date = (
+  ((closed_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+)
+WHERE business_date IS NULL
+  AND closed_at IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_pos_shift_reports_business_date
+  ON pos_shift_reports (business_date);
+
+-- DAILY SALES (Form 1) – ensure table/columns exist
+CREATE TABLE IF NOT EXISTS daily_sales (
+  id             text PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_id       text,
+  submitted_at   timestamp with time zone DEFAULT now(),
+  cash_sales     integer DEFAULT 0,
+  qr_sales       integer DEFAULT 0,
+  grab_sales     integer DEFAULT 0,
+  other_sales    integer DEFAULT 0,
+  shopping_total integer DEFAULT 0,
+  wages_total    integer DEFAULT 0,
+  other_expense  integer DEFAULT 0,
+  starting_cash  integer DEFAULT 0,
+  business_date  date
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_sales_business_date
+  ON daily_sales (business_date);
+
+-- Backfill business_date for existing forms:
+-- Rule: Form submitted after midnight belongs to previous business day (03:00 cutoff)
+UPDATE daily_sales
+SET business_date = (
+  ((submitted_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+)
+WHERE business_date IS NULL;
+
+> If your actual table names/columns are already snake_case (as above), keep them. Prisma map them with @map("column_name") if you prefer camelCase in the schema.
+
+
+
+
+---
+
+C) Prisma field mapping (only if your DB is snake_case)
+
+If your DB columns are snake_case (from the SQL above), add @map to your Prisma fields like this:
+
+model PosShiftReport {
+  id            String   @id @default(cuid())
+  storeId       String   @map("store_id")
+  openedAt      DateTime @map("opened_at")
+  closedAt      DateTime @map("closed_at")
+
+  cashTotal     Int      @default(0) @map("cash_total")
+  qrTotal       Int      @default(0) @map("qr_total")
+  grabTotal     Int      @default(0) @map("grab_total")
+  otherTotal    Int      @default(0) @map("other_total")
+  grandTotal    Int      @default(0) @map("grand_total")
+
+  shoppingTotal Int      @default(0) @map("shopping_total")
+  wagesTotal    Int      @default(0) @map("wages_total")
+  otherExpense  Int      @default(0) @map("other_expense")
+  startingCash  Int      @default(0) @map("starting_cash")
+  businessDate  DateTime? @db.Date @map("business_date")
+
+  @@index([businessDate])
+  @@map("pos_shift_reports")
+}
+
+model DailySales {
+  id            String   @id @default(cuid())
+  storeId       String?  @map("store_id")
+  submittedAt   DateTime @default(now()) @map("submitted_at")
+
+  cashSales     Int      @default(0) @map("cash_sales")
+  qrSales       Int      @default(0) @map("qr_sales")
+  grabSales     Int      @default(0) @map("grab_sales")
+  otherSales    Int      @default(0) @map("other_sales")
+
+  shoppingTotal Int      @default(0) @map("shopping_total")
+  wagesTotal    Int      @default(0) @map("wages_total")
+  otherExpense  Int      @default(0) @map("other_expense")
+
+  startingCash  Int      @default(0) @map("starting_cash")
+  businessDate  DateTime? @db.Date @map("business_date")
+
+  @@index([businessDate])
+  @@map("daily_sales")
+}
+
+
+---
+
+D) Server mapper sanity (already in place)
+
+Your server/routes/analysisDailyReview.ts is already pointing at:
+
+prisma.posShiftReport.findFirst({ where: { businessDate: new Date(businessDate) } })
+
+prisma.dailySales.findFirst({ where: { businessDate: new Date(businessDate) } })
+
+
+If you used @map(...) as above, no code changes are needed.
+
+
+---
+
+E) Test checklist (fast)
+
+1. Run migration
+
+npx prisma migrate deploy (or your deploy command).
+
+If you used the raw SQL file, run it once against the DB.
+
+
+
+2. Verify backfill
+
+SELECT date_trunc('day', business_date), count(*) FROM pos_shift_reports GROUP BY 1 ORDER BY 1;
+
+SELECT date_trunc('day', business_date), count(*) FROM daily_sales GROUP BY 1 ORDER BY 1;
+
+
+
+3. Hit APIs
+
+/api/analysis/daily-comparison?date=YYYY-MM-DD → Should return { availability: "ok", pos, form, variance } for a day you know exists.
+
+/api/analysis/daily-comparison-range?month=YYYY-MM → Array with mixed ok and missing_* depending on data.
+
+
+
+4. UI
+
+Open Daily Review: month pills show grey where missing; no fake values.
+
+A day with both sources shows comparisons + flags; a day with one source shows a clear “Missing” notice and no flags.
+
+
+
+
+
+---
+
+F) What to do if your existing field names differ
+
+Tell me your actual Prisma model names + field names for:
+
+POS shift totals (cash/qr/grab/other/grand/startingCash/expenses).
+
+Form 1 (cash/qr/grab/other/expenses/startingCash/submittedAt or businessDate).
+
+
+I’ll splice in the exact mapper so it’s 100% aligned without you having to rename anything.
+
+
+---

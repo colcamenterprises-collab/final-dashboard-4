@@ -25,17 +25,23 @@ model DailySales {
   qrSales         Int      @default(0)
   grabSales       Int      @default(0)
   aroiSales       Int      @default(0) // renamed from aroiDeeSales
+  otherSales      Int      @default(0) // for Daily Review
   totalSales      Int      @default(0)
 
   // Expenses totals
   shoppingTotal   Int      @default(0)
   wagesTotal      Int      @default(0)
   othersTotal     Int      @default(0)
+  otherExpense    Int      @default(0) // for Daily Review  
   totalExpenses   Int      @default(0)
 
   // Banking
   closingCash     Int      @default(0)
   qrTransfer      Int      @default(0)
+  
+  // Daily Review fields
+  storeId         String?
+  businessDate    DateTime? @db.Date
 
   // Relations
   shopping        ShoppingPurchase[]
@@ -52,6 +58,8 @@ model DailySales {
   // Phase 2 Relations
   snapshots       ShiftSnapshot[]
   comparisons     JussiComparison[]
+  
+  @@index([businessDate])
 }
 
 model ShoppingPurchase {
@@ -788,6 +796,8 @@ model PosShiftReport {
   id                 String   @id @default(uuid())
   batchId            String   @unique
   batch              PosBatch @relation(fields: [batchId], references: [id])
+  
+  // Existing fields
   grossSales         Decimal  @db.Decimal(10,2)
   discounts          Decimal  @db.Decimal(10,2)
   netSales           Decimal  @db.Decimal(10,2)
@@ -796,6 +806,23 @@ model PosShiftReport {
   qrSales            Decimal  @db.Decimal(10,2)
   otherSales         Decimal  @db.Decimal(10,2)
   receiptCount       Int
+  
+  // Daily Review fields
+  storeId            String?
+  openedAt           DateTime?
+  closedAt           DateTime?
+  cashTotal          Int      @default(0)
+  qrTotal            Int      @default(0)
+  grabTotal          Int      @default(0)
+  otherTotal         Int      @default(0)
+  grandTotal         Int      @default(0)
+  shoppingTotal      Int      @default(0)
+  wagesTotal         Int      @default(0)
+  otherExpense       Int      @default(0)
+  startingCash       Int      @default(0)
+  businessDate       DateTime? @db.Date
+  
+  @@index([businessDate])
 }
 
 model PosSalesItem {
