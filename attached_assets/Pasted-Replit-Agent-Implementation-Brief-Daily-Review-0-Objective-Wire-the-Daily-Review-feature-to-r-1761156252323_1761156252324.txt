@@ -1,0 +1,332 @@
+Replit Agent — Implementation Brief (Daily Review)
+
+0) Objective
+
+Wire the Daily Review feature to real data only:
+
+POS (Loyverse) is source of truth.
+
+Staff Daily Sales & Stock Form (“Form 1”) is compared against POS.
+
+Show anomalies only when both sources exist for a business date.
+
+
+
+---
+
+1) Business Date Rule (mandatory)
+
+Business Date D = shift window D 18:00 → D+1 03:00 in Asia/Bangkok.
+
+POS query window: created_at_min = D 18:00 BKK (UTC), created_at_max = D+1 03:00 BKK (UTC).
+
+Form 1 business_date = ((submitted_at @ BKK) - 3h)::date (so submissions after midnight belong to the previous business date).
+
+Never fabricate rows. If missing, return availability: "missing_*".
+
+
+
+---
+
+2) Data Sources (exact)
+
+A) POS — Loyverse API
+
+Endpoint: GET https://api.loyverse.com/v1.0/receipts
+
+Auth: Authorization: Bearer <LOYVERSE_TOKEN>
+
+Filters: store_id, created_at_min, created_at_max, limit, cursor (paginate until done).
+
+Fields used per receipt:
+
+created_at (UTC) → window filter
+
+store_id → filter
+
+payments[] → each { payment_type_id, amount }
+
+
+Payment type mapping: Query once and cache → map payment_type_id → one of Cash / QR / Grab / Other. (If the project already stores the mapping, use that.)
+
+
+curl template (for testing):
+
+curl -sS 'https://api.loyverse.com/v1.0/receipts?store_id=STORE_ID&created_at_min=START_ISO&created_at_max=END_ISO&limit=250' \
+  -H "Authorization: Bearer $LOYVERSE_TOKEN"
+
+B) Form 1 — App Database
+
+Table: daily_sales (or the existing form table; if names differ, adjust mappings in server route).
+
+Required fields (ints in minor units or whole THB; we store whole ints):
+
+submitted_at, business_date, store_id
+
+starting_cash
+
+cash_sales, qr_sales, grab_sales, other_sales
+
+shopping_total, wages_total, other_expense
+
+
+
+
+---
+
+3) Database Schema (Prisma with snake_case mapping)
+
+> If tables already exist, add missing columns; do not drop anything. Use @map for snake_case.
+
+
+
+model PosShiftReport {
+  id            String   @id @default(cuid())
+  storeId       String   @map("store_id")
+  openedAt      DateTime @map("opened_at")
+  closedAt      DateTime @map("closed_at")
+
+  cashTotal     Int      @default(0) @map("cash_total")
+  qrTotal       Int      @default(0) @map("qr_total")
+  grabTotal     Int      @default(0) @map("grab_total")
+  otherTotal    Int      @default(0) @map("other_total")
+  grandTotal    Int      @default(0) @map("grand_total")
+
+  shoppingTotal Int      @default(0) @map("shopping_total")
+  wagesTotal    Int      @default(0) @map("wages_total")
+  otherExpense  Int      @default(0) @map("other_expense")
+  startingCash  Int      @default(0) @map("starting_cash")
+
+  businessDate  DateTime? @db.Date @map("business_date")
+
+  @@index([businessDate])
+  @@map("pos_shift_reports")
+}
+
+model DailySales {
+  id            String   @id @default(cuid())
+  storeId       String?  @map("store_id")
+  submittedAt   DateTime @default(now()) @map("submitted_at")
+
+  cashSales     Int      @default(0) @map("cash_sales")
+  qrSales       Int      @default(0) @map("qr_sales")
+  grabSales     Int      @default(0) @map("grab_sales")
+  otherSales    Int      @default(0) @map("other_sales")
+
+  shoppingTotal Int      @default(0) @map("shopping_total")
+  wagesTotal    Int      @default(0) @map("wages_total")
+  otherExpense  Int      @default(0) @map("other_expense")
+
+  startingCash  Int      @default(0) @map("starting_cash")
+  businessDate  DateTime? @db.Date @map("business_date")
+
+  @@index([businessDate])
+  @@map("daily_sales")
+}
+
+Backfill business_date (Postgres; idempotent):
+
+UPDATE pos_shift_reports
+SET business_date = ((closed_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+WHERE closed_at IS NOT NULL;
+
+UPDATE daily_sales
+SET business_date = ((submitted_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date;
+
+CREATE INDEX IF NOT EXISTS idx_pos_shift_reports_business_date ON pos_shift_reports (business_date);
+CREATE INDEX IF NOT EXISTS idx_daily_sales_business_date      ON daily_sales (business_date);
+
+
+---
+
+4) POS Ingest Function (code outline)
+
+Where: server side, new module server/services/loyverseIngest.ts
+
+type Totals = { cash: number; qr: number; grab: number; other: number; grand: number };
+
+export async function ingestPosForBusinessDate(storeId: string, businessDate: string) {
+  const { startUtc, endUtc } = toUtcWindowForBkkShift(businessDate); // D18:00 → D+1 03:00
+  const mapping = await getPaymentTypeMapping(); // payment_type_id -> "Cash" | "QR" | "Grab" | "Other"
+
+  let cursor: string | undefined;
+  const totals: Totals = { cash: 0, qr: 0, grab: 0, other: 0, grand: 0 };
+
+  do {
+    const url = new URL("https://api.loyverse.com/v1.0/receipts");
+    url.searchParams.set("store_id", storeId);
+    url.searchParams.set("created_at_min", startUtc);
+    url.searchParams.set("created_at_max", endUtc);
+    url.searchParams.set("limit", "250");
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${process.env.LOYVERSE_TOKEN}` }});
+    if (!r.ok) throw new Error(`Loyverse ${r.status}`);
+
+    const data = await r.json() as { receipts: any[]; cursor?: string };
+    for (const rcpt of data.receipts) {
+      for (const p of (rcpt.payments || [])) {
+        const kind = mapping[p.payment_type_id] || "Other";
+        const amt = Number(p.amount) || 0;
+        if (kind === "Cash") totals.cash += amt;
+        else if (kind === "QR") totals.qr += amt;
+        else if (kind === "Grab") totals.grab += amt;
+        else totals.other += amt;
+        totals.grand += amt;
+      }
+    }
+    cursor = (data as any).cursor;
+  } while (cursor);
+
+  // Write one POS row for this business date (do NOT fabricate missing fields)
+  await prisma.posShiftReport.upsert({
+    where: { businessDate: new Date(businessDate) },
+    update: {
+      storeId,
+      cashTotal: totals.cash,
+      qrTotal: totals.qr,
+      grabTotal: totals.grab,
+      otherTotal: totals.other,
+      grandTotal: totals.grand,
+    },
+    create: {
+      storeId,
+      businessDate: new Date(businessDate),
+      cashTotal: totals.cash,
+      qrTotal: totals.qr,
+      grabTotal: totals.grab,
+      otherTotal: totals.other,
+      grandTotal: totals.grand,
+      shoppingTotal: 0,
+      wagesTotal: 0,
+      otherExpense: 0,
+      startingCash: 0,
+      openedAt: new Date(businessDate), // optional
+      closedAt: new Date(businessDate), // optional
+    },
+  });
+}
+
+Helper: toUtcWindowForBkkShift(businessDate) should return ISO strings for [D 18:00, D+1 03:00) in UTC.
+
+
+---
+
+5) Form 1 Save Hook
+
+When the staff submits the Daily Sales & Stock form, set:
+
+const submittedAt = new Date(); // actual submit time
+const businessDate = toBkkDateMinus3h(submittedAt); // ((BKK) - 3h) :: date
+
+await prisma.dailySales.create({
+  data: {
+    storeId,
+    submittedAt,
+    businessDate,
+    startingCash,
+    cashSales, qrSales, grabSales, otherSales,
+    shoppingTotal, wagesTotal, otherExpense,
+  }
+});
+
+Backfill existing rows with the same rule if needed (see SQL earlier).
+
+
+---
+
+6) API (already added)
+
+GET /api/analysis/daily-comparison?date=YYYY-MM-DD
+
+Looks up both tables by businessDate.
+
+Returns { availability: "ok" | "missing_pos" | "missing_form" | "missing_both", pos?, form?, variance? }
+
+
+GET /api/analysis/daily-comparison-range?month=YYYY-MM
+
+Iterates days, returns an array of the structure above.
+
+
+No variance if either side missing. No fabricated numbers.
+
+
+
+---
+
+7) UI behavior (already added)
+
+Grey day pills if availability !== "ok".
+
+Show “Missing POS/Form” notice when applicable.
+
+Only show flags/comparisons when both sources exist.
+
+
+
+---
+
+8) Environment / Config
+
+LOYVERSE_TOKEN — set in Replit environment secrets.
+
+LOYVERSE_STORE_ID — your store ID (string).
+
+Timezone: assume Asia/Bangkok (fixed +07:00, no DST). All window math must honor the 3h cutoff.
+
+
+
+---
+
+9) Tests (must pass)
+
+1. Real pull (yesterday’s business date):
+
+Run ingestPosForBusinessDate(LOYVERSE_STORE_ID, 'YYYY-MM-DD')
+
+Confirm 1 row in pos_shift_reports for that date.
+
+
+
+2. Form submit (manual or seed with real past entries):
+
+Create a real daily_sales row with business_date for the same day.
+
+
+
+3. API checks:
+
+GET /api/analysis/daily-comparison?date=YYYY-MM-DD → availability: "ok", includes pos, form, variance.
+
+Range endpoint returns a mix of "ok" and "missing_*" that matches DB reality.
+
+
+
+4. UI:
+
+Day pill turns active (not grey) when both sources exist.
+
+Anomalies flag based on thresholds; set thresholds to { sales: 1, expenses: 1, banking: 1 } for QA, then restore.
+
+
+
+
+
+---
+
+10) Do / Don’t
+
+DO: Use Loyverse receipts with created_at_min/max + pagination; aggregate by payments[].
+
+DO: Map payment types to Cash / QR / Grab / Other and keep a single POS row per business date.
+
+DO: Set business_date consistently using the 3h cutoff.
+
+DON’T: Generate or backfill synthetic numbers. If missing, return missing_*.
+
+DON’T: Bypass the business-date window (no calendar-day queries).
+
+
+
+---
