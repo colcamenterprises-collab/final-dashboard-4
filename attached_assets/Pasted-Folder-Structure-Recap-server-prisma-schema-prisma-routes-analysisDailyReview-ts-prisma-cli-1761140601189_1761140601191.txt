@@ -1,0 +1,265 @@
+Folder Structure Recap
+
+server/
+  prisma/schema.prisma
+  routes/analysisDailyReview.ts
+  prisma/
+client/
+  src/pages/analysis/DailyReview.tsx
+shared/
+  analysisTypes.ts
+
+
+---
+
+1️⃣ shared/analysisTypes.ts
+
+export type Money = number;
+
+export interface SalesBreakdown {
+  cash: Money;
+  qr: Money;
+  grab: Money;
+  other: Money;
+  total: Money;
+}
+
+export interface ExpenseItem {
+  id: string;
+  label: string;
+  amount: Money;
+  category: "shopping" | "wage" | "other";
+}
+
+export interface DailySource {
+  date: string;
+  sales: SalesBreakdown;
+  expenses: {
+    shoppingTotal: Money;
+    wageTotal: Money;
+    otherTotal: Money;
+    items: ExpenseItem[];
+  };
+  banking: {
+    startingCash: Money;
+    cashPayments: Money;
+    qrPayments: Money;
+    expensesTotal: Money;
+    expectedCash: Money;
+    estimatedNetBanked: Money;
+  };
+}
+
+export interface DailyComparisonResponse {
+  date: string;
+  pos: DailySource;
+  form: DailySource;
+  variance: {
+    sales: Record<keyof SalesBreakdown, Money>;
+    expenses: {
+      shoppingTotal: Money;
+      wageTotal: Money;
+      otherTotal: Money;
+      grandTotal: Money;
+    };
+    banking: {
+      expectedCash: Money;
+      estimatedNetBanked: Money;
+    };
+  };
+}
+
+
+---
+
+2️⃣ server/prisma/schema.prisma  (only add the new model if not present)
+
+model PosShiftReport {
+  id              String   @id @default(cuid())
+  storeId         String
+  openedAt        DateTime
+  closedAt        DateTime
+  cashTotal       Int
+  qrTotal         Int
+  grabTotal       Int
+  otherTotal      Int
+  grandTotal      Int
+  shoppingTotal   Int
+  wagesTotal      Int
+  otherExpense    Int
+  startingCash    Int      @default(0)
+  businessDate    DateTime? @db.Date
+
+  @@index([businessDate])
+}
+
+Migration SQL (optional manual run):
+
+ALTER TABLE pos_shift_reports ADD COLUMN IF NOT EXISTS business_date date;
+UPDATE pos_shift_reports
+SET business_date = ((closed_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+WHERE business_date IS NULL;
+CREATE INDEX IF NOT EXISTS idx_pos_shift_reports_business_date
+  ON pos_shift_reports (business_date);
+
+
+---
+
+3️⃣ server/routes/analysisDailyReview.ts
+
+import { Router } from "express";
+import { prisma } from "../prisma";
+import type {
+  DailyComparisonResponse,
+  DailySource,
+  ExpenseItem,
+  SalesBreakdown,
+} from "../../shared/analysisTypes";
+
+export const analysisDailyReviewRouter = Router();
+
+const THB = (n: number) => Number((n ?? 0).toFixed(2));
+
+/** Read POS shift data (Loyverse) already saved in DB */
+async function fetchPOSFromDB(businessDate: string): Promise<DailySource> {
+  const row = await prisma.posShiftReport.findFirst({
+    where: { businessDate: new Date(businessDate) },
+  });
+
+  const cash = row?.cashTotal ?? 0;
+  const qr = row?.qrTotal ?? 0;
+  const grab = row?.grabTotal ?? 0;
+  const other = row?.otherTotal ?? 0;
+  const total = row?.grandTotal ?? cash + qr + grab + other;
+
+  const shopping = row?.shoppingTotal ?? 0;
+  const wages = row?.wagesTotal ?? 0;
+  const otherExp = row?.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = row?.startingCash ?? 0;
+
+  return {
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: {
+      shoppingTotal: shopping,
+      wageTotal: wages,
+      otherTotal: otherExp,
+      items: [
+        { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+        { id: "wages", label: "Wages", amount: wages, category: "wage" },
+        ...(otherExp ? [{ id: "other", label: "Other", amount: otherExp, category: "other" as const }] : []),
+      ],
+    },
+    banking: {
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
+      expensesTotal,
+      expectedCash: THB(startingCash + cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
+    },
+  };
+}
+
+/** Mock: Form 1 data – replace with your real Prisma query */
+async function fetchForm1Daily(businessDate: string): Promise<DailySource> {
+  // TODO: connect to your Daily Sales & Stock Form 1 table
+  const sales: SalesBreakdown = { cash: 1900, qr: 1100, grab: 14000, other: 0, total: 17000 };
+  const shopping = 900;
+  const wages = 2700;
+  const otherExp = 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = 500;
+
+  return {
+    date: businessDate,
+    sales,
+    expenses: {
+      shoppingTotal: shopping,
+      wageTotal: wages,
+      otherTotal: otherExp,
+      items: [
+        { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+        { id: "wages", label: "Wages", amount: wages, category: "wage" },
+      ],
+    },
+    banking: {
+      startingCash,
+      cashPayments: sales.cash,
+      qrPayments: sales.qr,
+      expensesTotal,
+      expectedCash: THB(startingCash + sales.cash - expensesTotal),
+      estimatedNetBanked: THB(startingCash + sales.cash - expensesTotal + sales.qr),
+    },
+  };
+}
+
+function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResponse["variance"] {
+  const diff = (p: number, f: number) => THB(f - p); // Form - POS
+  return {
+    sales: {
+      cash: diff(pos.sales.cash, form.sales.cash),
+      qr: diff(pos.sales.qr, form.sales.qr),
+      grab: diff(pos.sales.grab, form.sales.grab),
+      other: diff(pos.sales.other, form.sales.other),
+      total: diff(pos.sales.total, form.sales.total),
+    },
+    expenses: {
+      shoppingTotal: diff(pos.expenses.shoppingTotal, form.expenses.shoppingTotal),
+      wageTotal: diff(pos.expenses.wageTotal, form.expenses.wageTotal),
+      otherTotal: diff(pos.expenses.otherTotal, form.expenses.otherTotal),
+      grandTotal: diff(
+        pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
+        form.expenses.shoppingTotal + form.expenses.wageTotal + form.expenses.otherTotal
+      ),
+    },
+    banking: {
+      expectedCash: diff(pos.banking.expectedCash, form.banking.expectedCash),
+      estimatedNetBanked: diff(pos.banking.estimatedNetBanked, form.banking.estimatedNetBanked),
+    },
+  };
+}
+
+/** GET one business day */
+analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
+  const date = String(req.query.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
+
+  const [pos, form] = await Promise.all([fetchPOSFromDB(date), fetchForm1Daily(date)]);
+  const response: DailyComparisonResponse = { date, pos, form, variance: buildVariance(pos, form) };
+  res.json(response);
+});
+
+/** GET month range */
+analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
+  const month = String(req.query.month || "").trim(); // YYYY-MM
+  if (!/^\d{4}-\d{2}$/.test(month))
+    return res.status(400).json({ error: "Provide month=YYYY-MM" });
+
+  const [Y, M] = month.split("-").map((x) => parseInt(x, 10));
+  const daysInMonth = new Date(Y, M, 0).getDate();
+  const today = new Date();
+  const currentMonth =
+    today.getFullYear() === Y && today.getMonth() + 1 === M
+      ? today.getDate()
+      : daysInMonth;
+
+  const out: DailyComparisonResponse[] = [];
+  for (let d = 1; d <= currentMonth; d++) {
+    const ds = `${month}-${String(d).padStart(2, "0")}`;
+    const [pos, form] = await Promise.all([fetchPOSFromDB(ds), fetchForm1Daily(ds)]);
+    out.push({ date: ds, pos, form, variance: buildVariance(pos, form) });
+  }
+
+  res.json(out);
+});
+
+Register in server/routes.ts:
+
+import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
+app.use("/api/analysis", analysisDailyReviewRouter);
+
+
+---
