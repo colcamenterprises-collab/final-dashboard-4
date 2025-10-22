@@ -12,9 +12,18 @@ export const analysisDailyReviewRouter = Router();
 
 const THB = (n: number) => Number((n ?? 0).toFixed(2));
 
+// Helper to build [date, date+1) UTC range safely for DATE columns
+function dayRange(businessDate: string) {
+  const start = new Date(`${businessDate}T00:00:00.000Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+}
+
 async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
+  const { start, end } = dayRange(businessDate);
   const row = await prisma.posShiftReport.findFirst({
-    where: { businessDate: new Date(businessDate) },
+    where: { businessDate: { gte: start, lt: end } },
   });
   if (!row) return null;
 
@@ -52,8 +61,12 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
 }
 
 async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
+  const { start, end } = dayRange(businessDate);
   const row = await prisma.dailySales.findFirst({
-    where: { businessDate: new Date(businessDate) },
+    where: { 
+      businessDate: { gte: start, lt: end },
+      deletedAt: null,
+    },
   });
   if (!row) return null;
 
@@ -161,4 +174,15 @@ analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
   }
 
   res.json(out);
+});
+
+// Diagnostic endpoint to help troubleshoot data presence
+analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
+  const date = String(req.query.date || "").trim();
+  const { start, end } = dayRange(date);
+  const [posCount, formCount] = await Promise.all([
+    prisma.posShiftReport.count({ where: { businessDate: { gte: start, lt: end } } }),
+    prisma.dailySales.count({ where: { businessDate: { gte: start, lt: end }, deletedAt: null } }),
+  ]);
+  res.json({ date, posCount, formCount, start, end });
 });

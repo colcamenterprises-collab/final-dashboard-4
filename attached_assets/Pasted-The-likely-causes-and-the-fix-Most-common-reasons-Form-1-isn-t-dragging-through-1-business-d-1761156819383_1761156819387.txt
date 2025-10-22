@@ -1,0 +1,177 @@
+The likely causes (and the fix)
+
+Most common reasons Form-1 isn’t “dragging through”:
+
+1. business_date not populated on daily_sales rows.
+
+
+2. Date equality mismatch (Prisma Date vs DB date type).
+
+
+3. Different field or table names than the mapper expects.
+
+
+
+We’ll solve (1) and (2) with a SQL backfill and a range-based Prisma query (instead of strict equality). If (3) applies, I included a one-line place to change names.
+
+
+---
+
+2) Backfill business_date for Form-1 (safe to re-run)
+
+-- Ensure business_date exists on every daily_sales row
+UPDATE daily_sales
+SET business_date = (
+  ((submitted_at AT TIME ZONE 'Asia/Bangkok') - interval '3 hours')::date
+)
+WHERE business_date IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_daily_sales_business_date
+  ON daily_sales (business_date);
+
+Quick check:
+
+SELECT business_date, COUNT(*) 
+FROM daily_sales 
+GROUP BY business_date 
+ORDER BY business_date DESC 
+LIMIT 10;
+
+You should see a row for the business date you’re viewing (e.g., 2025-10-20 in your screenshot).
+
+
+---
+
+3) Patch the server lookups to be range-based (casts Date safely)
+
+server/routes/analysisDailyReview.ts — replace both fetchers
+
+// helper to build [date, date+1) UTC range safely for DATE columns
+function dayRange(businessDate: string) {
+  const start = new Date(`${businessDate}T00:00:00.000Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+}
+
+// ---------- POS (unchanged table name; only range-based filter) ----------
+async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
+  const { start, end } = dayRange(businessDate);
+  const row = await prisma.posShiftReport.findFirst({
+    where: { businessDate: { gte: start, lt: end } }, // RANGE, not equals
+  });
+  if (!row) return null;
+
+  const cash = row.cashTotal ?? 0;
+  const qr = row.qrTotal ?? 0;
+  const grab = row.grabTotal ?? 0;
+  const other = row.otherTotal ?? 0;
+  const total = row.grandTotal ?? (cash + qr + grab + other);
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = row.startingCash ?? 0;
+
+  return {
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: {
+      shoppingTotal: shopping,
+      wageTotal: wages,
+      otherTotal: otherExp,
+      items: [
+        { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+        { id: "wages", label: "Wages", amount: wages, category: "wage" },
+        ...(otherExp ? [{ id: "other", label: "Other", amount: otherExp, category: "other" as const }] : []),
+      ],
+    },
+    banking: {
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
+      expensesTotal,
+      expectedCash: startingCash + cash - expensesTotal,
+      estimatedNetBanked: startingCash + cash - expensesTotal + qr,
+    },
+  };
+}
+
+// ---------- FORM 1 (adjust model/fields here if names differ) ----------
+async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
+  const { start, end } = dayRange(businessDate);
+  // If your table/model is named differently, change `prisma.dailySales` here:
+  const row = await prisma.dailySales.findFirst({
+    where: { businessDate: { gte: start, lt: end } }, // RANGE, not equals
+  });
+  if (!row) return null;
+
+  const cash = row.cashSales ?? 0;
+  const qr = row.qrSales ?? 0;
+  const grab = row.grabSales ?? 0;
+  const other = row.otherSales ?? 0;
+  const total = cash + qr + grab + other;
+
+  const shopping = row.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? 0;
+  const otherExp = row.otherExpense ?? 0;
+  const expensesTotal = shopping + wages + otherExp;
+  const startingCash = row.startingCash ?? 0;
+
+  return {
+    date: businessDate,
+    sales: { cash, qr, grab, other, total },
+    expenses: {
+      shoppingTotal: shopping,
+      wageTotal: wages,
+      otherTotal: otherExp,
+      items: [
+        { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
+        { id: "wages", label: "Wages", amount: wages, category: "wage" },
+        ...(otherExp ? [{ id: "other", label: "Other", amount: otherExp, category: "other" as const }] : []),
+      ],
+    },
+    banking: {
+      startingCash,
+      cashPayments: cash,
+      qrPayments: qr,
+      expensesTotal,
+      expectedCash: startingCash + cash - expensesTotal,
+      estimatedNetBanked: startingCash + cash - expensesTotal + qr,
+    },
+  };
+}
+
+Why this fixes it: Prisma sometimes treats @db.Date as midnight UTC; strict equality with new Date(businessDate) can miss matches. A gte/lt range overcomes timezone/equality quirks and works whether your DB stores a date or datetime.
+
+
+---
+
+4) Add a tiny diagnostic route (temporary, helps confirm data presence)
+
+analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
+  const date = String(req.query.date || "").trim();
+  const { start, end } = dayRange(date);
+  const [posCount, formCount] = await Promise.all([
+    prisma.posShiftReport.count({ where: { businessDate: { gte: start, lt: end } } }),
+    prisma.dailySales.count({ where: { businessDate: { gte: start, lt: end } } }),
+  ]);
+  res.json({ date, posCount, formCount, start, end });
+});
+
+Hit /api/analysis/diag/day?date=2025-10-20 — if formCount is 0, the DB really has no Form row for that business date.
+
+
+---
+
+5) Quick checklist to confirm end-to-end
+
+1. Run the backfill SQL for daily_sales.business_date.
+
+
+2. Hit diag: /api/analysis/diag/day?date=YYYY-MM-DD → confirm posCount and formCount are 1 for a date you expect.
+
+
+3. Open Daily Review on that same date → it should switch from “Missing Form” to full comparison with flags.
+
