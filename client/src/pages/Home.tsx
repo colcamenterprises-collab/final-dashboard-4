@@ -28,7 +28,7 @@ function BalanceHero() {
   const month = (financeSummary as any)?.month || '';
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-white shadow-xl">
+    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-white shadow-xl">
       {/* Background decoration */}
       <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
       <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
@@ -76,7 +76,7 @@ function KPIGrid() {
 
   const kpis = [
     {
-      title: "Sales Today",
+      title: "Sales MTD",
       value: `฿${(financeSummary as any)?.sales?.toLocaleString() || "0"}`,
       change: "+12.5%",
       trend: "up",
@@ -112,9 +112,9 @@ function KPIGrid() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.map((kpi, index) => (
-        <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+        <div key={index} className="bg-white rounded p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <div className={`p-2 rounded-xl bg-${kpi.color}-50`}>
+            <div className={`p-2 rounded bg-${kpi.color}-50`}>
               <kpi.icon className={`h-5 w-5 text-${kpi.color}-600`} />
             </div>
             <div className={`flex items-center text-sm ${kpi.trend === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -150,10 +150,10 @@ function CashBalanceSnapshot() {
     });
   }, []);
 
-  if (loading) return <div className="w-1/3 bg-white rounded-2xl p-6 shadow-sm border text-gray-500">Loading balances...</div>;
+  if (loading) return <div className="w-1/3 bg-white rounded p-6 shadow-sm border text-gray-500">Loading balances...</div>;
 
   return (
-    <div className="w-1/3 bg-white rounded-2xl p-6 shadow-sm border">
+    <div className="w-1/3 bg-white rounded p-6 shadow-sm border">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Shift Summary</h2>
       <div>
         {posBalances.length > 0 ? (
