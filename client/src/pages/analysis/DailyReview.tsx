@@ -8,7 +8,7 @@ function Flag({ val, limit }: { val: number; limit: number }) {
   const ok = Math.abs(val) < limit;
   return (
     <div
-      className={`rounded-lg px-2 py-1 text-center font-semibold ${
+      className={`rounded px-2 py-1 text-center font-semibold ${
         ok ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
       }`}
     >
@@ -75,7 +75,7 @@ export default function DailyReview() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border rounded-lg px-2 py-1 text-sm"
+          className="border rounded px-2 py-1 text-sm"
         />
       </header>
 
@@ -115,7 +115,7 @@ export default function DailyReview() {
       <section className="border-t pt-3">
         <h2 className="font-bold mb-2">Manager Comments</h2>
         <textarea
-          className="w-full border rounded-lg p-2 min-h-[100px] text-sm"
+          className="w-full border rounded p-2 min-h-[100px] text-sm"
           placeholder="Record findings, explanations, or actions taken..."
           value={comment}
           onChange={(e) => saveComment(e.target.value)}
