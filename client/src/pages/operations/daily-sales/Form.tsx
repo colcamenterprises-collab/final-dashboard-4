@@ -108,6 +108,7 @@ export default function DailySales() {
   const [errors, setErrors] = useState<string[]>([]);
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [loading, setLoading] = useState(isEditMode);
+  const [originalShiftDate, setOriginalShiftDate] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -143,6 +144,11 @@ export default function DailySales() {
           setGrab(p.grabSales || 0);
           setAroi(p.otherSales || 0);
           setClosingCash(p.closingCash || 0);
+          
+          // Preserve original shift date for editing
+          if (data.record.shift_date) {
+            setOriginalShiftDate(data.record.shift_date);
+          }
           
           // Load expenses
           if (p.shiftExpenses && Array.isArray(p.shiftExpenses)) {
@@ -236,7 +242,7 @@ export default function DailySales() {
         expenses: shiftExpenses,
         wages: staffWages,
         closingCash,
-        shiftDate: new Date().toISOString(),
+        shiftDate: isEditMode && originalShiftDate ? originalShiftDate : new Date().toISOString(),
         status: 'submitted'
       };
 
