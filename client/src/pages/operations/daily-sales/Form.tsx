@@ -108,7 +108,7 @@ export default function DailySales() {
   const [errors, setErrors] = useState<string[]>([]);
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [loading, setLoading] = useState(isEditMode);
-  const [originalShiftDate, setOriginalShiftDate] = useState<string | null>(null);
+  const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -145,9 +145,16 @@ export default function DailySales() {
           setAroi(p.otherSales || 0);
           setClosingCash(p.closingCash || 0);
           
-          // Preserve original shift date for editing
-          if (data.record.shift_date) {
-            setOriginalShiftDate(data.record.shift_date);
+          // Load shift date for editing
+          if (data.record.date) {
+            // Convert DD/MM/YYYY to YYYY-MM-DD for input[type="date"]
+            const parts = data.record.date.split('/');
+            if (parts.length === 3) {
+              setShiftDate(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            } else if (data.record.date.includes('-')) {
+              // Already in YYYY-MM-DD format
+              setShiftDate(data.record.date);
+            }
           }
           
           // Load expenses (API returns "expenses" not "shiftExpenses")
@@ -231,6 +238,11 @@ export default function DailySales() {
     setError(null);
     
     try {
+      // Convert date from YYYY-MM-DD to ISO string
+      const dateToSubmit = isEditMode 
+        ? new Date(shiftDate + 'T00:00:00').toISOString()
+        : new Date().toISOString();
+      
       const submitData = {
         completedBy,
         startingCash: cashStart,
@@ -242,7 +254,7 @@ export default function DailySales() {
         expenses: shiftExpenses,
         wages: staffWages,
         closingCash,
-        shiftDate: isEditMode && originalShiftDate ? originalShiftDate : new Date().toISOString(),
+        shiftDate: dateToSubmit,
         status: 'submitted'
       };
 
@@ -367,12 +379,21 @@ export default function DailySales() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Shift Date</label>
-                <input 
-                  type="text"
-                  value={new Date().toLocaleDateString()}
-                  readOnly
-                  className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50" 
-                />
+                {isEditMode ? (
+                  <input 
+                    type="date"
+                    value={shiftDate}
+                    onChange={(e) => setShiftDate(e.target.value)}
+                    className="w-full border rounded-xl px-3 py-2.5 h-10 text-base" 
+                  />
+                ) : (
+                  <input 
+                    type="text"
+                    value={new Date().toLocaleDateString()}
+                    readOnly
+                    className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50" 
+                  />
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].completedBy}</label>
