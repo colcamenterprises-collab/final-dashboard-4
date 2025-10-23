@@ -68,6 +68,7 @@ export default function App() {
                   
                   {/* ---- FORM 1: canonical + aliases ---- */}
                   <Route path="/operations/daily-sales" element={<DailySalesForm />} />
+                  <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />
                   <Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
                   <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
 

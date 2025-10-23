@@ -2,7 +2,7 @@
 // Smash Brothers Burgers — Daily Sales & Stock Form (V2)
 // This is the full preserved form (13 sections).
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
 
@@ -83,6 +83,9 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function DailySales() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
+  
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
   const [cash, setCash] = useState(0);
@@ -104,6 +107,7 @@ export default function DailySales() {
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [lang, setLang] = useState<'en' | 'th'>('en');
+  const [loading, setLoading] = useState(isEditMode);
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -120,6 +124,60 @@ export default function DailySales() {
     }, 1000);
     return () => clearInterval(t);
   }, [showSuccess, shiftId, navigate]);
+
+  // Load existing form data when editing
+  useEffect(() => {
+    if (!isEditMode || !id) return;
+    
+    async function loadFormData() {
+      try {
+        const response = await fetch(`/api/forms/daily-sales/v2/${id}`);
+        const data = await response.json();
+        
+        if (data.ok && data.record) {
+          const p = data.record.payload || {};
+          setCompletedBy(data.record.staff || "");
+          setCashStart(p.startingCash || 0);
+          setCash(p.cashSales || 0);
+          setQr(p.qrSales || 0);
+          setGrab(p.grabSales || 0);
+          setAroi(p.otherSales || 0);
+          setClosingCash(p.closingCash || 0);
+          
+          // Load expenses
+          if (p.shiftExpenses && Array.isArray(p.shiftExpenses)) {
+            setShiftExpenses(p.shiftExpenses.map((e: any) => ({
+              id: uid(),
+              item: e.item || "",
+              cost: e.cost || 0,
+              shop: e.shop || ""
+            })));
+          }
+          
+          // Load wages
+          if (p.staffWages && Array.isArray(p.staffWages)) {
+            setStaffWages(p.staffWages.map((w: any) => ({
+              id: uid(),
+              staff: w.staff || "",
+              amount: w.amount || 0,
+              type: w.type || "WAGES"
+            })));
+          }
+          
+          setShiftId(data.record.id);
+        } else {
+          setError("Failed to load form data");
+        }
+      } catch (err) {
+        setError("Failed to load form");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadFormData();
+  }, [isEditMode, id]);
 
   // Restore drafts on mount
   useEffect(() => {
@@ -182,9 +240,12 @@ export default function DailySales() {
         status: 'submitted'
       };
 
-      // Always call the canonical V3 endpoint
-      const res = await fetch("/api/forms/daily-sales/v3", {
-        method: "POST",
+      // Use update endpoint for edit mode, create endpoint for new forms
+      const endpoint = isEditMode ? `/api/forms/daily-sales/v2/${id}` : "/api/forms/daily-sales/v3";
+      const method = isEditMode ? "PATCH" : "POST";
+      
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),
       });
@@ -213,15 +274,22 @@ export default function DailySales() {
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
       
-      // Show loading indicator before navigation
-      setSubmitting(true);
-      
-      // Brief delay to show loading state before navigation
-      setTimeout(() => {
-        const target = `${FORM2_PATH}?shift=${shiftId}`;
-        console.log('[Form1] will navigate:', target);
-        window.location.assign(target);
-      }, 500);
+      if (isEditMode) {
+        // In edit mode, navigate back to library
+        setTimeout(() => {
+          window.location.assign('/operations/daily-sales-library');
+        }, 500);
+      } else {
+        // Show loading indicator before navigation
+        setSubmitting(true);
+        
+        // Brief delay to show loading state before navigation
+        setTimeout(() => {
+          const target = `${FORM2_PATH}?shift=${shiftId}`;
+          console.log('[Form1] will navigate:', target);
+          window.location.assign(target);
+        }, 500);
+      }
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
       setError(e?.message || "Failed to submit. Please try again.");
@@ -247,13 +315,30 @@ export default function DailySales() {
     localStorage.setItem("daily_sales_draft", JSON.stringify(draft));
   };
 
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading form data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="max-w-5xl mx-auto p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Daily Sales & Expenses</h1>
-            <p className="text-sm text-gray-600 mt-1">Step 1 of 2 — complete Sales & Expenses, then you'll be redirected to Stock.</p>
+            <h1 className="text-3xl font-extrabold tracking-tight">
+              {isEditMode ? 'Edit Daily Sales & Expenses' : 'Daily Sales & Expenses'}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {isEditMode 
+                ? 'Edit and save changes to this form' 
+                : 'Step 1 of 2 — complete Sales & Expenses, then you\'ll be redirected to Stock.'}
+            </p>
           </div>
           <button
             type="button"
@@ -588,8 +673,9 @@ export default function DailySales() {
               type="button"
               onClick={() => submit()}
               className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
+              disabled={submitting}
             >
-              Next →
+              {submitting ? 'Saving...' : (isEditMode ? 'Update Form' : 'Next →')}
             </button>
           </div>
 
