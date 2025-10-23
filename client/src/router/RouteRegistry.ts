@@ -37,6 +37,9 @@ export const ROUTES = {
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
   JUSSI_AI: "/ai/jussi-ops",
   JANE_ACCOUNTS: "/ai/jane-accounts",
+
+  // Marketing
+  ONLINE_ORDERING: "/marketing/online-ordering",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

@@ -41,6 +41,7 @@ import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
+import OnlineOrdering from "./pages/OnlineOrdering";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -122,6 +123,9 @@ export default function App() {
                   <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
                   <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
                   <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+
+                  {/* Marketing */}
+                  <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
 
                   {/* All Analysis Pages */}
                   <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />

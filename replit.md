@@ -62,6 +62,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual indicators, and automated calculations.
 - **Enhanced Email Reporting**: Daily management emails with colored balance status badges, sales breakdowns, expense tracking, and shopping list generation.
 - **Manager Checklist System**: Standalone modal with database, API, and React component for shift closing procedures.
+- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and admin menu editor (?admin=1). Features localStorage persistence, real-time price calculations, and mobile-optimized checkout flow.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
