@@ -88,10 +88,14 @@ export function StockLodgmentModal({ onSuccess, triggerClassName }: StockLodgmen
         body: JSON.stringify(data),
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      const stockType = variables.type === 'rolls' ? 'Rolls' : 
+                       variables.type === 'meat' ? 'Meat' : 'Drinks';
       toast({
-        title: "Success",
-        description: "Stock lodgment recorded successfully",
+        title: `${stockType} Lodged Successfully`,
+        description: "Stock purchase has been recorded",
+        variant: "success" as any,
+        duration: 3000,
       });
       setIsOpen(false);
       rollsForm.reset();
