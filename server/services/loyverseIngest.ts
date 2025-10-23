@@ -124,8 +124,8 @@ function categorizeExpense(comment: string): 'shopping' | 'wages' | 'other' {
     return 'wages';
   }
   
-  // Default to other
-  return 'other';
+  // Default everything else to shopping
+  return 'shopping';
 }
 
 async function fetchShiftExpenses(storeId: string, startUtc: string, endUtc: string): Promise<ExpenseTotals> {
@@ -178,9 +178,8 @@ async function fetchShiftExpenses(storeId: string, startUtc: string, endUtc: str
         const amount = Math.round(movement.money_amount || 0);
         const category = categorizeExpense(movement.comment || '');
         
-        if (category === 'shopping') expenses.shopping += amount;
-        else if (category === 'wages') expenses.wages += amount;
-        else expenses.other += amount;
+        if (category === 'wages') expenses.wages += amount;
+        else expenses.shopping += amount;
         
         console.log(`      • ${movement.comment || 'Unnamed'}: ฿${amount} → ${category}`);
       }
@@ -261,9 +260,8 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
         const amount = Math.round(movement.money_amount || 0);
         const category = categorizeExpense(movement.comment || '');
         
-        if (category === 'shopping') expenses.shopping += amount;
-        else if (category === 'wages') expenses.wages += amount;
-        else expenses.other += amount;
+        if (category === 'wages') expenses.wages += amount;
+        else expenses.shopping += amount;
         
         console.log(`      • ${movement.comment || 'Unnamed'}: ฿${amount} → ${category}`);
       }
