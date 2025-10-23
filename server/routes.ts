@@ -2002,7 +2002,7 @@ export function registerRoutes(app: express.Application): Server {
         SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
         FROM expenses 
         ${whereClause}
-        ORDER BY "createdAt" DESC
+        ORDER BY "shiftDate" DESC
         LIMIT 200
       `, ...params);
 
