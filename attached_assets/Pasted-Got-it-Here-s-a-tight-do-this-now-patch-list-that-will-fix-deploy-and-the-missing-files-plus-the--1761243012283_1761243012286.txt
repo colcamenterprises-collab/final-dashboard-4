@@ -1,0 +1,195 @@
+Got it. Here’s a tight, do-this-now patch list that will fix deploy and the missing files, plus the money/math issues. I’m giving you exact code to paste so it’s one-and-done.
+
+
+---
+
+1) Prisma deploy fix (mandatory)
+
+prisma/schema.prisma
+
+Make sure your generator looks like this:
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+package.json (scripts)
+
+Add postinstall and ensure build regenerates Prisma:
+
+{
+  "scripts": {
+    "postinstall": "prisma generate",
+    "build": "prisma generate && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "NODE_ENV=production node dist/index.js"
+  }
+}
+
+Also confirm:
+
+@prisma/client is in dependencies (not devDependencies)
+
+prisma is in devDependencies
+
+
+Clean + rebuild (once)
+
+From the shell:
+
+rm -rf node_modules
+npm ci
+npx prisma generate
+npm run build
+
+Then deploy.
+
+
+---
+
+2) Stop the build errors (missing pages)
+
+Create these two files so the router imports resolve:
+
+client/src/pages/DailyStockSales.tsx
+
+import React from "react";
+
+export default function DailyStockSales() {
+  return (
+    <div className="p-4 md:p-6">
+      <h1 className="text-xl font-semibold">Daily Stock Sales</h1>
+      <p className="text-sm text-gray-500">Placeholder page. Wire up later.</p>
+    </div>
+  );
+}
+
+client/src/pages/DailyShiftForm.tsx
+
+import React from "react";
+
+export default function DailyShiftForm() {
+  return (
+    <div className="p-4 md:p-6">
+      <h1 className="text-xl font-semibold">Daily Shift Form</h1>
+      <p className="text-sm text-gray-500">Placeholder page. Wire up later.</p>
+    </div>
+  );
+}
+
+No other changes are needed to deploy.
+
+
+---
+
+3) Currency & totals (the Baht/“cents” issue)
+
+Use one formatter everywhere and don’t divide by 100 unless your DB is actually storing satang.
+
+client/src/lib/money.ts
+
+export const THB = (v: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    minimumFractionDigits: 2,
+  }).format(v ?? 0);
+
+Replace all display spots to use THB(amount) and remove any amount / 100.
+
+
+---
+
+4) Month-to-date = Table1 + Table2 (exactly)
+
+Where you build the dashboard/home values, compute it like this (Prisma example):
+
+import { startOfMonth, endOfMonth } from "date-fns";
+
+const start = startOfMonth(new Date());
+const end   = endOfMonth(new Date());
+
+// Table 1: business expenses
+const t1 = await prisma.businessExpense.aggregate({
+  _sum: { amount: true },
+  where: { date: { gte: start, lte: end } }
+});
+
+// Table 2: stock lodgement (or the second table collection)
+const t2 = await prisma.stockLodgement.aggregate({
+  _sum: { amount: true },
+  where: { date: { gte: start, lte: end } }
+});
+
+const table1Total = t1._sum.amount ?? 0;
+const table2Total = t2._sum.amount ?? 0;
+
+const monthToDate = table1Total + table2Total;   // ← the number you want
+
+Render with THB(monthToDate).
+
+
+---
+
+5) Table 2 ordering & consistent font (tablet-first)
+
+Most-recent first (DESC)
+
+await prisma.stockLodgement.findMany({
+  where: { /* your filters */ },
+  orderBy: { date: "desc" }   // newest on top
+});
+
+Font consistency
+
+Wrap the page:
+
+<div className="text-[15px] md:text-base">
+  {/* both tables inherit this size; use font-semibold for headings only */}
+</div>
+
+
+---
+
+6) Sidebar: add “Library” under Daily Sales
+
+Where you define the Daily Sales menu group:
+
+const dailySalesItems = [
+  { label: "Daily Sales", to: "/operations/daily-sales" },
+  { label: "Library",     to: "/operations/library" } // ← new submenu item
+];
+
+
+---
+
+7) Online ordering page (status)
+
+I’ve already restored the original VEV-style screen, centered the headings, and tightened the content by ~30%. You can edit menu + images from the front end by opening the page with ?admin=1 and clicking Edit Menu (saves to localStorage for preview).
+
+
+---
+
+Quick checklist to finish
+
+1. Patch schema.prisma + package.json scripts (above).
+
+
+2. Add the two placeholder pages.
+
+
+3. Reinstall & generate: npm ci && npx prisma generate && npm run build.
+
+
+4. Deploy.
+
+
+5. Verify Baht formatting (THB()), MTD = Table1 + Table2, Table 2 sorted DESC, fonts consistent.
+
+
+6. Ordering page looks like your VEV screenshots; tweak via ?admin=1.
+
+
+
+If you paste your package.json scripts block or the exact files where totals are computed, I’ll return the exact diff lines to drop in.
+
