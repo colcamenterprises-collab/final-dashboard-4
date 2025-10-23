@@ -877,7 +877,7 @@ export default function Expenses() {
         title: "Success",
         description: "Stock item deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['purchase-tally'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-tally'] });
     },
     onError: (error: any) => {
       console.error("Delete stock mutation error:", error);
