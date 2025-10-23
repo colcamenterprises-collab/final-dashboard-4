@@ -150,20 +150,20 @@ export default function DailySales() {
             setOriginalShiftDate(data.record.shift_date);
           }
           
-          // Load expenses
-          if (p.shiftExpenses && Array.isArray(p.shiftExpenses)) {
-            setShiftExpenses(p.shiftExpenses.map((e: any) => ({
-              id: uid(),
+          // Load expenses (API returns "expenses" not "shiftExpenses")
+          if (p.expenses && Array.isArray(p.expenses)) {
+            setShiftExpenses(p.expenses.map((e: any) => ({
+              id: e.id || uid(),
               item: e.item || "",
               cost: e.cost || 0,
               shop: e.shop || ""
             })));
           }
           
-          // Load wages
-          if (p.staffWages && Array.isArray(p.staffWages)) {
-            setStaffWages(p.staffWages.map((w: any) => ({
-              id: uid(),
+          // Load wages (API returns "wages" not "staffWages")
+          if (p.wages && Array.isArray(p.wages)) {
+            setStaffWages(p.wages.map((w: any) => ({
+              id: w.id || uid(),
               staff: w.staff || "",
               amount: w.amount || 0,
               type: w.type || "WAGES"
