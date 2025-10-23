@@ -52,13 +52,14 @@ interface LoyverseShiftsResponse {
 function toUtcWindowForBkkShift(businessDate: string): { startUtc: string; endUtc: string } {
   // Bangkok is UTC+7
   // Business date shift: D 18:00 Bangkok → D+1 03:00 Bangkok
+  // Allow 30 min buffer for early openings
   const [year, month, day] = businessDate.split('-').map(Number);
   
-  // Start: businessDate 18:00 Bangkok = 11:00 UTC same day
-  const startUtc = new Date(Date.UTC(year, month - 1, day, 11, 0, 0));
+  // Start: 30 min before 18:00 Bangkok = 10:30 UTC same day
+  const startUtc = new Date(Date.UTC(year, month - 1, day, 10, 30, 0));
   
-  // End: businessDate+1 03:00 Bangkok = 20:00 UTC same day  
-  const endUtc = new Date(Date.UTC(year, month - 1, day, 20, 0, 0));
+  // End: 30 min after 03:00 Bangkok = 20:30 UTC same day  
+  const endUtc = new Date(Date.UTC(year, month - 1, day, 20, 30, 0));
   
   return {
     startUtc: startUtc.toISOString(),
