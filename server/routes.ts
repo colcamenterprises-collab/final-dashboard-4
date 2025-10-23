@@ -2011,7 +2011,7 @@ export function registerRoutes(app: express.Application): Server {
         id: expense.id,
         date: expense.shiftDate || expense.createdAt,
         description: expense.item || 'Unknown Item',
-        amount: (parseFloat(expense.costCents) || 0) / 100, // Convert cents to THB
+        amount: parseFloat(expense.costCents) || 0, // costCents stores whole THB, not cents
         category: expense.expenseType || 'Shopping',
         supplier: expense.supplier || 'Unknown',
         paymentMethod: 'Cash',
@@ -2381,6 +2381,7 @@ export function registerRoutes(app: express.Application): Server {
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
       // BUSINESS EXPENSES (from expenses table) - Includes DIRECT and STOCK_LODGMENT (paid rolls)
+      // costCents stores whole THB, not cents - no division needed
       // MTD Business
       const mtdBusinessResult = await db.execute(sql`
         SELECT COALESCE(SUM("costCents"), 0) as total 
@@ -2389,7 +2390,7 @@ export function registerRoutes(app: express.Application): Server {
         AND EXTRACT(year FROM "shiftDate") = ${currentYear}
         AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
-      const mtdBusiness = Number(mtdBusinessResult.rows[0]?.total || 0) / 100;
+      const mtdBusiness = Number(mtdBusinessResult.rows[0]?.total || 0);
 
       // YTD Business
       const ytdBusinessResult = await db.execute(sql`
@@ -2398,7 +2399,7 @@ export function registerRoutes(app: express.Application): Server {
         WHERE EXTRACT(year FROM "shiftDate") = ${currentYear}
         AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
-      const ytdBusiness = Number(ytdBusinessResult.rows[0]?.total || 0) / 100;
+      const ytdBusiness = Number(ytdBusinessResult.rows[0]?.total || 0);
 
       // Prev Month Business
       const prevMonthBusinessResult = await db.execute(sql`
@@ -2408,7 +2409,7 @@ export function registerRoutes(app: express.Application): Server {
         AND EXTRACT(year FROM "shiftDate") = ${prevYear}
         AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
-      const prevMonthBusiness = Number(prevMonthBusinessResult.rows[0]?.total || 0) / 100;
+      const prevMonthBusiness = Number(prevMonthBusinessResult.rows[0]?.total || 0);
 
       // SHIFT EXPENSES (from daily_sales_v2 payload - matching expenses page display)
       // Parse payload for accurate line-item totals (same method as shift expenses table)

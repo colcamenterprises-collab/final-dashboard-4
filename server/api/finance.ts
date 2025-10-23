@@ -94,11 +94,11 @@ router.get('/summary/today', async (req: Request, res: Response) => {
       }
     }
     
-    // Get business expenses from expenses table for current month (amount stored in cents as costCents)
+    // Get business expenses from expenses table for current month (costCents stores whole THB, not cents)
     // Includes DIRECT (modal entries) and STOCK_LODGMENT (paid rolls stock)
     const businessExpenseResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM("costCents") / 100.0, 0) as business_total
+        COALESCE(SUM("costCents"), 0) as business_total
       FROM expenses
       WHERE EXTRACT(YEAR FROM "shiftDate") = ${year}
         AND EXTRACT(MONTH FROM "shiftDate") = ${month}
