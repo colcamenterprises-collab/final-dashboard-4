@@ -2380,7 +2380,7 @@ export function registerRoutes(app: express.Application): Server {
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-      // BUSINESS EXPENSES (from expenses table) - Includes DIRECT and STOCK_LODGMENT (paid rolls)
+      // BUSINESS EXPENSES (from expenses table) - DIRECT only to match Table 1
       // costCents stores whole THB, not cents - no division needed
       // MTD Business
       const mtdBusinessResult = await db.execute(sql`
@@ -2388,7 +2388,7 @@ export function registerRoutes(app: express.Application): Server {
         FROM expenses 
         WHERE EXTRACT(month FROM "shiftDate") = ${currentMonth}
         AND EXTRACT(year FROM "shiftDate") = ${currentYear}
-        AND source IN ('DIRECT', 'STOCK_LODGMENT')
+        AND source = 'DIRECT'
       `);
       const mtdBusiness = Number(mtdBusinessResult.rows[0]?.total || 0);
 
@@ -2397,7 +2397,7 @@ export function registerRoutes(app: express.Application): Server {
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
         WHERE EXTRACT(year FROM "shiftDate") = ${currentYear}
-        AND source IN ('DIRECT', 'STOCK_LODGMENT')
+        AND source = 'DIRECT'
       `);
       const ytdBusiness = Number(ytdBusinessResult.rows[0]?.total || 0);
 
@@ -2407,7 +2407,7 @@ export function registerRoutes(app: express.Application): Server {
         FROM expenses 
         WHERE EXTRACT(month FROM "shiftDate") = ${prevMonth}
         AND EXTRACT(year FROM "shiftDate") = ${prevYear}
-        AND source IN ('DIRECT', 'STOCK_LODGMENT')
+        AND source = 'DIRECT'
       `);
       const prevMonthBusiness = Number(prevMonthBusinessResult.rows[0]?.total || 0);
 
