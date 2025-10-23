@@ -95,14 +95,14 @@ router.get('/summary/today', async (req: Request, res: Response) => {
     }
     
     // Get business expenses from expenses table for current month (amount stored in cents as costCents)
-    // Filter by source=DIRECT to match what's displayed in expenses page Table 1
+    // Includes DIRECT (modal entries) and STOCK_LODGMENT (paid rolls stock)
     const businessExpenseResult = await db.execute(sql`
       SELECT 
         COALESCE(SUM("costCents") / 100.0, 0) as business_total
       FROM expenses
       WHERE EXTRACT(YEAR FROM "shiftDate") = ${year}
         AND EXTRACT(MONTH FROM "shiftDate") = ${month}
-        AND source = 'DIRECT'
+        AND source IN ('DIRECT', 'STOCK_LODGMENT')
     `);
     
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');

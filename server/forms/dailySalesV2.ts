@@ -6,7 +6,7 @@ import { pool } from "../db";
 import { workingEmailService } from "../services/workingEmailService";
 import { v4 as uuidv4 } from "uuid";
 import { v4 as uuid } from "uuid";
-import { insertDirectExpensesFromShift } from "../utils/expenseLedger";
+// import { insertDirectExpensesFromShift } from "../utils/expenseLedger"; // REMOVED: Shift expenses tracked in payload only
 import { computeBankingAuto } from "../services/bankingAuto.js";
 import { validateStockRequired } from "../services/stockRequired.js";
 
@@ -171,11 +171,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [id, shiftDate, completedBy, createdAt, createdAt, payload]
     );
-
-    // Log shift expenses to expenses table
-    const savedRowCreatedAt = new Date(createdAt);
-    const directExpenses = Array.isArray(payload.expenses) ? payload.expenses : [];
-    await insertDirectExpensesFromShift(savedRowCreatedAt, directExpenses);
 
     // Build shopping list for email
     const shoppingList = (requisition || [])

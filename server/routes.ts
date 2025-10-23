@@ -2380,14 +2380,14 @@ export function registerRoutes(app: express.Application): Server {
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-      // BUSINESS EXPENSES (from expenses table) - Filter by source=DIRECT to match Table 1 display
+      // BUSINESS EXPENSES (from expenses table) - Includes DIRECT and STOCK_LODGMENT (paid rolls)
       // MTD Business
       const mtdBusinessResult = await db.execute(sql`
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
         WHERE EXTRACT(month FROM "shiftDate") = ${currentMonth}
         AND EXTRACT(year FROM "shiftDate") = ${currentYear}
-        AND source = 'DIRECT'
+        AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
       const mtdBusiness = Number(mtdBusinessResult.rows[0]?.total || 0) / 100;
 
@@ -2396,7 +2396,7 @@ export function registerRoutes(app: express.Application): Server {
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
         WHERE EXTRACT(year FROM "shiftDate") = ${currentYear}
-        AND source = 'DIRECT'
+        AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
       const ytdBusiness = Number(ytdBusinessResult.rows[0]?.total || 0) / 100;
 
@@ -2406,7 +2406,7 @@ export function registerRoutes(app: express.Application): Server {
         FROM expenses 
         WHERE EXTRACT(month FROM "shiftDate") = ${prevMonth}
         AND EXTRACT(year FROM "shiftDate") = ${prevYear}
-        AND source = 'DIRECT'
+        AND source IN ('DIRECT', 'STOCK_LODGMENT')
       `);
       const prevMonthBusiness = Number(prevMonthBusinessResult.rows[0]?.total || 0) / 100;
 
