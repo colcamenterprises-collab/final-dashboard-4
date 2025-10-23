@@ -176,6 +176,7 @@ export default function DailyReview() {
                 rows={[
                   { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
                   { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
+                  { label: "Other", pos: current.pos.expenses.otherTotal, form: current.form.expenses.otherTotal, diff: current.variance.expenses.otherTotal },
                   {
                     label: "Grand Total",
                     pos: current.pos.expenses.shoppingTotal + current.pos.expenses.wageTotal + current.pos.expenses.otherTotal,
