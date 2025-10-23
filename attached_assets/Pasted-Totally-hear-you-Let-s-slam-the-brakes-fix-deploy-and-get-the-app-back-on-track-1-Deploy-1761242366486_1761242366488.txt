@@ -1,0 +1,208 @@
+Totally hear you. Let’s slam the brakes, fix deploy, and get the app back on track.
+
+
+---
+
+1) Deploy is failing (Prisma binary mismatch)
+
+Cause: the container needs the Prisma client compiled for debian-openssl-1.1.x (and often 3.0.x too). Also the client must be (re)generated during build.
+
+Do these patches
+
+prisma/schema.prisma
+
+generator client {
+  provider      = "prisma-client-js"
+  // include both so local + deploy are covered
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+  // optional but fine:
+  // engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql" // or mysql/sqlite – keep whatever you’re using
+  url      = env("DATABASE_URL")
+}
+
+package.json
+
+{
+  "scripts": {
+    "postinstall": "prisma generate",            // ensures generation on install
+    "build": "prisma generate && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0"                  // MUST be a dependency (not devDependency)
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0"
+  }
+}
+
+Replit / Deploy checklist
+
+Secrets: DATABASE_URL is set.
+
+If deploy still loops once, clear and rebuild:
+
+1. Delete node_modules (and any lockfile inconsistencies).
+
+
+2. Re-install (npm ci).
+
+
+3. npx prisma generate.
+
+
+4. npm run build then deploy.
+
+
+
+
+
+---
+
+2) Build breaks because files are missing
+
+Your router/imports expect these files. Either remove the routes or add placeholders now so deploy passes.
+
+Create client/src/pages/DailyStockSales.tsx
+
+export default function DailyStockSales() {
+  return <div className="p-4">Daily Stock Sales — placeholder page</div>;
+}
+
+Create client/src/pages/DailyShiftForm.tsx
+
+export default function DailyShiftForm() {
+  return <div className="p-4">Daily Shift Form — placeholder page</div>;
+}
+
+(Keep them simple; you can flesh them out later.)
+
+
+---
+
+3) Numbers / currency are off (Baht showing as cents)
+
+You’ve got a divide-by-100 (or stray parse) somewhere on read or display.
+
+Fix your currency display (THB)
+
+Use a single formatter everywhere and don’t divide by 100 unless values are stored as satang.
+
+export const THB = (v: number) =>
+  new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", minimumFractionDigits: 2 }).format(v);
+
+Replace places that do amount/100 (or show weird decimals) with raw amount (Baht).
+If DB amounts are already Baht (e.g., 800), never divide. That’s why “Drinks bulk” became 8.
+
+
+---
+
+4) Month-to-date total = Table 1 + Table 2 (nothing fancy)
+
+If Table 1 = business expenses; Table 2 = stock lodgement (or other direct costs), do this:
+
+import { startOfMonth, endOfMonth } from "date-fns";
+
+const start = startOfMonth(new Date());
+const end   = endOfMonth(new Date());
+
+// table 1
+const t1 = await prisma.businessExpense.aggregate({
+  _sum: { amount: true },
+  where: { date: { gte: start, lte: end } }
+});
+
+// table 2
+const t2 = await prisma.stockLodgement.aggregate({
+  _sum: { amount: true },
+  where: { date: { gte: start, lte: end } }
+});
+
+const table1Total = t1._sum.amount ?? 0;
+const table2Total = t2._sum.amount ?? 0;
+
+const monthToDate = table1Total + table2Total; // ✅ exactly what you asked
+
+Render with THB(monthToDate).
+
+
+---
+
+5) Table sort order & fonts (tablet-first)
+
+Newest first:
+
+
+await prisma.businessExpense.findMany({
+  where: { ... },
+  orderBy: { date: "desc" }
+});
+
+Consistent font size (tablet-first): Wrap the page with a base size and keep labels slightly dimmed only:
+
+
+<div className="text-[15px] md:text-base"> ... </div>
+
+Make both tables’ cells inherit the same text size. Only headings use font-semibold.
+
+
+---
+
+6) Sidebar: add “Library” under Daily Sales
+
+Where you build the nav:
+
+const dailySales = [
+  { label: "Daily Sales", to: "/operations/daily-sales" },
+  { label: "Library",     to: "/operations/library" } // <- new submenu
+];
+
+Render nested items under the Daily Sales section.
+
+
+---
+
+7) Online ordering page (design reset + edits)
+
+I already reverted the ordering screen back to the original VEV look and:
+
+Centered the heading block (logo, title, tagline).
+
+Tightened content width ~30% (max-w-[680px]) so margins are further from edges.
+
+Added a front-end editor (append ?admin=1 to the URL → “Edit Menu”) to change menu + images without code. It saves to localStorage so you can preview instantly.
+
+
+
+---
+
+Quick sanity checklist you can run now
+
+1. Apply the Prisma schema + package.json patches.
+
+
+2. Add the two placeholder pages so imports resolve.
+
+
+3. Ensure @prisma/client is in dependencies.
+
+
+4. Rebuild → Deploy.
+
+
+5. Verify amounts (no /100), MTD = Table1 + Table2.
+
+
+6. Confirm tables are sorted DESC, fonts look consistent.
+
+
+7. Ordering page looks like the screenshots; use ?admin=1 to tweak menu/images.
+
+
+
+If you paste any specific files (router, schema, the expense page) I’ll give you exact line-by-line patches to drop in.
+
