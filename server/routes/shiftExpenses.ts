@@ -33,7 +33,7 @@ router.get("/", async (req, res) => {
       WHERE payload IS NOT NULL
         AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${targetYear}
         AND EXTRACT(MONTH FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${targetMonth}
-      ORDER BY "shiftDate" ASC
+      ORDER BY "shiftDate" DESC
     `);
     
     const lineItems: ShiftExpenseLineItem[] = [];

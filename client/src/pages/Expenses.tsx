@@ -782,21 +782,21 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
 
       {/* Mobile Compact Table View */}
       <div className="lg:hidden">
-        <table className="w-full border text-sm">
+        <table className="w-full border">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-2 border text-left">Date</th>
-              <th className="p-2 border text-left">Details</th>
-              <th className="p-2 border text-right">Amount</th>
+              <th className="p-2 border text-left text-sm">Date</th>
+              <th className="p-2 border text-left text-sm">Details</th>
+              <th className="p-2 border text-right text-sm">Amount</th>
             </tr>
           </thead>
           <tbody>
             {shiftExpenses.map((exp: any, i: number) => (
               <tr key={i} className="hover:bg-gray-50">
-                <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                <td className="border p-2 text-sm whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
                 <td className="border p-2">
                   <div className="text-sm font-medium">{exp.description}</div>
-                  <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
+                  <div className="text-sm text-gray-600">{exp.supplier} • {exp.category}</div>
                 </td>
                 <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
               </tr>
@@ -1268,22 +1268,22 @@ export default function Expenses() {
 
         {/* Mobile Compact Table View */}
         <div className="lg:hidden">
-          <table className="w-full border text-sm">
+          <table className="w-full border">
             <thead>
               <tr className="bg-gray-100">
-                <th className="p-2 border text-left">Date</th>
-                <th className="p-2 border text-left">Details</th>
-                <th className="p-2 border text-right">Amount</th>
-                <th className="p-2 border text-center w-20">Action</th>
+                <th className="p-2 border text-left text-sm">Date</th>
+                <th className="p-2 border text-left text-sm">Details</th>
+                <th className="p-2 border text-right text-sm">Amount</th>
+                <th className="p-2 border text-center w-20 text-sm">Action</th>
               </tr>
             </thead>
             <tbody>
               {expenses.map((exp,i)=>(
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                  <td className="border p-2 text-sm whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
                   <td className="border p-2">
                     <div className="text-sm font-medium">{exp.description}</div>
-                    <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
+                    <div className="text-sm text-gray-600">{exp.supplier} • {exp.category}</div>
                   </td>
                   <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
                   <td className="border p-2 text-center">
