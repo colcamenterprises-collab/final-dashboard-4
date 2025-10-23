@@ -200,54 +200,75 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   const token = process.env.LOYVERSE_TOKEN;
   if (!token) throw new Error('LOYVERSE_TOKEN not set');
 
-  // Fetch sales data
-  let cursor: string | undefined;
-  const totals: Totals = { cash: 0, qr: 0, grab: 0, other: 0, grand: 0 };
-  let receiptCount = 0;
+  const url = new URL('https://api.loyverse.com/v1.0/shifts');
+  url.searchParams.set('store_id', storeId);
+  url.searchParams.set('limit', '100');
 
-  do {
-    const url = new URL('https://api.loyverse.com/v1.0/receipts');
-    url.searchParams.set('store_id', storeId);
-    url.searchParams.set('created_at_min', startUtc);
-    url.searchParams.set('created_at_max', endUtc);
-    url.searchParams.set('limit', '250');
-    if (cursor) url.searchParams.set('cursor', cursor);
+  const r = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
-    const r = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  if (!r.ok) {
+    const errorText = await r.text();
+    throw new Error(`Loyverse shifts ${r.status}: ${errorText}`);
+  }
 
-    if (!r.ok) {
-      const errorText = await r.text();
-      throw new Error(`Loyverse ${r.status}: ${errorText}`);
-    }
-
-    const data = await r.json() as LoyverseResponse;
+  const data = await r.json() as LoyverseShiftsResponse;
+  
+  const startTime = new Date(startUtc).getTime();
+  const endTime = new Date(endUtc).getTime();
+  
+  const filteredShifts = data.shifts.filter(shift => {
+    const openedTime = new Date(shift.opened_at).getTime();
+    return openedTime >= startTime && openedTime <= endTime;
+  });
+  
+  if (filteredShifts.length === 0) {
+    throw new Error(`No shift found for ${businessDate}`);
+  }
+  
+  if (filteredShifts.length > 1) {
+    console.warn(`   ⚠️  Found ${filteredShifts.length} shifts, using first one`);
+  }
+  
+  const shift = filteredShifts[0];
+  console.log(`   📊 Using shift opened at ${shift.opened_at}`);
+  console.log(`   Net sales: ฿${shift.net_sales}, Receipts: ${shift.gross_sales - shift.net_sales > 0 ? 'has refunds' : 'no refunds'}`);
+  
+  const totals: Totals = { cash: 0, qr: 0, grab: 0, other: 0, grand: Math.round(shift.net_sales) };
+  
+  for (const payment of (shift.payments || [])) {
+    const kind = mapping[payment.payment_type_id] || 'Other';
+    const amt = Math.round(payment.money_amount);
     
-    for (const rcpt of data.receipts) {
-      receiptCount++;
-      for (const p of (rcpt.payments || [])) {
-        const kind = mapping[p.payment_type_id] || 'Other';
-        const amt = Math.round(Number(p.money_amount) || 0);
-        
-        if (kind === 'Cash') totals.cash += amt;
-        else if (kind === 'QR') totals.qr += amt;
-        else if (kind === 'Grab') totals.grab += amt;
-        else totals.other += amt;
-        
-        totals.grand += amt;
-      }
-    }
-    
-    cursor = data.cursor;
-  } while (cursor);
+    if (kind === 'Cash') totals.cash = amt;
+    else if (kind === 'QR') totals.qr = amt;
+    else if (kind === 'Grab') totals.grab = amt;
+    else totals.other = amt;
+  }
 
-  console.log(`   Processed ${receiptCount} receipts`);
   console.log(`   Sales: Cash=${totals.cash}, QR=${totals.qr}, Grab=${totals.grab}, Other=${totals.other}, Grand=${totals.grand}`);
 
   // Fetch expense data
   console.log(`   📦 Fetching expenses...`);
-  const expenses = await fetchShiftExpenses(storeId, startUtc, endUtc);
+  const expenses: ExpenseTotals = { shopping: 0, wages: 0, other: 0 };
+  
+  if (shift.cash_movements && shift.cash_movements.length > 0) {
+    console.log(`   💸 Processing ${shift.cash_movements.length} cash movements`);
+    
+    for (const movement of shift.cash_movements) {
+      if (movement.type === 'PAY_OUT') {
+        const amount = Math.round(movement.money_amount || 0);
+        const category = categorizeExpense(movement.comment || '');
+        
+        if (category === 'shopping') expenses.shopping += amount;
+        else if (category === 'wages') expenses.wages += amount;
+        else expenses.other += amount;
+        
+        console.log(`      • ${movement.comment || 'Unnamed'}: ฿${amount} → ${category}`);
+      }
+    }
+  }
   console.log(`   Expenses: Shopping=${expenses.shopping}, Wages=${expenses.wages}, Other=${expenses.other}`);
 
   const businessDateObj = new Date(businessDate + 'T00:00:00Z');
@@ -272,16 +293,16 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       otherTotal: totals.other,
       grandTotal: totals.grand,
       businessDate: businessDateObj,
-      grossSales: totals.grand,
-      discounts: 0,
+      grossSales: Math.round(shift.gross_sales),
+      discounts: Math.round(shift.discounts),
       netSales: totals.grand,
-      cashInDrawer: totals.cash,
+      cashInDrawer: Math.round(shift.expected_cash),
       cashSales: totals.cash,
       qrSales: totals.qr,
       otherSales: totals.other,
-      receiptCount: receiptCount,
-      openedAt: new Date(startUtc),
-      closedAt: new Date(endUtc),
+      receiptCount: 0,
+      openedAt: new Date(shift.opened_at),
+      closedAt: shift.closed_at ? new Date(shift.closed_at) : new Date(endUtc),
       shoppingTotal: expenses.shopping,
       wagesTotal: expenses.wages,
       otherExpense: expenses.other,
@@ -298,17 +319,17 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       shoppingTotal: expenses.shopping,
       wagesTotal: expenses.wages,
       otherExpense: expenses.other,
-      startingCash: 0,
-      grossSales: totals.grand,
-      discounts: 0,
+      startingCash: Math.round(shift.starting_cash),
+      grossSales: Math.round(shift.gross_sales),
+      discounts: Math.round(shift.discounts),
       netSales: totals.grand,
-      cashInDrawer: totals.cash,
+      cashInDrawer: Math.round(shift.expected_cash),
       cashSales: totals.cash,
       qrSales: totals.qr,
       otherSales: totals.other,
-      receiptCount: receiptCount,
-      openedAt: new Date(startUtc),
-      closedAt: new Date(endUtc),
+      receiptCount: 0,
+      openedAt: new Date(shift.opened_at),
+      closedAt: shift.closed_at ? new Date(shift.closed_at) : new Date(endUtc),
     },
   });
 
