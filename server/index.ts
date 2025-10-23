@@ -14,6 +14,8 @@ import { errorGuard } from './middleware/errorGuard';
 import { readonlyGuard } from './middleware/readonly';
 import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
 import posUploadRouter from "./routes/posUpload";
+import healthRouter from "./routes/health";
+import opsMtdRouter from "./routes/ops_mtd";
 
 const prisma = new PrismaClient();
 
@@ -177,6 +179,8 @@ async function checkSchema() {
   const shiftAnalysisRouter = (await import('./routes/shiftAnalysis.js')).default;
   app.use('/api', loyverseV2Router);
   app.use('/api', shiftAnalysisRouter);
+  app.use('/api', healthRouter);
+  app.use('/api', opsMtdRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {

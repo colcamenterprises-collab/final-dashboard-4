@@ -1,0 +1,272 @@
+Right—let’s prove everything is wired before you hit Deploy. Below are copy-paste tests you can run locally that verify:
+
+Prisma is using the correct binaries (and will regenerate on build)
+
+DB connection is healthy
+
+Money shows as Baht (no cents bug)
+
+Month-to-date = Table1 + Table2 (exact)
+
+Table 2 is sorted DESC
+
+
+I’m giving you tiny files + commands you can drop in now.
+
+
+---
+
+0) Quick sanity: do you have the two placeholder pages?
+
+If not, add them so the router stops breaking:
+
+client/src/pages/DailyStockSales.tsx
+
+export default function DailyStockSales() {
+  return <div className="p-4 md:p-6">Daily Stock Sales — placeholder</div>;
+}
+
+client/src/pages/DailyShiftForm.tsx
+
+export default function DailyShiftForm() {
+  return <div className="p-4 md:p-6">Daily Shift Form — placeholder</div>;
+}
+
+
+---
+
+1) Prisma verification script (checks binaries + DB)
+
+Create server/scripts/verify_prisma.ts:
+
+// server/scripts/verify_prisma.ts
+import { PrismaClient, Prisma } from "@prisma/client";
+
+async function main() {
+  const prisma = new PrismaClient();
+  const openssl = process.versions.openssl;
+  const versions = Prisma.prismaVersion; // { client, engine }
+
+  // Minimal DB ping (works for Postgres/MySQL; swap if needed)
+  const ping = await prisma.$queryRaw`SELECT 1 as ok`;
+
+  console.log("=== Prisma Verification ===");
+  console.log("OpenSSL:", openssl);
+  console.log("Prisma Client version:", versions.client);
+  console.log("Prisma Engine version:", versions.engine);
+  console.log("DB Ping:", ping);
+
+  await prisma.$disconnect();
+}
+
+main().catch((e) => {
+  console.error("Prisma verification failed:", e);
+  process.exit(1);
+});
+
+Add a run script (optional) in package.json:
+
+"scripts": {
+  "verify:prisma": "tsx server/scripts/verify_prisma.ts"
+}
+
+Run it:
+
+npm run verify:prisma
+
+✅ You should see:
+
+OpenSSL printed (any value is fine locally)
+
+Prisma client & engine versions
+
+DB Ping: [ { ok: 1 } ] (or similar)
+
+
+> If this fails, it means environment/secrets are wrong. Fix before deploy.
+
+
+
+
+---
+
+2) Health endpoint (so you can check in the browser)
+
+Create server/routes/health.ts:
+
+import { Router } from "express";
+import { PrismaClient, Prisma } from "@prisma/client";
+const router = Router();
+const prisma = new PrismaClient();
+
+router.get("/health", async (_req, res) => {
+  try {
+    const ping = await prisma.$queryRaw`SELECT 1 as ok`;
+    res.json({
+      ok: true,
+      openssl: process.versions.openssl,
+      prisma: Prisma.prismaVersion,
+      db: ping,
+      env: {
+        // useful sanity checks (mask secrets as needed)
+        node_env: process.env.NODE_ENV,
+        database_url_set: Boolean(process.env.DATABASE_URL),
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+export default router;
+
+Wire it in server/index.ts:
+
+import health from "./routes/health";
+// ...
+app.use("/api", health);
+
+Visit /api/health — you should get a JSON block confirming versions + DB ping.
+
+
+---
+
+3) Money/THB verification
+
+Create client/src/lib/money.ts (if not already):
+
+export const THB = (v: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    minimumFractionDigits: 2,
+  }).format(v ?? 0);
+
+Smoke test at runtime: temporarily log in any component:
+
+console.log("THB(800) =>", THB(800));     // ฿800.00
+console.log("THB(4080) =>", THB(4080));   // ฿4,080.00
+
+If you see ฿8.00 or ฿40.80, something is still dividing by 100. Remove all / 100 in render or queries.
+
+
+---
+
+4) Month-to-date (Table1 + Table2) endpoint
+
+This gives you one truth the UI can consume and you can eyeball:
+
+Create server/routes/ops_mtd.ts:
+
+import { Router } from "express";
+import { startOfMonth, endOfMonth } from "date-fns";
+import { PrismaClient } from "@prisma/client";
+
+const router = Router();
+const prisma = new PrismaClient();
+
+router.get("/ops/mtd", async (_req, res) => {
+  try {
+    const start = startOfMonth(new Date());
+    const end   = endOfMonth(new Date());
+
+    const t1 = await prisma.businessExpense.aggregate({
+      _sum: { amount: true },
+      where: { date: { gte: start, lte: end } },
+    });
+    const t2 = await prisma.stockLodgement.aggregate({
+      _sum: { amount: true },
+      where: { date: { gte: start, lte: end } },
+    });
+
+    const table1Total = t1._sum.amount ?? 0;
+    const table2Total = t2._sum.amount ?? 0;
+    const monthToDate = table1Total + table2Total;
+
+    res.json({ ok: true, table1Total, table2Total, monthToDate });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+export default router;
+
+Wire it in server/index.ts:
+
+import opsMTD from "./routes/ops_mtd";
+// ...
+app.use("/api", opsMTD);
+
+Hit /api/ops/mtd — for your example it should return:
+
+{
+  "ok": true,
+  "table1Total": 30507,   // or 30600 based on actual data
+  "table2Total": 105507,  // example
+  "monthToDate": 136107   // must equal t1 + t2 exactly
+}
+
+If the home page shows anything else, point it to this API to eliminate logic drift.
+
+
+---
+
+5) Table 2 DESC ordering (newest first)
+
+Where you fetch the second table:
+
+await prisma.stockLodgement.findMany({
+  where: {/* your filters */},
+  orderBy: { date: "desc" }  // ← critical
+});
+
+And unify table font sizing on the page root:
+
+<div className="text-[15px] md:text-base">
+  {/* both tables render here; headings only use font-semibold */}
+</div>
+
+
+---
+
+6) Final deploy checklist
+
+1. package.json scripts include:
+
+"build": "prisma generate && ..."
+
+"postinstall": "prisma generate"
+
+
+
+2. Prisma generator includes both:
+
+debian-openssl-1.1.x
+
+debian-openssl-3.0.x
+
+
+
+3. @prisma/client in dependencies
+
+
+4. Clean & rebuild:
+
+rm -rf node_modules
+npm ci
+npx prisma generate
+npm run build
+
+
+5. npm run verify:prisma passes
+
+
+6. /api/health responds with ok: true
+
+
+7. /api/ops/mtd returns the exact sum you expect
+
+
+
+If any step returns something weird, paste the output here and I’ll zero in on the exact line to change.
+
