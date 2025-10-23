@@ -718,10 +718,10 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
 }
 
 // Shift Expenses Component - Shows individual line items from Daily Sales & Stock forms
-function ShiftExpensesTable() {
+function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
   const { data: shiftExpenses = [], isLoading } = useQuery({
-    queryKey: ['/api/shift-expenses'],
-    queryFn: () => axios.get('/api/shift-expenses').then(res => res.data),
+    queryKey: ['/api/shift-expenses', month, year],
+    queryFn: () => axios.get(`/api/shift-expenses?month=${month}&year=${year}`).then(res => res.data),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
@@ -826,6 +826,11 @@ export default function Expenses() {
   const [uploading, setUploading] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+  
+  // Month/Year selection state - default to current month
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -884,13 +889,12 @@ export default function Expenses() {
     },
   });
 
-  useEffect(() => { fetchExpenses(); }, []);
+  useEffect(() => { fetchExpenses(); }, [selectedMonth, selectedYear]);
 
   async function fetchExpenses() {
     try {
-      const now = new Date();
       // Fetch ONLY DIRECT expenses for monthly expenses table (excludes stock tracking and shift form entries)
-      const { data } = await axios.get("/api/expensesV2?source=DIRECT");
+      const { data } = await axios.get(`/api/expensesV2?source=DIRECT&month=${selectedMonth}&year=${selectedYear}`);
       setExpenses(data || []);
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
@@ -1011,6 +1015,45 @@ export default function Expenses() {
           }}
         />
       )}
+
+      {/* Month Selector */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <h2 className="text-lg font-semibold">Select Month:</h2>
+          <div className="flex gap-3 flex-1">
+            <Select value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">January</SelectItem>
+                <SelectItem value="2">February</SelectItem>
+                <SelectItem value="3">March</SelectItem>
+                <SelectItem value="4">April</SelectItem>
+                <SelectItem value="5">May</SelectItem>
+                <SelectItem value="6">June</SelectItem>
+                <SelectItem value="7">July</SelectItem>
+                <SelectItem value="8">August</SelectItem>
+                <SelectItem value="9">September</SelectItem>
+                <SelectItem value="10">October</SelectItem>
+                <SelectItem value="11">November</SelectItem>
+                <SelectItem value="12">December</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear.toString()} onValueChange={(val) => setSelectedYear(parseInt(val))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2023">2023</SelectItem>
+                <SelectItem value="2024">2024</SelectItem>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2026">2026</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
 
       {/* Statistics Cards - Mobile Optimized */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -1304,7 +1347,7 @@ export default function Expenses() {
       </div>
 
       {/* Shift Expenses Table - From Daily Sales & Stock Forms */}
-      <ShiftExpensesTable />
+      <ShiftExpensesTable month={selectedMonth} year={selectedYear} />
 
       {/* Rolls Table */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">

@@ -1954,50 +1954,57 @@ export function registerRoutes(app: express.Application): Server {
 
   // ===== EXPENSE MANAGEMENT API ROUTES =====
   
-  // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM/STOCK_LODGMENT
+  // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM/STOCK_LODGMENT&month=10&year=2025
   app.get("/api/expensesV2", async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
     try {
-      // If source is specified, filter by it; otherwise return ALL expenses
+      // Extract query parameters
       const source = req.query.source as string | undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
       
-      // Query with optional source filtering
-      const expenses = source 
-        ? await prisma.$queryRaw<Array<{
-            id: string,
-            item: string,
-            costCents: number,
-            supplier: string,
-            shiftDate: Date,
-            expenseType: string,
-            createdAt: Date,
-            source: string,
-            meta: any
-          }>>`
-            SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
-            FROM expenses 
-            WHERE source = ${source}
-            ORDER BY "createdAt" DESC
-            LIMIT 200
-          `
-        : await prisma.$queryRaw<Array<{
-            id: string,
-            item: string,
-            costCents: number,
-            supplier: string,
-            shiftDate: Date,
-            expenseType: string,
-            createdAt: Date,
-            source: string,
-            meta: any
-          }>>`
-            SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
-            FROM expenses 
-            ORDER BY "createdAt" DESC
-            LIMIT 200
-          `;
+      // Build WHERE clause conditions
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+      
+      if (source) {
+        conditions.push(`source = $${paramIndex}`);
+        params.push(source);
+        paramIndex++;
+      }
+      
+      if (month && year) {
+        conditions.push(`EXTRACT(MONTH FROM "shiftDate") = $${paramIndex}`);
+        params.push(month);
+        paramIndex++;
+        conditions.push(`EXTRACT(YEAR FROM "shiftDate") = $${paramIndex}`);
+        params.push(year);
+        paramIndex++;
+      }
+      
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      
+      // Query with dynamic filtering
+      const expenses = await prisma.$queryRawUnsafe<Array<{
+        id: string,
+        item: string,
+        costCents: number,
+        supplier: string,
+        shiftDate: Date,
+        expenseType: string,
+        createdAt: Date,
+        source: string,
+        meta: any
+      }>>(`
+        SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
+        FROM expenses 
+        ${whereClause}
+        ORDER BY "createdAt" DESC
+        LIMIT 200
+      `, ...params);
 
       // Format for UI with source information
       const formattedExpenses = expenses.map((expense: any) => ({
