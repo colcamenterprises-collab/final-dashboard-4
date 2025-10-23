@@ -771,6 +771,12 @@ function ShiftExpensesTable() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="bg-gray-100 font-bold">
+              <td colSpan={4} className="border p-3 text-right">Total:</td>
+              <td className="border p-3 text-right">{formatCurrency(shiftExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0))}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
@@ -796,6 +802,12 @@ function ShiftExpensesTable() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="bg-gray-100 font-bold">
+              <td colSpan={2} className="border p-2 text-right text-sm">Total:</td>
+              <td className="border p-2 text-right text-sm">{formatCurrency(shiftExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0))}</td>
+            </tr>
+          </tfoot>
         </table>
         {shiftExpenses.length === 0 && (
           <div className="text-center py-8 text-gray-500">
@@ -1201,6 +1213,13 @@ export default function Expenses() {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-gray-100 font-bold">
+                <td colSpan={4} className="border p-3 text-right">Total:</td>
+                <td className="border p-3 text-right">{formatCurrency(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0))}</td>
+                <td className="border p-3"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
@@ -1268,6 +1287,13 @@ export default function Expenses() {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-gray-100 font-bold">
+                <td colSpan={2} className="border p-2 text-right text-sm">Total:</td>
+                <td className="border p-2 text-right text-sm">{formatCurrency(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0))}</td>
+                <td className="border p-2"></td>
+              </tr>
+            </tfoot>
           </table>
           {expenses.length === 0 && (
             <div className="text-center py-8 text-gray-500">
