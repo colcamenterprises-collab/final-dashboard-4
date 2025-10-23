@@ -134,12 +134,9 @@ async function fetchShiftExpenses(storeId: string, startUtc: string, endUtc: str
 
   const expenses: ExpenseTotals = { shopping: 0, wages: 0, other: 0 };
   
-  // Fetch shifts that opened within the business date window
   const url = new URL('https://api.loyverse.com/v1.0/shifts');
   url.searchParams.set('store_id', storeId);
-  url.searchParams.set('opening_time_min', startUtc);
-  url.searchParams.set('opening_time_max', endUtc);
-  url.searchParams.set('limit', '10'); // Should only be 1-2 shifts per day
+  url.searchParams.set('limit', '100');
 
   const r = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
@@ -148,25 +145,33 @@ async function fetchShiftExpenses(storeId: string, startUtc: string, endUtc: str
   if (!r.ok) {
     const errorText = await r.text();
     console.warn(`   ⚠️  Loyverse shifts ${r.status}: ${errorText}`);
-    return expenses; // Return empty expenses if shift data unavailable
+    return expenses;
   }
 
   const data = await r.json() as LoyverseShiftsResponse;
   
-  if (data.shifts.length === 0) {
-    console.log(`   ℹ️  No shifts found for this date`);
+  const startTime = new Date(startUtc).getTime();
+  const endTime = new Date(endUtc).getTime();
+  
+  const filteredShifts = data.shifts.filter(shift => {
+    const openedTime = new Date(shift.opened_at).getTime();
+    return openedTime >= startTime && openedTime <= endTime;
+  });
+  
+  if (filteredShifts.length === 0) {
+    console.log(`   ℹ️  No shifts found for this date window`);
     return expenses;
   }
   
-  console.log(`   📊 Processing ${data.shifts.length} shift(s)`);
+  console.log(`   📊 Filtered ${filteredShifts.length} shift(s) from ${data.shifts.length} total`);
   
-  for (const shift of data.shifts) {
+  for (const shift of filteredShifts) {
     if (!shift.cash_movements || shift.cash_movements.length === 0) {
       console.log(`   ℹ️  No cash movements in shift ${shift.id}`);
       continue;
     }
     
-    console.log(`   💸 Processing ${shift.cash_movements.length} cash movements`);
+    console.log(`   💸 Processing ${shift.cash_movements.length} cash movements from shift at ${shift.opened_at}`);
     
     for (const movement of shift.cash_movements) {
       if (movement.type === 'PAY_OUT') {
