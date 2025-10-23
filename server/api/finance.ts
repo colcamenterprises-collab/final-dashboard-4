@@ -30,7 +30,7 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// GET /api/finance/summary/today - Current Month Sales from Verified Shift Reports
+// GET /api/finance/summary/today - Current Month Sales and Expenses
 // Public endpoint - no auth required for dashboard display
 router.get('/summary/today', async (req: Request, res: Response) => {
   try {
@@ -56,21 +56,60 @@ router.get('/summary/today', async (req: Request, res: Response) => {
         AND jsonb_array_length(data->'shifts') > 0
     `);
     
+    // Get shift expenses from PosShiftReport for current month
+    const expenseResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM("shoppingTotal"), 0) as shopping_total,
+        COALESCE(SUM("wagesTotal"), 0) as wages_total,
+        COALESCE(SUM("otherExpense"), 0) as other_total
+      FROM "PosShiftReport"
+      WHERE EXTRACT(YEAR FROM "businessDate") = ${year}
+        AND EXTRACT(MONTH FROM "businessDate") = ${month}
+        AND "businessDate" IS NOT NULL
+    `);
+    
+    // Get business expenses from expenses table for current month (amount stored in cents as costCents)
+    const businessExpenseResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM("costCents") / 100.0, 0) as business_total
+      FROM expenses
+      WHERE EXTRACT(YEAR FROM "shiftDate") = ${year}
+        AND EXTRACT(MONTH FROM "shiftDate") = ${month}
+    `);
+    
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');
     const shiftCount = parseInt(rows[0]?.shift_count || '0');
+    
+    const shoppingExpenses = parseFloat(expenseResult.rows[0]?.shopping_total || '0');
+    const wagesExpenses = parseFloat(expenseResult.rows[0]?.wages_total || '0');
+    const otherExpenses = parseFloat(expenseResult.rows[0]?.other_total || '0');
+    const shiftExpensesTotal = shoppingExpenses + wagesExpenses + otherExpenses;
+    
+    const businessExpenses = parseFloat(businessExpenseResult.rows[0]?.business_total || '0');
+    
+    const totalExpenses = shiftExpensesTotal + businessExpenses;
     
     res.json({
       sales: currentMonthSales,
       currentMonthSales,
       shiftCount,
+      expenses: totalExpenses,
+      currentMonthExpenses: totalExpenses,
+      expenseBreakdown: {
+        shopping: shoppingExpenses,
+        wages: wagesExpenses,
+        other: otherExpenses,
+        business: businessExpenses,
+        shiftTotal: shiftExpensesTotal
+      },
       month: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      netProfit: currentMonthSales,
+      netProfit: currentMonthSales - totalExpenses,
       timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('Current month sales error:', error);
-    res.status(500).json({ error: 'Failed to fetch current month sales' });
+    console.error('Current month summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch current month summary' });
   }
 });
 
