@@ -2011,7 +2011,7 @@ export function registerRoutes(app: express.Application): Server {
         id: expense.id,
         date: expense.shiftDate || expense.createdAt,
         description: expense.item || 'Unknown Item',
-        amount: parseFloat(expense.costCents) || 0, // Already in THB
+        amount: (parseFloat(expense.costCents) || 0) / 100, // Convert cents to THB
         category: expense.expenseType || 'Shopping',
         supplier: expense.supplier || 'Unknown',
         paymentMethod: 'Cash',
