@@ -2371,46 +2371,115 @@ export function registerRoutes(app: express.Application): Server {
     }
   });
 
-  // Get comprehensive expense totals for dashboard
+  // Get comprehensive expense totals for dashboard - COMBINES business + shift expenses
   app.get("/api/expensesV2/totals", async (req: Request, res: Response) => {
     try {
-      // Get MTD (Month-to-Date) total - FIXED: Use correct column names
-      const mtdResult = await db.execute(sql`
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+      // BUSINESS EXPENSES (from expenses table)
+      // MTD Business
+      const mtdBusinessResult = await db.execute(sql`
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = ${currentMonth}
+        AND EXTRACT(year FROM "shiftDate") = ${currentYear}
       `);
-      const mtd = Number(mtdResult.rows[0]?.total || 0); // In cents, convert to THB
+      const mtdBusiness = Number(mtdBusinessResult.rows[0]?.total || 0) / 100;
 
-      // Get YTD (Year-to-Date) total - FIXED: Use correct column names  
-      const ytdResult = await db.execute(sql`
+      // YTD Business
+      const ytdBusinessResult = await db.execute(sql`
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(year FROM "shiftDate") = ${currentYear}
       `);
-      const ytd = Number(ytdResult.rows[0]?.total || 0); // In cents, convert to THB
+      const ytdBusiness = Number(ytdBusinessResult.rows[0]?.total || 0) / 100;
 
-      // Get previous month total for MoM calculation - FIXED: Use correct column names
-      const prevMonthResult = await db.execute(sql`
+      // Prev Month Business
+      const prevMonthBusinessResult = await db.execute(sql`
         SELECT COALESCE(SUM("costCents"), 0) as total 
         FROM expenses 
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE) - 1
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = ${prevMonth}
+        AND EXTRACT(year FROM "shiftDate") = ${prevYear}
       `);
-      const prevMonth = Number(prevMonthResult.rows[0]?.total || 0); // In cents, convert to THB
-      const prevMonthTHB = prevMonth / 100; // Convert to THB
-      const mtdTHB = mtd / 100; // Convert to THB  
-      const mom = prevMonthTHB > 0 ? ((mtdTHB - prevMonthTHB) / prevMonthTHB * 100).toFixed(1) : '0.0';
+      const prevMonthBusiness = Number(prevMonthBusinessResult.rows[0]?.total || 0) / 100;
 
-      // Get top 5 expense categories by total amount - FIXED: Use correct column names
+      // SHIFT EXPENSES (from daily_sales_v2 payload - matching expenses page display)
+      // Parse payload for accurate line-item totals (same method as shift expenses table)
+      
+      // MTD Shift
+      const mtdShiftResult = await db.execute(sql`
+        SELECT payload
+        FROM daily_sales_v2
+        WHERE payload IS NOT NULL
+        AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${currentYear}
+        AND EXTRACT(MONTH FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${currentMonth}
+      `);
+      let mtdShift = 0;
+      for (const row of mtdShiftResult.rows) {
+        const payload = row.payload as any;
+        if (payload.expenses && Array.isArray(payload.expenses)) {
+          for (const exp of payload.expenses) mtdShift += Number(exp.cost || 0);
+        }
+        if (payload.wages && Array.isArray(payload.wages)) {
+          for (const wage of payload.wages) mtdShift += Number(wage.amount || 0);
+        }
+      }
+
+      // YTD Shift
+      const ytdShiftResult = await db.execute(sql`
+        SELECT payload
+        FROM daily_sales_v2
+        WHERE payload IS NOT NULL
+        AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${currentYear}
+      `);
+      let ytdShift = 0;
+      for (const row of ytdShiftResult.rows) {
+        const payload = row.payload as any;
+        if (payload.expenses && Array.isArray(payload.expenses)) {
+          for (const exp of payload.expenses) ytdShift += Number(exp.cost || 0);
+        }
+        if (payload.wages && Array.isArray(payload.wages)) {
+          for (const wage of payload.wages) ytdShift += Number(wage.amount || 0);
+        }
+      }
+
+      // Prev Month Shift
+      const prevMonthShiftResult = await db.execute(sql`
+        SELECT payload
+        FROM daily_sales_v2
+        WHERE payload IS NOT NULL
+        AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${prevYear}
+        AND EXTRACT(MONTH FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${prevMonth}
+      `);
+      let prevMonthShift = 0;
+      for (const row of prevMonthShiftResult.rows) {
+        const payload = row.payload as any;
+        if (payload.expenses && Array.isArray(payload.expenses)) {
+          for (const exp of payload.expenses) prevMonthShift += Number(exp.cost || 0);
+        }
+        if (payload.wages && Array.isArray(payload.wages)) {
+          for (const wage of payload.wages) prevMonthShift += Number(wage.amount || 0);
+        }
+      }
+
+      // COMBINED TOTALS
+      const mtd = mtdBusiness + mtdShift;
+      const ytd = ytdBusiness + ytdShift;
+      const prevMonthTotal = prevMonthBusiness + prevMonthShift;
+      const mom = prevMonthTotal > 0 ? ((mtd - prevMonthTotal) / prevMonthTotal * 100).toFixed(1) : '0.0';
+
+      // Get top 5 expense categories (only from business expenses table)
       const top5Result = await db.execute(sql`
         SELECT 
           "expenseType" as type,
           COALESCE(SUM("costCents"), 0) as total
         FROM expenses
-        WHERE EXTRACT(month FROM "shiftDate") = EXTRACT(month FROM CURRENT_DATE)
-        AND EXTRACT(year FROM "shiftDate") = EXTRACT(year FROM CURRENT_DATE)
+        WHERE EXTRACT(month FROM "shiftDate") = ${currentMonth}
+        AND EXTRACT(year FROM "shiftDate") = ${currentYear}
         GROUP BY "expenseType"
         ORDER BY total DESC
         LIMIT 5
@@ -2418,14 +2487,14 @@ export function registerRoutes(app: express.Application): Server {
       
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
-        total: Number(row.total || 0) / 100 // Convert cents to THB
+        total: Number(row.total || 0) / 100
       }));
 
       res.json({
-        mtd: mtd / 100, // Convert cents to THB
-        ytd: ytd / 100, // Convert cents to THB
+        mtd,
+        ytd,
         mom: Number(mom),
-        top5: top5
+        top5
       });
     } catch (error) {
       console.error("Error fetching expense totals:", error);

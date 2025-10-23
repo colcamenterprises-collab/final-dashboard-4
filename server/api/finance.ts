@@ -56,17 +56,43 @@ router.get('/summary/today', async (req: Request, res: Response) => {
         AND jsonb_array_length(data->'shifts') > 0
     `);
     
-    // Get shift expenses from PosShiftReport for current month
-    const expenseResult = await db.execute(sql`
+    // Get shift expenses by parsing payload from daily_sales_v2 (matches expenses page display)
+    const shiftFormsResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM("shoppingTotal"), 0) as shopping_total,
-        COALESCE(SUM("wagesTotal"), 0) as wages_total,
-        COALESCE(SUM("otherExpense"), 0) as other_total
-      FROM "PosShiftReport"
-      WHERE EXTRACT(YEAR FROM "businessDate") = ${year}
-        AND EXTRACT(MONTH FROM "businessDate") = ${month}
-        AND "businessDate" IS NOT NULL
+        "shiftDate",
+        payload
+      FROM daily_sales_v2
+      WHERE payload IS NOT NULL
+        AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${year}
+        AND EXTRACT(MONTH FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${month}
     `);
+    
+    // Parse payload to get accurate line-item totals
+    let shiftExpensesTotal = 0;
+    let shoppingExpenses = 0;
+    let wagesExpenses = 0;
+    
+    for (const row of shiftFormsResult.rows) {
+      const payload = row.payload as any;
+      
+      // Sum shopping expenses from payload
+      if (payload.expenses && Array.isArray(payload.expenses)) {
+        for (const expense of payload.expenses) {
+          const amount = Number(expense.cost || 0);
+          shoppingExpenses += amount;
+          shiftExpensesTotal += amount;
+        }
+      }
+      
+      // Sum wages from payload
+      if (payload.wages && Array.isArray(payload.wages)) {
+        for (const wage of payload.wages) {
+          const amount = Number(wage.amount || 0);
+          wagesExpenses += amount;
+          shiftExpensesTotal += amount;
+        }
+      }
+    }
     
     // Get business expenses from expenses table for current month (amount stored in cents as costCents)
     const businessExpenseResult = await db.execute(sql`
@@ -79,11 +105,6 @@ router.get('/summary/today', async (req: Request, res: Response) => {
     
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');
     const shiftCount = parseInt(rows[0]?.shift_count || '0');
-    
-    const shoppingExpenses = parseFloat(expenseResult.rows[0]?.shopping_total || '0');
-    const wagesExpenses = parseFloat(expenseResult.rows[0]?.wages_total || '0');
-    const otherExpenses = parseFloat(expenseResult.rows[0]?.other_total || '0');
-    const shiftExpensesTotal = shoppingExpenses + wagesExpenses + otherExpenses;
     
     const businessExpenses = parseFloat(businessExpenseResult.rows[0]?.business_total || '0');
     
@@ -98,7 +119,6 @@ router.get('/summary/today', async (req: Request, res: Response) => {
       expenseBreakdown: {
         shopping: shoppingExpenses,
         wages: wagesExpenses,
-        other: otherExpenses,
         business: businessExpenses,
         shiftTotal: shiftExpensesTotal
       },
