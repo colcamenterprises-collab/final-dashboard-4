@@ -168,6 +168,10 @@ async function checkSchema() {
   const dailyStockRouter = (await import('./api/daily-stock')).default;
   app.use('/api/daily-stock', dailyStockRouter);
 
+  // Mount shift expenses router for extracting line items from Daily Sales & Stock forms
+  const shiftExpensesRouter = (await import('./routes/shiftExpenses')).default;
+  app.use('/api/shift-expenses', shiftExpensesRouter);
+
   // Mount Meekong Mumba v1.0 routes
   const loyverseV2Router = (await import('./routes/loyverseV2.js')).default;
   const shiftAnalysisRouter = (await import('./routes/shiftAnalysis.js')).default;

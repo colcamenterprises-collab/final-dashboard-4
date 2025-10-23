@@ -717,6 +717,96 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   );
 }
 
+// Shift Expenses Component - Shows individual line items from Daily Sales & Stock forms
+function ShiftExpensesTable() {
+  const { data: shiftExpenses = [], isLoading } = useQuery({
+    queryKey: ['/api/shift-expenses'],
+    queryFn: () => axios.get('/api/shift-expenses').then(res => res.data),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Format currency helper
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
+        <div className="text-center py-8 text-gray-500">Loading shift expenses...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
+      
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full border text-sm">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-3 border text-left">Date</th>
+              <th className="p-3 border text-left">Supplier</th>
+              <th className="p-3 border text-left">Category</th>
+              <th className="p-3 border text-left">Description</th>
+              <th className="p-3 border text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shiftExpenses.map((exp: any, i: number) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="border p-3">{new Date(exp.date).toLocaleDateString()}</td>
+                <td className="border p-3">{exp.supplier}</td>
+                <td className="border p-3">{exp.category}</td>
+                <td className="border p-3">{exp.description}</td>
+                <td className="border p-3 text-right">{formatCurrency(exp.amount || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Compact Table View */}
+      <div className="lg:hidden">
+        <table className="w-full border text-sm">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-2 border text-left">Date</th>
+              <th className="p-2 border text-left">Details</th>
+              <th className="p-2 border text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shiftExpenses.map((exp: any, i: number) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                <td className="border p-2">
+                  <div className="text-sm font-medium">{exp.description}</div>
+                  <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
+                </td>
+                <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {shiftExpenses.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No shift expenses recorded this month
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [parsed, setParsed] = useState<any[]>([]);
@@ -1186,6 +1276,9 @@ export default function Expenses() {
           )}
         </div>
       </div>
+
+      {/* Shift Expenses Table - From Daily Sales & Stock Forms */}
+      <ShiftExpensesTable />
 
       {/* Rolls Table */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
