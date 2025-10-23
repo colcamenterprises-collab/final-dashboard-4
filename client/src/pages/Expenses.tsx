@@ -410,7 +410,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
   return (
     <>
       {/* Golden Patch - Review Uploaded Transactions */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-emerald-600" />
@@ -737,7 +737,7 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
         <div className="text-center py-8 text-gray-500">Loading shift expenses...</div>
       </div>
@@ -745,7 +745,7 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6">
+    <div className="bg-white rounded shadow p-4 mb-6">
       <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
       
       {/* Desktop Table View */}
@@ -982,7 +982,7 @@ export default function Expenses() {
             fetchExpenses();
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
           }} 
-          triggerClassName="px-6 py-3 rounded-lg text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+          triggerClassName="px-6 py-3 rounded text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
         <StockLodgmentModal 
           onSuccess={() => {
@@ -991,7 +991,7 @@ export default function Expenses() {
             queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
             fetchExpenses();
           }} 
-          triggerClassName="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+          triggerClassName="bg-black text-white px-6 py-3 rounded text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
       </div>
 
@@ -1017,7 +1017,7 @@ export default function Expenses() {
       )}
 
       {/* Month Selector */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <h2 className="text-lg font-semibold">Select Month:</h2>
           <div className="flex gap-3 flex-1">
@@ -1121,11 +1121,11 @@ export default function Expenses() {
             type="file" 
             accept=".pdf,.csv,.png,.jpg" 
             onChange={e => setFile(e.target.files?.[0] || null)} 
-            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm" 
+            className="flex-1 p-3 border border-gray-300 rounded text-sm" 
           />
           <button 
             type="submit" 
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
+            className="bg-blue-600 text-white px-6 py-3 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
             disabled={!file || uploading}
           >
             {uploading ? (
@@ -1140,7 +1140,7 @@ export default function Expenses() {
 
       {/* Review Parsed */}
       {parsed.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-white rounded shadow p-4 mb-6">
           <h3 className="font-semibold text-sm mb-2">Review Uploaded Transactions ({parsed.length})</h3>
           <div className="overflow-x-auto">
             <table className="w-full border text-sm">
@@ -1188,7 +1188,7 @@ export default function Expenses() {
       <GoldenPatchReviewSection onExpenseApproved={fetchExpenses} />
 
       {/* Main Expense Table/Cards - Mobile Responsive */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-4">This Month's Expenses</h2>
         
         {/* Desktop Table View */}
@@ -1350,7 +1350,7 @@ export default function Expenses() {
       <ShiftExpensesTable month={selectedMonth} year={selectedYear} />
 
       {/* Rolls Table */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-2">Rolls Purchases</h2>
         <table className="w-full border text-sm">
           <thead>
@@ -1439,7 +1439,7 @@ export default function Expenses() {
       </div>
 
       {/* Meat Table */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-2">Meat Purchases</h2>
         <table className="w-full border text-sm">
           <thead>
@@ -1511,7 +1511,7 @@ export default function Expenses() {
       </div>
 
       {/* Drinks Table */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-2">Drinks Purchases</h2>
         <table className="w-full border text-sm">
           <thead>
