@@ -17,6 +17,13 @@ const menuItems = [
 
 const groups: Group[] = [
   {
+    title: "Daily Sales",
+    items: [
+      { to: "/operations/daily-sales", label: "Daily Sales Form" },
+      { to: "/operations/daily-sales-library", label: "Library" },
+    ],
+  },
+  {
     title: "Operations",
     items: [
       { to: "/operations", label: "Operations" },
