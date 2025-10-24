@@ -192,8 +192,10 @@ export default function DailySales() {
     loadFormData();
   }, [isEditMode, id]);
 
-  // Restore drafts on mount
+  // Restore drafts on mount (only when NOT in edit mode)
   useEffect(() => {
+    if (isEditMode) return; // Don't restore drafts when editing existing form
+    
     try {
       const raw = localStorage.getItem("daily_sales_draft");
       if (raw) {
@@ -206,7 +208,7 @@ export default function DailySales() {
         setAroi(draft.aroi || 0);
       }
     } catch {}
-  }, []);
+  }, [isEditMode]);
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault(); // allow call from button with no event
