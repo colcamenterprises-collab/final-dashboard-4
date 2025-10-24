@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+// SBB — Online Ordering (VEV exact replica)
+// Spec:
+//  • Full-width yellow hero with centered logo + black title/subtitle + address pill
+//  • Black category bar with UPPERCASE tabs; active tab text = yellow; NO underline/borders/pills
+//  • Black page body; centered narrow container (~700px)
+//  • Item rows: left image (square, rounded), center texts, right yellow price pill
+//  • Sticky bottom bar with yellow CTA
+//  • Simple front-end menu editor via ?admin=1
+
 const SBB_YELLOW = "#FFEB00";
 
+// ---------- Types ----------
 type ModifierOption = { 
   id: string; 
   name: string; 
@@ -49,6 +59,7 @@ type CartLine = {
 
 type MenuData = { items: MenuItem[] };
 
+// ---------- Defaults ----------
 const DEFAULT_MENU: MenuData = { 
   items: [ 
     { 
@@ -157,67 +168,75 @@ const CATEGORIES = [
   { id: "drinks", name: "DRINKS" }, 
 ] as const;
 
-const THB = (n: number) => `THB ${n.toFixed(2)}`;
+// ---------- Utils ----------
+const THB = (n: number) => `฿${n.toFixed(2)}`;
 const uid = (p = "id") => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 const lineTotal = (l: CartLine) => (l.basePrice + l.modifiers.reduce((s, m) => s + m.priceDelta, 0)) * l.qty;
-const getParam = (key: string) => new URLSearchParams(location.search).get(key);
+const getParam = (k: string) => new URLSearchParams(location.search).get(k);
 
+// ---------- Storage Keys ----------
 const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
-  const [menu, setMenu] = useState<MenuData>(() => {
-    try {
-      const raw = localStorage.getItem(LS_MENU);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return DEFAULT_MENU;
+  // Menu (editable via admin)
+  const [menu, setMenu] = useState<MenuData>(() => { 
+    try { 
+      const raw = localStorage.getItem(LS_MENU); 
+      if (raw) return JSON.parse(raw); 
+    } catch {} 
+    return DEFAULT_MENU; 
   });
 
   const [activeCat, setActiveCat] = useState<(typeof CATEGORIES)[number]["id"]>("sets");
-  const [cart, setCart] = useState<CartLine[]>(() => {
-    try {
-      const raw = localStorage.getItem(LS_CART);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+  const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<CartLine[]>(() => { 
+    try { 
+      const raw = localStorage.getItem(LS_CART); 
+      return raw ? JSON.parse(raw) : []; 
+    } catch { 
+      return []; 
+    } 
   });
   const [itemModal, setItemModal] = useState<{ open: boolean; item?: MenuItem; draft?: CartLine }>({ open: false });
   const [showCheckout, setShowCheckout] = useState(false);
-  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    localStorage.setItem(LS_CART, JSON.stringify(cart));
+  useEffect(() => { 
+    localStorage.setItem(LS_CART, JSON.stringify(cart)); 
   }, [cart]);
 
+  // Poppins font injection
   const fontInjected = useRef(false);
-  useEffect(() => {
-    if (fontInjected.current) return;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap";
-    document.head.appendChild(link);
-    fontInjected.current = true;
+  useEffect(() => { 
+    if (fontInjected.current) return; 
+    const link = document.createElement("link"); 
+    link.rel = "stylesheet"; 
+    link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap"; 
+    document.head.appendChild(link); 
+    fontInjected.current = true; 
   }, []);
 
-  const filteredMenu = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return menu.items.filter((m) => m.category === activeCat && (!q || m.name.toLowerCase().includes(q)));
+  const filteredMenu = useMemo(() => { 
+    const q = search.trim().toLowerCase(); 
+    return menu.items.filter((m) => m.category === activeCat && (!q || m.name.toLowerCase().includes(q))); 
   }, [menu, activeCat, search]);
-  
-  const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);
-  const vat = useMemo(() => subtotal - subtotal / 1.07, [subtotal]);
-  const total = subtotal;
 
-  function openItem(item: MenuItem) {
-    const defaultMods: CartLine["modifiers"] = [];
-    item.groups?.forEach((g) => {
-      if (g.type === "single") {
-        const def = g.options.find((o) => o.defaultSelected) || g.options[0];
-        if (def) defaultMods.push({ groupId: g.id, groupName: g.name, optionId: def.id, optionName: def.name, priceDelta: def.priceDelta });
-      }
-    });
+  const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);
+
+  function openItem(item: MenuItem) { 
+    const defaultMods: CartLine["modifiers"] = []; 
+    item.groups?.forEach((g) => { 
+      if (g.type === "single") { 
+        const def = g.options.find((o) => o.defaultSelected) || g.options[0]; 
+        if (def) defaultMods.push({ 
+          groupId: g.id, 
+          groupName: g.name, 
+          optionId: def.id, 
+          optionName: def.name, 
+          priceDelta: def.priceDelta 
+        }); 
+      } 
+    }); 
     setItemModal({ 
       open: true, 
       item, 
@@ -230,141 +249,216 @@ export default function OnlineOrderingPage() {
         qty: 1, 
         modifiers: defaultMods 
       } 
-    });
+    }); 
   }
 
-  function toggleDraftModifier(group: ModifierGroup, opt: ModifierOption) {
-    if (!itemModal.draft) return;
-    const l = itemModal.draft;
-    if (group.type === "single") {
-      const newMods = l.modifiers.filter((m) => m.groupId !== group.id);
-      newMods.push({ groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta });
-      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });
-    } else {
-      const exists = l.modifiers.find((m) => m.groupId === group.id && m.optionId === opt.id);
-      let newMods = l.modifiers.filter((m) => !(m.groupId === group.id && m.optionId === opt.id));
-      if (!exists) {
-        const count = l.modifiers.filter((m) => m.groupId === group.id).length;
-        if (!group.maxSelections || count < group.maxSelections) {
-          newMods = [...l.modifiers, { groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta }];
-        }
-      }
-      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } });
-    }
+  function toggleDraftModifier(group: ModifierGroup, opt: ModifierOption) { 
+    if (!itemModal.draft) return; 
+    const l = itemModal.draft; 
+    if (group.type === "single") { 
+      const newMods = l.modifiers.filter((m) => m.groupId !== group.id); 
+      newMods.push({ 
+        groupId: group.id, 
+        groupName: group.name, 
+        optionId: opt.id, 
+        optionName: opt.name, 
+        priceDelta: opt.priceDelta 
+      }); 
+      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } }); 
+    } else { 
+      const exists = l.modifiers.find((m) => m.groupId === group.id && m.optionId === opt.id); 
+      let newMods = l.modifiers.filter((m) => !(m.groupId === group.id && m.optionId === opt.id)); 
+      if (!exists) { 
+        const count = l.modifiers.filter((m) => m.groupId === group.id).length; 
+        if (!group.maxSelections || count < group.maxSelections) { 
+          newMods = [...l.modifiers, { 
+            groupId: group.id, 
+            groupName: group.name, 
+            optionId: opt.id, 
+            optionName: opt.name, 
+            priceDelta: opt.priceDelta 
+          }]; 
+        } 
+      } 
+      setItemModal({ ...itemModal, draft: { ...l, modifiers: newMods } }); 
+    } 
   }
 
-  function commitDraft() {
-    if (!itemModal.draft) return;
-    setCart((p) => [...p, itemModal.draft!]);
-    setItemModal({ open: false });
+  function commitDraft() { 
+    if (!itemModal.draft) return; 
+    setCart((p) => [...p, itemModal.draft!]); 
+    setItemModal({ open: false }); 
+  }
+  
+  function updateQty(id: string, d: number) { 
+    setCart((p) => p.map((l) => (l.id === id ? { ...l, qty: Math.max(1, l.qty + d) } : l))); 
+  }
+  
+  function removeLine(id: string) { 
+    setCart((p) => p.filter((l) => l.id !== id)); 
   }
 
-  function updateQty(id: string, d: number) {
-    setCart((p) => p.map((l) => (l.id === id ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
-  }
-
-  function removeLine(id: string) {
-    setCart((p) => p.filter((l) => l.id !== id));
-  }
-
+  // ---------- Admin Editor ----------
   const isAdmin = getParam("admin") === "1";
   const [showAdmin, setShowAdmin] = useState(isAdmin);
   const [draftJSON, setDraftJSON] = useState<string>(JSON.stringify(menu, null, 2));
-
-  function saveMenuFromDraft() {
-    try {
-      const json = JSON.parse(draftJSON) as MenuData;
-      setMenu(json);
-      localStorage.setItem(LS_MENU, JSON.stringify(json));
-      alert("Menu saved locally. Reload page to see images cached.");
-    } catch (e: any) {
-      alert("Invalid JSON: " + e.message);
-    }
+  
+  function saveMenuFromDraft() { 
+    try { 
+      const json = JSON.parse(draftJSON) as MenuData; 
+      setMenu(json); 
+      localStorage.setItem(LS_MENU, JSON.stringify(json)); 
+      alert("Menu saved."); 
+    } catch(e:unknown){ 
+      const msg = e instanceof Error ? e.message : String(e);
+      alert("Invalid JSON: " + msg); 
+    } 
   }
-
-  function resetMenu() {
-    setMenu(DEFAULT_MENU);
-    localStorage.removeItem(LS_MENU);
+  
+  function resetMenu() { 
+    setMenu(DEFAULT_MENU); 
+    localStorage.removeItem(LS_MENU); 
   }
 
   return (
     <div className="min-h-screen bg-black text-white font-[Poppins]">
-      <div className="mx-auto w-full max-w-[680px] px-4 pt-8 pb-4 text-center">
-        <div className="mx-auto h-16 w-16 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
-          <img src="/images/sbb-logo.png" alt="SBB" className="h-12 w-12 object-contain" />
+      {/* HERO: FULL YELLOW BANNER */}
+      <section style={{ background: SBB_YELLOW }} className="text-black">
+        <div className="mx-auto max-w-[720px] px-4 py-10 text-center">
+          <div className="mx-auto h-20 w-20 rounded-full bg-black/90 flex items-center justify-center">
+            <img src="/images/sbb-logo.png" alt="SBB" className="h-12 w-12 object-contain" />
+          </div>
+          <h1 className="mt-4 text-[30px] md:text-[34px] font-extrabold tracking-tight">
+            Smash Brothers Burgers (Rawai)
+          </h1>
+          <p className="mt-2 text-[15px] opacity-90">
+            Traditional American Smash Burgers — Opens at 6:00 pm
+          </p>
+          <div className="mt-4 inline-flex items-center rounded-xl px-4 py-3" style={{ background: "#F7E54C" }}>
+            <span className="text-[14px] font-semibold">
+              69/9 Soi Saiyuan, Rawai, Phuket 83130, Thailand — Gilbis Plaza, Phuket
+            </span>
+          </div>
         </div>
-        <h1 className="mt-3 text-3xl md:text-[34px] font-extrabold tracking-tight">Smash Brothers Burgers (Rawai)</h1>
-        <p className="mt-1 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>
+      </section>
 
-        <div className="mt-5">
-          <nav className="flex flex-wrap justify-center gap-5">
+      {/* CATEGORY BAR: PURE BLACK, UPPERCASE, ACTIVE=YELLOW, NO UNDERLINES */}
+      <div className="w-full bg-black">
+        <div className="mx-auto max-w-[720px] px-4">
+          <nav className="flex gap-6 py-4 justify-start md:justify-start">
             {CATEGORIES.map((c) => (
-              <button key={c.id} onClick={() => setActiveCat(c.id)} className="relative pb-2 text-sm font-semibold">
-                <span className="opacity-90">{c.name}</span>
-                {activeCat === c.id && <span className="absolute left-0 right-0 -bottom-[10px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />}
+              <button
+                key={c.id}
+                onClick={() => setActiveCat(c.id)}
+                className={`uppercase tracking-wide text-sm font-semibold transition-colors ${
+                  activeCat === c.id ? "text-[--sbb-yellow]" : "text-white"
+                }`}
+                style={{ ['--sbb-yellow' as string]: SBB_YELLOW }}
+                data-testid={`category-${c.id}`}
+              >
+                {c.name}
               </button>
             ))}
           </nav>
-          <div className="mt-3 h-px w-full bg-white/10" />
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[680px] px-4">
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <div className="h-1.5 w-6 rounded-full" style={{ background: SBB_YELLOW }} />
-          <h2 className="text-lg md:text-xl font-extrabold text-center">{CATEGORIES.find(c=>c.id===activeCat)?.name.replace("_"," ")}</h2>
-          <div className="h-1.5 w-6 rounded-full opacity-0" />
+      {/* MENU LIST: CENTERED NARROW CONTAINER */}
+      <main className="mx-auto max-w-[720px] px-4">
+        <div className="mt-4">
+          <h2 className="text-[22px] font-extrabold">
+            {CATEGORIES.find(c => c.id === activeCat)?.name.replace("_", " ")}
+          </h2>
+          <p className="mt-1 text-[14px] text-white/70">They are worth it!</p>
         </div>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-6 space-y-6">
           {filteredMenu.map((m) => (
-            <div key={m.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+            <div 
+              key={m.id} 
+              className="rounded-2xl bg-[#121212] border border-white/10 p-4"
+              data-testid={`menu-item-${m.id}`}
+            >
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                <div className="h-[56px] w-[56px] rounded-lg overflow-hidden bg-white/10 flex-shrink-0">
                   {m.image ? <img src={m.image} alt="" className="h-full w-full object-cover" /> : null}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold leading-tight">{m.name}</div>
-                  {m.description && <div className="text-sm text-white/70 line-clamp-2">{m.description}</div>}
+                  <div className="font-semibold leading-tight text-[16px]">{m.name}</div>
+                  {m.description && <div className="text-[14px] text-white/70 mt-1">{m.description}</div>}
                 </div>
-                <button onClick={() => openItem(m)} className="rounded-xl px-3 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+                <button 
+                  onClick={() => openItem(m)} 
+                  className="rounded-xl px-4 py-2 text-[14px] font-semibold text-black" 
+                  style={{ background: SBB_YELLOW }}
+                  data-testid={`button-add-${m.id}`}
+                >
                   {THB(m.price)} +
                 </button>
               </div>
             </div>
           ))}
         </div>
-
         <div className="h-28" />
-      </div>
+      </main>
 
+      {/* CART BAR */}
       <div className="fixed inset-x-0 bottom-0 z-50">
         <div className="mx-auto w-full max-w-[900px] px-3 pb-4">
           <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-2 md:p-3 flex items-center gap-2 md:gap-4">
-            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length!==1?"s":""}</div>
-            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>
-            <button className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => setShowCheckout(true)} disabled={cart.length===0}>Review & Checkout</button>
+            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">
+              {cart.length} item{cart.length !== 1 ? "s" : ""}
+            </div>
+            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">
+              Subtotal: {THB(subtotal)}
+            </div>
+            <button 
+              className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-black" 
+              style={{ background: SBB_YELLOW }} 
+              onClick={() => setShowCheckout(true)} 
+              disabled={cart.length === 0}
+              data-testid="button-checkout"
+            >
+              Review & Checkout
+            </button>
           </div>
         </div>
       </div>
 
+      {/* ITEM MODAL */}
       {itemModal.open && itemModal.item && itemModal.draft && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
           <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <div className="font-semibold">{itemModal.item.name}</div>
-              <button className="text-sm underline" onClick={() => setItemModal({ open: false })}>Close</button>
+              <button 
+                className="text-sm underline" 
+                onClick={() => setItemModal({ open: false })}
+                data-testid="button-close-item-modal"
+              >
+                Close
+              </button>
             </div>
             <div className="p-4 space-y-4">
               {itemModal.item.groups?.map(g => (
                 <div key={g.id}>
-                  <div className="text-sm font-semibold">{g.name} {g.required && <span className="text-white/50 text-xs">(required)</span>}</div>
+                  <div className="text-sm font-semibold">
+                    {g.name} {g.required && <span className="text-white/50 text-xs">(required)</span>}
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {g.options.map(o => {
                       const selected = itemModal.draft!.modifiers.some(m => m.groupId === g.id && m.optionId === o.id);
                       return (
-                        <button key={o.id} onClick={() => toggleDraftModifier(g,o)} className={`px-3 py-2 rounded-xl border text-sm ${selected?"bg-white text-black":"bg-transparent"}`} style={selected?{borderColor:"transparent"}:{borderColor:"rgba(255,255,255,0.15)"}}>
-                          {o.name}{o.priceDelta?` +${THB(o.priceDelta)}`:""}
+                        <button 
+                          key={o.id} 
+                          onClick={() => toggleDraftModifier(g, o)} 
+                          className={`px-3 py-2 rounded-xl border text-sm ${
+                            selected ? "bg-white text-black" : "bg-transparent"
+                          }`} 
+                          style={selected ? { borderColor: "transparent" } : { borderColor: "rgba(255,255,255,0.15)" }}
+                          data-testid={`modifier-${o.id}`}
+                        >
+                          {o.name}{o.priceDelta ? ` +${THB(o.priceDelta)}` : ""}
                         </button>
                       );
                     })}
@@ -374,14 +468,37 @@ export default function OnlineOrderingPage() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: Math.max(1, itemModal.draft!.qty - 1) } })}>-</button>
-                  <div>{itemModal.draft.qty}</div>
-                  <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setItemModal({ ...itemModal, draft: { ...itemModal.draft!, qty: itemModal.draft!.qty + 1 } })}>+</button>
+                  <button 
+                    className="border border-white/20 rounded-lg px-3 py-1" 
+                    onClick={() => setItemModal({ 
+                      ...itemModal, 
+                      draft: { ...itemModal.draft!, qty: Math.max(1, itemModal.draft!.qty - 1) } 
+                    })}
+                    data-testid="button-decrease-qty"
+                  >
+                    -
+                  </button>
+                  <div data-testid="text-qty">{itemModal.draft.qty}</div>
+                  <button 
+                    className="border border-white/20 rounded-lg px-3 py-1" 
+                    onClick={() => setItemModal({ 
+                      ...itemModal, 
+                      draft: { ...itemModal.draft!, qty: itemModal.draft!.qty + 1 } 
+                    })}
+                    data-testid="button-increase-qty"
+                  >
+                    +
+                  </button>
                 </div>
                 <div className="font-semibold">{THB(lineTotal(itemModal.draft))}</div>
               </div>
 
-              <button onClick={commitDraft} className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
+              <button 
+                onClick={commitDraft} 
+                className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" 
+                style={{ background: SBB_YELLOW }}
+                data-testid="button-add-to-order"
+              >
                 Add to order
               </button>
             </div>
@@ -389,12 +506,19 @@ export default function OnlineOrderingPage() {
         </div>
       )}
 
+      {/* CHECKOUT MODAL (summary only; POS hook TBD) */}
       {showCheckout && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">
           <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <div className="font-semibold">Your Order</div>
-              <button className="text-sm underline" onClick={() => setShowCheckout(false)}>Close</button>
+              <button 
+                className="text-sm underline" 
+                onClick={() => setShowCheckout(false)}
+                data-testid="button-close-checkout"
+              >
+                Close
+              </button>
             </div>
             <div className="max-h-[70vh] overflow-auto">
               <div className="p-4 space-y-3">
@@ -406,7 +530,9 @@ export default function OnlineOrderingPage() {
                         {l.modifiers.length > 0 && (
                           <ul className="text-xs text-white/70 list-disc ml-5 mt-1">
                             {l.modifiers.map(m => (
-                              <li key={`${l.id}_${m.optionId}`}>{m.groupName}: {m.optionName} {m.priceDelta ? `(+${THB(m.priceDelta)})` : ""}</li>
+                              <li key={`${l.id}_${m.optionId}`}>
+                                {m.groupName}: {m.optionName} {m.priceDelta ? `(+${THB(m.priceDelta)})` : ""}
+                              </li>
                             ))}
                           </ul>
                         )}
@@ -414,51 +540,106 @@ export default function OnlineOrderingPage() {
                       <div className="text-right min-w-[120px]">
                         <div className="font-semibold">{THB(lineTotal(l))}</div>
                         <div className="mt-2 inline-flex items-center gap-2">
-                          <button className="border border-white/20 rounded-lg px-2" onClick={() => updateQty(l.id, -1)}>-</button>
+                          <button 
+                            className="border border-white/20 rounded-lg px-2" 
+                            onClick={() => updateQty(l.id, -1)}
+                            data-testid={`button-decrease-${l.id}`}
+                          >
+                            -
+                          </button>
                           <span className="text-sm w-6 text-center">{l.qty}</span>
-                          <button className="border border-white/20 rounded-lg px-2" onClick={() => updateQty(l.id, +1)}>+</button>
+                          <button 
+                            className="border border-white/20 rounded-lg px-2" 
+                            onClick={() => updateQty(l.id, +1)}
+                            data-testid={`button-increase-${l.id}`}
+                          >
+                            +
+                          </button>
                         </div>
                         <div>
-                          <button className="mt-2 text-xs underline text-white/70" onClick={() => removeLine(l.id)}>Remove</button>
+                          <button 
+                            className="mt-2 text-xs underline text-white/70" 
+                            onClick={() => removeLine(l.id)}
+                            data-testid={`button-remove-${l.id}`}
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
                 ))}
-
-                <div className="border-t border-white/10 pt-3 text-sm space-y-1">
-                  <div className="flex justify-between"><span>Subtotal</span><span>{THB(subtotal)}</span></div>
-                  <div className="flex justify-between"><span>VAT (inc)</span><span>{THB(vat)}</span></div>
-                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{THB(total)}</span></div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <button className="rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => alert('POS hook here') } disabled={cart.length === 0}>
-                    Send to POS
-                  </button>
-                </div>
               </div>
+            </div>
+            <div className="p-4 border-t border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-semibold">Subtotal</div>
+                <div className="text-xl font-bold">{THB(subtotal)}</div>
+              </div>
+              <button 
+                className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" 
+                style={{ background: SBB_YELLOW }}
+                data-testid="button-place-order"
+              >
+                Place Order
+              </button>
+              <p className="text-xs text-white/50 text-center mt-3">
+                This is a preview. POS integration coming soon.
+              </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* ADMIN EDITOR */}
       {showAdmin && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
           <div className="bg-[#0B0B0B] text-white rounded-2xl w-full max-w-[880px] overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <div className="font-semibold">Menu Editor</div>
               <div className="flex items-center gap-2">
-                <button className="text-sm underline" onClick={resetMenu}>Reset to default</button>
-                <button className="text-sm underline" onClick={() => setShowAdmin(false)}>Close</button>
+                <button 
+                  className="text-sm underline" 
+                  onClick={resetMenu}
+                  data-testid="button-reset-menu"
+                >
+                  Reset to default
+                </button>
+                <button 
+                  className="text-sm underline" 
+                  onClick={() => setShowAdmin(false)}
+                  data-testid="button-close-admin"
+                >
+                  Close
+                </button>
               </div>
             </div>
             <div className="p-4 grid grid-cols-1 gap-3">
-              <p className="text-sm text-white/70">Paste or edit your JSON below. Use full image URLs or `/images/...` from your public folder. Save writes to localStorage.</p>
-              <textarea className="min-h-[360px] bg-black/50 border border-white/10 rounded-lg p-3 font-mono text-xs" value={draftJSON} onChange={(e)=>setDraftJSON(e.target.value)} />
+              <p className="text-sm text-white/70">
+                Paste or edit your JSON below. Use full image URLs or `/images/...` from your public folder. Save writes to localStorage.
+              </p>
+              <textarea 
+                className="min-h-[360px] bg-black/50 border border-white/10 rounded-lg p-3 font-mono text-xs" 
+                value={draftJSON} 
+                onChange={(e) => setDraftJSON(e.target.value)}
+                data-testid="textarea-menu-json"
+              />
               <div className="flex items-center gap-2">
-                <button className="rounded-xl px-4 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={saveMenuFromDraft}>Save Menu</button>
-                <button className="rounded-xl px-4 py-2 text-sm border border-white/15" onClick={()=>setDraftJSON(JSON.stringify(menu, null, 2))}>Reload Current</button>
+                <button 
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-black" 
+                  style={{ background: SBB_YELLOW }} 
+                  onClick={saveMenuFromDraft}
+                  data-testid="button-save-menu"
+                >
+                  Save Menu
+                </button>
+                <button 
+                  className="rounded-xl px-4 py-2 text-sm border border-white/15" 
+                  onClick={() => setDraftJSON(JSON.stringify(menu, null, 2))}
+                  data-testid="button-reload-current"
+                >
+                  Reload Current
+                </button>
               </div>
             </div>
           </div>
@@ -466,7 +647,12 @@ export default function OnlineOrderingPage() {
       )}
 
       {isAdmin && !showAdmin && (
-        <button onClick={()=>setShowAdmin(true)} className="fixed bottom-20 right-4 z-[55] rounded-full px-4 py-2 text-sm font-semibold text-black shadow-lg" style={{ background: SBB_YELLOW }}>
+        <button 
+          onClick={() => setShowAdmin(true)} 
+          className="fixed bottom-20 right-4 z-[55] rounded-full px-4 py-2 text-sm font-semibold text-black shadow-lg" 
+          style={{ background: SBB_YELLOW }}
+          data-testid="button-show-admin"
+        >
           Edit Menu
         </button>
       )}
