@@ -44,6 +44,7 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
+      // { to: "/analysis/daily-shift", label: "Daily Shift Analysis" }, // Hidden - can be re-enabled
       { to: "/analysis/shift-summary", label: "Shift Summary" }
     ],
   },

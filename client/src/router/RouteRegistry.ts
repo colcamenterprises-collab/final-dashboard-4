@@ -12,6 +12,7 @@ export const ROUTES = {
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
   SHIFT_ITEMS_MM: "/operations/analysis/shift-items",
   LOYVERSE_REPORTS: "/operations/analysis/loyverse",
+  // DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis", // Hidden - can be re-enabled
   STOCK_REVIEW: "/operations/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",

@@ -35,6 +35,7 @@ import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
+import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis"; // Hidden - can be re-enabled
 import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
@@ -82,6 +83,8 @@ export default function App() {
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                     <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
+                    {/* Hidden - can be re-enabled */}
+                    {/* <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} /> */}
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                     <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
                   </Route>
@@ -126,6 +129,8 @@ export default function App() {
                   <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
 
                   {/* All Analysis Pages */}
+                  {/* Hidden - can be re-enabled */}
+                  {/* <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} /> */}
                   <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
 
