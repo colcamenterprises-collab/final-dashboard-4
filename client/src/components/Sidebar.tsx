@@ -57,7 +57,7 @@ const groups: Group[] = [
   {
     title: "Customer Ordering",
     items: [
-      { to: "/online-ordering", label: "Online Ordering" },
+      { to: "/marketing/online-ordering", label: "Online Ordering" },
     ],
   },
 ];
