@@ -35,7 +35,6 @@ import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
-import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
@@ -83,7 +82,6 @@ export default function App() {
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                     <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
-                    <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                     <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
                   </Route>
