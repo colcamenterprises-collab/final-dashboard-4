@@ -1,0 +1,164 @@
+A) Show any meal-set + base burger on the same receipt
+
+-- Receipts that contain a meal-set AND its base burger on the same ticket
+WITH map AS (
+  SELECT * FROM (VALUES
+    ('10036','10019'), -- Super Double Set -> Super Double
+    ('10033','10004'), -- Single Set -> Single
+    ('10034','10009'), -- Triple Set -> Triple
+    ('10032','10006'), -- Double Set -> Ultimate Double
+    ('10071','10070')  -- Karaage Meal Deal -> Karaage Burger
+  ) AS t(meal_sku, base_sku)
+), win AS (
+  SELECT '2025-10-23 17:00:00+07'::timestamptz AS from_ts,
+         '2025-10-24 03:00:00+07'::timestamptz AS to_ts
+)
+SELECT r.receipt_id,
+       SUM(CASE WHEN li.sku IN (SELECT meal_sku FROM map) THEN li.qty ELSE 0 END) AS meal_qty,
+       SUM(CASE WHEN li.sku IN (SELECT base_sku FROM map) THEN li.qty ELSE 0 END) AS base_qty,
+       MIN(li.unit_price) FILTER (WHERE li.sku IN (SELECT base_sku FROM map)) AS any_base_price
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+GROUP BY r.receipt_id
+HAVING SUM(CASE WHEN li.sku IN (SELECT meal_sku FROM map) THEN li.qty ELSE 0 END) > 0
+   AND SUM(CASE WHEN li.sku IN (SELECT base_sku FROM map) THEN li.qty ELSE 0 END) > 0
+ORDER BY r.receipt_id
+LIMIT 50;
+
+If this returns rows, you’re seeing the over-count we suspect.
+
+If any_base_price is 0, those base burger lines are components of the set and must be excluded.
+
+
+1B) Count how many base burger zero-price lines we have (components)
+
+WITH base AS (
+  SELECT * FROM (VALUES
+    ('10019'), -- Super Double
+    ('10004'), -- Single
+    ('10009'), -- Triple
+    ('10006'), -- Ultimate Double
+    ('10070')  -- Karaage Burger
+  ) AS t(base_sku)
+), win AS (
+  SELECT '2025-10-23 17:00:00+07'::timestamptz AS from_ts,
+         '2025-10-24 03:00:00+07'::timestamptz AS to_ts
+)
+SELECT li.sku, SUM(li.qty) AS qty_zero_price_components
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+  AND li.sku IN (SELECT base_sku FROM base)
+  AND COALESCE(li.unit_price,0) = 0
+GROUP BY li.sku
+ORDER BY li.sku;
+
+These are the component lines causing double counts.
+
+
+
+---
+
+2) Hotfix: never count component base-burger lines when a set is present
+
+2A) Minimal migration (add flags to catalog once)
+
+-- 2025-10-23_mm_102_flags.sql
+ALTER TABLE item_catalog
+  ADD COLUMN IF NOT EXISTS is_meal_set boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS base_sku text NULL REFERENCES item_catalog(sku);
+
+-- Seed known links
+UPDATE item_catalog SET is_meal_set=true, base_sku='10019' WHERE sku='10036'; -- Super Double Set -> Super Double
+UPDATE item_catalog SET is_meal_set=true, base_sku='10004' WHERE sku='10033'; -- Single Set -> Single
+UPDATE item_catalog SET is_meal_set=true, base_sku='10009' WHERE sku='10034'; -- Triple Set -> Triple
+UPDATE item_catalog SET is_meal_set=true, base_sku='10006' WHERE sku='10032'; -- Double Set -> Ultimate Double
+UPDATE item_catalog SET is_meal_set=true, base_sku='10070' WHERE sku='10071'; -- Karaage Meal Deal -> Karaage Burger
+
+-- Mix & Match is a general bundle; keep it out of burger math
+UPDATE item_catalog SET category='bundle', is_meal_set=true, base_sku=NULL WHERE sku='10069';
+
+Run:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-23_mm_102_flags.sql
+
+2B) One-line exclusion rule in the analytics query
+
+In your computeShift(...) (the query that builds the rows), change the selection of line items to exclude base-burger components when the paired meal set exists on the same receipt.
+
+Replace your rows CTE with this filter:
+
+// inside computeShift()
+const rows = await db.$queryRaw<{
+  sku: string|null; name: string; qty: number;
+}[]>`
+  WITH win AS (
+    SELECT ${fromISO}::timestamptz AS from_ts, ${toISO}::timestamptz AS to_ts
+  ),
+  sets AS (
+    SELECT li.receipt_id, li.sku
+    FROM lv_line_item li
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    JOIN item_catalog c ON c.sku = li.sku
+    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+      AND c.is_meal_set = true
+    GROUP BY li.receipt_id, li.sku
+  ),
+  base_exclusions AS (
+    -- Base burger lines that appear as zero-price components alongside a set on the SAME receipt
+    SELECT li.receipt_id, li.line_no
+    FROM lv_line_item li
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    JOIN item_catalog b ON b.sku = li.sku
+    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+      AND b.category = 'burger'
+      AND COALESCE(li.unit_price,0) = 0
+      AND EXISTS (
+        SELECT 1
+        FROM sets s
+        JOIN item_catalog m ON m.sku = s.sku
+        WHERE m.is_meal_set = true
+          AND m.base_sku = li.sku
+          AND s.receipt_id = li.receipt_id
+      )
+  ),
+  base AS (
+    SELECT li.sku, li.name, SUM(li.qty)::int AS qty
+    FROM lv_line_item li
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+      AND (li.receipt_id, li.line_no) NOT IN (SELECT receipt_id, line_no FROM base_exclusions)
+    GROUP BY li.sku, li.name
+  )
+  SELECT COALESCE(base.sku, ia.sku) AS sku,
+         base.name,
+         base.qty
+  FROM base
+  LEFT JOIN item_alias ia ON base.sku IS NULL AND ia.alias_name = base.name
+`;
+
+What this does
+
+If a receipt has a meal set and a base burger with unit_price = 0, the base burger line is ignored (it’s a component).
+
+Meal set SKUs still count as burgers (they have patties/grams via catalog rules).
+
+We still aggregate strictly by SKU; alias only applies when SKU is missing.
+
+
+
+---
+
+3) Rebuild Oct 23 and verify (no more inflation)
+
+# Rebuild the day
+curl -s -X POST "/api/analysis/shift/rebuild?date=2025-10-23" \
+| jq -r '.shiftDate + " • " + (.items|length|tostring) + " items (" + .sourceUsed + ")"'
+
+# Check burgers only (quick glance)
+curl -s "/api/analysis/shift/items?date=2025-10-23" \
+| jq '[.items[] | select(.category=="burger")] | map({sku,name,qty})'
+
+If you want a hard proof vs your POS CSV (you uploaded item-sales-summary-2025-10-23-2025-10-23 (1).csv and shift-2025-10-23.csv earlier), run the reconcile script we prepared; the diffs should drop to zero or exactly pinpoint any remaining alias gaps.
+
