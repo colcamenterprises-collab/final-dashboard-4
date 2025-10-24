@@ -44,7 +44,6 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
-      { to: "/analysis/daily-shift", label: "Daily Shift Analysis" },
       { to: "/analysis/shift-summary", label: "Shift Summary" }
     ],
   },

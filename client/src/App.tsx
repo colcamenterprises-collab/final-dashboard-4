@@ -126,7 +126,6 @@ export default function App() {
                   <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
 
                   {/* All Analysis Pages */}
-                  <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} />
                   <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
 
