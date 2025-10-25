@@ -40,6 +40,7 @@ export const ROUTES = {
 
   // Marketing
   ONLINE_ORDERING: "/marketing/online-ordering",
+  ORDER: "/order",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

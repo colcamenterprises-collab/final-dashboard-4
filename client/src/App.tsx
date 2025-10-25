@@ -55,11 +55,15 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>
-          <PageShell>
-                  <Suspense fallback={<div className="p-6">Loading…</div>}>
-                <Routes>
-                  {/* Home */}
-                  <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
+          <Suspense fallback={<div className="p-6">Loading…</div>}>
+            <Routes>
+              {/* Standalone Ordering page — NO SIDEBAR/HEADER */}
+              <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
+
+              {/* Everything else uses the dashboard layout */}
+              <Route element={<PageShell />}>
+                {/* Home */}
+                <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
                   
 
                   {/* Operations */}
@@ -134,10 +138,10 @@ export default function App() {
                   <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
 
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-          </PageShell>
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </Suspense>
           <Toaster />
         </BrowserRouter>
       </TooltipProvider>

@@ -254,10 +254,10 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                     </NavLink>
                   ) : group.title === "Online Ordering" ? (
                     <a
-                      href="/marketing/online-ordering"
-                      onClick={onClose}
+                      href="/order"
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={onClose}
                       className="w-full flex items-center px-3 py-2 text-xs font-medium bg-black text-white hover:bg-gray-800 rounded-[9px] transition-colors"
                       data-testid="nav-online-ordering"
                     >

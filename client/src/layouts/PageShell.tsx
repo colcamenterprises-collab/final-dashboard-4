@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Outlet } from "react-router-dom";
 import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
 
-export default function PageShell({ children }: { children: React.ReactNode }) {
+export default function PageShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -26,7 +27,7 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
           {/* Content with proper scrolling */}
           <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
             <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
-              {children}
+              <Outlet />
             </div>
           </main>
         </div>
