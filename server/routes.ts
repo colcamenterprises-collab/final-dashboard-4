@@ -69,6 +69,9 @@ import stockReviewManual from "./routes/stockReviewManual";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
 import loyverseSync from "./routes/loyverseSync";
+import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
+import { registerAdminMenuRoutes } from "./routes/adminMenu";
+import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 // Email functionality will be added when needed
 
 
@@ -3867,6 +3870,11 @@ app.use("/api/bank-imports", bankUploadRouter);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
+  
+  // Register Online Ordering routes
+  registerOnlineMenuRoutes(app);
+  registerAdminMenuRoutes(app);
+  registerOnlineOrderRoutes(app);
   
   // MEGA V3 PATCH: GET /api/forms/library - properly return payload for library display
   app.get('/api/forms/library', async (req: Request, res: Response) => {
