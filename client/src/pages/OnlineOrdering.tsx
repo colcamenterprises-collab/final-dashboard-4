@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 // SBB — Online Ordering (VEV exact replica)
 // Spec:
@@ -179,14 +180,63 @@ const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
-  // Menu (editable via admin)
-  const [menu, setMenu] = useState<MenuData>(() => { 
-    try { 
-      const raw = localStorage.getItem(LS_MENU); 
-      if (raw) return JSON.parse(raw); 
-    } catch {} 
-    return DEFAULT_MENU; 
+  // Fetch menu from API
+  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories: Array<{ id: string; name: string; slug: string; items: MenuItem[] }> }>({
+    queryKey: ["/api/menu"],
+    enabled: !getParam("admin"), // Only fetch if NOT in admin mode
   });
+
+  // Transform API menu to flat structure
+  const apiMenu: MenuData = useMemo(() => {
+    if (!menuData?.categories) return DEFAULT_MENU;
+    const items: MenuItem[] = [];
+    menuData.categories.forEach((cat) => {
+      cat.items.forEach((item) => {
+        items.push({
+          id: item.id,
+          sku: item.sku,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          category: cat.slug,
+          image: item.imageUrl,
+          groups: item.groups?.map((g) => ({
+            id: g.id || uid("grp"),
+            name: g.name,
+            type: g.type as "single" | "multi",
+            required: g.required,
+            maxSelections: g.maxSel,
+            options: g.options?.map((o) => ({
+              id: o.id || uid("opt"),
+              name: o.name,
+              priceDelta: o.priceDelta,
+            })) || []
+          })) || [],
+          available: item.available !== false
+        });
+      });
+    });
+    return { items };
+  }, [menuData]);
+
+  // Menu (editable via admin mode, otherwise use API)
+  const [menu, setMenu] = useState<MenuData>(() => { 
+    if (getParam("admin")) {
+      try { 
+        const raw = localStorage.getItem(LS_MENU); 
+        if (raw) return JSON.parse(raw); 
+      } catch {} 
+      return DEFAULT_MENU;
+    }
+    return DEFAULT_MENU;
+  });
+
+  // Update menu from API when data arrives (unless in admin mode)
+  useEffect(() => {
+    if (!getParam("admin") && apiMenu.items.length > 0) {
+      setMenu(apiMenu);
+    }
+  }, [apiMenu]);
 
   const [activeCat, setActiveCat] = useState<(typeof CATEGORIES)[number]["id"]>("sets");
   const [search, setSearch] = useState("");
