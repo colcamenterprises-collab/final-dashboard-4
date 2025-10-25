@@ -42,6 +42,7 @@ import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
+import MenuAdmin from "./pages/marketing/MenuAdmin";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -131,6 +132,7 @@ export default function App() {
 
                   {/* Marketing */}
                   <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
+                  <Route path="/marketing/menu-admin" element={<Guard><MenuAdmin /></Guard>} />
 
                   {/* All Analysis Pages */}
                   {/* Hidden - can be re-enabled */}

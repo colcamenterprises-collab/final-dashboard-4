@@ -41,12 +41,6 @@ const navigationGroups: NavGroup[] = [
     items: []
   },
   {
-    title: "Online Ordering",
-    isStandalone: true,
-    defaultOpen: true,
-    items: []
-  },
-  {
     title: "Operations",
     defaultOpen: true,
     items: [
@@ -104,6 +98,13 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/ai/jussi-ops", label: "Jussi (Operations)", icon: Bot, testId: "nav-jussi" },
       { to: "/ai/jane-accounts", label: "Jane (Accounting)", icon: Bot, testId: "nav-jane" }
+    ]
+  },
+  {
+    title: "Marketing",
+    items: [
+      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true },
+      { to: "/marketing/menu-admin", label: "Menu Admin", icon: Settings, testId: "nav-menu-admin" }
     ]
   }
 ];
@@ -252,17 +253,6 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                     >
                       <span className="uppercase tracking-wider">{group.title}</span>
                     </NavLink>
-                  ) : group.title === "Online Ordering" ? (
-                    <a
-                      href="/order"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={onClose}
-                      className="w-full flex items-center px-3 py-2 text-xs font-medium bg-black text-white hover:bg-gray-800 rounded-[9px] transition-colors"
-                      data-testid="nav-online-ordering"
-                    >
-                      <span className="uppercase tracking-wider">{group.title}</span>
-                    </a>
                   ) : null
                 ) : !group.isStandalone && (
                   <button
