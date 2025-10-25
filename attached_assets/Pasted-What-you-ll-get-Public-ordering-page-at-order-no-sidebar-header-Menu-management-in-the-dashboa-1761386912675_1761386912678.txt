@@ -1,0 +1,409 @@
+What you’ll get
+
+Public ordering page at /order (no sidebar/header).
+
+Menu management in the dashboard (CRUD for items, prices, descriptions, image URLs).
+
+API: /api/menu (public), /api/admin/menu/* (secure), /api/order (submit order), /api/pay/checkout (Stripe), /api/webhooks/stripe (payment success), /api/loyverse (send to Loyverse—placeholder until API keys).
+
+Database (Prisma): categories, items, modifiers, orders, order lines.
+
+Images: use image URLs (Cloudinary/Drive/hosted), or serve from public/images/.... Tablet-friendly.
+
+
+
+---
+
+1) Database schema (Prisma)
+
+prisma/schema.prisma (append to your current schema; names are intentionally simple)
+
+model MenuCategory {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  position  Int        @default(0)
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model MenuItem {
+  id          String           @id @default(cuid())
+  categoryId  String
+  category    MenuCategory     @relation(fields: [categoryId], references: [id])
+  name        String
+  description String? 
+  price       Int              // store THB as integer baht (e.g., 209, not 20900)
+  imageUrl    String?
+  sku         String?          @unique
+  position    Int              @default(0)
+  available   Boolean          @default(true)
+  groups      ModifierGroup[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model ModifierGroup {
+  id        String        @id @default(cuid())
+  itemId    String
+  item      MenuItem      @relation(fields: [itemId], references: [id])
+  name      String
+  type      String        // "single" | "multi"
+  required  Boolean       @default(false)
+  maxSel    Int?          // only for multi
+  options   ModifierOption[]
+  position  Int           @default(0)
+}
+
+model ModifierOption {
+  id        String          @id @default(cuid())
+  groupId   String
+  group     ModifierGroup   @relation(fields: [groupId], references: [id])
+  name      String
+  priceDelta Int            // baht delta (+/-)
+  position  Int             @default(0)
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  ref         String      @unique
+  status      String      @default("pending") // pending|paid|sent_to_pos|completed|cancelled
+  name        String?
+  phone       String?
+  type        String      @default("Pickup")  // Pickup|Delivery
+  address     String?
+  payment     String      @default("Cash")    // Cash|Stripe|QR
+  subtotal    Int         // baht
+  vatAmount   Int         // baht
+  total       Int         // baht
+  lines       OrderLine[]
+  rawPayload  Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderLine {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  itemId    String?
+  sku       String?
+  name      String
+  qty       Int      @default(1)
+  basePrice Int
+  modifiers Json?    // [{groupName, optionName, priceDelta}]
+  note      String?
+  lineTotal Int
+}
+
+> You already fixed Prisma deploy scripts—so prisma generate will run automatically. After saving, run:
+
+npx prisma migrate dev -n "init_ordering"
+
+
+
+
+---
+
+2) Public route without sidebar/header
+
+Ensure /order renders the ordering page outside your dashboard layout (no chrome).
+
+Router (example):
+
+// client/src/App.tsx
+import { Routes, Route } from "react-router-dom";
+import DashboardLayout from "./layouts/DashboardLayout";
+import OnlineOrderingPage from "./pages/OnlineOrderingPage";
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/order" element={<OnlineOrderingPage />} /> {/* NO layout */}
+      <Route element={<DashboardLayout />}>
+        <Route path="/" element={<Home />} />
+        {/* ...other dashboard routes... */}
+      </Route>
+    </Routes>
+  );
+}
+
+
+---
+
+3) Backend API (Express)
+
+a) Public Menu API
+
+server/routes/menu.ts
+
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+const router = Router();
+
+// Public: GET /api/menu
+router.get("/menu", async (_req, res) => {
+  const categories = await prisma.menuCategory.findMany({
+    orderBy: { position: "asc" },
+    include: {
+      items: {
+        orderBy: { position: "asc" },
+        include: {
+          groups: {
+            orderBy: { position: "asc" },
+            include: { options: { orderBy: { position: "asc" } } }
+          }
+        }
+      }
+    }
+  });
+  res.json({ categories });
+});
+
+export default router;
+
+b) Admin Menu CRUD (simple)
+
+Use your existing dashboard auth middleware if you have one. If not, gate with a shared admin token env (quick and dirty):
+
+server/middleware/adminAuth.ts
+
+import { Request, Response, NextFunction } from "express";
+export function adminAuth(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers["x-admin-token"];
+  if (token && token === process.env.ADMIN_TOKEN) return next();
+  return res.status(401).json({ ok: false, error: "unauthorized" });
+}
+
+server/routes/menu_admin.ts
+
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+import { adminAuth } from "../middleware/adminAuth";
+const prisma = new PrismaClient();
+const router = Router();
+
+router.use(adminAuth);
+
+// Upsert category
+router.post("/admin/menu/category", async (req, res) => {
+  const { id, name, slug, position } = req.body;
+  const cat = await prisma.menuCategory.upsert({
+    where: { id: id ?? "new" }, // force create when not found
+    update: { name, slug, position },
+    create: { name, slug, position: position ?? 0 },
+  });
+  res.json({ ok: true, category: cat });
+});
+
+// Upsert item
+router.post("/admin/menu/item", async (req, res) => {
+  const { id, categoryId, name, description, price, imageUrl, sku, available, position } = req.body;
+  const item = await prisma.menuItem.upsert({
+    where: { id: id ?? "new" },
+    update: { categoryId, name, description, price, imageUrl, sku, available, position },
+    create: { categoryId, name, description, price, imageUrl, sku, available: available ?? true, position: position ?? 0 },
+  });
+  res.json({ ok: true, item });
+});
+
+// Delete item
+router.delete("/admin/menu/item/:id", async (req, res) => {
+  await prisma.menuItem.delete({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
+
+export default router;
+
+c) Orders + Payments
+
+server/routes/order.ts
+
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+import crypto from "crypto";
+const prisma = new PrismaClient();
+const router = Router();
+
+const VAT_RATE = 0.07; // if you need it; otherwise 0
+
+router.post("/order", async (req, res) => {
+  const { customer, lines } = req.body; // {name, phone, type, address, payment}, lines: [{name, qty, basePrice, modifiers[], note}]
+  if (!lines || !Array.isArray(lines) || lines.length === 0) return res.status(400).json({ ok: false, error: "empty order" });
+
+  const subtotal = lines.reduce((s: number, l: any) => s + (l.basePrice + (l.modifiers?.reduce((x: number, m: any) => x + (m.priceDelta||0), 0) || 0)) * l.qty, 0);
+  const vatAmount = Math.round(subtotal - subtotal / (1 + VAT_RATE));
+  const total = subtotal; // VAT included pricing; adjust if exclusive
+
+  const ref = (customer?.reference || "ORD") + "-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+
+  const order = await prisma.order.create({
+    data: {
+      ref,
+      status: "pending",
+      name: customer?.name,
+      phone: customer?.phone,
+      type: customer?.type || "Pickup",
+      address: customer?.address,
+      payment: customer?.payment || "Cash",
+      subtotal,
+      vatAmount,
+      total,
+      rawPayload: req.body,
+      lines: {
+        create: lines.map((l: any) => ({
+          itemId: l.itemId ?? null,
+          sku: l.sku ?? null,
+          name: l.name,
+          qty: l.qty,
+          basePrice: l.basePrice,
+          modifiers: l.modifiers ?? [],
+          note: l.note ?? null,
+          lineTotal: (l.basePrice + (l.modifiers?.reduce((x:number,m:any)=>x+(m.priceDelta||0),0)||0)) * l.qty,
+        })),
+      },
+    },
+    include: { lines: true },
+  });
+
+  res.json({ ok: true, order });
+});
+
+export default router;
+
+Stripe (optional now, ready later):
+
+server/routes/payments.ts
+
+import { Router } from "express";
+const router = Router();
+const stripeSecret = process.env.STRIPE_SECRET_KEY;
+let stripe: any = null;
+if (stripeSecret) stripe = require("stripe")(stripeSecret);
+
+// Create Checkout Session
+router.post("/pay/checkout", async (req, res) => {
+  if (!stripe) return res.status(500).json({ ok:false, error: "Stripe not configured" });
+
+  const { orderId } = req.body;
+  // fetch order total, build line items
+  // (simplest: 1 line 'Order #REF' with total)
+  // For THB: use amount in baht * 100 (Stripe uses minor units)
+  // Example only:
+  // const order = await prisma.order.findUnique({ where: { id: orderId } });
+  // const session = await stripe.checkout.sessions.create({...})
+
+  res.json({ ok:true, message: "TODO: implement Stripe session create" });
+});
+
+// Stripe webhook (mark order paid)
+router.post("/webhooks/stripe", async (req, res) => {
+  // TODO: verify signature, mark order as paid, then send to Loyverse
+  res.json({ ok: true });
+});
+
+export default router;
+
+Loyverse (placeholder):
+
+// server/routes/loyverse.ts
+import { Router } from "express";
+const router = Router();
+
+// POST /api/loyverse/send/:orderId
+router.post("/loyverse/send/:orderId", async (_req, res) => {
+  // TODO: call Loyverse API using your token and order mapping
+  // Save status => "sent_to_pos"
+  res.json({ ok: true, message: "Loyverse send stub" });
+});
+
+export default router;
+
+Wire routes in your server:
+
+// server/index.ts
+import express from "express";
+import path from "path";
+import menuPublic from "./routes/menu";
+import menuAdmin from "./routes/menu_admin";
+import orderRoutes from "./routes/order";
+import paymentRoutes from "./routes/payments";
+import loyRoutes from "./routes/loyverse";
+
+const app = express();
+app.use(express.json({ limit: "2mb" }));
+
+app.use("/api", menuPublic);
+app.use("/api", menuAdmin);
+app.use("/api", orderRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", loyRoutes);
+
+// static + SPA fallback
+app.use(express.static("dist"));
+app.get("*", (_req, res) => res.sendFile(path.join(process.cwd(), "dist", "index.html")));
+
+app.listen(process.env.PORT || 3000);
+
+> Secrets to set in Replit:
+DATABASE_URL, ADMIN_TOKEN, STRIPE_SECRET_KEY (later), LOYVERSE_API_TOKEN (later).
+
+
+
+
+---
+
+4) Admin UI (dashboard) for menu
+
+You already have the VEV-style public page at /order. In your dashboard, add a simple “Menu Manager” page:
+
+List categories + items (from /api/menu).
+
+Inline edit name/description/price/image URL → POST /api/admin/menu/item with header x-admin-token: <ADMIN_TOKEN>.
+
+Reorder via position (optional later).
+
+
+I kept your front-end quick editor (?admin=1) on the public page for ultra-fast previewing; but the source of truth is the database, used by the public /api/menu.
+
+
+---
+
+5) Payments (when you’re ready)
+
+Start with Cash/QR on pickup (no integration).
+
+Later, Stripe Checkout: create a session server-side from the Order, redirect from /order. When webhook says paid → call Loyverse and mark order as paid + sent_to_pos.
+
+
+
+---
+
+6) QR Code
+
+Once /order is live, generate a QR code that points to it:
+https://<your-repl>.replit.dev/order
+We can add a tiny button on the dashboard to render and print a QR.
+
+
+---
+
+7) Your next move (no local env!)
+
+1. Run migration: npx prisma migrate dev -n "init_ordering"
+
+
+2. Add the routes above and restart.
+
+
+3. Create initial categories/items (either from the Admin UI you already have, or quickly via Prisma Studio: npx prisma studio).
+
+
+4. Visit /order → you’ll see the menu from the DB.
+
+
+5. Place a test order → check row in Order + OrderLine.
+
+

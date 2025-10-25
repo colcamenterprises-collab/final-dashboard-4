@@ -964,3 +964,95 @@ model AnalyticsShiftBurgerSummary {
   @@map("analytics_shift_burger_summary")
 }
 
+
+// ========= Online Ordering System =========
+model MenuCategory {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  position  Int        @default(0)
+  items     MenuItem_Online[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
+  @@map("menu_categories")
+}
+
+model MenuItem_Online {
+  id          String           @id @default(cuid())
+  categoryId  String
+  category    MenuCategory     @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  price       Int              // THB as integer (e.g., 209, not 20900)
+  imageUrl    String?
+  sku         String?          @unique
+  position    Int              @default(0)
+  available   Boolean          @default(true)
+  groups      ModifierGroup_Online[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@map("menu_items_online")
+}
+
+model ModifierGroup_Online {
+  id        String             @id @default(cuid())
+  itemId    String
+  item      MenuItem_Online    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name      String
+  type      String             // "single" | "multi"
+  required  Boolean            @default(false)
+  maxSel    Int?               // only for multi
+  options   ModifierOption_Online[]
+  position  Int                @default(0)
+  
+  @@map("modifier_groups_online")
+}
+
+model ModifierOption_Online {
+  id         String                @id @default(cuid())
+  groupId    String
+  group      ModifierGroup_Online  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name       String
+  priceDelta Int                   // baht delta (+/-)
+  position   Int                   @default(0)
+  
+  @@map("modifier_options_online")
+}
+
+model OrderOnline {
+  id          String         @id @default(cuid())
+  ref         String         @unique
+  status      String         @default("pending") // pending|paid|sent_to_pos|completed|cancelled
+  name        String?
+  phone       String?
+  type        String         @default("Pickup")  // Pickup|Delivery
+  address     String?
+  payment     String         @default("Cash")    // Cash|Stripe|QR
+  subtotal    Int            // baht
+  vatAmount   Int            // baht
+  total       Int            // baht
+  lines       OrderLine_Online[]
+  rawPayload  Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  @@map("orders_online")
+}
+
+model OrderLine_Online {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     OrderOnline   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String?
+  sku       String?
+  name      String
+  qty       Int           @default(1)
+  basePrice Int
+  modifiers Json?         // [{groupName, optionName, priceDelta}]
+  note      String?
+  lineTotal Int
+  
+  @@map("order_lines_online")
+}
