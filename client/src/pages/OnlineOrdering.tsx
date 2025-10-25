@@ -181,7 +181,7 @@ const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
   // Fetch menu from API
-  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories: Array<{ id: string; name: string; slug: string; items: MenuItem[] }> }>({
+  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories: Array<any> }>({
     queryKey: ["/api/menu"],
     enabled: !getParam("admin"), // Only fetch if NOT in admin mode
   });
@@ -190,8 +190,8 @@ export default function OnlineOrderingPage() {
   const apiMenu: MenuData = useMemo(() => {
     if (!menuData?.categories) return DEFAULT_MENU;
     const items: MenuItem[] = [];
-    menuData.categories.forEach((cat) => {
-      cat.items.forEach((item) => {
+    menuData.categories.forEach((cat: any) => {
+      cat.items.forEach((item: any) => {
         items.push({
           id: item.id,
           sku: item.sku,
@@ -199,14 +199,14 @@ export default function OnlineOrderingPage() {
           description: item.description,
           price: item.price,
           category: cat.slug,
-          image: item.imageUrl,
-          groups: item.groups?.map((g) => ({
+          image: item.image,
+          groups: item.groups?.map((g: any) => ({
             id: g.id || uid("grp"),
             name: g.name,
             type: g.type as "single" | "multi",
             required: g.required,
-            maxSelections: g.maxSel,
-            options: g.options?.map((o) => ({
+            maxSelections: g.maxSelections,
+            options: g.options?.map((o: any) => ({
               id: o.id || uid("opt"),
               name: o.name,
               priceDelta: o.priceDelta,

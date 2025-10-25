@@ -40,6 +40,7 @@ export const ROUTES = {
 
   // Marketing
   ONLINE_ORDERING: "/marketing/online-ordering",
+  MENU_ADMIN: "/marketing/menu-admin",
   ORDER: "/order",
 } as const;
 

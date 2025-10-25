@@ -62,7 +62,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual indicators, and automated calculations.
 - **Enhanced Email Reporting**: Daily management emails with colored balance status badges, sales breakdowns, expense tracking, and shopping list generation.
 - **Manager Checklist System**: Standalone modal with database, API, and React component for shift closing procedures.
-- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and admin menu editor (?admin=1). Features localStorage persistence, real-time price calculations, and mobile-optimized checkout flow.
+- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and database-driven menu. Admin menu management at `/marketing/menu-admin` inside dashboard for full CRUD operations. Public ordering page at `/order` (standalone route without dashboard layout). Features database persistence via Prisma, API-driven menu loading, real-time price calculations, localStorage cart, and mobile-optimized checkout flow. Menu data flows: Admin UI → Prisma DB → Public API → Customer ordering page.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
@@ -71,6 +71,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - Normalized POS tables: lv_receipt, lv_line_item, lv_modifier.
 - Item catalog and analytics cache tables: item_catalog, analytics_shift_item, analytics_shift_category_summary.
 - Manager checklist tables: cleaning_tasks, manager_checklists.
+- Online ordering tables: menu_categories_online, menu_items_online, modifier_groups_online, modifier_options_online, orders_online, order_lines_online.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
