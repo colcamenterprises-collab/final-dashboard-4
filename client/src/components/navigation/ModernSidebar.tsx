@@ -103,7 +103,7 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Marketing",
     items: [
-      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering", external: true },
+      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" },
       { to: "/marketing/menu-admin", label: "Menu Admin", icon: Settings, testId: "nav-menu-admin" }
     ]
   }
