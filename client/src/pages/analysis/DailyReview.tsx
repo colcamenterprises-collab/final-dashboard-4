@@ -1,9 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
 
+const THRESHOLDS = { sales: 50, expenses: 100, banking: 50 };
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => todayISO().slice(0, 7);
 const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+
+function Flag({ val, limit }: { val: number; limit: number }) {
+  const ok = Math.abs(val) < limit;
+  return (
+    <div className={`rounded px-2 py-1 text-center font-semibold ${ok ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>
+      {ok ? "✓" : "⚠"}
+    </div>
+  );
+}
 
 function DayPill({
   date,
@@ -84,27 +94,41 @@ export default function DailyReview() {
 
   const current = useMemo(() => all.find(d => d.date === selectedDate) || null, [all, selectedDate]);
 
+  const dayHasFlag = (d: DailyComparisonResponse) => {
+    if (d.availability !== "ok" || !d.variance) return false;
+    const S = d.variance.sales, E = d.variance.expenses, B = d.variance.banking;
+    return (
+      Math.abs(S.cash) >= THRESHOLDS.sales ||
+      Math.abs(S.qr) >= THRESHOLDS.sales ||
+      Math.abs(S.grab) >= THRESHOLDS.sales ||
+      Math.abs(S.total) >= THRESHOLDS.sales ||
+      Math.abs(E.grandTotal) >= THRESHOLDS.expenses ||
+      Math.abs(B.expectedCash) >= THRESHOLDS.banking ||
+      Math.abs(B.estimatedNetBanked) >= THRESHOLDS.banking
+    );
+  };
+
   const saveComment = (txt: string) => {
     setComment(txt);
     localStorage.setItem("dailyReviewComment", txt);
   };
 
-  const Section = ({ title, rows }: { title: string; rows: any[] }) => (
+  const Section = ({ title, rows, type }: { title: string; rows: any[]; type: keyof typeof THRESHOLDS }) => (
     <section className="mb-6">
       <h2 className="text-sm font-bold mb-2">{title}</h2>
-      <div className="grid grid-cols-4 gap-1 text-sm items-center">
+      <div className="grid grid-cols-5 gap-1 text-sm items-center">
         <div className="font-semibold text-gray-500">Item</div>
         <div className="font-semibold">POS</div>
         <div className="font-semibold">Form</div>
         <div className="font-semibold">Diff (Form−POS)</div>
+        <div className="font-semibold text-center">Flag</div>
         {rows.map((r: any) => (
           <React.Fragment key={r.label}>
             <div className="text-gray-600">{r.label}</div>
             <div>{r.pos === null ? "—" : fmt(r.pos)}</div>
             <div>{r.form === null ? "—" : fmt(r.form)}</div>
-            <div className={r.diff !== null && r.diff !== 0 ? "font-semibold" : ""}>
-              {r.diff === null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}
-            </div>
+            <div>{r.diff === null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}</div>
+            <div>{r.diff === null ? "—" : <Flag val={r.diff} limit={THRESHOLDS[type]} />}</div>
           </React.Fragment>
         ))}
       </div>
@@ -154,6 +178,7 @@ export default function DailyReview() {
             <>
               <Section
                 title="Sales (Form vs POS)"
+                type="sales"
                 rows={[
                   { label: "Cash", pos: current.pos.sales.cash, form: current.form.sales.cash, diff: current.variance.sales.cash },
                   { label: "QR", pos: current.pos.sales.qr, form: current.form.sales.qr, diff: current.variance.sales.qr },
@@ -164,6 +189,7 @@ export default function DailyReview() {
 
               <Section
                 title="Expenses"
+                type="expenses"
                 rows={[
                   { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
                   { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
@@ -178,6 +204,7 @@ export default function DailyReview() {
 
               <Section
                 title="Banking & Cash"
+                type="banking"
                 rows={[
                   { label: "Expected Cash", pos: current.pos.banking.expectedCash, form: current.form.banking.expectedCash, diff: current.variance.banking.expectedCash },
                   { label: "Estimated Net Banked", pos: current.pos.banking.estimatedNetBanked, form: current.form.banking.estimatedNetBanked, diff: current.variance.banking.estimatedNetBanked },
