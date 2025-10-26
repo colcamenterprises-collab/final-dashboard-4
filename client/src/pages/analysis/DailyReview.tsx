@@ -57,6 +57,31 @@ export default function DailyReview() {
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
+  const [syncing, setSyncing] = useState(false);
+
+  const manualSync = async (date: string) => {
+    setSyncing(true);
+    try {
+      const response = await fetch(`/api/loyverse/shifts?shiftDate=${date}`);
+      if (response.ok) {
+        alert(`✅ POS data synced successfully for ${date}`);
+        // Refresh the data
+        const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
+        if (r.ok) {
+          const j = await r.json();
+          const dataArray = Array.isArray(j) ? j : [];
+          setAll(dataArray);
+        }
+      } else {
+        alert(`❌ Sync failed: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      alert(`❌ Sync error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -138,9 +163,19 @@ export default function DailyReview() {
     <div className="mx-auto max-w-[980px] p-4 space-y-6">
       <header className="border-b pb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-sm font-extrabold">Daily Review</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <label className="text-sm text-gray-600">Month</label>
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+          {selectedDate && (
+            <button
+              onClick={() => manualSync(selectedDate)}
+              disabled={syncing}
+              className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              data-testid="button-manual-sync"
+            >
+              {syncing ? "Syncing..." : "Sync POS"}
+            </button>
+          )}
         </div>
       </header>
 
