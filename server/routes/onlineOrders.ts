@@ -14,6 +14,27 @@ function generateOrderRef() {
 }
 
 export function registerOnlineOrderRoutes(app: Express) {
+  // GET /api/orders/today - Get today's order count
+  app.get("/api/orders/today", async (req, res) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const count = await prisma.orderOnline.count({
+        where: {
+          createdAt: {
+            gte: today
+          }
+        }
+      });
+      
+      res.json({ totalOrders: count, lastChecked: new Date() });
+    } catch (error) {
+      console.error('Error fetching order count:', error);
+      res.status(500).json({ error: 'Failed to fetch order count' });
+    }
+  });
+
   // POST /api/order - Submit order
   app.post("/api/order", async (req, res) => {
     try {
