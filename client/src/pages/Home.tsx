@@ -56,7 +56,7 @@ function BalanceHero() {
             Daily Sales & Stock
           </ModernButton>
           <ModernButton 
-            onClick={() => window.open('/ordering', '_blank')}
+            onClick={() => window.open('/order', '_blank')}
             className="bg-white/15 hover:bg-white/25 text-white border-white/20"
           >
             <Globe className="h-4 w-4 mr-2" />
@@ -170,10 +170,23 @@ function CashBalanceSnapshot() {
 }
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+  
   return (
     <div className="space-y-8">
       {/* Balance Hero */}
       <BalanceHero />
+      
+      {/* Online Ordering CTA Button */}
+      <button
+        onClick={() => window.open('/order', '_blank')}
+        className="w-full bg-black text-white font-semibold py-4 px-6 rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center gap-2 shadow-lg"
+        data-testid="button-online-ordering-cta"
+      >
+        <Globe className="h-5 w-5" />
+        <span className="text-base">Online Ordering Platform</span>
+        <ArrowUpRight className="h-4 w-4" />
+      </button>
       
       {/* KPI Grid */}
       <KPIGrid />
