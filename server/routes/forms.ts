@@ -220,9 +220,11 @@ router.post("/daily-sales-v2", async (req, res) => {
     });
 
     // MEGA PATCH V3: Use Drizzle to insert with payload support
+    const shiftDateStr = body.shiftDate || new Date().toISOString().split('T')[0];
     const [form] = await drizzleDb.insert(dailySalesV2).values({
       id: crypto.randomUUID(),
-      shiftDate: body.shiftDate || new Date().toISOString().split('T')[0],
+      shiftDate: shiftDateStr,
+      shift_date: shiftDateStr, // CRITICAL: Set date field for Daily Review API (YYYY-MM-DD string)
       submittedAtISO: new Date(),
       completedBy: body.completedBy,
       startingCash: body.cashManagement?.startingCash || 0,

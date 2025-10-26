@@ -65,11 +65,28 @@ export default function DailyReview() {
       setLoading(true);
       try {
         const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
-        const j = (await r.json()) as DailyComparisonResponse[];
+        if (!r.ok) {
+          console.error(`API error: ${r.status} ${r.statusText}`);
+          if (alive) {
+            setAll([]);
+            setSelectedDate(null);
+          }
+          return;
+        }
+        const j = await r.json();
         if (!alive) return;
-        setAll(j);
-        const latestWithAny = [...j].reverse().find(d => d.availability !== "missing_both");
-        setSelectedDate(latestWithAny?.date || j[j.length - 1]?.date || null);
+        
+        // Defensive: ensure j is an array
+        const dataArray = Array.isArray(j) ? j : [];
+        setAll(dataArray);
+        const latestWithAny = [...dataArray].reverse().find(d => d.availability !== "missing_both");
+        setSelectedDate(latestWithAny?.date || dataArray[dataArray.length - 1]?.date || null);
+      } catch (error) {
+        console.error('Failed to fetch daily comparison data:', error);
+        if (alive) {
+          setAll([]);
+          setSelectedDate(null);
+        }
       } finally { if (alive) setLoading(false); }
     })();
     return () => { alive = false; };
