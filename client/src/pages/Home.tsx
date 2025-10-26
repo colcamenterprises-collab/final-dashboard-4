@@ -55,13 +55,6 @@ function BalanceHero() {
             <FileText className="h-4 w-4 mr-2" />
             Daily Sales & Stock
           </ModernButton>
-          <ModernButton 
-            onClick={() => window.open('/order', '_blank')}
-            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
-          >
-            <Globe className="h-4 w-4 mr-2" />
-            Online Orders
-          </ModernButton>
         </div>
       </div>
     </div>
