@@ -375,11 +375,11 @@ export default function OnlineOrderingPage() {
       {/* HERO: FULL YELLOW BANNER */}
       <section style={{ background: SBB_YELLOW }} className="text-black">
         <div className="mx-auto max-w-[720px] px-4 py-10 text-center">
-          <div className="mx-auto h-24 w-24 flex items-center justify-center">
+          <div className="mx-auto h-28 w-28 flex items-center justify-center">
             <img 
-              src="/attached_assets/Yellow Circle - Black Logo_1757766401641.png" 
+              src="/attached_assets/1_1761464752373.png" 
               alt="Smash Brothers Burgers" 
-              className="h-24 w-24 object-contain" 
+              className="h-28 w-28 object-contain" 
             />
           </div>
           <h1 className="mt-4 text-[30px] md:text-[34px] font-extrabold tracking-tight">
