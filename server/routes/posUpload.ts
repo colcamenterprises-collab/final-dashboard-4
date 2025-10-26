@@ -44,4 +44,31 @@ router.get("/shifts", async (req, res) => {
   }
 });
 
+router.post("/sync-daily", async (req, res) => {
+  try {
+    const { businessDate } = req.body;
+    
+    if (!businessDate || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+      return res.status(400).json({ error: 'Invalid businessDate format (expected YYYY-MM-DD)' });
+    }
+    
+    const { ingestShiftForDate } = await import('../services/loyverseIngest');
+    const result = await ingestShiftForDate(businessDate);
+    
+    res.json({ 
+      success: true, 
+      businessDate,
+      sales: result.sales,
+      expenses: result.expenses,
+      message: 'POS data synced successfully'
+    });
+  } catch (error) {
+    console.error(`Daily sync error for ${req.body.businessDate}:`, error);
+    res.status(500).json({ 
+      error: 'Daily sync failed', 
+      details: (error as Error).message 
+    });
+  }
+});
+
 export default router;

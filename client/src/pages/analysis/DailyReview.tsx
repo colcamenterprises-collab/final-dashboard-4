@@ -62,9 +62,16 @@ export default function DailyReview() {
   const manualSync = async (date: string) => {
     setSyncing(true);
     try {
-      const response = await fetch(`/api/loyverse/shifts?shiftDate=${date}`);
+      const response = await fetch('/api/pos/sync-daily', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessDate: date })
+      });
+      
       if (response.ok) {
-        alert(`✅ POS data synced successfully for ${date}`);
+        const result = await response.json();
+        alert(`✅ POS data synced successfully for ${date}\n\nSales: ฿${result.sales.grand}\nExpenses: ฿${result.expenses.shopping + result.expenses.wages}`);
+        
         // Refresh the data
         const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
         if (r.ok) {
@@ -73,7 +80,8 @@ export default function DailyReview() {
           setAll(dataArray);
         }
       } else {
-        alert(`❌ Sync failed: ${response.statusText}`);
+        const errorData = await response.json();
+        alert(`❌ Sync failed: ${errorData.error || response.statusText}\n${errorData.details || ''}`);
       }
     } catch (error) {
       console.error('Sync error:', error);
