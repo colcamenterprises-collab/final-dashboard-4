@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => todayISO().slice(0, 7);
@@ -58,6 +60,14 @@ export default function DailyReview() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
   const [syncing, setSyncing] = useState(false);
+  const [syncDialog, setSyncDialog] = useState<{
+    open: boolean;
+    success: boolean;
+    message: string;
+    date?: string;
+    sales?: number;
+    expenses?: number;
+  }>({ open: false, success: false, message: "" });
 
   const manualSync = async (date: string) => {
     setSyncing(true);
@@ -70,7 +80,14 @@ export default function DailyReview() {
       
       if (response.ok) {
         const result = await response.json();
-        alert(`✅ POS data synced successfully for ${date}\n\nSales: ฿${result.sales.grand}\nExpenses: ฿${result.expenses.shopping + result.expenses.wages}`);
+        setSyncDialog({
+          open: true,
+          success: true,
+          message: 'POS data synced successfully',
+          date,
+          sales: result.sales.grand,
+          expenses: result.expenses.shopping + result.expenses.wages
+        });
         
         // Refresh the data
         const r = await fetch(`/api/analysis/daily-comparison-range?month=${month}`);
@@ -81,11 +98,19 @@ export default function DailyReview() {
         }
       } else {
         const errorData = await response.json();
-        alert(`❌ Sync failed: ${errorData.error || response.statusText}\n${errorData.details || ''}`);
+        setSyncDialog({
+          open: true,
+          success: false,
+          message: `Sync failed: ${errorData.error || response.statusText}${errorData.details ? '\n' + errorData.details : ''}`
+        });
       }
     } catch (error) {
       console.error('Sync error:', error);
-      alert(`❌ Sync error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSyncDialog({
+        open: true,
+        success: false,
+        message: `Sync error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
     } finally {
       setSyncing(false);
     }
@@ -277,6 +302,84 @@ export default function DailyReview() {
           </section>
         </>
       )}
+
+      {/* Sync Success/Error Dialog */}
+      <Dialog open={syncDialog.open} onOpenChange={(open) => setSyncDialog({ ...syncDialog, open })}>
+        <DialogContent className="sm:max-w-md" data-testid="sync-result-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {syncDialog.success ? (
+                <>
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                  <span className="text-emerald-700">Sync Successful</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-6 h-6 text-red-500" />
+                  <span className="text-red-700">Sync Failed</span>
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {syncDialog.success ? (
+              <>
+                <p className="text-sm text-gray-600">{syncDialog.message}</p>
+                
+                {syncDialog.date && (
+                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {new Date(syncDialog.date).toLocaleDateString('en-GB')}
+                      </span>
+                    </div>
+                    
+                    {syncDialog.sales !== undefined && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sales Total</span>
+                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                          ฿{syncDialog.sales.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {syncDialog.expenses !== undefined && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Expenses Total</span>
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                          ฿{syncDialog.expenses.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => setSyncDialog({ ...syncDialog, open: false })}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                  data-testid="btn-close-success"
+                >
+                  Got it!
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-red-600 whitespace-pre-wrap">{syncDialog.message}</p>
+                
+                <button
+                  onClick={() => setSyncDialog({ ...syncDialog, open: false })}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                  data-testid="btn-close-error"
+                >
+                  Close
+                </button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
