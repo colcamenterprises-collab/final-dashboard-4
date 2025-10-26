@@ -76,36 +76,36 @@ function KPIGrid() {
 
   const kpis = [
     {
-      title: "Sales MTD",
-      value: `฿${(financeSummary as any)?.sales?.toLocaleString() || "0"}`,
-      change: "+12.5%",
+      title: "Today's Orders",
+      value: "24",
+      change: "+15.3%",
       trend: "up",
+      icon: ShoppingCart,
+      color: "emerald"
+    },
+    {
+      title: "Net Profit",
+      value: "฿12,450",
+      change: "+8.7%",
+      trend: "up", 
       icon: DollarSign,
       color: "emerald"
     },
     {
-      title: "Orders",
-      value: "127",
-      change: "+8.2%",
-      trend: "up", 
-      icon: ShoppingCart,
+      title: "Online Orders",
+      value: "18",
+      change: "+22.1%",
+      trend: "up",
+      icon: Globe,
       color: "blue"
     },
     {
-      title: "Customers",
-      value: "89",
-      change: "-2.1%",
-      trend: "down",
-      icon: Users,
-      color: "orange"
-    },
-    {
-      title: "Profit Margin",
-      value: "42.1%",
-      change: "+1.8%",
+      title: "Deliveries",
+      value: "16",
+      change: "+12.5%",
       trend: "up",
       icon: Activity,
-      color: "emerald"
+      color: "orange"
     }
   ];
 
