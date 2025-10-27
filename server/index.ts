@@ -371,6 +371,10 @@ async function checkSchema() {
   const { adminTestEmailRouter } = await import('./routes/adminTestEmail');
   app.use(adminTestEmailRouter);
   
+  // Add admin sync route
+  const adminSyncRouter = (await import('./routes/adminSync.js')).default;
+  app.use('/api', adminSyncRouter);
+  
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks

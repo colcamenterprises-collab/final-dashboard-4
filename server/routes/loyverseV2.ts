@@ -6,9 +6,10 @@ const router = Router();
 
 router.post("/loyverse/sync", async (req, res) => {
   try {
+    console.log("[loyverseV2] sync request - query:", req.query, "body:", req.body);
     const { from, to } = req.query as { from: string; to: string };
     if (!from || !to) {
-      return res.status(400).json({ ok: false, error: "from/to required (YYYY-MM-DD)" });
+      return res.status(400).json({ ok: false, error: "from/to required (YYYY-MM-DD)", received: { query: req.query, body: req.body } });
     }
 
     const fromISO = DateTime.fromISO(from, { zone: "Asia/Bangkok" }).startOf("day").toISO();
