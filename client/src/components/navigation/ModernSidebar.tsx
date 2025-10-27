@@ -84,13 +84,13 @@ const navigationGroups: NavGroup[] = [
       { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" }
     ]
   },
-  {
-    title: "AI Assistants",
-    items: [
-      { to: "/ai/jussi-ops", label: "Jussi (Operations)", icon: Bot, testId: "nav-jussi" },
-      { to: "/ai/jane-accounts", label: "Jane (Accounting)", icon: Bot, testId: "nav-jane" }
-    ]
-  },
+  // {
+  //   title: "AI Assistants",
+  //   items: [
+  //     { to: "/ai/jussi-ops", label: "Jussi (Operations)", icon: Bot, testId: "nav-jussi" },
+  //     { to: "/ai/jane-accounts", label: "Jane (Accounting)", icon: Bot, testId: "nav-jane" }
+  //   ]
+  // },
   {
     title: "Sales & Ordering",
     defaultOpen: true,
