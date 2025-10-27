@@ -414,7 +414,7 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-emerald-600" />
-            <h3 className="font-semibold text-lg">Review Uploaded Transactions ({pendingExpenses.length})</h3>
+            <h3 className="font-semibold text-xs">Review Uploaded Transactions ({pendingExpenses.length})</h3>
             <Badge variant="outline" className="text-amber-600 border-amber-600">
               Golden Patch
             </Badge>
@@ -470,10 +470,10 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
           <div className="text-center py-4">Loading pending transactions...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border text-sm">
+            <table className="w-full border text-xs">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="p-2 border text-center w-12">
+                  <th className="p-2 border text-center w-12 text-xs">
                     <Checkbox
                       checked={selectedExpenses.length === pendingExpenses.length && pendingExpenses.length > 0}
                       onCheckedChange={(checked) => {
@@ -486,11 +486,11 @@ function GoldenPatchReviewSection({ onExpenseApproved }: { onExpenseApproved?: (
                       data-testid="checkbox-select-all-header"
                     />
                   </th>
-                  <th className="p-2 border text-left">Date</th>
-                  <th className="p-2 border text-left">Description</th>
-                  <th className="p-2 border text-right">Amount</th>
-                  <th className="p-2 border text-center">Status</th>
-                  <th className="p-2 border text-center">Actions</th>
+                  <th className="p-2 border text-left text-xs">Date</th>
+                  <th className="p-2 border text-left text-xs">Description</th>
+                  <th className="p-2 border text-right text-xs">Amount</th>
+                  <th className="p-2 border text-center text-xs">Status</th>
+                  <th className="p-2 border text-center text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -738,7 +738,7 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
   if (isLoading) {
     return (
       <div className="bg-white rounded shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
+        <h2 className="text-sm font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
         <div className="text-center py-8 text-gray-500">Loading shift expenses...</div>
       </div>
     );
@@ -746,18 +746,18 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
 
   return (
     <div className="bg-white rounded shadow p-4 mb-6">
-      <h2 className="text-lg font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
+      <h2 className="text-sm font-semibold mb-4">Shift Expenses (From Daily Sales & Stock)</h2>
       
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full border text-sm">
+        <table className="w-full border text-xs">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-3 border text-left">Date</th>
-              <th className="p-3 border text-left">Supplier</th>
-              <th className="p-3 border text-left">Category</th>
-              <th className="p-3 border text-left">Description</th>
-              <th className="p-3 border text-right">Amount</th>
+              <th className="p-3 border text-left text-xs">Date</th>
+              <th className="p-3 border text-left text-xs">Supplier</th>
+              <th className="p-3 border text-left text-xs">Category</th>
+              <th className="p-3 border text-left text-xs">Description</th>
+              <th className="p-3 border text-right text-xs">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -785,27 +785,27 @@ function ShiftExpensesTable({ month, year }: { month: number; year: number }) {
         <table className="w-full border">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-2 border text-left text-sm">Date</th>
-              <th className="p-2 border text-left text-sm">Details</th>
-              <th className="p-2 border text-right text-sm">Amount</th>
+              <th className="p-2 border text-left text-xs">Date</th>
+              <th className="p-2 border text-left text-xs">Details</th>
+              <th className="p-2 border text-right text-xs">Amount</th>
             </tr>
           </thead>
           <tbody>
             {shiftExpenses.map((exp: any, i: number) => (
               <tr key={i} className="hover:bg-gray-50">
-                <td className="border p-2 text-sm whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
                 <td className="border p-2">
-                  <div className="text-sm font-medium">{exp.description}</div>
-                  <div className="text-sm text-gray-600">{exp.supplier} • {exp.category}</div>
+                  <div className="text-xs font-medium">{exp.description}</div>
+                  <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
                 </td>
-                <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
+                <td className="border p-2 text-right font-medium text-xs whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="bg-gray-100 font-bold">
-              <td colSpan={2} className="border p-2 text-right text-sm">Total:</td>
-              <td className="border p-2 text-right text-sm">{formatCurrency(shiftExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0))}</td>
+              <td colSpan={2} className="border p-2 text-right text-xs">Total:</td>
+              <td className="border p-2 text-right text-xs">{formatCurrency(shiftExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0))}</td>
             </tr>
           </tfoot>
         </table>
@@ -1019,7 +1019,7 @@ export default function Expenses() {
       {/* Month Selector */}
       <div className="bg-white rounded shadow p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <h2 className="text-lg font-semibold">Select Month:</h2>
+          <h2 className="text-xs font-semibold">Select Month:</h2>
           <div className="flex gap-3 flex-1">
             <Select value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(parseInt(val))}>
               <SelectTrigger className="w-[180px]">
@@ -1059,10 +1059,10 @@ export default function Expenses() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Month to Date</CardTitle>
+            <CardTitle className="text-xs font-medium text-gray-600">Month to Date</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-base sm:text-lg font-bold">
               {totals?.mtd ? formatCurrency(totals.mtd) : '฿0'}
             </div>
           </CardContent>
@@ -1070,10 +1070,10 @@ export default function Expenses() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Year to Date</CardTitle>
+            <CardTitle className="text-xs font-medium text-gray-600">Year to Date</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-base sm:text-lg font-bold">
               {totals?.ytd ? formatCurrency(totals.ytd) : '฿0'}
             </div>
           </CardContent>
@@ -1081,13 +1081,13 @@ export default function Expenses() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-xs font-medium text-gray-600 flex items-center gap-2">
               MoM Trend
               {totals?.mom && getTrendIcon(totals.mom)}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${
+            <div className={`text-base sm:text-lg font-bold ${
               totals?.mom > 0 ? 'text-red-600' : 
               totals?.mom < 0 ? 'text-green-600' : 
               'text-gray-600'
@@ -1099,7 +1099,7 @@ export default function Expenses() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Top Expense Types</CardTitle>
+            <CardTitle className="text-xs font-medium text-gray-600">Expense Types</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
@@ -1121,11 +1121,11 @@ export default function Expenses() {
             type="file" 
             accept=".pdf,.csv,.png,.jpg" 
             onChange={e => setFile(e.target.files?.[0] || null)} 
-            className="flex-1 p-3 border border-gray-300 rounded text-sm" 
+            className="flex-1 p-3 border border-gray-300 rounded text-xs" 
           />
           <button 
             type="submit" 
-            className="bg-blue-600 text-white px-6 py-3 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
+            className="bg-blue-600 text-white px-6 py-3 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px] flex items-center justify-center whitespace-nowrap" 
             disabled={!file || uploading}
           >
             {uploading ? (
@@ -1141,36 +1141,36 @@ export default function Expenses() {
       {/* Review Parsed */}
       {parsed.length > 0 && (
         <div className="bg-white rounded shadow p-4 mb-6">
-          <h3 className="font-semibold text-sm mb-2">Review Uploaded Transactions ({parsed.length})</h3>
+          <h3 className="font-semibold text-xs mb-2">Review Uploaded Transactions ({parsed.length})</h3>
           <div className="overflow-x-auto">
-            <table className="w-full border text-sm">
+            <table className="w-full border text-xs">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="p-1 border text-left">Date</th>
-                  <th className="p-1 border text-left">Supplier</th>
-                  <th className="p-1 border text-left">Category</th>
-                  <th className="p-1 border text-left">Description</th>
-                  <th className="p-1 border text-right">Amount</th>
-                  <th className="p-1 border text-center">Action</th>
+                  <th className="p-1 border text-left text-xs">Date</th>
+                  <th className="p-1 border text-left text-xs">Supplier</th>
+                  <th className="p-1 border text-left text-xs">Category</th>
+                  <th className="p-1 border text-left text-xs">Description</th>
+                  <th className="p-1 border text-right text-xs">Amount</th>
+                  <th className="p-1 border text-center text-xs">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {parsed.map((line,i)=>(
                   <tr key={i} className="hover:bg-gray-50">
                     <td className="border p-1">
-                      <input defaultValue={line.date} className="border p-1 text-sm w-full" onChange={e => line.date = e.target.value} />
+                      <input defaultValue={line.date} className="border p-1 text-xs w-full" onChange={e => line.date = e.target.value} />
                     </td>
                     <td className="border p-1">
-                      <input defaultValue={line.supplier} className="border p-1 text-sm w-full" onChange={e => line.supplier = e.target.value} />
+                      <input defaultValue={line.supplier} className="border p-1 text-xs w-full" onChange={e => line.supplier = e.target.value} />
                     </td>
                     <td className="border p-1">
-                      <input defaultValue={line.category} className="border p-1 text-sm w-full" onChange={e => line.category = e.target.value} />
+                      <input defaultValue={line.category} className="border p-1 text-xs w-full" onChange={e => line.category = e.target.value} />
                     </td>
                     <td className="border p-1">
-                      <input defaultValue={line.description} className="border p-1 text-sm w-full" onChange={e => line.description = e.target.value} />
+                      <input defaultValue={line.description} className="border p-1 text-xs w-full" onChange={e => line.description = e.target.value} />
                     </td>
                     <td className="border p-1">
-                      <input defaultValue={line.amount} className="border p-1 text-sm w-full text-right" type="number" step="0.01" onChange={e => line.amount = e.target.value} />
+                      <input defaultValue={line.amount} className="border p-1 text-xs w-full text-right" type="number" step="0.01" onChange={e => line.amount = e.target.value} />
                     </td>
                     <td className="border p-1 text-center">
                       <button onClick={()=>approveLine(line)} className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 mr-1">Approve</button>
