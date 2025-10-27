@@ -2,6 +2,7 @@ import { Router } from "express";
 import { shiftWindow } from "../services/time/shiftWindow.js";
 import { PrismaClient } from "@prisma/client";
 import { computeShiftAll } from "../services/shiftItems.js";
+import { backfillShiftAnalytics, backfillLastNDays } from "../services/backfillShiftAnalytics.js";
 
 const db = new PrismaClient();
 const router = Router();
@@ -63,6 +64,42 @@ router.get("/analysis/shift/raw", async (req, res) => {
     res.json({ ok: true, fromISO, toISO, rows });
   } catch (error: any) {
     console.error("[shiftAnalysis] raw query failed:", error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+router.post("/analysis/shift/backfill", async (req, res) => {
+  try {
+    const { startDate, endDate, days } = req.query as { startDate?: string; endDate?: string; days?: string };
+    
+    let results;
+    if (days) {
+      const numDays = parseInt(days, 10);
+      if (isNaN(numDays) || numDays < 1) {
+        return res.status(400).json({ ok: false, error: "Invalid days parameter" });
+      }
+      console.log(`📊 Backfilling last ${numDays} days...`);
+      results = await backfillLastNDays(numDays);
+    } else if (startDate && endDate) {
+      console.log(`📊 Backfilling from ${startDate} to ${endDate}...`);
+      results = await backfillShiftAnalytics(startDate, endDate);
+    } else {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Provide either 'days' or both 'startDate' and 'endDate'" 
+      });
+    }
+
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+
+    res.json({ 
+      ok: true, 
+      message: `Backfilled ${successful} days successfully, ${failed} failed`,
+      results 
+    });
+  } catch (error: any) {
+    console.error("[shiftAnalysis] backfill failed:", error);
     res.status(500).json({ ok: false, error: error.message });
   }
 });
