@@ -84,6 +84,10 @@ export default function ShiftAnalyticsMM() {
     }
   }
 
+  React.useEffect(() => {
+    loadShift();
+  }, []);
+
   function exportCSV() {
     const headers = ["SKU", "Item", "Category", "Qty", "Patties", "RedMeat(g)", "Chicken(g)", "Rolls"];
     const rows = filtered.map((it) => [
