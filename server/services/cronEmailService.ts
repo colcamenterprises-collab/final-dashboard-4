@@ -41,7 +41,7 @@ export class CronEmailService {
   private isScheduled = false;
 
   /**
-   * Start the email cron job - runs at 8am Bangkok time (1am UTC)
+   * Start the email cron job - runs at 9am Bangkok time
    */
   startEmailCron() {
     if (this.isScheduled) {
@@ -49,21 +49,106 @@ export class CronEmailService {
       return;
     }
 
-    // Schedule for 8am Bangkok time (1am UTC)
-    cron.schedule('0 1 * * *', async () => {
-      console.log('🕐 Running daily management email at 8am Bangkok time');
-      await this.sendDailyManagementReport();
+    // Schedule for 9am Bangkok time
+    cron.schedule('0 9 * * *', async () => {
+      console.log('🕐 Running Daily Review email at 9am Bangkok time');
+      await this.sendDailyReviewEmail();
     }, {
-      timezone: 'UTC'
+      timezone: 'Asia/Bangkok'
     });
 
     this.isScheduled = true;
-    console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
+    console.log('📧 Daily Review Email cron scheduled for 9am Bangkok time');
   }
 
   /**
-   * Send daily management report email
+   * Send comprehensive Daily Review email
    */
+  async sendDailyReviewEmail() {
+    try {
+      const { formatInTimeZone } = await import('date-fns-tz');
+      const { subDays } = await import('date-fns');
+      const yesterday = formatInTimeZone(subDays(new Date(), 1), 'Asia/Bangkok', 'yyyy-MM-dd');
+
+      console.log(`📊 Generating Daily Review email for ${yesterday}`);
+
+      const { loadStaffForm, loadPosShift, loadDailyReview, loadFinance, buildFBvsSalesChart, rollsStatus, meatStatus } = await import('../email/dailyReviewData');
+      const { dailySummaryTemplate } = await import('../email/templates/dailySummary');
+      const { sendMail } = await import('../email/mailer');
+
+      const [form, pos, review, fin] = await Promise.all([
+        loadStaffForm(yesterday),
+        loadPosShift(yesterday),
+        loadDailyReview(yesterday),
+        loadFinance(yesterday),
+      ]);
+
+      const fbVsSalesChartDataUrl =
+        fin.fbExpensesMTD > 0 || fin.salesIncomeMTD > 0
+          ? await buildFBvsSalesChart({ fb: fin.fbExpensesMTD, sales: fin.salesIncomeMTD })
+          : undefined;
+
+      const rStatus = rollsStatus(pos.expectedRolls, form.rollsRecorded);
+      const mStatus = meatStatus(pos.expectedMeatGrams, form.meatRecordedGrams);
+
+      const html = dailySummaryTemplate({
+        dateISO: yesterday,
+        form: {
+          totalSales: form.totalSales,
+          bankedCash: form.bankedCash,
+          bankedQR: form.bankedQR,
+          closingCash: form.closingCash,
+          balanced: form.balanced,
+          itemisedSales: form.itemisedSales,
+          itemisedExpenses: form.itemisedExpenses,
+        },
+        pos: {
+          totalSales: pos.totalSales,
+          expensesTotal: pos.expensesTotal,
+          expectedCash: pos.expectedCash,
+          actualCash: pos.actualCash,
+          balanced: pos.balanced,
+          itemisedSales: pos.itemisedSales,
+          itemisedExpenses: pos.itemisedExpenses,
+        },
+        anomalies: review.anomalies,
+        managerNotes: review.managerNotes ?? null,
+        mtd: {
+          businessExpenses: fin.businessExpensesMTD,
+          shiftExpenses: fin.shiftExpensesMTD,
+          foodAndBeverageExpenses: fin.fbExpensesMTD,
+          salesIncome: fin.salesIncomeMTD,
+          fbVsSalesChartDataUrl,
+          businessExpensesToday: fin.businessExpensesToday,
+          shiftExpensesToday: fin.shiftExpensesToday,
+        },
+        priority: {
+          rolls: {
+            expected: pos.expectedRolls,
+            recorded: form.rollsRecorded,
+            variance: rStatus.variance,
+            status: rStatus.status,
+          },
+          meat: {
+            expectedGrams: pos.expectedMeatGrams,
+            recordedGrams: form.meatRecordedGrams,
+            varianceGrams: mStatus.varianceG,
+            status: mStatus.status,
+          },
+        },
+      });
+
+      const subject = `Daily Review — ${yesterday}`;
+      const to = process.env.EMAIL_TO_MANAGEMENT ?? 'smashbrothersburgersth@gmail.com';
+
+      await sendMail({ to, subject, html });
+      console.log(`✅ Daily Review email sent successfully to ${to}`);
+    } catch (error) {
+      console.error('❌ Daily Review email failed:', error);
+    }
+  }
+
+  // Keep old method for backwards compatibility (now deprecated)
   async sendDailyManagementReport() {
     try {
       const lastShiftDate = DateTime.now()
@@ -71,7 +156,7 @@ export class CronEmailService {
         .minus({ days: 1 })
         .toISODate();
 
-      console.log(`📊 Generating management report for ${lastShiftDate}`);
+      console.log(`📊 [DEPRECATED] Generating old management report for ${lastShiftDate}`);
 
       // Get latest form data
       const form = await db
