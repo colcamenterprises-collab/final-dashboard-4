@@ -982,7 +982,7 @@ export default function Expenses() {
             fetchExpenses();
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
           }} 
-          triggerClassName="px-6 py-3 rounded text-sm font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+          triggerClassName="px-6 py-3 rounded text-xs font-medium min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
         <StockLodgmentModal 
           onSuccess={() => {
@@ -991,7 +991,7 @@ export default function Expenses() {
             queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
             fetchExpenses();
           }} 
-          triggerClassName="bg-black text-white px-6 py-3 rounded text-sm font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
+          triggerClassName="bg-black text-white px-6 py-3 rounded text-xs font-medium hover:bg-gray-800 min-h-[44px] flex items-center justify-center w-full sm:w-auto" 
         />
       </div>
 
@@ -1189,19 +1189,19 @@ export default function Expenses() {
 
       {/* Main Expense Table/Cards - Mobile Responsive */}
       <div className="bg-white rounded shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-4">This Month's Expenses</h2>
+        <h2 className="text-sm font-semibold mb-4">This Month's Expenses</h2>
         
         {/* Desktop Table View */}
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full border text-sm">
+          <table className="w-full border text-xs">
             <thead>
               <tr className="bg-gray-100">
-                <th className="p-3 border text-left">Date</th>
-                <th className="p-3 border text-left">Supplier</th>
-                <th className="p-3 border text-left">Category</th>
-                <th className="p-3 border text-left">Description</th>
-                <th className="p-3 border text-right">Amount</th>
-                <th className="p-3 border text-center">Actions</th>
+                <th className="p-3 border text-left text-xs">Date</th>
+                <th className="p-3 border text-left text-xs">Supplier</th>
+                <th className="p-3 border text-left text-xs">Category</th>
+                <th className="p-3 border text-left text-xs">Description</th>
+                <th className="p-3 border text-right text-xs">Amount</th>
+                <th className="p-3 border text-center text-xs">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1271,21 +1271,21 @@ export default function Expenses() {
           <table className="w-full border">
             <thead>
               <tr className="bg-gray-100">
-                <th className="p-2 border text-left text-sm">Date</th>
-                <th className="p-2 border text-left text-sm">Details</th>
-                <th className="p-2 border text-right text-sm">Amount</th>
-                <th className="p-2 border text-center w-20 text-sm">Action</th>
+                <th className="p-2 border text-left text-xs">Date</th>
+                <th className="p-2 border text-left text-xs">Details</th>
+                <th className="p-2 border text-right text-xs">Amount</th>
+                <th className="p-2 border text-center w-20 text-xs">Action</th>
               </tr>
             </thead>
             <tbody>
               {expenses.map((exp,i)=>(
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-2 text-sm whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
+                  <td className="border p-2 text-xs whitespace-nowrap">{new Date(exp.date).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</td>
                   <td className="border p-2">
-                    <div className="text-sm font-medium">{exp.description}</div>
-                    <div className="text-sm text-gray-600">{exp.supplier} • {exp.category}</div>
+                    <div className="text-xs font-medium">{exp.description}</div>
+                    <div className="text-xs text-gray-600">{exp.supplier} • {exp.category}</div>
                   </td>
-                  <td className="border p-2 text-right font-medium text-sm whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
+                  <td className="border p-2 text-right font-medium text-xs whitespace-nowrap">{formatCurrency(exp.amount || 0)}</td>
                   <td className="border p-2 text-center">
                     <div className="flex gap-1 justify-center">
                       <Button
@@ -1332,8 +1332,8 @@ export default function Expenses() {
             </tbody>
             <tfoot>
               <tr className="bg-gray-100 font-bold">
-                <td colSpan={2} className="border p-2 text-right text-sm">Total:</td>
-                <td className="border p-2 text-right text-sm">{formatCurrency(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0))}</td>
+                <td colSpan={2} className="border p-2 text-right text-xs">Total:</td>
+                <td className="border p-2 text-right text-xs">{formatCurrency(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0))}</td>
                 <td className="border p-2"></td>
               </tr>
             </tfoot>
@@ -1351,15 +1351,15 @@ export default function Expenses() {
 
       {/* Rolls Table */}
       <div className="bg-white rounded shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Rolls Purchases</h2>
-        <table className="w-full border text-sm">
+        <h2 className="text-sm font-semibold mb-2">Rolls Purchases</h2>
+        <table className="w-full border text-xs">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-1 border text-left">Date</th>
-              <th className="p-1 border text-left">Quantity</th>
-              <th className="p-1 border text-left">Paid</th>
-              <th className="p-1 border text-right">Amount</th>
-              <th className="p-1 border text-center">Actions</th>
+              <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Quantity</th>
+              <th className="p-1 border text-left text-xs">Paid</th>
+              <th className="p-1 border text-right text-xs">Amount</th>
+              <th className="p-1 border text-center text-xs">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1440,15 +1440,15 @@ export default function Expenses() {
 
       {/* Meat Table */}
       <div className="bg-white rounded shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Meat Purchases</h2>
-        <table className="w-full border text-sm">
+        <h2 className="text-sm font-semibold mb-2">Meat Purchases</h2>
+        <table className="w-full border text-xs">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-1 border text-left">Date</th>
-              <th className="p-1 border text-left">Type</th>
-              <th className="p-1 border text-left">Weight</th>
-              <th className="p-1 border text-left">Supplier</th>
-              <th className="p-1 border text-center">Actions</th>
+              <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Type</th>
+              <th className="p-1 border text-left text-xs">Weight</th>
+              <th className="p-1 border text-left text-xs">Supplier</th>
+              <th className="p-1 border text-center text-xs">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1512,14 +1512,14 @@ export default function Expenses() {
 
       {/* Drinks Table */}
       <div className="bg-white rounded shadow p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Drinks Purchases</h2>
-        <table className="w-full border text-sm">
+        <h2 className="text-sm font-semibold mb-2">Drinks Purchases</h2>
+        <table className="w-full border text-xs">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-1 border text-left">Date</th>
-              <th className="p-1 border text-left">Type</th>
-              <th className="p-1 border text-left">Quantity</th>
-              <th className="p-1 border text-center">Actions</th>
+              <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Type</th>
+              <th className="p-1 border text-left text-xs">Quantity</th>
+              <th className="p-1 border text-center text-xs">Actions</th>
             </tr>
           </thead>
           <tbody>
