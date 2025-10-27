@@ -1,6 +1,5 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { parseISO } from "date-fns";
-import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -175,18 +174,18 @@ export async function loadFinance(dateISO: string) {
   const { start: todayStart, end: todayEnd } = dayRange(dateISO);
 
   const businessExpensesMTDResult = await prisma.$queryRaw<Array<{total: bigint}>>`
-    SELECT COALESCE(SUM(amount_cents), 0) as total 
+    SELECT COALESCE(SUM("costCents"), 0) as total 
     FROM expenses 
-    WHERE date >= ${monthStartISO}::date
-    AND date < ${dateISO}::date + INTERVAL '1 day'
+    WHERE "shiftDate" >= ${monthStartISO}::date
+    AND "shiftDate" < ${dateISO}::date + INTERVAL '1 day'
     AND source = 'DIRECT'
   `;
   const businessExpensesMTD = Number(businessExpensesMTDResult[0]?.total ?? 0);
 
   const businessExpensesTodayResult = await prisma.$queryRaw<Array<{total: bigint}>>`
-    SELECT COALESCE(SUM(amount_cents), 0) as total 
+    SELECT COALESCE(SUM("costCents"), 0) as total 
     FROM expenses 
-    WHERE date = ${dateISO}::date
+    WHERE "shiftDate" = ${dateISO}::date
     AND source = 'DIRECT'
   `;
   const businessExpensesToday = Number(businessExpensesTodayResult[0]?.total ?? 0);
@@ -219,11 +218,11 @@ export async function loadFinance(dateISO: string) {
   }
 
   const fbExpensesMTDResult = await prisma.$queryRaw<Array<{total: bigint}>>`
-    SELECT COALESCE(SUM(amount_cents), 0) as total 
+    SELECT COALESCE(SUM("costCents"), 0) as total 
     FROM expenses 
-    WHERE date >= ${monthStartISO}::date
-    AND date < ${dateISO}::date + INTERVAL '1 day'
-    AND (category ILIKE '%Food%' OR category ILIKE '%Beverage%' OR category ILIKE '%Ingredients%')
+    WHERE "shiftDate" >= ${monthStartISO}::date
+    AND "shiftDate" < ${dateISO}::date + INTERVAL '1 day'
+    AND ("expenseType" ILIKE '%Food%' OR "expenseType" ILIKE '%Beverage%' OR "expenseType" ILIKE '%Ingredients%')
   `;
   const fbExpensesMTD = Number(fbExpensesMTDResult[0]?.total ?? 0);
 
@@ -248,32 +247,37 @@ export async function loadFinance(dateISO: string) {
   };
 }
 
-const chart = new ChartJSNodeCanvas({ width: 560, height: 240, backgroundColour: "#11141A" });
-
-export async function buildFBvsSalesChart(data: { fb: number; sales: number }) {
-  const configuration = {
-    type: "bar" as const,
-    data: {
-      labels: ["F&B Expenses", "Sales Income"],
-      datasets: [
-        {
-          label: "Amount (฿)",
-          data: [data.fb, data.sales],
-          backgroundColor: ["#10B981", "#3B82F6"],
-        },
-      ],
-    },
-    options: {
-      responsive: false,
-      plugins: { legend: { display: false }, title: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: "#C7CFD9" } },
-        y: { grid: { color: "#1F2430" }, ticks: { color: "#C7CFD9" } },
+export async function buildFBvsSalesChart(data: { fb: number; sales: number }): Promise<string | undefined> {
+  try {
+    const { ChartJSNodeCanvas } = await import("chartjs-node-canvas");
+    const chart = new ChartJSNodeCanvas({ width: 560, height: 240, backgroundColour: "#11141A" });
+    const configuration = {
+      type: "bar" as const,
+      data: {
+        labels: ["F&B Expenses", "Sales Income"],
+        datasets: [
+          {
+            label: "Amount (฿)",
+            data: [data.fb, data.sales],
+            backgroundColor: ["#10B981", "#3B82F6"],
+          },
+        ],
       },
-    },
-  };
-  const png = await chart.renderToBuffer(configuration as any);
-  return `data:image/png;base64,${png.toString("base64")}`;
+      options: {
+        responsive: false,
+        plugins: { legend: { display: false }, title: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#C7CFD9" } },
+          y: { grid: { color: "#1F2430" }, ticks: { color: "#C7CFD9" } },
+        },
+      },
+    };
+    const png = await chart.renderToBuffer(configuration as any);
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } catch (error) {
+    console.warn("[buildFBvsSalesChart] Chart generation unavailable - skipping chart");
+    return undefined;
+  }
 }
 
 export function rollsStatus(expected: number | null, recorded: number | null) {
