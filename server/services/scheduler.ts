@@ -55,11 +55,17 @@ export class SchedulerService {
       this.ingestDailyPOSData();
     }, 3, 15); // 3:15 AM Bangkok time
 
+    // Schedule Shift Analytics MM cache rebuild at 3:20 AM Bangkok time
+    this.scheduleDailyTask(() => {
+      this.rebuildShiftAnalytics();
+    }, 3, 20); // 3:20 AM Bangkok time
+
     console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
     console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
     console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
     console.log('📊 Daily Review POS ingestion scheduled for 3:15am Bangkok time');
+    console.log('📊 Shift Analytics MM cache rebuild scheduled for 3:20am Bangkok time');
   }
 
   stop() {
@@ -518,6 +524,24 @@ export class SchedulerService {
       console.log(`✅ Daily Review POS data ingested for ${yesterdayStr}`);
     } catch (error) {
       console.error('❌ Failed to ingest Daily Review POS data:', error);
+    }
+  }
+
+  private async rebuildShiftAnalytics() {
+    try {
+      console.log('📊 Rebuilding Shift Analytics MM cache for previous shift...');
+      
+      const { computeShiftAll } = await import('./shiftItems');
+      
+      // Get yesterday's date (the shift that just completed at 3 AM)
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const yesterdayStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      const result = await computeShiftAll(yesterdayStr);
+      console.log(`✅ Shift Analytics MM cache rebuilt for ${result.shiftDate}: ${result.items.length} items`);
+    } catch (error) {
+      console.error('❌ Failed to rebuild Shift Analytics MM cache:', error);
     }
   }
 }
