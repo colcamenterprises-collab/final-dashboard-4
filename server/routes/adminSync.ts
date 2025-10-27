@@ -5,7 +5,6 @@ import { computeShiftAll } from "../services/shiftItems.js";
 
 const router = Router();
 
-// Manual sync endpoint that actually works
 router.get("/admin/sync-loyverse", async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 7;
@@ -13,17 +12,19 @@ router.get("/admin/sync-loyverse", async (req, res) => {
     const endDate = DateTime.now().setZone("Asia/Bangkok");
     const startDate = endDate.minus({ days });
     
-    const fromISO = startDate.startOf("day").toISO()!;
-    const toISO = endDate.endOf("day").toISO()!;
+    const fromBkk = startDate.startOf("day");
+    const toBkk = endDate.endOf("day");
     
-    console.log(`📊 Syncing Loyverse receipts from ${startDate.toISODate()} to ${endDate.toISODate()}`);
+    const fromUTC = fromBkk.toUTC().toISO()!;
+    const toUTC = toBkk.toUTC().toISO()!;
     
-    const syncResult = await importReceiptsV2(fromISO, toISO);
+    console.log(`📊 Syncing Loyverse from ${fromBkk.toISODate()} to ${toBkk.toISODate()}`);
     
-    // Also rebuild analytics cache for the synced dates
+    const syncResult = await importReceiptsV2(fromUTC, toUTC);
+    
     const analyticsResults = [];
-    let currentDate = startDate;
-    while (currentDate <= endDate) {
+    let currentDate = fromBkk;
+    while (currentDate <= toBkk) {
       const dateStr = currentDate.toISODate()!;
       try {
         const result = await computeShiftAll(dateStr);
@@ -46,7 +47,7 @@ router.get("/admin/sync-loyverse", async (req, res) => {
       ok: true,
       sync: syncResult,
       analytics: analyticsResults,
-      period: { from: startDate.toISODate(), to: endDate.toISODate() }
+      period: { from: fromBkk.toISODate(), to: toBkk.toISODate() }
     });
   } catch (error: any) {
     console.error("[adminSync] failed:", error);

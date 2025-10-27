@@ -1,0 +1,336 @@
+Mekong Mamba v1.0 — “All Items + Modifiers, Live from Loyverse” (One Patch)
+
+> Paste this whole plan to the agent and run in order.
+
+
+
+0) Preconditions (must be true)
+
+LOYVERSE_TOKEN is set and valid.
+
+We have a single Loyverse sync path (no legacy/duplicate sync code being called).
+
+Timezone = Asia/Bangkok for shift windows (5pm → 3am next day).
+
+
+
+---
+
+1) Migrations — normalize storage (idempotent)
+
+Create server/migrations/2025-10-27_mm_live.sql:
+
+-- Raw headers from Loyverse
+CREATE TABLE IF NOT EXISTS lv_receipt (
+  receipt_id    text PRIMARY KEY,
+  store_id      text,
+  receipt_no    text,
+  created_utc   timestamptz,  -- as sent by Loyverse (UTC)
+  closed_utc    timestamptz,
+  datetime_bkk  timestamptz,  -- computed once when inserting
+  total_cents   int,
+  raw_json      jsonb
+);
+CREATE INDEX IF NOT EXISTS ix_lv_receipt_bkk ON lv_receipt(datetime_bkk);
+
+-- Raw line items
+CREATE TABLE IF NOT EXISTS lv_line_item (
+  receipt_id    text NOT NULL REFERENCES lv_receipt(receipt_id) ON DELETE CASCADE,
+  line_no       int  NOT NULL,
+  sku           text NULL,
+  name          text NOT NULL,
+  category      text NULL,
+  qty           numeric NOT NULL,
+  unit_price    numeric NULL,
+  total_price   numeric NULL,
+  PRIMARY KEY (receipt_id, line_no)
+);
+CREATE INDEX IF NOT EXISTS ix_lv_line_item_sku ON lv_line_item(sku);
+CREATE INDEX IF NOT EXISTS ix_lv_line_item_receipt ON lv_line_item(receipt_id);
+
+-- Raw modifiers (children of a line)
+CREATE TABLE IF NOT EXISTS lv_modifier (
+  receipt_id    text NOT NULL,
+  parent_line_no int NOT NULL,
+  name          text NOT NULL,
+  sku           text NULL,
+  qty           numeric NOT NULL DEFAULT 1,
+  unit_price    numeric NULL,
+  PRIMARY KEY (receipt_id, parent_line_no, name)
+);
+
+-- Catalog (extend for sets)
+ALTER TABLE item_catalog
+  ADD COLUMN IF NOT EXISTS is_meal_set boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS base_sku   text NULL;
+
+-- Known meal-deal→base links (adjust if needed)
+UPDATE item_catalog SET is_meal_set=true, base_sku='10019' WHERE sku='10036'; -- Super Double Set → Super Double
+UPDATE item_catalog SET is_meal_set=true, base_sku='10004' WHERE sku='10033'; -- Single Set → Single
+UPDATE item_catalog SET is_meal_set=true, base_sku='10009' WHERE sku='10034'; -- Triple Set → Triple
+UPDATE item_catalog SET is_meal_set=true, base_sku='10006' WHERE sku='10032'; -- Double Set → Ultimate Double
+UPDATE item_catalog SET is_meal_set=true, base_sku='10070' WHERE sku='10071'; -- Karaage Meal Deal → Karaage Burger
+UPDATE item_catalog SET is_meal_set=true, base_sku=NULL    WHERE sku='10069'; -- Mix & Match is generic bundle
+
+-- Alias map: resolve name→SKU when Loyverse omits SKU
+CREATE TABLE IF NOT EXISTS item_alias (
+  alias_name  text PRIMARY KEY,
+  sku         text NOT NULL
+);
+
+-- Analytics cache
+CREATE TABLE IF NOT EXISTS analytics_shift_item (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date date NOT NULL,
+  from_ts timestamptz NOT NULL,
+  to_ts timestamptz NOT NULL,
+  sku text NULL,
+  name text NOT NULL,
+  category text NOT NULL,
+  qty int NOT NULL,
+  patties int NOT NULL DEFAULT 0,
+  red_meat_g int NOT NULL DEFAULT 0,
+  chicken_g int NOT NULL DEFAULT 0,
+  rolls int NOT NULL DEFAULT 0,
+  raw_hits jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, COALESCE(sku, name))
+);
+CREATE TABLE IF NOT EXISTS analytics_shift_modifier (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date date NOT NULL,
+  from_ts timestamptz NOT NULL,
+  to_ts timestamptz NOT NULL,
+  sku text NULL,
+  name text NOT NULL,
+  category text NOT NULL DEFAULT 'modifier',
+  qty int NOT NULL,
+  raw_hits jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, COALESCE(sku, name))
+);
+CREATE TABLE IF NOT EXISTS analytics_shift_category_summary (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date date NOT NULL,
+  from_ts timestamptz NOT NULL,
+  to_ts timestamptz NOT NULL,
+  category text NOT NULL,
+  items_total int NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, category)
+);
+
+Run:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-27_mm_live.sql
+
+
+---
+
+2) Loyverse sync — single source of truth, correct window, pagination
+
+Edit server/services/loyverseImport.ts (or your wrapper) to:
+
+Accept from/to as Bangkok local dates; compute UTC bounds.
+
+Page through results until no next_page_token.
+
+Insert/UPSERT lv_receipt + lv_line_item + lv_modifier.
+
+Compute datetime_bkk = created_utc AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok'.
+
+
+Pseudocode (keep real API calls you already have):
+
+import { DateTime } from 'luxon';
+
+export async function syncLoyverseRange(dateFromISO: string, dateToISO: string) {
+  const fromBkk = DateTime.fromISO(dateFromISO, { zone: 'Asia/Bangkok' }).startOf('day');
+  const toBkk   = DateTime.fromISO(dateToISO,   { zone: 'Asia/Bangkok' }).endOf('day');
+
+  // Query window in UTC
+  const fromUTC = fromBkk.toUTC();
+  const toUTC   = toBkk.toUTC();
+
+  let cursor: string | undefined;
+  do {
+    const resp = await loyverse.fetchReceipts({ from: fromUTC.toISO(), to: toUTC.toISO(), cursor });
+    for (const r of resp.receipts) {
+      // header
+      await upsertReceipt({
+        receipt_id: r.id,
+        created_utc: r.created_at, // UTC string
+        closed_utc:  r.closed_at,
+        datetime_bkk: DateTime.fromISO(r.created_at, { zone: 'utc' }).setZone('Asia/Bangkok').toJSDate(),
+        total_cents: Math.round(Number(r.total) * 100),
+        raw_json: r
+      });
+      // items
+      let lineNo = 0;
+      for (const it of r.items) {
+        await upsertLineItem({
+          receipt_id: r.id,
+          line_no: ++lineNo,
+          sku: it.sku ?? null,
+          name: it.name,
+          category: it.category ?? null,
+          qty: Number(it.quantity),
+          unit_price: toCents(it.price),
+          total_price: toCents(it.total)
+        });
+        // modifiers (if any)
+        for (const m of (it.modifiers ?? [])) {
+          await upsertModifier({
+            receipt_id: r.id,
+            parent_line_no: lineNo,
+            name: m.name,
+            sku: m.sku ?? null,
+            qty: Number(m.quantity ?? 1),
+            unit_price: toCents(m.price)
+          });
+        }
+      }
+    }
+    cursor = resp.next_page_token;
+  } while (cursor);
+}
+
+Critical: Do not use any legacy /api/receipts/* tables for MM v1.0—it must read from lv_*.
+
+
+---
+
+3) Shift window util — one function everywhere (5pm→3am)
+
+File server/services/time/shiftWindow.ts:
+
+import { DateTime } from "luxon";
+export function shiftWindow(dateISO: string) {
+  const base = DateTime.fromISO(dateISO, { zone: "Asia/Bangkok" }).startOf("day");
+  const from = base.plus({ hours: 17 });         // 17:00 BKK
+  const to   = base.plus({ days: 1, hours: 3 }); // +1d 03:00 BKK
+  return { shiftDate: base.toISODate()!, fromISO: from.toISO()!, toISO: to.toISO()! };
+}
+
+Use this in all MM endpoints.
+
+
+---
+
+4) Compute service — SKU-first, sets deduped, modifiers separate
+
+Edit/replace server/services/shiftItems.ts core query:
+
+Exclude base burger zero-price component lines when a meal-set appears on the same receipt.
+
+Aggregate by SKU; apply alias only when SKU is NULL.
+
+Compute burgers (patties/grams/rolls) from catalog rules.
+
+Write cache atomically (items + modifiers + per-category rollup).
+
+
+> You already have an earlier version; ensure the two key rules are enforced:
+
+1. NOT IN (base_exclusions) for base burger components
+
+
+2. COALESCE(li.sku, ia.sku) (alias only when SKU is NULL)
+
+
+
+
+
+
+---
+
+5) Endpoints (MM v1.0 only) — verify and keep them simple
+
+POST /api/loyverse/sync?from=YYYY-MM-DD&to=YYYY-MM-DD → calls syncLoyverseRange.
+
+GET  /api/analysis/shift/raw?date=YYYY-MM-DD
+→ returns raw lv_line_item grouped (no catalog logic), for debugging.
+
+POST /api/analysis/shift/rebuild?date=YYYY-MM-DD
+→ runs compute, overwrites cache for that shift.
+
+GET  /api/analysis/shift/items?date=YYYY-MM-DD
+→ returns cache (compute if empty).
+
+(Optional) GET /api/analysis/shift/modifiers?date=YYYY-MM-DD
+→ read analytics_shift_modifier by date.
+
+
+Disable/ignore any legacy analytics job/routes to avoid conflicting numbers.
+
+
+---
+
+6) Backfill a week (live from Loyverse → compute → cache)
+
+# Pull real receipts from Loyverse for the last 7 days, Bangkok-local dates
+FROM=$(date -d '7 days ago' +%F); TO=$(date +%F)
+curl -s -X POST "/api/loyverse/sync?from=$FROM&to=$TO" | jq
+
+# Rebuild each day’s shift cache (5pm→3am)
+for d in $(seq 0 7); do
+  DAY=$(date -d "$d days ago" +%F)
+  curl -s -X POST "/api/analysis/shift/rebuild?date=$DAY" \
+  | jq -r '"✅ " + .shiftDate + " • " + (.items|length|tostring) + " items (" + .sourceUsed + ")"'
+done
+
+
+---
+
+7) Prove it’s correct (hard checks, no guessing)
+
+7.1 Raw has rows in window
+
+DAY=2025-10-23
+curl -s "/api/analysis/shift/raw?date=$DAY" | jq '{fromISO,toISO,rows:(.rows|length)}'
+
+7.2 No UNKNOWNs after alias (should be 0)
+
+curl -s "/api/analysis/shift/items?date=$DAY" \
+| jq '[.items[] | select(.sku==null or .name=="UNKNOWN")] | length'
+
+7.3 Burgers: set/base duplication gone
+
+curl -s "/api/analysis/shift/items?date=$DAY" \
+| jq '[.items[] | select(.category=="burger")] | map({sku,name,qty})'
+
+7.4 Modifiers separated
+
+psql "$DATABASE_URL" -c "SELECT sku,name,qty FROM analytics_shift_modifier WHERE shift_date='${DAY}'::date ORDER BY name LIMIT 50;"
+
+If you want a POS CSV reconcile, use the reconcile script (you already have this pattern): POS vs MM must be 1:1 per SKU.
+
+
+---
+
+8) Nightly job (after shift)
+
+# 03:05 Bangkok daily
+curl -s -X POST "/api/loyverse/sync?from=$(date -d 'yesterday' +%F)&to=$(date -d 'yesterday' +%F)" >/dev/null
+curl -s -X POST "/api/analysis/shift/rebuild?date=$(date -d 'yesterday' +%F)" >/dev/null
+
+
+---
+
+Why this fixes the pain
+
+Live source = Loyverse API → stored as lv_* only.
+
+SKU-first counting → alias used only when Loyverse omitted SKU.
+
+No meal-deal inflation → base burger component lines excluded.
+
+Modifiers split → clean item totals and a separate modifier list.
+
+One cache → the UI reads the same truth as the compute.
+
+Backfill included → you’ll see the last week straight away.
+
+
+
+---

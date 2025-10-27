@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 
 const db = new PrismaClient();
 const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN!;
-const LOYVERSE_API = "https://api.loyverse.com/v1.0/receipts";
+const LOYVERSE_API = "https://api.loyverse.com/v1.0";
 
 type LvReceipt = {
   receipt_number: string;
@@ -23,23 +23,40 @@ type LvReceipt = {
 };
 
 async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<LvReceipt> {
-  let url = `${LOYVERSE_API}?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`;
+  let cursor: string | undefined;
+  let pageCount = 0;
   
-  for (let i = 0; i < 50 && url; i++) {
+  do {
+    const params = new URLSearchParams();
+    params.append('created_at_min', fromISO);
+    params.append('created_at_max', toISO);
+    if (cursor) params.append('cursor', cursor);
+    
+    const url = `${LOYVERSE_API}/receipts?${params.toString()}`;
+    
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
       timeout: 30000,
     });
     
     const data = response.data;
+    
     if (Array.isArray(data?.receipts)) {
       for (const receipt of data.receipts) {
         yield receipt;
       }
     }
     
-    url = data?.links?.next ?? null;
-  }
+    cursor = data?.cursor;
+    pageCount++;
+    
+    if (pageCount > 500) {
+      console.warn('[ImportV2] Hit page limit (500), stopping pagination');
+      break;
+    }
+  } while (cursor);
+  
+  console.log(`[ImportV2] Fetched ${pageCount} pages total`);
 }
 
 export async function importReceiptsV2(fromISO: string, toISO: string) {
@@ -56,7 +73,7 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
     for await (const rc of fetchReceipts(fromISO, toISO)) {
       fetched++;
 
-      const dtBkk = DateTime.fromISO(rc.receipt_date, { zone: "Asia/Bangkok" }).toISO();
+      const dtBkk = DateTime.fromISO(rc.receipt_date, { zone: "UTC" }).setZone("Asia/Bangkok").toISO();
       const totalAmount = (rc.total_money?.amount ?? 0) / 100.0;
 
       await db.$executeRaw`
@@ -104,6 +121,7 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
     console.log(`[ImportV2] Complete: fetched=${fetched}, upserted=${upserted}`);
     return { ok: true, fetched, upserted };
   } catch (error: any) {
+    console.error('[ImportV2] Error:', error.message);
     await db.$executeRaw`
       UPDATE import_log
       SET status='error', message=${error.message}, finished_at=now()
