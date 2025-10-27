@@ -92,10 +92,14 @@ const navigationGroups: NavGroup[] = [
     ]
   },
   {
+    title: "Sales & Ordering",
+    defaultOpen: true,
+    items: []
+  },
+  {
     title: "Marketing",
     defaultOpen: true,
     items: [
-      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" },
       { to: "/marketing/menu-admin", label: "Menu Admin", icon: Settings, testId: "nav-menu-admin" }
     ]
   }
