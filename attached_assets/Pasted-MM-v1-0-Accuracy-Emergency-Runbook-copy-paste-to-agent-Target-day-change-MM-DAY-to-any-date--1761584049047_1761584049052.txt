@@ -1,0 +1,239 @@
+MM v1.0 — Accuracy Emergency Runbook (copy/paste to agent)
+
+> Target day: change MM_DAY to any date you’re validating.
+
+
+
+0) Set the day
+
+export MM_DAY=2025-10-23
+
+
+---
+
+1) Prove the cause (duplication & null SKUs)
+
+1A) Meal-deal + base burger on the same receipt (double counting)
+
+WITH map AS (
+  SELECT * FROM (VALUES
+    ('10036','10019'), -- Super Double Set -> Super Double
+    ('10033','10004'), -- Single Set       -> Single
+    ('10034','10009'), -- Triple Set       -> Triple
+    ('10032','10006'), -- Double Set       -> Ultimate Double
+    ('10071','10070')  -- Karaage Meal     -> Karaage Burger
+  ) t(meal_sku, base_sku)
+), win AS (
+  SELECT (MM_DAY || ' 17:00:00+07')::timestamptz AS from_ts,
+         ((MM_DAY::date + 1)::text || ' 03:00:00+07')::timestamptz AS to_ts
+)
+SELECT r.receipt_id,
+       SUM(CASE WHEN li.sku IN (SELECT meal_sku FROM map) THEN li.qty ELSE 0 END) AS meal_qty,
+       SUM(CASE WHEN li.sku IN (SELECT base_sku FROM map) THEN li.qty ELSE 0 END) AS base_qty,
+       MIN(li.unit_price) FILTER (WHERE li.sku IN (SELECT base_sku FROM map)) AS any_base_price
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+GROUP BY r.receipt_id
+HAVING SUM(CASE WHEN li.sku IN (SELECT meal_sku FROM map) THEN li.qty ELSE 0 END) > 0
+   AND SUM(CASE WHEN li.sku IN (SELECT base_sku FROM map) THEN li.qty ELSE 0 END) > 0
+ORDER BY r.receipt_id
+LIMIT 100;
+
+Rows returned = receipts where sets and base burgers co-exist (the usual over-count).
+
+If any_base_price = 0 → base burger lines are components; must be excluded.
+
+
+1B) Count base burger zero-price components (should be excluded)
+
+WITH base AS (
+  SELECT * FROM (VALUES ('10019'),('10004'),('10009'),('10006'),('10070')) t(base_sku)
+), win AS (
+  SELECT (MM_DAY || ' 17:00:00+07')::timestamptz AS from_ts,
+         ((MM_DAY::date + 1)::text || ' 03:00:00+07')::timestamptz AS to_ts
+)
+SELECT li.sku, SUM(li.qty) AS qty_zero_price_components
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+  AND li.sku IN (SELECT base_sku FROM base)
+  AND COALESCE(li.unit_price,0) = 0
+GROUP BY li.sku
+ORDER BY li.sku;
+
+1C) Show NULL-SKU lines (root of UNKNOWN rows)
+
+WITH win AS (
+  SELECT (MM_DAY || ' 17:00:00+07')::timestamptz AS from_ts,
+         ((MM_DAY::date + 1)::text || ' 03:00:00+07')::timestamptz AS to_ts
+)
+SELECT li.name, SUM(li.qty) AS qty, COUNT(*) AS lines
+FROM lv_line_item li
+JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+LEFT JOIN item_alias ia ON ia.alias_name = li.name
+WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+  AND li.sku IS NULL
+  AND ia.sku IS NULL
+GROUP BY li.name
+ORDER BY qty DESC
+LIMIT 50;
+
+Any output here needs an alias entry (name → SKU) or POS config fix.
+
+
+
+---
+
+2) One-time migration: meal-deal links + modifier analytics
+
+-- 2025-10-27_mm_hotfix.sql
+ALTER TABLE item_catalog
+  ADD COLUMN IF NOT EXISTS is_meal_set boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS base_sku   text NULL;
+
+UPDATE item_catalog SET is_meal_set=true, base_sku='10019' WHERE sku='10036';
+UPDATE item_catalog SET is_meal_set=true, base_sku='10004' WHERE sku='10033';
+UPDATE item_catalog SET is_meal_set=true, base_sku='10009' WHERE sku='10034';
+UPDATE item_catalog SET is_meal_set=true, base_sku='10006' WHERE sku='10032';
+UPDATE item_catalog SET is_meal_set=true, base_sku='10070' WHERE sku='10071';
+UPDATE item_catalog SET is_meal_set=true, base_sku=NULL    WHERE sku='10069'; -- Mix & Match
+
+CREATE TABLE IF NOT EXISTS item_alias (
+  alias_name  text PRIMARY KEY,
+  sku         text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS analytics_shift_modifier (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date date NOT NULL,
+  from_ts timestamptz NOT NULL,
+  to_ts timestamptz NOT NULL,
+  sku text NULL,
+  name text NOT NULL,
+  category text NOT NULL DEFAULT 'modifier',
+  qty integer NOT NULL,
+  raw_hits jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (shift_date, COALESCE(sku, name))
+);
+
+Run:
+
+psql "$DATABASE_URL" -f server/migrations/2025-10-27_mm_hotfix.sql
+
+
+---
+
+3) Enforce SKU-first + exclude base components (single query patch)
+
+Use this selection logic wherever you build shift rows (your compute service). The key is the NOT IN base_exclusions and alias only when sku is NULL.
+
+WITH win AS (
+  SELECT (MM_DAY || ' 17:00:00+07')::timestamptz AS from_ts,
+         ((MM_DAY::date + 1)::text || ' 03:00:00+07')::timestamptz AS to_ts
+),
+base_exclusions AS (
+  SELECT li.receipt_id, li.line_no
+  FROM lv_line_item li
+  JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+  JOIN item_catalog b ON b.sku = li.sku
+  WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+    AND b.category='burger'
+    AND COALESCE(li.unit_price,0)=0
+    AND EXISTS (
+      SELECT 1
+      FROM lv_line_item si
+      JOIN item_catalog mc ON mc.sku = si.sku
+      WHERE si.receipt_id = li.receipt_id
+        AND mc.is_meal_set = true
+        AND mc.base_sku = li.sku
+    )
+),
+base AS (
+  SELECT COALESCE(li.sku, ia.sku) AS sku,
+         li.name,
+         SUM(li.qty)::int AS qty
+  FROM lv_line_item li
+  JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+  LEFT JOIN item_alias ia ON li.sku IS NULL AND ia.alias_name = li.name
+  WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+    AND (li.receipt_id, li.line_no) NOT IN (SELECT receipt_id, line_no FROM base_exclusions)
+  GROUP BY COALESCE(li.sku, ia.sku), li.name
+)
+SELECT sku, name, qty FROM base;
+
+Rules enforced:
+
+Never count base burger component lines (price=0) when a matching meal-set is on the same receipt.
+
+Always aggregate by SKU; alias used only if SKU is null.
+
+
+
+---
+
+4) Modifiers: count separately (no contamination of items)
+
+WITH win AS (
+  SELECT (MM_DAY || ' 17:00:00+07')::timestamptz AS from_ts,
+         ((MM_DAY::date + 1)::text || ' 03:00:00+07')::timestamptz AS to_ts
+)
+SELECT COALESCE(m.sku, ia.sku) AS sku,
+       m.name,
+       SUM(m.qty)::int AS qty
+FROM lv_modifier m
+JOIN lv_receipt r ON r.receipt_id = m.receipt_id, win
+LEFT JOIN item_alias ia ON m.sku IS NULL AND ia.alias_name = m.name
+WHERE r.datetime_bkk >= (SELECT from_ts FROM win) AND r.datetime_bkk < (SELECT to_ts FROM win)
+GROUP BY COALESCE(m.sku, ia.sku), m.name
+ORDER BY name;
+
+Store these into analytics_shift_modifier.
+
+Keep the items table free from modifier rows.
+
+
+
+---
+
+5) Purge cache for the day, recompute, verify
+
+# Clean the cache for MM_DAY (avoid ghosts)
+psql "$DATABASE_URL" -c "DELETE FROM analytics_shift_item WHERE shift_date='${MM_DAY}'::date; DELETE FROM analytics_shift_modifier WHERE shift_date='${MM_DAY}'::date; DELETE FROM analytics_shift_category_summary WHERE shift_date='${MM_DAY}'::date;"
+
+# Force rebuild via your rebuild endpoint (or run compute live and write cache)
+curl -s -X POST "/api/analysis/shift/rebuild?date=${MM_DAY}" | jq '.shiftDate,.items|length'
+
+Quick checks:
+
+# Items (burgers should now match POS logic)
+curl -s "/api/analysis/shift/items?date=${MM_DAY}" | jq '[.items[] | select(.category=="burger")] | map({sku,name,qty})'
+
+# Modifiers (new endpoint or direct table check)
+psql "$DATABASE_URL" -c "SELECT sku,name,qty FROM analytics_shift_modifier WHERE shift_date='${MM_DAY}'::date ORDER BY name LIMIT 50;"
+
+
+---
+
+6) Reconcile vs your POS CSV (hard proof)
+
+If you have /mnt/data/shift-${MM_DAY}.csv (POS export):
+
+# Use the existing reconcile script (or the one we gave earlier)
+MM_DAY=$MM_DAY MM_CSV="/mnt/data/shift-${MM_DAY}.csv" tsx server/scripts/mm_reconcile_day.ts
+
+You should see ✅ match or a short diff list pinpointing any remaining alias gaps (name-only lines).
+
+
+
+---
+
+7) Nightly stability
+
+# 03:05 Bangkok (after shift)
+curl -s -X POST "/api/loyverse/sync?from=$(date -d 'yesterday' +%F)&to=$(date -d 'yesterday' +%F)" >/dev/null
+curl -s -X POST "/api/analysis/shift/rebuild?date=$(date -d 'yesterday' +%F)" >/dev/null
+
+
+---
