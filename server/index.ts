@@ -367,6 +367,10 @@ async function checkSchema() {
   const checklistRouter = (await import('./routes/checklists')).default;
   app.use('/api/checklists', checklistRouter);
   
+  // Add admin test email route
+  const { adminTestEmailRouter } = await import('./routes/adminTestEmail');
+  app.use(adminTestEmailRouter);
+  
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks

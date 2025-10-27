@@ -1,7 +1,9 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { parseISO } from "date-fns";
-import { prisma } from "../../lib/prisma";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const ROLLS_THRESHOLD = 5;
 const MEAT_THRESHOLD_G = 500;
