@@ -1,33 +1,27 @@
 import nodemailer from "nodemailer";
 
-const {
-  SMTP_HOST,
-  SMTP_PORT,
-  SMTP_SECURE,
-  SMTP_USER,
-  SMTP_PASS,
-  EMAIL_FROM,
-} = process.env;
+const GMAIL_USER = process.env.GMAIL_USER || 'colcamenterprises@gmail.com';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
-if (!SMTP_HOST) {
-  console.warn("[mailer] SMTP env not set – using JSON transport for dev preview.");
+if (!GMAIL_APP_PASSWORD) {
+  console.warn("[mailer] GMAIL_APP_PASSWORD not set – using JSON transport for dev preview.");
 }
 
-export const transporter =
-  SMTP_HOST && SMTP_USER && SMTP_PASS
-    ? nodemailer.createTransport({
-        host: SMTP_HOST,
-        port: Number(SMTP_PORT ?? 465),
-        secure: String(SMTP_SECURE ?? "true") === "true",
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-      })
-    : nodemailer.createTransport({ jsonTransport: true });
+export const transporter = GMAIL_APP_PASSWORD
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: GMAIL_USER,
+        pass: GMAIL_APP_PASSWORD
+      }
+    })
+  : nodemailer.createTransport({ jsonTransport: true });
 
 export async function sendMail(opts: {
   to: string | string[];
   subject: string;
   html: string;
 }) {
-  const from = EMAIL_FROM ?? "Smash Brothers Burgers <noreply@sbb.local>";
+  const from = `"Smash Brothers Burgers" <${GMAIL_USER}>`;
   return transporter.sendMail({ from, ...opts });
 }
