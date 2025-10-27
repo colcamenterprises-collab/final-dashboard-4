@@ -367,10 +367,6 @@ async function checkSchema() {
   const checklistRouter = (await import('./routes/checklists')).default;
   app.use('/api/checklists', checklistRouter);
   
-  // Add admin test email route
-  const { adminTestEmailRouter } = await import('./routes/adminTestEmail');
-  app.use(adminTestEmailRouter);
-  
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Start the scheduler service for daily 4am tasks
@@ -379,10 +375,6 @@ async function checkSchema() {
   // Start the email cron service for daily 8am management reports
   const { cronEmailService } = await import('./services/cronEmailService');
   cronEmailService.startEmailCron();
-
-  // Start the Daily Review Email job scheduler (9am Bangkok)
-  const { startJobs } = await import('./jobs/index');
-  startJobs();
 
   // 🚨 Jussi Daily Cron (3AM BKK)
   setInterval(async () => {
