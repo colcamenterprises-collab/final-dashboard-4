@@ -11,7 +11,7 @@ type LvReceipt = {
   receipt_date: string;
   total_money?: { amount: number };
   line_items?: Array<{
-    name: string;
+    item_name: string;
     quantity: number;
     price?: number;
     sku?: string;
@@ -93,7 +93,7 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
         lineNo++;
         await db.$executeRaw`
           INSERT INTO lv_line_item (receipt_id, line_no, sku, name, qty, unit_price, raw_json)
-          VALUES (${rc.receipt_number}, ${lineNo}, ${li.sku ?? null}, ${li.name ?? "UNKNOWN"},
+          VALUES (${rc.receipt_number}, ${lineNo}, ${li.sku ?? null}, ${li.item_name ?? "UNKNOWN"},
                   ${Number(li.quantity || 0)}, ${Number(li.price || 0)}, ${JSON.stringify(li)}::jsonb)
           ON CONFLICT (receipt_id, line_no) DO UPDATE
           SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, unit_price=EXCLUDED.unit_price,
