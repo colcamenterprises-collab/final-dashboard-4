@@ -127,7 +127,7 @@ export async function computeShiftAll(dateISO: string) {
 
     const byCat:any = {};
 
-    for (const v of accItems.values()) {
+    for (const v of Array.from(accItems.values())) {
       byCat[v.category] = (byCat[v.category] ?? 0) + v.qty;
       await tx.$executeRaw`
         INSERT INTO analytics_shift_item
@@ -144,7 +144,7 @@ export async function computeShiftAll(dateISO: string) {
     }
 
     // modifiers table
-    for (const v of accMods.values()) {
+    for (const v of Array.from(accMods.values())) {
       byCat['modifier'] = (byCat['modifier'] ?? 0) + v.qty;
       await tx.$executeRaw`
         INSERT INTO analytics_shift_modifier

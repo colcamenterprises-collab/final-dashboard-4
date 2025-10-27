@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { shiftWindow } from "../services/time/shiftWindow.js";
 import { PrismaClient } from "@prisma/client";
-import { computeShift } from "../services/shiftItems.js";
+import { computeShiftAll } from "../services/shiftItems.js";
 
 const db = new PrismaClient();
 const router = Router();
@@ -17,10 +17,9 @@ router.get("/analysis/shift/items", async (req, res) => {
       ORDER BY category, name`;
 
     if ((rows?.length ?? 0) === 0) {
-      const out = await computeShift(date);
+      const out = await computeShiftAll(date);
       return res.json({
         ok: true,
-        sourceUsed: "live",
         ...out,
         items: category ? out.items.filter((x) => x.category === category) : out.items,
       });
@@ -41,8 +40,8 @@ router.get("/analysis/shift/items", async (req, res) => {
 router.post("/analysis/shift/rebuild", async (req, res) => {
   try {
     const { date } = req.query as { date: string };
-    const out = await computeShift(date);
-    res.json({ ok: true, sourceUsed: "live", ...out });
+    const out = await computeShiftAll(date);
+    res.json({ ok: true, ...out });
   } catch (error: any) {
     console.error("[shiftAnalysis] rebuild failed:", error);
     res.status(500).json({ ok: false, error: error.message });
