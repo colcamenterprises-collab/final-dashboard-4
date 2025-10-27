@@ -1,0 +1,732 @@
+Got it, Cam. I’ll ship you a drop-in 9:00 AM (Bangkok) Daily Review Email that’s minimal, professional (Montserrat + system fallbacks), no emojis, and includes everything you asked for: Daily Sales & Stock vs POS Shift, anomalies + manager notes, MTD expense rollups, F&B vs Sales (mini chart), and priority flags for Rolls & Meat.
+
+Below are the exact steps and full files for copy/paste.
+
+
+---
+
+To-do (one pass)
+
+1. Install deps
+
+
+
+npm i nodemailer date-fns date-fns-tz chartjs-node-canvas
+
+2. .env (reuse your current SMTP if you already send emails; otherwise add)
+
+
+
+EMAIL_FROM="Smash Brothers Burgers <noreply@sbb.local>"
+EMAIL_TO_MANAGEMENT="smashbrothersburgersth@gmail.com"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your_user
+SMTP_PASS=your_pass
+
+3. Add these files (paths as shown) and paste the code blocks in order:
+
+
+
+server/email/mailer.ts
+
+server/email/templates/dailySummary.ts
+
+server/jobs/dailySummaryEmail.ts
+
+server/jobs/index.ts  (new or extend existing)
+
+server/routes/adminTestEmail.ts (optional manual trigger)
+
+
+4. Wire jobs on server start
+In your server bootstrap (usually server/index.ts or server/app.ts) add:
+
+
+
+import { startJobs } from "./jobs";
+startJobs();
+
+5. Manual test
+Start the app, hit GET /admin/test-daily-summary?date=YYYY-MM-DD to send a one-off email for that date.
+
+
+
+
+---
+
+server/email/mailer.ts
+
+import nodemailer from "nodemailer";
+
+const {
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER,
+  SMTP_PASS,
+  EMAIL_FROM,
+} = process.env;
+
+if (!SMTP_HOST) {
+  console.warn("[mailer] SMTP env not set – using JSON transport for dev preview.");
+}
+
+export const transporter =
+  SMTP_HOST && SMTP_USER && SMTP_PASS
+    ? nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: Number(SMTP_PORT ?? 465),
+        secure: String(SMTP_SECURE ?? "true") === "true",
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+      })
+    : nodemailer.createTransport({ jsonTransport: true });
+
+export async function sendMail(opts: {
+  to: string | string[];
+  subject: string;
+  html: string;
+}) {
+  const from = EMAIL_FROM ?? "Smash Brothers Burgers <noreply@sbb.local>";
+  return transporter.sendMail({ from, ...opts });
+}
+
+
+---
+
+server/email/templates/dailySummary.ts
+
+// Minimal, professional email template. No emojis. Montserrat with fallbacks.
+// NOTE: Many email clients fall back to system fonts; we include sensible fallbacks.
+export function dailySummaryTemplate(input: {
+  dateISO: string;
+  // Sales/Stock Form
+  form: {
+    totalSales: number | null;
+    bankedCash: number | null;
+    bankedQR: number | null;
+    closingCash: number | null;
+    balanced: boolean | null;
+    itemisedSales: Array<{ name: string; qty: number; total: number }>;
+    itemisedExpenses: Array<{ name: string; total: number }>;
+  };
+  // POS Shift
+  pos: {
+    totalSales: number | null;
+    expensesTotal: number | null;
+    expectedCash: number | null;
+    actualCash: number | null;
+    balanced: boolean | null;
+    itemisedSales: Array<{ name: string; qty: number; total: number }>;
+    itemisedExpenses: Array<{ name: string; total: number }>;
+  };
+  // Review / anomalies
+  anomalies: Array<{ title: string; detail?: string }>;
+  managerNotes?: string | null;
+
+  // Finance / Expenses
+  mtd: {
+    businessExpenses: number;
+    shiftExpenses: number;
+    foodAndBeverageExpenses: number;
+    salesIncome: number;
+    fbVsSalesChartDataUrl?: string; // base64 image
+    businessExpensesToday: number;
+    shiftExpensesToday: number;
+  };
+
+  // Priority flags
+  priority: {
+    rolls: {
+      expected?: number | null;
+      recorded?: number | null;
+      variance?: number | null;
+      status: "OK" | "FLAG" | "INSUFFICIENT_DATA";
+    };
+    meat: {
+      expectedGrams?: number | null;
+      recordedGrams?: number | null;
+      varianceGrams?: number | null;
+      status: "OK" | "FLAG" | "INSUFFICIENT_DATA";
+    };
+  };
+}) {
+  const css = `
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin:0; padding:0; background:#0B0C10; }
+.container { max-width: 880px; margin:0 auto; padding:32px 20px; background:#0B0C10; }
+.card { background:#11141A; border:1px solid #1F2430; border-radius:12px; padding:20px; margin:16px 0; }
+.h1 { font-size:22px; font-weight:700; letter-spacing:.2px; margin:0 0 8px; }
+.h2 { font-size:16px; font-weight:600; margin:0 0 12px; color:#D7DFEA; }
+.p  { font-size:14px; line-height:1.6; color:#C7CFD9; margin:0; }
+.small { font-size:12px; color:#9AA7B2; }
+.row { display:flex; gap:16px; flex-wrap:wrap; }
+.col { flex:1 1 300px; }
+.kpi { display:flex; justify-content:space-between; padding:10px 0; border-top:1px solid #1F2430; }
+.kpi:first-child { border-top:none; }
+.kpi .label { color:#A9B4BF; font-size:12px; }
+.kpi .value { color:#E6EDF5; font-weight:600; font-size:14px; }
+.tag { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid #2A3441; color:#B9C3CE; }
+.tag.ok { border-color:#234B2A; color:#CFEAD3; background:#102015; }
+.tag.flag { border-color:#5A1F22; color:#F2C6C9; background:#1F1011; }
+.table { width:100%; border-collapse:collapse; }
+.table th, .table td { text-align:left; padding:8px 0; border-bottom:1px solid #1F2430; color:#C7CFD9; font-size:13px; }
+.header { padding-bottom:8px; margin-bottom:16px; border-bottom:1px solid #1F2430; }
+`;
+  const currency = (n: number | null | undefined) =>
+    n == null ? "—" : `฿${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const qty = (n: number | null | undefined) => (n == null ? "—" : String(n));
+
+  const statusTag = (s: "OK" | "FLAG" | "INSUFFICIENT_DATA") =>
+    s === "OK"
+      ? `<span class="tag ok">OK</span>`
+      : s === "FLAG"
+      ? `<span class="tag flag">FLAG</span>`
+      : `<span class="tag">INSUFFICIENT DATA</span>`;
+
+  // Build itemised lists
+  const listRows = (rows: Array<{ name: string; qty?: number; total?: number }>) =>
+    rows
+      .map(
+        (r) => `<tr>
+  <td>${r.name}</td>
+  ${"qty" in r ? `<td>${qty(r.qty as any)}</td>` : ""}
+  ${"total" in r ? `<td>${currency(r.total as any)}</td>` : ""}
+</tr>`
+      )
+      .join("");
+
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>${css}</style>
+</head>
+<body style="font-family: Montserrat, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+  <div class="container">
+    <div class="header">
+      <div class="h1" style="color:#E6EDF5;">Daily Review — ${input.dateISO}</div>
+      <div class="small">Generated automatically at 09:00 (Bangkok)</div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <div class="card">
+          <div class="h2">Daily Sales & Stock (Staff Form)</div>
+          <div class="kpi"><span class="label">Total Sales</span><span class="value">${currency(input.form.totalSales)}</span></div>
+          <div class="kpi"><span class="label">Closing Cash</span><span class="value">${currency(input.form.closingCash)}</span></div>
+          <div class="kpi"><span class="label">Cash Banked</span><span class="value">${currency(input.form.bankedCash)}</span></div>
+          <div class="kpi"><span class="label">QR Transfer</span><span class="value">${currency(input.form.bankedQR)}</span></div>
+          <div class="kpi"><span class="label">Balanced?</span><span class="value">${input.form.balanced === null ? "—" : input.form.balanced ? "Yes" : "No"}</span></div>
+          <div style="margin-top:12px" class="small">Itemised Sales</div>
+          <table class="table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+            <tbody>${listRows(input.form.itemisedSales as any)}</tbody>
+          </table>
+          <div style="margin-top:12px" class="small">Itemised Expenses</div>
+          <table class="table">
+            <thead><tr><th>Category</th><th>Total</th></tr></thead>
+            <tbody>${listRows(input.form.itemisedExpenses as any)}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <div class="h2">POS Shift Report</div>
+          <div class="kpi"><span class="label">Total Sales</span><span class="value">${currency(input.pos.totalSales)}</span></div>
+          <div class="kpi"><span class="label">Expenses</span><span class="value">${currency(input.pos.expensesTotal)}</span></div>
+          <div class="kpi"><span class="label">Expected Cash</span><span class="value">${currency(input.pos.expectedCash)}</span></div>
+          <div class="kpi"><span class="label">Actual Cash</span><span class="value">${currency(input.pos.actualCash)}</span></div>
+          <div class="kpi"><span class="label">Balanced?</span><span class="value">${input.pos.balanced === null ? "—" : input.pos.balanced ? "Yes" : "No"}</span></div>
+          <div style="margin-top:12px" class="small">Itemised Sales</div>
+          <table class="table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+            <tbody>${listRows(input.pos.itemisedSales as any)}</tbody>
+          </table>
+          <div style="margin-top:12px" class="small">Itemised Expenses</div>
+          <table class="table">
+            <thead><tr><th>Category</th><th>Total</th></tr></thead>
+            <tbody>${listRows(input.pos.itemisedExpenses as any)}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="h2">Anomalies & Manager Notes</div>
+      ${
+        input.anomalies.length
+          ? `<ul style="margin:0; padding-left:18px; color:#C7CFD9; font-size:14px;">${input.anomalies
+              .map((a) => `<li><strong>${a.title}</strong>${a.detail ? ` — ${a.detail}` : ""}</li>`)
+              .join("")}</ul>`
+          : `<div class="p">No anomalies recorded.</div>`
+      }
+      ${
+        input.managerNotes
+          ? `<div style="margin-top:12px"><div class="small">Manager Notes</div><div class="p">${input.managerNotes}</div></div>`
+          : ""
+      }
+    </div>
+
+    <div class="card">
+      <div class="h2">Finance / Expenses</div>
+      <div class="row">
+        <div class="col">
+          <div class="kpi"><span class="label">MTD Business Expenses</span><span class="value">${currency(input.mtd.businessExpenses)}</span></div>
+          <div class="kpi"><span class="label">MTD Shift Expenses</span><span class="value">${currency(input.mtd.shiftExpenses)}</span></div>
+          <div class="kpi"><span class="label">Business Expenses (Today)</span><span class="value">${currency(input.mtd.businessExpensesToday)}</span></div>
+          <div class="kpi"><span class="label">Shift Expenses (Today)</span><span class="value">${currency(input.mtd.shiftExpensesToday)}</span></div>
+        </div>
+        <div class="col">
+          <div class="kpi"><span class="label">MTD F&B Expenses</span><span class="value">${currency(input.mtd.foodAndBeverageExpenses)}</span></div>
+          <div class="kpi"><span class="label">MTD Sales Income</span><span class="value">${currency(input.mtd.salesIncome)}</span></div>
+          ${
+            input.mtd.fbVsSalesChartDataUrl
+              ? `<div style="margin-top:8px"><img alt="F&B vs Sales" src="${input.mtd.fbVsSalesChartDataUrl}" style="max-width:100%; border-radius:8px;"/></div>`
+              : ""
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="h2">Priority Flags — Rolls & Meat</div>
+      <table class="table">
+        <thead>
+          <tr><th>Item</th><th>Expected</th><th>Recorded</th><th>Variance</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Rolls (units)</td>
+            <td>${qty(input.priority.rolls.expected ?? null)}</td>
+            <td>${qty(input.priority.rolls.recorded ?? null)}</td>
+            <td>${qty(input.priority.rolls.variance ?? null)}</td>
+            <td>${statusTag(input.priority.rolls.status)}</td>
+          </tr>
+          <tr>
+            <td>Meat (grams)</td>
+            <td>${qty(input.priority.meat.expectedGrams ?? null)}</td>
+            <td>${qty(input.priority.meat.recordedGrams ?? null)}</td>
+            <td>${qty(input.priority.meat.varianceGrams ?? null)}</td>
+            <td>${statusTag(input.priority.meat.status)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small" style="margin-top:8px">Thresholds: Rolls ±5 units; Meat ±500 g.</div>
+    </div>
+
+    <div class="small" style="margin-top:12px; text-align:center; color:#8C98A4;">
+      Smash Brothers Burgers — Daily Review Email
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+
+---
+
+server/jobs/dailySummaryEmail.ts
+
+import { formatInTimeZone, zonedTimeToUtc } from "date-fns-tz";
+import { startOfDay, endOfDay, parseISO } from "date-fns";
+import { dailySummaryTemplate } from "../email/templates/dailySummary";
+import { sendMail } from "../email/mailer";
+
+// If you use Prisma, import your client here
+// import { prisma } from "../db/prisma";
+
+// If you prefer raw SQL, import your pg client instead.
+// import { pool } from "../db/pool";
+
+/**
+ * Thresholds (Cam-approved):
+ * Rolls variance: ±5 units
+ * Meat variance: ±500 g
+ */
+const ROLLS_THRESHOLD = 5;
+const MEAT_THRESHOLD_G = 500;
+
+// Helper: Bangkok window for a given ISO date (YYYY-MM-DD)
+function shiftWindowBKK(dateISO: string) {
+  // Form & POS “shift date” is the calendar date of service (5pm–3am BKK)
+  const tz = "Asia/Bangkok";
+  const start = zonedTimeToUtc(`${dateISO}T00:00:00`, tz);
+  const end = zonedTimeToUtc(`${dateISO}T23:59:59`, tz);
+  return { start, end, tz };
+}
+
+// ====== DATA LOADERS ======
+// NOTE: Adjust these to match your actual schema/table names.
+// They’re written defensively so the email still sends if a section is missing.
+
+async function loadStaffForm(dateISO: string) {
+  // Example expected shape from your Prisma DailySales/DailyStock
+  // Replace with real queries.
+  const itemisedSales: Array<{ name: string; qty: number; total: number }> = [];
+  const itemisedExpenses: Array<{ name: string; total: number }> = [];
+
+  // TODO: query your latest combined submission for dateISO
+  // const latestSales = await prisma.dailySales.findFirst({ where: { date: dateISO }, orderBy:{ createdAt:'desc' }});
+  // const latestStock = await prisma.dailyStock.findFirst({ where: { date: dateISO }, orderBy:{ createdAt:'desc' }});
+
+  return {
+    totalSales: null,
+    bankedCash: null,
+    bankedQR: null,
+    closingCash: null,
+    balanced: null as boolean | null,
+    itemisedSales,
+    itemisedExpenses,
+    // For Rolls & Meat (recorded)
+    rollsRecorded: null as number | null,
+    meatRecordedGrams: null as number | null,
+  };
+}
+
+async function loadPosShift(dateISO: string) {
+  // Replace with your POS shift report table/view.
+  const itemisedSales: Array<{ name: string; qty: number; total: number }> = [];
+  const itemisedExpenses: Array<{ name: string; total: number }> = [];
+
+  return {
+    totalSales: null,
+    expensesTotal: null,
+    expectedCash: null,
+    actualCash: null,
+    balanced: null as boolean | null,
+    itemisedSales,
+    itemisedExpenses,
+    // For Rolls & Meat expected usage derived from items
+    expectedRolls: null as number | null,
+    expectedMeatGrams: null as number | null,
+  };
+}
+
+async function loadDailyReview(dateISO: string) {
+  // Pull anomalies + manager notes from your Review table.
+  // const review = await prisma.dailyReview.findFirst({ where:{ date: dateISO }, orderBy:{ createdAt:'desc' }});
+  return {
+    anomalies: [] as Array<{ title: string; detail?: string }>,
+    managerNotes: null as string | null,
+  };
+}
+
+async function loadFinance(dateISO: string) {
+  // Compute month-to-date ranges in Bangkok.
+  const tz = "Asia/Bangkok";
+  const d = parseISO(`${dateISO}`);
+  const yyyyMM = formatInTimeZone(d, tz, "yyyy-MM");
+  const monthStartISO = `${yyyyMM}-01`;
+
+  // TODO: query your expenses & sales tables for MTD + today
+  return {
+    businessExpensesMTD: 0,
+    shiftExpensesMTD: 0,
+    businessExpensesToday: 0,
+    shiftExpensesToday: 0,
+    fbExpensesMTD: 0,
+    salesIncomeMTD: 0,
+  };
+}
+
+// Optional: very small chart as inline base64 image
+import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+const chart = new ChartJSNodeCanvas({ width: 560, height: 240, backgroundColour: "#11141A" });
+
+async function buildFBvsSalesChart(data: { fb: number; sales: number }) {
+  const configuration = {
+    type: "bar" as const,
+    data: {
+      labels: ["F&B Expenses", "Sales Income"],
+      datasets: [
+        {
+          label: "Amount",
+          data: [data.fb, data.sales],
+        },
+      ],
+    },
+    options: {
+      responsive: false,
+      plugins: { legend: { display: false }, title: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: "#C7CFD9" } },
+        y: { grid: { color: "#1F2430" }, ticks: { color: "#C7CFD9" } },
+      },
+    },
+  };
+  const png = await chart.renderToBuffer(configuration as any);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
+
+// ====== VARIANCE/FLAGS ======
+function rollsStatus(expected: number | null, recorded: number | null) {
+  if (expected == null || recorded == null) return { variance: null, status: "INSUFFICIENT_DATA" as const };
+  const variance = recorded - expected; // positive => more remaining than expected
+  const status = Math.abs(variance) > ROLLS_THRESHOLD ? ("FLAG" as const) : ("OK" as const);
+  return { variance, status };
+}
+function meatStatus(expectedG: number | null, recordedG: number | null) {
+  if (expectedG == null || recordedG == null) return { varianceG: null, status: "INSUFFICIENT_DATA" as const };
+  const varianceG = recordedG - expectedG;
+  const status = Math.abs(varianceG) > MEAT_THRESHOLD_G ? ("FLAG" as const) : ("OK" as const);
+  return { varianceG, status };
+}
+
+// ====== MAIN COMPOSER ======
+export async function sendDailyReviewEmail(forDateISO: string) {
+  const { tz } = shiftWindowBKK(forDateISO);
+
+  const [form, pos, review, fin] = await Promise.all([
+    loadStaffForm(forDateISO),
+    loadPosShift(forDateISO),
+    loadDailyReview(forDateISO),
+    loadFinance(forDateISO),
+  ]);
+
+  // Chart
+  const fbVsSalesChartDataUrl =
+    fin.fbExpensesMTD > 0 || fin.salesIncomeMTD > 0
+      ? await buildFBvsSalesChart({ fb: fin.fbExpensesMTD, sales: fin.salesIncomeMTD })
+      : undefined;
+
+  const rStatus = rollsStatus(pos.expectedRolls, form.rollsRecorded);
+  const mStatus = meatStatus(pos.expectedMeatGrams, form.meatRecordedGrams);
+
+  const html = dailySummaryTemplate({
+    dateISO: forDateISO,
+    form: {
+      totalSales: form.totalSales,
+      bankedCash: form.bankedCash,
+      bankedQR: form.bankedQR,
+      closingCash: form.closingCash,
+      balanced: form.balanced,
+      itemisedSales: form.itemisedSales,
+      itemisedExpenses: form.itemisedExpenses,
+    },
+    pos: {
+      totalSales: pos.totalSales,
+      expensesTotal: pos.expensesTotal,
+      expectedCash: pos.expectedCash,
+      actualCash: pos.actualCash,
+      balanced: pos.balanced,
+      itemisedSales: pos.itemisedSales,
+      itemisedExpenses: pos.itemisedExpenses,
+    },
+    anomalies: review.anomalies,
+    managerNotes: review.managerNotes ?? null,
+    mtd: {
+      businessExpenses: fin.businessExpensesMTD,
+      shiftExpenses: fin.shiftExpensesMTD,
+      foodAndBeverageExpenses: fin.fbExpensesMTD,
+      salesIncome: fin.salesIncomeMTD,
+      fbVsSalesChartDataUrl,
+      businessExpensesToday: fin.businessExpensesToday,
+      shiftExpensesToday: fin.shiftExpensesToday,
+    },
+    priority: {
+      rolls: {
+        expected: pos.expectedRolls,
+        recorded: form.rollsRecorded,
+        variance: rStatus.variance,
+        status: rStatus.status,
+      },
+      meat: {
+        expectedGrams: pos.expectedMeatGrams,
+        recordedGrams: form.meatRecordedGrams,
+        varianceGrams: mStatus.varianceG,
+        status: mStatus.status,
+      },
+    },
+  });
+
+  const subject = `Daily Review — ${forDateISO}`;
+  const to = process.env.EMAIL_TO_MANAGEMENT ?? "smashbrothersburgersth@gmail.com";
+
+  await sendMail({ to, subject, html });
+}
+
+// Choose which date to send each morning: usually “yesterday” in BKK.
+import { subDays } from "date-fns";
+export async function runScheduledDailyReviewEmail() {
+  const tz = "Asia/Bangkok";
+  const nowBKK = formatInTimeZone(new Date(), tz, "yyyy-MM-dd");
+  const yesterday = formatInTimeZone(subDays(new Date(), 1), tz, "yyyy-MM-dd");
+  // If you prefer “today’s” date at 9am BKK, switch to nowBKK.
+  await sendDailyReviewEmail(yesterday);
+}
+
+
+---
+
+server/jobs/index.ts
+
+import cron from "node-cron";
+import { runScheduledDailyReviewEmail } from "./dailySummaryEmail";
+
+// Start all jobs
+export function startJobs() {
+  // 09:00 Asia/Bangkok every day
+  cron.schedule("0 9 * * *", async () => {
+    try {
+      await runScheduledDailyReviewEmail();
+      console.log("[jobs] Daily Review email sent.");
+    } catch (e) {
+      console.error("[jobs] Daily Review email failed:", e);
+    }
+  }, { timezone: "Asia/Bangkok" });
+
+  console.log("[jobs] Scheduler started (09:00 Asia/Bangkok).");
+}
+
+
+---
+
+server/routes/adminTestEmail.ts (optional manual trigger)
+
+import { Router } from "express";
+import { sendDailyReviewEmail } from "../jobs/dailySummaryEmail";
+
+export const adminTestEmailRouter = Router();
+
+// GET /admin/test-daily-summary?date=2025-10-26
+adminTestEmailRouter.get("/admin/test-daily-summary", async (req, res) => {
+  const dateISO = String(req.query.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) {
+    return res.status(400).json({ ok: false, error: "Provide ?date=YYYY-MM-DD" });
+  }
+  try {
+    await sendDailyReviewEmail(dateISO);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || "failed" });
+  }
+});
+
+> Mount this route in your main express app:
+
+
+
+import { adminTestEmailRouter } from "./routes/adminTestEmail";
+app.use(adminTestEmailRouter);
+
+
+---
+
+What’s included (mapped to your requirements)
+
+Daily Sales & Stock (staff form): totals + itemised sales/expenses + banked + balanced.
+
+POS Shift Report: totals + itemised sales/expenses + expected vs actual cash + balanced.
+
+Anomalies & Manager Notes: pulled from Daily Review.
+
+Finance / Expenses:
+
+MTD Business vs Shift expenses (plus today for each).
+
+MTD F&B expenses vs Sales income as both figures and a small inline chart.
+
+
+Priority Flags (Rolls & Meat):
+
+Shows expected (from POS items), recorded (from staff form end-of-shift), variance, and status with thresholds:
+
+Rolls: ±5 units
+
+Meat: ±500 g
+
+
+
+
+
+---
+
+Integration notes (where you’ll likely plug your data)
+
+Inside dailySummaryEmail.ts, replace the 4 loader stubs with your real queries:
+
+loadStaffForm(dateISO)
+
+Pull latest DailySales + DailyStock for that date.
+
+Return: totalSales, closingCash, bankedCash, bankedQR, balanced (your computed), itemisedSales[], itemisedExpenses[], rollsRecorded, meatRecordedGrams.
+
+
+loadPosShift(dateISO)
+
+Pull POS Shift Report aggregates + item lines.
+
+Return: totalSales, expensesTotal, expectedCash, actualCash, balanced, itemisedSales[], itemisedExpenses[].
+
+Also compute expectedRolls and expectedMeatGrams from item lines using your recipe map (1 bun per burger, 90g per patty, double burgers = 2 patties, etc.).
+
+
+loadDailyReview(dateISO)
+
+Pull anomalies[] and managerNotes.
+
+
+loadFinance(dateISO)
+
+MTD sums:
+
+Business expenses (Table 1 bottom total).
+
+Shift expenses (Table 2 bottom total).
+
+F&B expenses MTD (sum of food & beverage categories only).
+
+Sales income MTD.
+
+
+Also return today’s totals for Business and Shift expenses.
+
+
+
+Everything else (templating, styles, flags, chart, scheduling) is production-ready.
+
+
+---
+
+Style guidelines satisfied
+
+Clean, minimal layout on a dark canvas.
+
+Montserrat with system fallbacks; careful sizes (22/16/14/12).
+
+No emojis or oversized headings.
+
+Responsive single-column on narrow clients.
+
+
+
+---
+
+Next steps (fast)
+
+Paste files, wire the scheduler, run a one-off test:
+GET /admin/test-daily-summary?date=2025-10-26
+
+If any field names differ, update the four loader stubs only. The rest of the pipeline stays fixed.
+
+
+If you want, I can tailor the 4 loaders to your exact table/field names—send me the schema snippets for:
+
+DailySales, DailyStock
+
+POS shift report source (or the view you prefer)
+
+Daily Review table
+
+Expenses + Sales sources for MTD
+
+
+I kept the thresholds for Rolls (±5) and Meat (±500 g) exactly as specified and the email delivers the “priceless & informative” snapshot you described.
+
