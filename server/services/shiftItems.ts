@@ -8,24 +8,22 @@ export async function computeShiftAll(dateISO: string) {
 
   // 1) Find receipts that have meal-sets in the window
   const mealSetReceipts = await db.$queryRaw<{receipt_id:string}[]>`
-    WITH win AS (SELECT ${fromISO}::timestamptz AS from_ts, ${toISO}::timestamptz AS to_ts)
     SELECT DISTINCT li.receipt_id
     FROM lv_line_item li
-    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
     JOIN item_catalog c ON c.sku = li.sku
-    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
       AND c.is_meal_set = true
   `;
   const setReceiptIds = new Set(mealSetReceipts.map(r=>r.receipt_id));
 
   // 2) Base exclusions: base burger zero-price components when paired with a set on SAME receipt
   const exclusions = await db.$queryRaw<{receipt_id:string; line_no:number}[]>`
-    WITH win AS (SELECT ${fromISO}::timestamptz AS from_ts, ${toISO}::timestamptz AS to_ts)
     SELECT li.receipt_id, li.line_no
     FROM lv_line_item li
-    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
     JOIN item_catalog b ON b.sku = li.sku
-    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
       AND b.category='burger'
       AND COALESCE(li.unit_price,0)=0
       AND EXISTS (
@@ -41,30 +39,28 @@ export async function computeShiftAll(dateISO: string) {
 
   // 3) Line items (all categories), SKU-first with alias fallback ONLY when sku is NULL
   const lineItems = await db.$queryRaw<{ sku:string|null; name:string; qty:number; receipt_id:string; line_no:number }[]>`
-    WITH win AS (SELECT ${fromISO}::timestamptz AS from_ts, ${toISO}::timestamptz AS to_ts)
     SELECT COALESCE(li.sku, ia.sku) AS sku,
            li.name,
            SUM(li.qty)::int AS qty,
            li.receipt_id,
            MIN(li.line_no)::int AS line_no
     FROM lv_line_item li
-    JOIN lv_receipt r ON r.receipt_id = li.receipt_id, win
+    JOIN lv_receipt r ON r.receipt_id = li.receipt_id
     LEFT JOIN item_alias ia ON li.sku IS NULL AND ia.alias_name = li.name
-    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
     GROUP BY COALESCE(li.sku, ia.sku), li.name, li.receipt_id
   `;
 
   // 4) Modifiers (group by resolved sku/name), keep them separate in analytics_shift_modifier
   const modifiers = await db.$queryRaw<{ sku:string|null; name:string; qty:number; receipt_id:string }[]>`
-    WITH win AS (SELECT ${fromISO}::timestamptz AS from_ts, ${toISO}::timestamptz AS to_ts)
     SELECT COALESCE(m.sku, ia.sku) AS sku,
            m.name,
            SUM(m.qty)::int AS qty,
            m.receipt_id
     FROM lv_modifier m
-    JOIN lv_receipt r ON r.receipt_id = m.receipt_id, win
+    JOIN lv_receipt r ON r.receipt_id = m.receipt_id
     LEFT JOIN item_alias ia ON m.sku IS NULL AND ia.alias_name = m.name
-    WHERE r.datetime_bkk >= win.from_ts AND r.datetime_bkk < win.to_ts
+    WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
     GROUP BY COALESCE(m.sku, ia.sku), m.name, m.receipt_id
   `;
 
