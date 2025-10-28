@@ -129,7 +129,7 @@ export default function ShiftAnalyticsMM() {
       <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
         {/* Header */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-base font-semibold">Shift Analytics</h1>
+          <h1 className="text-base font-semibold">F&B Analysis</h1>
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs">
               Window: 5 PM → 3 AM (Bangkok)

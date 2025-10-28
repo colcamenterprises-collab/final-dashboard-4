@@ -245,7 +245,7 @@ export default function DailyReview() {
     <div className="container mx-auto p-4 max-w-7xl space-y-4">
       <div className="flex items-center gap-3 pb-3 border-b border-slate-200">
         <FileText className="h-8 w-8 text-emerald-600" />
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Daily Review</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sales & Shift Analysis</h1>
       </div>
 
       <div className="flex items-center gap-3">
