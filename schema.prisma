@@ -648,35 +648,99 @@ model DailyStockV2 {
   @@map("daily_stock_v2")
 }
 
+// ================ INGREDIENT & RECIPE V2 SYSTEM ================
+// PURCHASING vs PORTIONING SPLIT
+// - Purchasing fields (purchaseUnit, purchaseQty, packageCost) → Shopping lists (pack quantities)
+// - Portion fields (portionUnit, portionQty) → Recipe costing (cost per serving)
+
+enum RecipeStatus {
+  draft
+  approved
+  archived
+}
+
 model IngredientV2 {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  name      String   @unique
-  unit      String
-  unitCost  Decimal  @default(0)
-  supplier  String?
-  notes     String?
-  recipeItems RecipeItemV2[]
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Identity
+  name          String   @unique
+  category      String?
+  brand         String?
+  supplier      String?
+
+  // PURCHASING (SOURCE OF TRUTH for shopping list)
+  purchaseUnit  String   // kg|g|L|ml|each
+  purchaseQty   Decimal  // how much per pack (e.g., 1.00 kg, or 3960 ml, or 1 each)
+  packageCost   Decimal  // THB cost per pack
+
+  // PORTIONS (COSTING ONLY - for recipe pricing)
+  portionUnit   String?  // g|ml|each
+  portionQty    Decimal? // e.g., 95 g per burger
+
+  lastReview    DateTime?
+  notes         String?
+
+  // Relations
+  items         RecipeItemV2[]
+  priceHistory  IngredientPriceV2[]
+
   @@map("ingredient_v2")
+  @@index([category])
+  @@index([supplier])
+}
+
+// Historical prices for as-of costing and trend analysis
+model IngredientPriceV2 {
+  id            String   @id @default(uuid())
+  ingredientId  String
+  effectiveFrom DateTime
+  purchaseUnit  String
+  purchaseQty   Decimal
+  packageCost   Decimal
+
+  ingredient    IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@map("ingredient_price_v2")
+  @@index([ingredientId, effectiveFrom])
 }
 
 model RecipeV2 {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   name         String   @unique
-  yield        Decimal  @default(1)
+  category     String?
+  yieldQty     Decimal  @default(1)
+  yieldUnit    String   @default("servings")
   targetMargin Decimal  @default(0)
+  status       RecipeStatus @default(draft)
+  approvedAt   DateTime?
+  approvedBy   String?
+  notes        String?
+  imageUrl     String?
+
   items        RecipeItemV2[]
+
   @@map("recipe_v2")
+  @@index([category])
 }
 
 model RecipeItemV2 {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
+  createdAt    DateTime @default(now())
+
   recipeId     String
   ingredientId String
-  qty          Decimal  @default(0)
-  recipe       RecipeV2      @relation(fields:[recipeId], references:[id], onDelete:Cascade)
-  ingredient   IngredientV2  @relation(fields:[ingredientId], references:[id], onDelete:Restrict)
+
+  qty          Decimal  @default(0)    // quantity in unit below
+  unit         String                  // g|ml|each
+
+  recipe       RecipeV2     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient   IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
   @@unique([recipeId, ingredientId])
   @@map("recipe_item_v2")
 }
