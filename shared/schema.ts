@@ -1446,3 +1446,17 @@ export type AnalyticsShiftBurgerItem = typeof analyticsShiftBurgerItem.$inferSel
 export type InsertAnalyticsShiftBurgerItem = z.infer<typeof insertAnalyticsShiftBurgerItemSchema>;
 export type AnalyticsShiftBurgerSummary = typeof analyticsShiftBurgerSummary.$inferSelect;
 export type InsertAnalyticsShiftBurgerSummary = z.infer<typeof insertAnalyticsShiftBurgerSummarySchema>;
+
+// Daily Review Manager Comments
+export const dailyReviewComments = pgTable("daily_review_comments", {
+  id: serial("id").primaryKey(),
+  businessDate: date("business_date").notNull().unique(),
+  comment: text("comment").notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDailyReviewCommentSchema = createInsertSchema(dailyReviewComments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDailyReviewComment = z.infer<typeof insertDailyReviewCommentSchema>;
+export type SelectDailyReviewComment = typeof dailyReviewComments.$inferSelect;

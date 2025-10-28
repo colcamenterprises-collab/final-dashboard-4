@@ -65,6 +65,7 @@ import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
+import { dailyReviewCommentsRouter } from "./routes/dailyReviewComments";
 import stockReviewManual from "./routes/stockReviewManual";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
@@ -1110,6 +1111,7 @@ export function registerRoutes(app: express.Application): Server {
 
   // Register daily review routes BEFORE catch-all :date route
   app.use('/api/analysis', analysisDailyReviewRouter);
+  app.use('/api/daily-review-comments', dailyReviewCommentsRouter);
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {

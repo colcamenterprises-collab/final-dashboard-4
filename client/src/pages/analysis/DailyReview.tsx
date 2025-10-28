@@ -58,7 +58,8 @@ export default function DailyReview() {
   const [all, setAll] = useState<DailyComparisonResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [comment, setComment] = useState(localStorage.getItem("dailyReviewComment") || "");
+  const [comment, setComment] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDialog, setSyncDialog] = useState<{
     open: boolean;
@@ -165,10 +166,50 @@ export default function DailyReview() {
     );
   };
 
-  const saveComment = (txt: string) => {
-    setComment(txt);
-    localStorage.setItem("dailyReviewComment", txt);
+  const saveComment = async () => {
+    if (!selectedDate) return;
+    
+    setSavingComment(true);
+    try {
+      const response = await fetch('/api/daily-review-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          businessDate: selectedDate, 
+          comment,
+          createdBy: 'Manager'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save comment');
+      }
+      
+      alert('Comment saved successfully');
+    } catch (error) {
+      console.error('Error saving comment:', error);
+      alert('Failed to save comment');
+    } finally {
+      setSavingComment(false);
+    }
   };
+
+  // Load comment when date changes
+  useEffect(() => {
+    if (!selectedDate) return;
+    
+    (async () => {
+      try {
+        const response = await fetch(`/api/daily-review-comments/${selectedDate}`);
+        if (response.ok) {
+          const data = await response.json();
+          setComment(data.comment || "");
+        }
+      } catch (error) {
+        console.error('Error loading comment:', error);
+      }
+    })();
+  }, [selectedDate]);
 
   const Section = ({ title, rows }: { title: string; rows: any[] }) => (
     <section className="mb-6">
@@ -289,15 +330,26 @@ export default function DailyReview() {
           )}
 
           <section className="border-t pt-3">
-            <h2 className="font-bold mb-2 text-sm">Manager Comments (local only)</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-sm">Manager Comments</h2>
+              <button
+                onClick={saveComment}
+                disabled={savingComment || !selectedDate}
+                className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                data-testid="button-save-comment"
+              >
+                {savingComment ? "Saving..." : "Save Comment"}
+              </button>
+            </div>
             <textarea
               className="w-full border rounded p-2 min-h-[110px] text-sm"
-              placeholder="Record findings, explanations, or actions taken…"
+              placeholder="Record findings, explanations, or actions taken for this specific date…"
               value={comment}
-              onChange={(e) => saveComment(e.target.value)}
+              onChange={(e) => setComment(e.target.value)}
+              data-testid="textarea-manager-comment"
             />
             <div className="text-xs text-gray-500 mt-1">
-              (Comments are saved only on this device. We can wire them to the database per business date later if you'd like.)
+              Comments are saved per business date and stored in the database.
             </div>
           </section>
         </>
