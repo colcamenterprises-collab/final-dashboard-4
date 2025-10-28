@@ -522,46 +522,106 @@ model DailyStockV2 {
   @@map("daily_stock_v2")
 }
 
+// ================== ONE-AND-DONE COSTING CORE ==================
+enum RecipeStatus {
+  draft
+  approved
+  archived
+}
+
 model IngredientV2 {
-  id          String         @id @default(uuid())
-  createdAt   DateTime       @default(now())
-  name        String         @unique
-  unit        String
-  unitCost    Decimal        @default(0)
-  supplier    String?
-  notes       String?
-  category    String?
-  brand       String?
-  packagesize String?
-  portionsize String?
-  lastreview  String?
-  items       RecipeItemV2[]
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  name          String   @unique
+  category      String?
+  brand         String?
+  supplier      String?
+
+  // Purchasing (used for shopping lists; pack-based)
+  purchaseUnit  String
+  purchaseQty   Decimal
+  packageCost   Decimal
+
+  // Portioning (used ONLY for recipe costing)
+  portionUnit   String?
+  portionQty    Decimal?
+
+  lastReview    DateTime?
+  notes         String?
+
+  // Legacy fields (keep for backwards compatibility)
+  unit          String?
+  unitCost      Decimal?
+  packagesize   String?
+  portionsize   String?
+  lastreview    String?
+
+  items         RecipeItemV2[]
+  priceHistory  IngredientPriceV2[]
 
   @@map("ingredient_v2")
+  @@index([category])
+  @@index([supplier])
+}
+
+model IngredientPriceV2 {
+  id            String   @id @default(uuid())
+  ingredientId  String
+  effectiveFrom DateTime
+  purchaseUnit  String
+  purchaseQty   Decimal
+  packageCost   Decimal
+
+  ingredient    IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@map("ingredient_price_v2")
+  @@index([ingredientId, effectiveFrom])
 }
 
 model RecipeV2 {
-  id           String         @id @default(uuid())
-  createdAt    DateTime       @default(now())
-  name         String         @unique
-  yield        Decimal        @default(1)
-  targetMargin Decimal        @default(0)
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  name         String   @unique
+  category     String?
+  yieldQty     Decimal  @default(1)
+  yieldUnit    String   @default("servings")
+  targetMargin Decimal  @default(0)
+  status       RecipeStatus @default(draft)
+  approvedAt   DateTime?
+  approvedBy   String?
+  notes        String?
+  imageUrl     String?
+
+  // Legacy field (keep for backwards compatibility)
+  yield        Decimal?
+
   items        RecipeItemV2[]
 
   @@map("recipe_v2")
+  @@index([category])
 }
 
 model RecipeItemV2 {
-  id           String       @id @default(uuid())
+  id           String  @id @default(uuid())
+  createdAt    DateTime @default(now())
+
   recipeId     String
   ingredientId String
-  qty          Decimal      @default(0)
-  ingredient   IngredientV2 @relation(fields: [ingredientId], references: [id])
+
+  qty          Decimal  @default(0)
+  unit         String   // g|ml|each
+
   recipe       RecipeV2     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient   IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
 
   @@unique([recipeId, ingredientId])
   @@map("recipe_item_v2")
 }
+// ================================================================
 
 model MenuV2 {
   id         String       @id @default(uuid())
