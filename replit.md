@@ -32,7 +32,16 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **State Management**: TanStack Query (React Query) for server state.
 - **Routing**: React Router for modern navigation.
 - **Forms**: React Hook Form with Zod validation.
-- **UI/UX Decisions**: Tablet-first design with 12px font sizes, 8px border radius, touch-optimized interactions, consistent button styling, responsive design, rounded corners, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
+- **UI/UX Decisions**: Tablet-first design with 12px font sizes, 4px border radius, touch-optimized interactions, consistent button styling, responsive design, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
+- **Style Guide (Golden Standard)**: Reference `/finance/expenses-import` for canonical styling:
+  - Typography: `text-xs` (12px standard), `text-sm` (14px labels), `text-3xl` (page titles)
+  - Colors: `text-emerald-600` (primary icons/accents), `text-slate-600` (secondary text), `slate-50/100` (backgrounds), `border-slate-200` (borders)
+  - Border Radius: `rounded-[4px]` (4px standard for tablet optimization)
+  - Spacing: `p-4` (16px padding), `gap-3` (12px gaps), `space-y-4` (16px vertical spacing)
+  - Components: shadcn/ui Card, Button, Input, Table, Badge, Tabs
+  - Tables: `text-xs` for all table content, `font-medium` for headers, `border-slate-200` borders
+  - Buttons: `text-xs` sizing, emerald-600 primary, slate-200 borders for outlined
+  - Status Indicators: emerald-100/600 (success), red-100/600 (error), amber-100/600 (warning)
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js.
