@@ -36,7 +36,6 @@ import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis"; // Hidden - can be re-enabled
-import DailySalesAnalysis from "./pages/analysis/DailySalesAnalysis";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
@@ -137,7 +136,6 @@ export default function App() {
                   {/* All Analysis Pages */}
                   {/* Hidden - can be re-enabled */}
                   {/* <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} /> */}
-                  <Route path="/analysis/daily-sales" element={<DailySalesAnalysis />} />
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
 
                 <Route path="*" element={<NotFound />} />

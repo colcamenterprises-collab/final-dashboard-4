@@ -2,6 +2,27 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
+interface DailySalesRow {
+  id: string;
+  shift_date: string;
+  completed_by: string;
+  total_sales: number;
+  cash_sales: number;
+  qr_sales: number;
+  grab_sales: number;
+  aroi_sales: number;
+  shopping_total: number;
+  wages_total: number;
+  others_total: number;
+  total_expenses: number;
+  rolls_end: number;
+  meat_end_g: number;
+  expected_cash_bank: number;
+  expected_qr_bank: number;
+  expected_total_bank: number;
+}
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => todayISO().slice(0, 7);
@@ -63,6 +84,7 @@ export default function DailyReview() {
   const [actualAmountBanked, setActualAmountBanked] = useState("");
   const [savingComment, setSavingComment] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [exportDate, setExportDate] = useState("");
   const [syncDialog, setSyncDialog] = useState<{
     open: boolean;
     success: boolean;
@@ -74,6 +96,11 @@ export default function DailyReview() {
     open: false,
     success: false,
     message: "",
+  });
+
+  // Query for Daily Sales table data
+  const { data: dailySalesRows = [], isLoading: isDailySalesLoading } = useQuery<DailySalesRow[]>({
+    queryKey: ['/api/analysis/daily-sales'],
   });
 
   async function fetchJSON(url: string, init?: RequestInit) {
@@ -140,6 +167,12 @@ export default function DailyReview() {
       setSavingComment(false);
     }
   }
+
+  const handleDateExport = () => {
+    if (exportDate) {
+      window.open(`/api/analysis/daily-sales/export.csv?date=${exportDate}`, '_blank');
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -380,6 +413,95 @@ export default function DailyReview() {
           </section>
         </>
       )}
+
+      {/* All Shifts Data Section */}
+      <section className="border-t pt-6 mt-8">
+        <div className="mb-4">
+          <h2 className="text-sm font-extrabold mb-4">All Shifts Data</h2>
+          
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <input
+              id="export-by-date"
+              type="date"
+              value={exportDate}
+              onChange={(e) => setExportDate(e.target.value)}
+              className="border rounded px-2 py-1"
+            />
+            <button
+              onClick={handleDateExport}
+              className="border rounded px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={!exportDate}
+            >
+              Export by Date (CSV)
+            </button>
+          </div>
+
+          {isDailySalesLoading && <p className="text-sm mt-4">Loading...</p>}
+          {!isDailySalesLoading && dailySalesRows.length === 0 && (
+            <p className="text-sm text-gray-500 mt-4">No data available</p>
+          )}
+        </div>
+
+        {!isDailySalesLoading && dailySalesRows.length > 0 && (
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+            <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: '1400px' }}>
+              <thead>
+                <tr className="bg-gray-100 border-b">
+                  <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">Completed By</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Total</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Cash</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">QR</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Grab</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Other</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp Cash</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp QR</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp Total</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Shopping</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Wages</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Other Exp</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Tot Exp</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Rolls</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Meat (g)</th>
+                  <th className="px-3 py-2 text-right whitespace-nowrap">Export</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailySalesRows.map((r) => (
+                  <tr key={r.id} className="border-b hover:bg-gray-50">
+                    <td className="px-3 py-2 whitespace-nowrap">{r.shift_date}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{r.completed_by}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_sales || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.cash_sales || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.qr_sales || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.grab_sales || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.aroi_sales || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_cash_bank || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_qr_bank || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_total_bank || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.shopping_total || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.wages_total || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.others_total || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_expenses || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{r.rolls_end || 0}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{r.meat_end_g || 0}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <a
+                        className="underline text-xs text-emerald-600 hover:text-emerald-700"
+                        href={`/api/analysis/daily-sales/export.csv?id=${r.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Export
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Sync Success/Error Dialog */}
       <Dialog open={syncDialog.open} onOpenChange={(open) => setSyncDialog({ ...syncDialog, open })}>
