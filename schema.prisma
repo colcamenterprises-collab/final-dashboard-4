@@ -9,68 +9,49 @@ datasource db {
 }
 
 model DailySales {
-  id              String   @id @default(uuid())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  status          String   @default("draft") // "draft" or "submitted"
-  shiftDate       String   // "DD/MM/YYYY" (as entered)
-  submittedAtISO  DateTime?
+  id             String             @id @default(uuid())
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  status         String             @default("draft")
+  shiftDate      String
+  submittedAtISO DateTime?
+  completedBy    String
+  startingCash   Int                @default(0)
+  endingCash     Int                @default(0)
+  cashBanked     Int                @default(0)
+  cashSales      Int                @default(0)
+  qrSales        Int                @default(0)
+  grabSales      Int                @default(0)
+  aroiSales      Int                @default(0)
+  totalSales     Int                @default(0)
+  shoppingTotal  Int                @default(0)
+  wagesTotal     Int                @default(0)
+  othersTotal    Int                @default(0)
+  totalExpenses  Int                @default(0)
+  closingCash    Int                @default(0)
+  qrTransfer     Int                @default(0)
+  notes          String?
+  deletedAt      DateTime?
+  storeId        String?
+  otherSales     Int?               @default(0)
+  otherExpense   Int?               @default(0)
+  businessDate   DateTime?          @db.Date
+  stock          DailyStock?
+  comparisons    JussiComparison[]
+  snapshots      ShiftSnapshot[]
+  others         OtherExpense[]
+  shopping       ShoppingPurchase[]
+  wages          WageEntry[]
 
-  completedBy     String
-  startingCash    Int      @default(0)
-  endingCash      Int      @default(0)
-  cashBanked      Int      @default(0)
-
-  // Sales
-  cashSales       Int      @default(0)
-  qrSales         Int      @default(0)
-  grabSales       Int      @default(0)
-  aroiSales       Int      @default(0) // renamed from aroiDeeSales
-  otherSales      Int      @default(0) // for Daily Review
-  totalSales      Int      @default(0)
-
-  // Expenses totals
-  shoppingTotal   Int      @default(0)
-  wagesTotal      Int      @default(0)
-  othersTotal     Int      @default(0)
-  otherExpense    Int      @default(0) // for Daily Review  
-  totalExpenses   Int      @default(0)
-
-  // Banking
-  closingCash     Int      @default(0)
-  qrTransfer      Int      @default(0)
-  
-  // Daily Review fields
-  storeId         String?
-  businessDate    DateTime? @db.Date
-
-  // Relations
-  shopping        ShoppingPurchase[]
-  wages           WageEntry[]
-  others          OtherExpense[]
-  stock           DailyStock?
-
-  // Notes
-  notes           String?
-
-  // Soft delete
-  deletedAt       DateTime? // null = active, otherwise hidden
-  
-  // Phase 2 Relations
-  snapshots       ShiftSnapshot[]
-  comparisons     JussiComparison[]
-  
   @@index([businessDate])
 }
 
 model ShoppingPurchase {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
   item      String
-  cost      Int      @default(0)
+  cost      Int        @default(0)
   shop      String
-
   salesId   String
   sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
@@ -78,13 +59,11 @@ model ShoppingPurchase {
 }
 
 model WageEntry {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
   staff     String
-  amount    Int      @default(0)
-  type      String   // WAGES | OVERTIME | BONUS | REIMBURSEMENT
-
+  amount    Int        @default(0)
+  type      String
   salesId   String
   sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
@@ -92,12 +71,10 @@ model WageEntry {
 }
 
 model OtherExpense {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
   label     String
-  amount    Int      @default(0)
-
+  amount    Int        @default(0)
   salesId   String
   sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
@@ -105,32 +82,1367 @@ model OtherExpense {
 }
 
 model DailyStock {
-  id                String   @id @default(uuid())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  salesId           String   @unique
-  sales             DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
-
-  // Stock counts (per your ops rules)
-  burgerBuns        Int      @default(0) // end-of-shift count - RENAMED: was bunsCount
-  meatWeightG       Int      @default(0) // grams remaining - RENAMED: was meatGrams
-  // Drinks by item – simple JSON to stay flexible
-  drinksJson        Json?
-
-  // Notes & purchasing needs
-  notes             String?  // free text
-  purchasingJson    Json?    // items requested (>0) from Form 2
-
-  // Status
-  status            String   @default("submitted") // keep simple for now
-  deletedAt         DateTime?
-  
-  // Additional fields for new spec
-  bunsCount         Int      @default(0) // new alias for burgerBuns
-  meatGrams         Int      @default(0) // new alias for meatWeightG
+  id             String     @id @default(uuid())
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  salesId        String     @unique
+  burgerBuns     Int        @default(0)
+  meatWeightG    Int        @default(0)
+  drinksJson     Json?
+  notes          String?
+  purchasingJson Json?
+  status         String     @default("submitted")
+  deletedAt      DateTime?
+  bunsCount      Int        @default(0)
+  meatGrams      Int        @default(0)
+  sales          DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 }
 
-// New models for POS ingestion and analytics
+model Restaurant {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  email           String?
+  timezone        String           @default("Asia/Bangkok")
+  locale          String           @default("en-TH")
+  logoUrl         String?
+  brandColor      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  analyticsDaily  AnalyticsDaily[]
+  expenses        Expense[]
+  ingestionErrors IngestionError[]
+  jobs            Job[]
+  menuItems       MenuItem[]
+  posConnections  PosConnection[]
+  syncLogs        PosSyncLog[]
+  receipts        Receipt[]
+
+  @@map("restaurants")
+}
+
+model PosConnection {
+  id           String      @id @default(cuid())
+  restaurantId String
+  provider     POSProvider
+  apiKey       String?
+  refreshToken String?
+  meta         Json?
+  isActive     Boolean     @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@index([provider, isActive])
+  @@map("pos_connections")
+}
+
+model Receipt {
+  id            String           @id @default(cuid())
+  restaurantId  String
+  provider      POSProvider
+  externalId    String
+  receiptNumber String?
+  channel       SalesChannel     @default(OTHER)
+  createdAtUTC  DateTime
+  closedAtUTC   DateTime?
+  subtotal      Int
+  tax           Int
+  discount      Int
+  total         Int
+  notes         String?
+  rawPayload    Json?
+  createdAt     DateTime         @default(now())
+  items         ReceiptItem[]
+  payments      ReceiptPayment[]
+  restaurant    Restaurant       @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, provider, externalId])
+  @@index([restaurantId, createdAtUTC])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id             String  @id @default(cuid())
+  receiptId      String
+  providerItemId String?
+  sku            String?
+  name           String
+  category       String?
+  qty            Int
+  unitPrice      Int
+  total          Int
+  modifiers      Json?
+  receipt        Receipt @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_items")
+}
+
+model ReceiptPayment {
+  id        String        @id @default(cuid())
+  receiptId String
+  method    PaymentMethod @default(OTHER)
+  amount    Int
+  meta      Json?
+  receipt   Receipt       @relation(fields: [receiptId], references: [id])
+
+  @@index([receiptId])
+  @@map("receipt_payments")
+}
+
+model MenuItem {
+  id           String     @id @default(cuid())
+  restaurantId String
+  sku          String
+  name         String
+  category     String
+  portionGrams Int?
+  isDrink      Boolean    @default(false)
+  isBurger     Boolean    @default(false)
+  active       Boolean    @default(true)
+  meta         Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, sku])
+  @@index([restaurantId, category])
+  @@map("menu_items")
+}
+
+model Expense {
+  id           String     @id @default(cuid())
+  restaurantId String
+  shiftDate    DateTime
+  item         String
+  costCents    Int
+  supplier     String?
+  expenseType  String?
+  meta         Json?
+  createdAt    DateTime   @default(now())
+  source       String?
+  wages        Decimal?   @default(0) @db.Decimal
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, shiftDate])
+  @@map("expenses")
+}
+
+model ExpenseLine {
+  id           String      @id @default(uuid())
+  expenseId    String
+  ingredientId String?
+  name         String
+  qty          Float?
+  uom          String?
+  unitPriceTHB Decimal?    @db.Decimal(12, 4)
+  lineTotalTHB Decimal?    @db.Decimal(12, 2)
+  type         ExpenseType @default(GENERAL)
+  createdAt    DateTime    @default(now())
+
+  @@index([ingredientId])
+}
+
+model AnalyticsDaily {
+  id                 String     @id @default(cuid())
+  restaurantId       String
+  shiftDate          DateTime
+  top5ByQty          Json?
+  top5ByRevenue      Json?
+  expectedBunsUsed   Int?
+  expectedMeatGrams  Int?
+  expectedDrinksUsed Int?
+  variance           Json?
+  shoppingList       Json?
+  flags              Json?
+  createdAt          DateTime   @default(now())
+  restaurant         Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, shiftDate])
+  @@index([restaurantId, shiftDate])
+  @@map("analytics_daily")
+}
+
+model Job {
+  id           String      @id @default(cuid())
+  restaurantId String?
+  type         JobType
+  payload      Json?
+  status       JobStatus   @default(QUEUED)
+  runAt        DateTime?
+  attempts     Int         @default(0)
+  lastError    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([status, runAt])
+  @@index([restaurantId])
+  @@map("jobs")
+}
+
+model PosSyncLog {
+  id               String      @id @default(cuid())
+  restaurantId     String
+  provider         POSProvider
+  startedAt        DateTime    @default(now())
+  finishedAt       DateTime?
+  mode             String
+  receiptsFetched  Int         @default(0)
+  itemsUpserted    Int         @default(0)
+  paymentsUpserted Int         @default(0)
+  status           String      @default("SUCCESS")
+  message          String?
+  createdAt        DateTime    @default(now())
+  restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, startedAt])
+  @@map("pos_sync_logs")
+}
+
+model IngestionError {
+  id           String       @id @default(cuid())
+  restaurantId String?
+  provider     POSProvider?
+  externalId   String?
+  context      String?
+  errorMessage String
+  rawPayload   Json?
+  createdAt    DateTime     @default(now())
+  restaurant   Restaurant?  @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, provider, createdAt])
+  @@map("ingestion_errors")
+}
+
+model ShiftSnapshot {
+  id                  String             @id @default(uuid())
+  provider            Provider           @default(LOYVERSE)
+  windowStartUTC      DateTime
+  windowEndUTC        DateTime
+  loyverseShiftNumber Int?
+  salesFormId         String?
+  createdAt           DateTime           @default(now())
+  totalReceipts       Int                @default(0)
+  totalSalesSatang    BigInt             @default(0)
+  reconcileState      ReconcileState     @default(MISSING_DATA)
+  reconcileNotes      String?
+  comparisons         JussiComparison[]
+  payments            PaymentBreakdown[]
+  salesForm           DailySales?        @relation(fields: [salesFormId], references: [id])
+  items               SnapshotItem[]
+  modifiers           SnapshotModifier[]
+
+  @@index([windowStartUTC, windowEndUTC])
+}
+
+model PaymentBreakdown {
+  id          String         @id @default(uuid())
+  snapshotId  String
+  channel     PaymentChannel
+  count       Int            @default(0)
+  totalSatang BigInt         @default(0)
+  snapshot    ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, channel])
+  @@index([snapshotId])
+}
+
+model SnapshotItem {
+  id            String        @id @default(uuid())
+  snapshotId    String
+  itemName      String
+  sku           String?
+  category      String?
+  qty           Int           @default(0)
+  revenueSatang BigInt        @default(0)
+  snapshot      ShiftSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+model SnapshotModifier {
+  id            String        @id @default(uuid())
+  snapshotId    String
+  modifierName  String
+  lines         Int           @default(0)
+  revenueSatang BigInt        @default(0)
+  snapshot      ShiftSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+}
+
+model PaymentMethodMap {
+  id         String         @id @default(uuid())
+  provider   Provider       @default(LOYVERSE)
+  sourceName String
+  channel    PaymentChannel @default(OTHER)
+  createdAt  DateTime       @default(now())
+
+  @@unique([provider, sourceName])
+}
+
+model RecipeItem {
+  id         String            @id @default(uuid())
+  sku        String?           @unique
+  name       String
+  category   String?
+  isMealDeal Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  components RecipeComponent[]
+}
+
+model RecipeComponent {
+  id           String     @id @default(uuid())
+  recipeItemId String
+  ingredientId String
+  baseQty      Float
+  uom          String
+  recipeItem   RecipeItem @relation(fields: [recipeItemId], references: [id], onDelete: Cascade)
+
+  @@index([recipeItemId])
+}
+
+model JussiComparison {
+  id                    String         @id @default(uuid())
+  snapshotId            String
+  salesFormId           String?
+  createdAt             DateTime       @default(now())
+  openingBuns           Int?
+  openingMeatGram       Int?
+  openingDrinks         Int?
+  purchasedBuns         Int?
+  purchasedMeatGram     Int?
+  purchasedDrinks       Int?
+  expectedBuns          Int?
+  expectedMeatGram      Int?
+  expectedDrinks        Int?
+  expectedCloseBuns     Int?
+  expectedCloseMeatGram Int?
+  expectedCloseDrinks   Int?
+  staffBuns             Int?
+  staffMeatGram         Int?
+  staffDrinks           Int?
+  varBuns               Int?
+  varMeatGram           Int?
+  varDrinks             Int?
+  state                 ReconcileState @default(MISSING_DATA)
+  notes                 String?
+  salesForm             DailySales?    @relation(fields: [salesFormId], references: [id])
+  snapshot              ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([salesFormId])
+}
+
+model DailySalesV2 {
+  id             String               @id @default(uuid())
+  createdAt      DateTime             @default(now())
+  shiftDate      String
+  submittedAtISO DateTime
+  completedBy    String
+  startingCash   Int                  @default(0)
+  endingCash     Int                  @default(0)
+  cashBanked     Int                  @default(0)
+  cashSales      Int                  @default(0)
+  qrSales        Int                  @default(0)
+  grabSales      Int                  @default(0)
+  aroiSales      Int                  @default(0)
+  totalSales     Int                  @default(0)
+  shoppingTotal  Int                  @default(0)
+  wagesTotal     Int                  @default(0)
+  othersTotal    Int                  @default(0)
+  totalExpenses  Int                  @default(0)
+  qrTransfer     Int                  @default(0)
+  deletedAt      DateTime?
+  staff          String?
+  shift_date     DateTime?            @db.Date
+  payload        Json?
+  stock          DailyStockV2?
+  others         OtherExpenseV2[]
+  shopping       ShoppingPurchaseV2[]
+  wages          WageEntryV2[]
+
+  @@index([completedBy], map: "idx_daily_sales_v2_completed_by")
+  @@index([createdAt], map: "idx_daily_sales_v2_created_at")
+  @@index([shiftDate], map: "idx_daily_sales_v2_shift_date")
+  @@map("daily_sales_v2")
+}
+
+model ShoppingPurchaseV2 {
+  id        String       @id @default(uuid())
+  createdAt DateTime     @default(now())
+  item      String
+  cost      Int          @default(0)
+  shop      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("shopping_purchase_v2")
+}
+
+model WageEntryV2 {
+  id        String       @id @default(uuid())
+  createdAt DateTime     @default(now())
+  staff     String
+  amount    Int          @default(0)
+  type      String
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("wage_entry_v2")
+}
+
+model OtherExpenseV2 {
+  id        String       @id @default(uuid())
+  createdAt DateTime     @default(now())
+  label     String
+  amount    Int          @default(0)
+  salesId   String
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("other_expense_v2")
+}
+
+model DailyStockV2 {
+  id             String       @id @default(uuid())
+  createdAt      DateTime     @default(now())
+  salesId        String       @unique
+  burgerBuns     Int          @default(0)
+  meatWeightG    Int          @default(0)
+  drinksJson     Json?
+  purchasingJson Json?
+  notes          String?
+  deletedAt      DateTime?
+  sales          DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("daily_stock_v2")
+}
+
+model IngredientV2 {
+  id          String         @id @default(uuid())
+  createdAt   DateTime       @default(now())
+  name        String         @unique
+  unit        String
+  unitCost    Decimal        @default(0)
+  supplier    String?
+  notes       String?
+  category    String?
+  brand       String?
+  packagesize String?
+  portionsize String?
+  lastreview  String?
+  items       RecipeItemV2[]
+
+  @@map("ingredient_v2")
+}
+
+model RecipeV2 {
+  id           String         @id @default(uuid())
+  createdAt    DateTime       @default(now())
+  name         String         @unique
+  yield        Decimal        @default(1)
+  targetMargin Decimal        @default(0)
+  items        RecipeItemV2[]
+
+  @@map("recipe_v2")
+}
+
+model RecipeItemV2 {
+  id           String       @id @default(uuid())
+  recipeId     String
+  ingredientId String
+  qty          Decimal      @default(0)
+  ingredient   IngredientV2 @relation(fields: [ingredientId], references: [id])
+  recipe       RecipeV2     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_item_v2")
+}
+
+model MenuV2 {
+  id         String       @id @default(uuid())
+  name       String
+  source     MenuSource
+  fileType   String
+  version    String?
+  importedAt DateTime     @default(now())
+  notes      String?
+  items      MenuItemV2[]
+
+  @@index([source])
+  @@map("menu_v2")
+}
+
+model MenuItemV2 {
+  id          String           @id @default(uuid())
+  menuId      String
+  externalId  String?
+  name        String
+  category    String?
+  basePrice   Decimal          @default(0)
+  description String?
+  active      Boolean          @default(true)
+  menu        MenuV2           @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  modifiers   MenuModifierV2[]
+
+  @@unique([menuId, name])
+  @@index([name])
+  @@map("menu_item_v2")
+}
+
+model MenuModifierV2 {
+  id        String     @id @default(uuid())
+  itemId    String
+  groupName String?
+  name      String
+  price     Decimal    @default(0)
+  item      MenuItemV2 @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("menu_modifier_v2")
+}
+
+model StockItem {
+  id            Int            @id @default(autoincrement())
+  name          String
+  category      String
+  isDrink       Boolean        @default(false)
+  isExcluded    Boolean        @default(false)
+  displayOrder  Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  stockRequests StockRequest[]
+
+  @@map("stock_items")
+}
+
+model StockRequest {
+  id           Int       @id @default(autoincrement())
+  shiftId      String
+  stockItemId  Int
+  requestedQty Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  StockItem    StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@unique([shiftId, stockItemId])
+  @@map("stock_requests")
+}
+
+model PosBatch {
+  id         String              @id @default(uuid())
+  createdAt  DateTime            @default(now())
+  title      String?
+  shiftStart DateTime?
+  shiftEnd   DateTime?
+  payments   PosPaymentSummary[]
+  receipts   PosReceipt[]
+  items      PosSalesItem[]
+  modifiers  PosSalesModifier[]
+  shift      PosShiftReport?
+}
+
+model PosReceipt {
+  id        String   @id @default(uuid())
+  batchId   String
+  receiptId String
+  datetime  DateTime
+  total     Decimal  @db.Decimal(10, 2)
+  itemsJson Json
+  payment   String?
+  batch     PosBatch @relation(fields: [batchId], references: [id])
+}
+
+model PosShiftReport {
+  id            String    @id @default(uuid())
+  batchId       String    @unique
+  grossSales    Decimal   @db.Decimal(10, 2)
+  discounts     Decimal   @db.Decimal(10, 2)
+  netSales      Decimal   @db.Decimal(10, 2)
+  cashInDrawer  Decimal   @db.Decimal(10, 2)
+  cashSales     Decimal   @db.Decimal(10, 2)
+  qrSales       Decimal   @db.Decimal(10, 2)
+  otherSales    Decimal   @db.Decimal(10, 2)
+  receiptCount  Int
+  storeId       String?
+  openedAt      DateTime?
+  closedAt      DateTime?
+  cashTotal     Int?      @default(0)
+  qrTotal       Int?      @default(0)
+  grabTotal     Int?      @default(0)
+  otherTotal    Int?      @default(0)
+  grandTotal    Int?      @default(0)
+  shoppingTotal Int?      @default(0)
+  wagesTotal    Int?      @default(0)
+  otherExpense  Int?      @default(0)
+  startingCash  Int?      @default(0)
+  businessDate  DateTime? @db.Date
+  batch         PosBatch  @relation(fields: [batchId], references: [id])
+
+  @@index([businessDate])
+}
+
+model PosSalesItem {
+  id      String   @id @default(uuid())
+  batchId String
+  name    String
+  qty     Int
+  net     Decimal  @db.Decimal(10, 2)
+  batch   PosBatch @relation(fields: [batchId], references: [id])
+}
+
+model PosSalesModifier {
+  id      String   @id @default(uuid())
+  batchId String
+  name    String
+  qty     Int
+  net     Decimal  @db.Decimal(10, 2)
+  batch   PosBatch @relation(fields: [batchId], references: [id])
+}
+
+model PosPaymentSummary {
+  id      String   @id @default(uuid())
+  batchId String
+  method  String
+  amount  Decimal  @db.Decimal(10, 2)
+  batch   PosBatch @relation(fields: [batchId], references: [id])
+}
+
+model BankImportBatch {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  source    String
+  filename  String
+  status    String    @default("pending")
+  txns      BankTxn[]
+}
+
+model BankTxn {
+  id          String          @id @default(uuid())
+  batchId     String
+  postedAt    DateTime
+  description String
+  amountTHB   Decimal         @db.Decimal(12, 2)
+  ref         String?
+  raw         Json
+  status      String          @default("pending")
+  category    String?
+  supplier    String?
+  notes       String?
+  expenseId   String?
+  dedupeKey   String          @unique
+  batch       BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
+
+model VendorRule {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  matchText String
+  category  String
+  supplier  String
+}
+
+model ManagerCheckQuestion {
+  id         Int       @id @default(autoincrement())
+  text       String
+  text_en    String?
+  text_th    String?
+  category   String?
+  enabled    Boolean?  @default(true)
+  weight     Int?      @default(1)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model AnalyticsShiftBurgerItem {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurant_id   String?
+  shift_date      DateTime @db.Date
+  from_ts         DateTime @db.Timestamptz(6)
+  to_ts           DateTime @db.Timestamptz(6)
+  normalized_name String
+  qty             Int      @default(0)
+  patties         Int      @default(0)
+  red_meat_g      Int      @default(0)
+  chicken_g       Int      @default(0)
+  rolls           Int      @default(0)
+  raw_hits        Json     @default("[]")
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([restaurant_id, shift_date, normalized_name])
+  @@index([shift_date], map: "idx_asbi_shift")
+  @@map("analytics_shift_burger_item")
+}
+
+model AnalyticsShiftBurgerSummary {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurant_id    String?
+  shift_date       DateTime @unique @db.Date
+  from_ts          DateTime @db.Timestamptz(6)
+  to_ts            DateTime @db.Timestamptz(6)
+  burgers_total    Int      @default(0)
+  patties_total    Int      @default(0)
+  red_meat_g_total Int      @default(0)
+  chicken_g_total  Int      @default(0)
+  rolls_total      Int      @default(0)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("analytics_shift_burger_summary")
+}
+
+model MenuCategory {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  position  Int?              @default(0)
+  createdAt DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt DateTime          @default(now()) @updatedAt @db.Timestamp(6)
+  items     MenuItem_Online[]
+
+  @@map("menu_categories")
+}
+
+model MenuItem_Online {
+  id          String                 @id @default(cuid())
+  categoryId  String
+  name        String
+  description String?
+  price       Int
+  imageUrl    String?
+  sku         String?                @unique
+  position    Int?                   @default(0)
+  available   Boolean?               @default(true)
+  createdAt   DateTime               @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamp(6)
+  category    MenuCategory           @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  groups      ModifierGroup_Online[]
+
+  @@map("menu_items_online")
+}
+
+model ModifierGroup_Online {
+  id       String                  @id @default(cuid())
+  itemId   String
+  name     String
+  type     String
+  required Boolean?                @default(false)
+  maxSel   Int?
+  position Int?                    @default(0)
+  item     MenuItem_Online         @relation(fields: [itemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  options  ModifierOption_Online[]
+
+  @@map("modifier_groups_online")
+}
+
+model ModifierOption_Online {
+  id         String               @id @default(cuid())
+  groupId    String
+  name       String
+  priceDelta Int
+  position   Int?                 @default(0)
+  group      ModifierGroup_Online @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("modifier_options_online")
+}
+
+model OrderOnline {
+  id         String             @id @default(cuid())
+  ref        String             @unique
+  status     String?            @default("pending")
+  name       String?
+  phone      String?
+  type       String?            @default("Pickup")
+  address    String?
+  payment    String?            @default("Cash")
+  subtotal   Int
+  vatAmount  Int
+  total      Int
+  rawPayload Json?
+  createdAt  DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime           @default(now()) @updatedAt @db.Timestamp(6)
+  lines      OrderLine_Online[]
+
+  @@map("orders_online")
+}
+
+model OrderLine_Online {
+  id        String      @id @default(cuid())
+  orderId   String
+  itemId    String?
+  sku       String?
+  name      String
+  qty       Int?        @default(1)
+  basePrice Int
+  modifiers Json?
+  note      String?
+  lineTotal Int
+  order     OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_lines_online")
+}
+
+model ManagerChecklist {
+  id             Int       @id @default(autoincrement())
+  shiftId        String
+  managerName    String
+  tasksAssigned  Json
+  tasksCompleted Json
+  createdAt      DateTime? @default(now()) @db.Timestamptz(6)
+  signedAt       DateTime? @db.Timestamptz(6)
+
+  @@index([shiftId], map: "idx_manager_checklist_shift")
+}
+
+model analytics_shift_category_summary {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shift_date  DateTime @db.Date
+  from_ts     DateTime @db.Timestamptz(6)
+  to_ts       DateTime @db.Timestamptz(6)
+  category    String
+  items_total Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([shift_date, category])
+  @@index([shift_date, category], map: "idx_ascs_shift")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model analytics_shift_item {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shift_date DateTime @db.Date
+  from_ts    DateTime @db.Timestamptz(6)
+  to_ts      DateTime @db.Timestamptz(6)
+  sku        String?
+  name       String
+  category   String
+  qty        Int      @default(0)
+  raw_hits   Json     @default("[]")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  patties    Int?     @default(0)
+  red_meat_g Float?   @default(0) @db.Real
+  chicken_g  Float?   @default(0) @db.Real
+  rolls      Int?     @default(0)
+
+  @@index([shift_date, category], map: "idx_asi_shift")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model analytics_shift_modifier {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shift_date DateTime @db.Date
+  from_ts    DateTime @db.Timestamptz(6)
+  to_ts      DateTime @db.Timestamptz(6)
+  sku        String?
+  name       String
+  category   String   @default("modifier")
+  qty        Int
+  raw_hits   Json     @default("[]")
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model checklist_assignments {
+  id                String    @id @default(dbgenerated("gen_random_uuid()"))
+  shift_id          String
+  manager_name      String
+  assigned_task_ids Json
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  expires_at        DateTime  @db.Timestamp(6)
+}
+
+model cleaning_tasks {
+  id         Int       @id @default(autoincrement())
+  taskName   String
+  taskDetail String?
+  zone       String
+  shiftPhase String
+  active     Boolean?  @default(true)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model dailyReceiptSummaries {
+  id         Int       @id @default(autoincrement())
+  shift_date DateTime  @unique @db.Date
+  data       Json
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model dailyShiftAnalysis {
+  id         Int       @id @default(autoincrement())
+  shift_date DateTime  @unique @db.Date
+  analysis   Json
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model daily_review_comments {
+  id                   Int      @id @default(autoincrement())
+  business_date        DateTime @unique @db.Date
+  comment              String
+  created_by           String?
+  created_at           DateTime @default(now()) @db.Timestamp(6)
+  updated_at           DateTime @default(now()) @db.Timestamp(6)
+  actual_amount_banked Decimal? @db.Decimal(10, 2)
+}
+
+model daily_stock_sales {
+  id                      Int       @id @default(autoincrement())
+  completed_by            String
+  shift_type              String
+  shift_date              DateTime  @db.Timestamp(6)
+  starting_cash           Decimal?  @db.Decimal(10, 2)
+  ending_cash             Decimal?  @db.Decimal(10, 2)
+  grab_sales              Decimal?  @db.Decimal(10, 2)
+  food_panda_sales        Decimal?  @db.Decimal(10, 2)
+  aroi_dee_sales          Decimal?  @db.Decimal(10, 2)
+  qr_scan_sales           Decimal?  @db.Decimal(10, 2)
+  cash_sales              Decimal?  @db.Decimal(10, 2)
+  total_sales             Decimal?  @db.Decimal(10, 2)
+  salary_wages            Decimal?  @db.Decimal(10, 2)
+  gas_expense             Decimal?  @db.Decimal(10, 2)
+  total_expenses          Decimal?  @db.Decimal(10, 2)
+  expense_description     String?
+  burger_buns_stock       Int?
+  rolls_ordered_count     Int?
+  meat_weight             Decimal?  @db.Decimal(10, 2)
+  drink_stock_count       Int?
+  food_items              Json?
+  drink_stock             Json?
+  kitchen_items           Json?
+  packaging_items         Json?
+  fresh_food              Json?
+  frozen_food             Json?
+  shelf_items             Json?
+  wage_entries            Json?
+  shopping_entries        Json?
+  rolls_ordered_confirmed Boolean?
+  wages                   Json?
+  banked_amount           Decimal?  @db.Decimal(10, 2)
+  purchased_amounts       Json?
+  number_needed           Json?
+  shopping                Json?
+  pdf_path                String?
+  is_draft                Boolean?  @default(false)
+  deleted_at              DateTime? @db.Timestamp(6)
+  created_at              DateTime? @default(now()) @db.Timestamp(6)
+  updated_at              DateTime? @default(now()) @db.Timestamp(6)
+  status                  String?
+  notes                   String?
+  discrepancy_notes       String?
+}
+
+model drink_brand {
+  id                  Int                   @id @default(autoincrement())
+  name                String                @unique
+  unit                String                @default("can")
+  manual_drink_ledger manual_drink_ledger[]
+}
+
+model import_log {
+  run_id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          String
+  from_ts           DateTime  @db.Timestamptz(6)
+  to_ts             DateTime  @db.Timestamptz(6)
+  receipts_fetched  Int       @default(0)
+  receipts_upserted Int       @default(0)
+  status            String    @default("ok")
+  message           String?
+  started_at        DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at       DateTime? @db.Timestamptz(6)
+}
+
+model imported_expenses {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()"))
+  restaurant_id   String
+  import_batch_id String
+  date            DateTime?               @db.Date
+  description     String?
+  amount_cents    Int?
+  raw_data        Json?
+  status          imported_expense_status @default(PENDING)
+  approved_by     String?
+  approved_at     DateTime?               @db.Timestamp(6)
+  created_at      DateTime?               @default(now()) @db.Timestamp(6)
+  supplier        String?
+  category        String?
+  source          String?                 @default("MANUAL_ENTRY")
+}
+
+model ingredients {
+  id               Int        @id @default(autoincrement())
+  name             String
+  category         String
+  supplier         String
+  unit_price       Decimal    @db.Decimal(10, 2)
+  price            Decimal?   @db.Decimal(10, 2)
+  package_size     Decimal?   @db.Decimal(10, 2)
+  portion_size     Decimal?   @db.Decimal(10, 2)
+  cost_per_portion Decimal?   @db.Decimal(10, 2)
+  unit             String
+  notes            String?
+  brand            String?
+  packaging_qty    String?
+  last_review_date String?
+  source           String?    @default("manual")
+  last_updated     DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?  @default(now()) @db.Timestamp(6)
+  created_at       DateTime?  @default(now()) @db.Timestamp(6)
+  supplier_id      Int?
+  package_qty      Decimal?   @db.Decimal(10, 3)
+  package_unit     String?    @db.VarChar(50)
+  package_cost     Decimal?   @db.Decimal(10, 2)
+  portion_qty      Decimal?   @db.Decimal(10, 3)
+  portion_unit     String?    @db.VarChar(50)
+  purchase_qty     Decimal?   @db.Decimal
+  suppliers        suppliers? @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([category], map: "idx_ingredients_category")
+  @@index([supplier_id], map: "idx_ingredients_supplier_id")
+}
+
+model item_alias {
+  alias_name   String       @id
+  sku          String
+  item_catalog item_catalog @relation(fields: [sku], references: [sku], onDelete: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model item_catalog {
+  sku         String       @id
+  name        String
+  category    String
+  kind        String?
+  patties_per Int?
+  grams_per   Int?
+  rolls_per   Int          @default(1)
+  updated_at  DateTime     @default(now()) @db.Timestamptz(6)
+  active      Boolean      @default(true)
+  is_meal_set Boolean      @default(false)
+  base_sku    String?
+  item_alias  item_alias[]
+
+  @@index([category], map: "idx_item_catalog_category")
+  @@index([kind], map: "idx_item_catalog_kind")
+}
+
+model loyverse_receipts {
+  shift_date DateTime @id @db.Date
+  data       Json?
+}
+
+model loyverse_shifts {
+  shift_date DateTime @id @db.Date
+  data       Json?
+}
+
+model lv_line_item {
+  receipt_id    String
+  line_no       Int
+  sku           String?
+  name          String
+  qty           Int
+  unit_price    Decimal?      @db.Decimal(12, 2)
+  category_hint String?
+  raw_json      Json?         @default("{}")
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  lv_receipt    lv_receipt    @relation(fields: [receipt_id], references: [receipt_id], onDelete: Cascade, onUpdate: NoAction)
+  lv_modifier   lv_modifier[]
+
+  @@id([receipt_id, line_no])
+  @@index([receipt_id], map: "ix_lv_line_item_receipt")
+  @@index([sku], map: "ix_lv_line_item_sku")
+}
+
+model lv_modifier {
+  receipt_id   String
+  line_no      Int
+  mod_no       Int
+  sku          String?
+  name         String
+  qty          Int          @default(1)
+  raw_json     Json?        @default("{}")
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+  lv_line_item lv_line_item @relation(fields: [receipt_id, line_no], references: [receipt_id, line_no], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([receipt_id, line_no, mod_no])
+}
+
+model lv_receipt {
+  receipt_id   String         @id @unique(map: "ux_lv_receipt")
+  datetime_bkk DateTime       @db.Timestamptz(6)
+  staff_name   String?
+  customer_id  String?
+  total_amount Decimal?       @db.Decimal(12, 2)
+  payment_json Json?          @default("{}")
+  raw_json     Json?          @default("{}")
+  created_at   DateTime       @default(now()) @db.Timestamptz(6)
+  lv_line_item lv_line_item[]
+
+  @@index([datetime_bkk], map: "ix_lv_receipt_bkk")
+  @@index([datetime_bkk], map: "ix_lv_receipt_datetime")
+}
+
+model manager_checklists {
+  id             Int       @id @default(autoincrement())
+  shiftId        String
+  managerName    String
+  tasksAssigned  Json
+  tasksCompleted Json
+  createdAt      DateTime? @default(now()) @db.Timestamp(6)
+  signedAt       DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model manual_drink_ledger {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shift_id            String              @db.Uuid
+  brand_id            Int
+  prev_end            Int?                @default(0)
+  purchased           Int?                @default(0)
+  sold                Int?                @default(0)
+  expected            Int?                @default(0)
+  actual              Int?                @default(0)
+  variance            Int?                @default(0)
+  paid                Boolean?            @default(false)
+  drink_brand         drink_brand         @relation(fields: [brand_id], references: [id], onUpdate: NoAction)
+  manual_stock_ledger manual_stock_ledger @relation(fields: [shift_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([shift_id, brand_id], map: "idx_manual_drink_ledger_shift_brand")
+}
+
+model manual_stock_ledger {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shift_date          DateTime              @db.Date
+  completed_by        String?
+  source_form_id      String?               @db.Uuid
+  total_sales         Decimal?              @db.Decimal(12, 2)
+  cash_sales          Decimal?              @db.Decimal(12, 2)
+  qr_sales            Decimal?              @db.Decimal(12, 2)
+  grab_sales          Decimal?              @db.Decimal(12, 2)
+  other_sales         Decimal?              @db.Decimal(12, 2)
+  shopping_total      Decimal?              @db.Decimal(12, 2)
+  wages_total         Decimal?              @db.Decimal(12, 2)
+  rolls_prev_end      Int?                  @default(0)
+  rolls_purchased     Int?                  @default(0)
+  burgers_sold        Int?                  @default(0)
+  rolls_expected      Int?                  @default(0)
+  rolls_actual        Int?                  @default(0)
+  rolls_variance      Int?                  @default(0)
+  rolls_paid          Boolean?              @default(false)
+  meat_prev_end_g     Int?                  @default(0)
+  meat_purchased_g    Int?                  @default(0)
+  meat_sold_g         Int?                  @default(0)
+  meat_expected_g     Int?                  @default(0)
+  meat_actual_g       Int?                  @default(0)
+  meat_variance_g     Int?                  @default(0)
+  meat_paid           Boolean?              @default(false)
+  notes               String?
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  manual_drink_ledger manual_drink_ledger[]
+
+  @@index([shift_date], map: "idx_manual_stock_ledger_shift_date")
+}
+
+model partner_statements {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()"))
+  restaurant_id     String
+  partner           String?
+  import_batch_id   String
+  statement_date    DateTime?               @db.Date
+  gross_sales_cents Int?
+  commission_cents  Int?
+  net_payout_cents  Int?
+  raw_data          Json?
+  status            imported_expense_status @default(PENDING)
+  created_at        DateTime?               @default(now()) @db.Timestamp(6)
+  approved_by       String?
+  approved_at       DateTime?               @db.Timestamp(6)
+}
+
+model pos_receipt {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batch_id   String
+  receipt_id String   @unique(map: "ux_pos_receipt_receiptid")
+  datetime   DateTime @db.Timestamptz(6)
+  total      Decimal  @default(0) @db.Decimal(10, 2)
+  items_json Json     @default("[]")
+  payment    String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([batch_id, receipt_id])
+  @@index([batch_id], map: "idx_pos_receipt_batch_id")
+  @@index([datetime], map: "idx_pos_receipt_datetime")
+}
+
+model purchase_tally {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  created_at           DateTime               @default(now()) @db.Timestamp(6)
+  date                 DateTime               @db.Date
+  staff                String?
+  supplier             String?
+  amount_thb           Decimal?               @db.Decimal(10, 2)
+  notes                String?
+  rolls_pcs            Int?
+  meat_grams           Int?
+  purchase_tally_drink purchase_tally_drink[]
+}
+
+model purchase_tally_drink {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  tally_id       String         @db.VarChar
+  item_name      String
+  qty            Int
+  unit           String         @default("pcs")
+  purchase_tally purchase_tally @relation(fields: [tally_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([item_name])
+  @@index([tally_id])
+}
+
+model recipe_lines {
+  id              BigInt   @id @default(autoincrement())
+  recipe_id       BigInt?
+  ingredient_id   String?
+  ingredient_name String
+  qty             Decimal  @default(0) @db.Decimal
+  unit            String
+  unit_cost_thb   Decimal  @default(0) @db.Decimal
+  cost_thb        Decimal  @default(0) @db.Decimal
+  supplier        String?
+  recipes         recipes? @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model recipes {
+  id               BigInt         @id @default(autoincrement())
+  name             String
+  note             String?
+  waste_pct        Decimal?       @default(0) @db.Decimal
+  portions         Int?           @default(1)
+  menu_price_thb   Decimal?       @default(0) @db.Decimal
+  totals_json      Json?
+  description      String?
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  category         String?        @default("Burgers")
+  yield_quantity   Decimal?       @default(1) @db.Decimal
+  yield_unit       String?        @default("servings")
+  ingredients      Json?          @default("[]")
+  total_cost       Decimal?       @default(0) @db.Decimal
+  cost_per_serving Decimal?       @default(0) @db.Decimal
+  cogs_percent     Decimal?       @default(0) @db.Decimal
+  suggested_price  Decimal?       @default(0) @db.Decimal
+  waste_factor     Decimal?       @default(0.05) @db.Decimal
+  yield_efficiency Decimal?       @default(0.90) @db.Decimal
+  image_url        String?
+  instructions     String?
+  notes            String?
+  is_active        Boolean?       @default(true)
+  updated_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  version          Int?           @default(1)
+  parent_id        Int?
+  recipe_lines     recipe_lines[]
+}
+
+model shopping_list {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()"))
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  sales_form_id       String?
+  stock_form_id       String?
+  rolls_count         Int?                  @default(0)
+  meat_weight_grams   Int?                  @default(0)
+  drinks_counts       Json?                 @default("[]")
+  items               Json?                 @default("[]")
+  total_items         Int?                  @default(0)
+  item_name           String?               @db.VarChar(255)
+  quantity            Int?
+  unit                String?               @default("unit") @db.VarChar(50)
+  form_id             Int?
+  list_date           DateTime?             @db.Timestamp(6)
+  estimated_cost      Decimal?              @default(0) @db.Decimal(10, 2)
+  supplier            String?               @default("") @db.VarChar(255)
+  price_per_unit      Decimal?              @default(0) @db.Decimal(10, 2)
+  notes               String?               @default("") @db.VarChar(255)
+  priority            String?               @default("medium")
+  selected            Boolean?              @default(false)
+  ai_generated        Boolean?              @default(false)
+  list_name           String?
+  is_completed        Boolean?              @default(false)
+  completed_at        DateTime?             @db.Timestamp(6)
+  actual_cost         Decimal?              @default(0) @db.Decimal(10, 2)
+  updated_at          DateTime?             @default(now()) @db.Timestamp(6)
+  shopping_list_items shopping_list_items[]
+}
+
+model shopping_list_items {
+  id               Int            @id @default(autoincrement())
+  shopping_list_id String?
+  ingredient_name  String         @db.VarChar(255)
+  requested_qty    Decimal?       @db.Decimal(10, 3)
+  requested_unit   String?        @db.VarChar(50)
+  notes            String?
+  created_at       DateTime?      @default(now()) @db.Timestamp(6)
+  shopping_list    shopping_list? @relation(fields: [shopping_list_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([shopping_list_id], map: "idx_shopping_list_items_list_id")
+}
+
+model stock_ledger_day {
+  day              DateTime  @id @db.Date
+  rolls_prev_end   Int       @default(0)
+  rolls_purchased  Int       @default(0)
+  burgers_sold     Int       @default(0)
+  rolls_expected   Int       @default(0)
+  rolls_actual     Int       @default(0)
+  rolls_paid       String    @default("N") @db.Char(1)
+  meat_prev_end_g  Int       @default(0)
+  meat_purchased_g Int       @default(0)
+  meat_sold_g      Int       @default(0)
+  meat_expected_g  Int       @default(0)
+  meat_actual_g    Int       @default(0)
+  meat_paid        String    @default("N") @db.Char(1)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  rolls_sold       Int?      @default(0)
+  submitted        Boolean?  @default(false)
+}
+
+model stock_ledger_drinks {
+  day        DateTime  @db.Date
+  brand      String
+  prev_end   Int       @default(0)
+  purchased  Int       @default(0)
+  sold       Int       @default(0)
+  expected   Int       @default(0)
+  actual     Int       @default(0)
+  variance   Int       @default(0)
+  paid       String    @default("N") @db.Char(1)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+
+  @@id([day, brand])
+}
+
+model supplier_defaults {
+  id               String    @id @default(dbgenerated("gen_random_uuid()"))
+  restaurant_id    String
+  supplier         String
+  default_category String
+  notes_template   String?
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model suppliers {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique @db.VarChar(255)
+  contact_info String?
+  created_at   DateTime?     @default(now()) @db.Timestamp(6)
+  ingredients  ingredients[]
+}
+
 enum POSProvider {
   LOYVERSE
   TOAST
@@ -139,10 +1451,10 @@ enum POSProvider {
   OTHER
 }
 
-enum ExpenseType { 
-  GENERAL 
-  PURCHASE 
-  WAGE 
+enum ExpenseType {
+  GENERAL
+  PURCHASE
+  WAGE
 }
 
 enum PaymentMethod {
@@ -178,236 +1490,6 @@ enum JobStatus {
   DEAD_LETTER
 }
 
-model Restaurant {
-  id              String           @id @default(cuid())
-  name            String
-  slug            String           @unique
-  email           String?
-  timezone        String           @default("Asia/Bangkok")
-  locale          String           @default("en-TH")
-  logoUrl         String?
-  brandColor      String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  posConnections  PosConnection[]
-  menuItems       MenuItem[]
-  receipts        Receipt[]
-  expenses        Expense[]
-  analyticsDaily  AnalyticsDaily[]
-  jobs            Job[]
-  syncLogs        PosSyncLog[]
-  ingestionErrors IngestionError[]
-
-  @@map("restaurants")
-}
-
-model PosConnection {
-  id            String      @id @default(cuid())
-  restaurantId  String
-  provider      POSProvider
-  apiKey        String?
-  refreshToken  String?
-  meta          Json?
-  isActive      Boolean     @default(true)
-  lastSyncAt    DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id])
-
-  @@index([restaurantId])
-  @@index([provider, isActive])
-  @@map("pos_connections")
-}
-
-model Receipt {
-  id            String        @id @default(cuid())
-  restaurantId  String
-  provider      POSProvider
-  externalId    String
-  receiptNumber String?
-  channel       SalesChannel  @default(OTHER)
-  createdAtUTC  DateTime
-  closedAtUTC   DateTime?
-  subtotal      Int
-  tax           Int
-  discount      Int
-  total         Int
-  notes         String?
-  rawPayload    Json?
-  createdAt     DateTime      @default(now())
-
-  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
-  items         ReceiptItem[]
-  payments      ReceiptPayment[]
-
-  @@unique([restaurantId, provider, externalId])
-  @@index([restaurantId, createdAtUTC])
-  @@map("receipts")
-}
-
-model ReceiptItem {
-  id             String   @id @default(cuid())
-  receiptId      String
-  providerItemId String?
-  sku            String?
-  name           String
-  category       String?
-  qty            Int
-  unitPrice      Int
-  total          Int
-  modifiers      Json?
-
-  receipt        Receipt  @relation(fields: [receiptId], references: [id])
-
-  @@index([receiptId])
-  @@map("receipt_items")
-}
-
-model ReceiptPayment {
-  id        String        @id @default(cuid())
-  receiptId String
-  method    PaymentMethod @default(OTHER)
-  amount    Int
-  meta      Json?
-
-  receipt   Receipt       @relation(fields: [receiptId], references: [id])
-
-  @@index([receiptId])
-  @@map("receipt_payments")
-}
-
-model MenuItem {
-  id            String     @id @default(cuid())
-  restaurantId  String
-  sku           String
-  name          String
-  category      String
-  portionGrams  Int?
-  isDrink       Boolean    @default(false)
-  isBurger      Boolean    @default(false)
-  active        Boolean    @default(true)
-  meta          Json?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-
-  @@unique([restaurantId, sku])
-  @@index([restaurantId, category])
-  @@map("menu_items")
-}
-
-model Expense {
-  id            String     @id @default(cuid())
-  restaurantId  String
-  shiftDate     DateTime
-  item          String
-  costCents     Int
-  supplier      String?
-  expenseType   String?
-  meta          Json?
-  createdAt     DateTime   @default(now())
-
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-
-  @@index([restaurantId, shiftDate])
-  @@map("expenses")
-}
-
-model ExpenseLine {
-  id           String      @id @default(uuid())
-  expenseId    String
-  ingredientId String?
-  name         String
-  qty          Float?
-  uom          String?
-  unitPriceTHB Decimal?    @db.Decimal(12,4)
-  lineTotalTHB Decimal?    @db.Decimal(12,2)
-  type         ExpenseType @default(GENERAL)
-  createdAt    DateTime    @default(now())
-  
-  @@index([ingredientId])
-}
-
-model AnalyticsDaily {
-  id                String    @id @default(cuid())
-  restaurantId      String
-  shiftDate         DateTime
-  top5ByQty         Json?
-  top5ByRevenue     Json?
-  expectedBunsUsed  Int?
-  expectedMeatGrams Int?
-  expectedDrinksUsed Int?
-  variance          Json?
-  shoppingList      Json?
-  flags             Json?
-  createdAt         DateTime  @default(now())
-
-  restaurant        Restaurant @relation(fields: [restaurantId], references: [id])
-
-  @@unique([restaurantId, shiftDate])
-  @@index([restaurantId, shiftDate])
-  @@map("analytics_daily")
-}
-
-model Job {
-  id            String     @id @default(cuid())
-  restaurantId  String?
-  type          JobType
-  payload       Json?
-  status        JobStatus  @default(QUEUED)
-  runAt         DateTime?
-  attempts      Int        @default(0)
-  lastError     String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
-
-  @@index([status, runAt])
-  @@index([restaurantId])
-  @@map("jobs")
-}
-
-model PosSyncLog {
-  id               String      @id @default(cuid())
-  restaurantId     String
-  provider         POSProvider
-  startedAt        DateTime    @default(now())
-  finishedAt       DateTime?
-  mode             String
-  receiptsFetched  Int         @default(0)
-  itemsUpserted    Int         @default(0)
-  paymentsUpserted Int         @default(0)
-  status           String      @default("SUCCESS")
-  message          String?
-  createdAt        DateTime    @default(now())
-
-  restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
-
-  @@index([restaurantId, provider, startedAt])
-  @@map("pos_sync_logs")
-}
-
-model IngestionError {
-  id            String      @id @default(cuid())
-  restaurantId  String?
-  provider      POSProvider?
-  externalId    String?
-  context       String?
-  errorMessage  String
-  rawPayload    Json?
-  createdAt     DateTime    @default(now())
-
-  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
-
-  @@index([restaurantId, provider, createdAt])
-  @@map("ingestion_errors")
-}
-
-// ========= Phase 2: Snapshot System Enums =========
 enum Provider {
   LOYVERSE
 }
@@ -426,325 +1508,6 @@ enum ReconcileState {
   MISSING_DATA
 }
 
-// ========= Core Snapshot =========
-model ShiftSnapshot {
-  id                  String            @id @default(uuid())
-  provider            Provider          @default(LOYVERSE)
-  windowStartUTC      DateTime
-  windowEndUTC        DateTime
-  loyverseShiftNumber Int?
-  salesFormId         String?
-  createdAt           DateTime          @default(now())
-  totalReceipts       Int               @default(0)
-  totalSalesSatang    BigInt            @default(0)
-  reconcileState      ReconcileState    @default(MISSING_DATA)
-  reconcileNotes      String?
-
-  payments   PaymentBreakdown[]
-  items      SnapshotItem[]
-  modifiers  SnapshotModifier[]
-  comparisons JussiComparison[]
-
-  salesForm  DailySales? @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
-
-  @@index([windowStartUTC, windowEndUTC])
-}
-
-model PaymentBreakdown {
-  id           String         @id @default(uuid())
-  snapshotId   String
-  channel      PaymentChannel
-  count        Int            @default(0)
-  totalSatang  BigInt         @default(0)
-
-  snapshot     ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-
-  @@index([snapshotId])
-  @@unique([snapshotId, channel])
-}
-
-model SnapshotItem {
-  id            String         @id @default(uuid())
-  snapshotId    String
-  itemName      String
-  sku           String?
-  category      String?
-  qty           Int            @default(0)
-  revenueSatang BigInt         @default(0)
-
-  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-
-  @@index([snapshotId])
-}
-
-model SnapshotModifier {
-  id            String         @id @default(uuid())
-  snapshotId    String
-  modifierName  String
-  lines         Int            @default(0)
-  revenueSatang BigInt         @default(0)
-
-  snapshot      ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-
-  @@index([snapshotId])
-}
-
-// Map LV payment labels to canonical channels
-model PaymentMethodMap {
-  id         String         @id @default(uuid())
-  provider   Provider       @default(LOYVERSE)
-  sourceName String
-  channel    PaymentChannel @default(OTHER)
-  createdAt  DateTime       @default(now())
-
-  @@unique([provider, sourceName])
-}
-
-// ========= Recipes (for precise Jussi) =========
-model RecipeItem {
-  id         String   @id @default(uuid())
-  sku        String?  @unique
-  name       String
-  category   String?
-  isMealDeal Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  components RecipeComponent[]
-}
-
-model RecipeComponent {
-  id           String     @id @default(uuid())
-  recipeItemId String
-  ingredientId String
-  baseQty      Float
-  uom          String
-
-  recipeItem   RecipeItem @relation(fields: [recipeItemId], references: [id], onDelete: Cascade)
-
-  @@index([recipeItemId])
-}
-
-// ========= Jussi Comparison Record =========
-model JussiComparison {
-  id               String         @id @default(uuid())
-  snapshotId       String
-  salesFormId      String?
-  createdAt        DateTime       @default(now())
-
-  // Opening stock (from previous shift)
-  openingBuns      Int?
-  openingMeatGram  Int?
-  openingDrinks    Int?
-
-  // Purchases during the window
-  purchasedBuns    Int?
-  purchasedMeatGram Int?
-  purchasedDrinks  Int?
-
-  // Usage from POS
-  expectedBuns     Int?
-  expectedMeatGram Int?
-  expectedDrinks   Int?
-
-  // Expected closing (opening + purchases - usage)
-  expectedCloseBuns    Int?
-  expectedCloseMeatGram Int?
-  expectedCloseDrinks  Int?
-
-  // Staff closing (actual counts)
-  staffBuns        Int?
-  staffMeatGram    Int?
-  staffDrinks      Int?
-
-  // Variance (staff - expected closing)
-  varBuns          Int?
-  varMeatGram      Int?
-  varDrinks        Int?
-
-  state            ReconcileState @default(MISSING_DATA)
-  notes            String?
-
-  snapshot         ShiftSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  salesForm        DailySales?    @relation(fields: [salesFormId], references: [id], onDelete: SetNull)
-
-  @@index([snapshotId])
-  @@index([salesFormId])
-}
-
-// V2 Models (additive, non-destructive)
-model DailySalesV2 {
-  id             String   @id @default(uuid())
-  createdAt      DateTime @default(now())
-  shiftDate      String
-  submittedAtISO DateTime
-  completedBy    String
-  startingCash   Int      @default(0)
-  endingCash     Int      @default(0)
-  cashBanked     Int      @default(0)
-  cashSales      Int      @default(0)
-  qrSales        Int      @default(0)
-  grabSales      Int      @default(0)
-  aroiSales      Int      @default(0)
-  totalSales     Int      @default(0)
-  shoppingTotal  Int      @default(0)
-  wagesTotal     Int      @default(0)
-  othersTotal    Int      @default(0)
-  totalExpenses  Int      @default(0)
-  qrTransfer     Int      @default(0)
-  payload        Json?
-  staff          String?
-  shift_date     DateTime? @db.Date
-  shopping       ShoppingPurchaseV2[]
-  wages          WageEntryV2[]
-  others         OtherExpenseV2[]
-  stock          DailyStockV2?
-  deletedAt      DateTime?
-  @@map("daily_sales_v2")
-}
-
-model ShoppingPurchaseV2 {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  item      String
-  cost      Int      @default(0)
-  shop      String
-  salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
-  @@map("shopping_purchase_v2")
-}
-
-model WageEntryV2 {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  staff     String
-  amount    Int      @default(0)
-  type      String
-  salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
-  @@map("wage_entry_v2")
-}
-
-model OtherExpenseV2 {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  label     String
-  amount    Int      @default(0)
-  salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
-  @@map("other_expense_v2")
-}
-
-model DailyStockV2 {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  salesId       String   @unique
-  sales         DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
-  burgerBuns    Int      @default(0)
-  meatWeightG   Int      @default(0)
-  drinksJson    Json?
-  purchasingJson Json?
-  notes         String?
-  deletedAt     DateTime?
-  @@map("daily_stock_v2")
-}
-
-// ================ INGREDIENT & RECIPE V2 SYSTEM ================
-// PURCHASING vs PORTIONING SPLIT
-// - Purchasing fields (purchaseUnit, purchaseQty, packageCost) → Shopping lists (pack quantities)
-// - Portion fields (portionUnit, portionQty) → Recipe costing (cost per serving)
-
-enum RecipeStatus {
-  draft
-  approved
-  archived
-}
-
-model IngredientV2 {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
-
-  // Identity
-  name          String   @unique
-  category      String?
-  brand         String?
-  supplier      String?
-
-  // PURCHASING (SOURCE OF TRUTH for shopping list)
-  purchaseUnit  String   @default("g") // kg|g|L|ml|each
-  purchaseQty   Decimal  @default(1)   // how much per pack (e.g., 1.00 kg, or 3960 ml, or 1 each)
-  packageCost   Decimal  @default(0)   // THB cost per pack
-
-  // PORTIONS (COSTING ONLY - for recipe pricing)
-  portionUnit   String?  // g|ml|each
-  portionQty    Decimal? // e.g., 95 g per burger
-
-  lastReview    DateTime?
-  notes         String?
-
-  // Relations
-  items         RecipeItemV2[]
-  priceHistory  IngredientPriceV2[]
-
-  @@map("ingredient_v2")
-  @@index([category])
-  @@index([supplier])
-}
-
-// Historical prices for as-of costing and trend analysis
-model IngredientPriceV2 {
-  id            String   @id @default(uuid())
-  ingredientId  String
-  effectiveFrom DateTime
-  purchaseUnit  String
-  purchaseQty   Decimal
-  packageCost   Decimal
-
-  ingredient    IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-
-  @@map("ingredient_price_v2")
-  @@index([ingredientId, effectiveFrom])
-}
-
-model RecipeV2 {
-  id           String   @id @default(uuid())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
-
-  name         String   @unique
-  category     String?
-  yieldQty     Decimal  @default(1)
-  yieldUnit    String   @default("servings")
-  targetMargin Decimal  @default(0)
-  status       RecipeStatus @default(draft)
-  approvedAt   DateTime?
-  approvedBy   String?
-  notes        String?
-  imageUrl     String?
-
-  items        RecipeItemV2[]
-
-  @@map("recipe_v2")
-  @@index([category])
-}
-
-model RecipeItemV2 {
-  id           String  @id @default(uuid())
-  createdAt    DateTime @default(now())
-
-  recipeId     String
-  ingredientId String
-
-  qty          Decimal  @default(0)    // quantity in unit below
-  unit         String                  // g|ml|each
-
-  recipe       RecipeV2     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  ingredient   IngredientV2 @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
-
-  @@unique([recipeId, ingredientId])
-  @@map("recipe_item_v2")
-}
-
 enum MenuSource {
   house
   pos
@@ -753,370 +1516,8 @@ enum MenuSource {
   other
 }
 
-model MenuV2 {
-  id          String      @id @default(uuid())
-  name        String
-  source      MenuSource
-  fileType    String
-  version     String?     // optional partner version tag
-  importedAt  DateTime    @default(now())
-  notes       String?
-  items       MenuItemV2[]
-  @@index([source])
-  @@map("menu_v2")
-}
-
-model MenuItemV2 {
-  id          String   @id @default(uuid())
-  menuId      String
-  externalId  String?  // partner id / SKU
-  name        String
-  category    String?
-  basePrice   Decimal  @default(0)
-  description String?
-  active      Boolean  @default(true)
-
-  menu        MenuV2     @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  modifiers   MenuModifierV2[]
-
-  @@unique([menuId, name])
-  @@index([name])
-  @@map("menu_item_v2")
-}
-
-model MenuModifierV2 {
-  id        String   @id @default(uuid())
-  itemId    String
-  groupName String?
-  name      String
-  price     Decimal  @default(0)
-
-  item      MenuItemV2 @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  @@index([itemId])
-  @@map("menu_modifier_v2")
-}
-
-// ========= Stock Catalog System =========
-// Stock catalog (imported from CSV)
-model StockItem {
-  id             Int       @id @default(autoincrement())
-  name           String
-  category       String     // e.g., "Fresh Food", "Drinks", "Packaging"
-  isDrink        Boolean    @default(false)
-  isExcluded     Boolean    @default(false) // will be true for the first 4 rows from CSV
-  displayOrder   Int        @default(0)     // for stable ordering within categories
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-
-  // reverse relation
-  stockRequests  StockRequest[]
-
-  @@map("stock_items")
-}
-
-// One row per (shiftId, item)
-model StockRequest {
-  id         Int      @id @default(autoincrement())
-  shiftId    String   // UUID from Form 1
-  stockItemId Int
-  requestedQty Int?   // null or >= 0; null treated like "not requested"
-
-  // audit
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  StockItem  StockItem @relation(fields: [stockItemId], references: [id])
-
-  @@unique([shiftId, stockItemId])
-  @@map("stock_requests")
-}
-
-model PosBatch {
-  id         String   @id @default(uuid())
-  createdAt  DateTime @default(now())
-  title      String?
-  shiftStart DateTime?
-  shiftEnd   DateTime?
-
-  receipts   PosReceipt[]
-  shift      PosShiftReport?
-  items      PosSalesItem[]
-  modifiers  PosSalesModifier[]
-  payments   PosPaymentSummary[]
-}
-
-model PosReceipt {
-  id         String   @id @default(uuid())
-  batchId    String
-  batch      PosBatch @relation(fields: [batchId], references: [id])
-  receiptId  String
-  datetime   DateTime
-  total      Decimal  @db.Decimal(10,2)
-  itemsJson  Json
-  payment    String?
-}
-
-model PosShiftReport {
-  id                 String   @id @default(uuid())
-  batchId            String   @unique
-  batch              PosBatch @relation(fields: [batchId], references: [id])
-  
-  // Existing fields
-  grossSales         Decimal  @db.Decimal(10,2)
-  discounts          Decimal  @db.Decimal(10,2)
-  netSales           Decimal  @db.Decimal(10,2)
-  cashInDrawer       Decimal  @db.Decimal(10,2)
-  cashSales          Decimal  @db.Decimal(10,2)
-  qrSales            Decimal  @db.Decimal(10,2)
-  otherSales         Decimal  @db.Decimal(10,2)
-  receiptCount       Int
-  
-  // Daily Review fields
-  storeId            String?
-  openedAt           DateTime?
-  closedAt           DateTime?
-  cashTotal          Int      @default(0)
-  qrTotal            Int      @default(0)
-  grabTotal          Int      @default(0)
-  otherTotal         Int      @default(0)
-  grandTotal         Int      @default(0)
-  shoppingTotal      Int      @default(0)
-  wagesTotal         Int      @default(0)
-  otherExpense       Int      @default(0)
-  startingCash       Int      @default(0)
-  businessDate       DateTime? @db.Date
-  
-  @@index([businessDate])
-}
-
-model PosSalesItem {
-  id        String   @id @default(uuid())
-  batchId   String
-  batch     PosBatch @relation(fields: [batchId], references: [id])
-  name      String
-  qty       Int
-  net       Decimal  @db.Decimal(10,2)
-}
-
-model PosSalesModifier {
-  id        String   @id @default(uuid())
-  batchId   String
-  batch     PosBatch @relation(fields: [batchId], references: [id])
-  name      String
-  qty       Int
-  net       Decimal  @db.Decimal(10,2)
-}
-
-model PosPaymentSummary {
-  id        String   @id @default(uuid())
-  batchId   String
-  batch     PosBatch @relation(fields: [batchId], references: [id])
-  method    String
-  amount    Decimal  @db.Decimal(10,2)
-}
-model BankImportBatch {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  source    String
-  filename  String
-  status    String   @default("pending") // pending | partially_approved | approved
-  txns      BankTxn[]
-}
-
-model BankTxn {
-  id        String   @id @default(uuid())
-  batchId   String
-  batch     BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-
-  postedAt  DateTime
-  description String
-  amountTHB Decimal   @db.Decimal(12,2) // POSITIVE = expense/outflow
-  ref       String?
-  raw       Json
-
-  status    String    @default("pending") // pending | approved | rejected | deleted
-  category  String?
-  supplier  String?
-  notes     String?
-  expenseId String?
-
-  dedupeKey String    @unique
-}
-
-model VendorRule {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  matchText String   // e.g., "MAKRO"
-  category  String   // e.g., "Supplies"
-  supplier  String   // e.g., "Makro"
-}
-
-// Manager Quick Check System
-model ManagerCheckQuestion {
-  id          Int       @id @default(autoincrement())
-  text        String
-  category    String?   // e.g., Hygiene, Equipment, Food Safety
-  enabled     Boolean   @default(true)
-  weight      Int       @default(1)
-  lastUsedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  items       DailyManagerCheckItem[]
-}
-
-model DailyManagerCheck {
-  id           Int       @id @default(autoincrement())
-  salesId      Int       // link to your DailySalesV2 or the ID used to join Form 1 -> Form 2 (shift id)
-  createdAt    DateTime  @default(now())
-  answeredBy   String?
-  managerPin   String?
-  status       String    @default("PENDING") // PENDING | COMPLETED | SKIPPED | UNAVAILABLE
-  skipReason   String?
-  items        DailyManagerCheckItem[]
-}
-
-model DailyManagerCheckItem {
-  id            Int       @id @default(autoincrement())
-  dailyCheckId  Int
-  questionId    Int
-  response      String?   // PASS | FAIL | NA
-  note          String?
-  photoUrl      String?
-
-  ManagerCheckQuestion ManagerCheckQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  DailyManagerCheck    DailyManagerCheck    @relation(fields: [dailyCheckId], references: [id], onDelete: Cascade)
-
-  @@unique([dailyCheckId, questionId])
-}
-
-// Burger Metrics Analytics Tables
-model AnalyticsShiftBurgerItem {
-  id            String   @id @default(uuid())
-  restaurantId  String?
-  shiftDate     DateTime
-  fromTs        DateTime
-  toTs          DateTime
-  normalizedName String
-  qty           Int      @default(0)
-  patties       Int      @default(0)
-  redMeatG      Int      @default(0)
-  chickenG      Int      @default(0)
-  rolls         Int      @default(0)
-  rawHits       Json     @default("[]")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now())
-
-  @@unique([restaurantId, shiftDate, normalizedName])
-  @@map("analytics_shift_burger_item")
-}
-
-model AnalyticsShiftBurgerSummary {
-  id              String   @id @default(uuid())
-  restaurantId    String?
-  shiftDate       DateTime @unique
-  fromTs          DateTime
-  toTs            DateTime
-  burgersTotal    Int      @default(0)
-  pattiesTotal    Int      @default(0)
-  redMeatGTotal   Int      @default(0)
-  chickenGTotal   Int      @default(0)
-  rollsTotal      Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @default(now())
-
-  @@map("analytics_shift_burger_summary")
-}
-
-
-// ========= Online Ordering System =========
-model MenuCategory {
-  id        String     @id @default(cuid())
-  name      String
-  slug      String     @unique
-  position  Int        @default(0)
-  items     MenuItem_Online[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  
-  @@map("menu_categories")
-}
-
-model MenuItem_Online {
-  id          String           @id @default(cuid())
-  categoryId  String
-  category    MenuCategory     @relation(fields: [categoryId], references: [id])
-  name        String
-  description String?
-  price       Int              // THB as integer (e.g., 209, not 20900)
-  imageUrl    String?
-  sku         String?          @unique
-  position    Int              @default(0)
-  available   Boolean          @default(true)
-  groups      ModifierGroup_Online[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  
-  @@map("menu_items_online")
-}
-
-model ModifierGroup_Online {
-  id        String             @id @default(cuid())
-  itemId    String
-  item      MenuItem_Online    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  name      String
-  type      String             // "single" | "multi"
-  required  Boolean            @default(false)
-  maxSel    Int?               // only for multi
-  options   ModifierOption_Online[]
-  position  Int                @default(0)
-  
-  @@map("modifier_groups_online")
-}
-
-model ModifierOption_Online {
-  id         String                @id @default(cuid())
-  groupId    String
-  group      ModifierGroup_Online  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name       String
-  priceDelta Int                   // baht delta (+/-)
-  position   Int                   @default(0)
-  
-  @@map("modifier_options_online")
-}
-
-model OrderOnline {
-  id          String         @id @default(cuid())
-  ref         String         @unique
-  status      String         @default("pending") // pending|paid|sent_to_pos|completed|cancelled
-  name        String?
-  phone       String?
-  type        String         @default("Pickup")  // Pickup|Delivery
-  address     String?
-  payment     String         @default("Cash")    // Cash|Stripe|QR
-  subtotal    Int            // baht
-  vatAmount   Int            // baht
-  total       Int            // baht
-  lines       OrderLine_Online[]
-  rawPayload  Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  
-  @@map("orders_online")
-}
-
-model OrderLine_Online {
-  id        String        @id @default(cuid())
-  orderId   String
-  order     OrderOnline   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId    String?
-  sku       String?
-  name      String
-  qty       Int           @default(1)
-  basePrice Int
-  modifiers Json?         // [{groupName, optionName, priceDelta}]
-  note      String?
-  lineTotal Int
-  
-  @@map("order_lines_online")
+enum imported_expense_status {
+  PENDING
+  APPROVED
+  REJECTED
 }
