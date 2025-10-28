@@ -1452,6 +1452,7 @@ export const dailyReviewComments = pgTable("daily_review_comments", {
   id: serial("id").primaryKey(),
   businessDate: date("business_date").notNull().unique(),
   comment: text("comment").notNull(),
+  actualAmountBanked: decimal("actual_amount_banked", { precision: 10, scale: 2 }),
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

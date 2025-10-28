@@ -21,10 +21,13 @@ dailyReviewCommentsRouter.get("/:date", async (req, res) => {
       .limit(1);
 
     if (!comment) {
-      return res.json({ comment: "" });
+      return res.json({ comment: "", actualAmountBanked: null });
     }
 
-    res.json({ comment: comment.comment });
+    res.json({ 
+      comment: comment.comment,
+      actualAmountBanked: comment.actualAmountBanked ? parseFloat(comment.actualAmountBanked) : null
+    });
   } catch (error) {
     console.error("Error fetching comment:", error);
     res.status(500).json({ error: "Failed to fetch comment" });
@@ -34,7 +37,7 @@ dailyReviewCommentsRouter.get("/:date", async (req, res) => {
 // POST /api/daily-review-comments - Save or update comment for a date
 dailyReviewCommentsRouter.post("/", async (req, res) => {
   try {
-    const { businessDate, comment, createdBy } = req.body;
+    const { businessDate, comment, actualAmountBanked, createdBy } = req.body;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
       return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
@@ -50,19 +53,29 @@ dailyReviewCommentsRouter.post("/", async (req, res) => {
       .values({
         businessDate,
         comment,
+        actualAmountBanked: actualAmountBanked !== null && actualAmountBanked !== undefined 
+          ? actualAmountBanked.toString() 
+          : null,
         createdBy: createdBy || null,
       })
       .onConflictDoUpdate({
         target: dailyReviewComments.businessDate,
         set: {
           comment,
+          actualAmountBanked: actualAmountBanked !== null && actualAmountBanked !== undefined 
+            ? actualAmountBanked.toString() 
+            : null,
           createdBy: createdBy || null,
           updatedAt: new Date(),
         },
       })
       .returning();
 
-    res.json({ ok: true, comment: saved.comment });
+    res.json({ 
+      ok: true, 
+      comment: saved.comment,
+      actualAmountBanked: saved.actualAmountBanked ? parseFloat(saved.actualAmountBanked) : null
+    });
   } catch (error) {
     console.error("Error saving comment:", error);
     res.status(500).json({ error: "Failed to save comment" });

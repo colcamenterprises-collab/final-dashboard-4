@@ -59,6 +59,7 @@ export default function DailyReview() {
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [actualAmountBanked, setActualAmountBanked] = useState<string>("");
   const [savingComment, setSavingComment] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDialog, setSyncDialog] = useState<{
@@ -177,24 +178,25 @@ export default function DailyReview() {
         body: JSON.stringify({ 
           businessDate: selectedDate, 
           comment,
+          actualAmountBanked: actualAmountBanked ? parseFloat(actualAmountBanked) : null,
           createdBy: 'Manager'
         })
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save comment');
+        throw new Error('Failed to save');
       }
       
-      alert('Comment saved successfully');
+      alert('Manager review saved successfully');
     } catch (error) {
-      console.error('Error saving comment:', error);
-      alert('Failed to save comment');
+      console.error('Error saving:', error);
+      alert('Failed to save manager review');
     } finally {
       setSavingComment(false);
     }
   };
 
-  // Load comment when date changes
+  // Load comment and banking data when date changes
   useEffect(() => {
     if (!selectedDate) return;
     
@@ -204,9 +206,10 @@ export default function DailyReview() {
         if (response.ok) {
           const data = await response.json();
           setComment(data.comment || "");
+          setActualAmountBanked(data.actualAmountBanked !== null ? data.actualAmountBanked.toString() : "");
         }
       } catch (error) {
-        console.error('Error loading comment:', error);
+        console.error('Error loading review data:', error);
       }
     })();
   }, [selectedDate]);
@@ -330,15 +333,64 @@ export default function DailyReview() {
           )}
 
           <section className="border-t pt-3">
+            <h2 className="font-bold text-sm mb-3">Manager Review</h2>
+            
+            {/* Banking Verification */}
+            <div className="mb-4 p-3 bg-gray-50 rounded border">
+              <div className="grid grid-cols-3 gap-3 items-center text-sm mb-2">
+                <div>
+                  <div className="text-xs text-gray-500">Expected Net Banked (from above)</div>
+                  <div className="font-semibold text-base">
+                    {current?.variance 
+                      ? fmt(current.form?.banking.estimatedNetBanked ?? 0) 
+                      : "—"}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Actual Amount Banked</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter actual..."
+                    value={actualAmountBanked}
+                    onChange={(e) => setActualAmountBanked(e.target.value)}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    data-testid="input-actual-banked"
+                  />
+                </div>
+                <div>
+                  {actualAmountBanked && current?.variance && current.form && (
+                    (() => {
+                      const expected = current.form.banking.estimatedNetBanked;
+                      const actual = parseFloat(actualAmountBanked);
+                      const diff = actual - expected;
+                      const hasDiff = Math.abs(diff) > 0.01;
+                      return (
+                        <div className={`text-center p-2 rounded ${hasDiff ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'}`}>
+                          <div className="text-xs font-semibold">{hasDiff ? '⚠️ Variance' : '✓ Match'}</div>
+                          {hasDiff && (
+                            <div className="text-sm font-bold text-red-700">
+                              {diff > 0 ? '+' : ''}{fmt(diff)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Manager Comments */}
             <div className="flex items-center justify-between mb-2">
-              <h2 className="font-bold text-sm">Manager Comments</h2>
+              <h3 className="font-semibold text-sm">Notes</h3>
               <button
                 onClick={saveComment}
                 disabled={savingComment || !selectedDate}
                 className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                data-testid="button-save-comment"
+                data-testid="button-save-review"
               >
-                {savingComment ? "Saving..." : "Save Comment"}
+                {savingComment ? "Saving..." : "Save Review"}
               </button>
             </div>
             <textarea
@@ -349,7 +401,7 @@ export default function DailyReview() {
               data-testid="textarea-manager-comment"
             />
             <div className="text-xs text-gray-500 mt-1">
-              Comments are saved per business date and stored in the database.
+              Manager review data is saved per business date and stored in the database.
             </div>
           </section>
         </>
