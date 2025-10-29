@@ -1,0 +1,178 @@
+
+Do this now (in order)
+
+1) Relax the Drizzle schema to match the DB (nullable)
+
+Your DB columns are nullable, but shared/schema.ts marks them .notNull(). Make them nullable (for now) so seeding/backfill can proceed.
+
+Patch: shared/schema.ts (Drizzle)
+
+// BEFORE (problem)
+// purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
+// purchaseUnit: text("purchase_unit").notNull(),
+// purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+
+// AFTER (temporary: nullable to match DB)
+purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 })
+  // Type hint if you use TS strictness:
+  // .$type<string | null>() // drizzle decimal is string by default
+  ,
+purchaseUnit: text("purchase_unit"),
+purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 })
+  // .$type<string | null>()
+  ,
+
+> Keep the column names exactly as they exist in the DB (purchase_unit, purchase_qty, purchase_cost). Do not rename them here.
+
+
+
+Agent rule: Do not add .notNull() back yet.
+
+
+---
+
+2) Rebuild + regenerate types
+
+# If you have typegen steps for Drizzle:
+# (skip if you don’t)
+npm run build || true
+
+If a type error appears because those fields became nullable, update any TypeScript that assumed non-null to handle null (simple fallback like ??).
+
+
+---
+
+3) Run the ingredient backfill (packs only)
+
+Use the one-file script we added earlier. This fills purchaseUnit/purchaseQty/purchaseCost for all ingredients from foodCostings.ts.
+
+# Dry run
+npx tsx server/scripts/backfillIngredientPurchasing.ts
+
+# Apply purchasing data for ALL ingredients
+npx tsx server/scripts/backfillIngredientPurchasing.ts --apply
+
+# (Optional) also fill portion fields if missing (for costing only):
+npx tsx server/scripts/backfillIngredientPurchasing.ts --apply --portion
+
+Verify data actually filled:
+
+psql "$DATABASE_URL" -c "
+  SELECT COUNT(*) AS missing_pack
+  FROM ingredient_v2
+  WHERE purchase_unit IS NULL OR purchase_qty IS NULL OR purchase_qty = 0
+     OR purchase_cost IS NULL OR purchase_cost = 0;
+"
+
+Expected: missing_pack = 0 (or close; any outliers will be named in the backfill output—fix those rows).
+
+
+---
+
+4) Sanity test the Purchasing API (pack-based)
+
+# 8.7 kg beef, packs are 1 kg
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_BEEF>","requiredQty":8.7,"requiredUnit":"kg"}]}' | jq
+
+# 3.3 L Coke, packs are 12×330 ml (3960 ml)
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type': 'application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_COKE>","requiredQty":3.3,"requiredUnit":"L"}]}' | jq
+
+# 15 kg Fries, packs are 2.5 kg
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_FRIES>","requiredQty":15,"requiredUnit":"kg"}]}' | jq
+
+Expected: packsToBuy: 9, 1, and 6 respectively.
+
+If you see “unit family mismatch,” it means the request used the wrong unit family (e.g., ml for a g-based pack). Fix the request units.
+
+
+---
+
+5) (Optional, but recommended) Harden after backfill
+
+Once every ingredient has pack data, we can lock the DB and Drizzle back to NOT NULL to prevent future bad inputs.
+
+SQL (runs only after missing_pack = 0):
+
+ALTER TABLE ingredient_v2
+  ALTER COLUMN purchase_unit SET NOT NULL,
+  ALTER COLUMN purchase_qty  SET NOT NULL,
+  ALTER COLUMN purchase_cost SET NOT NULL;
+
+Then update shared/schema.ts back to:
+
+purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
+purchaseUnit: text("purchase_unit").notNull(),
+purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+
+> Don’t do this hardening step until after the backfill has made all rows valid.
+
+
+
+
+---
+
+6) Seeding guidance (so it won’t fail again)
+
+Seeding should not rely on portions for purchasing.
+
+If a seed row lacks purchase_* data, either:
+
+(A) skip the row and log it, or
+
+(B) insert minimal row (no purchasing), then let the backfill script populate later.
+
+
+Never inject fake defaults for purchase_*. That pollutes costs and shopping lists.
+
+
+Example seed guard (pseudo):
+
+if (!row.packagingQty || !row.cost) {
+  console.warn('Skipping purchasing for', row.name);
+  // insert base ingredient only; backfill handles purchasing later
+} else {
+  // insert with purchaseUnit/purchaseQty/purchaseCost
+}
+
+
+---
+
+7) Frontend reminder
+
+Make sure your Purchasing page uses POST /api/purchasing/plan and renders:
+
+packsToBuy
+
+lineCostTHB
+
+totalCostTHB
+
+
+If the UI still looks “unchanged,” it’s usually because:
+
+It’s still using old client-side math,
+
+Or it never calls /api/purchasing/plan.
+
+
+
+---
+
+Replit Agent — what you cannot do
+
+Do not reintroduce .notNull() until after the backfill shows no missing pack data.
+
+Do not switch shopping math to portions—shopping is pack-based only.
+
+Do not convert mass↔volume families (no g↔ml).
+
+Do not rename columns (purchase_unit, purchase_qty, purchase_cost) in Drizzle to “package_*” without explicit instruction.
+
+If any command errors, stop and paste the full output.
+

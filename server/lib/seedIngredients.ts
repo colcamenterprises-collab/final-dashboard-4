@@ -66,6 +66,9 @@ export async function seedGodList() {
 // Auto-seed on module load (called from server startup)
 export async function autoSeedOnStartup() {
   console.log('[autoSeedOnStartup] Checking if auto-seed needed...');
+  console.log('[autoSeedOnStartup] ⚠️  Auto-seed disabled - ingredient_v2 table is the source of truth');
+  console.log('[autoSeedOnStartup] Use backfillIngredientPurchasing.ts script for purchasing data');
+  return { seeded: 0, updated: 0, total: 0 };
   
   try {
     const existingCount = await db.select({ count: sql`count(*)` }).from(ingredients);

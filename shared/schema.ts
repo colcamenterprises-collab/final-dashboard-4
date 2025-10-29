@@ -426,10 +426,10 @@ export const ingredients = pgTable("ingredients", {
   supplier: text("supplier"),
   brand: text("brand"),
 
-  // Purchase (bulk side)
-  purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
-  purchaseUnit: text("purchase_unit").notNull(),
-  purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+  // Purchase (bulk side) - nullable to match DB during backfill
+  purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }),
+  purchaseUnit: text("purchase_unit"),
+  purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }),
 
   // Portion (recipe side)
   portionUnit: text("portion_unit"),

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { calculatePurchasingPlan, type IngredientNeed } from '../lib/purchasingPlanner';
+import { calculatePurchasingPlan, type IngredientNeedRequest } from '../lib/purchasingPlanner';
 
 const router = Router();
 
@@ -9,7 +9,7 @@ const router = Router();
  */
 router.post('/plan', async (req, res) => {
   try {
-    const { needs } = req.body as { needs: IngredientNeed[] };
+    const { needs } = req.body as { needs: IngredientNeedRequest[] };
 
     if (!needs || !Array.isArray(needs)) {
       return res.status(400).json({ error: 'Invalid request: needs array required' });
