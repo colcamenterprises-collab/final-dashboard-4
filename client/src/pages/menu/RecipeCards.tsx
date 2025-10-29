@@ -552,7 +552,7 @@ export default function RecipeCards() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-lg line-clamp-2" data-testid={`text-recipe-name-${recipe.id}`}>
+                  <CardTitle className="text-sm font-medium line-clamp-2" data-testid={`text-recipe-name-${recipe.id}`}>
                     {recipe.name}
                   </CardTitle>
                   <div className="flex items-center gap-2 mt-2">
@@ -577,7 +577,7 @@ export default function RecipeCards() {
             
             <CardContent className="space-y-4">
               {recipe.description && (
-                <p className="text-sm text-gray-600 line-clamp-2" data-testid={`text-description-${recipe.id}`}>
+                <p className="text-xs text-slate-600 line-clamp-2" data-testid={`text-description-${recipe.id}`}>
                   {recipe.description}
                 </p>
               )}
@@ -589,7 +589,7 @@ export default function RecipeCards() {
                     <img
                       src={recipe.image_url}
                       alt={recipe.name}
-                      className="w-full h-32 object-cover rounded-lg"
+                      className="w-full h-32 object-cover rounded-[4px]"
                       data-testid={`image-recipe-${recipe.id}`}
                     />
                     <div className="absolute top-2 right-2">
@@ -615,9 +615,9 @@ export default function RecipeCards() {
                     </div>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                  <div className="border-2 border-dashed border-slate-300 rounded-[4px] p-4 text-center">
                     <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 mb-2">No image uploaded</p>
+                    <p className="text-xs text-slate-500 mb-2">No image uploaded</p>
                     <Button
                       size="sm"
                       variant="outline"
@@ -642,24 +642,24 @@ export default function RecipeCards() {
               </div>
               
               {/* Cost Information */}
-              <div className="bg-gray-50 p-3 rounded-lg space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Total Cost:</span>
+              <div className="bg-slate-50 p-3 rounded-[4px] space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600">Total Cost:</span>
                   <span className="font-medium" data-testid={`text-cost-${recipe.id}`}>
                     ฿{(Number(recipe.total_cost ?? 0) || 0).toFixed(2)}
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Per Serving:</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600">Per Serving:</span>
                   <span className="font-medium">
                     ฿{(Number(recipe.cost_per_serving ?? 0) || 0).toFixed(2)}
                   </span>
                 </div>
                 
                 {(Number(recipe.suggested_price ?? 0) || 0) > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Suggested Price:</span>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">Suggested Price:</span>
                     <span className="font-medium text-emerald-600">
                       ฿{(Number(recipe.suggested_price ?? 0) || 0).toFixed(2)}
                     </span>
@@ -668,7 +668,7 @@ export default function RecipeCards() {
               </div>
               
               {/* Ingredients Count */}
-              <div className="flex items-center text-sm text-gray-600">
+              <div className="flex items-center text-xs text-slate-600">
                 <Utensils className="w-4 h-4 mr-1" />
                 <span data-testid={`text-ingredients-count-${recipe.id}`}>
                   {recipe.ingredients?.length || 0} ingredients
@@ -695,8 +695,8 @@ export default function RecipeCards() {
         <Card>
           <CardContent className="p-12 text-center">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No recipes found</h3>
-            <p className="text-gray-600">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">No recipes found</h3>
+            <p className="text-xs text-slate-600">
               Try adjusting your search terms or category filter to find recipes.
             </p>
           </CardContent>
@@ -708,8 +708,8 @@ export default function RecipeCards() {
         <Card>
           <CardContent className="p-12 text-center">
             <Utensils className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No recipes available</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">No recipes available</h3>
+            <p className="text-xs text-slate-600 mb-4">
               Create your first recipe to start generating professional recipe cards.
             </p>
             <Button

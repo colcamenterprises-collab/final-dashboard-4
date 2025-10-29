@@ -443,9 +443,9 @@ export default function RecipesUnified() {
   }
 
   return (
-    <div className="bg-[#f5f7f8] min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
+    <div className="bg-slate-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Recipe Management</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Recipe Management</h1>
         <div className="flex gap-3 items-center">
           <Button 
             onClick={() => setView(view === "cards" ? "calculator" : "cards")}
@@ -462,7 +462,7 @@ export default function RecipesUnified() {
         // ---- RECIPE CARDS VIEW ----
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <div className="text-lg font-semibold text-gray-700">
+            <div className="text-sm font-medium text-slate-600">
               {recipes.length} Recipe{recipes.length !== 1 ? 's' : ''} Available
             </div>
             <Button onClick={() => { resetCalculator(); setView("calculator"); }} className="bg-emerald-600 hover:bg-emerald-700">
@@ -473,38 +473,38 @@ export default function RecipesUnified() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recipes.map((recipe: Recipe) => (
-              <Card key={recipe.id} className="hover:shadow-lg transition-shadow">
+              <Card key={recipe.id} className="hover:shadow-lg transition-shadow rounded-[4px]">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg font-semibold">{recipe.name}</CardTitle>
+                    <CardTitle className="text-sm font-semibold">{recipe.name}</CardTitle>
                     <Badge variant={recipe.cogsPercent <= 32 ? "default" : recipe.cogsPercent <= 38 ? "secondary" : "destructive"}>
                       {recipe.cogsPercent?.toFixed(1) || 0}% COGS
                     </Badge>
                   </div>
                   {recipe.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2">{recipe.description}</p>
+                    <p className="text-xs text-slate-600 line-clamp-2">{recipe.description}</p>
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {recipe.imageUrl && (
-                    <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-32 object-cover rounded-lg" />
+                    <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-32 object-cover rounded-[4px]" />
                   )}
                   
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <div className="text-gray-600">Total Cost</div>
+                      <div className="text-slate-600">Total Cost</div>
                       <div className="font-semibold">{THB(recipe.totalCost || 0)}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Cost/Serving</div>
+                      <div className="text-slate-600">Cost/Serving</div>
                       <div className="font-semibold">{THB(recipe.costPerServing || 0)}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Suggested Price</div>
+                      <div className="text-slate-600">Suggested Price</div>
                       <div className="font-semibold">{THB(recipe.suggestedPrice || 0)}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Ingredients</div>
+                      <div className="text-slate-600">Ingredients</div>
                       <div className="font-semibold">{recipe.ingredients?.length || 0} items</div>
                     </div>
                   </div>
@@ -548,8 +548,8 @@ export default function RecipesUnified() {
           {recipes.length === 0 && (
             <div className="text-center py-12">
               <ChefHat className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Recipes Yet</h3>
-              <p className="text-gray-500 mb-4">Start creating your first recipe with our cost calculator</p>
+              <h3 className="text-sm font-semibold text-slate-600 mb-2">No Recipes Yet</h3>
+              <p className="text-xs text-slate-500 mb-4">Start creating your first recipe with our cost calculator</p>
               <Button onClick={() => setView("calculator")} className="bg-emerald-600 hover:bg-emerald-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Create First Recipe
@@ -580,9 +580,9 @@ export default function RecipesUnified() {
 
           {/* Recipe Header */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl shadow-sm border">
+            <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
               <div className="p-6">
-                <div className="text-sm text-gray-600">Recipe Details</div>
+                <div className="text-xs text-slate-600">Recipe Details</div>
                 <Input 
                   value={recipeName} 
                   onChange={(e) => setRecipeName(e.target.value)} 
@@ -603,7 +603,7 @@ export default function RecipesUnified() {
                 </Select>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-sm text-gray-600">Portions</div>
+                    <div className="text-xs text-slate-600">Portions</div>
                     <Input 
                       type="number" 
                       min={1} 
@@ -613,7 +613,7 @@ export default function RecipesUnified() {
                     />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Waste %</div>
+                    <div className="text-xs text-slate-600">Waste %</div>
                     <Input 
                       type="number" 
                       min={0} 
@@ -625,7 +625,7 @@ export default function RecipesUnified() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-sm text-gray-600">Menu Price (THB)</div>
+                  <div className="text-xs text-slate-600">Menu Price (THB)</div>
                   <Input 
                     type="number" 
                     min={0} 
@@ -637,7 +637,7 @@ export default function RecipesUnified() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border lg:col-span-2">
+            <div className="bg-white rounded-[4px] shadow-sm border border-slate-200 lg:col-span-2">
               <div className="p-6">
                 <div className="flex items-center gap-3">
                   <Input 
@@ -653,7 +653,7 @@ export default function RecipesUnified() {
                       <button 
                         key={ing.id} 
                         onClick={() => addIngredient(ing)} 
-                        className="border rounded-xl px-3 py-2 text-left hover:bg-gray-50"
+                        className="border border-slate-200 rounded-[4px] px-3 py-2 text-left hover:bg-slate-50"
                       >
                         <div className="font-medium">{ing.name}</div>
                         <div className="text-xs text-gray-500">
@@ -669,9 +669,9 @@ export default function RecipesUnified() {
           </div>
 
           {/* Ingredients Table */}
-          <div className="bg-white rounded-2xl shadow-sm border">
+          <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
             <div className="p-6">
-              <h3 className="text-[18px] font-semibold">Ingredients</h3>
+              <h3 className="text-sm font-medium">Ingredients</h3>
               <div className="mt-3 overflow-auto">
                 <table className="min-w-[820px] w-full">
                   <thead>
@@ -740,7 +740,7 @@ export default function RecipesUnified() {
 
           {/* Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl shadow-sm border">
+            <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
               <div className="p-6">
                 <div className="text-xs text-gray-600">Recipe Cost</div>
                 <div className="text-2xl font-semibold tabular-nums">{THB(recipeCostTHB)}</div>
@@ -748,7 +748,7 @@ export default function RecipesUnified() {
                 <div className="text-2xl font-semibold tabular-nums">{THB(costPerPortionTHB)}</div>
               </div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border">
+            <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
               <div className="p-6">
                 <div className="text-xs text-gray-600">Menu Price</div>
                 <div className="text-2xl font-semibold tabular-nums">{THB(menuPrice)}</div>
@@ -761,7 +761,7 @@ export default function RecipesUnified() {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border">
+            <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
               <div className="p-6">
                 <div className="text-xs text-gray-600">Gross Profit (per portion)</div>
                 <div className="text-2xl font-semibold tabular-nums">{THB(gpTHB)}</div>
@@ -772,7 +772,7 @@ export default function RecipesUnified() {
           </div>
 
           {/* Description */}
-          <div className="bg-white rounded-2xl shadow-sm border">
+          <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
             <div className="p-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-[18px] font-semibold">Recipe Description</h3>
