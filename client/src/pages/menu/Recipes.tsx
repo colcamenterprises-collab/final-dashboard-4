@@ -753,7 +753,7 @@ export default function RecipesUnified() {
                 <div className="text-xs text-gray-600">Menu Price</div>
                 <div className="text-2xl font-semibold tabular-nums">{THB(menuPrice)}</div>
                 <div className="mt-3 text-xs text-gray-600">Food Cost %</div>
-                <div className={`inline-block mt-1 px-3 py-1 rounded-md text-sm font-semibold ${
+                <div className={`inline-block mt-1 px-3 py-1 rounded-[4px] text-xs font-semibold ${
                   foodCostPct <= 32 ? "bg-green-100 text-green-800" : 
                   foodCostPct <= 38 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                 }`}>
@@ -775,7 +775,7 @@ export default function RecipesUnified() {
           <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
             <div className="p-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-semibold">Recipe Description</h3>
+                <h3 className="text-sm font-medium">Recipe Description</h3>
                 <Button onClick={generateDescription} className="bg-emerald-600 hover:bg-emerald-700">
                   {chefMode === "ramsay" ? "Ask Chef Ramsay" : "Generate Description"}
                 </Button>
@@ -784,7 +784,7 @@ export default function RecipesUnified() {
                 value={recipeDesc} 
                 onChange={(e) => setRecipeDesc(e.target.value)} 
                 placeholder="Recipe description for Grab, ingredients, preparation notes..." 
-                className="mt-4 w-full border rounded-xl px-3 py-2 h-24 resize-none" 
+                className="mt-4 w-full border border-slate-200 rounded-[4px] px-3 py-2 h-24 resize-none text-xs" 
               />
             </div>
           </div>
