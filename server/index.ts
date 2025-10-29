@@ -16,6 +16,7 @@ import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
 import posUploadRouter from "./routes/posUpload";
 import healthRouter from "./routes/health";
 import opsMtdRouter from "./routes/ops_mtd";
+import purchasingRouter from "./routes/purchasing";
 
 const prisma = new PrismaClient();
 
@@ -181,6 +182,7 @@ async function checkSchema() {
   app.use('/api', shiftAnalysisRouter);
   app.use('/api', healthRouter);
   app.use('/api', opsMtdRouter);
+  app.use('/api/purchasing', purchasingRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {

@@ -525,22 +525,21 @@ model DailyStockV2 {
 model IngredientV2 {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
   name      String   @unique
   supplier  String?
   category  String?
   brand     String?
 
   // Purchasing (pack-based - for shopping lists)
-  purchaseUnit String // e.g., "kg", "pack"
-  purchaseQty  Decimal // e.g., 1.0 kg per pack
-  packageCost  Decimal // THB per pack
+  purchaseUnit String? @map("purchase_unit") // e.g., "kg", "pack"
+  purchaseQty  Decimal? @map("purchase_qty") // e.g., 1.0 kg per pack
+  packageCost  Decimal? @map("package_cost") // THB per pack
 
   // Portioning (used ONLY for recipe costing)
-  portionUnit String? // e.g., "g", "ml"
-  portionQty  Decimal? // e.g., 1000 (for 1kg = 1000g)
+  portionUnit String? @map("portion_unit") // e.g., "g", "ml"
+  portionQty  Decimal? @map("portion_qty") // e.g., 1000 (for 1kg = 1000g)
 
-  lastReview DateTime?
+  lastReview DateTime? @map("lastreview")
   notes      String?
 
   items        RecipeItemV2[]
