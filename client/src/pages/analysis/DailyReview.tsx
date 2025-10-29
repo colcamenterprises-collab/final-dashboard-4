@@ -26,7 +26,10 @@ interface DailySalesRow {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => todayISO().slice(0, 7);
-const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+const fmt = (n: number | null | undefined) => {
+  if (n === null || n === undefined) return "—";
+  return n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+};
 
 function Flag({ val }: { val: number }) {
   const match = val === 0;
