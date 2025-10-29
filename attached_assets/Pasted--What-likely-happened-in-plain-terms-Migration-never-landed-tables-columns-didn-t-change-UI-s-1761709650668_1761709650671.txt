@@ -1,0 +1,137 @@
+
+What likely happened (in plain terms)
+
+Migration never landed → tables/columns didn’t change → UI shows old behavior.
+
+Server not restarted / wrong DB → code changed, but you’re running against the previous database.
+
+New route not wired (/api/purchasing/plan) → frontend can’t hit the new purchasing engine.
+
+No data backfill → purchaseUnit/purchaseQty/packageCost are empty, so purchasing looks unchanged.
+
+
+Fix-now checklist (copy/paste for the agent)
+
+Run these in order. If ANY step fails, stop and paste the full output.
+
+1. Confirm we’re on the right DB
+
+
+
+echo "$DATABASE_URL"
+
+Must be the Neon prod URL you expect (not local / old dev).
+
+
+2. See if our new tables/columns actually exist
+
+
+
+psql "$DATABASE_URL" -c "\dt"
+psql "$DATABASE_URL" -c "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('ingredient_v2','ingredient_price_v2','recipe_v2','recipe_item_v2') ORDER BY 1;"
+psql "$DATABASE_URL" -c "SELECT column_name FROM information_schema.columns WHERE table_name='ingredient_v2' ORDER BY 1;"
+
+Expected: tables listed, and columns including purchaseunit, purchaseqty, packagecost, portionunit, portionqty.
+
+3. If they don’t exist, apply the drift-safe plan we agreed
+
+
+
+# align Prisma to existing DB without losing data
+npx prisma db pull
+npx prisma format
+npx prisma validate
+
+# re-apply our IngredientV2/PriceHistory/Recipe tweaks (already in schema.prisma)
+npx prisma generate
+npx prisma migrate dev --name add_ingredient_price_history_and_split
+
+4. Confirm the purchasing route is actually mounted
+
+
+
+grep -n "app.use('/api/purchasing'" -n server/index.ts || echo "MISSING_PURCHASING_ROUTE"
+ls -1 server/routes | grep purchasing.ts || echo "MISSING_purchasing.ts"
+
+Expected: both present. If missing, add:
+
+// server/index.ts
+import purchasingRoute from './routes/purchasing';
+app.use('/api/purchasing', purchasingRoute);
+
+5. Restart the server process
+
+
+
+Hit your normal Replit “Run” to restart. (No waiting—just ensure it restarts.)
+
+
+6. Backfill real purchasing fields (packs), not portions
+(If we didn’t run this yet, the shopping list won’t change.)
+
+
+
+# If present from earlier work:
+npm run sync:ingredients || echo "no sync script defined"
+
+# If not defined, run a one-off Node task:
+node -e "const { foodCostings } = require('./server/data/foodCostings'); console.log(!!foodCostings && foodCostings.length, 'items');"
+
+If the sync script isn’t set up, say so—I’ll drop a 1-file backfill you can paste and run.
+
+7. Sanity check the data actually contains pack info
+
+
+
+psql "$DATABASE_URL" -c "SELECT name, purchaseunit, purchaseqty, packagecost FROM ingredient_v2 ORDER BY name LIMIT 10;"
+psql "$DATABASE_URL" -c "SELECT COUNT(*) AS missing_pack FROM ingredient_v2 WHERE purchaseunit IS NULL OR purchaseqty IS NULL OR purchaseqty=0 OR packagecost IS NULL OR packagecost=0;"
+
+Expected: missing_pack = 0 for ingredients you expect to buy.
+
+8. Prove the new purchasing works (no UI required)
+
+
+
+Grab a real ingredient UUID:
+
+
+psql "$DATABASE_URL" -c "SELECT id, name FROM ingredient_v2 ORDER BY createdat DESC LIMIT 5;"
+
+Call the API manually (replace UUID + qty):
+
+
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_TOPSIDE_BEEF>","requiredQtyBase":8700}]}'
+
+Expected JSON: packsToBuy computed from purchaseQty/purchaseUnit, not portion. For 8.7 kg and 1 kg packs → packsToBuy: 9.
+
+9. Point the frontend to the new endpoint
+
+
+
+Confirm your Purchasing page calls POST /api/purchasing/plan and renders packsToBuy, lineCostTHB.
+
+If it still shows the old “portion-based” numbers, it’s hitting the wrong route or using old math in the client.
+
+
+Why it looked like nothing changed
+
+Until the DB schema + data and route wiring are both in place, the UI literally has nothing new to read—so it appears unchanged.
+
+The earlier drift error likely meant migrations never applied, and the sync/backfill never ran, so your tables still had old shapes/values.
+
+
+If step 6 shows missing pack data
+
+Tell me and I’ll give you a single backfill script that:
+
+Parses foodCostings.ts packaging like “12 x 330 ml” → purchaseUnit=ml, purchaseQty=3960, packageCost=THB.
+
+Leaves portionUnit/portionQty as-is (for costing only).
+
+Upserts every item into ingredient_v2 without touching anything else.
+
+
+
+---
