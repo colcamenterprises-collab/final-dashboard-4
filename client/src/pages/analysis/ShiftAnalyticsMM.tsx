@@ -142,7 +142,7 @@ export default function ShiftAnalyticsMM() {
   }, [filtered]);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto" style={{ fontFamily: 'Poppins, sans-serif' }}>
       {/* Header and Controls - with padding */}
       <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
         {/* Header */}
@@ -217,13 +217,14 @@ export default function ShiftAnalyticsMM() {
 
       {/* Table - Full Width Scrollable (no padding) */}
       <div 
-        className="w-full overflow-x-auto bg-white" 
+        className="w-full overflow-x-auto overflow-y-visible bg-white" 
         style={{ 
           WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x pan-y'
+          overscrollBehaviorX: 'contain',
+          scrollBehavior: 'smooth'
         }}
       >
-        <table className="w-full border-collapse text-xs" style={{ minWidth: '800px' }}>
+        <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
           <thead>
             <tr className="border-b border-slate-300">
               <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">SKU</th>
