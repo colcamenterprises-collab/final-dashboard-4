@@ -4,7 +4,7 @@ import { formatDateDDMMYYYY, convertFromInputDate } from "@/lib/format";
 type ShiftItem = {
   sku: string | null;
   name: string;
-  category: "burger" | "drink" | "side" | "modifier" | "bundle" | "other";
+  category: string; // Allow any category from Loyverse
   qty: number;
   patties?: number;
   red_meat_g?: number;
@@ -31,8 +31,8 @@ type ShiftResp =
       items: ShiftItem[];
     };
 
-const CATS = ["all", "burger", "drink", "side", "modifier", "bundle", "other"] as const;
-type CatTab = typeof CATS[number];
+// Dynamic categories - extracted from actual data
+type CatTab = "all" | string;
 
 function fmt(n: number | undefined) {
   if (n == null) return "";
@@ -109,10 +109,28 @@ export default function ShiftAnalyticsMM() {
     URL.revokeObjectURL(a.href);
   }
 
+  // Extract unique categories from items
+  const categories = useMemo(() => {
+    const cats = new Set(items.map(x => x.category));
+    return ["all", ...Array.from(cats).sort()];
+  }, [items]);
+
   const filtered = useMemo(() => {
     if (tab === "all") return items;
     return items.filter((x) => x.category === tab);
   }, [items, tab]);
+
+  // Group items by category for display
+  const itemsByCategory = useMemo(() => {
+    const groups: Record<string, ShiftItem[]> = {};
+    filtered.forEach(item => {
+      if (!groups[item.category]) {
+        groups[item.category] = [];
+      }
+      groups[item.category].push(item);
+    });
+    return groups;
+  }, [filtered]);
 
   const totals = useMemo(() => {
     const totalQty = filtered.reduce((sum, it) => sum + (it.qty || 0), 0);
@@ -174,18 +192,18 @@ export default function ShiftAnalyticsMM() {
 
         {/* Category Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 sm:mx-0 sm:px-0">
-          {CATS.map((c) => (
+          {categories.map((c) => (
             <button
               key={c}
               onClick={() => setTab(c)}
               className={`px-3 sm:px-4 py-2 rounded border text-xs font-medium whitespace-nowrap min-h-[44px] min-w-[44px] active:scale-95 transition-all ${
                 tab === c 
-                  ? "bg-slate-900 text-white border-slate-900" 
+                  ? "bg-emerald-600 text-white border-emerald-600" 
                   : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
               }`}
               data-testid={`tab-${c}`}
             >
-              {c.toUpperCase()}
+              {c === "all" ? "ALL" : c.toUpperCase()}
             </button>
           ))}
         </div>
@@ -219,21 +237,32 @@ export default function ShiftAnalyticsMM() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((it, idx) => (
-              <tr 
-                key={idx} 
-                className="border-b border-slate-200 hover:bg-slate-50"
-                data-testid={`row-item-${idx}`}
-              >
-                <td className="hidden sm:table-cell px-2 py-2 font-mono text-slate-600 text-[10px] sm:text-xs whitespace-nowrap">{it.sku ?? "—"}</td>
-                <td className="px-2 py-2 text-slate-900 whitespace-nowrap">{it.name}</td>
-                <td className="hidden md:table-cell px-2 py-2 text-slate-600 capitalize whitespace-nowrap">{it.category}</td>
-                <td className="px-2 py-2 text-right font-semibold text-slate-900 whitespace-nowrap">{fmt(it.qty)}</td>
-                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.patties ?? 0)}</td>
-                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
-                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
-                <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.rolls ?? 0)}</td>
-              </tr>
+            {Object.entries(itemsByCategory).map(([category, categoryItems]) => (
+              <>
+                {/* Category Header Row */}
+                <tr key={`cat-${category}`} className="bg-emerald-50 border-t border-emerald-200">
+                  <td colSpan={8} className="px-2 py-2 font-semibold text-emerald-900 text-xs uppercase tracking-wide">
+                    {category} ({categoryItems.length} items)
+                  </td>
+                </tr>
+                {/* Items in this category */}
+                {categoryItems.map((it, idx) => (
+                  <tr 
+                    key={`${category}-${idx}`} 
+                    className="border-b border-slate-200 hover:bg-slate-50"
+                    data-testid={`row-item-${category}-${idx}`}
+                  >
+                    <td className="hidden sm:table-cell px-2 py-2 font-mono text-slate-600 text-[10px] sm:text-xs whitespace-nowrap">{it.sku ?? "—"}</td>
+                    <td className="px-2 py-2 text-slate-900 whitespace-nowrap">{it.name}</td>
+                    <td className="hidden md:table-cell px-2 py-2 text-slate-600 whitespace-nowrap">{it.category}</td>
+                    <td className="px-2 py-2 text-right font-semibold text-slate-900 whitespace-nowrap">{fmt(it.qty)}</td>
+                    <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.patties ?? 0)}</td>
+                    <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "red_meat_g", "redMeatGrams"))}</td>
+                    <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(getMeat(it, "chicken_g", "chickenGrams"))}</td>
+                    <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.rolls ?? 0)}</td>
+                  </tr>
+                ))}
+              </>
             ))}
             {filtered.length === 0 && (
               <tr>
