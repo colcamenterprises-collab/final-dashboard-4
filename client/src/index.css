@@ -912,3 +912,6 @@ h3 {
   h2 { font-size: 20px !important; }
   h3 { font-size: 18px !important; }
 }
+/* Fix: headings follow page text color */\nh1, h2, h3 { color: inherit !important; }
+/* Fix: headings follow page text color */
+h1, h2, h3 { color: inherit !important; }
