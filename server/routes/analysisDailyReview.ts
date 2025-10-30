@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma";
+import { ingestPosForBusinessDate } from "../services/loyverseIngest";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -194,4 +195,46 @@ analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
     prisma.dailySalesV2.count({ where: { shift_date: { gte: start, lt: end }, deletedAt: null } }),
   ]);
   res.json({ date, posCount, formCount, start, end });
+});
+
+// Manual sync endpoint for Daily Review page
+analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
+  try {
+    const date = String(req.query.date || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ ok: false, error: "Provide date=YYYY-MM-DD" });
+    }
+
+    console.log(`📊 Manual sync requested for ${date}`);
+    
+    // Get store ID from environment or default to Smash Brothers Burgers store
+    const storeId = process.env.LOYVERSE_STORE_ID || '0c87cebd-e5e5-45b6-b57a-6764b869f38e';
+    
+    // Call the POS ingestion service
+    await ingestPosForBusinessDate(storeId, date);
+    
+    // Fetch the synced data to return to frontend
+    const pos = await fetchPOSFromDB(date);
+    
+    if (!pos) {
+      return res.json({ 
+        ok: false, 
+        error: "Sync completed but no POS data found. The shift may not have opened yet." 
+      });
+    }
+
+    res.json({
+      ok: true,
+      message: `Successfully synced POS data for ${date}`,
+      date: date,
+      sales: pos.sales.total,
+      expenses: pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
+    });
+  } catch (error: any) {
+    console.error("❌ Sync error:", error);
+    res.status(500).json({ 
+      ok: false, 
+      error: error.message || "Failed to sync POS data" 
+    });
+  }
 });
