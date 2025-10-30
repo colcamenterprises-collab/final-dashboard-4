@@ -873,3 +873,42 @@ html, body {
 .dark .input::placeholder {
   color: #6B7280; /* gray-500 for dark mode */
 }
+
+/* === Global Typography Standard — Smash Brothers Burgers === */
+/* Mobile-first, tablet-friendly headings — matches Daily Sales form */
+
+/* H1 — Page Title */
+h1 {
+  font-size: 22px !important;
+  font-weight: 900 !important;  /* Black weight */
+  line-height: 1.2 !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #000; /* Adjust if using dark backgrounds */
+}
+
+/* H2 — Section Header */
+h2 {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  font-family: 'Poppins', sans-serif !important;
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+  color: #000;
+}
+
+/* H3 — Subsection Label */
+h3 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #000;
+}
+
+/* Responsive Scaling for Tablet/Desktop */
+@media (min-width: 768px) {
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 20px !important; }
+  h3 { font-size: 18px !important; }
+}

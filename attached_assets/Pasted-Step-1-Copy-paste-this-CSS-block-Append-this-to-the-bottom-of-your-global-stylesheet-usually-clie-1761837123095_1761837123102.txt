@@ -1,0 +1,97 @@
+Step 1: Copy-paste this CSS block
+
+Append this to the bottom of your global stylesheet (usually
+client/src/index.css or client/src/styles/globals.css):
+
+/* === Global Typography Standard — Smash Brothers Burgers === */
+/* Mobile-first, tablet-friendly headings — matches Daily Sales form */
+
+/* H1 — Page Title */
+h1 {
+  font-size: 22px !important;
+  font-weight: 900 !important;  /* Black weight */
+  line-height: 1.2 !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #000; /* Adjust if using dark backgrounds */
+}
+
+/* H2 — Section Header */
+h2 {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  font-family: 'Poppins', sans-serif !important;
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+  color: #000;
+}
+
+/* H3 — Subsection Label */
+h3 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #000;
+}
+
+/* Responsive Scaling for Tablet/Desktop */
+@media (min-width: 768px) {
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 20px !important; }
+  h3 { font-size: 18px !important; }
+}
+
+
+---
+
+⚡ Step 2: Or apply automatically (Bash)
+
+If you’re on tablet and want to do this fast from Replit shell:
+
+echo '/* === Global Typography Standard — Smash Brothers Burgers === */
+h1 {
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+  font-family: "Poppins", sans-serif !important;
+  color: #000;
+}
+h2 {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  font-family: "Poppins", sans-serif !important;
+  color: #000;
+}
+h3 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  font-family: "Poppins", sans-serif !important;
+  color: #000;
+}
+@media (min-width: 768px) {
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 20px !important; }
+  h3 { font-size: 18px !important; }
+}' >> client/src/index.css
+
+
+---
+
+✅ Step 3: Rebuild + Verify
+
+1. Hit Stop → Run in Replit (or npm run dev).
+
+
+2. Refresh on your tablet (clear cache if needed).
+
+
+3. Open any page — Daily Sales, Online Ordering, Analysis, etc.
+→ Every H1, H2, and H3 will now follow the same Poppins-Black hierarchy.
+
+
+
+
+---
