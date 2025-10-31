@@ -443,7 +443,7 @@ export default function RecipesUnified() {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
+    <div className="min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Recipe Management</h1>
         <div className="flex gap-3 items-center">
