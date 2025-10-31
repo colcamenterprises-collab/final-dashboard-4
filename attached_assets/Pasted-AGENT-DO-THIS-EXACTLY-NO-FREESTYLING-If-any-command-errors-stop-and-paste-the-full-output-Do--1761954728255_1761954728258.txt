@@ -1,0 +1,632 @@
+AGENT — DO THIS EXACTLY (NO FREESTYLING)
+
+If any command errors, stop and paste the full output.
+Do not merge purchasing and portion concepts. Do not convert mass↔volume.
+
+
+---
+
+0) Preconditions (no changes, just confirm)
+
+echo "DB:" $DATABASE_URL
+node -e "console.log('Node ok')"
+
+
+---
+
+1) Fix Drizzle (unblock seeding/backfill)
+
+File: shared/schema.ts
+Change these three columns to be nullable (remove .notNull()):
+
+// BEFORE (blocker)
+// purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
+// purchaseUnit: text("purchase_unit").notNull(),
+// purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+
+// AFTER (temporary, nullable to match DB)
+purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }),
+purchaseUnit: text("purchase_unit"),
+purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }),
+
+> Don’t re-add .notNull() until we’ve backfilled every ingredient (final hardening step later).
+
+
+
+
+---
+
+2) Backend — pack-based purchasing (FULL FILES)
+
+A) server/lib/purchasingPlanner.ts (replace)
+
+// server/lib/purchasingPlanner.ts
+// Robust, pack-based purchasing math with strict unit families.
+// Portions are NEVER used here.
+
+import { prisma } from '../lib/prisma';
+
+type Unit = 'kg'|'g'|'L'|'ml'|'each';
+type Family = 'g'|'ml'|'each';
+
+function toBase(unit: Unit, qty: number): { base: Family, value: number } {
+  switch (unit) {
+    case 'kg': return { base: 'g',  value: qty * 1000 };
+    case 'g':  return { base: 'g',  value: qty };
+    case 'L':  return { base: 'ml', value: qty * 1000 };
+    case 'ml': return { base: 'ml', value: qty };
+    case 'each': return { base: 'each', value: qty };
+    default: return { base: 'each', value: qty };
+  }
+}
+
+export type PurchasingNeedBase = {
+  ingredientId: string;
+  requiredQtyBase: number;    // already in base units (g/ml/each)
+};
+
+export type PurchasingNeedQty = {
+  ingredientId: string;
+  requiredQty: number;        // numeric
+  requiredUnit: Unit;         // 'g','kg','ml','L','each'
+};
+
+export type PurchasingNeed = PurchasingNeedBase | PurchasingNeedQty;
+
+export type PurchasingPlanLine = {
+  ingredientId: string;
+  name: string;
+  supplier?: string | null;
+  requiredQtyBase: number;  // normalized need in pack base family
+  packBaseQty: number;      // pack size in base units (e.g., 1000 g, 3960 ml, 1 each)
+  packsToBuy: number;       // ceil(required / packBaseQty)
+  packageCostTHB: number;
+  lineCostTHB: number;
+  baseFamily: Family;
+};
+
+export async function buildPurchasingPlan(needs: PurchasingNeed[]): Promise<{
+  lines: PurchasingPlanLine[];
+  totalCostTHB: number;
+}> {
+  const ingIds = needs.map(n => n.ingredientId);
+  const ingredients = await prisma.ingredientV2.findMany({
+    where: { id: { in: ingIds } },
+    select: { id: true, name: true, supplier: true, purchaseUnit: true, purchaseQty: true, packageCost: true }
+  });
+
+  const byId = new Map(ingredients.map(i => [i.id, i]));
+  const lines: PurchasingPlanLine[] = [];
+
+  for (const need of needs) {
+    const ing = byId.get(need.ingredientId);
+    if (!ing) throw new Error(`Ingredient not found: ${need.ingredientId}`);
+
+    // Pack size in base units (family)
+    const pack = toBase(ing.purchaseUnit as any, Number(ing.purchaseQty));
+    if (!Number.isFinite(pack.value) || pack.value <= 0) {
+      throw new Error(`Invalid pack size for ingredient: ${ing.name}`);
+    }
+
+    // Need → same base family as pack
+    let requiredBase: number;
+    if ('requiredQtyBase' in need) {
+      requiredBase = Number(need.requiredQtyBase);
+    } else if ('requiredQty' in need && 'requiredUnit' in need) {
+      const conv = toBase(need.requiredUnit as any, Number(need.requiredQty));
+      if (conv.base !== pack.base) {
+        throw new Error(`Unit family mismatch for ${ing.name}: need ${conv.base}, pack ${pack.base}.`);
+      }
+      requiredBase = conv.value;
+    } else {
+      throw new Error('Invalid need: pass requiredQtyBase OR (requiredQty & requiredUnit).');
+    }
+    if (!Number.isFinite(requiredBase) || requiredBase < 0) {
+      throw new Error(`Invalid required quantity for ${ing.name}.`);
+    }
+
+    const packsToBuy = Math.ceil(requiredBase / pack.value);
+    const packageCostTHB = Number(ing.packageCost);
+    const lineCostTHB = packsToBuy * packageCostTHB;
+
+    lines.push({
+      ingredientId: ing.id,
+      name: ing.name,
+      supplier: ing.supplier,
+      requiredQtyBase: requiredBase,
+      packBaseQty: pack.value,
+      packsToBuy,
+      packageCostTHB,
+      lineCostTHB,
+      baseFamily: pack.base,
+    });
+  }
+
+  const totalCostTHB = lines.reduce((s, l) => s + l.lineCostTHB, 0);
+  return { lines, totalCostTHB };
+}
+
+B) server/routes/purchasing.ts (replace)
+
+// server/routes/purchasing.ts
+import { Router } from 'express';
+import { z } from 'zod';
+import { buildPurchasingPlan } from '../lib/purchasingPlanner';
+
+const router = Router();
+
+const NeedBase = z.object({
+  ingredientId: z.string().uuid(),
+  requiredQtyBase: z.number().nonnegative(),
+});
+
+const NeedQty = z.object({
+  ingredientId: z.string().uuid(),
+  requiredQty: z.number().nonnegative(),
+  requiredUnit: z.enum(['kg','g','L','ml','each']),
+});
+
+const BodySchema = z.object({
+  needs: z.array(z.union([NeedBase, NeedQty])).min(1),
+});
+
+router.post('/plan', async (req, res) => {
+  const parsed = BodySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    const plan = await buildPurchasingPlan(parsed.data.needs);
+    res.json(plan);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || 'Failed to build purchasing plan' });
+  }
+});
+
+export default router;
+
+C) Mount route
+
+File: server/index.ts
+
+// add near other routes
+import purchasingRoute from './routes/purchasing';
+app.use('/api/purchasing', purchasingRoute);
+
+
+---
+
+3) Backfill — pack fields (FULL FILE)
+
+File: server/scripts/backfillIngredientPurchasing.ts
+
+// server/scripts/backfillIngredientPurchasing.ts
+import { prisma } from '../lib/prisma';
+import dayjs from 'dayjs';
+const mod = require('../data/foodCostings');
+const foodCostings: any[] = Array.isArray(mod?.foodCostings) ? mod.foodCostings : (Array.isArray(mod?.default) ? mod.default : []);
+
+type Unit = 'kg'|'g'|'L'|'ml'|'each';
+
+function parseCostTHB(raw?: string): number {
+  if (!raw) return 0;
+  const n = Number(String(raw).replace(/[^\d.]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+function parsePackagingQty(raw?: string): { purchaseUnit: Unit, purchaseQty: number } {
+  if (!raw) return { purchaseUnit: 'each', purchaseQty: 1 };
+  const lower = String(raw).trim().toLowerCase();
+  const multi = lower.match(/(\d+)\s*x\s*(\d*\.?\d+)\s*(kg|g|l|ml|each|pc|piece|pieces|unit|can|bottle)/);
+  if (multi) {
+    const packs = Number(multi[1]);
+    const eachQty = Number(multi[2]);
+    let u = multi[3];
+    if (u === 'l') u = 'L';
+    if (['pc','piece','pieces','unit','can','bottle','each'].includes(u)) return { purchaseUnit: 'each', purchaseQty: packs * eachQty };
+    return { purchaseUnit: u as Unit, purchaseQty: packs * eachQty };
+  }
+  const per = lower.match(/per\s+(kg|g|l|ml|each|piece|pc|unit)/);
+  if (per) {
+    let u = per[1]; if (u === 'l') u = 'L'; if (['piece','pc','unit'].includes(u)) u = 'each';
+    return { purchaseUnit: u as Unit, purchaseQty: 1 };
+  }
+  const simple = lower.match(/(\d*\.?\d+)\s*(kg|g|l|ml|each|piece|pc|unit)/);
+  if (simple) {
+    const qty = Number(simple[1]);
+    let u = simple[2]; if (u === 'l') u = 'L'; if (['piece','pc','unit'].includes(u)) u = 'each';
+    return { purchaseUnit: u as Unit, purchaseQty: qty };
+  }
+  return { purchaseUnit: 'each', purchaseQty: 1 };
+}
+function parsePortion(raw?: string) {
+  if (!raw) return {};
+  const m = String(raw).toLowerCase().match(/(\d*\.?\d+)\s*(g|gr|gram|kg|ml|l|each|piece|pc|unit)/);
+  if (!m) return {};
+  const qty = Number(m[1]);
+  let u = m[2]; if (u === 'gr' || u === 'gram') u = 'g'; if (u === 'l') u = 'L';
+  if (['piece','pc','unit'].includes(u)) u = 'each';
+  if (u === 'kg') return { portionQty: qty * 1000, portionUnit: 'g' as const };
+  return { portionQty: qty, portionUnit: u as Unit };
+}
+const args = new Set(process.argv.slice(2));
+const APPLY = args.has('--apply');
+const ALSO_SET_PORTION_IF_MISSING = args.has('--portion');
+
+async function upsertByName(item: any) {
+  const name = (item.item || item.name || '').trim();
+  if (!name) return { skip: true };
+  const costTHB = parseCostTHB(item.cost);
+  const { purchaseUnit, purchaseQty } = parsePackagingQty(item.packagingQty);
+  const { portionQty, portionUnit } = parsePortion(item.averageMenuPortion);
+  const lastReview = item.lastReviewDate ? dayjs(item.lastReviewDate, ['DD.MM.YY','DD/MM/YY','YYYY-MM-DD']).toDate() : null;
+
+  const existing = await prisma.ingredientV2.findFirst({ where: { name } });
+  if (!existing) {
+    if (!APPLY) return { created: true, name, purchaseUnit, purchaseQty, packageCost: costTHB };
+    const created = await prisma.ingredientV2.create({
+      data: {
+        name,
+        category: item.category ?? null,
+        brand: item.brand ?? null,
+        supplier: item.supplier ?? null,
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+        portionUnit: ALSO_SET_PORTION_IF_MISSING ? (portionUnit ?? null) : null,
+        portionQty: ALSO_SET_PORTION_IF_MISSING ? (portionQty as any ?? null) : null,
+        lastReview: lastReview ?? undefined,
+      }
+    });
+    await prisma.ingredientPriceV2.create({
+      data: {
+        ingredientId: created.id,
+        effectiveFrom: new Date(),
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+      }
+    });
+    return { created: true, name };
+  }
+
+  // update only purchasing (and portions if missing + flag)
+  const updates: any = {};
+  let changed = false;
+
+  if (String(existing.purchaseUnit) !== String(purchaseUnit)) { updates.purchaseUnit = purchaseUnit; changed = true; }
+  if (Number(existing.purchaseQty) !== Number(purchaseQty))   { updates.purchaseQty = purchaseQty as any; changed = true; }
+  if (Number(existing.packageCost) !== Number(costTHB))       { updates.packageCost = costTHB as any; changed = true; }
+
+  if (ALSO_SET_PORTION_IF_MISSING) {
+    if (!existing.portionUnit && portionUnit) { updates.portionUnit = portionUnit; changed = true; }
+    if ((existing.portionQty == null || Number(existing.portionQty) === 0) && portionQty) {
+      updates.portionQty = portionQty as any; changed = true;
+    }
+  }
+
+  if (!changed) return { unchanged: true, name };
+
+  if (!APPLY) return { updated: true, name, updates };
+
+  const updated = await prisma.ingredientV2.update({
+    where: { id: existing.id },
+    data: {
+      ...updates,
+      lastReview: lastReview ?? existing.lastReview ?? undefined,
+      supplier: item.supplier ?? existing.supplier ?? undefined,
+      brand: item.brand ?? existing.brand ?? undefined,
+      category: item.category ?? existing.category ?? undefined,
+    }
+  });
+  if (updates.packageCost != null) {
+    await prisma.ingredientPriceV2.create({
+      data: {
+        ingredientId: updated.id,
+        effectiveFrom: new Date(),
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+      }
+    });
+  }
+  return { updated: true, name };
+}
+
+async function main() {
+  if (!foodCostings || !Array.isArray(foodCostings) || foodCostings.length === 0) {
+    console.error('ERROR: Could not load server/data/foodCostings.ts');
+    process.exit(1);
+  }
+  let created = 0, updated = 0, unchanged = 0;
+  for (const row of foodCostings) {
+    const r = await upsertByName(row);
+    if (!r) continue;
+    if ((r as any).created) created++;
+    else if ((r as any).updated) updated++;
+    else if ((r as any).unchanged) unchanged++;
+  }
+  console.log(`Backfill ${APPLY ? 'APPLIED' : 'DRY-RUN'} — created:${created} updated:${updated} unchanged:${unchanged}`);
+}
+main().catch(e => (console.error(e), process.exit(1)));
+
+Add script to package.json:
+
+{
+  "scripts": {
+    "backfill:ingredients": "tsx server/scripts/backfillIngredientPurchasing.ts"
+  }
+}
+
+
+---
+
+4) Frontend — make it visible NOW
+
+A) API helper
+
+File: client/src/lib/purchasingApi.ts
+
+export type NeedBase = { ingredientId: string; requiredQtyBase: number };
+export type NeedQty = { ingredientId: string; requiredQty: number; requiredUnit: 'kg'|'g'|'L'|'ml'|'each' };
+export type Need = NeedBase | NeedQty;
+
+export type PurchasingPlanLine = {
+  ingredientId: string;
+  name: string;
+  supplier?: string | null;
+  requiredQtyBase: number;
+  packBaseQty: number;
+  packsToBuy: number;
+  packageCostTHB: number;
+  lineCostTHB: number;
+  baseFamily: 'g'|'ml'|'each';
+};
+
+export async function getPurchasingPlan(needs: Need[]) {
+  const res = await fetch('/api/purchasing/plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ needs }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to build purchasing plan');
+  }
+  return res.json() as Promise<{ lines: PurchasingPlanLine[]; totalCostTHB: number }>;
+}
+
+B) Live page (standalone) — shows pack data + planner
+
+File: client/src/pages/ops/PurchasingLive.tsx
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { getPurchasingPlan, Need } from '@/lib/purchasingApi';
+
+type Ingredient = {
+  id: string;
+  name: string;
+  supplier?: string | null;
+  purchaseUnit?: string | null;
+  purchaseQty?: number | null;
+  packageCost?: number | null;
+  portionUnit?: string | null;
+  portionQty?: number | null;
+};
+
+export default function PurchasingLive() {
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [onlyMissing, setOnlyMissing] = useState(false);
+
+  const [rows, setRows] = useState<Array<{ingredientId: string; qty: number; unit: 'kg'|'g'|'L'|'ml'|'each'}>>([]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch('/api/ingredients'); // assumes our enriched route or fallback returning items
+        const j = await r.json();
+        const items: Ingredient[] = (j.items ?? j) as any;
+        setIngredients(items);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!onlyMissing) return ingredients;
+    return ingredients.filter(i => !i.purchaseUnit || !i.purchaseQty || !i.packageCost);
+  }, [ingredients, onlyMissing]);
+
+  const addRow = (id?: string) => {
+    const first = id ?? ingredients[0]?.id ?? '';
+    setRows(prev => [...prev, { ingredientId: first, qty: 1, unit: 'kg' }]);
+  };
+
+  const removeRow = (idx: number) => setRows(prev => prev.filter((_, i) => i !== idx));
+
+  const buildPlan = async () => {
+    const needs: Need[] = rows.map(r => ({ ingredientId: r.ingredientId, requiredQty: Number(r.qty) || 0, requiredUnit: r.unit }));
+    const plan = await getPurchasingPlan(needs);
+    alert(JSON.stringify(plan, null, 2)); // quick visibility; wire to your UI table as needed
+  };
+
+  return (
+    <div className="p-4 space-y-6">
+      <h1 className="text-xl font-extrabold">Purchasing & Ingredients (Live)</h1>
+
+      <div className="flex items-center gap-4">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={onlyMissing} onChange={e => setOnlyMissing(e.target.checked)} />
+          Show Missing Pack Data
+        </label>
+        <button className="px-3 py-2 rounded bg-black text-white" onClick={() => addRow()}>Add Need</button>
+      </div>
+
+      <div className="overflow-auto border rounded">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-2 text-left">Ingredient</th>
+              <th className="p-2 text-left">Supplier</th>
+              <th className="p-2 text-left">Pack Size</th>
+              <th className="p-2 text-left">Pack Cost (THB)</th>
+              <th className="p-2 text-left">Portion (Costing)</th>
+              <th className="p-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td className="p-2" colSpan={6}>Loading…</td></tr>
+            )}
+            {!loading && filtered.map(i => {
+              const packOk = !!i.purchaseUnit && !!i.purchaseQty && !!i.packageCost;
+              return (
+                <tr key={i.id} className="border-t">
+                  <td className="p-2">{i.name}</td>
+                  <td className="p-2">{i.supplier ?? '-'}</td>
+                  <td className="p-2">{packOk ? `${i.purchaseQty} ${i.purchaseUnit}` : '-'}</td>
+                  <td className="p-2">{packOk ? Number(i.packageCost).toFixed(2) : '-'}</td>
+                  <td className="p-2">{i.portionQty ? `${i.portionQty} ${i.portionUnit ?? ''}` : '-'}</td>
+                  <td className="p-2">
+                    <span className={`px-2 py-1 rounded text-xs ${packOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {packOk ? 'Pack OK' : 'Missing Pack'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-bold">Quick Plan Builder</h2>
+        <div className="space-y-2">
+          {rows.map((r, idx) => (
+            <div key={idx} className="flex flex-wrap items-center gap-2">
+              <select className="border rounded p-2"
+                      value={r.ingredientId}
+                      onChange={e => setRows(prev => prev.map((x,i)=>i===idx?{...x,ingredientId:e.target.value}:x))}>
+                {ingredients.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+              <input className="border rounded p-2 w-24" type="number" min="0" step="0.01"
+                     value={r.qty}
+                     onChange={e => setRows(prev => prev.map((x,i)=>i===idx?{...x,qty:Number(e.target.value)}:x))}/>
+              <select className="border rounded p-2"
+                      value={r.unit}
+                      onChange={e => setRows(prev => prev.map((x,i)=>i===idx?{...x,unit:e.target.value as any}:x))}>
+                <option>kg</option><option>g</option><option>L</option><option>ml</option><option>each</option>
+              </select>
+              <button className="px-3 py-2 rounded border" onClick={() => removeRow(idx)}>Remove</button>
+            </div>
+          ))}
+        </div>
+        {rows.length > 0 && (
+          <button className="px-3 py-2 rounded bg-black text-white" onClick={buildPlan}>Build Plan</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+C) Register route (React Router)
+
+Find your router (commonly client/src/App.tsx or client/src/main.tsx) and add:
+
+import PurchasingLive from '@/pages/ops/PurchasingLive';
+// ...
+<Routes>
+  {/* existing routes */}
+  <Route path="/ops/purchasing-live" element={<PurchasingLive />} />
+</Routes>
+
+
+---
+
+5) Run backfill + smoke tests
+
+# rebuild types if needed, then run backfill
+npm run build || true
+
+# Dry run
+npx tsx server/scripts/backfillIngredientPurchasing.ts
+
+# Apply to ALL ingredients
+npx tsx server/scripts/backfillIngredientPurchasing.ts --apply
+
+# Optional: also fill portions where missing
+npx tsx server/scripts/backfillIngredientPurchasing.ts --apply --portion
+
+# Verify DB pack data present
+psql "$DATABASE_URL" -c "
+SELECT COUNT(*) AS missing_pack
+FROM ingredient_v2
+WHERE purchase_unit IS NULL OR purchase_qty IS NULL OR purchase_qty=0
+   OR package_cost IS NULL OR package_cost=0;
+"
+
+Expect: missing_pack = 0 (or the backfill will tell you which names still need a fix).
+
+API sanity:
+
+# Beef 8.7 kg => expect packsToBuy: 9 (for 1kg packs)
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_BEEF>","requiredQty":8.7,"requiredUnit":"kg"}]}' | jq
+
+# Coke 3.3 L => expect 1 pack (12x330ml=3960ml)
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_COKE>","requiredQty":3.3,"requiredUnit":"L"}]}' | jq
+
+# Fries 15 kg with 2.5kg packs => expect 6 packs
+curl -s -X POST http://localhost:5000/api/purchasing/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"needs":[{"ingredientId":"<UUID_FRIES>","requiredQty":15,"requiredUnit":"kg"}]}' | jq
+
+
+---
+
+6) Make it obvious in the UI
+
+Open the browser to:
+/ops/purchasing-live
+
+You’ll see:
+
+Ingredient table with Pack Size, Pack Cost, Portion, and a Pack OK / Missing Pack badge.
+
+A Quick Plan Builder that hits /api/purchasing/plan and shows the JSON (use it now; we can pretty-table it later).
+
+
+
+---
+
+7) (Later) Harden back to NOT NULL (after backfill)
+
+Only when missing_pack = 0:
+
+ALTER TABLE ingredient_v2
+  ALTER COLUMN purchase_unit SET NOT NULL,
+  ALTER COLUMN purchase_qty  SET NOT NULL,
+  ALTER COLUMN purchase_cost SET NOT NULL;
+
+Then set Drizzle back to:
+
+purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }).notNull(),
+purchaseUnit: text("purchase_unit").notNull(),
+purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).notNull(),
+
+
+---
+
+8) What NOT to change (ever)
+
+Don’t derive shopping packs from portionQty/portionUnit.
+
+Don’t convert mass↔volume families (no g↔ml).
+
+Don’t remove or rename purchasing columns.
+
+If db pull/push warns about drift, stop and report.
+
