@@ -7,7 +7,7 @@ const TZ = "Asia/Bangkok";
 
 router.post("/sync", async (req, res) => {
   try {
-    const { from, to } = req.body as { from: string; to: string };
+    const { from, to } = (req.query.from ? req.query : req.body) as { from: string; to: string };
     if (!from || !to) return res.status(400).json({ ok: false, error: "from/to required (YYYY-MM-DD)" });
 
     const start = DateTime.fromISO(from, { zone: TZ }).startOf("day");
@@ -16,9 +16,13 @@ router.post("/sync", async (req, res) => {
       return res.status(400).json({ ok: false, error: "invalid date range" });
     }
 
-    const { loyverseImportRange } = await import("../services/loyverseImport.js");
+    const { importReceiptsV2 } = await import("../services/loyverseImportV2.js");
     
-    const imported = await loyverseImportRange(from, to);
+    const fromUTC = start.toUTC().toISO()!;
+    const toUTC = end.plus({ days: 1 }).toUTC().toISO()!;
+    console.log(`[loyverseSync] Importing from ${fromUTC} to ${toUTC}`);
+    const imported = await importReceiptsV2(fromUTC, toUTC);
+    console.log(`[loyverseSync] Import result:`, imported);
     const caches: Record<string, { burgers: number }> = {};
     const errors: string[] = [];
 

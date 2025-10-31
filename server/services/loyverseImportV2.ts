@@ -28,8 +28,8 @@ async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<Lv
   
   do {
     const params = new URLSearchParams();
-    params.append('created_at_min', fromISO);
-    params.append('created_at_max', toISO);
+    params.append('receipt_date_min', fromISO);
+    params.append('receipt_date_max', toISO);
     if (cursor) params.append('cursor', cursor);
     
     const url = `${LOYVERSE_API}/receipts?${params.toString()}`;
@@ -60,6 +60,7 @@ async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<Lv
 }
 
 export async function importReceiptsV2(fromISO: string, toISO: string) {
+  console.log(`[ImportV2] Starting import from ${fromISO} to ${toISO}`);
   const started = new Date();
   const runId = crypto.randomUUID();
   let fetched = 0;
@@ -72,6 +73,9 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
 
     for await (const rc of fetchReceipts(fromISO, toISO)) {
       fetched++;
+      if (fetched <= 3) {
+        console.log(`[ImportV2] Receipt ${fetched}: ${rc.receipt_number} at ${rc.receipt_date}`);
+      }
 
       const dtBkk = DateTime.fromISO(rc.receipt_date, { zone: "UTC" }).setZone("Asia/Bangkok").toISO();
       const totalAmount = (rc.total_money?.amount ?? 0) / 100.0;
