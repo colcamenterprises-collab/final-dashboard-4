@@ -1025,13 +1025,25 @@ export function registerRoutes(app: express.Application): Server {
         const othersTotal = payload.othersTotal || f.othersTotal || 0;
         const totalExpenses = payload.totalExpenses || shoppingTotal + wagesTotal + othersTotal || f.totalExpenses || 0;
         
+        // Calculate expected banking amounts
+        const startingCash = f.startingCash || 0;
+        const endingCash = f.endingCash || 0;
+        const cashSales = payload.cashSales || f.cashSales || 0;
+        const qrSales = payload.qrSales || f.qrSales || 0;
+        const cashBanked = f.cashBanked || 0;
+        const qrTransfer = f.qrTransfer || 0;
+        
+        const expected_cash_bank = startingCash + cashSales - endingCash;
+        const expected_qr_bank = qrSales;
+        const expected_total_bank = expected_cash_bank + expected_qr_bank;
+        
         return {
           id: f.id,
           shift_date: f.shiftDate || 'N/A',
           completed_by: f.completedBy || 'Unknown',
           total_sales: payload.totalSales || f.totalSales || 0,
-          cash_sales: payload.cashSales || f.cashSales || 0,
-          qr_sales: payload.qrSales || f.qrSales || 0,
+          cash_sales: cashSales,
+          qr_sales: qrSales,
           grab_sales: payload.grabSales || f.grabSales || 0,
           aroi_sales: payload.otherSales || f.aroiSales || 0,
           shopping_total: shoppingTotal,
@@ -1039,7 +1051,10 @@ export function registerRoutes(app: express.Application): Server {
           others_total: othersTotal,
           total_expenses: totalExpenses,
           rolls_end: payload.rollsEnd || 0,
-          meat_end_g: payload.meatEnd || 0
+          meat_end_g: payload.meatEnd || 0,
+          expected_cash_bank,
+          expected_qr_bank,
+          expected_total_bank
         };
       });
 
