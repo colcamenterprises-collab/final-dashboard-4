@@ -1,0 +1,171 @@
+What to add (simple, robust)
+
+House SKU on every sellable menu item (and variant) you own.
+
+Channel mappings (Loyverse POS, Grab, Foodpanda) stored in a junction table, not as free text.
+
+Modifier SKUs/IDs too (bacon, extra cheese, etc.) so ingredients explode correctly.
+
+Supplier SKU on ingredients for purchasing (Makro codes, barcodes).
+
+Effective dates on mappings (as-of replay for historical receipts).
+
+Normalized alias as a fallback (only if SKU is missing in old data).
+
+
+
+---
+
+Prisma patch (add once)
+
+(Append to your schema.prisma; uses your existing models.)
+
+// Sales channels for external mapping
+enum SalesChannel {
+  pos        // Loyverse POS
+  grab
+  foodpanda
+  house      // your own site/app
+  other
+}
+
+// Map any item/modifier/ingredient to an external SKU/ID/barcode per channel
+model ExternalSkuMapV2 {
+  id            String       @id @default(uuid())
+  channel       SalesChannel
+  // One of these three will be set:
+  itemId        String?
+  modifierId    String?
+  ingredientId  String?
+
+  // External identifiers
+  sku           String?      // e.g., POS Item Code / Partner SKU
+  externalId    String?      // e.g., internal id from partner API
+  barcode       String?      // EAN/UPC if used by POS
+  variant       String?      // e.g., size/flavour code from POS
+
+  // Governance
+  effectiveFrom DateTime     @default(now())
+  effectiveTo   DateTime?
+  active        Boolean      @default(true)
+  notes         String?
+
+  // Relations
+  item          MenuItemV2?      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  modifier      MenuModifierV2?  @relation(fields: [modifierId], references: [id], onDelete: Cascade)
+  ingredient    IngredientV2?    @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@map("external_sku_map_v2")
+  @@index([channel, sku])
+  @@index([channel, externalId])
+  @@index([channel, barcode])
+  @@index([itemId])
+  @@index([modifierId])
+  @@index([ingredientId])
+}
+
+// Optional quality-of-life fields on your existing models:
+model MenuItemV2 {
+  // ...existing fields...
+  houseSku     String?   @unique
+  // relations unchanged
+}
+
+model MenuModifierV2 {
+  // ...existing fields...
+  houseSku     String?   @unique
+}
+
+model IngredientV2 {
+  // ...existing fields...
+  supplierSku   String?
+  supplierBarcode String?
+}
+
+Run (when ready):
+
+npx prisma generate
+npx prisma migrate dev --name add_external_sku_map
+
+
+---
+
+Minimal API to use it
+
+Create/update a mapping
+
+// POST /api/sku-map
+// body: { channel: 'pos'|'grab'|'foodpanda'|'house'|'other', targetType: 'item'|'modifier'|'ingredient', targetId: 'uuid', sku?, externalId?, barcode?, variant?, effectiveFrom?, effectiveTo? }
+
+Resolve a POS line → menu item/modifier
+
+// POST /api/sku-map/resolve
+// body: { channel:'pos', sku?:string, externalId?:string, barcode?:string, name?:string, modifierName?:string }
+// 1) exact by sku/externalId/barcode (and active, within effective dates)
+// 2) if missing: try normalized alias on name (optional)
+// 3) return { itemId, modifierId, mappingConfidence }
+
+
+---
+
+Frontend (tiny additions)
+
+Menu Manager → Item form
+
+Field: House SKU (unique).
+
+Tab “Channels”: add/remove mappings (channel + sku/externalId/barcode).
+
+
+Modifiers editor
+
+Field: House SKU (optional but recommended).
+
+
+Ingredients editor
+
+Fields: Supplier SKU, Supplier Barcode.
+
+
+
+
+---
+
+How this helps your pipeline
+
+Receipts ingestion: use SKU first, not name.
+POS line → ExternalSkuMapV2 → MenuItemV2/ModifierV2 → RecipeV2 → ingredients explode
+
+Old data: if some legacy receipts lack SKU, fall back once to normalizedName; store the learned SKU mapping for next time.
+
+Multi-channel pricing: keep one recipe; different channels can map to different items/IDs without duplicating recipes.
+
+Auditable: with effectiveFrom/To, you can replay any day with the mappings that existed then.
+
+
+
+---
+
+Acceptance checks (fast)
+
+Create one mapping: Single Smash Burger ↔ pos channel, sku: "SBB-SSB-001".
+
+Ingest a POS line with sku="SBB-SSB-001" → resolver returns that item without string matching.
+
+Add modifier mapping for Bacon (pos modifier id / sku). A POS “Bacon +1” line maps deterministically and adds 20 g bacon to theoretical usage.
+
+
+
+---
+
+Optional (nice extras)
+
+SKU generator: SBB-<CAT>-<SLUG>-### to avoid manual errors.
+
+“Unmapped inbox” view: show recent POS lines with no mapping; one-click “link to item/modifier”.
+
+Constraints: @@unique([channel, sku, effectiveFrom]) if you want to prevent duplicate live mappings.
+
+
+
+---
