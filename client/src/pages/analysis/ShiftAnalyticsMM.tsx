@@ -160,52 +160,59 @@ export default function ShiftAnalyticsMM() {
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Controls - Better tablet layout */}
+        <div className="space-y-2">
+          {/* Date row */}
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-600">Shift date:</label>
+            <label className="text-xs text-slate-600 whitespace-nowrap">Shift date:</label>
             <span className="text-xs font-medium text-slate-900">{convertFromInputDate(date)}</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border rounded-[4px] px-3 py-2 text-xs min-h-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500 border-slate-200"
+              data-testid="input-shift-date"
+            />
           </div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="border rounded px-2 sm:px-3 py-2 text-xs min-h-[44px] min-w-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            data-testid="input-shift-date"
-          />
-          <button 
-            onClick={loadShift} 
-            disabled={loading} 
-            className="px-3 sm:px-4 py-2 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
-            data-testid="button-load-shift"
-          >
-            {loading ? "Loading…" : "Load Shift"}
-          </button>
-          <button 
-            onClick={exportCSV} 
-            className="px-3 sm:px-4 py-2 rounded bg-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-300 min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
-            data-testid="button-export-csv"
-          >
-            Export CSV
-          </button>
+          
+          {/* Button row */}
+          <div className="flex gap-2">
+            <button 
+              onClick={loadShift} 
+              disabled={loading} 
+              className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-1 sm:flex-none active:scale-95 transition-transform"
+              data-testid="button-load-shift"
+            >
+              {loading ? "Loading…" : "Load Shift"}
+            </button>
+            <button 
+              onClick={exportCSV} 
+              className="px-4 py-2 rounded-[4px] bg-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-300 min-h-[44px] flex-1 sm:flex-none active:scale-95 transition-transform border border-slate-200"
+              data-testid="button-export-csv"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
 
-        {/* Category Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 sm:mx-0 sm:px-0">
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setTab(c)}
-              className={`px-3 sm:px-4 py-2 rounded border text-xs font-medium whitespace-nowrap min-h-[44px] min-w-[44px] active:scale-95 transition-all ${
-                tab === c 
-                  ? "bg-emerald-600 text-white border-emerald-600" 
-                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-              }`}
-              data-testid={`tab-${c}`}
-            >
-              {c === "all" ? "ALL" : c.toUpperCase()}
-            </button>
-          ))}
+        {/* Category Tabs - Horizontal scroll on tablet */}
+        <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+          <div className="flex gap-2 pb-2 min-w-max">
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setTab(c)}
+                className={`px-4 py-2 rounded-[4px] border text-xs font-medium whitespace-nowrap min-h-[44px] active:scale-95 transition-all ${
+                  tab === c 
+                    ? "bg-emerald-600 text-white border-emerald-600" 
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+                data-testid={`tab-${c}`}
+              >
+                {c === "all" ? "ALL" : c.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && (
