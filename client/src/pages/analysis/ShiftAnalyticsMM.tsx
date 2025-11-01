@@ -239,9 +239,9 @@ export default function ShiftAnalyticsMM() {
           </thead>
           <tbody>
             {Object.entries(itemsByCategory).map(([category, categoryItems]) => (
-              <>
+              <React.Fragment key={category}>
                 {/* Category Header Row */}
-                <tr key={`cat-${category}`} className="bg-emerald-50 border-t border-emerald-200">
+                <tr className="bg-emerald-50 border-t border-emerald-200">
                   <td colSpan={8} className="px-2 py-2 font-semibold text-emerald-900 text-xs uppercase tracking-wide">
                     {category} ({categoryItems.length} items)
                   </td>
@@ -249,7 +249,7 @@ export default function ShiftAnalyticsMM() {
                 {/* Items in this category */}
                 {categoryItems.map((it, idx) => (
                   <tr 
-                    key={`${category}-${idx}`} 
+                    key={`${category}-${it.sku ?? it.name}-${idx}`} 
                     className="border-b border-slate-200 hover:bg-slate-50"
                     data-testid={`row-item-${category}-${idx}`}
                   >
@@ -263,7 +263,7 @@ export default function ShiftAnalyticsMM() {
                     <td className="px-2 py-2 text-right text-slate-700 whitespace-nowrap">{fmt(it.rolls ?? 0)}</td>
                   </tr>
                 ))}
-              </>
+              </React.Fragment>
             ))}
             {filtered.length === 0 && (
               <tr>
