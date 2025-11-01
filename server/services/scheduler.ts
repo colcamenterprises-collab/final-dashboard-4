@@ -138,11 +138,12 @@ export class SchedulerService {
       }
 
       // 3. Sync additional data (items, customers, etc.)
-      const itemCount = await loyverseAPI.syncAllItems();
-      console.log(`✅ Synced ${itemCount} menu items`);
+      // Note: syncAllItems() and syncCustomers() are not implemented yet
+      // const itemCount = await loyverseAPI.syncAllItems();
+      // console.log(`✅ Synced ${itemCount} menu items`);
 
-      const customerCount = await loyverseAPI.syncCustomers();
-      console.log(`✅ Synced ${customerCount} customers`);
+      // const customerCount = await loyverseAPI.syncCustomers();
+      // console.log(`✅ Synced ${customerCount} customers`);
 
       console.log('🎉 Daily sync completed successfully');
     } catch (error) {
@@ -174,9 +175,10 @@ export class SchedulerService {
       
       for (const shift of shiftsResponse.shifts) {
         // Check if this shift is already in our database
+        const { eq } = await import('drizzle-orm');
         const existingShift = await db.select()
           .from(loyverseShiftReports)
-          .where(`report_id = 'shift-${shift.id}-authentic'`)
+          .where(eq(loyverseShiftReports.reportId, `shift-${shift.id}-authentic`))
           .limit(1);
         
         if (existingShift.length === 0) {
@@ -189,15 +191,15 @@ export class SchedulerService {
           
           // Create shift report data
           const shiftData = {
-            report_id: `shift-${shift.id}-authentic`,
-            shift_date: new Date(bangkokOpen.getFullYear(), bangkokOpen.getMonth(), bangkokOpen.getDate()),
-            shift_start: openingTime,
-            shift_end: closingTime,
-            total_sales: shift.expected_amount - shift.opening_amount,
-            total_transactions: 0,
-            cash_sales: 0,
-            card_sales: 0,
-            report_data: JSON.stringify({
+            reportId: `shift-${shift.id}-authentic`,
+            shiftDate: new Date(bangkokOpen.getFullYear(), bangkokOpen.getMonth(), bangkokOpen.getDate()),
+            shiftStart: openingTime,
+            shiftEnd: closingTime || new Date(),
+            totalSales: (shift.expected_amount - shift.opening_amount).toString(),
+            totalTransactions: 0,
+            cashSales: '0',
+            cardSales: '0',
+            reportData: {
               shift_number: shift.id.toString(),
               opening_time: shift.opening_time,
               closing_time: shift.closing_time,
@@ -208,9 +210,7 @@ export class SchedulerService {
               expected_cash: shift.expected_amount,
               actual_cash: shift.actual_amount || shift.expected_amount,
               cash_difference: (shift.actual_amount || shift.expected_amount) - shift.expected_amount
-            }),
-            created_at: new Date(),
-            updated_at: new Date()
+            }
           };
           
           // Insert into database
@@ -241,7 +241,7 @@ export class SchedulerService {
       console.log('📊 Building shift summary for', dateStr);
       const summary = await buildShiftSummary(dateStr);
       
-      console.log(`✅ Shift summary built: ${summary.burgersSold} burgers, ${summary.drinksSold} drinks`);
+      console.log(`✅ Shift summary built successfully`);
     } catch (error) {
       console.error('❌ Failed to build daily summary:', error);
     }
@@ -305,6 +305,7 @@ export class SchedulerService {
       try {
         console.log('🔄 Starting scheduled incremental POS sync...');
         
+        // @ts-expect-error - JavaScript module without type declarations
         const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
         
         const endDate = new Date();
@@ -329,6 +330,7 @@ export class SchedulerService {
     try {
       console.log('📊 Starting scheduled analytics processing...');
       
+      // @ts-expect-error - JavaScript module without type declarations
       const { processAnalytics } = await import('./analytics/processor.js');
       
       const restaurant = await this.prisma.restaurant.findFirst({
@@ -354,6 +356,7 @@ export class SchedulerService {
     try {
       console.log('📧 Starting scheduled Jussi summary generation...');
       
+      // @ts-expect-error - JavaScript module without type declarations
       const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
       const result = await generateDailySummary();
       
@@ -452,6 +455,7 @@ export class SchedulerService {
 
   // Manual trigger for new services
   async triggerPOSSync() {
+    // @ts-expect-error - JavaScript module without type declarations
     const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
     const endDate = new Date();
     const startDate = new Date();
@@ -460,6 +464,7 @@ export class SchedulerService {
   }
 
   async triggerAnalytics() {
+    // @ts-expect-error - JavaScript module without type declarations
     const { processAnalytics } = await import('./analytics/processor.js');
     const restaurant = await this.prisma.restaurant.findFirst({
       where: { slug: 'smash-brothers-burgers' }
@@ -471,6 +476,7 @@ export class SchedulerService {
   }
 
   async triggerJussiSummary() {
+    // @ts-expect-error - JavaScript module without type declarations
     const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
     return await generateDailySummary();
   }
@@ -479,11 +485,11 @@ export class SchedulerService {
     try {
       console.log('💰 Running finance calculations...');
       
-      // Import the finance job here to avoid circular dependencies
-      const { runDailyFinanceJob } = await import('../jobs/dailyFinanceJob');
-      await runDailyFinanceJob();
+      // Note: dailyFinanceJob is not implemented yet
+      // const { runDailyFinanceJob } = await import('../jobs/dailyFinanceJob');
+      // await runDailyFinanceJob();
       
-      console.log('✅ Finance calculations completed');
+      console.log('✅ Finance calculations completed (placeholder)');
     } catch (error) {
       console.error('❌ Failed to run finance calculations:', error);
     }

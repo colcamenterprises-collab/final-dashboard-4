@@ -203,15 +203,6 @@ export default function DailyReview() {
   useEffect(() => {
     const item = all.find((d) => d.date === selectedDate);
     setCurrent(item ?? null);
-    if (item) {
-      setComment(item.managerComment || "");
-      setActualAmountBanked(
-        item.actualAmountBanked != null ? String(item.actualAmountBanked) : ""
-      );
-    } else {
-      setComment("");
-      setActualAmountBanked("");
-    }
   }, [selectedDate, all]);
 
   useEffect(() => {
@@ -314,10 +305,10 @@ export default function DailyReview() {
               <Section
                 title="Expenses"
                 rows={[
-                  { label: "Shopping", pos: current.pos.expenses.shopping, form: current.form.expenses.shopping, diff: current.variance.expenses.shopping },
-                  { label: "Wages", pos: current.pos.expenses.wages, form: current.form.expenses.wages, diff: current.variance.expenses.wages },
-                  { label: "Other", pos: current.pos.expenses.other, form: current.form.expenses.other, diff: current.variance.expenses.other },
-                  { label: "Total", pos: current.pos.expenses.total, form: current.form.expenses.total, diff: current.variance.expenses.total },
+                  { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
+                  { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
+                  { label: "Other", pos: current.pos.expenses.otherTotal, form: current.form.expenses.otherTotal, diff: current.variance.expenses.otherTotal },
+                  { label: "Total", pos: (current.pos.expenses.shoppingTotal + current.pos.expenses.wageTotal + current.pos.expenses.otherTotal), form: (current.form.expenses.shoppingTotal + current.form.expenses.wageTotal + current.form.expenses.otherTotal), diff: current.variance.expenses.grandTotal },
                 ]}
               />
 
@@ -325,7 +316,7 @@ export default function DailyReview() {
                 title="Net Banking & Cash"
                 rows={[
                   { label: "Est. Net Banked", pos: current.pos.banking.estimatedNetBanked, form: current.form.banking.estimatedNetBanked, diff: current.variance.banking.estimatedNetBanked },
-                  { label: "Cash on Hand", pos: current.pos.banking.cashOnHand, form: current.form.banking.cashOnHand, diff: current.variance.banking.cashOnHand },
+                  { label: "Expected Cash", pos: current.pos.banking.expectedCash, form: current.form.banking.expectedCash, diff: current.variance.banking.expectedCash },
                 ]}
               />
             </>
