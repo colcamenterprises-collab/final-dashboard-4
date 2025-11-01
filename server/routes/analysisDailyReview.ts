@@ -68,6 +68,9 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
       shift_date: { gte: start, lt: end },
       deletedAt: null,
     },
+    orderBy: {
+      createdAt: 'desc'
+    }
   });
   if (!row) return null;
 
@@ -80,18 +83,13 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
   const other = payload?.otherSales ?? row.aroiSales ?? 0;
   const total = payload?.totalSales ?? row.totalSales ?? (cash + qr + grab + other);
 
-  // Calculate shopping total from expenses array in payload
-  const expensesArray = (payload?.expenses || []) as Array<{cost: number}>;
-  const shopping = expensesArray.reduce((sum, exp) => sum + (exp.cost || 0), 0);
-  
-  // Calculate wages total from wages array in payload
-  const wagesArray = (payload?.wages || []) as Array<{amount: number}>;
-  const wages = wagesArray.reduce((sum, w) => sum + (w.amount || 0), 0);
-  
-  const otherExp = 0; // No separate "other" expense in payload
-  const expensesTotal = payload?.totalExpenses ?? shopping + wages;
+  // Use database columns for expense totals (source of truth)
+  const shopping = row.shoppingTotal ?? payload?.shoppingTotal ?? 0;
+  const wages = row.wagesTotal ?? payload?.wagesTotal ?? 0;
+  const otherExp = row.othersTotal ?? payload?.othersTotal ?? 0;
+  const expensesTotal = row.totalExpenses ?? payload?.totalExpenses ?? (shopping + wages + otherExp);
 
-  const startingCash = payload?.startingCash ?? row.startingCash ?? 0;
+  const startingCash = row.startingCash ?? payload?.startingCash ?? 0;
 
   const items: ExpenseItem[] = [
     { id: "shopping", label: "Shopping", amount: shopping, category: "shopping" },
