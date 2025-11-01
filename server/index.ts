@@ -17,7 +17,6 @@ import posUploadRouter from "./routes/posUpload";
 import healthRouter from "./routes/health";
 import opsMtdRouter from "./routes/ops_mtd";
 import purchasingRouter from "./routes/purchasing";
-import skuMapRouter from "./routes/skuMap";
 
 const prisma = new PrismaClient();
 
@@ -370,8 +369,9 @@ async function checkSchema() {
   const checklistRouter = (await import('./routes/checklists')).default;
   app.use('/api/checklists', checklistRouter);
   
-  // Add SKU mapping routes
-  app.use('/api/sku-map', skuMapRouter);
+  // Add SKU mapping routes (Prisma-based)
+  const { skuMapRouter } = await import('./routes/skuMap');
+  app.use('/api', skuMapRouter);
   
   // Add admin test email route
   const { adminTestEmailRouter } = await import('./routes/adminTestEmail');
