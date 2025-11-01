@@ -1,284 +1,114 @@
-import { Router, Request, Response } from "express";
-import { db } from "../db";
-import { externalSkuMapV2, menuItems, ingredients } from "../../shared/schema";
-import { eq, and, or, isNull, lte, gte } from "drizzle-orm";
+import { Router } from "express";
+import { z } from "zod";
+import { PrismaClient, SkuKind } from "@prisma/client";
+import { requireAdmin } from "../middleware/requireAdmin";
+import { resolveSku } from "../services/skuMap";
 
-const router = Router();
+const prisma = new PrismaClient();
+export const skuMapRouter = Router();
 
-/**
- * Create or update an SKU mapping
- * POST /api/sku-map
- * 
- * Body: {
- *   channel: 'pos'|'grab'|'foodpanda'|'house'|'other',
- *   targetType: 'item'|'modifier'|'ingredient',
- *   targetId: number,
- *   sku?: string,
- *   externalId?: string,
- *   barcode?: string,
- *   variant?: string,
- *   effectiveFrom?: string,
- *   effectiveTo?: string,
- *   notes?: string
- * }
- */
-router.post("/", async (req: Request, res: Response) => {
-  try {
-    const {
-      channel,
-      targetType,
-      targetId,
-      sku,
-      externalId,
-      barcode,
-      variant,
-      effectiveFrom,
-      effectiveTo,
-      notes
-    } = req.body;
-
-    // Validate required fields
-    if (!channel || !targetType || !targetId) {
-      return res.status(400).json({
-        error: "Missing required fields: channel, targetType, targetId"
-      });
-    }
-
-    // Validate at least one identifier is provided
-    if (!sku && !externalId && !barcode) {
-      return res.status(400).json({
-        error: "At least one identifier (sku, externalId, or barcode) is required"
-      });
-    }
-
-    // Build the mapping object
-    const mapping: any = {
-      channel,
-      sku: sku || null,
-      externalId: externalId || null,
-      barcode: barcode || null,
-      variant: variant || null,
-      notes: notes || null,
-    };
-
-    // Set the target ID based on type
-    if (targetType === "item") {
-      mapping.itemId = targetId;
-    } else if (targetType === "modifier") {
-      mapping.modifierId = targetId;
-    } else if (targetType === "ingredient") {
-      mapping.ingredientId = targetId;
-    } else {
-      return res.status(400).json({
-        error: "Invalid targetType. Must be 'item', 'modifier', or 'ingredient'"
-      });
-    }
-
-    // Set effective dates
-    if (effectiveFrom) {
-      mapping.effectiveFrom = new Date(effectiveFrom);
-    }
-    if (effectiveTo) {
-      mapping.effectiveTo = new Date(effectiveTo);
-    }
-
-    // Insert the mapping
-    const [result] = await db
-      .insert(externalSkuMapV2)
-      .values(mapping)
-      .returning();
-
-    res.json({
-      success: true,
-      mapping: result
-    });
-  } catch (error: any) {
-    console.error("Error creating SKU mapping:", error);
-    res.status(500).json({ error: error.message });
-  }
+const Mapping = z.object({
+  channel: z.enum(["grab", "pos"]),
+  channelSku: z.string().min(1),
+  kind: z.nativeEnum(SkuKind),
+  internalId: z.string().min(1),
+  active: z.boolean().optional().default(true),
+  meta: z.any().optional(),
 });
 
-/**
- * Resolve a POS line to menu item/modifier/ingredient
- * POST /api/sku-map/resolve
- * 
- * Body: {
- *   channel: 'pos'|'grab'|'foodpanda'|'house'|'other',
- *   sku?: string,
- *   externalId?: string,
- *   barcode?: string,
- *   name?: string,
- *   modifierName?: string,
- *   asOfDate?: string  // Optional: resolve using mappings as of this date
- * }
- * 
- * Response: {
- *   itemId?: number,
- *   modifierId?: number,
- *   ingredientId?: number,
- *   mappingConfidence: 'exact' | 'name_fallback' | 'not_found',
- *   mapping?: object
- * }
- */
-router.post("/resolve", async (req: Request, res: Response) => {
-  try {
-    const {
-      channel,
-      sku,
-      externalId,
-      barcode,
-      name,
-      modifierName,
-      asOfDate
-    } = req.body;
+const ListQuery = z.object({
+  channel: z.enum(["grab", "pos"]).optional(),
+  kind: z.nativeEnum(SkuKind).optional(),
+  q: z.string().optional(),
+});
 
-    if (!channel) {
-      return res.status(400).json({ error: "channel is required" });
-    }
-
-    // Build conditions for exact match
-    const conditions = [
-      eq(externalSkuMapV2.channel, channel),
-      eq(externalSkuMapV2.active, true),
+skuMapRouter.get("/sku-map", requireAdmin, async (req, res) => {
+  const { channel, kind, q } = ListQuery.parse(req.query);
+  const where: any = {};
+  if (channel) where.channel = channel;
+  if (kind) where.kind = kind;
+  if (q) {
+    where.OR = [
+      { channelSku: { contains: q, mode: "insensitive" } },
+      { internalId: { contains: q, mode: "insensitive" } },
     ];
-
-    // Add identifier conditions (sku, externalId, or barcode)
-    const identifierConditions = [];
-    if (sku) identifierConditions.push(eq(externalSkuMapV2.sku, sku));
-    if (externalId) identifierConditions.push(eq(externalSkuMapV2.externalId, externalId));
-    if (barcode) identifierConditions.push(eq(externalSkuMapV2.barcode, barcode));
-
-    if (identifierConditions.length === 0 && !name && !modifierName) {
-      return res.status(400).json({
-        error: "At least one identifier (sku, externalId, barcode) or name is required"
-      });
-    }
-
-    // Add effective date conditions
-    const effectiveDate = asOfDate ? new Date(asOfDate) : new Date();
-    conditions.push(lte(externalSkuMapV2.effectiveFrom, effectiveDate));
-    conditions.push(
-      or(
-        isNull(externalSkuMapV2.effectiveTo),
-        gte(externalSkuMapV2.effectiveTo, effectiveDate)
-      )!
-    );
-
-    // Try exact match first (if we have identifiers)
-    if (identifierConditions.length > 0) {
-      conditions.push(or(...identifierConditions)!);
-
-      const mappings = await db
-        .select()
-        .from(externalSkuMapV2)
-        .where(and(...conditions));
-
-      if (mappings.length > 0) {
-        // Return the first matching mapping
-        const mapping = mappings[0];
-        return res.json({
-          itemId: mapping.itemId || undefined,
-          modifierId: mapping.modifierId || undefined,
-          ingredientId: mapping.ingredientId || undefined,
-          mappingConfidence: "exact",
-          mapping
-        });
-      }
-    }
-
-    // Fallback: try normalized name matching (optional)
-    // This is a basic implementation - you can enhance with fuzzy matching
-    if (name || modifierName) {
-      // TODO: Implement normalized name fallback
-      // For now, return not_found
-      return res.json({
-        mappingConfidence: "not_found",
-        message: "No SKU mapping found for the provided identifiers"
-      });
-    }
-
-    res.json({
-      mappingConfidence: "not_found",
-      message: "No SKU mapping found"
-    });
-  } catch (error: any) {
-    console.error("Error resolving SKU mapping:", error);
-    res.status(500).json({ error: error.message });
   }
+  const rows = await prisma.externalSkuMap.findMany({ where, orderBy: { updatedAt: "desc" } });
+  res.json(rows);
 });
 
-/**
- * Get all SKU mappings for a specific item/modifier/ingredient
- * GET /api/sku-map/:targetType/:targetId
- */
-router.get("/:targetType/:targetId", async (req: Request, res: Response) => {
-  try {
-    const { targetType, targetId } = req.params;
-
-    let condition;
-    if (targetType === "item") {
-      condition = eq(externalSkuMapV2.itemId, parseInt(targetId));
-    } else if (targetType === "modifier") {
-      condition = eq(externalSkuMapV2.modifierId, parseInt(targetId));
-    } else if (targetType === "ingredient") {
-      condition = eq(externalSkuMapV2.ingredientId, parseInt(targetId));
-    } else {
-      return res.status(400).json({
-        error: "Invalid targetType. Must be 'item', 'modifier', or 'ingredient'"
-      });
-    }
-
-    const mappings = await db
-      .select()
-      .from(externalSkuMapV2)
-      .where(condition)
-      .orderBy(externalSkuMapV2.createdAt);
-
-    res.json(mappings);
-  } catch (error: any) {
-    console.error("Error fetching SKU mappings:", error);
-    res.status(500).json({ error: error.message });
-  }
+skuMapRouter.post("/sku-map/upsert", requireAdmin, async (req, res) => {
+  const body = z.array(Mapping).parse(req.body);
+  const ops = body.map((m) =>
+    prisma.externalSkuMap.upsert({
+      where: { channel_channelSku_kind: { channel: m.channel, channelSku: m.channelSku, kind: m.kind } },
+      update: { internalId: m.internalId, active: m.active, meta: m.meta },
+      create: { ...m },
+    })
+  );
+  const results = await prisma.$transaction(ops);
+  res.json({ ok: true, count: results.length });
 });
 
-/**
- * Delete an SKU mapping
- * DELETE /api/sku-map/:id
- */
-router.delete("/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    await db
-      .delete(externalSkuMapV2)
-      .where(eq(externalSkuMapV2.id, id));
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("Error deleting SKU mapping:", error);
-    res.status(500).json({ error: error.message });
-  }
+const ResolveQuery = z.object({
+  channel: z.enum(["grab", "pos"]),
+  sku: z.string().min(1),
+  kind: z.nativeEnum(SkuKind),
 });
 
-/**
- * Get all unmapped POS items (items from recent receipts with no SKU mapping)
- * GET /api/sku-map/unmapped
- * 
- * This would require integration with your POS receipt system
- * TODO: Implement unmapped items inbox
- */
-router.get("/unmapped", async (req: Request, res: Response) => {
-  try {
-    // This is a placeholder - would need to query recent POS receipts
-    // and find items that don't have SKU mappings
-    res.json({
-      message: "Unmapped items inbox not yet implemented",
-      items: []
-    });
-  } catch (error: any) {
-    console.error("Error fetching unmapped items:", error);
-    res.status(500).json({ error: error.message });
-  }
+skuMapRouter.get("/sku-map/resolve", async (req, res) => {
+  const { channel, sku, kind } = ResolveQuery.parse(req.query);
+  const r = await resolveSku(channel, sku, kind);
+  res.json(r);
 });
 
-export default router;
+// --- CSV Export ---
+skuMapRouter.get("/sku-map/export.csv", requireAdmin, async (_req, res) => {
+  const rows = await prisma.externalSkuMap.findMany({ orderBy: { channel: "asc" } });
+  const header = "channel,kind,channelSku,internalId,active\n";
+  const lines = rows.map((r) =>
+    [r.channel, r.kind, r.channelSku, r.internalId, r.active ? "true" : "false"]
+      .map((v) => String(v).replace(/"/g, '""'))
+      .map((v) => (v.includes(",") ? `"${v}"` : v))
+      .join(",")
+  );
+  res.setHeader("Content-Type", "text/csv");
+  res.send(header + lines.join("\n"));
+});
+
+// --- CSV Import (simple CSV: no embedded commas/quotes) ---
+skuMapRouter.post("/sku-map/import.csv", requireAdmin, async (req, res) => {
+  if (typeof req.body !== "string") return res.status(400).json({ error: "Expect text/csv body" });
+  const lines = req.body.split(/\r?\n/).filter(Boolean);
+  const [maybeHeader, ...data] = lines;
+  const hasHeader = /^channel,/.test(maybeHeader.toLowerCase());
+  const rows = (hasHeader ? data : lines).map((ln) => ln.split(","));
+  const parsed = rows.map((arr) => ({
+    channel: (arr[0] || "").trim() as "grab" | "pos",
+    kind: (arr[1] || "").trim().toUpperCase() as keyof typeof SkuKind,
+    channelSku: (arr[2] || "").trim(),
+    internalId: (arr[3] || "").trim(),
+    active: String(arr[4] || "true").trim().toLowerCase() !== "false",
+  }));
+  // validate
+  const valid = parsed
+    .filter((r) => (r.channel === "grab" || r.channel === "pos") && r.channelSku && r.internalId && SkuKind[r.kind]);
+
+  const tx = valid.map((m) =>
+    prisma.externalSkuMap.upsert({
+      where: { channel_channelSku_kind: { channel: m.channel, channelSku: m.channelSku, kind: SkuKind[m.kind] } },
+      update: { internalId: m.internalId, active: m.active },
+      create: { channel: m.channel, channelSku: m.channelSku, kind: SkuKind[m.kind], internalId: m.internalId, active: m.active },
+    })
+  );
+  const results = await prisma.$transaction(tx);
+  res.json({ ok: true, imported: results.length, skipped: parsed.length - valid.length });
+});
+
+// --- Missing SKU events (admin listing) ---
+skuMapRouter.get("/sku-map/missing", requireAdmin, async (_req, res) => {
+  const rows = await prisma.missingSkuEvent.findMany({ orderBy: { lastSeenAt: "desc" }, take: 200 });
+  res.json(rows);
+});
+
+export default skuMapRouter;
