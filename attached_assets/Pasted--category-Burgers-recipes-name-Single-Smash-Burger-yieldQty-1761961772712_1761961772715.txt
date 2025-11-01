@@ -1,0 +1,94 @@
+{
+  "category": "Burgers",
+  "recipes": [
+    {
+      "name": "Single Smash Burger",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "salad (lettuce)", "qty": 20, "unit": "g" },
+        { "ingredient": "Meat", "qty": 95, "unit": "g" },
+        { "ingredient": "Cheese", "qty": 1, "unit": "each" },
+        { "ingredient": "Tomato", "qty": 15, "unit": "g" },
+        { "ingredient": "Onion", "qty": 15, "unit": "g" },
+        { "ingredient": "Burger Sauce", "qty": 20, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Double Smash Burger",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "salad (lettuce)", "qty": 20, "unit": "g" },
+        { "ingredient": "Meat", "qty": 190, "unit": "g" },
+        { "ingredient": "Cheese", "qty": 2, "unit": "each" },
+        { "ingredient": "Tomato", "qty": 15, "unit": "g" },
+        { "ingredient": "Onion", "qty": 15, "unit": "g" },
+        { "ingredient": "Burger Sauce", "qty": 20, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Triple Smash Burger",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "salad (lettuce)", "qty": 20, "unit": "g" },
+        { "ingredient": "Meat", "qty": 285, "unit": "g" },
+        { "ingredient": "Cheese", "qty": 1, "unit": "each" },
+        { "ingredient": "Tomato", "qty": 15, "unit": "g" },
+        { "ingredient": "Onion", "qty": 15, "unit": "g" },
+        { "ingredient": "Burger Sauce", "qty": 20, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Super Double Bacon & Cheese",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "salad (lettuce)", "qty": 0, "unit": "g" },
+        { "ingredient": "Meat", "qty": 190, "unit": "g" },
+        { "ingredient": "Cheese", "qty": 3, "unit": "each" },
+        { "ingredient": "Bacon", "qty": 40, "unit": "g" },
+        { "ingredient": "Tomato", "qty": 0, "unit": "g" },
+        { "ingredient": "Onion", "qty": 15, "unit": "g" },
+        { "ingredient": "Burger Sauce", "qty": 20, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Big Rooster Chicken",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "Coleslaw", "qty": 0, "unit": "g" },
+        { "ingredient": "Chicken Fillets", "qty": 3, "unit": "each" },
+        { "ingredient": "Cheese", "qty": 1, "unit": "each" },
+        { "ingredient": "Tomato", "qty": 15, "unit": "g" },
+        { "ingredient": "Sriracha Mayo", "qty": 20, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Chicken Fillet Burger",
+      "yieldQty": 1,
+      "yieldUnit": "servings",
+      "items": [
+        { "ingredient": "Bun", "qty": 1, "unit": "each" },
+        { "ingredient": "Pickles", "qty": 20, "unit": "g" },
+        { "ingredient": "salad (lettuce)", "qty": 0, "unit": "g" },
+        { "ingredient": "Chicken Fillets", "qty": 3, "unit": "each" },
+        { "ingredient": "Cheese", "qty": 1, "unit": "each" },
+        { "ingredient": "Tomato", "qty": 15, "unit": "g" },
+        { "ingredient": "Mayonnaise", "qty": 20, "unit": "g" }
+      ]
+    }
+  ]
+}
