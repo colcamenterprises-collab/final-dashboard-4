@@ -91,7 +91,7 @@ export async function computeShiftAll(dateISO: string) {
     p.qty += r.qty;
     p.hits.add(`${r.sku ?? 'no-sku'} :: ${name}`);
 
-    if (category === 'burger' && rule) {
+    if (rule && rule.kind) {
       if (rule.kind === 'beef') {
         const patties = (rule.patties_per ?? 1) * r.qty;
         p.patties += patties;
