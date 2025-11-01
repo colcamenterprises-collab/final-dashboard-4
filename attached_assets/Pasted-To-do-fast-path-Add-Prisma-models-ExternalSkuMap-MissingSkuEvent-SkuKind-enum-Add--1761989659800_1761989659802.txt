@@ -1,0 +1,415 @@
+To-do (fast path)
+
+[ ] Add Prisma models (ExternalSkuMap + MissingSkuEvent, SkuKind enum).
+
+[ ] Add Express router (/api/sku-map/*) + admin guard.
+
+[ ] Register the router.
+
+[ ] (Optional) seed script for name-match auto-map.
+
+[ ] Run dev migration locally → then deploy migration to prod.
+
+
+
+---
+
+1) Prisma schema (add this block)
+
+> Open prisma/schema.prisma and append this block (do not remove your existing models).
+
+
+
+// === External SKU Mapping (Grab <-> POS) ===
+
+enum SkuKind {
+  ITEM
+  MODIFIER
+  BUNDLE
+}
+
+model ExternalSkuMap {
+  id          String   @id @default(cuid())
+  channel     String   @db.VarChar(20) // 'grab' | 'pos'
+  channelSku  String
+  kind        SkuKind
+  internalId  String   // maps to your internal Items/Modifiers ID (string UUID/cuid/sku)
+  active      Boolean  @default(true)
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channel, channelSku, kind])
+  @@index([kind, internalId])
+}
+
+model MissingSkuEvent {
+  id            String   @id @default(cuid())
+  channel       String   @db.VarChar(20) // 'grab' | 'pos'
+  kind          SkuKind
+  sku           String
+  count         Int      @default(1)
+  samplePayload Json?
+  lastOrderRef  String?
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @updatedAt
+
+  @@unique([channel, kind, sku])
+}
+
+Dev migration (local):
+
+# dev only
+npx prisma generate
+npx prisma migrate dev -n "sku_map_v1"
+
+Prod deploy (safe):
+
+# ensure NODE_ENV=production and use migrator_user (not app user)
+npx prisma generate
+npx prisma migrate deploy
+
+
+---
+
+2) Admin guard (simple, token-based for now)
+
+> server/middleware/requireAdmin.ts
+
+
+
+import { Request, Response, NextFunction } from "express";
+
+/**
+ * Minimal admin guard:
+ * - Set an env var ADMIN_TOKEN
+ * - Send header: x-admin-token: <ADMIN_TOKEN>
+ * Replace with your session middleware when ready.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const token = req.header("x-admin-token");
+  if (!process.env.ADMIN_TOKEN) {
+    console.warn("[requireAdmin] ADMIN_TOKEN not set; blocking all admin routes.");
+    return res.status(503).json({ error: "Admin not configured" });
+  }
+  if (token !== process.env.ADMIN_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
+
+
+---
+
+3) SKU map service (resolve + log missing)
+
+> server/services/skuMap.ts
+
+
+
+import { PrismaClient, SkuKind } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export type ResolveResult =
+  | { found: true; kind: SkuKind; internalId: string; meta?: any }
+  | { found: false };
+
+export async function resolveSku(channel: string, sku: string, kind: SkuKind): Promise<ResolveResult> {
+  const m = await prisma.externalSkuMap.findUnique({
+    where: { channel_channelSku_kind: { channel, channelSku: sku, kind } },
+  });
+  if (!m || !m.active) return { found: false };
+  return { found: true, kind: m.kind, internalId: m.internalId, meta: m.meta ?? undefined };
+}
+
+export async function logMissingSku(opts: {
+  channel: string;
+  kind: SkuKind;
+  sku: string;
+  samplePayload?: any;
+  lastOrderRef?: string;
+}) {
+  const { channel, kind, sku, samplePayload, lastOrderRef } = opts;
+  try {
+    await prisma.missingSkuEvent.upsert({
+      where: { channel_kind_sku: { channel, kind, sku } },
+      update: {
+        count: { increment: 1 },
+        samplePayload: samplePayload ?? undefined,
+        lastOrderRef: lastOrderRef ?? undefined,
+      },
+      create: {
+        channel,
+        kind,
+        sku,
+        samplePayload: samplePayload ?? undefined,
+        lastOrderRef: lastOrderRef ?? undefined,
+      },
+    });
+  } catch (e) {
+    console.error("[logMissingSku] upsert failed", e);
+  }
+}
+
+
+---
+
+4) Express router (admin-only, upsert/resolve/csv, missing list)
+
+> server/routes/skuMap.ts
+
+
+
+import { Router } from "express";
+import { z } from "zod";
+import { PrismaClient, SkuKind } from "@prisma/client";
+import { requireAdmin } from "../middleware/requireAdmin";
+import { resolveSku } from "../services/skuMap";
+
+const prisma = new PrismaClient();
+export const skuMapRouter = Router();
+
+const Mapping = z.object({
+  channel: z.enum(["grab", "pos"]),
+  channelSku: z.string().min(1),
+  kind: z.nativeEnum(SkuKind),
+  internalId: z.string().min(1),
+  active: z.boolean().optional().default(true),
+  meta: z.any().optional(),
+});
+
+const ListQuery = z.object({
+  channel: z.enum(["grab", "pos"]).optional(),
+  kind: z.nativeEnum(SkuKind).optional(),
+  q: z.string().optional(),
+});
+
+skuMapRouter.get("/sku-map", requireAdmin, async (req, res) => {
+  const { channel, kind, q } = ListQuery.parse(req.query);
+  const where: any = {};
+  if (channel) where.channel = channel;
+  if (kind) where.kind = kind;
+  if (q) {
+    where.OR = [
+      { channelSku: { contains: q, mode: "insensitive" } },
+      { internalId: { contains: q, mode: "insensitive" } },
+    ];
+  }
+  const rows = await prisma.externalSkuMap.findMany({ where, orderBy: { updatedAt: "desc" } });
+  res.json(rows);
+});
+
+skuMapRouter.post("/sku-map/upsert", requireAdmin, async (req, res) => {
+  const body = z.array(Mapping).parse(req.body);
+  const ops = body.map((m) =>
+    prisma.externalSkuMap.upsert({
+      where: { channel_channelSku_kind: { channel: m.channel, channelSku: m.channelSku, kind: m.kind } },
+      update: { internalId: m.internalId, active: m.active, meta: m.meta },
+      create: { ...m },
+    })
+  );
+  const results = await prisma.$transaction(ops);
+  res.json({ ok: true, count: results.length });
+});
+
+const ResolveQuery = z.object({
+  channel: z.enum(["grab", "pos"]),
+  sku: z.string().min(1),
+  kind: z.nativeEnum(SkuKind),
+});
+
+skuMapRouter.get("/sku-map/resolve", async (req, res) => {
+  const { channel, sku, kind } = ResolveQuery.parse(req.query);
+  const r = await resolveSku(channel, sku, kind);
+  res.json(r);
+});
+
+// --- CSV Export ---
+skuMapRouter.get("/sku-map/export.csv", requireAdmin, async (_req, res) => {
+  const rows = await prisma.externalSkuMap.findMany({ orderBy: { channel: "asc" } });
+  const header = "channel,kind,channelSku,internalId,active\n";
+  const lines = rows.map((r) =>
+    [r.channel, r.kind, r.channelSku, r.internalId, r.active ? "true" : "false"]
+      .map((v) => String(v).replace(/"/g, '""'))
+      .map((v) => (v.includes(",") ? `"${v}"` : v))
+      .join(",")
+  );
+  res.setHeader("Content-Type", "text/csv");
+  res.send(header + lines.join("\n"));
+});
+
+// --- CSV Import (simple CSV: no embedded commas/quotes) ---
+skuMapRouter.post("/sku-map/import.csv", requireAdmin, async (req, res) => {
+  if (typeof req.body !== "string") return res.status(400).json({ error: "Expect text/csv body" });
+  const lines = req.body.split(/\r?\n/).filter(Boolean);
+  const [maybeHeader, ...data] = lines;
+  const hasHeader = /^channel,/.test(maybeHeader.toLowerCase());
+  const rows = (hasHeader ? data : lines).map((ln) => ln.split(","));
+  const parsed = rows.map((arr) => ({
+    channel: (arr[0] || "").trim() as "grab" | "pos",
+    kind: (arr[1] || "").trim().toUpperCase() as keyof typeof SkuKind,
+    channelSku: (arr[2] || "").trim(),
+    internalId: (arr[3] || "").trim(),
+    active: String(arr[4] || "true").trim().toLowerCase() !== "false",
+  }));
+  // validate
+  const valid = parsed
+    .filter((r) => (r.channel === "grab" || r.channel === "pos") && r.channelSku && r.internalId && SkuKind[r.kind]);
+
+  const tx = valid.map((m) =>
+    prisma.externalSkuMap.upsert({
+      where: { channel_channelSku_kind: { channel: m.channel, channelSku: m.channelSku, kind: SkuKind[m.kind] } },
+      update: { internalId: m.internalId, active: m.active },
+      create: { channel: m.channel, channelSku: m.channelSku, kind: SkuKind[m.kind], internalId: m.internalId, active: m.active },
+    })
+  );
+  const results = await prisma.$transaction(tx);
+  res.json({ ok: true, imported: results.length, skipped: parsed.length - valid.length });
+});
+
+// --- Missing SKU events (admin listing) ---
+skuMapRouter.get("/sku-map/missing", requireAdmin, async (_req, res) => {
+  const rows = await prisma.missingSkuEvent.findMany({ orderBy: { lastSeenAt: "desc" }, take: 200 });
+  res.json(rows);
+});
+
+
+---
+
+5) Register the router
+
+> server/index.ts (add near other routes)
+
+
+
+const { skuMapRouter } = await import("./routes/skuMap");
+app.use("/api", skuMapRouter);
+
+
+---
+
+6) Optional: quick name-match auto-seed
+
+> scripts/seed_sku_name_match.mjs (run once in dev)
+
+
+
+#!/usr/bin/env node
+import { PrismaClient, SkuKind } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+function norm(s) { return s.toLowerCase().replace(/\s+/g, " ").trim(); }
+
+(async () => {
+  // Replace these with your actual tables/fields
+  const grabMenu = await prisma.grabMenuItem.findMany();     // { id, name, externalSku }
+  const posItems = await prisma.item.findMany();             // { id, name, sku? }
+
+  const byName = new Map(posItems.map(i => [norm(i.name), i]));
+  const upserts = [];
+
+  for (const g of grabMenu) {
+    const match = byName.get(norm(g.name));
+    if (match) {
+      upserts.push(
+        prisma.externalSkuMap.upsert({
+          where: { channel_channelSku_kind: { channel: "grab", channelSku: g.externalSku, kind: SkuKind.ITEM } },
+          update: { internalId: match.id, active: true },
+          create: { channel: "grab", channelSku: g.externalSku, kind: SkuKind.ITEM, internalId: match.id, active: true },
+        })
+      );
+    }
+  }
+
+  if (upserts.length) await prisma.$transaction(upserts);
+  console.log(`Seeded tentative mappings: ${upserts.length}`);
+  process.exit(0);
+})();
+
+
+---
+
+7) How ingestion should use it (example)
+
+import { resolveSku, logMissingSku } from "../services/skuMap";
+import { SkuKind } from "@prisma/client";
+
+export async function mapGrabLine(line: { sku: string; modifiers?: { sku: string }[] }, orderId: string) {
+  const itemRes = await resolveSku("grab", line.sku, SkuKind.ITEM);
+  if (!itemRes.found) {
+    await logMissingSku({ channel: "grab", kind: SkuKind.ITEM, sku: line.sku, lastOrderRef: orderId, samplePayload: line });
+  }
+  const mappedMods = [];
+  for (const m of line.modifiers ?? []) {
+    const modRes = await resolveSku("grab", m.sku, SkuKind.MODIFIER);
+    if (!modRes.found) {
+      await logMissingSku({ channel: "grab", kind: SkuKind.MODIFIER, sku: m.sku, lastOrderRef: orderId, samplePayload: m });
+    } else {
+      mappedMods.push(modRes.internalId);
+    }
+  }
+  return {
+    itemInternalId: itemRes.found ? itemRes.internalId : null,
+    modifierInternalIds: mappedMods,
+  };
+}
+
+
+---
+
+8) Quick tests
+
+Upsert JSON:
+
+curl -X POST http://localhost:5000/api/sku-map/upsert \
+  -H 'Content-Type: application/json' \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -d '[
+    {"channel":"grab","channelSku":"GF-123","kind":"ITEM","internalId":"item_classic_burger","active":true},
+    {"channel":"grab","channelSku":"GF-M-EXCH","kind":"MODIFIER","internalId":"mod_cheese_slice","active":true}
+  ]'
+
+Resolve:
+
+curl "http://localhost:5000/api/sku-map/resolve?channel=grab&sku=GF-123&kind=ITEM"
+
+Export CSV:
+
+curl -H "x-admin-token: $ADMIN_TOKEN" http://localhost:5000/api/sku-map/export.csv -o sku_map.csv
+
+Import CSV:
+
+curl -X POST http://localhost:5000/api/sku-map/import.csv \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: text/plain" \
+  --data-binary @sku_map.csv
+
+Missing SKUs list:
+
+curl -H "x-admin-token: $ADMIN_TOKEN" http://localhost:5000/api/sku-map/missing
+
+
+---
+
+9) Remove Foodpanda paths
+
+Backend: Ensure only "grab" | "pos" are accepted (already enforced above).
+
+Frontend/Admin: Remove Foodpanda from any dropdowns or code paths.
+
+
+
+---
+
+Summary
+
+Replaces the overbuilt Drizzle, multi-channel approach with your Prisma + 2-channel design.
+
+Guarantees uniqueness with @@unique([channel, channelSku, kind]).
+
+Gives you bulk upsert, fast resolve, missing SKU tracking, and CSV tooling.
+
+Everything is admin-guarded and minimal.
+

@@ -1543,3 +1543,40 @@ enum imported_expense_status {
   APPROVED
   REJECTED
 }
+
+// === External SKU Mapping (Grab <-> POS) ===
+
+enum SkuKind {
+  ITEM
+  MODIFIER
+  BUNDLE
+}
+
+model ExternalSkuMap {
+  id          String   @id @default(cuid())
+  channel     String   @db.VarChar(20) // 'grab' | 'pos'
+  channelSku  String
+  kind        SkuKind
+  internalId  String   // maps to your internal Items/Modifiers ID (string UUID/cuid/sku)
+  active      Boolean  @default(true)
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channel, channelSku, kind])
+  @@index([kind, internalId])
+}
+
+model MissingSkuEvent {
+  id            String   @id @default(cuid())
+  channel       String   @db.VarChar(20) // 'grab' | 'pos'
+  kind          SkuKind
+  sku           String
+  count         Int      @default(1)
+  samplePayload Json?
+  lastOrderRef  String?
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @updatedAt
+
+  @@unique([channel, kind, sku])
+}
