@@ -81,6 +81,9 @@ export async function computeShiftAll(dateISO: string) {
     // Skip base burger component lines when excluded
     if (excludeKey.has(`${r.receipt_id}#${r.line_no}`)) continue;
 
+    // CRITICAL: SKU-first lookup from item_catalog
+    // If SKU exists, get metadata (patties_per, grams_per, kind, etc.)
+    // Do NOT check category - use 'kind' field to determine if burger calculations apply
     const rule = r.sku ? bySku.get(r.sku) ?? null : null;
     const name = rule?.name ?? r.name;
     const category = rule?.category ?? 'other';
@@ -91,15 +94,20 @@ export async function computeShiftAll(dateISO: string) {
     p.qty += r.qty;
     p.hits.add(`${r.sku ?? 'no-sku'} :: ${name}`);
 
-    if (rule && rule.kind) {
-      if (rule.kind === 'beef') {
-        const patties = (rule.patties_per ?? 1) * r.qty;
+    // CRITICAL: Calculate burger metrics ONLY if item_catalog has 'kind' field populated
+    // 'kind' can be: 'beef' or 'chicken' (set by seed_burger_catalog.ts script)
+    // DO NOT check category name - it varies (Smash Burgers, Meal Deals, etc.)
+    if (rule?.kind) {
+      if (rule.kind === 'beef' && rule.patties_per) {
+        const patties = rule.patties_per * r.qty;
         p.patties += patties;
         p.red += patties * BEEF_G;
-      } else if (rule.kind === 'chicken') {
-        p.chick += (rule.grams_per ?? 100) * r.qty;
+      } else if (rule.kind === 'chicken' && rule.grams_per) {
+        p.chick += rule.grams_per * r.qty;
       }
-      p.rolls += (rule.rolls_per ?? 1) * r.qty;
+      if (rule.rolls_per) {
+        p.rolls += rule.rolls_per * r.qty;
+      }
     }
   }
 
