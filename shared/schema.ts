@@ -15,6 +15,9 @@ export const bankTxnStatusEnum = pgEnum('bank_txn_status', ['pending', 'approved
 export const importedExpenseStatusEnum = pgEnum('imported_expense_status', ['PENDING', 'APPROVED', 'REJECTED']);
 export const expenseSourceEnum = pgEnum('expense_source', ['BANK_UPLOAD', 'PARTNER_UPLOAD', 'MANUAL_ENTRY']);
 
+// Enum for External SKU Mapping - Sales Channels
+export const salesChannelEnum = pgEnum('sales_channel', ['pos', 'grab', 'foodpanda', 'house', 'other']);
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -103,6 +106,7 @@ export const menuItems = pgTable("menu_items", {
   price: decimal("price", { precision: 8, scale: 2 }).notNull(),
   cost: decimal("cost", { precision: 8, scale: 2 }).notNull(),
   ingredients: jsonb("ingredients").$type<string[]>().notNull(),
+  houseSku: text("house_sku").unique(), // House SKU for external mapping
 });
 
 // Inventory table
@@ -435,6 +439,10 @@ export const ingredients = pgTable("ingredients", {
   portionUnit: text("portion_unit"),
   portionsPerPurchase: integer("portions_per_purchase"),
   portionCost: decimal("portion_cost", { precision: 10, scale: 4 }),
+
+  // External mapping for purchasing
+  supplierSku: text("supplier_sku"), // Supplier product code (e.g., Makro code)
+  supplierBarcode: text("supplier_barcode"), // EAN/UPC barcode
 
   lastReview: timestamp("last_review").defaultNow(),
   
@@ -1265,6 +1273,40 @@ export const managerChecklists = pgTable("manager_checklists", {
   signedAt: timestamp("signedAt").defaultNow(),
 });
 
+// === External SKU Mapping System ===
+// Maps items/modifiers/ingredients to external channel SKUs (POS, Grab, Foodpanda, etc.)
+export const externalSkuMapV2 = pgTable("external_sku_map_v2", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  channel: salesChannelEnum("channel").notNull(), // pos, grab, foodpanda, house, other
+  
+  // One of these will be set (target entity)
+  itemId: integer("item_id"), // Reference to menuItems.id
+  modifierId: integer("modifier_id"), // Reference to modifier if exists
+  ingredientId: integer("ingredient_id"), // Reference to ingredients.id
+  
+  // External identifiers
+  sku: text("sku"), // External SKU/product code
+  externalId: text("external_id"), // External system ID
+  barcode: text("barcode"), // EAN/UPC barcode
+  variant: text("variant"), // Size/flavor variant code
+  
+  // Governance
+  effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
+  effectiveTo: timestamp("effective_to"),
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  channelSkuIdx: index("external_sku_map_v2_channel_sku_idx").on(table.channel, table.sku),
+  channelExternalIdIdx: index("external_sku_map_v2_channel_external_id_idx").on(table.channel, table.externalId),
+  channelBarcodeIdx: index("external_sku_map_v2_channel_barcode_idx").on(table.channel, table.barcode),
+  itemIdIdx: index("external_sku_map_v2_item_id_idx").on(table.itemId),
+  modifierIdIdx: index("external_sku_map_v2_modifier_id_idx").on(table.modifierId),
+  ingredientIdIdx: index("external_sku_map_v2_ingredient_id_idx").on(table.ingredientId),
+}));
+
 // Checklist Assignments table - Fort Knox security for server-side task binding
 export const checklistAssignments = pgTable("checklist_assignments", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`), // assignmentId UUID
@@ -1460,4 +1502,9 @@ export const dailyReviewComments = pgTable("daily_review_comments", {
 
 export const insertDailyReviewCommentSchema = createInsertSchema(dailyReviewComments).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDailyReviewComment = z.infer<typeof insertDailyReviewCommentSchema>;
+
+// External SKU Mapping Insert Schemas and Types
+export const insertExternalSkuMapV2Schema = createInsertSchema(externalSkuMapV2).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertExternalSkuMapV2 = z.infer<typeof insertExternalSkuMapV2Schema>;
+export type SelectExternalSkuMapV2 = typeof externalSkuMapV2.$inferSelect;
 export type SelectDailyReviewComment = typeof dailyReviewComments.$inferSelect;

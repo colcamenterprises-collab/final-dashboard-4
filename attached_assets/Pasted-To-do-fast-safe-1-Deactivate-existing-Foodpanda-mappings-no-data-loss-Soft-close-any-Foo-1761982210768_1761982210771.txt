@@ -1,0 +1,123 @@
+To-do (fast + safe)
+
+1) Deactivate existing Foodpanda mappings (no data loss)
+
+-- Soft-close any Foodpanda mappings so they stop resolving
+UPDATE external_sku_map_v2
+SET active = false, effectiveTo = NOW()
+WHERE channel = 'foodpanda' AND active = true;
+
+> We’re not deleting history; just turning them off.
+
+
+
+
+---
+
+2) API: disallow Foodpanda at the edge (Zod)
+
+Edit: server/routes/skuMap.ts
+
+Replace the enum so requests can’t use Foodpanda:
+
+// before
+// const SalesChannelEnum = z.enum(['pos', 'grab', 'foodpanda', 'house', 'other']);
+
+// after (GrabFood-only among aggregators)
+const SalesChannelEnum = z.enum(['pos', 'grab', 'house', 'other']);
+
+(Optional hard guard) reject any stray ‘foodpanda’ payloads early:
+
+// just under router.post('/resolve'...) and other POSTs, add:
+if ((req.body?.channel || '').toLowerCase() === 'foodpanda') {
+  return res.status(400).json({ error: 'Foodpanda is disabled for this account.' });
+}
+
+Do the same guard in the POST /api/sku-map create route if you want belt-and-braces.
+
+Restart the server.
+
+
+---
+
+3) Frontend: remove Foodpanda from pickers
+
+Search your front-end for channel option arrays and remove 'foodpanda'.
+
+Example:
+
+Edit: client/src/lib/constants.ts (or wherever you keep options)
+
+// before
+// export const SALES_CHANNELS = ['pos','grab','foodpanda','house','other'] as const;
+
+// after
+export const SALES_CHANNELS = ['pos','grab','house','other'] as const;
+
+If you render a select:
+
+{SALES_CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+
+No UI for Foodpanda should remain.
+
+
+---
+
+4) (Optional later) Drop Foodpanda from Prisma enum
+
+> This is a heavier migration; skip if you want zero risk right now.
+
+
+
+If/when you want the DB enum cleaned:
+
+Edit: schema.prisma
+
+// before
+// enum SalesChannel { pos grab foodpanda house other }
+
+// after
+enum SalesChannel { pos grab house other }
+
+Then run the two-step safe migration:
+
+-- Step A (already done, but safe to re-run):
+UPDATE external_sku_map_v2
+SET active = false, effectiveTo = NOW()
+WHERE channel = 'foodpanda' AND active = true;
+
+-- Step B: map legacy values to 'other' so cast succeeds
+UPDATE external_sku_map_v2
+SET channel = 'other'
+WHERE channel = 'foodpanda';
+
+Now apply Prisma migration:
+
+npx prisma generate
+npx prisma migrate dev --name drop_foodpanda_channel
+
+
+---
+
+5) Ingestion pipeline note
+
+Wherever you ingest orders (webhooks, polling), assert channel !== 'foodpanda'. Example:
+
+if (incoming.channel?.toLowerCase() === 'foodpanda') {
+  throw new Error('Foodpanda disabled');
+}
+
+
+---
+
+6) Agent guardrails
+
+Do not re-add Foodpanda to any enum/options.
+
+Do not auto-map old Foodpanda SKUs to Grab without explicit instruction.
+
+If any code references Foodpanda imports or parsers, disable those paths (feature flag) rather than deleting.
+
+
+
+---
