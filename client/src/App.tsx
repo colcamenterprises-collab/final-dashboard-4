@@ -42,6 +42,7 @@ import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
+import PurchasingLive from "./pages/ops/PurchasingLive";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -82,6 +83,9 @@ export default function App() {
                   {/* Comment out duplicates to avoid conflicts */}
                   {/* <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} /> */}
                   {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
+                  
+                  {/* Purchasing Planner */}
+                  <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
                   
                   {/* Analysis with nested routes */}
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>

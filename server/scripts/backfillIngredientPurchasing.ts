@@ -1,214 +1,151 @@
-import { PrismaClient } from '@prisma/client';
-import { foodCostings } from '../data/foodCostings';
+// server/scripts/backfillIngredientPurchasing.ts
+import { db } from '../lib/prisma';
+import dayjs from 'dayjs';
+import * as modImport from '../data/foodCostings.js';
+const mod: any = modImport;
+const foodCostings: any[] = Array.isArray(mod?.foodCostings) ? mod.foodCostings : (Array.isArray(mod?.default) ? mod.default : []);
 
-const prisma = new PrismaClient();
+type Unit = 'kg'|'g'|'L'|'ml'|'each';
 
-// CLI flags
-const args = process.argv.slice(2);
-const APPLY = args.includes('--apply');
-const FILL_PORTION = args.includes('--portion');
-const DRY_RUN = !APPLY;
+const prisma = db();
 
-interface ParsedPackaging {
-  purchaseUnit: string;
-  purchaseQty: number;
-  portionUnit?: string;
-  portionQty?: number;
+function parseCostTHB(raw?: string): number {
+  if (!raw) return 0;
+  const n = Number(String(raw).replace(/[^\d.]/g, ''));
+  return isFinite(n) ? n : 0;
 }
-
-/**
- * Parse packaging strings like:
- * - "Per kg" → { purchaseUnit: "kg", purchaseQty: 1 }
- * - "6 Cans" → { purchaseUnit: "can", purchaseQty: 6 }
- * - "12 x 330 ml" → { purchaseUnit: "ml", purchaseQty: 3960 }
- */
-function parsePackaging(packagingQty: string, averageMenuPortion?: string): ParsedPackaging {
-  const pkg = packagingQty.toLowerCase().trim();
-  
-  // Pattern: "Per kg" or "per unit"
-  if (pkg.startsWith('per ')) {
-    const unit = pkg.replace('per ', '').trim();
-    return {
-      purchaseUnit: unit,
-      purchaseQty: 1,
-    };
+function parsePackagingQty(raw?: string): { purchaseUnit: Unit, purchaseQty: number } {
+  if (!raw) return { purchaseUnit: 'each', purchaseQty: 1 };
+  const lower = String(raw).trim().toLowerCase();
+  const multi = lower.match(/(\d+)\s*x\s*(\d*\.?\d+)\s*(kg|g|l|ml|each|pc|piece|pieces|unit|can|bottle)/);
+  if (multi) {
+    const packs = Number(multi[1]);
+    const eachQty = Number(multi[2]);
+    let u = multi[3];
+    if (u === 'l') u = 'L';
+    if (['pc','piece','pieces','unit','can','bottle','each'].includes(u)) return { purchaseUnit: 'each', purchaseQty: packs * eachQty };
+    return { purchaseUnit: u as Unit, purchaseQty: packs * eachQty };
   }
-  
-  // Pattern: "6 Cans"
-  const simpleMatch = pkg.match(/^(\d+(?:\.\d+)?)\s*(.+)$/);
-  if (simpleMatch) {
-    const qty = parseFloat(simpleMatch[1]);
-    const unit = simpleMatch[2].trim().replace(/s$/, ''); // Remove plural 's'
-    return {
-      purchaseUnit: unit,
-      purchaseQty: qty,
-    };
+  const per = lower.match(/per\s+(kg|g|l|ml|each|piece|pc|unit)/);
+  if (per) {
+    let u = per[1]; if (u === 'l') u = 'L'; if (['piece','pc','unit'].includes(u)) u = 'each';
+    return { purchaseUnit: u as Unit, purchaseQty: 1 };
   }
-  
-  // Pattern: "12 x 330 ml" (cases/packs)
-  const caseMatch = pkg.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*([a-z]+)/);
-  if (caseMatch) {
-    const caseQty = parseInt(caseMatch[1]);
-    const unitQty = parseFloat(caseMatch[2]);
-    const unit = caseMatch[3];
-    return {
-      purchaseUnit: unit,
-      purchaseQty: caseQty * unitQty,
-    };
+  const simple = lower.match(/(\d*\.?\d+)\s*(kg|g|l|ml|each|piece|pc|unit)/);
+  if (simple) {
+    const qty = Number(simple[1]);
+    let u = simple[2]; if (u === 'l') u = 'L'; if (['piece','pc','unit'].includes(u)) u = 'each';
+    return { purchaseUnit: u as Unit, purchaseQty: qty };
   }
-  
-  // Fallback: treat as pack
-  return {
-    purchaseUnit: 'pack',
-    purchaseQty: 1,
-  };
+  return { purchaseUnit: 'each', purchaseQty: 1 };
 }
-
-/**
- * Parse portion strings like "95 gr" → { portionUnit: "g", portionQty: 95 }
- */
-function parsePortion(portion: string): { portionUnit: string; portionQty: number } | null {
-  if (!portion || portion.toLowerCase() === 'each') return null;
-  
-  const match = portion.match(/(\d+(?:\.\d+)?)\s*([a-z]+)/i);
-  if (match) {
-    let qty = parseFloat(match[1]);
-    let unit = match[2].toLowerCase();
-    
-    // Normalize units
-    if (unit === 'gr') unit = 'g';
-    
-    return { portionUnit: unit, portionQty: qty };
-  }
-  
-  return null;
+function parsePortion(raw?: string) {
+  if (!raw) return {};
+  const m = String(raw).toLowerCase().match(/(\d*\.?\d+)\s*(g|gr|gram|kg|ml|l|each|piece|pc|unit)/);
+  if (!m) return {};
+  const qty = Number(m[1]);
+  let u = m[2]; if (u === 'gr' || u === 'gram') u = 'g'; if (u === 'l') u = 'L';
+  if (['piece','pc','unit'].includes(u)) u = 'each';
+  if (u === 'kg') return { portionQty: qty * 1000, portionUnit: 'g' as const };
+  return { portionQty: qty, portionUnit: u as Unit };
 }
+const args = new Set(process.argv.slice(2));
+const APPLY = args.has('--apply');
+const ALSO_SET_PORTION_IF_MISSING = args.has('--portion');
 
-/**
- * Parse cost string "฿319.00" → 319
- */
-function parseCost(costStr: string): number {
-  return parseFloat(costStr.replace(/[฿,]/g, ''));
-}
+async function upsertByName(item: any) {
+  const name = (item.item || item.name || '').trim();
+  if (!name) return { skip: true };
+  const costTHB = parseCostTHB(item.cost);
+  const { purchaseUnit, purchaseQty } = parsePackagingQty(item.packagingQty);
+  const { portionQty, portionUnit } = parsePortion(item.averageMenuPortion);
+  const lastReview = item.lastReviewDate ? dayjs(item.lastReviewDate, ['DD.MM.YY','DD/MM/YY','YYYY-MM-DD']).toDate() : null;
 
-/**
- * Parse review date "20.08.25" (DD.MM.YY) → Date or null
- */
-function parseReviewDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  
-  try {
-    const parts = dateStr.split('.');
-    if (parts.length !== 3) return null;
-    
-    const day = parseInt(parts[0]);
-    const month = parseInt(parts[1]);
-    const year = 2000 + parseInt(parts[2]); // 25 → 2025
-    
-    const date = new Date(year, month - 1, day);
-    return isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-}
-
-async function backfillIngredientPurchasing() {
-  console.log(`🔄 ${DRY_RUN ? '[DRY RUN]' : '[APPLY MODE]'} Backfilling purchasing data...`);
-  console.log(`📦 Processing ${foodCostings.length} items from foodCostings.ts`);
-  console.log(`   Portion backfill: ${FILL_PORTION ? 'YES' : 'NO'}\n`);
-  
-  let updated = 0;
-  let created = 0;
-  let skipped = 0;
-  let errors: string[] = [];
-  
-  for (const item of foodCostings) {
-    try {
-      const packaging = parsePackaging(item.packagingQty, item.averageMenuPortion);
-      const portion = parsePortion(item.averageMenuPortion || '');
-      const packageCost = parseCost(item.cost);
-      
-      // Check if ingredient exists
-      const existing = await prisma.ingredientV2.findFirst({
-        where: { name: item.item },
-      });
-      
-      const purchaseData = {
-        purchaseUnit: packaging.purchaseUnit,
-        purchaseQty: packaging.purchaseQty,
-        packageCost: packageCost,
-      };
-      
-      const portionData = FILL_PORTION && portion ? {
-        portionUnit: portion.portionUnit,
-        portionQty: portion.portionQty,
-      } : {};
-      
-      const updateData = { ...purchaseData, ...portionData };
-      
-      if (existing) {
-        if (!DRY_RUN) {
-          await prisma.ingredientV2.update({
-            where: { id: existing.id },
-            data: updateData,
-          });
-        }
-        updated++;
-        console.log(`✅ ${DRY_RUN ? '[DRY]' : 'Updated'}: ${item.item} (${packaging.purchaseQty} ${packaging.purchaseUnit} @ ฿${packageCost})`);
-      } else {
-        if (!DRY_RUN) {
-          await prisma.ingredientV2.create({
-            data: {
-              name: item.item,
-              supplier: item.supplier || null,
-              category: item.category || null,
-              brand: item.brand || null,
-              ...updateData,
-              lastReview: item.lastReviewDate ? parseReviewDate(item.lastReviewDate) : null,
-              notes: null,
-            },
-          });
-        }
-        created++;
-        console.log(`✨ ${DRY_RUN ? '[DRY]' : 'Created'}: ${item.item} (${packaging.purchaseQty} ${packaging.purchaseUnit} @ ฿${packageCost})`);
+  const existing = await prisma.ingredientV2.findFirst({ where: { name } });
+  if (!existing) {
+    if (!APPLY) return { created: true, name, purchaseUnit, purchaseQty, packageCost: costTHB };
+    const created = await prisma.ingredientV2.create({
+      data: {
+        name,
+        category: item.category ?? null,
+        brand: item.brand ?? null,
+        supplier: item.supplier ?? null,
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+        portionUnit: ALSO_SET_PORTION_IF_MISSING ? (portionUnit ?? null) : null,
+        portionQty: ALSO_SET_PORTION_IF_MISSING ? (portionQty as any ?? null) : null,
+        lastReview: lastReview ?? undefined,
       }
-    } catch (error: any) {
-      console.error(`❌ Failed to process ${item.item}:`, error.message);
-      errors.push(`${item.item}: ${error.message}`);
-      skipped++;
+    });
+    await prisma.ingredientPriceV2.create({
+      data: {
+        ingredientId: created.id,
+        effectiveFrom: new Date(),
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+      }
+    });
+    return { created: true, name };
+  }
+
+  // update only purchasing (and portions if missing + flag)
+  const updates: any = {};
+  let changed = false;
+
+  if (String(existing.purchaseUnit) !== String(purchaseUnit)) { updates.purchaseUnit = purchaseUnit; changed = true; }
+  if (Number(existing.purchaseQty) !== Number(purchaseQty))   { updates.purchaseQty = purchaseQty as any; changed = true; }
+  if (Number(existing.packageCost) !== Number(costTHB))       { updates.packageCost = costTHB as any; changed = true; }
+
+  if (ALSO_SET_PORTION_IF_MISSING) {
+    if (!existing.portionUnit && portionUnit) { updates.portionUnit = portionUnit; changed = true; }
+    if ((existing.portionQty == null || Number(existing.portionQty) === 0) && portionQty) {
+      updates.portionQty = portionQty as any; changed = true;
     }
   }
-  
-  console.log('\n📊 Backfill Summary:');
-  console.log(`   ${DRY_RUN ? '[DRY RUN - no changes made]' : '[CHANGES APPLIED]'}`);
-  console.log(`   ✨ Created: ${created}`);
-  console.log(`   ✅ Updated: ${updated}`);
-  console.log(`   ❌ Skipped/Errors: ${skipped}`);
-  console.log(`   📦 Total processed: ${foodCostings.length}`);
-  
-  if (errors.length > 0) {
-    console.log('\n⚠️  Errors:');
-    errors.forEach(err => console.log(`   - ${err}`));
-  }
-  
-  if (DRY_RUN) {
-    console.log('\n💡 To apply changes, run: npx tsx server/scripts/backfillIngredientPurchasing.ts --apply');
-    if (!FILL_PORTION) {
-      console.log('💡 To also fill portion data, add: --portion');
+
+  if (!changed) return { unchanged: true, name };
+
+  if (!APPLY) return { updated: true, name, updates };
+
+  const updated = await prisma.ingredientV2.update({
+    where: { id: existing.id },
+    data: {
+      ...updates,
+      lastReview: (lastReview && !isNaN(lastReview.getTime())) ? lastReview : (existing.lastReview ?? undefined),
+      supplier: item.supplier ?? existing.supplier ?? undefined,
+      brand: item.brand ?? existing.brand ?? undefined,
+      category: item.category ?? existing.category ?? undefined,
     }
+  });
+  if (updates.packageCost != null) {
+    await prisma.ingredientPriceV2.create({
+      data: {
+        ingredientId: updated.id,
+        effectiveFrom: new Date(),
+        purchaseUnit,
+        purchaseQty: purchaseQty as any,
+        packageCost: costTHB as any,
+      }
+    });
   }
+  return { updated: true, name };
 }
 
-// Run backfill
-backfillIngredientPurchasing()
-  .then(() => {
-    console.log('\n✅ Backfill complete!');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('\n❌ Backfill failed:', error);
+async function main() {
+  if (!foodCostings || !Array.isArray(foodCostings) || foodCostings.length === 0) {
+    console.error('ERROR: Could not load server/data/foodCostings.ts');
     process.exit(1);
-  })
-  .finally(() => {
-    prisma.$disconnect();
-  });
+  }
+  let created = 0, updated = 0, unchanged = 0;
+  for (const row of foodCostings) {
+    const r = await upsertByName(row);
+    if (!r) continue;
+    if ((r as any).created) created++;
+    else if ((r as any).updated) updated++;
+    else if ((r as any).unchanged) unchanged++;
+  }
+  console.log(`Backfill ${APPLY ? 'APPLIED' : 'DRY-RUN'} — created:${created} updated:${updated} unchanged:${unchanged}`);
+}
+main().catch(e => (console.error(e), process.exit(1)));

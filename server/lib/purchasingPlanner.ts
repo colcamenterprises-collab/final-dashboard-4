@@ -1,99 +1,106 @@
-import { PrismaClient } from '@prisma/client';
+// server/lib/purchasingPlanner.ts
+// Robust, pack-based purchasing math with strict unit families.
+// Portions are NEVER used here.
 
-const prisma = new PrismaClient();
+import { db } from './prisma';
+const prisma = db();
 
-export interface IngredientNeedRequest {
-  ingredientId: string;
-  requiredQty: number;
-  requiredUnit: string; // e.g., "kg", "g", "L", "ml"
+type Unit = 'kg'|'g'|'L'|'ml'|'each';
+type Family = 'g'|'ml'|'each';
+
+function toBase(unit: Unit, qty: number): { base: Family, value: number } {
+  switch (unit) {
+    case 'kg': return { base: 'g',  value: qty * 1000 };
+    case 'g':  return { base: 'g',  value: qty };
+    case 'L':  return { base: 'ml', value: qty * 1000 };
+    case 'ml': return { base: 'ml', value: qty };
+    case 'each': return { base: 'each', value: qty };
+    default: return { base: 'each', value: qty };
+  }
 }
 
-export interface PurchasePlan {
+export type PurchasingNeedBase = {
   ingredientId: string;
-  ingredientName: string;
-  purchaseUnit: string;
-  purchaseQty: number;
-  packsToBuy: number;
+  requiredQtyBase: number;    // already in base units (g/ml/each)
+};
+
+export type PurchasingNeedQty = {
+  ingredientId: string;
+  requiredQty: number;        // numeric
+  requiredUnit: Unit;         // 'g','kg','ml','L','each'
+};
+
+export type PurchasingNeed = PurchasingNeedBase | PurchasingNeedQty;
+
+export type PurchasingPlanLine = {
+  ingredientId: string;
+  name: string;
+  supplier?: string | null;
+  requiredQtyBase: number;  // normalized need in pack base family
+  packBaseQty: number;      // pack size in base units (e.g., 1000 g, 3960 ml, 1 each)
+  packsToBuy: number;       // ceil(required / packBaseQty)
+  packageCostTHB: number;
   lineCostTHB: number;
-}
+  baseFamily: Family;
+};
 
-/**
- * Convert between units in the same family
- * Mass: kg ↔ g
- * Volume: L ↔ ml
- * Count: piece, pack, can, etc (no conversion)
- */
-function convertToSameUnit(qty: number, fromUnit: string, toUnit: string): number {
-  const from = fromUnit.toLowerCase();
-  const to = toUnit.toLowerCase();
-  
-  if (from === to) return qty;
-  
-  // Mass conversions
-  if (from === 'kg' && to === 'g') return qty * 1000;
-  if (from === 'g' && to === 'kg') return qty / 1000;
-  
-  // Volume conversions
-  if (from === 'l' && to === 'ml') return qty * 1000;
-  if (from === 'ml' && to === 'l') return qty / 1000;
-  
-  // Same unit family (e.g., "kg bag" vs "kg")
-  if (from.includes(to) || to.includes(from)) return qty;
-  
-  throw new Error(`Cannot convert ${fromUnit} to ${toUnit} - different unit families`);
-}
+export async function buildPurchasingPlan(needs: PurchasingNeed[]): Promise<{
+  lines: PurchasingPlanLine[];
+  totalCostTHB: number;
+}> {
+  const ingIds = needs.map(n => n.ingredientId);
+  const ingredients = await prisma.ingredientV2.findMany({
+    where: { id: { in: ingIds } },
+    select: { id: true, name: true, supplier: true, purchaseUnit: true, purchaseQty: true, packageCost: true }
+  });
 
-/**
- * Calculate how many packs to buy based on purchasing units
- */
-export async function calculatePurchasingPlan(
-  needs: IngredientNeedRequest[]
-): Promise<PurchasePlan[]> {
-  const plan: PurchasePlan[] = [];
+  const byId = new Map(ingredients.map(i => [i.id, i]));
+  const lines: PurchasingPlanLine[] = [];
 
   for (const need of needs) {
-    const ingredient = await prisma.ingredientV2.findUnique({
-      where: { id: need.ingredientId },
-      select: {
-        id: true,
-        name: true,
-        purchaseUnit: true,
-        purchaseQty: true,
-        packageCost: true,
-      },
-    });
+    const ing = byId.get(need.ingredientId);
+    if (!ing) throw new Error(`Ingredient not found: ${need.ingredientId}`);
 
-    if (!ingredient) {
-      throw new Error(`Ingredient ${need.ingredientId} not found`);
+    // Pack size in base units (family)
+    const pack = toBase(ing.purchaseUnit as any, Number(ing.purchaseQty));
+    if (!Number.isFinite(pack.value) || pack.value <= 0) {
+      throw new Error(`Invalid pack size for ingredient: ${ing.name}`);
     }
 
-    if (!ingredient.purchaseUnit || !ingredient.purchaseQty || !ingredient.packageCost) {
-      throw new Error(`Ingredient ${ingredient.name} missing purchasing data`);
+    // Need → same base family as pack
+    let requiredBase: number;
+    if ('requiredQtyBase' in need) {
+      requiredBase = Number(need.requiredQtyBase);
+    } else if ('requiredQty' in need && 'requiredUnit' in need) {
+      const conv = toBase(need.requiredUnit as any, Number(need.requiredQty));
+      if (conv.base !== pack.base) {
+        throw new Error(`Unit family mismatch for ${ing.name}: need ${conv.base}, pack ${pack.base}.`);
+      }
+      requiredBase = conv.value;
+    } else {
+      throw new Error('Invalid need: pass requiredQtyBase OR (requiredQty & requiredUnit).');
+    }
+    if (!Number.isFinite(requiredBase) || requiredBase < 0) {
+      throw new Error(`Invalid required quantity for ${ing.name}.`);
     }
 
-    const purchaseQtyNum = Number(ingredient.purchaseQty);
-    const packageCostNum = Number(ingredient.packageCost);
+    const packsToBuy = Math.ceil(requiredBase / pack.value);
+    const packageCostTHB = Number(ing.packageCost);
+    const lineCostTHB = packsToBuy * packageCostTHB;
 
-    // Convert required qty to same unit as purchase qty
-    const requiredInPurchaseUnits = convertToSameUnit(
-      need.requiredQty,
-      need.requiredUnit,
-      ingredient.purchaseUnit
-    );
-
-    // Calculate packs needed
-    const packsToBuy = Math.ceil(requiredInPurchaseUnits / purchaseQtyNum);
-    const lineCostTHB = packsToBuy * packageCostNum;
-
-    plan.push({
-      ingredientId: ingredient.id,
-      ingredientName: ingredient.name,
-      purchaseUnit: ingredient.purchaseUnit,
-      purchaseQty: purchaseQtyNum,
+    lines.push({
+      ingredientId: ing.id,
+      name: ing.name,
+      supplier: ing.supplier,
+      requiredQtyBase: requiredBase,
+      packBaseQty: pack.value,
       packsToBuy,
+      packageCostTHB,
       lineCostTHB,
+      baseFamily: pack.base,
     });
   }
 
-  return plan;
+  const totalCostTHB = lines.reduce((s, l) => s + l.lineCostTHB, 0);
+  return { lines, totalCostTHB };
 }

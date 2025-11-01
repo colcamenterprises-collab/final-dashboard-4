@@ -1,30 +1,33 @@
+// server/routes/purchasing.ts
 import { Router } from 'express';
-import { calculatePurchasingPlan, type IngredientNeedRequest } from '../lib/purchasingPlanner';
+import { z } from 'zod';
+import { buildPurchasingPlan } from '../lib/purchasingPlanner';
 
 const router = Router();
 
-/**
- * POST /api/purchasing/plan
- * Calculate purchasing plan based on ingredient needs
- */
+const NeedBase = z.object({
+  ingredientId: z.string().uuid(),
+  requiredQtyBase: z.number().nonnegative(),
+});
+
+const NeedQty = z.object({
+  ingredientId: z.string().uuid(),
+  requiredQty: z.number().nonnegative(),
+  requiredUnit: z.enum(['kg','g','L','ml','each']),
+});
+
+const BodySchema = z.object({
+  needs: z.array(z.union([NeedBase, NeedQty])).min(1),
+});
+
 router.post('/plan', async (req, res) => {
+  const parsed = BodySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   try {
-    const { needs } = req.body as { needs: IngredientNeedRequest[] };
-
-    if (!needs || !Array.isArray(needs)) {
-      return res.status(400).json({ error: 'Invalid request: needs array required' });
-    }
-
-    const plan = await calculatePurchasingPlan(needs);
-
-    res.json({
-      success: true,
-      plan,
-      totalCostTHB: plan.reduce((sum, item) => sum + item.lineCostTHB, 0),
-    });
-  } catch (error: any) {
-    console.error('Purchasing plan error:', error);
-    res.status(500).json({ error: error.message || 'Failed to calculate purchasing plan' });
+    const plan = await buildPurchasingPlan(parsed.data.needs);
+    res.json(plan);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || 'Failed to build purchasing plan' });
   }
 });
 
