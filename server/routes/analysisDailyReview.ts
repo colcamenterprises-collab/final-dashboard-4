@@ -238,3 +238,68 @@ analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
     });
   }
 });
+
+// Manager review comments endpoints
+analysisDailyReviewRouter.get("/daily-review-comments/:date", async (req, res) => {
+  try {
+    const date = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    const { start, end } = dayRange(date);
+    const review = await prisma.daily_review_comments.findFirst({
+      where: { 
+        business_date: { gte: start, lt: end }
+      }
+    });
+
+    if (!review) {
+      return res.json({ comment: "", actualAmountBanked: null });
+    }
+
+    res.json({
+      comment: review.comment || "",
+      actualAmountBanked: review.actual_amount_banked ? Number(review.actual_amount_banked) : null
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching review comment:", error);
+    res.status(500).json({ error: "Failed to fetch review comment" });
+  }
+});
+
+analysisDailyReviewRouter.post("/daily-review-comments/:date", async (req, res) => {
+  try {
+    const date = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    const { comment, actualAmountBanked } = req.body;
+    const businessDate = new Date(`${date}T00:00:00.000Z`);
+
+    await prisma.daily_review_comments.upsert({
+      where: { 
+        business_date: businessDate
+      },
+      update: {
+        comment: comment || "",
+        actual_amount_banked: actualAmountBanked !== null ? actualAmountBanked : null,
+        updated_at: new Date()
+      },
+      create: {
+        business_date: businessDate,
+        comment: comment || "",
+        actual_amount_banked: actualAmountBanked !== null ? actualAmountBanked : null
+      }
+    });
+
+    res.json({ 
+      ok: true, 
+      message: "Review saved successfully" 
+    });
+  } catch (error: any) {
+    console.error("❌ Error saving review comment:", error);
+    res.status(500).json({ error: "Failed to save review comment" });
+  }
+});
