@@ -1,0 +1,140 @@
+Scope (final)
+
+Channels: grab, pos (remove Foodpanda paths/UI/options).
+
+What it does: Map any external SKU (Grab) to your internal item/modifier (POS).
+
+Where it’s used: On order ingest (Grab → Dashboard → Loyverse), reporting, and the menu tools.
+
+
+Minimal data model (Prisma)
+
+Use a single table with a kind flag so uniqueness is simple and no NULL traps:
+
+enum SkuKind {
+  ITEM
+  MODIFIER
+  BUNDLE
+}
+
+model ExternalSkuMap {
+  id          String   @id @default(cuid())
+  channel     String   @db.VarChar(20) // 'grab' | 'pos'
+  channelSku  String
+  kind        SkuKind
+  internalId  String   // id from your Items/Modifiers table
+  active      Boolean  @default(true)
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channel, channelSku, kind])        // one-to-one per channel+sku+kind
+  @@index([kind, internalId])                  // reverse lookups
+}
+
+> This avoids composite-NULL uniqueness edge cases and lets you map items, modifiers, and bundles separately.
+
+
+
+API contracts (keep what you added, tighten a little)
+
+GET /api/sku-map?channel=grab&kind=ITEM → list
+
+POST /api/sku-map/upsert → bulk upsert
+
+[
+  {"channel":"grab","channelSku":"GF-123","kind":"ITEM","internalId":"item_abc","active":true}
+]
+
+GET /api/sku-map/resolve?channel=grab&sku=GF-123&kind=ITEM
+
+{"found":true,"kind":"ITEM","internalId":"item_abc","meta":{}}
+
+Auth: lock these behind your Admin session (no public access).
+
+Non-destructive: no deletes on upsert; use active=false to retire.
+
+
+Ingestion usage (where it pays off)
+
+When a Grab order arrives:
+
+1. For each line item SKU → resolve(kind=ITEM).
+
+
+2. For each modifier SKU → resolve(kind=MODIFIER).
+
+
+3. If not found, log to missing_sku_events and flag the order as “Needs Mapping” (dashboard chip) but still store the raw payload, so nothing blocks.
+
+
+
+Pseudo:
+
+const rItem = await resolve('grab', line.externalSku, 'ITEM');
+if (!rItem.found) logMissing('ITEM', line.externalSku, orderId);
+const rMods = await Promise.all(line.modifiers.map(m => resolve('grab', m.externalSku, 'MODIFIER')));
+
+Safety checks so it “does no harm”
+
+Read-only by default in prod: app runtime uses app_user (no DDL). Migrations only via migrator_user.
+
+No route regressions: ensure the new router is registered once (same pattern you already used for analysis).
+If you want ultra-light guard: add a unit smoke test that hits /api/sku-map/resolve and fails build if 404.
+
+
+Acceptance tests (quick)
+
+[ ] POST /api/sku-map/upsert with one item + one modifier returns 200.
+
+[ ] GET /api/sku-map/resolve?channel=grab&sku=<known>&kind=ITEM returns {found:true}.
+
+[ ] Unknown SKU returns {found:false} and a missing_sku_events row is written.
+
+[ ] Ingest a sample Grab order payload with mapped SKUs → internal IDs resolve and store.
+
+[ ] UI: Admin page lists mappings, can search, can toggle Active.
+
+
+Admin seed (fastest path)
+
+Two ways—pick one:
+
+A) Name-match auto seed (zero manual):
+
+Scan current POS Items/Modifiers and Grab menu export.
+
+Case-insensitive normalize names, create tentative mappings where unique name matches exist.
+
+Output a “Needs review” list for collisions/duplicates.
+
+
+B) CSV upload (explicit + reliable): Upload a simple CSV like this (I’ll support both import and export):
+
+channel,kind,channelSku,internalId,internalName,notes,active
+grab,ITEM,GF-123,item_classic_burger,Classic Burger,,true
+grab,MODIFIER,GF-M-EXCH,item_cheese_slice,Extra Cheese,,true
+
+Clean-up to keep it Grab-only
+
+Remove/disable any Foodpanda options in:
+
+Admin UI: channel dropdown
+
+Back-end enum/constants
+
+Any scheduled jobs or importers
+
+
+
+What I’ll do next (tiny, focused)
+
+Add/confirm the Prisma model above (non-destructive migration).
+
+Ensure the three endpoints match the contracts here and are admin-only.
+
+Add a missing_sku_events table (id, channel, kind, sku, samplePayloadRef, firstSeenAt, lastSeenAt, count) so ops can triage unmapped SKUs quickly.
+
+Provide a CSV import/export on the Admin page for bulk mapping.
+
+Wire ingestion to resolve() and flag “Needs Mapping” on unknowns (no order loss).
