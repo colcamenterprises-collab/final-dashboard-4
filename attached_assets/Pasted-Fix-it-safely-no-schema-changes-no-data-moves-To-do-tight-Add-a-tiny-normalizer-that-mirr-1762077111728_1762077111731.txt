@@ -1,0 +1,198 @@
+Fix it safely (no schema changes, no data moves)
+
+To-do (tight)
+
+[ ] Add a tiny normalizer that mirrors the working logic (calculate totals from arrays as last resort).
+
+[ ] Use it in both Daily Review endpoints:
+
+GET /api/analysis/daily-comparison
+
+GET /api/analysis/daily-comparison-range
+
+
+[ ] (Optional but recommended) Make sure the front-end doesn’t hide zeros by treating 0 as falsy.
+
+
+
+---
+
+1) Add a defensive normalizer (server-side)
+
+Create server/lib/expenseTotals.ts:
+
+// server/lib/expenseTotals.ts
+type Num = number | string | null | undefined;
+const toNum = (v: Num) => (v === null || v === undefined || Number.isNaN(Number(v)) ? 0 : Number(v));
+const sumBy = (arr: any[], key: string) =>
+  Array.isArray(arr) ? arr.reduce((a, b) => a + toNum(b?.[key]), 0) : 0;
+
+/**
+ * Accepts the DB row that contains either column totals and/or a JSON payload with arrays:
+ *   row.shoppingTotal, row.wagesTotal, row.othersTotal
+ *   row.payload.expenses[] -> { cost }
+ *   row.payload.wages[] -> { amount }
+ *   row.payload.otherExpenses[] -> { amount }
+ *   row.payload.shoppingTotal / wagesTotal / othersTotal (optional)
+ * Returns legacy keys used by the UI.
+ */
+export function extractFormExpenseTotals(row: any) {
+  const payload = row?.payload ?? {};
+
+  // 1) Column totals
+  const colShopping = toNum(row?.shoppingTotal);
+  const colWages    = toNum(row?.wagesTotal);
+  const colOthers   = toNum(row?.othersTotal);
+
+  // 2) Top-level payload totals (if your submitter sets them)
+  const payShopping = toNum(payload?.shoppingTotal);
+  const payWages    = toNum(payload?.wagesTotal);
+  const payOthers   = toNum(payload?.othersTotal);
+
+  // 3) Calculated from arrays (defensive fallback)
+  const calcShopping = sumBy(payload?.expenses, "cost");
+  const calcWages    = sumBy(payload?.wages, "amount");
+  const calcOthers   = sumBy(payload?.otherExpenses, "amount");
+
+  const shoppingTotal = colShopping || payShopping || calcShopping;
+  const wageTotal     = colWages    || payWages    || calcWages;
+  const otherTotal    = colOthers   || payOthers   || calcOthers;
+  const grandTotal    = shoppingTotal + wageTotal + otherTotal;
+
+  return { shoppingTotal, wageTotal, otherTotal, grandTotal };
+}
+
+/**
+ * POS/shift side — if you don’t store expenses there, keep zeros but return the same keys.
+ * If you do store them, apply the same pattern here.
+ */
+export function extractPosExpenseTotals(posRow: any) {
+  const payload = posRow?.payload ?? {};
+  const colShopping = toNum(posRow?.shoppingTotal);
+  const colWages    = toNum(posRow?.wagesTotal);
+  const colOthers   = toNum(posRow?.othersTotal);
+  const payShopping = toNum(payload?.shoppingTotal);
+  const payWages    = toNum(payload?.wagesTotal);
+  const payOthers   = toNum(payload?.othersTotal);
+
+  const shoppingTotal = colShopping || payShopping || 0;
+  const wageTotal     = colWages    || payWages    || 0;
+  const otherTotal    = colOthers   || payOthers   || 0;
+  const grandTotal    = shoppingTotal + wageTotal + otherTotal;
+
+  return { shoppingTotal, wageTotal, otherTotal, grandTotal };
+}
+
+
+---
+
+2) Use the normalizer in the Daily Review routes
+
+In server/routes/analysisDailyReview.ts, update both handlers to call the normalizer(s). Example for the single-day endpoint:
+
+// server/routes/analysisDailyReview.ts
+import { Router } from "express";
+import { prisma } from "../db"; // adjust your import
+import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
+
+export const analysisDailyReviewRouter = Router();
+
+analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
+  try {
+    const date = String(req.query.date);
+    // Fetch rows as you already do
+    const formRow = await prisma.daily_sales_v2.findFirst({
+      where: { shiftDate: date, deletedAt: null },
+      select: { shoppingTotal: true, wagesTotal: true, othersTotal: true, payload: true } // keep minimal
+    });
+
+    const posRow = await prisma.pos_shift_report.findFirst({
+      where: { shiftDate: date },
+      select: { shoppingTotal: true, wagesTotal: true, othersTotal: true, payload: true }
+    });
+
+    const formExp = extractFormExpenseTotals(formRow ?? {});
+    const posExp  = extractPosExpenseTotals(posRow ?? {});
+
+    const variance = {
+      expenses: {
+        shoppingTotal: formExp.shoppingTotal - posExp.shoppingTotal,
+        wageTotal:     formExp.wageTotal     - posExp.wageTotal,
+        otherTotal:    formExp.otherTotal    - posExp.otherTotal,
+        grandTotal:    formExp.grandTotal    - posExp.grandTotal,
+      }
+    };
+
+    return res.json({ date, form: { expenses: formExp }, pos: { expenses: posExp }, variance });
+  } catch (e: any) {
+    console.error("daily-comparison error", e);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+And in the month/range endpoint, when you loop per day, compute the same formExp/posExp via the helpers before pushing each day’s object. This keeps both endpoints consistent with the working “All Shifts Data” logic.
+
+
+---
+
+3) Front-end guard (don’t hide zero)
+
+If any cell renderer does this pattern:
+
+{value ? formatNumber(value) : "—"}
+
+it will wrongly hide 0. Change to:
+
+{value === null || value === undefined ? "—" : formatNumber(value)}
+
+or, if the data might come as string:
+
+{value == null ? "—" : formatNumber(Number(value))}
+
+This ensures 0 displays as 0, not “—”.
+
+
+---
+
+4) Validation (before/after, 2 quick checks)
+
+API check (single day):
+
+
+curl -s "http://localhost:5000/api/analysis/daily-comparison?date=2025-11-01" \
+| jq '{date, form: .form.expenses, pos: .pos.expenses, variance: .variance.expenses}'
+
+Expect nonzero form.shoppingTotal/form.wageTotal even when DB columns are 0, provided arrays are present in payload.
+
+API check (range, filtered to one day):
+
+
+curl -s "http://localhost:5000/api/analysis/daily-comparison-range?month=2025-11" \
+| jq '.[] | select(.date=="2025-11-01") | {date, form: .form.expenses, pos: .pos.expenses}'
+
+UI sanity: Refresh the Sales (Form vs POS) table and confirm expenses now render like the lower table.
+
+
+
+---
+
+5) Risk/rollback
+
+No schema changes. Pure server-side normalization + optional tiny UI check.
+
+Fully revertible by removing expenseTotals.ts and the two call sites.
+
+Low risk: mirrors logic already proven in your working endpoint.
+
+
+
+---
+
+Summary
+
+Root cause: Daily Review endpoint didn’t compute expense totals from arrays; the “All Shifts Data” endpoint did.
+
+Fix: Add a defensive fallback that computes totals from payload.expenses[]/wages[]/otherExpenses[] when columns/top-level totals are zero/missing, and apply it in both Daily Review endpoints. Optionally ensure the UI renders 0 (not “—”).
+
+
+This keeps behavior consistent, restores the comparison table, and doesn’t touch your data or schemas.

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma";
 import { ingestPosForBusinessDate } from "../services/loyverseIngest";
+import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -34,9 +35,10 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
   const other = row.otherTotal ?? 0;
   const total = (row.grandTotal ?? (cash + qr + grab + other)) as number;
 
-  const shopping = row.shoppingTotal ?? 0;
-  const wages = row.wagesTotal ?? 0;
-  const otherExp = row.otherExpense ?? 0;
+  const expenseNorms = extractPosExpenseTotals(row);
+  const shopping = expenseNorms.shoppingTotal;
+  const wages = expenseNorms.wageTotal;
+  const otherExp = expenseNorms.otherTotal;
   const expensesTotal = shopping + wages + otherExp;
   const startingCash = row.startingCash ?? 0;
 
@@ -83,11 +85,12 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
   const other = payload?.otherSales ?? row.aroiSales ?? 0;
   const total = payload?.totalSales ?? row.totalSales ?? (cash + qr + grab + other);
 
-  // Use database columns for expense totals (source of truth)
-  const shopping = row.shoppingTotal ?? payload?.shoppingTotal ?? 0;
-  const wages = row.wagesTotal ?? payload?.wagesTotal ?? 0;
-  const otherExp = row.othersTotal ?? payload?.othersTotal ?? 0;
-  const expensesTotal = row.totalExpenses ?? payload?.totalExpenses ?? (shopping + wages + otherExp);
+  // Use normalizer to extract expense totals (handles columns, payload totals, and arrays)
+  const expenseNorms = extractFormExpenseTotals(row);
+  const shopping = expenseNorms.shoppingTotal;
+  const wages = expenseNorms.wageTotal;
+  const otherExp = expenseNorms.otherTotal;
+  const expensesTotal = expenseNorms.grandTotal;
 
   const startingCash = row.startingCash ?? payload?.startingCash ?? 0;
 
