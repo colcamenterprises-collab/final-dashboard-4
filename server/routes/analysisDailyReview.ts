@@ -57,8 +57,8 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
       cashPayments: cash,
       qrPayments: qr,
       expensesTotal,
-      expectedCash: THB(startingCash + cash - expensesTotal),
-      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
+      expectedCash: THB(cash - expensesTotal),
+      estimatedNetBanked: THB(cash - expensesTotal + qr),
     },
   };
 }
@@ -109,8 +109,8 @@ async function fetchForm1FromDB(businessDate: string): Promise<DailySource | nul
       cashPayments: cash,
       qrPayments: qr,
       expensesTotal,
-      expectedCash: THB(startingCash + cash - expensesTotal),
-      estimatedNetBanked: THB(startingCash + cash - expensesTotal + qr),
+      expectedCash: THB(cash - expensesTotal),
+      estimatedNetBanked: THB(cash - expensesTotal + qr),
     },
   };
 }
