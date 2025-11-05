@@ -1,0 +1,142 @@
+AGENT TICKET — Fix “Expenses missing” in Analysis (no user steps)
+
+Goal
+
+Top table Analysis → Daily Review → “Sales (Form vs POS)” must show expenses exactly like the lower “All Shifts Data” table. Zeros must display as 0, not “—”. No schema changes.
+
+Guardrails (strict)
+
+❌ Do not run prisma db push, db reset, or any destructive commands.
+
+❌ Do not modify DB schema or data.
+
+✅ Only edit server routes under server/routes/* and the React page client/src/pages/analysis/DailyReview.tsx.
+
+✅ You must commit & push the fix yourself.
+
+
+Deliverables
+
+1. Working UI where the top table expenses equal the lower table for the same date(s).
+
+
+2. Two screenshots (before/after not required; after is fine) of the top+lower tables for a real date (e.g., 2025-11-01).
+
+
+3. Curl outputs for single day & range confirming non-null expense totals.
+
+
+4. Git commit hash + pushed to origin/main.
+
+
+
+
+---
+
+Tasks (do in order)
+
+1) Backend sanity (use existing normalizers)
+
+Confirm these functions are present and used by both endpoints:
+
+File: server/lib/expenseTotals.ts
+
+extractFormExpenseTotals(row)
+
+extractPosExpenseTotals(row)
+
+
+File: server/routes/analysisDailyReview.ts
+
+GET /api/analysis/daily-comparison
+
+GET /api/analysis/daily-comparison-range
+
+
+
+If any endpoint doesn’t use them, wire them in. Example inside each handler:
+
+import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
+const formExp = extractFormExpenseTotals(formRow ?? {});
+const posExp  = extractPosExpenseTotals(posRow ?? {});
+const variance = { expenses: {
+  shoppingTotal: formExp.shoppingTotal - posExp.shoppingTotal,
+  wageTotal:     formExp.wageTotal     - posExp.wageTotal,
+  otherTotal:    formExp.otherTotal    - posExp.otherTotal,
+  grandTotal:    formExp.grandTotal    - posExp.grandTotal,
+}};
+return res.json({ date, form: { ...form, expenses: formExp }, pos: { ...pos, expenses: posExp }, variance });
+
+
+2) Frontend fix (render 0, not “—”)
+
+File: client/src/pages/analysis/DailyReview.tsx
+
+Add a small helper near the top of the component:
+
+const renderAmount = (v: unknown) => (v == null ? "—" : formatNumber(Number(v)));
+
+Ensure the Sales (Form vs POS) table uses renderAmount for all expense cells, e.g.:
+
+renderAmount(row.form?.expenses?.shoppingTotal)
+renderAmount(row.form?.expenses?.wageTotal)
+renderAmount(row.form?.expenses?.otherTotal)
+renderAmount(row.form?.expenses?.grandTotal)
+renderAmount(row.pos?.expenses?.shoppingTotal)
+renderAmount(row.pos?.expenses?.wageTotal)
+renderAmount(row.pos?.expenses?.otherTotal)
+renderAmount(row.pos?.expenses?.grandTotal)
+
+Replace any patterns like:
+
+{value ? formatNumber(value) : "—"}       // WRONG (hides 0)
+{value === null ? "—" : formatNumber(...)}// TOO STRICT
+
+with:
+
+{value == null ? "—" : formatNumber(Number(value))}
+
+
+3) Verification (no UI guesswork)
+
+Run these and paste outputs in the chat:
+
+# Choose a date that previously showed dashes on the top table (example below)
+DATE=2025-11-01
+MONTH=2025-11
+
+# Single-day (drives the top table)
+curl -s "http://localhost:5000/api/analysis/daily-comparison?date=$DATE" \
+  | jq '{date, form: .form.expenses, pos: .pos.expenses, variance: .variance.expenses}'
+
+# Range (page hydration)
+curl -s "http://localhost:5000/api/analysis/daily-comparison-range?month=$MONTH" \
+  | jq '.[] | select(.date=="'"$DATE"'") | {date, form: .form.expenses, pos: .pos.expenses}'
+
+4) Git ops (you do it)
+
+git add client/src/pages/analysis/DailyReview.tsx server/routes/analysisDailyReview.ts server/lib/expenseTotals.ts 2>/dev/null || true
+git commit -m "fix(analysis): show expense totals in top table; render zero instead of dash"
+# handle remote README or initial commit
+git pull --rebase origin main || true
+git push -u origin main
+
+5) Evidence
+
+After push, reload Analysis → Daily Review and attach one screenshot showing top and lower tables with matching expense totals for the test date.
+
+Paste the two curl outputs above and the final commit hash.
+
+
+
+---
+
+Acceptance Criteria (agent must tick)
+
+[ ] Top table Sales (Form vs POS) now shows shopping/wages/others/grand totals identical to All Shifts Data for the same date.
+
+[ ] Zeros display as 0 (not “—”).
+
+[ ] No schema changes or Prisma destructive commands were run.
+
+[ ] Code committed & pushed; commit hash provided.
