@@ -1,0 +1,258 @@
+1) I parsed your CSV and built a seed file
+
+Columns detected: Item Name, SKU, Category, Description, Price
+
+Total items: 47
+
+Categories found: Drinks, Side Orders, Smash Burgers, Smash Burger Sets (Meal Deals), Kids Will Love This, GRAB AND FOODPANDA PROMOTIONS, Smash Brothers Sauce
+
+
+Download the seed JSON (grouped by category, with placeholders for images):
+
+menu_seed.json
+
+
+This file is ready to import straight into your DB.
+
+
+---
+
+2) Prisma schema (adds imageUrl, position, etc.)
+
+> Full block — paste into your Prisma schema (or merge if you already have models).
+
+
+
+model MenuCategory {
+  id        String      @id @default(cuid())
+  name      String
+  slug      String      @unique
+  position  Int         @default(0)
+  items     MenuItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model MenuItem {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  sku         String?
+  description String?
+  price       Float
+  imageUrl    String?   // NEW — admin can paste URL (S3, Drive, CDN)
+  position    Int       @default(0)
+  available   Boolean   @default(true)
+
+  categoryId  String
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+Then regenerate client:
+
+npx prisma generate
+
+
+---
+
+3) Import script (one-shot bulk loader)
+
+Create server/scripts/import_menu_from_json.ts:
+
+import { PrismaClient } from "@prisma/client";
+import fs from "fs";
+import path from "path";
+
+const prisma = new PrismaClient();
+
+type SeedCategory = {
+  name: string;
+  slug: string;
+  items: {
+    name: string;
+    sku?: string;
+    description?: string;
+    price?: number;
+    slug: string;
+    imageUrl?: string;
+    position?: number;
+    available?: boolean;
+    category?: string; // ignored
+  }[];
+};
+
+type SeedPayload = {
+  generatedAt: string;
+  categories: SeedCategory[];
+};
+
+function thbToFloat(v: any): number {
+  if (v === null || v === undefined || v === "") return 0;
+  const n = Number(v);
+  if (Number.isFinite(n)) return n;
+  return parseFloat(String(v).replace(/[^\d.]/g, "")) || 0;
+}
+
+async function main() {
+  const file = path.join(process.cwd(), "data", "menu_seed.json");
+  const raw = fs.readFileSync(file, "utf8");
+  const payload = JSON.parse(raw) as SeedPayload;
+
+  for (const [catIndex, cat] of payload.categories.entries()) {
+    // upsert category
+    const category = await prisma.menuCategory.upsert({
+      where: { slug: cat.slug },
+      update: { name: cat.name, position: catIndex },
+      create: { name: cat.name, slug: cat.slug, position: catIndex },
+    });
+
+    for (const [i, it] of cat.items.entries()) {
+      await prisma.menuItem.upsert({
+        where: { slug: it.slug },
+        update: {
+          name: it.name,
+          sku: it.sku || null,
+          description: it.description || null,
+          price: thbToFloat(it.price),
+          imageUrl: it.imageUrl || null,
+          position: i,
+          available: it.available ?? true,
+          categoryId: category.id,
+        },
+        create: {
+          name: it.name,
+          slug: it.slug,
+          sku: it.sku || null,
+          description: it.description || null,
+          price: thbToFloat(it.price),
+          imageUrl: it.imageUrl || null,
+          position: i,
+          available: it.available ?? true,
+          categoryId: category.id,
+        },
+      });
+    }
+  }
+
+  console.log("✅ Menu import complete");
+}
+
+main()
+  .then(async () => { await prisma.$disconnect(); })
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+
+Create data/menu_seed.json in your repo and upload the downloaded file there.
+
+Run once to import:
+
+node --loader tsx server/scripts/import_menu_from_json.ts
+
+
+---
+
+4) API endpoints (optional, but handy)
+
+Add server/routes/menu.ts:
+
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+const router = Router();
+
+// Public menu (for ordering page)
+router.get("/menu", async (_req, res) => {
+  const cats = await prisma.menuCategory.findMany({
+    orderBy: { position: "asc" },
+    include: {
+      items: {
+        where: { available: true },
+        orderBy: { position: "asc" },
+      },
+    },
+  });
+  res.json(cats);
+});
+
+// Admin quick update (name/price/desc/image/available)
+router.patch("/menu/item/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, price, description, imageUrl, available, position, sku, categoryId } = req.body;
+  const updated = await prisma.menuItem.update({
+    where: { id },
+    data: { name, price, description, imageUrl, available, position, sku, categoryId },
+  });
+  res.json(updated);
+});
+
+export default router;
+
+Wire it in server/index.ts:
+
+import menuRoutes from "./routes/menu";
+app.use("/api", menuRoutes);
+
+
+---
+
+5) Admin UI: add image field + placeholder thumbnail
+
+In your Menu Admin item form, add an Image URL input and preview. Example (React):
+
+// Add inside your Add/Edit Menu Item modal form
+<label className="block text-sm font-medium mb-1">Image URL</label>
+<input
+  className="w-full border rounded-lg px-3 py-2"
+  placeholder="https://cdn.example.com/imgs/double-burger.jpg"
+  value={form.imageUrl || ""}
+  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+/>
+
+{/* Live preview */}
+<div className="mt-2 flex items-center gap-3">
+  <div className="w-16 h-16 rounded-xl bg-neutral-100 flex items-center justify-center overflow-hidden">
+    {form.imageUrl ? (
+      <img src={form.imageUrl} alt={form.name} className="w-full h-full object-cover" />
+    ) : (
+      <img
+        src="https://placehold.co/96x96?text=SBB"
+        alt="placeholder"
+        className="w-full h-full object-cover"
+      />
+    )}
+  </div>
+  <div className="text-xs text-neutral-500">Paste a direct image URL (S3/Drive public/Cloudinary/CDN).</div>
+</div>
+
+And when you render items in the public ordering list, show the same placeholder if imageUrl is empty.
+
+
+---
+
+6) Admin Typography (match your style)
+
+Append to your global CSS to lock fonts/weights/sizes (no forced black color; inherits context):
+
+/* SBB Admin Typography — Poppins, tablet-first */
+:root { --sbb-h1: 22px; --sbb-h2: 18px; --sbb-h3: 16px; }
+@media (min-width: 768px){ :root { --sbb-h1: 24px; --sbb-h2: 20px; --sbb-h3: 18px; } }
+
+h1 { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: var(--sbb-h1); line-height: 1.2; color: inherit; }
+h2 { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: var(--sbb-h2); line-height: 1.25; color: inherit; }
+h3 { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: var(--sbb-h3); line-height: 1.3; color: inherit; }
+
+
+---
+
+7) One-liner to create the proper data/ folder and copy the seed (shell)
+
+Paste this in Replit shell:
+
+mkdir -p data && cp /mnt/data/menu_seed.json data/menu_seed.json && \
+echo "✅ menu_seed.json copied to ./data"
+
+
+---
