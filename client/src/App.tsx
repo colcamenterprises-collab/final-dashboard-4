@@ -43,6 +43,7 @@ import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import PurchasingLive from "./pages/ops/PurchasingLive";
+import MembershipApp from "./pages/membership/MembershipApp";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -136,6 +137,9 @@ export default function App() {
                   {/* Marketing */}
                   <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
                   <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
+
+                  {/* Membership */}
+                  <Route path="/membership" element={<Guard><MembershipApp /></Guard>} />
 
                   {/* All Analysis Pages */}
                   {/* Hidden - can be re-enabled */}

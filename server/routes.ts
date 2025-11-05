@@ -73,6 +73,7 @@ import loyverseSync from "./routes/loyverseSync";
 import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
 import { registerAdminMenuRoutes } from "./routes/adminMenu";
 import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
+import membershipRouter from "./routes/membership";
 // Email functionality will be added when needed
 
 
@@ -3080,6 +3081,7 @@ export function registerRoutes(app: express.Application): Server {
   app.use('/api/ingredients', ingredientsRoutes);
   app.use('/api/manager-check', managerCheckRouter);
   app.use('/api/shopping-list', shoppingListRouter);
+  app.use('/api/membership', membershipRouter);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

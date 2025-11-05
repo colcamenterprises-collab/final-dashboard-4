@@ -1,0 +1,398 @@
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import JsBarcode from 'jsbarcode';
+
+type Member = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalSpend: number;
+};
+
+type NewMember = {
+  name: string;
+  email: string;
+  phone: string;
+};
+
+const Icon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props} />
+);
+const UserIcon = (p: any) => (
+  <Icon {...p}><path strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z" /><path strokeWidth="1.5" d="M12 14c-5 0-8 2.5-8 5v1h16v-1c0-2.5-3-5-8-5z" /></Icon>
+);
+const EmailIcon = (p: any) => (
+  <Icon {...p}><path strokeWidth="1.5" d="M4 6h16v12H4z" /><path strokeWidth="1.5" d="M4 7l8 6 8-6" /></Icon>
+);
+const PhoneIcon = (p: any) => (
+  <Icon {...p}><path strokeWidth="1.5" d="M22 16.92V21a1 1 0 01-1.09 1 19.86 19.86 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.86 19.86 0 013 3.09 1 1 0 014 2h4.09A1 1 0 019 2.91a12.66 12.66 0 00.7 2.18 1 1 0 01-.23 1.11L8.09 7.5a16 16 0 006 6l1.3-1.38a1 1 0 011.11-.23 12.66 12.66 0 002.18.7A1 1 0 0119 13.91V18a1 1 0 01-1 1z"/></Icon>
+);
+const CardIcon = (p: any) => (
+  <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2" strokeWidth="1.5" /><path strokeWidth="1.5" d="M2 10h20" /></Icon>
+);
+const MoneyIcon = (p: any) => (
+  <Icon {...p}><rect x="3" y="7" width="18" height="10" rx="2" strokeWidth="1.5"/><path strokeWidth="1.5" d="M7 12h10M9 10v4m6-4v4"/></Icon>
+);
+const CloseIcon = (p: any) => (
+  <Icon {...p}><path strokeWidth="1.5" d="M6 6l12 12M18 6L6 18"/></Icon>
+);
+
+async function apiRegister(newMember: NewMember): Promise<Member | null> {
+  try {
+    const r = await fetch('/api/membership/register', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(newMember),
+    });
+    if (!r.ok) throw new Error('register failed');
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+async function apiAddSpend(id: string, amount: number) {
+  try {
+    const r = await fetch(`/api/membership/${id}/spend`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ amount }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+const Barcode: React.FC<{ value: string; className?: string }> = ({ value, className }) => {
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      JsBarcode(ref.current, value, {
+        displayValue: true,
+        fontSize: 14,
+        margin: 8,
+        height: 48,
+      });
+    }
+  }, [value]);
+  return <svg ref={ref} className={className} />;
+};
+
+const MemberCard: React.FC<{ member: Member }> = ({ member }) => {
+  return (
+    <div className="w-96 h-60 bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-2xl p-5 flex flex-col justify-between text-white relative overflow-hidden shadow-xl">
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-400/10 rounded-full blur-2xl" />
+      <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-yellow-400/20 rounded-full blur-xl" />
+      <div className="z-10 flex justify-between items-start">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-neutral-300">Smash Brothers Burgers</div>
+          <div className="text-2xl font-black mt-1">Membership</div>
+        </div>
+        <CardIcon className="w-8 h-8 text-yellow-400" />
+      </div>
+      <div className="z-10">
+        <div className="text-lg font-semibold">{member.name}</div>
+        <div className="text-sm text-neutral-300">{member.email}</div>
+        <div className="text-sm text-neutral-300">{member.phone}</div>
+      </div>
+      <div className="z-10">
+        <Barcode value={member.id} />
+      </div>
+    </div>
+  );
+};
+
+const AddSpendModal: React.FC<{
+  member: Member;
+  onClose: () => void;
+  onConfirm: (amount: number) => void;
+}> = ({ member, onClose, onConfirm }) => {
+  const [amount, setAmount] = useState('');
+  const confirm = () => {
+    const n = parseFloat(amount);
+    if (!isNaN(n) && n > 0) onConfirm(n);
+  };
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-neutral-900 rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-2xl font-black">Add Spend</h3>
+          <button onClick={onClose} className="p-1 hover:bg-neutral-800 rounded-md">
+            <CloseIcon className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="text-sm text-neutral-300 mb-3">{member.name} — {member.id}</div>
+        <input
+          type="number"
+          inputMode="decimal"
+          placeholder="Amount"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+        />
+        <div className="mt-5 flex gap-2 justify-end">
+          <button onClick={onClose} className="px-3 py-2 rounded-md bg-neutral-800 border border-neutral-700">Cancel</button>
+          <button onClick={confirm} className="px-3 py-2 rounded-md bg-yellow-400 text-black font-semibold">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MemberList: React.FC<{
+  members: Member[];
+  onViewCard: (m: Member) => void;
+  onAddSpend: (m: Member) => void;
+}> = ({ members, onViewCard, onAddSpend }) => {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-neutral-800">
+      <table className="min-w-full bg-neutral-900">
+        <thead>
+          <tr className="border-b border-neutral-800">
+            <th className="p-4 text-left text-sm font-black uppercase tracking-wider text-yellow-400">Name</th>
+            <th className="p-4 text-left text-sm font-black uppercase tracking-wider text-yellow-400">Member ID</th>
+            <th className="p-4 text-left text-sm font-black uppercase tracking-wider text-yellow-400 hidden md:table-cell">Contact</th>
+            <th className="p-4 text-right text-sm font-black uppercase tracking-wider text-yellow-400">Spend</th>
+            <th className="p-4 text-right text-sm font-black uppercase tracking-wider text-yellow-400">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map(m => (
+            <tr key={m.id} className="border-b border-neutral-800 hover:bg-neutral-800/50">
+              <td className="p-4">{m.name}</td>
+              <td className="p-4">{m.id}</td>
+              <td className="p-4 hidden md:table-cell">
+                <div className="text-sm text-neutral-300">{m.email}</div>
+                <div className="text-sm text-neutral-300">{m.phone}</div>
+              </td>
+              <td className="p-4 text-right font-semibold">{m.totalSpend.toLocaleString()}</td>
+              <td className="p-4">
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => onViewCard(m)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-md hover:bg-neutral-700">
+                    <CardIcon className="w-4 h-4" /><span>Card</span>
+                  </button>
+                  <button onClick={() => onAddSpend(m)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-400 text-black rounded-md hover:bg-yellow-300">
+                    <MoneyIcon className="w-4 h-4" /><span>Add Spend</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {members.length === 0 && (
+            <tr><td colSpan={5} className="p-6 text-center text-neutral-400">No members yet.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const RegistrationForm: React.FC<{ onRegister: (data: NewMember) => Promise<Member> }> = ({ onRegister }) => {
+  const [form, setForm] = useState<NewMember>({ name: '', email: '', phone: '' });
+  const [status, setStatus] = useState<'idle'|'submitting'|'success'|'error'>('idle');
+  const [err, setErr] = useState<string| null>(null);
+  const [savedMember, setSavedMember] = useState<Member | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.phone) {
+      setErr('All fields are required.');
+      return;
+    }
+    setErr(null);
+    setStatus('submitting');
+    try {
+      const member = await onRegister(form);
+      setSavedMember(member);
+      setForm({ name: '', email: '', phone: '' });
+      setStatus('success');
+    } catch (e) {
+      setStatus('error');
+      setErr('Failed to register member. Please try again.');
+    }
+  };
+
+  if (status === 'success' && savedMember) {
+    return (
+      <div className="bg-neutral-900 p-8 rounded-xl shadow-2xl max-w-lg mx-auto text-center">
+        <h2 className="text-3xl font-black text-green-400 mb-3">Welcome!</h2>
+        <p className="text-neutral-300 mb-6">
+          Registration complete. This is your digital membership card. Save it to your photos.
+        </p>
+        <div className="scale-105 mx-auto w-fit">
+          <MemberCard member={savedMember} />
+        </div>
+        <button onClick={() => { setStatus('idle'); setSavedMember(null); }} className="mt-8 px-4 py-2 bg-yellow-400 text-black rounded-md font-semibold">
+          Register Another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg mx-auto bg-neutral-900 p-8 rounded-xl shadow-2xl">
+      <h2 className="text-3xl font-black text-center text-yellow-400 mb-2">Join the Club</h2>
+      <p className="text-center text-neutral-400 mb-6">Fill out your details to get your digital card.</p>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <div className="relative">
+          <label htmlFor="name" className="sr-only">Full Name</label>
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <UserIcon className="h-5 w-5 text-neutral-400" />
+          </div>
+          <input
+            id="name"
+            name="name"
+            value={form.name}
+            onChange={(e) => setForm(f => ({...f, name: e.target.value}))}
+            placeholder="Full Name"
+            className="w-full bg-neutral-800 border border-neutral-700 rounded-md pl-10 pr-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            required
+          />
+        </div>
+        <div className="relative">
+          <label htmlFor="email" className="sr-only">Email</label>
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <EmailIcon className="h-5 w-5 text-neutral-400" />
+          </div>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm(f => ({...f, email: e.target.value}))}
+            placeholder="Email Address"
+            className="w-full bg-neutral-800 border border-neutral-700 rounded-md pl-10 pr-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            required
+          />
+        </div>
+        <div className="relative">
+          <label htmlFor="phone" className="sr-only">Phone</label>
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <PhoneIcon className="h-5 w-5 text-neutral-400" />
+          </div>
+          <input
+            id="phone"
+            name="phone"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm(f => ({...f, phone: e.target.value}))}
+            placeholder="Phone Number"
+            className="w-full bg-neutral-800 border border-neutral-700 rounded-md pl-10 pr-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            required
+          />
+        </div>
+        {err && <div className="text-red-400 text-sm">{err}</div>}
+        <button
+          type="submit"
+          disabled={status === 'submitting'}
+          className="w-full py-2 rounded-md bg-yellow-400 text-black font-semibold hover:bg-yellow-300 disabled:opacity-70"
+        >
+          {status === 'submitting' ? 'Submitting…' : 'Register'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+const AdminDashboard: React.FC<{
+  members: Member[];
+  onAddSpend: (id: string, amount: number) => void;
+}> = ({ members, onAddSpend }) => {
+  const [selected, setSelected] = useState<Member | null>(null);
+  const [cardOpen, setCardOpen] = useState(false);
+  const [spendOpen, setSpendOpen] = useState(false);
+
+  const openCard = (m: Member) => { setSelected(m); setCardOpen(true); };
+  const openSpend = (m: Member) => { setSelected(m); setSpendOpen(true); };
+
+  return (
+    <div className="space-y-6">
+      <MemberList
+        members={members}
+        onViewCard={openCard}
+        onAddSpend={openSpend}
+      />
+      {cardOpen && selected && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setCardOpen(false)}>
+          <div className="bg-neutral-900 rounded-xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-black">Membership Card</h3>
+              <button onClick={() => setCardOpen(false)} className="p-1 hover:bg-neutral-800 rounded-md">
+                <CloseIcon className="w-6 h-6" />
+              </button>
+            </div>
+            <MemberCard member={selected} />
+          </div>
+        </div>
+      )}
+      {spendOpen && selected && (
+        <AddSpendModal
+          member={selected}
+          onClose={() => setSpendOpen(false)}
+          onConfirm={(amt) => { onAddSpend(selected.id, amt); setSpendOpen(false); }}
+        />
+      )}
+    </div>
+  );
+};
+
+const initialMembers: Member[] = [
+  { id: '123456', name: 'John Doe', email: 'john.doe@example.com', phone: '0812345678', totalSpend: 1550 },
+  { id: '789012', name: 'Jane Smith', email: 'jane.smith@example.com', phone: '0887654321', totalSpend: 2300.5 },
+  { id: '345678', name: 'Mike Johnson', email: 'mike.j@example.com', phone: '0912345678', totalSpend: 875 },
+];
+
+const MembershipApp: React.FC = () => {
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [view, setView] = useState<'dashboard'|'register'>('dashboard');
+
+  const generateId = useCallback(() => {
+    let id: string;
+    do { id = Math.floor(100000 + Math.random()*900000).toString(); }
+    while (members.some(m => m.id === id));
+    return id;
+  }, [members]);
+
+  const registerMember = async (data: NewMember): Promise<Member> => {
+    const serverMember = await apiRegister(data);
+    if (serverMember) {
+      setMembers((prev) => [serverMember, ...prev]);
+      return serverMember;
+    }
+    const m: Member = { id: generateId(), totalSpend: 0, ...data };
+    setMembers(prev => [m, ...prev]);
+    return m;
+  };
+
+  const addSpend = async (id: string, amount: number) => {
+    const ok = await apiAddSpend(id, amount);
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, totalSpend: m.totalSpend + amount } : m));
+    return ok;
+  };
+
+  const toggle = () => setView(v => v === 'dashboard' ? 'register' : 'dashboard');
+
+  return (
+    <div className="min-h-screen bg-white text-neutral-900 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        <header className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-black font-black">SBB</span>
+            <h1 className="text-2xl sm:text-3xl font-black">Membership</h1>
+          </div>
+          <button onClick={toggle} className="px-3 py-2 bg-neutral-900 text-white rounded-md hover:bg-neutral-800">
+            {view === 'dashboard' ? 'New Member Form' : 'Admin Dashboard'}
+          </button>
+        </header>
+
+        {view === 'dashboard' ? (
+          <AdminDashboard members={members} onAddSpend={addSpend} />
+        ) : (
+          <RegistrationForm onRegister={registerMember} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MembershipApp;
