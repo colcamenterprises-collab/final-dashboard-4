@@ -45,6 +45,8 @@ export const ROUTES = {
 
   // Membership
   MEMBERSHIP: "/membership",
+  MEMBERSHIP_DASHBOARD: "/membership/dashboard",
+  MEMBERSHIP_REGISTER: "/membership/register",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
