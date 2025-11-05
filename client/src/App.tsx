@@ -44,6 +44,8 @@ import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import PurchasingLive from "./pages/ops/PurchasingLive";
 import MembershipApp from "./pages/membership/MembershipApp";
+import MemberDashboard from "./pages/membership/MemberDashboard";
+import MemberRegistration from "./pages/membership/MemberRegistration";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -139,7 +141,9 @@ export default function App() {
                   <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
 
                   {/* Membership */}
-                  <Route path="/membership" element={<Guard><MembershipApp /></Guard>} />
+                  <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
+                  <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
+                  <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
                   {/* All Analysis Pages */}
                   {/* Hidden - can be re-enabled */}
