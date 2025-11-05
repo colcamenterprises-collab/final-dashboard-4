@@ -42,6 +42,14 @@ const navigationGroups: NavGroup[] = [
     items: []
   },
   {
+    title: "Online Ordering Button",
+    isStandalone: true,
+    defaultOpen: true,
+    items: [
+      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "button-online-ordering", external: true, isButton: true }
+    ]
+  },
+  {
     title: "Operations",
     defaultOpen: true,
     items: [
@@ -272,9 +280,12 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                 )}
 
                 {/* Group items */}
-                {!group.isStandalone && isGroupOpen && (
+                {((group.isStandalone && group.items.length > 0) || (!group.isStandalone && isGroupOpen)) && (
                   <div 
-                    className="space-y-1 ml-2"
+                    className={cn(
+                      "space-y-1",
+                      !group.isStandalone && "ml-2"
+                    )}
                     id={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     {group.items.map((item) => {
@@ -292,7 +303,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                               className={cn(
                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                                 item.isButton 
-                                  ? "bg-black text-white hover:bg-gray-800 rounded-[9px]"
+                                  ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                   : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
                               )}
                               data-testid={item.testId}
@@ -310,7 +321,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                               item.isButton
-                                ? "bg-black text-white hover:bg-gray-800 rounded-[9px]"
+                                ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
                             )}
                             data-testid={item.testId}
@@ -337,7 +348,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                       className={cn(
                                         "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                                         subActive
-                                          ? "bg-black text-white rounded-[9px]"
+                                          ? "bg-black text-white rounded-[4px]"
                                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
                                       )}
                                       data-testid={subItem.testId}
@@ -363,7 +374,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                               className={cn(
                                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
                                                 nestedActive
-                                                  ? "bg-black text-white rounded-[9px]"
+                                                  ? "bg-black text-white rounded-[4px]"
                                                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
                                               )}
                                               data-testid={nestedItem.testId}
