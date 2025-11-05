@@ -1,0 +1,100 @@
+Finish & Verify (to-do)
+
+1. Commit + Push (UI)
+
+Replit → Git → you should see a pending change to
+client/src/pages/analysis/DailyReview.tsx
+
+Stage all → Commit (fix(analysis): render zeros instead of dashes) → Push
+
+
+If you don’t see a change:
+
+Replit Shell:
+
+git status
+git diff -- client/src/pages/analysis/DailyReview.tsx | sed -n '1,120p'
+
+If there’s no diff, the agent’s edit didn’t persist—run the one-liner fix below, then commit.
+
+
+
+2. One-liner fix (only if needed) Replace strict null checks that hide 0:
+
+# make 0 render as 0 (not "—")
+sed -i 's/=== null/== null/g' client/src/pages/analysis/DailyReview.tsx
+sed -i 's/!== null/!= null/g' client/src/pages/analysis/DailyReview.tsx
+# if you find patterns like `{value ? fmt(value) : "—"}`, change them manually to:
+# {value == null ? "—" : formatNumber(Number(value))}
+git add client/src/pages/analysis/DailyReview.tsx
+git commit -m "fix(analysis): render zero expense values properly instead of dashes"
+git push
+
+
+3. Hard refresh the page
+
+Open Analysis → Daily Review
+
+Pull to refresh on tablet or Ctrl/Cmd+R on desktop
+
+
+
+4. API smoke checks (same date that was wrong, e.g., 2025-11-01)
+
+curl -s "http://localhost:5000/api/analysis/daily-comparison?date=2025-11-01" \
+  | jq '{date, form: .form.expenses, pos: .pos.expenses, variance: .variance.expenses}'
+
+curl -s "http://localhost:5000/api/analysis/daily-comparison-range?month=2025-11" \
+  | jq '.[] | select(.date=="2025-11-01") | {date, form: .form.expenses, pos: .pos.expenses}'
+
+You should see non-zero form.shoppingTotal / wageTotal / otherTotal / grandTotal when the arrays exist in payload.
+
+
+5. Visual check
+
+In Sales (Form vs POS) (top table), Expenses should now match:
+
+the All Shifts Data table below, and
+
+the Expenses section elsewhere in the app.
+
+
+
+
+
+If Push is rejected
+
+Remote has a README or an initial commit:
+
+git pull --rebase origin main
+git push -u origin main
+
+Quick “did we actually fix the right logic?” checks
+
+Verify the backend is already using the normalizers (the agent said yes):
+
+rg -n "extractFormExpenseTotals|extractPosExpenseTotals" server/routes/analysisDailyReview.ts
+
+You should see both functions used in:
+
+GET /api/analysis/daily-comparison
+
+GET /api/analysis/daily-comparison-range
+
+
+Confirm the renderer doesn’t hide zero:
+
+rg -n '"—"|=== null|!== null|\? "—"' client/src/pages/analysis/DailyReview.tsx
+
+Anywhere you find a pattern like {value ? ... : "—"}, change to:
+
+{value == null ? "—" : formatNumber(Number(value))}
+
+
+Acceptance criteria
+
+Top Sales (Form vs POS) table shows the same expense totals as the All Shifts Data table for the test date.
+
+Days with no expenses render 0, not “—”.
+
+No schema/data changes were required.
