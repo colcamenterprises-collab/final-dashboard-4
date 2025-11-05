@@ -1,0 +1,213 @@
+AGENT WORK ORDER — Fix “Expenses missing” in Analysis → Daily Sales (Form vs POS)
+
+Objective
+
+Ensure the top table “Sales (Form vs POS)” shows expense totals exactly like the lower ‘All Shifts Data’ table by adding defensive fallbacks that compute totals from the form payload arrays when DB column/top-level totals are 0/undefined. Also make the UI render 0 (not “—”).
+
+Guardrails (do NOT do)
+
+❌ Do not run prisma db push, reset, or any destructive command.
+
+❌ Do not change database schema.
+
+✅ Only change server code in the analysis routes and add a tiny helper.
+
+✅ One optional, tiny UI change to stop hiding zeros.
+
+
+
+---
+
+Step 1 — Add shared expense normalizer (new file)
+
+Create: server/lib/expenseTotals.ts
+
+// server/lib/expenseTotals.ts
+
+type Num = number | string | null | undefined;
+const toNum = (v: Num) =>
+  v === null || v === undefined || Number.isNaN(Number(v)) ? 0 : Number(v);
+
+const sumBy = (arr: any[] | undefined, key: string) =>
+  Array.isArray(arr) ? arr.reduce((a, b) => a + toNum(b?.[key]), 0) : 0;
+
+/**
+ * Form-side totals (Daily Sales form row).
+ * Accepts a DB row with optional column totals and a JSON payload with arrays:
+ *   row.shoppingTotal / wagesTotal / othersTotal
+ *   payload.expenses[] -> { cost }
+ *   payload.wages[] -> { amount }
+ *   payload.otherExpenses[] -> { amount }
+ *   payload.shoppingTotal / wagesTotal / othersTotal (optional)
+ * Returns legacy keys used by UI.
+ */
+export function extractFormExpenseTotals(row: any) {
+  const payload = row?.payload ?? {};
+
+  // 1) DB column totals
+  const colShopping = toNum(row?.shoppingTotal);
+  const colWages    = toNum(row?.wagesTotal);
+  const colOthers   = toNum(row?.othersTotal);
+
+  // 2) Top-level payload totals (if present)
+  const payShopping = toNum(payload?.shoppingTotal);
+  const payWages    = toNum(payload?.wagesTotal);
+  const payOthers   = toNum(payload?.othersTotal);
+
+  // 3) Calculated from arrays (defensive fallback)
+  const calcShopping = sumBy(payload?.expenses, "cost");
+  const calcWages    = sumBy(payload?.wages, "amount");
+  const calcOthers   = sumBy(payload?.otherExpenses, "amount");
+
+  const shoppingTotal = colShopping || payShopping || calcShopping;
+  const wageTotal     = colWages    || payWages    || calcWages;
+  const otherTotal    = colOthers   || payOthers   || calcOthers;
+  const grandTotal    = shoppingTotal + wageTotal + otherTotal;
+
+  return { shoppingTotal, wageTotal, otherTotal, grandTotal };
+}
+
+/**
+ * POS-side totals (shift report). If no expenses exist in POS, return zeros
+ * but keep the same keys for UI compatibility.
+ */
+export function extractPosExpenseTotals(row: any) {
+  const payload = row?.payload ?? {};
+
+  const colShopping = toNum(row?.shoppingTotal);
+  const colWages    = toNum(row?.wagesTotal);
+  const colOthers   = toNum(row?.othersTotal);
+
+  const payShopping = toNum(payload?.shoppingTotal);
+  const payWages    = toNum(payload?.wagesTotal);
+  const payOthers   = toNum(payload?.othersTotal);
+
+  const shoppingTotal = colShopping || payShopping || 0;
+  const wageTotal     = colWages    || payWages    || 0;
+  const otherTotal    = colOthers   || payOthers   || 0;
+  const grandTotal    = shoppingTotal + wageTotal + otherTotal;
+
+  return { shoppingTotal, wageTotal, otherTotal, grandTotal };
+}
+
+
+---
+
+Step 2 — Patch Daily Review routes to use the normalizer
+
+File: server/routes/analysisDailyReview.ts
+(If your file name differs, patch the file that declares analysisDailyReviewRouter.)
+
+1. Import the helpers at the top:
+
+
+
+import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
+
+2. In /api/analysis/daily-comparison, after you’ve fetched formRow (Daily Sales form row) and posRow (POS shift row), replace the current expense calc with:
+
+
+
+const formExp = extractFormExpenseTotals(formRow ?? {});
+const posExp  = extractPosExpenseTotals(posRow ?? {});
+
+const variance = {
+  expenses: {
+    shoppingTotal: formExp.shoppingTotal - posExp.shoppingTotal,
+    wageTotal:     formExp.wageTotal     - posExp.wageTotal,
+    otherTotal:    formExp.otherTotal    - posExp.otherTotal,
+    grandTotal:    formExp.grandTotal    - posExp.grandTotal,
+  }
+};
+
+// ensure response includes these exact structures for the UI:
+return res.json({
+  date,
+  form: { ...(form ?? {}), expenses: formExp },
+  pos:  { ...(pos  ?? {}), expenses: posExp  },
+  variance
+});
+
+> Delete/replace any previous lines like:
+
+const shopping = row.shoppingTotal ?? payload?.shoppingTotal ?? 0;
+const wages = row.wagesTotal ?? payload?.wagesTotal ?? 0;
+
+Those miss the array fallback and cause the “—”.
+
+
+
+3. In /api/analysis/daily-comparison-range, where you loop per day, for each resolved (formRow, posRow) pair, compute formExp/posExp using the same helpers and put them into the array element returned for that day. (Same pattern as above.)
+
+
+
+
+---
+
+Step 3 — UI: don’t hide zero values
+
+File: client/src/pages/analysis/DailyReview.tsx (or the component that renders the top table)
+
+Search for any conditional that looks like this:
+
+{value ? formatNumber(value) : "—"}
+
+Replace with:
+
+{value == null ? "—" : formatNumber(Number(value))}
+
+> This makes sure 0 renders as 0, not “—”.
+
+
+
+
+---
+
+Step 4 — Verify with one target date
+
+Pick a date you know is wrong in the top table but correct in the lower table (e.g. 2025-11-01).
+
+Shell checks:
+
+# Single day (drives TOP table)
+curl -s "http://localhost:5000/api/analysis/daily-comparison?date=2025-11-01" | jq '{date, form: .form.expenses, pos: .pos.expenses, variance: .variance.expenses}'
+
+# Range (page hydration)
+curl -s "http://localhost:5000/api/analysis/daily-comparison-range?month=2025-11" \
+| jq '.[] | select(.date=="2025-11-01") | {date, form: .form.expenses, pos: .pos.expenses}'
+
+Expected: form.expenses.shoppingTotal / wageTotal / otherTotal / grandTotal should now be non-zero when arrays exist in the payload, matching the lower table.
+
+Open the app page and confirm the top table shows the same totals as the lower table.
+
+
+---
+
+Step 5 — Commit
+
+git add server/lib/expenseTotals.ts server/routes/analysisDailyReview.ts client/src/pages/analysis/DailyReview.tsx
+git commit -m "fix(analysis): compute expense totals with array fallback + render zero values properly"
+git push
+
+
+---
+
+Rollback Plan
+
+Revert the commit above. No schema changes were made.
+
+The helper is additive; removing expenseTotals.ts and the two call sites restores prior behavior.
+
+
+
+---
+
+Acceptance Criteria (tick before closing)
+
+[ ] For the target date, top “Sales (Form vs POS)” table shows identical expense totals to the lower table.
+
+[ ] A day with no expenses renders 0, not “—”.
+
+[ ] No impact to other sections (Daily Sales page, POS summaries still match).
+
+[ ] No schema changes, no data migration.

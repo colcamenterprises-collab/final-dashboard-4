@@ -231,10 +231,10 @@ export default function DailyReview() {
         {rows.map((r: any) => (
           <React.Fragment key={r.label}>
             <div className="text-gray-600">{r.label}</div>
-            <div>{r.pos === null ? "—" : fmt(r.pos)}</div>
-            <div>{r.form === null ? "—" : fmt(r.form)}</div>
-            <div>{r.diff === null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}</div>
-            <div>{r.diff === null ? "—" : <Flag val={r.diff} />}</div>
+            <div>{r.pos == null ? "—" : fmt(Number(r.pos))}</div>
+            <div>{r.form == null ? "—" : fmt(Number(r.form))}</div>
+            <div>{r.diff == null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}</div>
+            <div>{r.diff == null ? "—" : <Flag val={r.diff} />}</div>
           </React.Fragment>
         ))}
       </div>
