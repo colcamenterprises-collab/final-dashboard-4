@@ -42,6 +42,9 @@ export const ROUTES = {
   ONLINE_ORDERING: "/marketing/online-ordering",
   MENU_ADMIN: "/marketing/menu-admin",
   ORDER: "/order",
+
+  // Membership
+  MEMBERSHIP: "/membership",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
