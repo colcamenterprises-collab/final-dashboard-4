@@ -51,7 +51,8 @@ const groups: Group[] = [
   {
     title: "Membership",
     items: [
-      { to: "/membership", label: "Membership" },
+      { to: "/membership/dashboard", label: "Member Dashboard" },
+      { to: "/membership/register", label: "Registration Form" },
     ],
   },
   {
