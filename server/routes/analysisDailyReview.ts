@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../../lib/prisma";
 import { ingestPosForBusinessDate } from "../services/loyverseIngest";
 import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
+import { findDailySalesRowFor, findPosShiftRowFor } from "../lib/findShiftRows";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -23,10 +24,8 @@ function dayRange(businessDate: string) {
 }
 
 async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
-  const { start, end } = dayRange(businessDate);
-  const row = await prisma.posShiftReport.findFirst({
-    where: { businessDate: { gte: start, lt: end } },
-  });
+  // Use resilient resolver to find shift even if stored under D±1
+  const row = await findPosShiftRowFor(businessDate);
   if (!row) return null;
 
   const cash = row.cashTotal ?? 0;
@@ -64,16 +63,8 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
 }
 
 async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
-  const { start, end } = dayRange(businessDate);
-  const row = await prisma.dailySalesV2.findFirst({
-    where: { 
-      shift_date: { gte: start, lt: end },
-      deletedAt: null,
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
-  });
+  // Use resilient resolver to find shift even if stored under D±1
+  const row = await findDailySalesRowFor(businessDate);
   if (!row) return null;
 
   // Data is stored in payload JSONB field
@@ -152,10 +143,29 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const date = String(req.query.date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
 
+  const debug = req.query.debug === "1";
+  
+  // Fetch using resilient resolvers (internally handle D±1 lookup)
   const [pos, form] = await Promise.all([fetchPOSFromDB(date), fetchForm1FromDB(date)]);
+  
   const availability = availabilityOf(pos, form);
 
   const payload: DailyComparisonResponse = { date, availability };
+  
+  // Add debug info if requested
+  if (debug) {
+    const [posRow, formRow] = await Promise.all([
+      findPosShiftRowFor(date),
+      findDailySalesRowFor(date)
+    ]);
+    if (posRow || formRow) {
+      (payload as any).debug = {
+        formShiftDate: formRow?.shiftDate,
+        posBusinessDate: posRow?.businessDate?.toISOString().slice(0, 10)
+      };
+    }
+  }
+  
   if (pos) payload.pos = pos;
   if (form) payload.form = form;
   if (availability === "ok") payload.variance = buildVariance(pos!, form!);
