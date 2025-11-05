@@ -57,6 +57,7 @@ export default function MenuAdmin() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
 
   const { data, isLoading } = useQuery<{ categories: Category[] }>({
     queryKey: ["/api/admin/menu"],
@@ -284,6 +285,8 @@ export default function MenuAdmin() {
                     onClick={() => {
                       setSelectedCategoryId(category.id!);
                       setEditingItem(null);
+                      setImagePreviewUrl("");
+                      setImageLoadError(false);
                       setItemDialogOpen(true);
                     }}
                     data-testid={`button-add-item-${category.id}`}
@@ -354,6 +357,8 @@ export default function MenuAdmin() {
                           onClick={() => {
                             setSelectedCategoryId(category.id!);
                             setEditingItem(item);
+                            setImagePreviewUrl(item.imageUrl || "");
+                            setImageLoadError(false);
                             setItemDialogOpen(true);
                           }}
                           data-testid={`button-edit-item-${item.id}`}
@@ -387,7 +392,16 @@ export default function MenuAdmin() {
         ))}
       </div>
 
-      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+      <Dialog 
+        open={itemDialogOpen} 
+        onOpenChange={(open) => {
+          setItemDialogOpen(open);
+          if (!open) {
+            setImagePreviewUrl("");
+            setImageLoadError(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -421,21 +435,29 @@ export default function MenuAdmin() {
                 name="imageUrl"
                 type="url"
                 defaultValue={editingItem?.imageUrl}
-                onChange={(e) => setImagePreviewUrl(e.target.value)}
+                onChange={(e) => {
+                  setImagePreviewUrl(e.target.value);
+                  setImageLoadError(false);
+                }}
                 placeholder="https://example.com/image.jpg"
                 data-testid="input-item-imageUrl"
               />
-              {(imagePreviewUrl || editingItem?.imageUrl) && (
+              {(imagePreviewUrl || editingItem?.imageUrl) && !imageLoadError && (
                 <div className="mt-2">
                   <img 
                     src={imagePreviewUrl || editingItem?.imageUrl} 
                     alt="Preview"
                     className="w-32 h-32 object-cover rounded border"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
+                    onLoad={() => setImageLoadError(false)}
+                    onError={() => setImageLoadError(true)}
+                    data-testid="img-preview"
                   />
                 </div>
+              )}
+              {imageLoadError && (
+                <p className="text-xs text-red-600 mt-1">
+                  Failed to load image. Please check the URL.
+                </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">

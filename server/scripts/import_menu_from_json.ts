@@ -45,11 +45,15 @@ async function main() {
     });
 
     for (const [i, it] of cat.items.entries()) {
+      if (!it.sku) {
+        console.warn(`Skipping item ${it.name} - no SKU`);
+        continue;
+      }
+      
       await prisma.menuItem_Online.upsert({
-        where: { slug: it.slug },
+        where: { sku: it.sku },
         update: {
           name: it.name,
-          sku: it.sku || null,
           description: it.description || null,
           price: thbToInt(it.price),
           imageUrl: it.imageUrl || null,
@@ -59,8 +63,7 @@ async function main() {
         },
         create: {
           name: it.name,
-          slug: it.slug,
-          sku: it.sku || null,
+          sku: it.sku,
           description: it.description || null,
           price: thbToInt(it.price),
           imageUrl: it.imageUrl || null,
