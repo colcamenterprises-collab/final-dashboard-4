@@ -34,6 +34,7 @@ type MenuItem = {
   description?: string;
   price: number;
   sku?: string;
+  imageUrl?: string;
   position?: number;
   available?: boolean;
   groups?: ModifierGroup[];
@@ -55,6 +56,7 @@ export default function MenuAdmin() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
 
   const { data, isLoading } = useQuery<{ categories: Category[] }>({
     queryKey: ["/api/admin/menu"],
@@ -175,6 +177,7 @@ export default function MenuAdmin() {
       description: formData.get("description") as string,
       price: parseInt(formData.get("price") as string),
       sku: formData.get("sku") as string || undefined,
+      imageUrl: formData.get("imageUrl") as string || undefined,
       position: parseInt(formData.get("position") as string) || 0,
       available: formData.get("available") === "on",
       groups: editingItem?.groups || [],
@@ -323,17 +326,26 @@ export default function MenuAdmin() {
                       className="flex justify-between items-center p-3 border rounded"
                       data-testid={`item-${item.id}`}
                     >
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ฿{item.price}
-                          {item.description && ` - ${item.description}`}
-                        </div>
-                        {item.groups && item.groups.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {item.groups.length} modifier group(s)
-                          </div>
+                      <div className="flex items-center gap-3">
+                        {item.imageUrl && (
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.name}
+                            className="w-16 h-16 object-cover rounded"
+                          />
                         )}
+                        <div>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            ฿{item.price}
+                            {item.description && ` - ${item.description}`}
+                          </div>
+                          {item.groups && item.groups.length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {item.groups.length} modifier group(s)
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -401,6 +413,30 @@ export default function MenuAdmin() {
                 defaultValue={editingItem?.description}
                 data-testid="input-item-description"
               />
+            </div>
+            <div>
+              <Label htmlFor="item-imageUrl">Image URL</Label>
+              <Input
+                id="item-imageUrl"
+                name="imageUrl"
+                type="url"
+                defaultValue={editingItem?.imageUrl}
+                onChange={(e) => setImagePreviewUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                data-testid="input-item-imageUrl"
+              />
+              {(imagePreviewUrl || editingItem?.imageUrl) && (
+                <div className="mt-2">
+                  <img 
+                    src={imagePreviewUrl || editingItem?.imageUrl} 
+                    alt="Preview"
+                    className="w-32 h-32 object-cover rounded border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

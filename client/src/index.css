@@ -915,3 +915,73 @@ h3 {
 /* Fix: headings follow page text color */\nh1, h2, h3 { color: inherit !important; }
 /* Fix: headings follow page text color */
 h1, h2, h3 { color: inherit !important; }
+
+/* === Admin Pages Style Guide Typography === */
+/* Reference: /finance/expenses-import for canonical styling */
+/* Standard: text-xs (12px), 4px border radius, tablet-optimized */
+
+.admin-page h1,
+.admin-page .page-title {
+  font-size: 1.875rem !important; /* text-3xl */
+  font-weight: 700 !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: inherit;
+}
+
+.admin-page .section-title {
+  font-size: 0.875rem !important; /* text-sm */
+  font-weight: 600 !important;
+  color: #475569; /* slate-600 */
+}
+
+.admin-page table {
+  font-size: 0.75rem !important; /* text-xs - 12px standard */
+}
+
+.admin-page th {
+  font-weight: 500 !important;
+  color: #475569 !important; /* slate-600 */
+  border-color: #e2e8f0 !important; /* slate-200 */
+}
+
+.admin-page td {
+  border-color: #e2e8f0 !important; /* slate-200 */
+}
+
+.admin-page button,
+.admin-page .btn {
+  font-size: 0.75rem !important; /* text-xs */
+  border-radius: 4px !important; /* 4px standard for tablet */
+}
+
+.admin-page .card {
+  border-radius: 4px !important;
+  border-color: #e2e8f0 !important; /* slate-200 */
+}
+
+.admin-page input,
+.admin-page select,
+.admin-page textarea {
+  font-size: 0.75rem !important; /* text-xs */
+  border-radius: 4px !important;
+}
+
+.admin-page .badge {
+  font-size: 0.75rem !important; /* text-xs */
+}
+
+/* Status indicators matching style guide */
+.admin-page .status-success {
+  background-color: #d1fae5 !important; /* emerald-100 */
+  color: #059669 !important; /* emerald-600 */
+}
+
+.admin-page .status-error {
+  background-color: #fee2e2 !important; /* red-100 */
+  color: #dc2626 !important; /* red-600 */
+}
+
+.admin-page .status-warning {
+  background-color: #fef3c7 !important; /* amber-100 */
+  color: #d97706 !important; /* amber-600 */
+}
