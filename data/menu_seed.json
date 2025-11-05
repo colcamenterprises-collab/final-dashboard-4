@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2025-01-05T05:00:00Z",
+  "categories": [
+    {
+      "name": "Smash Burgers",
+      "slug": "smash-burgers",
+      "items": [
+        { "name": "Single Smash Burger", "sku": "10004", "description": "Classic single smash burger", "price": 17000, "slug": "single-smash-burger", "imageUrl": null, "position": 0 },
+        { "name": "Ultimate Double", "sku": "10006", "description": "Double patty burger", "price": 22000, "slug": "ultimate-double", "imageUrl": null, "position": 1 },
+        { "name": "Triple Smash Burger", "sku": "10009", "description": "Triple patty burger", "price": 29000, "slug": "triple-smash-burger", "imageUrl": null, "position": 2 },
+        { "name": "Crispy Chicken Fillet Burger", "sku": "10066", "description": "Chicken fillet Burger", "price": 16900, "slug": "crispy-chicken-fillet-burger", "imageUrl": null, "position": 3 },
+        { "name": "Super Single Bacon & Cheese", "sku": "10038", "description": "The number 1 best seller Super Double Bacon & Cheese has a little brother. All the flavor of the Super Double but a single. 100% Australian Beef (Brisket and Topside) with pickles, burger sauce, 2 slices of cheese, bacon, onion. Its the number 1 best seller downsized.", "price": 19700, "slug": "super-single-bacon-cheese", "imageUrl": null, "position": 4 },
+        { "name": "Super Double Bacon and Cheese", "sku": "10019", "description": "Best seller double bacon and cheese", "price": 24000, "slug": "super-double-bacon-cheese", "imageUrl": null, "position": 5 },
+        { "name": "Karaage Chicken Burger", "sku": "10070", "description": "Crispy karaage chicken thigh, fresh slaw, house dill pickles, special burger sauce, cheese, and a light Nanami togarashi sprinkle on a toasted bun. Bold, crunchy, umami.", "price": 24900, "slug": "karaage-chicken-burger", "imageUrl": null, "position": 6 },
+        { "name": "El Smasho Grande Chicken Burger", "sku": "10037", "description": "This burger has a toasted bun, chipotle mayonnaise, chicken fillets, cheese, coleslaw, and jalapenos", "price": 24900, "slug": "el-smasho-grande-chicken-burger", "imageUrl": null, "position": 7 },
+        { "name": "Big Rooster Sriracha Chicken", "sku": "10068", "description": "Bun, coleslaw, chicken, cheese, jalapenos", "price": 24900, "slug": "big-rooster-sriracha-chicken", "imageUrl": null, "position": 8 }
+      ]
+    },
+    {
+      "name": "Smash Burger Sets (Meal Deals)",
+      "slug": "meal-deals",
+      "items": [
+        { "name": "Single Meal Set (Meal Deal)", "sku": "10033", "description": "Single burger meal with fries and drink", "price": 24900, "slug": "single-meal-set", "imageUrl": null, "position": 0 },
+        { "name": "Double Set (Meal Deal)", "sku": "10032", "description": "Double Smash with Drink and Fries", "price": 29900, "slug": "double-set", "imageUrl": null, "position": 1 },
+        { "name": "Karaage Chicken (Meal Deal)", "sku": "10071", "description": "Karaage Chicken Meal Deal (Set)", "price": 32000, "slug": "karaage-chicken-meal-deal", "imageUrl": null, "position": 2 },
+        { "name": "Super Double Bacon & Cheese Set (Meal Deal)", "sku": "10036", "description": "Super Double Bacon & Cheese with fries and drink", "price": 31900, "slug": "super-double-bacon-cheese-set", "imageUrl": null, "position": 3 },
+        { "name": "Triple Smash Set (Meal Deal)", "sku": "10034", "description": "Triple burger with fries and drink", "price": 36900, "slug": "triple-smash-set", "imageUrl": null, "position": 4 }
+      ]
+    },
+    {
+      "name": "Side Orders",
+      "slug": "side-orders",
+      "items": [
+        { "name": "French Fries", "sku": "10030", "description": "1 serving of French Fries 130 grams", "price": 8900, "slug": "french-fries", "imageUrl": null, "position": 0 },
+        { "name": "Cajun Fries", "sku": "10018", "description": "1 Serving of Cajun Fries - 130 grams", "price": 9900, "slug": "cajun-fries", "imageUrl": null, "position": 1 },
+        { "name": "Sweet Potato Fries", "sku": "10022", "description": "1 Serving of sweet potato fries - 130 grams", "price": 9900, "slug": "sweet-potato-fries", "imageUrl": null, "position": 2 },
+        { "name": "Onion Rings", "sku": "10020", "description": "Crispy onion rings", "price": 9900, "slug": "onion-rings", "imageUrl": null, "position": 3 },
+        { "name": "Coleslaw with Bacon", "sku": "10025", "description": "1 serving of coleslaw with bacon", "price": 9900, "slug": "coleslaw-with-bacon", "imageUrl": null, "position": 4 },
+        { "name": "Cheesy Bacon Fries", "sku": "10010", "description": "Single serving of French fries with bacon rasher, cheese and crunchy onions.", "price": 11900, "slug": "cheesy-bacon-fries", "imageUrl": null, "position": 5 },
+        { "name": "Loaded Fries (Original)", "sku": "10035", "description": "Loaded fries with toppings", "price": 17000, "slug": "loaded-fries-original", "imageUrl": null, "position": 6 },
+        { "name": "Chicken Nuggets (6 pcs)", "sku": "10000", "description": "6 pieces of chicken nuggets", "price": 8900, "slug": "chicken-nuggets-6", "imageUrl": null, "position": 7 },
+        { "name": "Chicken Nuggets (9 pcs)", "sku": "10001", "description": "9 pieces of chicken nuggets", "price": 9900, "slug": "chicken-nuggets-9", "imageUrl": null, "position": 8 },
+        { "name": "Chicken Nuggets (12 pcs)", "sku": "10002", "description": "12 pieces of chicken nuggets", "price": 12900, "slug": "chicken-nuggets-12", "imageUrl": null, "position": 9 },
+        { "name": "Chicken Nuggets (Extra)", "sku": "10016", "description": "Extra chicken nuggets", "price": 19900, "slug": "chicken-nuggets-extra", "imageUrl": null, "position": 10 }
+      ]
+    },
+    {
+      "name": "Kids Will Love This",
+      "slug": "kids-meals",
+      "items": [
+        { "name": "Kids Single Cheeseburger", "sku": "10015", "description": "Kids portion single cheeseburger", "price": 14900, "slug": "kids-single-cheeseburger", "imageUrl": null, "position": 0 },
+        { "name": "Kids Double Cheeseburger", "sku": "10017", "description": "Kids portion double cheeseburger", "price": 18900, "slug": "kids-double-cheeseburger", "imageUrl": null, "position": 1 },
+        { "name": "Kids Single Meal Set (Burger Fries Drink)", "sku": "10003", "description": "Kids Single Cheese Burger, French Fries, Juice", "price": 18900, "slug": "kids-single-meal-set", "imageUrl": null, "position": 2 }
+      ]
+    },
+    {
+      "name": "Drinks",
+      "slug": "drinks",
+      "items": [
+        { "name": "Bottle Water", "sku": "10031", "description": "Bottle of Drinking Water", "price": 4000, "slug": "bottle-water", "imageUrl": null, "position": 0 },
+        { "name": "Soda Water", "sku": "10029", "description": "1 Bottle of Soda Water", "price": 4000, "slug": "soda-water", "imageUrl": null, "position": 1 },
+        { "name": "Coke Can", "sku": "10012", "description": "1 Can of Coke", "price": 4000, "slug": "coke-can", "imageUrl": null, "position": 2 },
+        { "name": "Coke Zero", "sku": "10013", "description": "1 Can of Coke Zero", "price": 4000, "slug": "coke-zero", "imageUrl": null, "position": 3 },
+        { "name": "Pepsi Can", "sku": "10042", "description": "1 Can of Pepsi", "price": 4000, "slug": "pepsi-can", "imageUrl": null, "position": 4 },
+        { "name": "Sprite", "sku": "10026", "description": "1 Can of Sprite", "price": 4000, "slug": "sprite", "imageUrl": null, "position": 5 },
+        { "name": "Fanta Orange", "sku": "10027", "description": "1 Can of Fanta Orange", "price": 4000, "slug": "fanta-orange", "imageUrl": null, "position": 6 },
+        { "name": "Fanta Strawberry", "sku": "10028", "description": "1 Can of Fanta Strawberry", "price": 4000, "slug": "fanta-strawberry", "imageUrl": null, "position": 7 },
+        { "name": "Schweppes Lime", "sku": "10021", "description": "1 can of Schweppes lime", "price": 4000, "slug": "schweppes-lime", "imageUrl": null, "position": 8 },
+        { "name": "Singha Pink Soda", "sku": "10005", "description": "Pink soda drink", "price": 4000, "slug": "singha-pink-soda", "imageUrl": null, "position": 9 },
+        { "name": "Singha Yellow Lemon Soda", "sku": "10072", "description": "Yellow lemon soda", "price": 4000, "slug": "singha-yellow-lemon-soda", "imageUrl": null, "position": 10 },
+        { "name": "Juice Box (Apple)", "sku": "10040", "description": "Apple juice box", "price": 4000, "slug": "juice-box-apple", "imageUrl": null, "position": 11 },
+        { "name": "Juice Box (Orange)", "sku": "10039", "description": "Orange juice box", "price": 4000, "slug": "juice-box-orange", "imageUrl": null, "position": 12 },
+        { "name": "Soft Drinks", "sku": "10007", "description": "Assorted soft drinks", "price": 4000, "slug": "soft-drinks-1", "imageUrl": null, "position": 13 },
+        { "name": "Soft Drinks", "sku": "10011", "description": "Assorted soft drinks", "price": 4000, "slug": "soft-drinks-2", "imageUrl": null, "position": 14 },
+        { "name": "Soft Drinks", "sku": "10067", "description": "Assorted soft drinks", "price": 4000, "slug": "soft-drinks-3", "imageUrl": null, "position": 15 }
+      ]
+    },
+    {
+      "name": "Smash Brothers Sauce",
+      "slug": "sauces",
+      "items": [
+        { "name": "Original Burger Sauce", "sku": "10043", "description": "The original Smash Burger Sauce", "price": 9900, "slug": "original-burger-sauce", "imageUrl": null, "position": 0 }
+      ]
+    },
+    {
+      "name": "GRAB AND FOODPANDA PROMOTIONS",
+      "slug": "promotions",
+      "items": [
+        { "name": "MEGA MEAL DEAL", "sku": "10041", "description": "Super Single Bacon & Cheese, Drink, Coleslaw, Serving of French Fries.", "price": 19900, "slug": "mega-meal-deal", "imageUrl": null, "position": 0 },
+        { "name": "Mix and Match Meal Deal", "sku": "10069", "description": "2 x Burgers of their choice, 2 fries, 2 drinks and a coleslaw.", "price": 69700, "slug": "mix-and-match-meal-deal", "imageUrl": null, "position": 1 }
+      ]
+    }
+  ]
+}
