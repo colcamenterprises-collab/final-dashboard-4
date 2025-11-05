@@ -941,7 +941,8 @@ export default function Expenses() {
   });
 
   // Filter helpers - ensure arrays are always defined
-  const rolls = expenses ? expenses.filter((e: any) => e.description?.includes("Rolls") || (e.source === 'STOCK_LODGMENT' && e.item?.includes("Rolls"))) : [];
+  const rolls = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
+    ? purchaseTallyData.entries.filter((item: any) => item.rollsPcs != null && item.rollsPcs > 0) : [];
   const meat = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
     ? purchaseTallyData.entries.filter((item: any) => item.meatGrams != null && item.meatGrams > 0) : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
@@ -1364,27 +1365,20 @@ export default function Expenses() {
           </thead>
           <tbody>
             {rolls.map((r,i)=>{
-              // Parse the meta JSON to get quantity and paid status
-              let quantity = "N/A";
-              let paid = "N/A";
-              try {
-                const meta = typeof r.notes === 'string' ? JSON.parse(r.notes) : r.notes;
-                quantity = meta.quantity || meta.qty || "N/A";
-                paid = meta.paid ? "Yes" : "No";
-              } catch (e) {
-                // If parsing fails, try to extract from the raw string
-                if (typeof r.notes === 'string' && r.notes.includes('qty')) {
-                  const qtyMatch = r.notes.match(/"qty":\s*(\d+)/);
-                  if (qtyMatch) quantity = qtyMatch[1];
-                }
-              }
+              // Get quantity directly from rollsPcs field
+              const quantity = r.rollsPcs || 0;
+              const amount = r.amountTHB || 0;
+              
+              // Note: "paid" status is not currently tracked in purchase_tally
+              // This would need to be added if required
+              const paid = "N/A";
               
               return (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="border p-1">{new Date(r.date).toLocaleDateString()}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1">{paid}</td>
-                  <td className="border p-1 text-right">฿{(r.amount || 0).toLocaleString()}</td>
+                  <td className="border p-1 text-right">฿{amount.toLocaleString()}</td>
                   <td className="border p-1 text-center">
                     <div className="flex justify-center gap-1">
                       <Button
