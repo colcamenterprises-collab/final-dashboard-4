@@ -1,0 +1,434 @@
+--
+
+AGENT WORK ORDER — Online Ordering (CSV import + API + images)
+
+0) Goal (do not deviate)
+
+Use the existing online ordering system and DB tables. Populate menu from CSV, expose a stable read API, and allow images via image_url. No duplicate systems. No breaking changes.
+
+Admin stays: /marketing/menu-admin
+
+Public page stays: /order
+
+Tables stay: menu_categories_online, menu_items_online
+
+
+1) Guardrails (STRICT)
+
+❌ Do not rename or remove tables/columns.
+
+❌ Do not change other routes or dashboard pages.
+
+✅ Only add the files and edits below.
+
+✅ Any schema adjustments must be idempotent and limited to adding missing columns: image_url, position, available.
+
+✅ Keep font/UX untouched elsewhere.
+
+
+
+---
+
+2) Files to add (exact paths + full contents)
+
+A) server/routes/menuOnline.ts
+
+Create new route namespace /api/menu-online/* that reads the existing tables and lets us update fields (e.g., image_url) on items.
+
+// server/routes/menuOnline.ts
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+const router = Router();
+
+/**
+ * GET /api/menu-online
+ * Returns categories with their available items, ordered by position ASC.
+ */
+router.get("/menu-online", async (_req, res) => {
+  const cats = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT id, name, slug, position FROM menu_categories_online ORDER BY position ASC`
+  );
+  const out = [];
+  for (const c of cats) {
+    const items = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT id, name, slug, sku, description, price,
+              image_url AS "imageUrl", position, available
+         FROM menu_items_online
+        WHERE category_id = $1 AND available = TRUE
+        ORDER BY position ASC`,
+      c.id
+    );
+    out.push({ ...c, items });
+  }
+  res.json(out);
+});
+
+/**
+ * PATCH /api/menu-online/item/:id
+ * Allows updating common fields like image_url, price, available, etc.
+ * Body: { name?, sku?, description?, price?, image_url?, position?, available?, category_id? }
+ */
+router.patch("/menu-online/item/:id", async (req, res) => {
+  const { id } = req.params;
+  const allowed = ["name","sku","description","price","image_url","position","available","category_id"];
+  const data: any = {};
+  for (const k of allowed) if (k in req.body) data[k] = req.body[k];
+
+  const keys = Object.keys(data);
+  if (keys.length === 0) return res.json({ ok: true, changed: 0 });
+
+  const setSql = keys.map((k, i) => `${k}=$${i + 2}`).join(", ");
+  await prisma.$executeRawUnsafe(
+    `UPDATE menu_items_online SET ${setSql} WHERE id=$1`,
+    id,
+    ...keys.map((k) => data[k])
+  );
+
+  const row = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT id, name, slug, sku, description, price,
+            image_url AS "imageUrl", position, available, category_id
+       FROM menu_items_online WHERE id=$1 LIMIT 1`,
+    id
+  );
+  res.json(row?.[0] ?? { ok: true });
+});
+
+export default router;
+
+B) Wire the new routes in the server
+
+Open server/index.ts and add:
+
+// at top with other imports
+import menuOnline from "./routes/menuOnline";
+
+// after app initialization
+app.use("/api", menuOnline);
+
+(If already present, skip.)
+
+
+---
+
+C) Idempotent SQL bootstrap (ensures columns exist; no destructive changes)
+
+Create both files:
+
+server/scripts/bootstrap_menu_online.sql
+
+-- Create tables if missing (keep names as-is)
+CREATE TABLE IF NOT EXISTS menu_categories_online (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  slug       TEXT UNIQUE NOT NULL,
+  position   INT  NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS menu_items_online (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  slug        TEXT UNIQUE NOT NULL,
+  sku         TEXT,
+  description TEXT,
+  price       DOUBLE PRECISION NOT NULL DEFAULT 0,
+  image_url   TEXT,
+  position    INT  NOT NULL DEFAULT 0,
+  available   BOOLEAN NOT NULL DEFAULT TRUE,
+  category_id TEXT NOT NULL REFERENCES menu_categories_online(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Add missing columns (safe; no-op if already present)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='menu_items_online' AND column_name='image_url') THEN
+    ALTER TABLE menu_items_online ADD COLUMN image_url TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='menu_items_online' AND column_name='position') THEN
+    ALTER TABLE menu_items_online ADD COLUMN position INT NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='menu_items_online' AND column_name='available') THEN
+    ALTER TABLE menu_items_online ADD COLUMN available BOOLEAN NOT NULL DEFAULT TRUE;
+  END IF;
+END $$;
+
+-- Keep updated_at current on updates
+CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS t_menu_cat_updated ON menu_categories_online;
+CREATE TRIGGER t_menu_cat_updated BEFORE UPDATE ON menu_categories_online
+FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+DROP TRIGGER IF EXISTS t_menu_item_updated ON menu_items_online;
+CREATE TRIGGER t_menu_item_updated BEFORE UPDATE ON menu_items_online
+FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+server/scripts/bootstrap_menu_online.ts
+
+import { PrismaClient } from "@prisma/client";
+import fs from "fs";
+import path from "path";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const sqlPath = path.join(process.cwd(), "server/scripts/bootstrap_menu_online.sql");
+  const sql = fs.readFileSync(sqlPath, "utf8");
+  await prisma.$executeRawUnsafe(sql);
+  console.log("✅ menu_*_online tables/columns ensured.");
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .catch((e) => { console.error(e); process.exit(1); });
+
+
+---
+
+D) CSV → DB importer (upserts by slug)
+
+Create a folder data/ and place the CSV as data/menu.csv.
+
+Expected headers: Category, Item Name, SKU, Description, Price, Image
+(Image is optional. If present, it becomes image_url.)
+
+server/scripts/import_menu_online_from_csv.ts
+
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { parse } from "csv-parse/sync";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+const cuid = () => "c" + crypto.randomBytes(15).toString("hex");
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const toNumber = (v: any) => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+  const n = parseFloat(String(v).replace(/[^\d.,-]/g, "").replace(/,/g, ""));
+  return isNaN(n) ? 0 : n;
+};
+
+async function upsertCategory(name: string, position: number) {
+  const slug = slugify(name);
+  const row = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT id FROM menu_categories_online WHERE slug=$1 LIMIT 1`, slug
+  );
+  const id = row?.[0]?.id || cuid();
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO menu_categories_online (id,name,slug,position)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, position=EXCLUDED.position`,
+    id, name, slug, position
+  );
+  const again = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT id FROM menu_categories_online WHERE slug=$1 LIMIT 1`, slug
+  );
+  return { id: again?.[0]?.id as string, slug };
+}
+
+async function upsertItem(row: any, categoryId: string, position: number) {
+  const name = (row["Item Name"] ?? row["name"] ?? "").toString().trim();
+  if (!name) return;
+  const slug = slugify(name);
+  const sku = (row["SKU"] ?? row["sku"] ?? null) as string | null;
+  const description = (row["Description"] ?? row["description"] ?? null) as string | null;
+  const price = toNumber(row["Price"] ?? row["price"]);
+  const imageUrl = (row["Image"] ?? row["image_url"] ?? null) as string | null;
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO menu_items_online (id,name,slug,sku,description,price,image_url,position,available,category_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT (slug) DO UPDATE SET
+       name=EXCLUDED.name, sku=EXCLUDED.sku, description=EXCLUDED.description,
+       price=EXCLUDED.price, image_url=EXCLUDED.image_url, position=EXCLUDED.position,
+       available=EXCLUDED.available, category_id=EXCLUDED.category_id`,
+    cuid(), name, slug, sku, description, price, imageUrl, position, true, categoryId
+  );
+}
+
+async function main() {
+  const csvPath = path.join(process.cwd(), "data", "menu.csv");
+  if (!fs.existsSync(csvPath)) {
+    throw new Error(
+      `CSV not found: ${csvPath}. Expected headers: Category, Item Name, SKU, Description, Price, Image`
+    );
+  }
+  const raw = fs.readFileSync(csvPath, "utf8");
+  const rows = parse(raw, { columns: true, skip_empty_lines: true, trim: true }) as any[];
+
+  // Group rows by Category and preserve file order
+  const byCat = new Map<string, any[]>();
+  for (const r of rows) {
+    const cat = (r["Category"] ?? "Uncategorized").toString().trim();
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat)!.push(r);
+  }
+
+  let cIndex = 0;
+  for (const [cat, items] of byCat) {
+    const { id: categoryId } = await upsertCategory(cat, cIndex++);
+    for (let i = 0; i < items.length; i++) {
+      await upsertItem(items[i], categoryId, i);
+    }
+  }
+
+  console.log("✅ Online menu import complete.");
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .catch((e) => { console.error(e); process.exit(1); });
+
+
+---
+
+3) Package scripts (for deploy compatibility)
+
+Edit package.json → "scripts" block. Ensure BOTH lines exist:
+
+{
+  "scripts": {
+    "dev": "NODE_ENV=development tsx server/index.ts",
+    "build": "prisma generate && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "NODE_ENV=production node dist/index.js",
+    "postinstall": "prisma generate"
+  }
+}
+
+(If you maintain additional scripts like check, db:push, etc., keep them; just ensure the two prisma lines above are present.)
+
+Dependencies (verify present):
+
+"@prisma/client" in dependencies
+
+"prisma" in devDependencies
+
+"csv-parse" in dependencies (for the importer)
+
+
+
+---
+
+4) Admin image support (tiny UI hook)
+
+Your Menu Admin should write the uploaded image URL into menu_items_online.image_url:
+
+On save/update of a menu item in the admin page, call:
+
+PATCH /api/menu-online/item/:id with { image_url: "<https://...>" }.
+
+
+
+(No UI redesign required—just bind your existing image uploader to this PATCH.)
+
+
+---
+
+5) Data flow & verification checklist
+
+1. Run bootstrap (one time; safe repeated):
+
+
+
+Execute server/scripts/bootstrap_menu_online.ts (via your build pipeline or npm script).
+
+Result: columns ensured, triggers set.
+
+
+
+2. Upload CSV:
+
+
+
+Place your file at data/menu.csv.
+
+The CSV you gave is named All Menu Items- SKU and Categories - Loyverse.csv. Copy/rename into data/menu.csv.
+
+Columns required: Category, Item Name, SKU, Description, Price, Image.
+
+
+
+3. Run importer:
+
+
+
+Execute server/scripts/import_menu_online_from_csv.ts.
+
+Upserts categories/items (by slug).
+
+Preserves file order via position.
+
+
+
+4. Smoke test API:
+
+
+
+Visit /api/menu-online.
+
+Expect JSON array of categories, each with items[].
+
+Confirm items and prices match your CSV, and images appear where provided.
+
+
+
+5. Public page (/order):
+
+
+
+If it already consumes these tables, items should appear immediately.
+
+If it fetches a different endpoint, switch it to fetch("/api/menu-online").
+
+
+6. Admin image update test:
+
+
+
+In admin, update an image. Confirm PATCH:
+
+PATCH /api/menu-online/item/:id body { image_url: "<url>" }
+
+
+Reload /api/menu-online to see the new imageUrl.
+
+
+
+---
+
+6) Acceptance criteria (what “done” means)
+
+/api/menu-online returns all categories/items from the CSV with correct fields (name, sku, description, price, imageUrl, available, position).
+
+/order shows the same items and categories as the CSV (positions respected).
+
+Admin can update image URLs and availability via the PATCH endpoint.
+
+No existing pages/routes/styles regressed.
+
+Deploy passes (Prisma postinstall + build generate in place).
+
+
+
+---
+
+7) Rollback plan
+
+Delete only the files added in section 2 and the two lines added in server/index.ts.
+
+Remove the two prisma script lines from package.json.
+
+No DB destructive changes were made.
+
+
+
+---
