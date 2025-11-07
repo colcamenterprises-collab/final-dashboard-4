@@ -482,14 +482,14 @@ export default function MenuAdmin() {
             </div>
             <div>
               <Label htmlFor="item-image">Image</Label>
-              <Input
+              <input
                 id="item-image"
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
                 disabled={uploadImageMutation.isPending}
                 data-testid="input-item-image"
-                className="text-xs"
+                className="flex h-10 w-full rounded-[4px] border border-slate-200 bg-white px-3 py-2 text-xs file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
               />
               {uploadImageMutation.isPending && (
                 <p className="text-xs text-slate-600 mt-1">Uploading image...</p>
