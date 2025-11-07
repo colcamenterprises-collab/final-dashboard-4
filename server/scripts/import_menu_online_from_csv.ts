@@ -83,19 +83,9 @@ async function main() {
   let cIndex = 0;
   for (const [cat, items] of byCat) {
     const { id: categoryId } = await upsertCategory(cat, cIndex++);
-    console.log(`  ✓ Category: ${cat} (${items.length} items) - ID: ${categoryId}`);
-    
-    // Verify the category exists before inserting items
-    const verify = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT id FROM menu_categories_online WHERE id=$1`, categoryId
-    );
-    if (!verify || verify.length === 0) {
-      console.error(`❌ Category ${cat} (ID: ${categoryId}) was not found after insert!`);
-      throw new Error(`Category ${cat} not found`);
-    }
+    console.log(`  ✓ Category: ${cat} (${items.length} items)`);
     
     for (let i = 0; i < items.length; i++) {
-      console.log(`    - Inserting item ${i + 1}/${items.length}: ${items[i]["Item Name"]}`);
       await upsertItem(items[i], categoryId, i);
     }
   }
