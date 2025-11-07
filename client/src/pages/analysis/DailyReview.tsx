@@ -280,7 +280,7 @@ export default function DailyReview() {
         <>
           <div className="rounded border p-3 bg-gray-50">
             <div className="text-sm">
-              <span className="font-semibold">Business date:</span> {current.date} (18:00→03:00, POS = source of truth)
+              <span className="font-semibold">Business date:</span> {current.date} (17:00→03:00, POS = source of truth)
               {current.availability !== "ok" && (
                 <span className="ml-2 text-red-700">
                   — {current.availability === "missing_both" ? "Missing POS & Form" :
