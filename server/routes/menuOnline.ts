@@ -5,6 +5,40 @@ const prisma = new PrismaClient();
 const router = Router();
 
 /**
+ * GET /api/menu
+ * Public menu endpoint for customer ordering page
+ * Returns categories with their available items, ordered by position ASC.
+ */
+router.get("/menu", async (_req, res) => {
+  try {
+    const categories = await prisma.menuCategory.findMany({
+      orderBy: { position: "asc" },
+      include: {
+        items: {
+          where: { available: true },
+          orderBy: { position: "asc" },
+          include: {
+            groups: {
+              orderBy: { position: "asc" },
+              include: {
+                options: {
+                  orderBy: { position: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    res.json({ categories });
+  } catch (error) {
+    console.error("Error fetching menu:", error);
+    res.status(500).json({ error: "Failed to fetch menu" });
+  }
+});
+
+/**
  * GET /api/menu-online
  * Returns categories with their available items, ordered by position ASC.
  */
