@@ -30,10 +30,10 @@ function bkkLastShiftBoundsUTC(): { startUTC: string; endUTC: string } {
   const endBkk = new Date(nowUTC + BKK_OFFSET);
   endBkk.setHours(3, 0, 0, 0);
 
-  // start = yesterday 18:00 BKK
+  // start = yesterday 17:00 BKK
   const startBkk = new Date(endBkk);
   startBkk.setDate(startBkk.getDate() - 1);
-  startBkk.setHours(18, 0, 0, 0);
+  startBkk.setHours(17, 0, 0, 0);
 
   return {
     startUTC: new Date(startBkk.getTime() - BKK_OFFSET).toISOString(),

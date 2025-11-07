@@ -548,7 +548,7 @@ export class LoyverseReceiptService {
 
       const shiftReport: LoyverseShiftData = {
         id: `shift-${shiftKey}-${shiftReceipts.length}`,
-        start_time: `${shiftKey}T18:00:00+07:00`, // 6pm Bangkok time
+        start_time: `${shiftKey}T17:00:00+07:00`, // 5pm Bangkok time
         end_time: `${new Date(shiftDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T03:00:00+07:00`, // 3am next day
         total_sales: Math.round(totalSales * 100) / 100,
         total_transactions: shiftReceipts.length,
@@ -574,7 +574,7 @@ export class LoyverseReceiptService {
     const shiftStart = new Date(reportData.start_time);
     const shiftEnd = new Date(reportData.end_time);
     const shiftDate = new Date(shiftStart);
-    shiftDate.setHours(18, 0, 0, 0); // Normalize to 6pm
+    shiftDate.setHours(17, 0, 0, 0); // Normalize to 5pm
 
     // Check if report already exists
     const existing = await db.select().from(loyverseShiftReports)
