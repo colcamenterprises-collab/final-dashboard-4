@@ -103,7 +103,7 @@ async function main() {
     }
   }
 
-  console.log('✅ Seeded 6 receipts into test shift window (2025-10-15 18:00 → 2025-10-16 03:00 Bangkok)');
+  console.log('✅ Seeded 6 receipts into test shift window (2025-10-15 17:00 → 2025-10-16 03:00 Bangkok)');
   await db.end();
 }
 

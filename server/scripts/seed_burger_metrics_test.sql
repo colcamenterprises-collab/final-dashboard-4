@@ -1,5 +1,5 @@
 -- Seed test receipts for burger metrics testing
--- Deterministic test shift on 2025-10-15 (18:00 -> 03:00 next day, Asia/Bangkok)
+-- Deterministic test shift on 2025-10-15 (17:00 -> 03:00 next day, Asia/Bangkok)
 
 -- Clean previous test data
 DELETE FROM receipt_items WHERE "receiptId" IN (SELECT id FROM receipts WHERE "receiptNumber" LIKE 'TEST-%');
