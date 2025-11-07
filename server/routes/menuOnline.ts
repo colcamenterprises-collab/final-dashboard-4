@@ -16,9 +16,9 @@ router.get("/menu-online", async (_req, res) => {
   for (const c of cats) {
     const items = await prisma.$queryRawUnsafe<any[]>(
       `SELECT id, name, slug, sku, description, price,
-              image_url AS "imageUrl", position, available
+              "imageUrl", position, available
          FROM menu_items_online
-        WHERE category_id = $1 AND available = TRUE
+        WHERE "categoryId" = $1 AND available = TRUE
         ORDER BY position ASC`,
       c.id
     );
@@ -29,19 +29,19 @@ router.get("/menu-online", async (_req, res) => {
 
 /**
  * PATCH /api/menu-online/item/:id
- * Allows updating common fields like image_url, price, available, etc.
- * Body: { name?, sku?, description?, price?, image_url?, position?, available?, category_id? }
+ * Allows updating common fields like imageUrl, price, available, etc.
+ * Body: { name?, sku?, description?, price?, imageUrl?, position?, available?, categoryId? }
  */
 router.patch("/menu-online/item/:id", async (req, res) => {
   const { id } = req.params;
-  const allowed = ["name","sku","description","price","image_url","position","available","category_id"];
+  const allowed = ["name","sku","description","price","imageUrl","position","available","categoryId"];
   const data: any = {};
   for (const k of allowed) if (k in req.body) data[k] = req.body[k];
 
   const keys = Object.keys(data);
   if (keys.length === 0) return res.json({ ok: true, changed: 0 });
 
-  const setSql = keys.map((k, i) => `${k}=$${i + 2}`).join(", ");
+  const setSql = keys.map((k, i) => `"${k}"=$${i + 2}`).join(", ");
   await prisma.$executeRawUnsafe(
     `UPDATE menu_items_online SET ${setSql} WHERE id=$1`,
     id,
@@ -50,7 +50,7 @@ router.patch("/menu-online/item/:id", async (req, res) => {
 
   const row = await prisma.$queryRawUnsafe<any[]>(
     `SELECT id, name, slug, sku, description, price,
-            image_url AS "imageUrl", position, available, category_id
+            "imageUrl", position, available, "categoryId"
        FROM menu_items_online WHERE id=$1 LIMIT 1`,
     id
   );

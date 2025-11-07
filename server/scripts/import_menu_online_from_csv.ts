@@ -42,13 +42,14 @@ async function upsertItem(row: any, categoryId: string, position: number) {
   const price = toNumber(row["Price"] ?? row["price"]);
   const imageUrl = (row["Image"] ?? row["image_url"] ?? null) as string | null;
 
+  // Use existing camelCase column names (categoryId, imageUrl) not snake_case
   await prisma.$executeRawUnsafe(
-    `INSERT INTO menu_items_online (id,name,slug,sku,description,price,image_url,position,available,category_id)
+    `INSERT INTO menu_items_online (id,name,slug,sku,description,price,"imageUrl",position,available,"categoryId")
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT (slug) DO UPDATE SET
        name=EXCLUDED.name, sku=EXCLUDED.sku, description=EXCLUDED.description,
-       price=EXCLUDED.price, image_url=EXCLUDED.image_url, position=EXCLUDED.position,
-       available=EXCLUDED.available, category_id=EXCLUDED.category_id`,
+       price=EXCLUDED.price, "imageUrl"=EXCLUDED."imageUrl", position=EXCLUDED.position,
+       available=EXCLUDED.available, "categoryId"=EXCLUDED."categoryId"`,
     cuid(), name, slug, sku, description, price, imageUrl, position, true, categoryId
   );
 }

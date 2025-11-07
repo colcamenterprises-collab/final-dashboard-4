@@ -1,16 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { pool } from "../db";
 import fs from "fs";
 import path from "path";
-
-const prisma = new PrismaClient();
 
 async function main() {
   const sqlPath = path.join(process.cwd(), "server/scripts/bootstrap_menu_online.sql");
   const sql = fs.readFileSync(sqlPath, "utf8");
-  await prisma.$executeRawUnsafe(sql);
+  
+  // Execute the entire SQL file as one query (PostgreSQL supports this)
+  await pool.query(sql);
+  
   console.log("✅ menu_*_online tables/columns ensured.");
 }
 
 main()
-  .then(() => prisma.$disconnect())
+  .then(() => process.exit(0))
   .catch((e) => { console.error(e); process.exit(1); });
