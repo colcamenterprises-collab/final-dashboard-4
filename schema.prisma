@@ -823,11 +823,11 @@ model MenuCategory {
   name      String
   slug      String            @unique
   position  Int?              @default(0)
-  createdAt DateTime          @default(now()) @db.Timestamp(6)
-  updatedAt DateTime          @default(now()) @updatedAt @db.Timestamp(6)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   items     MenuItem_Online[]
 
-  @@map("menu_categories")
+  @@map("menu_categories_online")
 }
 
 model MenuItem_Online {
