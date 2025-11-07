@@ -57,7 +57,8 @@ export default function MenuAdmin() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
-  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>("");
 
   const { data, isLoading } = useQuery<{ categories: Category[] }>({
     queryKey: ["/api/admin/menu"],
@@ -143,6 +144,32 @@ export default function MenuAdmin() {
     },
   });
 
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      
+      const response = await fetch("/api/upload/menu-item-image", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to upload image");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setUploadedImageUrl(data.imageUrl);
+      setImagePreviewUrl(data.imageUrl);
+      toast({ title: "Image uploaded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    },
+  });
+
   const toggleCategory = (id: string) => {
     const newExpanded = new Set(expandedCategories);
     if (newExpanded.has(id)) {
@@ -178,7 +205,7 @@ export default function MenuAdmin() {
       description: formData.get("description") as string,
       price: parseInt(formData.get("price") as string),
       sku: formData.get("sku") as string || undefined,
-      imageUrl: formData.get("imageUrl") as string || undefined,
+      imageUrl: uploadedImageUrl || editingItem?.imageUrl || undefined,
       position: parseInt(formData.get("position") as string) || 0,
       available: formData.get("available") === "on",
       groups: editingItem?.groups || [],
@@ -188,6 +215,22 @@ export default function MenuAdmin() {
       updateItemMutation.mutate({ ...item, id: editingItem.id });
     } else {
       createItemMutation.mutate(item);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      // Upload immediately
+      uploadImageMutation.mutate(file);
     }
   };
 
@@ -287,7 +330,8 @@ export default function MenuAdmin() {
                       setSelectedCategoryId(category.id!);
                       setEditingItem(null);
                       setImagePreviewUrl("");
-                      setImageLoadError(false);
+                      setImageFile(null);
+                      setUploadedImageUrl("");
                       setItemDialogOpen(true);
                     }}
                     data-testid={`button-add-item-${category.id}`}
@@ -362,7 +406,8 @@ export default function MenuAdmin() {
                             setSelectedCategoryId(category.id!);
                             setEditingItem(item);
                             setImagePreviewUrl(item.imageUrl || "");
-                            setImageLoadError(false);
+                            setImageFile(null);
+                            setUploadedImageUrl(item.imageUrl || "");
                             setItemDialogOpen(true);
                           }}
                           data-testid={`button-edit-item-${item.id}`}
@@ -404,7 +449,8 @@ export default function MenuAdmin() {
           setItemDialogOpen(open);
           if (!open) {
             setImagePreviewUrl("");
-            setImageLoadError(false);
+            setImageFile(null);
+            setUploadedImageUrl("");
           }
         }}
       >
@@ -435,35 +481,38 @@ export default function MenuAdmin() {
               />
             </div>
             <div>
-              <Label htmlFor="item-imageUrl">Image URL</Label>
+              <Label htmlFor="item-image">Image</Label>
               <Input
-                id="item-imageUrl"
-                name="imageUrl"
-                type="url"
-                defaultValue={editingItem?.imageUrl}
-                onChange={(e) => {
-                  setImagePreviewUrl(e.target.value);
-                  setImageLoadError(false);
-                }}
-                placeholder="https://example.com/image.jpg"
-                data-testid="input-item-imageUrl"
+                id="item-image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={uploadImageMutation.isPending}
+                data-testid="input-item-image"
+                className="text-xs"
               />
-              {(imagePreviewUrl || editingItem?.imageUrl) && !imageLoadError && (
+              {uploadImageMutation.isPending && (
+                <p className="text-xs text-slate-600 mt-1">Uploading image...</p>
+              )}
+              {imagePreviewUrl && (
                 <div className="mt-2">
                   <img 
-                    src={imagePreviewUrl || editingItem?.imageUrl} 
+                    src={imagePreviewUrl}
                     alt="Preview"
                     className="w-32 h-32 object-cover rounded border"
-                    onLoad={() => setImageLoadError(false)}
-                    onError={() => setImageLoadError(true)}
                     data-testid="img-preview"
                   />
                 </div>
               )}
-              {imageLoadError && (
-                <p className="text-xs text-red-600 mt-1">
-                  Failed to load image. Please check the URL.
-                </p>
+              {editingItem?.imageUrl && !imagePreviewUrl && (
+                <div className="mt-2">
+                  <p className="text-xs text-slate-600 mb-1">Current image:</p>
+                  <img 
+                    src={editingItem.imageUrl}
+                    alt="Current"
+                    className="w-32 h-32 object-cover rounded border"
+                  />
+                </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
