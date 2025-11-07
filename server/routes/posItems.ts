@@ -14,7 +14,7 @@ function bkkBounds() {
   const off = 7 * 3600_000;
   const now = Date.now();
   const endB = new Date(now); endB.setHours(3, 0, 0, 0);
-  const startB = new Date(endB); startB.setDate(startB.getDate() - 1); startB.setHours(18, 0, 0, 0);
+  const startB = new Date(endB); startB.setDate(startB.getDate() - 1); startB.setHours(17, 0, 0, 0);
   return { from: new Date(startB.getTime() - off).toISOString(), to: new Date(endB.getTime() - off).toISOString() };
 }
 

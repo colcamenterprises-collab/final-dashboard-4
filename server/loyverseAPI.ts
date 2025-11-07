@@ -370,17 +370,17 @@ class LoyverseAPI {
       
       // Always get the LAST COMPLETED shift (not current/ongoing)
       if (bangkokTime.getHours() >= 3) {
-        // After 3am - show the shift that just ended (6pm yesterday to 3am today)
+        // After 3am - show the shift that just ended (5pm yesterday to 3am today)
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 1);
-        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftStartTime.setHours(17, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setHours(3, 0, 0, 0);
       } else {
-        // Before 3am - show the previous completed shift (6pm two days ago to 3am yesterday)
+        // Before 3am - show the previous completed shift (5pm two days ago to 3am yesterday)
         shiftStartTime = new Date(bangkokTime);
         shiftStartTime.setDate(shiftStartTime.getDate() - 2);
-        shiftStartTime.setHours(18, 0, 0, 0);
+        shiftStartTime.setHours(17, 0, 0, 0);
         shiftEndTime = new Date(bangkokTime);
         shiftEndTime.setDate(shiftEndTime.getDate() - 1);
         shiftEndTime.setHours(3, 0, 0, 0);

@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
- * Compute shift date for analytics (6pm previous day to 3am current day)
+ * Compute shift date for analytics (5pm previous day to 3am current day)
  */
 function computeShiftDate(date = new Date()) {
   const hour = date.getHours();
@@ -17,8 +17,8 @@ function computeShiftDate(date = new Date()) {
     shiftDate.setDate(shiftDate.getDate() - 1);
   }
   
-  // Set to 6pm of shift date
-  shiftDate.setHours(18, 0, 0, 0);
+  // Set to 5pm of shift date
+  shiftDate.setHours(17, 0, 0, 0);
   return shiftDate;
 }
 
