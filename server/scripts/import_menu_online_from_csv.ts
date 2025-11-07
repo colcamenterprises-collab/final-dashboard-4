@@ -17,20 +17,19 @@ const toNumber = (v: any) => {
 
 async function upsertCategory(name: string, position: number) {
   const slug = slugify(name);
-  const row = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id FROM menu_categories_online WHERE slug=$1 LIMIT 1`, slug
-  );
-  const id = row?.[0]?.id || cuid();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO menu_categories_online (id,name,slug,position)
-     VALUES ($1,$2,$3,$4)
-     ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, position=EXCLUDED.position`,
+  const id = cuid();
+  
+  // Use INSERT with RETURNING to get the ID in one go
+  const result = await prisma.$queryRawUnsafe<any[]>(
+    `INSERT INTO menu_categories_online (id, name, slug, position)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (slug) DO UPDATE 
+       SET name = EXCLUDED.name, position = EXCLUDED.position
+     RETURNING id`,
     id, name, slug, position
   );
-  const again = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id FROM menu_categories_online WHERE slug=$1 LIMIT 1`, slug
-  );
-  return { id: again?.[0]?.id as string, slug };
+  
+  return { id: result[0].id as string, slug };
 }
 
 async function upsertItem(row: any, categoryId: string, position: number) {
@@ -61,6 +60,13 @@ async function main() {
       `CSV not found: ${csvPath}. Expected headers: Category, Item Name, SKU, Description, Price, Image`
     );
   }
+  
+  // Clear existing data
+  console.log("🗑️  Clearing existing menu data...");
+  await prisma.$executeRawUnsafe(`DELETE FROM menu_items_online`);
+  await prisma.$executeRawUnsafe(`DELETE FROM menu_categories_online`);
+  console.log("✅ Existing data cleared");
+  
   const raw = fs.readFileSync(csvPath, "utf8");
   const rows = parse(raw, { columns: true, skip_empty_lines: true, trim: true }) as any[];
 
@@ -72,10 +78,24 @@ async function main() {
     byCat.get(cat)!.push(r);
   }
 
+  console.log(`📦 Importing ${rows.length} items from ${byCat.size} categories...`);
+  
   let cIndex = 0;
   for (const [cat, items] of byCat) {
     const { id: categoryId } = await upsertCategory(cat, cIndex++);
+    console.log(`  ✓ Category: ${cat} (${items.length} items) - ID: ${categoryId}`);
+    
+    // Verify the category exists before inserting items
+    const verify = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT id FROM menu_categories_online WHERE id=$1`, categoryId
+    );
+    if (!verify || verify.length === 0) {
+      console.error(`❌ Category ${cat} (ID: ${categoryId}) was not found after insert!`);
+      throw new Error(`Category ${cat} not found`);
+    }
+    
     for (let i = 0; i < items.length; i++) {
+      console.log(`    - Inserting item ${i + 1}/${items.length}: ${items[i]["Item Name"]}`);
       await upsertItem(items[i], categoryId, i);
     }
   }
