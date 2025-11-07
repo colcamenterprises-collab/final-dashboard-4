@@ -1,0 +1,327 @@
+# ===== SBB ONLINE ORDERING — ONE-SHOT PATCH =====
+set -e
+
+# 0) Pre-reqs
+mkdir -p server/routes server/scripts client/src/pages data
+
+# 1) Prisma schema (adds MenuCategory/MenuItem + imageUrl/position)
+cat > prisma/schema.prisma <<'PRISMA'
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model MenuCategory {
+  id        String      @id @default(cuid())
+  name      String
+  slug      String      @unique
+  position  Int         @default(0)
+  items     MenuItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model MenuItem {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  sku         String?
+  description String?
+  price       Float
+  imageUrl    String?
+  position    Int          @default(0)
+  available   Boolean      @default(true)
+  categoryId  String
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+PRISMA
+
+# 2) Menu API routes (public menu + admin patch)
+cat > server/routes/menu.ts <<'ROUTES'
+import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+const router = Router();
+
+// Public: full menu grouped by category
+router.get("/menu", async (_req, res) => {
+  const cats = await prisma.menuCategory.findMany({
+    orderBy: { position: "asc" },
+    include: {
+      items: {
+        where: { available: true },
+        orderBy: { position: "asc" },
+      },
+    },
+  });
+  res.json(cats);
+});
+
+// Admin quick update for a single item
+router.patch("/menu/item/:id", async (req, res) => {
+  const { id } = req.params;
+  const data = req.body ?? {};
+  const updated = await prisma.menuItem.update({
+    where: { id },
+    data,
+  });
+  res.json(updated);
+});
+
+export default router;
+ROUTES
+
+# 3) Wire routes in server/index.ts (create small loader if not present)
+# - This file is additive-safe: if you already import other routes, we only add the menu route block once.
+if ! grep -q "app.use(\"/api\", menuRoutes);" server/index.ts 2>/dev/null; then
+cat > server/index.ts <<'SERVER'
+import express from "express";
+import cors from "cors";
+import menuRoutes from "./routes/menu";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.use("/api", menuRoutes);
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`SBB server running on :${port}`));
+SERVER
+fi
+
+# 4) CSV → DB importer (reads data/menu.csv and upserts everything)
+cat > server/scripts/import_menu_from_csv.ts <<'SEED'
+import fs from "fs";
+import path from "path";
+import { parse } from "csv-parse/sync";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function asNumber(v: any): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+  const cleaned = String(v).replace(/[^\d.,-]/g, "").replace(/,/g, "");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+async function main() {
+  const csvPath = path.join(process.cwd(), "data", "menu.csv");
+  if (!fs.existsSync(csvPath)) {
+    throw new Error(`Missing CSV at ${csvPath}. Upload your CSV as data/menu.csv`);
+  }
+  const raw = fs.readFileSync(csvPath, "utf8");
+  const rows = parse(raw, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  }) as any[];
+
+  // Expect columns: Item Name, SKU, Category, Description, Price
+  type Row = { "Item Name": string; SKU?: string; Category: string; Description?: string; Price?: string|number; };
+
+  // Build category map → items
+  const byCat = new Map<string, Row[]>();
+  for (const r of rows as Row[]) {
+    const cat = (r.Category || "Uncategorized").trim();
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat)!.push(r);
+  }
+
+  let catIndex = 0;
+  for (const [catName, items] of byCat.entries()) {
+    const catSlug = slugify(catName);
+    const category = await prisma.menuCategory.upsert({
+      where: { slug: catSlug },
+      update: { name: catName, position: catIndex },
+      create: { name: catName, slug: catSlug, position: catIndex },
+    });
+    catIndex++;
+
+    for (let i = 0; i < items.length; i++) {
+      const r = items[i];
+      const name = r["Item Name"]?.trim() || "Unnamed";
+      const slug = slugify(name);
+      const description = r.Description?.trim() || null;
+      const sku = r.SKU?.trim() || null;
+      const price = asNumber(r.Price);
+
+      await prisma.menuItem.upsert({
+        where: { slug },
+        update: {
+          name,
+          sku,
+          description,
+          price,
+          imageUrl: null,   // admin can set later
+          position: i,
+          available: true,
+          categoryId: category.id,
+        },
+        create: {
+          name,
+          slug,
+          sku,
+          description,
+          price,
+          imageUrl: null,
+          position: i,
+          available: true,
+          categoryId: category.id,
+        },
+      });
+    }
+  }
+
+  console.log("✅ Menu CSV import complete");
+}
+
+main()
+  .then(async () => { await prisma.$disconnect(); })
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+SEED
+
+# 5) Public ordering page that fetches /api/menu and renders with image placeholders
+cat > client/src/pages/OnlineOrdering.tsx <<'CLIENT'
+import React, { useEffect, useState } from "react";
+
+type MenuItem = {
+  id: string; name: string; description?: string | null; price: number;
+  imageUrl?: string | null; position: number; sku?: string | null; available: boolean;
+};
+type MenuCategory = { id: string; name: string; slug: string; position: number; items: MenuItem[] };
+
+const PLACEHOLDER = "https://placehold.co/96x96?text=SBB";
+
+export default function OnlineOrdering() {
+  const [cats, setCats] = useState<MenuCategory[]>([]);
+  const [active, setActive] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/menu");
+        const data = await res.json();
+        setCats(data || []);
+        setActive((data?.[0]?.slug) ?? "");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="p-6 text-center">Loading…</div>;
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Header block (Vev-like) */}
+      <div className="bg-[#FFE300]">
+        <div className="mx-auto" style={{maxWidth: 980}}>
+          <div className="py-10 md:py-14 text-center">
+            <div className="mx-auto w-24 h-24 rounded-full bg-black/90 flex items-center justify-center text-2xl font-bold">SBB</div>
+            <h1 className="mt-6 font-extrabold text-3xl md:text-5xl text-black">Smash Brothers Burgers (Rawai)</h1>
+            <p className="mt-2 text-black/80">Traditional American Smash Burgers — Opens at 6:00 pm</p>
+            <div className="mt-4 inline-block bg-black/10 text-black font-semibold rounded-full px-5 py-3">
+              69/9 Soi Saiyuan, Rawai, Phuket 83130, Thailand — Gilbis Plaza, Phuket
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Category tabs */}
+      <div className="bg-black sticky top-0 z-10">
+        <div className="mx-auto" style={{maxWidth: 980}}>
+          <div className="flex gap-6 overflow-auto px-4 pt-4">
+            {cats.map((c) => (
+              <button
+                key={c.slug}
+                onClick={() => setActive(c.slug)}
+                className={`pb-3 border-b-2 ${active === c.slug ? "border-[#FFE300] text-white" : "border-transparent text-white/70"}`}
+              >
+                {c.name.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Items list */}
+      <div className="mx-auto px-4" style={{maxWidth: 980}}>
+        {cats.filter(c => !active || c.slug === active).map((c) => (
+          <section key={c.id} className="py-6">
+            <h2 className="text-xl font-bold mb-4">{c.name}</h2>
+            <div className="space-y-4">
+              {c.items.map((it) => (
+                <article key={it.id} className="flex items-center justify-between bg-[#111] rounded-2xl px-4 py-4 border border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#222]">
+                      <img src={it.imageUrl || PLACEHOLDER} alt={it.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">{it.name}</div>
+                      {it.description && <div className="text-sm text-white/70">{it.description}</div>}
+                    </div>
+                  </div>
+                  <button className="shrink-0 bg-[#FFE300] text-black font-bold rounded-xl px-4 py-2">
+                    THB {Math.round(it.price).toFixed(0)} +
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+CLIENT
+
+# 6) Minimal client route export (for React Router setups)
+cat > client/src/pages/online-ordering.ts <<'EXPORTS'
+export { default } from "./OnlineOrdering";
+EXPORTS
+
+# 7) Ensure build scripts generate Prisma correctly on deploy
+if grep -q '"build":' package.json; then
+  node - <<'NODE'
+const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+pkg.scripts = pkg.scripts || {};
+pkg.scripts.build = "prisma generate && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist";
+pkg.scripts.postinstall = "prisma generate";
+fs.writeFileSync('package.json', JSON.stringify(pkg,null,2));
+console.log("Updated package.json scripts.");
+NODE
+fi
+
+# 8) Install deps for CSV parsing + TS runtime (csv-parse + tsx if missing)
+npm i -D tsx csv-parse
+npm i @prisma/client prisma
+
+# 9) Generate Prisma + build DB client
+npx prisma generate
+
+# 10) Expect a CSV at data/menu.csv; if your file has a different name, copy it:
+# cp "data/All Menu Items- SKU and Categories - Loyverse.csv" data/menu.csv  # (uncomment/adjust path)
+
+# 11) Run importer (will throw if CSV missing)
+node --loader tsx server/scripts/import_menu_from_csv.ts || true
+
+echo "✅ Patch applied. Upload your CSV as data/menu.csv then run:"
+echo "node --loader tsx server/scripts/import_menu_from_csv.ts"
+echo "Finally: npm run build && (npm start OR Deploy)"
+# ===== END PATCH =====
