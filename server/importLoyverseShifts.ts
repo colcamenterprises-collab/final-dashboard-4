@@ -55,7 +55,7 @@ export async function importLoyverseShifts(): Promise<{ success: boolean; import
             
             // Calculate shift date (use opening date)
             const shiftDate = new Date(openingTime);
-            shiftDate.setHours(18, 0, 0, 0); // 6 PM start time
+            shiftDate.setHours(17, 0, 0, 0); // 5 PM start time
 
             const cashPayments = parseFloat(record['Cash payments']) || 0;
             const cashRefunds = parseFloat(record['Cash refunds']) || 0;

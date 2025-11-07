@@ -7,13 +7,13 @@ const prisma = new PrismaClient();
 
 const TZ = process.env.TZ || 'Asia/Bangkok';
 // Tuning knobs
-const SHIFT_START_HOUR_LOCAL = 18; // 18:00 -> 03:00
+const SHIFT_START_HOUR_LOCAL = 17; // 17:00 -> 03:00
 const MEAT_PER_PATTY_GRAMS = 90;
 const BUNS_VARIANCE = 5;
 const MEAT_VARIANCE = 500;
 const DRINKS_VARIANCE = 5;
 
-// Convert a UTC date into the shift anchor (18:00 local)
+// Convert a UTC date into the shift anchor (17:00 local)
 function shiftAnchorUTC(utcDate) {
   const local = utcToZonedTime(utcDate, TZ);
   const localShift = new Date(local);

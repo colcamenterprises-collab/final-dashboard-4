@@ -31,7 +31,7 @@ function fmtMoney(cents) { return `฿${(cents/100).toFixed(2)}`; }
 function renderPlain({ restaurant, shiftDate, sales, analytics, expenses }) {
   const lines = [];
   lines.push(`Jussi — Daily Ops Report`);
-  lines.push(`${restaurant.name} — ${format(shiftDate, 'yyyy-MM-dd')} (18:00–03:00 ${TZ})`);
+  lines.push(`${restaurant.name} — ${format(shiftDate, 'yyyy-MM-dd')} (17:00–03:00 ${TZ})`);
   lines.push('');
 
   if (sales) {
