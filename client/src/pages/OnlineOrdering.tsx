@@ -199,7 +199,7 @@ export default function OnlineOrderingPage() {
           description: item.description,
           price: item.price,
           category: cat.slug,
-          image: item.image,
+          image: item.imageUrl,
           groups: item.groups?.map((g: any) => ({
             id: g.id || uid("grp"),
             name: g.name,
