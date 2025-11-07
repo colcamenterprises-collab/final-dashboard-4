@@ -200,12 +200,13 @@ export default function MenuAdmin() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Online Menu Admin</h1>
+        <h1 className="text-3xl font-bold">Online Menu Admin</h1>
         <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={() => setEditingCategory(null)}
               data-testid="button-add-category"
+              className="text-xs"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Category
@@ -273,8 +274,8 @@ export default function MenuAdmin() {
                       <ChevronRight className="w-5 h-5" />
                     )}
                   </button>
-                  <CardTitle>{category.name}</CardTitle>
-                  <span className="text-sm text-muted-foreground">
+                  <CardTitle className="text-xs font-medium">{category.name}</CardTitle>
+                  <span className="text-xs text-slate-600">
                     ({category.items?.length || 0} items)
                   </span>
                 </div>
@@ -290,6 +291,7 @@ export default function MenuAdmin() {
                       setItemDialogOpen(true);
                     }}
                     data-testid={`button-add-item-${category.id}`}
+                    className="text-xs"
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Add Item
@@ -302,6 +304,7 @@ export default function MenuAdmin() {
                       setCategoryDialogOpen(true);
                     }}
                     data-testid={`button-edit-category-${category.id}`}
+                    className="text-xs"
                   >
                     <Pencil className="w-4 h-4" />
                   </Button>
@@ -314,6 +317,7 @@ export default function MenuAdmin() {
                       }
                     }}
                     data-testid={`button-delete-category-${category.id}`}
+                    className="text-xs"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -338,13 +342,13 @@ export default function MenuAdmin() {
                           />
                         )}
                         <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs font-medium">{item.name}</div>
+                          <div className="text-xs text-slate-600">
                             ฿{item.price}
                             {item.description && ` - ${item.description}`}
                           </div>
                           {item.groups && item.groups.length > 0 && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-slate-600">
                               {item.groups.length} modifier group(s)
                             </div>
                           )}
@@ -362,6 +366,7 @@ export default function MenuAdmin() {
                             setItemDialogOpen(true);
                           }}
                           data-testid={`button-edit-item-${item.id}`}
+                          className="text-xs"
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -374,6 +379,7 @@ export default function MenuAdmin() {
                             }
                           }}
                           data-testid={`button-delete-item-${item.id}`}
+                          className="text-xs"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -381,7 +387,7 @@ export default function MenuAdmin() {
                     </div>
                   ))}
                   {(!category.items || category.items.length === 0) && (
-                    <div className="text-sm text-muted-foreground py-4 text-center">
+                    <div className="text-xs text-slate-600 py-4 text-center">
                       No items yet. Click "Add Item" to create one.
                     </div>
                   )}
