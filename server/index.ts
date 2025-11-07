@@ -18,6 +18,7 @@ import healthRouter from "./routes/health";
 import opsMtdRouter from "./routes/ops_mtd";
 import purchasingRouter from "./routes/purchasing";
 import menuOnlineRouter from "./routes/menuOnline";
+import imageUploadRouter from "./routes/imageUpload";
 
 const prisma = new PrismaClient();
 
@@ -185,6 +186,7 @@ async function checkSchema() {
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);
   app.use('/api', menuOnlineRouter);
+  app.use('/api', imageUploadRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {
