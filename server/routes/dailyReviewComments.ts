@@ -34,16 +34,17 @@ dailyReviewCommentsRouter.get("/:date", async (req, res) => {
   }
 });
 
-// POST /api/daily-review-comments - Save or update comment for a date
-dailyReviewCommentsRouter.post("/", async (req, res) => {
+// POST /api/daily-review-comments/:date - Save or update comment for a date
+dailyReviewCommentsRouter.post("/:date", async (req, res) => {
   try {
-    const { businessDate, comment, actualAmountBanked, createdBy } = req.body;
+    const { date } = req.params;
+    const { comment, actualAmountBanked, createdBy } = req.body;
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
     }
 
-    if (typeof comment !== "string") {
+    if (comment !== undefined && typeof comment !== "string") {
       return res.status(400).json({ error: "Comment must be a string" });
     }
 
@@ -51,8 +52,8 @@ dailyReviewCommentsRouter.post("/", async (req, res) => {
     const [saved] = await db
       .insert(dailyReviewComments)
       .values({
-        businessDate,
-        comment,
+        businessDate: date,
+        comment: comment || "",
         actualAmountBanked: actualAmountBanked !== null && actualAmountBanked !== undefined 
           ? actualAmountBanked.toString() 
           : null,
@@ -61,7 +62,7 @@ dailyReviewCommentsRouter.post("/", async (req, res) => {
       .onConflictDoUpdate({
         target: dailyReviewComments.businessDate,
         set: {
-          comment,
+          comment: comment || "",
           actualAmountBanked: actualAmountBanked !== null && actualAmountBanked !== undefined 
             ? actualAmountBanked.toString() 
             : null,
@@ -72,7 +73,8 @@ dailyReviewCommentsRouter.post("/", async (req, res) => {
       .returning();
 
     res.json({ 
-      ok: true, 
+      ok: true,
+      message: "Review saved successfully",
       comment: saved.comment,
       actualAmountBanked: saved.actualAmountBanked ? parseFloat(saved.actualAmountBanked) : null
     });

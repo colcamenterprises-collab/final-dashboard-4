@@ -151,7 +151,10 @@ export default function DailyReview() {
   }
 
   async function saveComment() {
-    if (!selectedDate) return;
+    if (!selectedDate) {
+      alert("No date selected. Please select a date first.");
+      return;
+    }
     setSavingComment(true);
     try {
       const payload = {
