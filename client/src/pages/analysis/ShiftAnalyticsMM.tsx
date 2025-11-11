@@ -1,5 +1,16 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { formatDateDDMMYYYY, convertFromInputDate } from "@/lib/format";
+
+type RollsRow = {
+  shift_date: string;
+  rolls_start: number;
+  rolls_purchased: number;
+  burgers_sold: number;
+  estimated_rolls_end: number;
+  actual_rolls_end: number | null;
+  variance: number;
+  status: 'PENDING' | 'OK' | 'ALERT';
+};
 
 type ShiftItem = {
   sku: string | null;
@@ -54,6 +65,7 @@ export default function ShiftAnalyticsMM() {
   const [items, setItems] = useState<ShiftItem[]>([]);
   const [tab, setTab] = useState<CatTab>("all");
   const [error, setError] = useState<string>("");
+  const [rolls, setRolls] = useState<RollsRow | null>(null);
 
   async function fetchJSON(url: string, init?: RequestInit) {
     const r = await fetch(url, init);
@@ -87,6 +99,15 @@ export default function ShiftAnalyticsMM() {
   React.useEffect(() => {
     loadShift();
   }, []);
+
+  useEffect(() => {
+    if (!sourceUsed) return;
+    const d = date;
+    fetch(`/api/analysis/rolls-ledger?date=${d}`)
+      .then(r => r.json())
+      .then(json => setRolls(json?.row ?? null))
+      .catch(() => setRolls(null));
+  }, [date, sourceUsed]);
 
   function exportCSV() {
     const headers = ["SKU", "Item", "Category", "Qty", "Patties", "RedMeat(g)", "Chicken(g)", "Rolls"];
@@ -218,6 +239,51 @@ export default function ShiftAnalyticsMM() {
         {error && (
           <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
             {error}
+          </div>
+        )}
+
+        {/* Rolls Ledger Status Bar */}
+        {rolls && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+              <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+                <div className="text-slate-600">Start</div>
+                <div className="font-medium text-slate-900">{rolls.rolls_start}</div>
+              </div>
+              <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+                <div className="text-slate-600">Purchased</div>
+                <div className="font-medium text-slate-900">{rolls.rolls_purchased}</div>
+              </div>
+              <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+                <div className="text-slate-600">Burgers Sold</div>
+                <div className="font-medium text-slate-900">{rolls.burgers_sold}</div>
+              </div>
+              <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+                <div className="text-slate-600">Estimated End</div>
+                <div className="font-medium text-slate-900">{rolls.estimated_rolls_end}</div>
+              </div>
+              <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+                <div className="text-slate-600">Actual End</div>
+                <div className="font-medium text-slate-900">{rolls.actual_rolls_end ?? '—'}</div>
+              </div>
+              <div className={`p-2 border rounded-[4px] font-bold text-center ${rolls.status === 'OK' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : rolls.status === 'ALERT' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                <div className="text-xs">{rolls.status}</div>
+                {rolls.actual_rolls_end !== null && (
+                  <div className="text-xs">({rolls.variance >= 0 ? '+' : ''}{rolls.variance})</div>
+                )}
+              </div>
+            </div>
+            <button
+              className="px-3 py-1 border border-slate-200 rounded-[4px] text-xs hover:bg-slate-50 active:scale-95 transition-transform"
+              onClick={async () => {
+                await fetch(`/api/analysis/rolls-ledger/rebuild?date=${date}`, { method: 'POST' });
+                const resp = await fetch(`/api/analysis/rolls-ledger?date=${date}`).then(r=>r.json());
+                setRolls(resp?.row ?? null);
+              }}
+              data-testid="button-refresh-rolls"
+            >
+              Refresh Rolls
+            </button>
           </div>
         )}
       </div>
