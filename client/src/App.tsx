@@ -39,6 +39,7 @@ import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis"; // Hidde
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
+import RollsLedger from "./pages/analysis/RollsLedger";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
@@ -98,6 +99,7 @@ export default function App() {
                     {/* <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} /> */}
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                     <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
+                    <Route path="rolls-ledger" element={<Guard><RollsLedger /></Guard>} />
                   </Route>
                   
                   {/* Legacy analysis routes */}
