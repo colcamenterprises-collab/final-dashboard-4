@@ -74,7 +74,12 @@ r.get('/history', async (req, res) => {
     start.setUTCDate(start.getUTCDate() - 13);
     const startKey = start.toISOString().slice(0, 10);
     const rows = await getRollsLedgerRange(startKey, end);
-    rows.sort((a, b) => b.shift_date.localeCompare(a.shift_date));
+    // Sort by date descending (handle both Date objects and strings)
+    rows.sort((a, b) => {
+      const dateA = a.shift_date instanceof Date ? a.shift_date.getTime() : new Date(a.shift_date).getTime();
+      const dateB = b.shift_date instanceof Date ? b.shift_date.getTime() : new Date(b.shift_date).getTime();
+      return dateB - dateA;
+    });
     return res.json({ ok: true, start: startKey, end, rows });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });

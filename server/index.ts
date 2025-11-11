@@ -180,10 +180,8 @@ async function checkSchema() {
   // Mount Meekong Mumba v1.0 routes
   const loyverseV2Router = (await import('./routes/loyverseV2.js')).default;
   const shiftAnalysisRouter = (await import('./routes/shiftAnalysis.js')).default;
-  const rollsLedgerRouter = (await import('./routes/rollsLedger.js')).default;
   app.use('/api', loyverseV2Router);
   app.use('/api', shiftAnalysisRouter);
-  app.use('/api/analysis/rolls-ledger', rollsLedgerRouter);
   app.use('/api', healthRouter);
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);

@@ -1492,13 +1492,18 @@ export type InsertAnalyticsShiftBurgerSummary = z.infer<typeof insertAnalyticsSh
 // Rolls Ledger - Tracks burger bun inventory per shift
 export const rollsLedger = pgTable("rolls_ledger", {
   shiftDate: date("shift_date").primaryKey(),
+  fromTs: timestamp("from_ts"),
+  toTs: timestamp("to_ts"),
   rollsStart: integer("rolls_start").notNull().default(0),
   rollsPurchased: integer("rolls_purchased").notNull().default(0),
   burgersSold: integer("burgers_sold").notNull().default(0),
   estimatedRollsEnd: integer("estimated_rolls_end").notNull().default(0),
   actualRollsEnd: integer("actual_rolls_end"),
+  wasteAllowance: integer("waste_allowance"),
   variance: integer("variance").notNull().default(0),
   status: text("status").notNull().default('PENDING'),
+  sourceStockId: text("source_stock_id"),
+  sourceExpenseId: text("source_expense_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

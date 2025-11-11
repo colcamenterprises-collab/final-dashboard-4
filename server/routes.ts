@@ -257,7 +257,7 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
   };
 }
 
-export function registerRoutes(app: express.Application): Server {
+export async function registerRoutes(app: express.Application): Promise<Server> {
   const server = createServer(app);
   // Stock discrepancy endpoint for dashboard
   // Suppliers JSON endpoint (loads all suppliers for form)
@@ -1128,6 +1128,10 @@ export function registerRoutes(app: express.Application): Server {
   // Register daily review routes BEFORE catch-all :date route
   app.use('/api/analysis', analysisDailyReviewRouter);
   app.use('/api/daily-review-comments', dailyReviewCommentsRouter);
+  
+  // Register rolls ledger routes BEFORE catch-all :date route
+  const rollsLedgerRouter = (await import('./routes/rollsLedger.js')).default;
+  app.use('/api/analysis/rolls-ledger', rollsLedgerRouter);
 
   // Get one analysis by date
   app.get("/api/analysis/:date", async (req, res) => {

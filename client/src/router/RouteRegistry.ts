@@ -11,6 +11,7 @@ export const ROUTES = {
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
   SHIFT_ITEMS_MM: "/operations/analysis/shift-items",
+  ROLLS_LEDGER: "/operations/analysis/rolls-ledger",
   // LOYVERSE_REPORTS: "/operations/analysis/loyverse", // Hidden - can be re-enabled
   // DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis", // Hidden - can be re-enabled
   STOCK_REVIEW: "/operations/analysis/stock-review",
