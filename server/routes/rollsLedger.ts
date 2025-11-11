@@ -49,4 +49,36 @@ r.post('/rebuild', async (req, res) => {
   }
 });
 
+// POST backfill last 14 days
+r.post('/backfill-14', async (req, res) => {
+  try {
+    const results:any[] = [];
+    for (let offset = -13; offset <= 0; offset++) {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + offset);
+      const key = d.toISOString().slice(0, 10);
+      const result = await computeAndUpsertRollsLedger(key);
+      results.push({ date: key, result });
+    }
+    return res.json({ ok: true, count: results.length, results });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
+// GET history (last 14 days descending)
+r.get('/history', async (req, res) => {
+  try {
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - 13);
+    const startKey = start.toISOString().slice(0, 10);
+    const rows = await getRollsLedgerRange(startKey, end);
+    rows.sort((a, b) => b.shift_date.localeCompare(a.shift_date));
+    return res.json({ ok: true, start: startKey, end, rows });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
 export default r;

@@ -3,6 +3,8 @@ import cron from 'node-cron';
 import { computeShiftAll } from '../services/shiftItems.js';
 import { computeAndUpsertRollsLedger } from '../services/rollsLedger.js';
 
+console.log('📊 Rolls Ledger analytics cron jobs scheduled for 3:05am, 3:15am, and hourly refresh');
+
 // yesterday in BKK terms
 function bkkYesterdayISODate(): string {
   const now = new Date();
