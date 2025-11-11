@@ -1,0 +1,664 @@
+What I’m shipping (drop-in)
+
+1. DB migration for rolls_ledger.
+
+
+2. Service to compute & upsert the ledger per shift.
+
+
+3. Cron jobs (Asia/Bangkok) to:
+
+pull POS for yesterday’s shift,
+
+compute analytics cache,
+
+update Rolls Ledger.
+
+
+
+4. API routes to fetch/rebuild the ledger.
+
+
+5. UI changes to /analysis/fb to display a green/red Rolls status bar + a new Rolls Ledger page.
+
+
+
+
+---
+
+Install steps (do these in order)
+
+1. Create migration (SQL) → prisma/migrations/20251110_rolls_ledger/migration.sql and run.
+
+
+2. Add server files below exactly as given.
+
+
+3. Wire cron into your server index.ts (or server bootstrap).
+
+
+4. Add routes to Express app.
+
+
+5. Patch frontend: update ShiftAnalyticsMM.tsx and add RollsLedger.tsx.
+
+
+6. Env: set TZ=Asia/Bangkok and (optional) ROLLS_WASTE_ALLOWANCE=4.
+
+
+7. Backfill last 14 days via the provided endpoint.
+
+
+
+
+---
+
+1) DB migration (PostgreSQL / Prisma)
+
+File: prisma/migrations/20251110_rolls_ledger/migration.sql
+
+-- Rolls Ledger per-shift reconciliation for burger buns (“rolls”)
+
+CREATE TABLE IF NOT EXISTS rolls_ledger (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date         date NOT NULL UNIQUE,              -- logical shift date (BKK day at 17:00→03:00)
+  from_ts            timestamptz NOT NULL,              -- 17:00 BKK = 10:00Z on shift_date
+  to_ts              timestamptz NOT NULL,              -- 03:00 BKK next day = 20:00Z on shift_date
+  rolls_start        integer NOT NULL DEFAULT 0,
+  rolls_purchased    integer NOT NULL DEFAULT 0,
+  burgers_sold       integer NOT NULL DEFAULT 0,
+  estimated_rolls_end integer NOT NULL DEFAULT 0,
+  actual_rolls_end   integer,                           -- from Daily Sales & Stock v2 “rolls end”
+  waste_allowance    integer NOT NULL DEFAULT 4,
+  variance           integer NOT NULL DEFAULT 0,        -- actual - estimated
+  status             text    NOT NULL DEFAULT 'PENDING',-- PENDING/OK/ALERT
+  source_sales_id    uuid,                              -- FK to DailySales (nullable)
+  source_stock_id    uuid,                              -- FK to DailyStock (nullable)
+  source_expense_id  uuid,                              -- FK to roll purchase record (nullable)
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rolls_ledger_date ON rolls_ledger (shift_date);
+
+-- Helpful view: burgers sold = SUM(rolls) from analytics cache if present
+-- (No schema change required; service will compute)
+
+> Prisma model (optional if you keep raw SQL). If you want Prisma types, append to schema.prisma:
+
+
+
+model RollsLedger {
+  id                 String   @id @default(uuid())
+  shift_date         DateTime @db.Date
+  from_ts            DateTime @db.Timestamptz(6)
+  to_ts              DateTime @db.Timestamptz(6)
+  rolls_start        Int      @default(0)
+  rolls_purchased    Int      @default(0)
+  burgers_sold       Int      @default(0)
+  estimated_rolls_end Int     @default(0)
+  actual_rolls_end   Int?
+  waste_allowance    Int      @default(4)
+  variance           Int      @default(0)
+  status             String   @default("PENDING")
+  source_sales_id    String?  @db.Uuid
+  source_stock_id    String?  @db.Uuid
+  source_expense_id  String?  @db.Uuid
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([shift_date])
+}
+
+Run migration:
+
+# pick your existing workflow
+npx prisma migrate deploy
+# or
+npx prisma db push
+
+
+---
+
+2) Server service — Rolls Ledger compute & upsert
+
+File: server/services/rollsLedger.ts
+
+// server/services/rollsLedger.ts
+import { PrismaClient } from '@prisma/client';
+import { computeShiftAll } from './shiftItems'; // existing service export
+const db = new PrismaClient();
+
+const WASTE = Number(process.env.ROLLS_WASTE_ALLOWANCE ?? 4);
+
+// BKK is UTC+7; shift on a given YYYY-MM-DD runs 17:00→03:00 (same UTC day: 10:00Z→20:00Z)
+export function shiftWindowUTC(shiftDate: string) {
+  const [y,m,d] = shiftDate.split('-').map(Number);
+  const fromISO = new Date(Date.UTC(y, m-1, d, 10, 0, 0)).toISOString(); // 17:00 BKK
+  const toISO   = new Date(Date.UTC(y, m-1, d, 20, 0, 0)).toISOString(); // 03:00 BKK next day
+  return { fromISO, toISO };
+}
+
+// Ensure analytics cache exists for date (build if needed)
+async function ensureAnalytics(shiftDate: string) {
+  const existing = await db.$queryRaw<{ cnt: bigint }[]>`
+    SELECT COUNT(*)::bigint AS cnt FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
+  `;
+  const has = existing?.[0]?.cnt && Number(existing[0].cnt) > 0;
+  if (!has) {
+    await computeShiftAll(shiftDate); // populates analytics_shift_item
+  }
+}
+
+// Helpers pulling from your current tables. Adjust names if different.
+async function getBurgersSoldFromAnalytics(shiftDate: string): Promise<number> {
+  // preferred: sum rolls column (1 per burger)
+  const rows = await db.$queryRaw<{ n: number }[]>`
+    SELECT COALESCE(SUM(rolls),0)::int AS n
+    FROM analytics_shift_item
+    WHERE shift_date = ${shiftDate}::date
+  `;
+  let burgers = rows?.[0]?.n ?? 0;
+  if (burgers === 0) {
+    // fallback: sum qty where category='burger'
+    const r2 = await db.$queryRaw<{ n: number }[]>`
+      SELECT COALESCE(SUM(qty),0)::int AS n
+      FROM analytics_shift_item
+      WHERE shift_date = ${shiftDate}::date AND category = 'burger'
+    `;
+    burgers = r2?.[0]?.n ?? 0;
+  }
+  return burgers;
+}
+
+async function getRollsPurchased(fromISO: string, toISO: string): Promise<{ qty: number, sourceExpenseId: string | null }> {
+  // Prefer dedicated roll purchase table if present
+  try {
+    const r = await db.$queryRaw<{ qty: number, id: string | null }[]>`
+      SELECT COALESCE(SUM(quantity),0)::int AS qty, NULL::uuid AS id
+      FROM roll_purchase
+      WHERE purchase_ts >= ${fromISO}::timestamptz AND purchase_ts < ${toISO}::timestamptz
+    `;
+    if (r && r[0] && r[0].qty > 0) return { qty: r[0].qty, sourceExpenseId: r[0].id };
+  } catch {_e} { /* table may not exist; ignore */ }
+
+  // Fallback: Expenses table pattern-match on rolls/buns (adjust to your schema)
+  try {
+    const r2 = await db.$queryRaw<{ qty: number }[]>`
+      SELECT COALESCE(SUM(qty),0)::int AS qty
+      FROM expenses
+      WHERE (lower(item) LIKE '%bun%' OR lower(item) LIKE '%roll%')
+        AND ts >= ${fromISO}::timestamptz AND ts < ${toISO}::timestamptz
+    `;
+    return { qty: r2?.[0]?.qty ?? 0, sourceExpenseId: null };
+  } catch {_e} {
+    return { qty: 0, sourceExpenseId: null };
+  }
+}
+
+async function getActualRollsEnd(shiftDate: string): Promise<{ count: number | null, stockId: string | null, salesId: string | null }> {
+  // Prefer Daily Stock form v2 end-of-shift buns count
+  try {
+    const a = await db.$queryRaw<{ id: string, burger_buns_stock: number | null }[]>`
+      SELECT id::text, burger_buns_stock
+      FROM daily_stock_sales
+      WHERE shift_date = ${shiftDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (a?.length && a[0].burger_buns_stock !== null) {
+      return { count: a[0].burger_buns_stock!, stockId: a[0].id, salesId: null };
+    }
+  } catch {_e} { /* table may not exist; ignore */ }
+
+  // Alternative column names
+  try {
+    const b = await db.$queryRaw<{ id: string, rolls_end: number | null }[]>`
+      SELECT id::text, rolls_end
+      FROM daily_stock_sales
+      WHERE shift_date = ${shiftDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (b?.length && b[0].rolls_end !== null) {
+      return { count: b[0].rolls_end!, stockId: b[0].id, salesId: null };
+    }
+  } catch {_e} {}
+
+  return { count: null, stockId: null, salesId: null };
+}
+
+async function getRollsStart(shiftDate: string): Promise<number> {
+  // previous day ledger if exists
+  const prev = new Date(shiftDate + 'T00:00:00Z'); prev.setUTCDate(prev.getUTCDate() - 1);
+  const prevDate = prev.toISOString().slice(0,10);
+  const r1 = await db.$queryRaw<{ v: number | null }[]>`
+    SELECT actual_rolls_end AS v FROM rolls_ledger WHERE shift_date = ${prevDate}::date
+  `;
+  if (r1?.length && r1[0].v !== null) return r1[0].v!;
+
+  // else previous day stock form end
+  try {
+    const r2 = await db.$queryRaw<{ v: number | null }[]>`
+      SELECT burger_buns_stock AS v
+      FROM daily_stock_sales
+      WHERE shift_date = ${prevDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (r2?.length && r2[0].v !== null) return r2[0].v!;
+  } catch {_e} {}
+
+  return 0;
+}
+
+export async function computeAndUpsertRollsLedger(shiftDate: string) {
+  const { fromISO, toISO } = shiftWindowUTC(shiftDate);
+  await ensureAnalytics(shiftDate);
+
+  const [rolls_start, burgers_sold, purchased, actual] = await Promise.all([
+    getRollsStart(shiftDate),
+    getBurgersSoldFromAnalytics(shiftDate),
+    (async () => {
+      const r = await getRollsPurchased(fromISO, toISO);
+      return r;
+    })(),
+    getActualRollsEnd(shiftDate),
+  ]);
+
+  const rolls_purchased = purchased.qty;
+  const estimated = rolls_start + rolls_purchased - burgers_sold;
+  const actual_end = actual.count;
+  const variance = (actual_end ?? estimated) - estimated;
+
+  const status =
+    actual_end == null
+      ? 'PENDING'
+      : (Math.abs(variance) <= WASTE ? 'OK' : 'ALERT');
+
+  await db.$executeRaw`
+    INSERT INTO rolls_ledger
+    (shift_date, from_ts, to_ts, rolls_start, rolls_purchased, burgers_sold,
+     estimated_rolls_end, actual_rolls_end, waste_allowance, variance, status,
+     source_stock_id, source_expense_id)
+    VALUES
+    (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz,
+     ${rolls_start}, ${rolls_purchased}, ${burgers_sold},
+     ${estimated}, ${actual_end}, ${WASTE}, ${variance}, ${status},
+     ${actual.stockId}, ${purchased.sourceExpenseId})
+    ON CONFLICT (shift_date) DO UPDATE SET
+      from_ts = EXCLUDED.from_ts,
+      to_ts   = EXCLUDED.to_ts,
+      rolls_start = EXCLUDED.rolls_start,
+      rolls_purchased = EXCLUDED.rolls_purchased,
+      burgers_sold = EXCLUDED.burgers_sold,
+      estimated_rolls_end = EXCLUDED.estimated_rolls_end,
+      actual_rolls_end    = EXCLUDED.actual_rolls_end,
+      waste_allowance = EXCLUDED.waste_allowance,
+      variance = EXCLUDED.variance,
+      status   = EXCLUDED.status,
+      source_stock_id = EXCLUDED.source_stock_id,
+      source_expense_id = EXCLUDED.source_expense_id,
+      updated_at = now()
+  `;
+
+  return { shiftDate, fromISO, toISO, rolls_start, rolls_purchased, burgers_sold, estimated, actual_end, variance, status };
+}
+
+export async function getRollsLedgerRange(startDate: string, endDate: string) {
+  return db.$queryRaw<any[]>`
+    SELECT *
+    FROM rolls_ledger
+    WHERE shift_date >= ${startDate}::date AND shift_date <= ${endDate}::date
+    ORDER BY shift_date DESC
+  `;
+}
+
+
+---
+
+3) Cron — fully automatic ingest + analytics + ledger
+
+File: server/jobs/cron.ts
+
+// server/jobs/cron.ts
+import cron from 'node-cron';
+import { computeShiftAll } from '../services/shiftItems';
+import { computeAndUpsertRollsLedger } from '../services/rollsLedger';
+
+// yesterday in BKK terms
+function bkkYesterdayISODate(): string {
+  const now = new Date();
+  // BKK is UTC+7, but we work in UTC window using the “shiftDate” day key.
+  // Yesterday relative to server clock is fine for our shift key.
+  now.setUTCDate(now.getUTCDate() - 1);
+  return now.toISOString().slice(0,10);
+}
+
+// 03:05 BKK — ensure analytics cache for yesterday’s shift (pulls POS + writes analytics cache via computeShiftAll)
+cron.schedule('5 3 * * *', async () => {
+  const d = bkkYesterdayISODate();
+  try {
+    await computeShiftAll(d);
+    console.log(`[CRON] Analytics built for ${d}`);
+  } catch (e) {
+    console.error(`[CRON] Analytics build failed for ${d}`, e);
+  }
+}, { timezone: 'Asia/Bangkok' });
+
+// 03:15 BKK — update rolls ledger for yesterday (uses analytics + forms + expenses)
+cron.schedule('15 3 * * *', async () => {
+  const d = bkkYesterdayISODate();
+  try {
+    const res = await computeAndUpsertRollsLedger(d);
+    console.log(`[CRON] Rolls ledger upserted`, res);
+  } catch (e) {
+    console.error(`[CRON] Rolls ledger failed`, e);
+  }
+}, { timezone: 'Asia/Bangkok' });
+
+// Hourly safety re-run for today’s in-progress shift (keeps ledger fresh if stock form arrives late)
+cron.schedule('0 * * * *', async () => {
+  const now = new Date().toISOString().slice(0,10);
+  try {
+    await computeAndUpsertRollsLedger(now);
+    console.log(`[CRON] Hourly refresh for ${now}`);
+  } catch (e) {
+    // non-fatal
+  }
+}, { timezone: 'Asia/Bangkok' });
+
+export {};
+
+Wire it in your server bootstrap (e.g., end of server/index.ts):
+
+import './jobs/cron'; // starts the schedules
+
+
+---
+
+4) API routes
+
+File: server/routes/rollsLedger.ts
+
+// server/routes/rollsLedger.ts
+import { Router } from 'express';
+import { computeAndUpsertRollsLedger, getRollsLedgerRange, shiftWindowUTC } from '../services/rollsLedger';
+
+const r = Router();
+
+// GET one or range
+r.get('/', async (req, res) => {
+  const { date, start, end } = req.query as { date?: string, start?: string, end?: string };
+  try {
+    if (date) {
+      const s = date;
+      const rows = await getRollsLedgerRange(s, s);
+      const row = rows[0] ?? null;
+      const win = shiftWindowUTC(s);
+      return res.json({ ok: true, date: s, ...win, row });
+    }
+    if (start && end) {
+      const rows = await getRollsLedgerRange(start, end);
+      return res.json({ ok: true, start, end, rows });
+    }
+    return res.status(400).json({ ok: false, error: 'Provide ?date=YYYY-MM-DD or ?start=&end=' });
+  } catch (e:any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
+// POST rebuild (single date or range)
+r.post('/rebuild', async (req, res) => {
+  const { date, start, end } = req.query as any;
+  try {
+    if (date) {
+      const out = await computeAndUpsertRollsLedger(date);
+      return res.json({ ok: true, result: out });
+    }
+    if (start && end) {
+      const out:any[] = [];
+      const s = new Date(start + 'T00:00:00Z');
+      const e = new Date(end + 'T00:00:00Z');
+      for (let d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate()+1)) {
+        const key = d.toISOString().slice(0,10);
+        out.push(await computeAndUpsertRollsLedger(key));
+      }
+      return res.json({ ok: true, results: out });
+    }
+    return res.status(400).json({ ok: false, error: 'Provide ?date= or ?start=&end=' });
+  } catch (e:any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
+export default r;
+
+Mount in your Express app (e.g., in server/index.ts):
+
+import rollsLedgerRouter from './routes/rollsLedger';
+app.use('/api/analysis/rolls-ledger', rollsLedgerRouter);
+
+(Optional) Replace broken manual POS sync with a single-shot route that does “analytics + ledger” in one call:
+
+// server/routes/loyverseSyncShift.ts
+import { Router } from 'express';
+import { computeShiftAll } from '../services/shiftItems';
+import { computeAndUpsertRollsLedger } from '../services/rollsLedger';
+const r = Router();
+
+r.post('/sync-shift', async (req, res) => {
+  const { date } = req.query as { date?: string };
+  if (!date) return res.status(400).json({ ok:false, error:'?date=YYYY-MM-DD required' });
+  try {
+    await computeShiftAll(date);
+    const out = await computeAndUpsertRollsLedger(date);
+    res.json({ ok:true, result: out });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message ?? 'unknown' });
+  }
+});
+export default r;
+
+…and mount at app.use('/api/loyverse', loyverseSyncRouter);
+
+
+---
+
+5) Frontend — add Rolls status to F&B and a ledger page
+
+A) Patch client/src/pages/analysis/ShiftAnalyticsMM.tsx (top summary bar)
+
+Add state + fetch after you load the shift:
+
+// imports
+import { useEffect, useState } from 'react';
+
+type RollsRow = {
+  shift_date: string;
+  rolls_start: number;
+  rolls_purchased: number;
+  burgers_sold: number;
+  estimated_rolls_end: number;
+  actual_rolls_end: number | null;
+  variance: number;
+  status: 'PENDING' | 'OK' | 'ALERT';
+};
+
+const [rolls, setRolls] = useState<RollsRow | null>(null);
+
+useEffect(() => {
+  if (!sourceUsed) return;
+  const d = date; // current shift date key
+  fetch(`/api/analysis/rolls-ledger?date=${d}`)
+    .then(r => r.json())
+    .then(json => setRolls(json?.row ?? null))
+    .catch(() => setRolls(null));
+}, [date, sourceUsed]);
+
+Render a compact status bar above your table:
+
+{rolls && (
+  <div className="mt-3 mb-2 grid grid-cols-2 md:grid-cols-6 gap-2">
+    <div className="p-2 border rounded">Start<br/><b>{rolls.rolls_start}</b></div>
+    <div className="p-2 border rounded">Purchased<br/><b>{rolls.rolls_purchased}</b></div>
+    <div className="p-2 border rounded">Burgers Sold<br/><b>{rolls.burgers_sold}</b></div>
+    <div className="p-2 border rounded">Estimated End<br/><b>{rolls.estimated_rolls_end}</b></div>
+    <div className="p-2 border rounded">Actual End<br/><b>{rolls.actual_rolls_end ?? '—'}</b></div>
+    <div className={`p-2 border rounded font-bold text-center ${rolls.status === 'OK' ? 'bg-emerald-100 text-emerald-800' : rolls.status === 'ALERT' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+      {rolls.status}{rolls.actual_rolls_end !== null ? ` (${rolls.variance >= 0 ? '+' : ''}${rolls.variance})` : ''}
+    </div>
+  </div>
+)}
+
+Add a small action to re-run for this date (admin use):
+
+<button
+  className="mt-1 px-3 py-1 border rounded"
+  onClick={async () => {
+    await fetch(`/api/analysis/rolls-ledger/rebuild?date=${date}`, { method: 'POST' });
+    const resp = await fetch(`/api/analysis/rolls-ledger?date=${date}`).then(r=>r.json());
+    setRolls(resp?.row ?? null);
+  }}
+>
+  Refresh Rolls
+</button>
+
+B) New page client/src/pages/analysis/RollsLedger.tsx
+
+import React, { useEffect, useState } from 'react';
+
+export default function RollsLedger() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [range, setRange] = useState<{start:string, end:string}>(() => {
+    const end = new Date().toISOString().slice(0,10);
+    const s = new Date(); s.setUTCDate(s.getUTCDate()-14);
+    const start = s.toISOString().slice(0,10);
+    return { start, end };
+  });
+
+  useEffect(() => {
+    fetch(`/api/analysis/rolls-ledger?start=${range.start}&end=${range.end}`)
+      .then(r => r.json())
+      .then(j => setRows(j?.rows ?? []));
+  }, [range]);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-3">Rolls Ledger</h1>
+      <div className="flex gap-2 mb-3">
+        <input type="date" value={range.start} onChange={e => setRange(r => ({...r, start: e.target.value}))} className="border p-2 rounded"/>
+        <input type="date" value={range.end} onChange={e => setRange(r => ({...r, end: e.target.value}))} className="border p-2 rounded"/>
+        <button className="border rounded px-3" onClick={() => {
+          fetch(`/api/analysis/rolls-ledger/rebuild?start=${range.start}&end=${range.end}`, { method:'POST' })
+            .then(() => fetch(`/api/analysis/rolls-ledger?start=${range.start}&end=${range.end}`))
+            .then(r => r.json()).then(j => setRows(j?.rows ?? []));
+        }}>Rebuild Range</button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[900px] w-full text-sm">
+          <thead>
+            <tr className="text-left border-b">
+              <th className="p-2">Date</th>
+              <th className="p-2">Start</th>
+              <th className="p-2">Purchased</th>
+              <th className="p-2">Burgers Sold</th>
+              <th className="p-2">Estimated</th>
+              <th className="p-2">Actual</th>
+              <th className="p-2">Variance</th>
+              <th className="p-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r:any) => (
+              <tr key={r.id} className="border-b">
+                <td className="p-2">{r.shift_date}</td>
+                <td className="p-2">{r.rolls_start}</td>
+                <td className="p-2">{r.rolls_purchased}</td>
+                <td className="p-2">{r.burgers_sold}</td>
+                <td className="p-2">{r.estimated_rolls_end}</td>
+                <td className="p-2">{r.actual_rolls_end ?? '—'}</td>
+                <td className="p-2">{r.variance >= 0 ? `+${r.variance}` : r.variance}</td>
+                <td className="p-2">
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${
+                    r.status === 'OK' ? 'bg-emerald-100 text-emerald-800' :
+                    r.status === 'ALERT' ? 'bg-red-100 text-red-800' :
+                    'bg-amber-100 text-amber-800'
+                  }`}>{r.status}</span>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr><td className="p-2 text-slate-500" colSpan={8}>No rows in range</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+(Add route to your client router at /analysis/rolls-ledger.)
+
+
+---
+
+6) How the numbers are calculated (exact)
+
+Shift window (UTC): from = YYYY-MM-DD 10:00Z, to = YYYY-MM-DD 20:00Z (i.e., 17:00→03:00 BKK).
+
+Rolls Start: previous day’s Actual Rolls End (from ledger if available, else from Daily Stock form v2 previous day).
+
+Purchased: sum of roll purchases between from..to (uses roll_purchase if present; else expenses rows with “bun/roll” match).
+
+Burgers Sold: from analytics_shift_item (prefers SUM(rolls), otherwise SUM(qty WHERE category='burger')).
+
+Estimated End: rolls_start + rolls_purchased - burgers_sold.
+
+Actual End: Daily Sales & Stock v2 end-of-shift buns for the same shift date.
+
+Variance: actual_end - estimated_end.
+
+Status:
+
+PENDING if actual_end not available yet,
+
+OK if |variance| ≤ waste_allowance (default 4),
+
+ALERT otherwise.
+
+
+
+
+---
+
+7) Backfill & verification
+
+Backfill last 14 days:
+
+
+curl -X POST "http://localhost:5000/api/analysis/rolls-ledger/rebuild?start=2025-10-28&end=2025-11-10"
+
+Spot-check a date in the UI:
+
+Open /analysis/fb, pick the date → Rolls status bar shows green/red with variance.
+
+Open /analysis/rolls-ledger to review the history list.
+
+
+
+
+---
+
+8) Notes / assumptions you can tweak fast
+
+Waste allowance defaulted to 4; change via ROLLS_WASTE_ALLOWANCE or in DB row if you want per-shift overrides later.
+
+If your Daily Stock table/field names differ, adjust the two queries marked in getActualRollsEnd() and getRollsStart().
+
+If you have a dedicated Roll Purchases table, the service prefers that; otherwise it falls back to expenses text match.
+
+
+
+---

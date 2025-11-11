@@ -1,0 +1,189 @@
+// server/services/rollsLedger.ts
+import { PrismaClient } from '@prisma/client';
+import { computeShiftAll } from './shiftItems.js'; // existing service export
+const db = new PrismaClient();
+
+const WASTE = Number(process.env.ROLLS_WASTE_ALLOWANCE ?? 4);
+
+// BKK is UTC+7; shift on a given YYYY-MM-DD runs 17:00→03:00 (same UTC day: 10:00Z→20:00Z)
+export function shiftWindowUTC(shiftDate: string) {
+  const [y,m,d] = shiftDate.split('-').map(Number);
+  const fromISO = new Date(Date.UTC(y, m-1, d, 10, 0, 0)).toISOString(); // 17:00 BKK
+  const toISO   = new Date(Date.UTC(y, m-1, d, 20, 0, 0)).toISOString(); // 03:00 BKK next day
+  return { fromISO, toISO };
+}
+
+// Ensure analytics cache exists for date (build if needed)
+async function ensureAnalytics(shiftDate: string) {
+  const existing = await db.$queryRaw<{ cnt: bigint }[]>`
+    SELECT COUNT(*)::bigint AS cnt FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
+  `;
+  const has = existing?.[0]?.cnt && Number(existing[0].cnt) > 0;
+  if (!has) {
+    await computeShiftAll(shiftDate); // populates analytics_shift_item
+  }
+}
+
+// Helpers pulling from your current tables. Adjust names if different.
+async function getBurgersSoldFromAnalytics(shiftDate: string): Promise<number> {
+  // preferred: sum rolls column (1 per burger)
+  const rows = await db.$queryRaw<{ n: number }[]>`
+    SELECT COALESCE(SUM(rolls),0)::int AS n
+    FROM analytics_shift_item
+    WHERE shift_date = ${shiftDate}::date
+  `;
+  let burgers = rows?.[0]?.n ?? 0;
+  if (burgers === 0) {
+    // fallback: sum qty where category='burger'
+    const r2 = await db.$queryRaw<{ n: number }[]>`
+      SELECT COALESCE(SUM(qty),0)::int AS n
+      FROM analytics_shift_item
+      WHERE shift_date = ${shiftDate}::date AND category = 'burger'
+    `;
+    burgers = r2?.[0]?.n ?? 0;
+  }
+  return burgers;
+}
+
+async function getRollsPurchased(fromISO: string, toISO: string): Promise<{ qty: number, sourceExpenseId: string | null }> {
+  // Prefer dedicated roll purchase table if present
+  try {
+    const r = await db.$queryRaw<{ qty: number, id: string | null }[]>`
+      SELECT COALESCE(SUM(quantity),0)::int AS qty, NULL::uuid AS id
+      FROM roll_purchase
+      WHERE purchase_ts >= ${fromISO}::timestamptz AND purchase_ts < ${toISO}::timestamptz
+    `;
+    if (r && r[0] && r[0].qty > 0) return { qty: r[0].qty, sourceExpenseId: r[0].id };
+  } catch (_e) { /* table may not exist; ignore */ }
+
+  // Fallback: Expenses table pattern-match on rolls/buns (adjust to your schema)
+  try {
+    const r2 = await db.$queryRaw<{ qty: number }[]>`
+      SELECT COALESCE(SUM(qty),0)::int AS qty
+      FROM expenses
+      WHERE (lower(item) LIKE '%bun%' OR lower(item) LIKE '%roll%')
+        AND ts >= ${fromISO}::timestamptz AND ts < ${toISO}::timestamptz
+    `;
+    return { qty: r2?.[0]?.qty ?? 0, sourceExpenseId: null };
+  } catch (_e) {
+    return { qty: 0, sourceExpenseId: null };
+  }
+}
+
+async function getActualRollsEnd(shiftDate: string): Promise<{ count: number | null, stockId: string | null, salesId: string | null }> {
+  // Prefer Daily Stock form v2 end-of-shift buns count
+  try {
+    const a = await db.$queryRaw<{ id: string, burger_buns_stock: number | null }[]>`
+      SELECT id::text, burger_buns_stock
+      FROM daily_stock_sales
+      WHERE shift_date = ${shiftDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (a?.length && a[0].burger_buns_stock !== null) {
+      return { count: a[0].burger_buns_stock!, stockId: a[0].id, salesId: null };
+    }
+  } catch (_e) { /* table may not exist; ignore */ }
+
+  // Alternative column names
+  try {
+    const b = await db.$queryRaw<{ id: string, rolls_end: number | null }[]>`
+      SELECT id::text, rolls_end
+      FROM daily_stock_sales
+      WHERE shift_date = ${shiftDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (b?.length && b[0].rolls_end !== null) {
+      return { count: b[0].rolls_end!, stockId: b[0].id, salesId: null };
+    }
+  } catch (_e) {}
+
+  return { count: null, stockId: null, salesId: null };
+}
+
+async function getRollsStart(shiftDate: string): Promise<number> {
+  // previous day ledger if exists
+  const prev = new Date(shiftDate + 'T00:00:00Z'); prev.setUTCDate(prev.getUTCDate() - 1);
+  const prevDate = prev.toISOString().slice(0,10);
+  const r1 = await db.$queryRaw<{ v: number | null }[]>`
+    SELECT actual_rolls_end AS v FROM rolls_ledger WHERE shift_date = ${prevDate}::date
+  `;
+  if (r1?.length && r1[0].v !== null) return r1[0].v!;
+
+  // else previous day stock form end
+  try {
+    const r2 = await db.$queryRaw<{ v: number | null }[]>`
+      SELECT burger_buns_stock AS v
+      FROM daily_stock_sales
+      WHERE shift_date = ${prevDate}::date
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    if (r2?.length && r2[0].v !== null) return r2[0].v!;
+  } catch (_e) {}
+
+  return 0;
+}
+
+export async function computeAndUpsertRollsLedger(shiftDate: string) {
+  const { fromISO, toISO } = shiftWindowUTC(shiftDate);
+  await ensureAnalytics(shiftDate);
+
+  const [rolls_start, burgers_sold, purchased, actual] = await Promise.all([
+    getRollsStart(shiftDate),
+    getBurgersSoldFromAnalytics(shiftDate),
+    (async () => {
+      const r = await getRollsPurchased(fromISO, toISO);
+      return r;
+    })(),
+    getActualRollsEnd(shiftDate),
+  ]);
+
+  const rolls_purchased = purchased.qty;
+  const estimated = rolls_start + rolls_purchased - burgers_sold;
+  const actual_end = actual.count;
+  const variance = (actual_end ?? estimated) - estimated;
+
+  const status =
+    actual_end == null
+      ? 'PENDING'
+      : (Math.abs(variance) <= WASTE ? 'OK' : 'ALERT');
+
+  await db.$executeRaw`
+    INSERT INTO rolls_ledger
+    (shift_date, from_ts, to_ts, rolls_start, rolls_purchased, burgers_sold,
+     estimated_rolls_end, actual_rolls_end, waste_allowance, variance, status,
+     source_stock_id, source_expense_id)
+    VALUES
+    (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz,
+     ${rolls_start}, ${rolls_purchased}, ${burgers_sold},
+     ${estimated}, ${actual_end}, ${WASTE}, ${variance}, ${status},
+     ${actual.stockId}, ${purchased.sourceExpenseId})
+    ON CONFLICT (shift_date) DO UPDATE SET
+      from_ts = EXCLUDED.from_ts,
+      to_ts   = EXCLUDED.to_ts,
+      rolls_start = EXCLUDED.rolls_start,
+      rolls_purchased = EXCLUDED.rolls_purchased,
+      burgers_sold = EXCLUDED.burgers_sold,
+      estimated_rolls_end = EXCLUDED.estimated_rolls_end,
+      actual_rolls_end    = EXCLUDED.actual_rolls_end,
+      waste_allowance = EXCLUDED.waste_allowance,
+      variance = EXCLUDED.variance,
+      status   = EXCLUDED.status,
+      source_stock_id = EXCLUDED.source_stock_id,
+      source_expense_id = EXCLUDED.source_expense_id,
+      updated_at = now()
+  `;
+
+  return { shiftDate, fromISO, toISO, rolls_start, rolls_purchased, burgers_sold, estimated, actual_end, variance, status };
+}
+
+export async function getRollsLedgerRange(startDate: string, endDate: string) {
+  return db.$queryRaw<any[]>`
+    SELECT *
+    FROM rolls_ledger
+    WHERE shift_date >= ${startDate}::date AND shift_date <= ${endDate}::date
+    ORDER BY shift_date DESC
+  `;
+}
