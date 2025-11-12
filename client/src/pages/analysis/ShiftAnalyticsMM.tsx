@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatDateDDMMYYYY } from '@/lib/format';
 
 type ShiftItem = {
   sku: string | null;
@@ -49,6 +50,7 @@ export default function ShiftAnalyticsMM() {
   const [items, setItems] = useState<ShiftItem[]>([]);
   const [sourceUsed, setSourceUsed] = useState<"live"|"cache"|"">("");
   const [rolls, setRolls] = useState<RollsRow|null>(null);
+  const [rollsHistory, setRollsHistory] = useState<RollsRow[]>([]);
   const [fresh, setFresh] = useState<Freshness>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -70,7 +72,16 @@ export default function ShiftAnalyticsMM() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { loadAll(); }, []);
+  async function loadRollsHistory() {
+    try {
+      const resp = await fetch('/api/analysis/rolls-ledger/history').then(r => r.json());
+      setRollsHistory(resp?.rows ?? []);
+    } catch (e) {
+      console.error('Failed to load rolls history:', e);
+    }
+  }
+
+  useEffect(() => { loadAll(); loadRollsHistory(); }, []);
 
   const categories = useMemo(() => {
     const cats = new Set(items.map(x => x.category));
@@ -138,36 +149,89 @@ export default function ShiftAnalyticsMM() {
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="min-w-[950px] w-full text-sm">
+        <table className="min-w-[950px] w-full text-xs bg-white rounded-[4px] border border-slate-200">
           <thead>
-            <tr className="text-left border-b">
-              <th className="p-2">SKU</th>
-              <th className="p-2">Item</th>
-              <th className="p-2">Category</th>
-              <th className="p-2">Qty</th>
-              <th className="p-2">Patties</th>
-              <th className="p-2">Beef (g)</th>
-              <th className="p-2">Chicken (g)</th>
-              <th className="p-2">Rolls</th>
+            <tr className="text-left border-b border-slate-200 bg-slate-50">
+              <th className="px-3 py-2 font-medium text-slate-700">SKU</th>
+              <th className="px-3 py-2 font-medium text-slate-700">Item</th>
+              <th className="px-3 py-2 font-medium text-slate-700">Category</th>
+              <th className="px-3 py-2 text-right font-medium text-slate-700">Qty</th>
+              <th className="px-3 py-2 text-right font-medium text-slate-700">Patties</th>
+              <th className="px-3 py-2 text-right font-medium text-slate-700">Beef (g)</th>
+              <th className="px-3 py-2 text-right font-medium text-slate-700">Chicken (g)</th>
+              <th className="px-3 py-2 text-right font-medium text-slate-700">Rolls</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((it, i) => (
-              <tr key={i} className="border-b">
-                <td className="p-2">{it.sku ?? ''}</td>
-                <td className="p-2">{it.name}</td>
-                <td className="p-2">{it.category}</td>
-                <td className="p-2">{it.qty}</td>
-                <td className="p-2">{it.patties ?? 0}</td>
-                <td className="p-2">{(it.red_meat_g ?? it.redMeatGrams ?? 0) as number}</td>
-                <td className="p-2">{(it.chicken_g ?? it.chickenGrams ?? 0) as number}</td>
-                <td className="p-2">{it.rolls ?? 0}</td>
+              <tr key={i} className="border-b border-slate-200 hover:bg-slate-50">
+                <td className="px-3 py-2 text-slate-700">{it.sku ?? ''}</td>
+                <td className="px-3 py-2 text-slate-900">{it.name}</td>
+                <td className="px-3 py-2 text-slate-700">{it.category}</td>
+                <td className="px-3 py-2 text-right text-slate-900">{it.qty}</td>
+                <td className="px-3 py-2 text-right text-slate-700">{it.patties ?? 0}</td>
+                <td className="px-3 py-2 text-right text-slate-700">{(it.red_meat_g ?? it.redMeatGrams ?? 0) as number}</td>
+                <td className="px-3 py-2 text-right text-slate-700">{(it.chicken_g ?? it.chickenGrams ?? 0) as number}</td>
+                <td className="px-3 py-2 text-right text-slate-700">{it.rolls ?? 0}</td>
               </tr>
             ))}
-            {!filtered.length && <tr><td colSpan={8} className="p-3 text-slate-500">No items</td></tr>}
+            {!filtered.length && <tr><td colSpan={8} className="px-3 py-3 text-slate-500 text-center">No items</td></tr>}
           </tbody>
         </table>
       </div>
+
+      {rollsHistory.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Rolls Ledger (14 Days)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">Date</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Start</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Purchased</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Burgers Sold</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Est. End</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Actual End</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Variance</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rollsHistory.map((row) => (
+                  <tr key={row.shift_date} className="border-b border-slate-200 hover:bg-slate-50">
+                    <td className="px-3 py-2 text-slate-900">{formatDateDDMMYYYY(row.shift_date)}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{row.rolls_start}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{row.rolls_purchased}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{row.burgers_sold}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{row.estimated_rolls_end}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{row.actual_rolls_end ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-medium text-slate-900">
+                      {row.actual_rolls_end !== null ? (
+                        <span className={row.variance >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                          {row.variance >= 0 ? '+' : ''}{row.variance}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`inline-block px-2 py-1 rounded-[4px] text-xs font-medium ${
+                        row.status === 'OK' 
+                          ? 'bg-emerald-100 text-emerald-800' 
+                          : row.status === 'ALERT' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {error && <div className="mt-3 text-red-700 text-sm">{error}</div>}
     </div>
   );
