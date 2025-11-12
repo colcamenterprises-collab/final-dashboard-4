@@ -1,0 +1,229 @@
+1) Server: accept DD/MM/YYYY and YYYY-MM-DD
+
+A) Add a tiny normalizer
+
+File: server/utils/normalizeDate.ts
+
+// server/utils/normalizeDate.ts
+export function normalizeDateParam(input?: string): string {
+  if (!input) throw new Error('Missing date');
+  const s = input.trim();
+  // DD/MM/YYYY -> YYYY-MM-DD
+  const m1 = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+  // YYYY-MM-DD pass-through
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Try native Date if someone sends ISO
+  const d = new Date(s);
+  if (!Number.isNaN(d.valueOf())) return d.toISOString().slice(0,10);
+  throw new Error(`Bad date format: ${s}`);
+}
+
+B) Use it in both routes
+
+File: server/routes/rollsLedger.ts (replace date parsing at top of handlers)
+
+import { normalizeDateParam } from '../utils/normalizeDate';
+
+r.get('/', async (req, res) => {
+  try {
+    const qp = req.query as any;
+    if (qp.date) {
+      const s = normalizeDateParam(qp.date);
+      const rows = await getRollsLedgerRange(s, s);
+      const row = rows[0] ?? null;
+      const win = shiftWindowUTC(s);
+      return res.json({ ok: true, date: s, ...win, row });
+    }
+    if (qp.start && qp.end) {
+      const start = normalizeDateParam(qp.start);
+      const end   = normalizeDateParam(qp.end);
+      const rows = await getRollsLedgerRange(start, end);
+      return res.json({ ok: true, start, end, rows });
+    }
+    return res.status(400).json({ ok:false, error:'Provide ?date= or ?start=&end=' });
+  } catch (e:any) {
+    return res.status(500).json({ ok:false, error: e?.message ?? 'unknown' });
+  }
+});
+
+r.post('/rebuild', async (req, res) => {
+  try {
+    const qp = req.query as any;
+    if (qp.date) {
+      const d = normalizeDateParam(qp.date);
+      const out = await computeAndUpsertRollsLedger(d);
+      return res.json({ ok:true, result: out });
+    }
+    if (qp.start && qp.end) {
+      const start = normalizeDateParam(qp.start);
+      const end   = normalizeDateParam(qp.end);
+      const out:any[] = [];
+      const s = new Date(start + 'T00:00:00Z');
+      const e = new Date(end   + 'T00:00:00Z');
+      for (let d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate()+1)) {
+        out.push(await computeAndUpsertRollsLedger(d.toISOString().slice(0,10)));
+      }
+      return res.json({ ok:true, results: out });
+    }
+    return res.status(400).json({ ok:false, error:'Provide ?date= or ?start=&end=' });
+  } catch (e:any) {
+    return res.status(500).json({ ok:false, error: e?.message ?? 'unknown' });
+  }
+});
+
+File: server/routes/shiftAnalysis.ts (where you read req.query.date)
+
+import { normalizeDateParam } from '../utils/normalizeDate';
+
+// inside GET /api/analysis/shift/items
+const shiftDate = normalizeDateParam(req.query.date as string);
+// use shiftDate downstream (cache lookup / computeShiftAll)
+
+
+---
+
+2) Frontend: use a single <input type="date">, always send YYYY-MM-DD, fetch ledger after items
+
+File: client/src/pages/analysis/ShiftAnalyticsMM.tsx (core changes only)
+
+// utilities
+const toYMD = (v: string) => {
+  // accept "YYYY-MM-DD" or "DD/MM/YYYY"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // Safari date input returns "YYYY-MM-DD"
+  try { return new Date(v).toISOString().slice(0,10); } catch { return v; }
+};
+
+const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
+const [items, setItems] = useState<ShiftItem[]>([]);
+const [sourceUsed, setSourceUsed] = useState<"live"|"cache"| "">("");
+const [rolls, setRolls] = useState<RollsRow|null>(null);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState<string>("");
+
+async function loadAll() {
+  setLoading(true); setError("");
+  const ymd = toYMD(date);
+  try {
+    const a = await fetch(`/api/analysis/shift/items?date=${ymd}`).then(r=>r.json());
+    setItems(a?.items ?? []);
+    setSourceUsed(a?.sourceUsed ?? "");
+    // fetch ledger after items so the status bar reflects same key
+    const b = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r=>r.json());
+    setRolls(b?.row ?? null);
+  } catch (e:any) {
+    setError(e?.message ?? "Failed to load");
+    setItems([]); setRolls(null);
+  } finally { setLoading(false); }
+}
+
+useEffect(() => { loadAll(); /* auto-load on mount */ }, []);
+
+function exportCSV() {
+  const headers = ["SKU","Item","Category","Qty","Patties","RedMeat(g)","Chicken(g)","Rolls"];
+  const rows = items.length
+    ? items.map(it => [
+        it.sku ?? "", it.name, it.category, it.qty,
+        it.patties ?? 0,
+        (it as any).red_meat_g ?? (it as any).redMeatGrams ?? 0,
+        (it as any).chicken_g ?? (it as any).chickenGrams ?? 0,
+        it.rolls ?? 0,
+      ])
+    : []; // allow header-only export
+  const csv = [headers, ...rows].map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `shift-${toYMD(date)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+Replace the two date inputs with one:
+
+<label className="block text-sm mb-1">Shift date</label>
+<input
+  type="date"
+  value={toYMD(date)}
+  onChange={(e)=> setDate(e.target.value)}
+  className="border rounded p-2"
+/>
+
+Buttons:
+
+<div className="flex gap-2 mt-2">
+  <button className="px-4 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={loadAll} disabled={loading}>
+    {loading ? 'Loading…' : 'Load Shift'}
+  </button>
+  <button className="px-4 py-2 rounded bg-slate-200" onClick={exportCSV}>
+    Export CSV
+  </button>
+</div>
+
+(Keep the rolls status bar exactly as you have; it will populate once the date key aligns.)
+
+
+---
+
+3) Quick verification
+
+1. Check ledger actually has data:
+
+
+
+SELECT shift_date, rolls_start, rolls_purchased, burgers_sold, estimated_rolls_end, actual_rolls_end, status
+FROM rolls_ledger
+ORDER BY shift_date DESC
+LIMIT 10;
+
+You should see rows for the backfilled dates Agent listed (Nov 1–5). If not, run:
+
+curl -X POST "/api/analysis/rolls-ledger/rebuild?start=2025-11-01&end=2025-11-10"
+
+2. Check analytics cache exists for the same date key:
+
+
+
+SELECT shift_date, SUM(qty) AS items, SUM(rolls) AS rolls
+FROM analytics_shift_item
+WHERE shift_date = '2025-11-05'
+GROUP BY shift_date;
+
+3. UI sanity check:
+
+
+
+Open /operations/analysis/shift-items
+
+Pick Nov 05, 2025 in the date picker (it will send 2025-11-05)
+
+Click Load Shift
+
+Expect Burgers Sold to match analytics; Status will be PENDING until Daily Stock form provides Actual.
+
+
+4. CSV:
+
+
+
+Click Export CSV → a file named shift-YYYY-MM-DD.csv downloads even if table is empty (headers only).
+
+
+
+---
+
+4) Why this fixes your screenshot
+
+Your control showed 09/11/2025 while the system keyed rows at 2025-11-09. With normalization on both server and client, we always hit the correct cache/ledger rows. That populates Start, Purchased, Burgers Sold, Estimated and fixes CSV (since items is now filled).
+
+
+
+---
+
+5) Optional hardening (fast wins)
+
+Add a small badge beside the date: Key: 2025-11-09 so staff can see what’s being queried.
+
+In the ledger API, if no row exists after normalization, auto-compute computeAndUpsertRollsLedger(date) once before returning (guarded to avoid loops).

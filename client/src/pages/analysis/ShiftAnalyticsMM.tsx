@@ -56,6 +56,16 @@ function getMeat(it: ShiftItem, keyA: keyof ShiftItem, keyB: keyof ShiftItem) {
   return a ?? b ?? 0;
 }
 
+// Utility to normalize date to YYYY-MM-DD
+const toYMD = (v: string) => {
+  // Accept "YYYY-MM-DD" or "DD/MM/YYYY"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // Safari date input returns "YYYY-MM-DD"
+  try { return new Date(v).toISOString().slice(0,10); } catch { return v; }
+};
+
 export default function ShiftAnalyticsMM() {
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
@@ -67,67 +77,60 @@ export default function ShiftAnalyticsMM() {
   const [error, setError] = useState<string>("");
   const [rolls, setRolls] = useState<RollsRow | null>(null);
 
-  async function fetchJSON(url: string, init?: RequestInit) {
-    const r = await fetch(url, init);
-    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    return r.json();
-  }
-
-  async function loadShift() {
-    setError("");
+  async function loadAll() {
     setLoading(true);
+    setError("");
+    const ymd = toYMD(date);
     try {
-      const res: ShiftResp = await fetchJSON(`/api/analysis/shift/items?date=${date}`);
-      const used = ("sourceUsed" in res ? res.sourceUsed : "cache") as "live" | "cache";
-      setSourceUsed(used);
-      if ("shiftDate" in res) {
-        setFromISO(res.fromISO);
-        setToISO(res.toISO);
-        setItems(res.items || []);
+      // Fetch items first
+      const a = await fetch(`/api/analysis/shift/items?date=${ymd}`).then(r => r.json());
+      setItems(a?.items ?? []);
+      setSourceUsed(a?.sourceUsed ?? "");
+      if ("shiftDate" in a) {
+        setFromISO(a.fromISO);
+        setToISO(a.toISO);
       } else {
         setFromISO("");
         setToISO("");
-        setItems(res.items || []);
       }
+      // Fetch rolls ledger after items so status bar reflects same key
+      const b = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r => r.json());
+      setRolls(b?.row ?? null);
     } catch (e: any) {
-      setError(e.message);
+      setError(e?.message ?? "Failed to load");
+      setItems([]);
+      setRolls(null);
     } finally {
       setLoading(false);
     }
   }
 
-  React.useEffect(() => {
-    loadShift();
-  }, []);
-
   useEffect(() => {
-    if (!sourceUsed) return;
-    const d = date;
-    fetch(`/api/analysis/rolls-ledger?date=${d}`)
-      .then(r => r.json())
-      .then(json => setRolls(json?.row ?? null))
-      .catch(() => setRolls(null));
-  }, [date, sourceUsed]);
+    loadAll();
+  }, []);
 
   function exportCSV() {
     const headers = ["SKU", "Item", "Category", "Qty", "Patties", "RedMeat(g)", "Chicken(g)", "Rolls"];
-    const rows = filtered.map((it) => [
-      it.sku ?? "",
-      it.name,
-      it.category,
-      it.qty,
-      (it.patties ?? 0).toString(),
-      getMeat(it, "red_meat_g", "redMeatGrams").toString(),
-      getMeat(it, "chicken_g", "chickenGrams").toString(),
-      (it.rolls ?? 0).toString(),
-    ]);
+    const rows = items.length
+      ? items.map((it) => [
+          it.sku ?? "",
+          it.name,
+          it.category,
+          it.qty,
+          it.patties ?? 0,
+          (it as any).red_meat_g ?? (it as any).redMeatGrams ?? 0,
+          (it as any).chicken_g ?? (it as any).chickenGrams ?? 0,
+          it.rolls ?? 0,
+        ])
+      : []; // Allow header-only export
     const csv = [headers, ...rows].map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `shift-${date}.csv`;
+    a.download = `shift-${toYMD(date)}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    a.remove();
   }
 
   // Extract unique categories from items
@@ -185,21 +188,21 @@ export default function ShiftAnalyticsMM() {
         <div className="space-y-2">
           {/* Date row */}
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-600 whitespace-nowrap">Shift date:</label>
-            <span className="text-xs font-medium text-slate-900">{convertFromInputDate(date)}</span>
+            <label className="text-xs text-slate-600 whitespace-nowrap">Shift date</label>
             <input
               type="date"
-              value={date}
+              value={toYMD(date)}
               onChange={(e) => setDate(e.target.value)}
               className="border rounded-[4px] px-3 py-2 text-xs min-h-[44px] focus:outline-none focus:ring-2 focus:ring-emerald-500 border-slate-200"
               data-testid="input-shift-date"
             />
+            <span className="text-xs text-slate-500">Key: {toYMD(date)}</span>
           </div>
           
           {/* Button row */}
           <div className="flex gap-2">
             <button 
-              onClick={loadShift} 
+              onClick={loadAll} 
               disabled={loading} 
               className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-1 sm:flex-none active:scale-95 transition-transform"
               data-testid="button-load-shift"
@@ -276,8 +279,9 @@ export default function ShiftAnalyticsMM() {
             <button
               className="px-3 py-1 border border-slate-200 rounded-[4px] text-xs hover:bg-slate-50 active:scale-95 transition-transform"
               onClick={async () => {
-                await fetch(`/api/analysis/rolls-ledger/rebuild?date=${date}`, { method: 'POST' });
-                const resp = await fetch(`/api/analysis/rolls-ledger?date=${date}`).then(r=>r.json());
+                const ymd = toYMD(date);
+                await fetch(`/api/analysis/rolls-ledger/rebuild?date=${ymd}`, { method: 'POST' });
+                const resp = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r=>r.json());
                 setRolls(resp?.row ?? null);
               }}
               data-testid="button-refresh-rolls"

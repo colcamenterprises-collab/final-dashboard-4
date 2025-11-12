@@ -3,14 +3,16 @@ import { shiftWindow } from "../services/time/shiftWindow.js";
 import { PrismaClient } from "@prisma/client";
 import { computeShiftAll } from "../services/shiftItems.js";
 import { backfillShiftAnalytics, backfillLastNDays } from "../services/backfillShiftAnalytics.js";
+import { normalizeDateParam } from "../utils/normalizeDate.js";
 
 const db = new PrismaClient();
 const router = Router();
 
 router.get("/analysis/shift/items", async (req, res) => {
   try {
-    const { date, category } = req.query as { date: string; category?: string };
-    const { shiftDate } = shiftWindow(date);
+    const rawDate = req.query.date as string;
+    const shiftDate = normalizeDateParam(rawDate);
+    const category = req.query.category as string | undefined;
 
     const rows = await db.$queryRaw<any[]>`
       SELECT sku, name, category, qty, patties, red_meat_g, chicken_g, rolls
@@ -18,7 +20,7 @@ router.get("/analysis/shift/items", async (req, res) => {
       ORDER BY category, name`;
 
     if ((rows?.length ?? 0) === 0) {
-      const out = await computeShiftAll(date);
+      const out = await computeShiftAll(shiftDate);
       return res.json({
         ok: true,
         ...out,
@@ -40,8 +42,9 @@ router.get("/analysis/shift/items", async (req, res) => {
 
 router.post("/analysis/shift/rebuild", async (req, res) => {
   try {
-    const { date } = req.query as { date: string };
-    const out = await computeShiftAll(date);
+    const rawDate = req.query.date as string;
+    const shiftDate = normalizeDateParam(rawDate);
+    const out = await computeShiftAll(shiftDate);
     res.json({ ok: true, ...out });
   } catch (error: any) {
     console.error("[shiftAnalysis] rebuild failed:", error);
@@ -51,8 +54,9 @@ router.post("/analysis/shift/rebuild", async (req, res) => {
 
 router.get("/analysis/shift/raw", async (req, res) => {
   try {
-    const { date } = req.query as { date: string };
-    const { fromISO, toISO } = shiftWindow(date);
+    const rawDate = req.query.date as string;
+    const shiftDate = normalizeDateParam(rawDate);
+    const { fromISO, toISO } = shiftWindow(shiftDate);
     const rows = await db.$queryRaw<any[]>`
       SELECT ri.sku, COALESCE(c.name, ri.name) AS name, SUM(ri.qty)::int AS qty
       FROM receipt_items ri
