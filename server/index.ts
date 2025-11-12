@@ -21,7 +21,6 @@ import menuOnlineRouter from "./routes/menuOnline";
 import imageUploadRouter from "./routes/imageUpload";
 import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
-import freshnessRouter from "./routes/freshness";
 
 const prisma = new PrismaClient();
 
@@ -187,7 +186,6 @@ async function checkSchema() {
   app.use('/api', shiftAnalysisRouter);
   app.use('/api/analysis/shift', analysisCsv);
   app.use(ensureShiftRouter);
-  app.use(freshnessRouter);
   app.use('/api', healthRouter);
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);
