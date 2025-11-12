@@ -1,0 +1,403 @@
+AGENT WORK ORDER — “Truthful Ingestion + Freshness + Server CSV”
+
+Objective
+
+1. Guarantee daily POS ingestion is real (not cache-only) and auditable.
+
+
+2. Expose Data Freshness (source, counts, timestamp) on F&B Analysis UI.
+
+
+3. Provide server-side CSV export that works on mobile/tablet.
+
+
+4. Keep existing Rolls Ledger + F&B Analysis intact.
+
+
+
+Constraints (do not change)
+
+Do not alter existing styles or layout beyond the additions below.
+
+Do not rename existing tables, routes, or components.
+
+Keep shift window logic: BKK 17:00 → 03:00 (UTC 10:00 → 20:00) for a given date key.
+
+
+Environment
+
+Ensure env has:
+
+TZ=Asia/Bangkok
+
+PUBLIC_BASE_URL=http://localhost:5000 (or your deployed base)
+
+LOYVERSE_API_TOKEN (optional; if absent, ingestion is marked skipped but still audited)
+
+
+
+
+---
+
+Deliverables (files & patches)
+
+1) DB Migration — ingestion audit table
+
+Create: prisma/migrations/20251112_ingestion_audit/migration.sql
+
+CREATE TABLE IF NOT EXISTS ingestion_audit (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_date       date NOT NULL,
+  from_ts          timestamptz NOT NULL,
+  to_ts            timestamptz NOT NULL,
+  source           text NOT NULL,
+  receipts_count   integer NOT NULL DEFAULT 0,
+  line_items_count integer NOT NULL DEFAULT 0,
+  modifiers_count  integer NOT NULL DEFAULT 0,
+  duration_ms      integer NOT NULL DEFAULT 0,
+  status           text NOT NULL DEFAULT 'success',
+  error_message    text,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_audit_date ON ingestion_audit (shift_date);
+
+Run:
+
+npx prisma migrate deploy || npx prisma db push
+
+
+---
+
+2) Server utilities/services/routes
+
+A) Date normalizer (idempotent; create if missing)
+
+File: server/utils/normalizeDate.ts
+
+export function normalizeDateParam(input?: string): string {
+  if (!input) throw new Error('Missing date');
+  const s = input.trim();
+  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (!Number.isNaN(d.valueOf())) return d.toISOString().slice(0,10);
+  throw new Error(`Bad date format: ${s}`);
+}
+
+B) Ingestion audit writer
+
+File: server/services/ingestionAudit.ts
+
+import { PrismaClient } from '@prisma/client';
+const db = new PrismaClient();
+
+export async function recordIngestionAudit(p: {
+  shiftDate: string, fromISO: string, toISO: string,
+  source: 'loyverse_api'|'manual'|'backfill'|'unknown',
+  receipts: number, items: number, modifiers: number,
+  durationMs: number, status?: 'success'|'failed'|'skipped', error?: string
+}) {
+  await db.$executeRaw`
+    INSERT INTO ingestion_audit
+      (shift_date, from_ts, to_ts, source, receipts_count, line_items_count, modifiers_count,
+       duration_ms, status, error_message)
+    VALUES
+      (${p.shiftDate}::date, ${p.fromISO}::timestamptz, ${p.toISO}::timestamptz, ${p.source},
+       ${p.receipts}, ${p.items}, ${p.modifiers}, ${p.durationMs},
+       ${p.status ?? 'success'}, ${p.error ?? null})
+  `;
+}
+
+export async function latestIngestionFor(shiftDate: string) {
+  const rows = await db.$queryRaw<any[]>`
+    SELECT source, receipts_count, line_items_count, modifiers_count, status, created_at
+    FROM ingestion_audit
+    WHERE shift_date = ${shiftDate}::date
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+C) Ensure real ingestion (audited)
+
+File: server/routes/ensureShift.ts
+
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { normalizeDateParam } from '../utils/normalizeDate';
+import { recordIngestionAudit } from '../services/ingestionAudit';
+
+// use the window helper from your rollsLedger service if present
+function shiftWindowUTC(shiftDate: string) {
+  const [y,m,d] = shiftDate.split('-').map(Number);
+  const fromISO = new Date(Date.UTC(y, m-1, d, 10, 0, 0)).toISOString();
+  const toISO   = new Date(Date.UTC(y, m-1, d, 20, 0, 0)).toISOString();
+  return { fromISO, toISO };
+}
+
+const db = new PrismaClient();
+const r = Router();
+
+async function countsInDb(fromISO: string, toISO: string) {
+  const [r1, r2, r3] = await Promise.all([
+    db.$queryRaw<any[]>`SELECT COUNT(*)::int AS n FROM lv_receipt   WHERE datetime_bkk >= ${fromISO}::timestamptz AND datetime_bkk < ${toISO}::timestamptz`,
+    db.$queryRaw<any[]>`SELECT COUNT(*)::int AS n FROM lv_line_item WHERE receipt_id IN (SELECT receipt_id FROM lv_receipt WHERE datetime_bkk >= ${fromISO}::timestamptz AND datetime_bkk < ${toISO}::timestamptz)`,
+    db.$queryRaw<any[]>`SELECT COUNT(*)::int AS n FROM lv_modifier   WHERE receipt_id IN (SELECT receipt_id FROM lv_receipt WHERE datetime_bkk >= ${fromISO}::timestamptz AND datetime_bkk < ${toISO}::timestamptz)`,
+  ]);
+  return { receipts: r1?.[0]?.n ?? 0, items: r2?.[0]?.n ?? 0, modifiers: r3?.[0]?.n ?? 0 };
+}
+
+// Stub: replace with real Loyverse sync later
+async function tryIngestFromLoyverseAPI(_fromISO: string, _toISO: string) {
+  if (!process.env.LOYVERSE_API_TOKEN) return { receipts:0, items:0, modifiers:0, used:false };
+  // TODO: call your existing importer here
+  return { receipts:0, items:0, modifiers:0, used:true };
+}
+
+r.post('/api/loyverse/ensure-shift', async (req, res) => {
+  const started = Date.now();
+  try {
+    const date = normalizeDateParam(req.query.date as string);
+    const { fromISO, toISO } = shiftWindowUTC(date);
+
+    const before = await countsInDb(fromISO, toISO);
+    let receipts = before.receipts, items = before.items, modifiers = before.modifiers;
+    let source:'loyverse_api'|'manual'|'backfill'|'unknown' = 'unknown';
+
+    if (receipts === 0) {
+      const ing = await tryIngestFromLoyverseAPI(fromISO, toISO);
+      source = ing.used ? 'loyverse_api' : 'unknown';
+      const after = await countsInDb(fromISO, toISO);
+      receipts = after.receipts; items = after.items; modifiers = after.modifiers;
+      await recordIngestionAudit({
+        shiftDate: date, fromISO, toISO, source,
+        receipts, items, modifiers, durationMs: Date.now()-started,
+        status: ing.used ? 'success' : 'skipped',
+        error: ing.used ? undefined : 'LOYVERSE_API_TOKEN not set or importer not wired'
+      });
+    } else {
+      source = 'manual';
+      await recordIngestionAudit({
+        shiftDate: date, fromISO, toISO, source,
+        receipts, items, modifiers, durationMs: Date.now()-started, status: 'success'
+      });
+    }
+
+    res.json({ ok:true, date, fromISO, toISO, source, receipts, items, modifiers });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message ?? 'ensure-failed' });
+  }
+});
+
+export default r;
+
+D) Freshness read API
+
+File: server/routes/freshness.ts
+
+import { Router } from 'express';
+import { normalizeDateParam } from '../utils/normalizeDate';
+import { latestIngestionFor } from '../services/ingestionAudit';
+const r = Router();
+
+r.get('/api/analysis/freshness', async (req, res) => {
+  try {
+    const date = normalizeDateParam(req.query.date as string);
+    const f = await latestIngestionFor(date);
+    res.json({ ok:true, freshness: f });
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error:e?.message ?? 'freshness-failed' });
+  }
+});
+export default r;
+
+E) Server-side CSV
+
+File: server/routes/analysisCsv.ts
+
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { normalizeDateParam } from '../utils/normalizeDate';
+const db = new PrismaClient();
+const r = Router();
+
+r.get('/items.csv', async (req, res) => {
+  try {
+    const date = normalizeDateParam(req.query.date as string);
+    const rows:any[] = await db.$queryRaw`
+      SELECT sku, name, category, qty, patties, red_meat_g, chicken_g, rolls
+      FROM analytics_shift_item
+      WHERE shift_date = ${date}::date
+      ORDER BY category, name
+    `;
+    const header = ['SKU','Item','Category','Qty','Patties','RedMeat(g)','Chicken(g)','Rolls'];
+    const csv = [header.join(',')]
+      .concat(rows.map(r => [
+        r.sku ?? '', r.name, r.category,
+        r.qty ?? 0, r.patties ?? 0,
+        r.red_meat_g ?? 0, r.chicken_g ?? 0, r.rolls ?? 0
+      ].map(x => `"${String(x).replace(/"/g,'""')}"`).join(',')))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="shift-${date}.csv"`);
+    res.status(200).send(csv);
+  } catch (e:any) {
+    res.status(500).json({ ok:false, error: e?.message ?? 'csv-failed' });
+  }
+});
+export default r;
+
+F) Mount routes & cron
+
+Edit: server/index.ts — add these lines with other routes (before any catch-all):
+
+import analysisCsv from './routes/analysisCsv';
+import ensureShiftRouter from './routes/ensureShift';
+import freshnessRouter from './routes/freshness';
+import './jobs/cron';
+
+app.use('/api/analysis/shift', analysisCsv);
+app.use(ensureShiftRouter);
+app.use(freshnessRouter);
+
+Edit: server/jobs/cron.ts — prepend ensure-shift job
+
+import cron from 'node-cron';
+import fetch from 'node-fetch';
+
+function bkkYesterdayISODate(): string {
+  const now = new Date(); now.setUTCDate(now.getUTCDate()-1);
+  return now.toISOString().slice(0,10);
+}
+
+// 02:55 BKK ensure POS exists + audit
+cron.schedule('55 2 * * *', async () => {
+  const d = bkkYesterdayISODate();
+  try {
+    const base = process.env.PUBLIC_BASE_URL ?? 'http://localhost:5000';
+    const resp = await fetch(`${base}/api/loyverse/ensure-shift?date=${d}`, { method:'POST' });
+    console.log('[CRON] ensure-shift', await resp.json());
+  } catch (e) { console.error('[CRON] ensure-shift failed', e); }
+}, { timezone: 'Asia/Bangkok' });
+
+// keep existing 03:05 analytics and 03:15 rolls-ledger jobs
+export {};
+
+
+---
+
+3) Frontend — F&B page: freshness + server CSV
+
+Edit: client/src/pages/analysis/ShiftAnalyticsMM.tsx
+Add minimal state/hooks and use server CSV.
+
+Add types/state:
+
+type Freshness = null | { source:string, receipts_count:number, line_items_count:number, modifiers_count:number, status:string, created_at:string };
+
+const [fresh, setFresh] = useState<Freshness>(null);
+
+After your existing shift data load finishes, fetch freshness:
+
+const ymd = toYMD(date);
+const f = await fetch(`/api/analysis/freshness?date=${ymd}`).then(r=>r.json()).catch(()=>null);
+setFresh(f?.freshness ?? null);
+
+Render under the page title:
+
+{fresh && (
+  <div className="mt-2 text-xs text-slate-600">
+    Data Freshness: <b>{fresh.source}</b>
+    {' · '}r:{fresh.receipts_count} i:{fresh.line_items_count} m:{fresh.modifiers_count}
+    {' · '}{new Date(fresh.created_at).toLocaleString()}
+  </div>
+)}
+
+Replace client-blob CSV with server CSV:
+
+function exportCSV() {
+  const ymd = toYMD(date);
+  window.location.href = `/api/analysis/shift/items.csv?date=${ymd}`;
+}
+
+
+---
+
+Smoke Tests (run exactly)
+
+1. Migrate
+
+
+
+npx prisma migrate deploy || npx prisma db push
+
+2. Start server, open F&B page.
+
+
+3. Force real ingestion audit for a date key
+
+
+
+curl -s -X POST "http://localhost:5000/api/loyverse/ensure-shift?date=2025-11-05" | jq
+
+Expect JSON with source, counts, and the audit row written.
+
+4. See audit row
+
+
+
+SELECT shift_date, source, receipts_count, line_items_count, modifiers_count, status, created_at
+FROM ingestion_audit
+ORDER BY created_at DESC
+LIMIT 5;
+
+5. Freshness pill shows on UI with source + counts + timestamp.
+
+
+6. CSV works on tablet Open F&B → pick date → Export CSV → downloads shift-YYYY-MM-DD.csv.
+
+
+
+
+---
+
+Acceptance Criteria
+
+[ ] ingestion_audit table exists and fills on POST /api/loyverse/ensure-shift?date=YYYY-MM-DD.
+
+[ ] F&B page shows Data Freshness with non-empty counts and a timestamp.
+
+[ ] Export CSV always downloads shift-YYYY-MM-DD.csv from the server.
+
+[ ] Cron logs show ensure-shift at 02:55 BKK, followed by your existing 03:05/03:15 jobs.
+
+[ ] No regressions to existing analytics or Rolls Ledger.
+
+
+Commit Message
+
+feat(analysis): truthful ingestion audit + freshness badge + server CSV export
+- Add ingestion_audit table & writer
+- Add /api/loyverse/ensure-shift to verify/ingest and audit
+- Add /api/analysis/freshness and /api/analysis/shift/items.csv
+- Show Data Freshness on F&B page; switch to server CSV
+- Cron: ensure-shift before analytics/ledger (Asia/Bangkok)
+
+Rollback Plan
+
+Remove the new route mounts from server/index.ts.
+
+Delete server/routes/{ensureShift, freshness, analysisCsv}.ts and server/services/ingestionAudit.ts.
+
+Drop ingestion_audit table:
+
+DROP TABLE IF EXISTS ingestion_audit;
+
+Revert F&B page CSV and freshness additions.
+
+
+
+---
