@@ -1,9 +1,10 @@
 // server/jobs/cron.ts
 import cron from 'node-cron';
+import fetch from 'node-fetch';
 import { computeShiftAll } from '../services/shiftItems.js';
 import { computeAndUpsertRollsLedger } from '../services/rollsLedger.js';
 
-console.log('📊 Rolls Ledger analytics cron jobs scheduled for 3:05am, 3:15am, and hourly refresh');
+console.log('📊 Ingestion audit + analytics + rolls ledger cron jobs scheduled');
 
 // yesterday in BKK terms
 function bkkYesterdayISODate(): string {
@@ -13,6 +14,19 @@ function bkkYesterdayISODate(): string {
   now.setUTCDate(now.getUTCDate() - 1);
   return now.toISOString().slice(0,10);
 }
+
+// 02:55 BKK — ensure POS data exists + audit (before analytics)
+cron.schedule('55 2 * * *', async () => {
+  const d = bkkYesterdayISODate();
+  try {
+    const base = process.env.PUBLIC_BASE_URL ?? 'http://localhost:5000';
+    const resp = await fetch(`${base}/api/loyverse/ensure-shift?date=${d}`, { method: 'POST' });
+    const result = await resp.json();
+    console.log('[CRON] ensure-shift', result);
+  } catch (e) {
+    console.error('[CRON] ensure-shift failed', e);
+  }
+}, { timezone: 'Asia/Bangkok' });
 
 // 03:05 BKK — ensure analytics cache for yesterday's shift (pulls POS + writes analytics cache via computeShiftAll)
 cron.schedule('5 3 * * *', async () => {
