@@ -12,6 +12,15 @@ type RollsRow = {
   status: 'PENDING' | 'OK' | 'ALERT';
 };
 
+type Freshness = null | {
+  source: string;
+  receipts_count: number;
+  line_items_count: number;
+  modifiers_count: number;
+  status: string;
+  created_at: string;
+};
+
 type ShiftItem = {
   sku: string | null;
   name: string;
@@ -76,6 +85,7 @@ export default function ShiftAnalyticsMM() {
   const [tab, setTab] = useState<CatTab>("all");
   const [error, setError] = useState<string>("");
   const [rolls, setRolls] = useState<RollsRow | null>(null);
+  const [fresh, setFresh] = useState<Freshness>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -96,10 +106,14 @@ export default function ShiftAnalyticsMM() {
       // Fetch rolls ledger after items so status bar reflects same key
       const b = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r => r.json());
       setRolls(b?.row ?? null);
+      // Fetch freshness data
+      const f = await fetch(`/api/analysis/freshness?date=${ymd}`).then(r => r.json()).catch(() => null);
+      setFresh(f?.freshness ?? null);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load");
       setItems([]);
       setRolls(null);
+      setFresh(null);
     } finally {
       setLoading(false);
     }
@@ -110,27 +124,8 @@ export default function ShiftAnalyticsMM() {
   }, []);
 
   function exportCSV() {
-    const headers = ["SKU", "Item", "Category", "Qty", "Patties", "RedMeat(g)", "Chicken(g)", "Rolls"];
-    const rows = items.length
-      ? items.map((it) => [
-          it.sku ?? "",
-          it.name,
-          it.category,
-          it.qty,
-          it.patties ?? 0,
-          (it as any).red_meat_g ?? (it as any).redMeatGrams ?? 0,
-          (it as any).chicken_g ?? (it as any).chickenGrams ?? 0,
-          it.rolls ?? 0,
-        ])
-      : []; // Allow header-only export
-    const csv = [headers, ...rows].map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `shift-${toYMD(date)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    const ymd = toYMD(date);
+    window.location.href = `/api/analysis/shift/items.csv?date=${ymd}`;
   }
 
   // Extract unique categories from items
@@ -182,6 +177,13 @@ export default function ShiftAnalyticsMM() {
               </span>
             )}
           </div>
+          {fresh && (
+            <div className="text-xs text-slate-600">
+              Data Freshness: <b>{fresh.source}</b>
+              {' · '}r:{fresh.receipts_count} i:{fresh.line_items_count} m:{fresh.modifiers_count}
+              {' · '}{new Date(fresh.created_at).toLocaleString()}
+            </div>
+          )}
         </div>
 
         {/* Controls - Better tablet layout */}
