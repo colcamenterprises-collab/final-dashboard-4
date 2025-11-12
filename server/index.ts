@@ -19,6 +19,9 @@ import opsMtdRouter from "./routes/ops_mtd";
 import purchasingRouter from "./routes/purchasing";
 import menuOnlineRouter from "./routes/menuOnline";
 import imageUploadRouter from "./routes/imageUpload";
+import analysisCsv from "./routes/analysisCsv";
+import ensureShiftRouter from "./routes/ensureShift";
+import freshnessRouter from "./routes/freshness";
 
 const prisma = new PrismaClient();
 
@@ -182,6 +185,9 @@ async function checkSchema() {
   const shiftAnalysisRouter = (await import('./routes/shiftAnalysis.js')).default;
   app.use('/api', loyverseV2Router);
   app.use('/api', shiftAnalysisRouter);
+  app.use('/api/analysis/shift', analysisCsv);
+  app.use(ensureShiftRouter);
+  app.use(freshnessRouter);
   app.use('/api', healthRouter);
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);
