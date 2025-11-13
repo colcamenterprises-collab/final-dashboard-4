@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
+import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { 
@@ -14,7 +15,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   FileText,
-  Globe
+  Globe,
+  Package
 } from "lucide-react";
 
 // Balance Hero Component
@@ -28,29 +30,28 @@ function BalanceHero() {
   const month = (financeSummary as any)?.month || '';
 
   return (
-    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-white shadow-xl">
+    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
       {/* Background decoration */}
       <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
       <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
       
       <div className="relative">
-        <p className="text-emerald-100 text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
-        <h1 className="text-4xl font-bold mb-8">
+        <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
           ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h1>
         
         {/* Quick Actions */}
-        <div className="flex gap-3">
-          <ModernButton 
-            onClick={() => setLocation('/finance/expenses')}
-            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense
-          </ModernButton>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <StockLodgmentModal
+            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto"
+            triggerText="Add Business Expense"
+            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+            onSuccess={() => {}}
+          />
           <ModernButton 
             onClick={() => setLocation('/operations/daily-sales-v2/library')}
-            className="bg-white/15 hover:bg-white/25 text-white border-white/20"
+            className="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto"
           >
             <FileText className="h-4 w-4 mr-2" />
             Daily Sales & Stock
@@ -103,20 +104,20 @@ function KPIGrid() {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {kpis.map((kpi, index) => (
-        <div key={index} className="bg-white rounded p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
+        <div key={index} className="bg-white rounded p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className={`p-2 rounded bg-${kpi.color}-50`}>
-              <kpi.icon className={`h-5 w-5 text-${kpi.color}-600`} />
+              <kpi.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${kpi.color}-600`} />
             </div>
-            <div className={`flex items-center text-sm ${kpi.trend === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
+            <div className={`flex items-center text-xs sm:text-sm ${kpi.trend === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
               {kpi.trend === 'up' ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
               {kpi.change}
             </div>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mb-1">{kpi.value}</p>
-          <p className="text-sm text-slate-600">{kpi.title}</p>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">{kpi.value}</p>
+          <p className="text-xs sm:text-sm text-slate-600">{kpi.title}</p>
         </div>
       ))}
     </div>
@@ -143,16 +144,16 @@ function CashBalanceSnapshot() {
     });
   }, []);
 
-  if (loading) return <div className="w-1/3 bg-white rounded p-6 shadow-sm border text-gray-500">Loading balances...</div>;
+  if (loading) return <div className="w-full lg:w-1/3 bg-white rounded p-4 sm:p-6 shadow-sm border text-gray-500">Loading balances...</div>;
 
   return (
-    <div className="w-1/3 bg-white rounded p-6 shadow-sm border">
-      <h2 className="text-sm font-bold mb-4 text-gray-800">Shift Summary</h2>
+    <div className="w-full lg:w-1/3 bg-white rounded p-4 sm:p-6 shadow-sm border">
+      <h2 className="text-xs sm:text-sm font-bold mb-4 text-gray-800">Shift Summary</h2>
       <div>
         {posBalances.length > 0 ? (
           posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
         ) : (
-          <div className="text-gray-500 text-sm">No shift data available</div>
+          <div className="text-gray-500 text-xs sm:text-sm">No shift data available</div>
         )}
         <div className="mt-4 text-xs text-gray-500">
           Note: Green boxes indicate register difference within ฿50 (acceptable range). Red boxes indicate difference exceeding ฿50 (requires attention).
@@ -166,7 +167,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8 p-2 sm:p-0">
       {/* Balance Hero */}
       <BalanceHero />
       

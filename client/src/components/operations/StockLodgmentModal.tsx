@@ -38,6 +38,8 @@ type MeatForm = z.infer<typeof meatSchema>;
 interface StockLodgmentModalProps {
   onSuccess?: () => void;
   triggerClassName?: string;
+  triggerText?: string;
+  triggerIcon?: React.ReactNode;
 }
 
 const DRINK_TYPES = [
@@ -49,7 +51,12 @@ const MEAT_TYPES = [
   "Topside", "Chuck", "Brisket", "Rump", "Outside", "Mixed", "Other"
 ];
 
-export function StockLodgmentModal({ onSuccess, triggerClassName }: StockLodgmentModalProps) {
+export function StockLodgmentModal({ 
+  onSuccess, 
+  triggerClassName,
+  triggerText = "Lodge Stock Purchase",
+  triggerIcon
+}: StockLodgmentModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"rolls" | "meat" | "drinks">("rolls");
   const { toast } = useToast();
@@ -140,7 +147,8 @@ export function StockLodgmentModal({ onSuccess, triggerClassName }: StockLodgmen
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className={triggerClassName}>
-          Lodge Stock Purchase
+          {triggerIcon}
+          {triggerText}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
