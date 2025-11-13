@@ -44,17 +44,17 @@ function BalanceHero() {
         {/* Quick Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
           <StockLodgmentModal
-            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto"
-            triggerText="Add Business Expense"
-            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
+            triggerText="Lodge Stock Purchase"
+            triggerIcon={<Package className="h-4 w-4 mr-2" />}
             onSuccess={() => {}}
           />
           <ModernButton 
-            onClick={() => setLocation('/operations/daily-sales-v2/library')}
-            className="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto"
+            onClick={() => setLocation('/finance/expenses')}
+            className="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Daily Sales & Stock
+            <Plus className="h-4 w-4 mr-2" />
+            Add Business Expense
           </ModernButton>
         </div>
       </div>
