@@ -64,60 +64,58 @@ function BalanceHero() {
 
 // KPI Grid Component
 function KPIGrid() {
-  const { data: financeSummary } = useQuery({
+  const { data: financeSummary, isLoading } = useQuery({
     queryKey: ['/api/finance/summary/today'],
   });
 
+  const mtdSales = (financeSummary as any)?.currentMonthSales || 0;
+  const netProfit = (financeSummary as any)?.netProfit || 0;
+  const totalExpenses = (financeSummary as any)?.currentMonthExpenses || 0;
+  const shiftCount = (financeSummary as any)?.shiftCount || 0;
+
   const kpis = [
     {
-      title: "Today's Orders",
-      value: "24",
-      change: "+15.3%",
-      trend: "up",
-      icon: ShoppingCart,
-      color: "emerald"
-    },
-    {
-      title: "Net Profit",
-      value: "฿12,450",
-      change: "+8.7%",
-      trend: "up", 
+      title: "MTD Sales",
+      value: isLoading ? "—" : `฿${mtdSales.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      subtitle: `${shiftCount} shifts`,
       icon: DollarSign,
       color: "emerald"
     },
     {
-      title: "Online Orders",
-      value: "18",
-      change: "+22.1%",
-      trend: "up",
-      icon: Globe,
-      color: "blue"
+      title: "Net Profit",
+      value: isLoading ? "—" : `฿${netProfit.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      subtitle: "This month",
+      icon: TrendingUp,
+      color: "emerald"
     },
     {
-      title: "Deliveries",
-      value: "16",
-      change: "+12.5%",
-      trend: "up",
-      icon: Activity,
+      title: "Total Expenses",
+      value: isLoading ? "—" : `฿${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      subtitle: "MTD spend",
+      icon: ArrowDownLeft,
       color: "orange"
+    },
+    {
+      title: "Avg Per Shift",
+      value: isLoading || shiftCount === 0 ? "—" : `฿${(mtdSales / shiftCount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      subtitle: `${shiftCount} shifts`,
+      icon: Activity,
+      color: "blue"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
       {kpis.map((kpi, index) => (
-        <div key={index} className="bg-white rounded p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+        <div key={index} className="bg-white rounded p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className={`p-2 rounded bg-${kpi.color}-50`}>
               <kpi.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${kpi.color}-600`} />
             </div>
-            <div className={`flex items-center text-xs sm:text-sm ${kpi.trend === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
-              {kpi.trend === 'up' ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-              {kpi.change}
-            </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">{kpi.value}</p>
-          <p className="text-xs sm:text-sm text-slate-600">{kpi.title}</p>
+          <p className="text-base sm:text-xl md:text-2xl font-bold text-slate-900 mb-1 break-words">{kpi.value}</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-900">{kpi.title}</p>
+          <p className="text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
         </div>
       ))}
     </div>
