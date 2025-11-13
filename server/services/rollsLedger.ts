@@ -71,31 +71,34 @@ async function getRollsPurchased(fromISO: string, toISO: string): Promise<{ qty:
 }
 
 async function getActualRollsEnd(shiftDate: string): Promise<{ count: number | null, stockId: string | null, salesId: string | null }> {
-  // Prefer Daily Stock form v2 end-of-shift buns count
+  // Query daily_sales_v2 table where the actual form data is stored
   try {
-    const a = await db.$queryRaw<{ id: string, burger_buns_stock: number | null }[]>`
+    const a = await db.$queryRaw<{ id: string, rolls_end: number | null }[]>`
+      SELECT id::text, (payload->>'rollsEnd')::int AS rolls_end
+      FROM daily_sales_v2
+      WHERE "shiftDate" = ${shiftDate}
+        AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `;
+    if (a?.length && a[0].rolls_end !== null) {
+      return { count: a[0].rolls_end!, stockId: null, salesId: a[0].id };
+    }
+  } catch (_e) { 
+    console.error('Error fetching rolls from daily_sales_v2:', _e);
+  }
+
+  // Fallback: Try legacy daily_stock_sales table
+  try {
+    const b = await db.$queryRaw<{ id: string, burger_buns_stock: number | null }[]>`
       SELECT id::text, burger_buns_stock
       FROM daily_stock_sales
       WHERE shift_date = ${shiftDate}::date
       ORDER BY updated_at DESC
       LIMIT 1
     `;
-    if (a?.length && a[0].burger_buns_stock !== null) {
-      return { count: a[0].burger_buns_stock!, stockId: a[0].id, salesId: null };
-    }
-  } catch (_e) { /* table may not exist; ignore */ }
-
-  // Alternative column names
-  try {
-    const b = await db.$queryRaw<{ id: string, rolls_end: number | null }[]>`
-      SELECT id::text, rolls_end
-      FROM daily_stock_sales
-      WHERE shift_date = ${shiftDate}::date
-      ORDER BY updated_at DESC
-      LIMIT 1
-    `;
-    if (b?.length && b[0].rolls_end !== null) {
-      return { count: b[0].rolls_end!, stockId: b[0].id, salesId: null };
+    if (b?.length && b[0].burger_buns_stock !== null) {
+      return { count: b[0].burger_buns_stock!, stockId: b[0].id, salesId: null };
     }
   } catch (_e) {}
 
@@ -111,16 +114,29 @@ async function getRollsStart(shiftDate: string): Promise<number> {
   `;
   if (r1?.length && r1[0].v !== null) return r1[0].v!;
 
-  // else previous day stock form end
+  // else previous day from daily_sales_v2 form
   try {
     const r2 = await db.$queryRaw<{ v: number | null }[]>`
+      SELECT (payload->>'rollsEnd')::int AS v
+      FROM daily_sales_v2
+      WHERE "shiftDate" = ${prevDate}
+        AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `;
+    if (r2?.length && r2[0].v !== null) return r2[0].v!;
+  } catch (_e) {}
+
+  // Fallback: legacy daily_stock_sales table
+  try {
+    const r3 = await db.$queryRaw<{ v: number | null }[]>`
       SELECT burger_buns_stock AS v
       FROM daily_stock_sales
       WHERE shift_date = ${prevDate}::date
       ORDER BY updated_at DESC
       LIMIT 1
     `;
-    if (r2?.length && r2[0].v !== null) return r2[0].v!;
+    if (r3?.length && r3[0].v !== null) return r3[0].v!;
   } catch (_e) {}
 
   return 0;
@@ -152,17 +168,12 @@ export async function computeAndUpsertRollsLedger(shiftDate: string) {
 
   await db.$executeRaw`
     INSERT INTO rolls_ledger
-    (shift_date, from_ts, to_ts, rolls_start, rolls_purchased, burgers_sold,
-     estimated_rolls_end, actual_rolls_end, waste_allowance, variance, status,
-     source_stock_id, source_expense_id)
+    (shift_date, rolls_start, rolls_purchased, burgers_sold,
+     estimated_rolls_end, actual_rolls_end, waste_allowance, variance, status)
     VALUES
-    (${shiftDate}::date, ${fromISO}::timestamptz, ${toISO}::timestamptz,
-     ${rolls_start}, ${rolls_purchased}, ${burgers_sold},
-     ${estimated}, ${actual_end}, ${WASTE}, ${variance}, ${status},
-     ${actual.stockId}, ${purchased.sourceExpenseId})
+    (${shiftDate}::date, ${rolls_start}, ${rolls_purchased}, ${burgers_sold},
+     ${estimated}, ${actual_end}, ${WASTE}, ${variance}, ${status})
     ON CONFLICT (shift_date) DO UPDATE SET
-      from_ts = EXCLUDED.from_ts,
-      to_ts   = EXCLUDED.to_ts,
       rolls_start = EXCLUDED.rolls_start,
       rolls_purchased = EXCLUDED.rolls_purchased,
       burgers_sold = EXCLUDED.burgers_sold,
@@ -171,8 +182,6 @@ export async function computeAndUpsertRollsLedger(shiftDate: string) {
       waste_allowance = EXCLUDED.waste_allowance,
       variance = EXCLUDED.variance,
       status   = EXCLUDED.status,
-      source_stock_id = EXCLUDED.source_stock_id,
-      source_expense_id = EXCLUDED.source_expense_id,
       updated_at = now()
   `;
 
