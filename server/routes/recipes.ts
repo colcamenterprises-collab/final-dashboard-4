@@ -107,7 +107,7 @@ router.get('/cards', async (req, res) => {
     }));
     
     console.log(`[/api/recipes/cards] Returning ${rows.length} recipe cards`);
-    res.json({ ok: true, recipes: parsedRecipes });
+    res.json(parsedRecipes); // Return array directly, not wrapped in object
   } catch (error) {
     console.error('[/api/recipes/cards] Error:', error);
     res.status(500).json({ ok: false, error: 'Failed to fetch recipe cards' });
@@ -254,14 +254,14 @@ router.post('/', async (req, res) => {
         name, description, category, yield_quantity, yield_unit, ingredients,
         total_cost, cost_per_serving, cogs_percent, suggested_price,
         waste_factor, yield_efficiency, image_url, instructions, notes,
-        allergens, nutritional, is_active, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
+        is_active, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
       RETURNING *
     `, [
       name, description, category, yieldQuantity, yieldUnit, JSON.stringify(enhancedIngredients),
       finalTotalCost, finalCostPerServing, cogsPercent, finalSuggestedPrice,
       wasteFactor, yieldEfficiency, imageUrl, instructions, notes,
-      JSON.stringify(allergens), JSON.stringify(nutritional), isActive
+      isActive
     ]);
 
     console.log(`[recipes] Created recipe: ${rows[0].name}`);

@@ -3323,69 +3323,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // Recipe Management Routes - handled by /api/recipes router
+  // NOTE: POST /api/recipes is handled by the recipes router (server/routes/recipes.ts)
+  // to ensure database persistence. Do not add duplicate handlers here.
 
-  app.post("/api/recipes", async (req: Request, res: Response) => {
-    try {
-      // FORT KNOX FIX: Add cost calculation before creating recipe
-      const { ingredients = [] } = req.body;
-      
-      const ingredientPricing = {
-        'beef': { pricePerKg: 319, unit: 'kg' }, // 319 THB per kg → 95g = 30.305 THB exactly
-        'topside-beef': { pricePerKg: 319, unit: 'kg' },
-        'brisket': { pricePerKg: 350, unit: 'kg' },
-        'chuck': { pricePerKg: 300, unit: 'kg' },
-        'cheese': { pricePerKg: 280, unit: 'kg' },
-        'burger-bun': { pricePerUnit: 8, unit: 'each' },
-        'bacon': { pricePerKg: 450, unit: 'kg' },
-        'lettuce': { pricePerKg: 50, unit: 'kg' },
-        'tomato': { pricePerKg: 60, unit: 'kg' },
-        'onion': { pricePerKg: 35, unit: 'kg' }
-      };
-
-      let calculatedTotalCost = 0;
-      const enhancedIngredients = ingredients.map((ingredient: any) => {
-        const pricing = ingredientPricing[ingredient.id as keyof typeof ingredientPricing];
-        let cost = 0;
-        
-        if (pricing) {
-          const portionGrams = parseFloat(ingredient.portion) || 0;
-          if (pricing.unit === 'kg' && 'pricePerKg' in pricing) {
-            cost = (portionGrams / 1000) * pricing.pricePerKg;
-          } else if (pricing.unit === 'each' && 'pricePerUnit' in pricing) {
-            cost = portionGrams * pricing.pricePerUnit;
-          }
-        }
-        
-        calculatedTotalCost += cost;
-        return {
-          ...ingredient,
-          cost: Number(cost.toFixed(3)),
-          unitPrice: pricing ? (pricing.unit === 'kg' && 'pricePerKg' in pricing ? pricing.pricePerKg : pricing.pricePerUnit) : 0
-        };
-      });
-
-      const yieldQuantity = req.body.yieldQuantity || 1;
-      const costPerServing = calculatedTotalCost / yieldQuantity;
-      const suggestedPrice = costPerServing / 0.35; // 35% COGS target
-      const cogsPercent = (calculatedTotalCost / suggestedPrice) * 100;
-
-      const enrichedData = {
-        ...req.body,
-        ingredients: enhancedIngredients,
-        totalCost: Number(calculatedTotalCost.toFixed(3)),
-        costPerServing: Number(costPerServing.toFixed(3)),
-        cogsPercent: Number(cogsPercent.toFixed(1)),
-        suggestedPrice: Number(suggestedPrice.toFixed(2))
-      };
-
-      console.log(`[Recipe Cost Calc] ${req.body.name}: ${enhancedIngredients.length} ingredients, total_cost=${calculatedTotalCost.toFixed(3)} THB`);
-      
-      const recipe = await storage.createRecipe(enrichedData);
-      res.json(recipe);
-    } catch (error) {
-      res.status(400).json({ error: "Failed to create recipe", details: (error as Error).message });
-    }
-  });
+  // app.post("/api/recipes", async (req: Request, res: Response) => {
+  //   // REMOVED: This was creating recipes in memory storage instead of PostgreSQL
+  //   // Use the recipes router mounted at line 3880 instead
+  // });
 
   app.post("/api/recipes/save-with-photo", async (req: Request, res: Response) => {
     try {
