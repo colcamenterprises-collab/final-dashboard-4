@@ -46,26 +46,21 @@ async function getBurgersSoldFromAnalytics(shiftDate: string): Promise<number> {
 }
 
 async function getRollsPurchased(fromISO: string, toISO: string): Promise<{ qty: number, sourceExpenseId: string | null }> {
-  // Prefer dedicated roll purchase table if present
+  // Query expenses table for Stock Lodgment entries with rolls
+  // Quantity is stored in meta->'quantity' JSON field
   try {
-    const r = await db.$queryRaw<{ qty: number, id: string | null }[]>`
-      SELECT COALESCE(SUM(quantity),0)::int AS qty, NULL::uuid AS id
-      FROM roll_purchase
-      WHERE purchase_ts >= ${fromISO}::timestamptz AND purchase_ts < ${toISO}::timestamptz
-    `;
-    if (r && r[0] && r[0].qty > 0) return { qty: r[0].qty, sourceExpenseId: r[0].id };
-  } catch (_e) { /* table may not exist; ignore */ }
-
-  // Fallback: Expenses table pattern-match on rolls/buns (adjust to your schema)
-  try {
-    const r2 = await db.$queryRaw<{ qty: number }[]>`
-      SELECT COALESCE(SUM(qty),0)::int AS qty
+    const r = await db.$queryRaw<{ qty: number }[]>`
+      SELECT COALESCE(SUM((meta->>'quantity')::int), 0)::int AS qty
       FROM expenses
       WHERE (lower(item) LIKE '%bun%' OR lower(item) LIKE '%roll%')
-        AND ts >= ${fromISO}::timestamptz AND ts < ${toISO}::timestamptz
+        AND source = 'STOCK_LODGMENT'
+        AND "createdAt" >= ${fromISO}::timestamptz 
+        AND "createdAt" < ${toISO}::timestamptz
+        AND meta->>'quantity' IS NOT NULL
     `;
-    return { qty: r2?.[0]?.qty ?? 0, sourceExpenseId: null };
+    return { qty: r?.[0]?.qty ?? 0, sourceExpenseId: null };
   } catch (_e) {
+    console.error('Error fetching rolls purchased:', _e);
     return { qty: 0, sourceExpenseId: null };
   }
 }
