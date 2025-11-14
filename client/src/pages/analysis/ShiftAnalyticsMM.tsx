@@ -117,32 +117,48 @@ export default function ShiftAnalyticsMM() {
       <div className="mt-4 flex items-end gap-3">
         <div>
           <label className="block text-sm mb-1">Shift date</label>
-          <input type="date" value={keyDate} onChange={e => setDate(e.target.value)} className="border rounded p-2" />
+          <input type="date" value={keyDate} onChange={e => setDate(e.target.value)} className="border rounded-[4px] p-2 text-xs" />
         </div>
-        <button className="px-4 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={loadAll} disabled={loading} data-testid="button-load-shift">
+        <button className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs disabled:opacity-50" onClick={loadAll} disabled={loading} data-testid="button-load-shift">
           {loading ? 'Loading…' : 'Load Shift'}
         </button>
-        <button className="px-4 py-2 rounded bg-slate-200" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
+        <button className="px-4 py-2 rounded-[4px] bg-slate-200 text-xs" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
       </div>
 
       {rolls && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-2">
-          <div className="p-2 border rounded">Start<br/><b>{rolls.rolls_start}</b></div>
-          <div className="p-2 border rounded">Purchased<br/><b>{rolls.rolls_purchased}</b></div>
-          <div className="p-2 border rounded">Burgers Sold<br/><b>{rolls.burgers_sold}</b></div>
-          <div className="p-2 border rounded">Estimated End<br/><b>{rolls.estimated_rolls_end}</b></div>
-          <div className="p-2 border rounded">Actual End<br/><b>{rolls.actual_rolls_end ?? '—'}</b></div>
-          <div className={`p-2 border rounded font-bold text-center ${
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Start</div>
+            <div className="font-bold text-slate-900 mt-1">{rolls.rolls_start}</div>
+          </div>
+          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Purchased</div>
+            <div className="font-bold text-slate-900 mt-1">{rolls.rolls_purchased}</div>
+          </div>
+          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Burgers Sold</div>
+            <div className="font-bold text-slate-900 mt-1">{rolls.burgers_sold}</div>
+          </div>
+          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Estimated End</div>
+            <div className="font-bold text-slate-900 mt-1">{rolls.estimated_rolls_end}</div>
+          </div>
+          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Actual End</div>
+            <div className="font-bold text-slate-900 mt-1">{rolls.actual_rolls_end ?? '—'}</div>
+          </div>
+          <div className={`p-2 border border-slate-200 rounded-[4px] font-bold text-center ${
             rolls.status === 'OK' ? 'bg-emerald-100 text-emerald-800' :
             rolls.status === 'ALERT' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-            {rolls.status}{rolls.actual_rolls_end !== null ? ` (${rolls.variance >= 0 ? '+' : ''}${rolls.variance})` : ''}
+            <div>{rolls.status}</div>
+            {rolls.actual_rolls_end !== null && <div className="text-xs font-normal mt-1">{rolls.variance >= 0 ? '+' : ''}{rolls.variance}</div>}
           </div>
         </div>
       )}
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-2 flex-wrap">
         {categories.map(c => (
-          <button key={c} className={`px-3 py-1 rounded border ${tab===c ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setTab(c)} data-testid={`button-tab-${c}`}>
+          <button key={c} className={`px-3 py-1 rounded-[4px] border border-slate-200 text-xs font-medium ${tab===c ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700'}`} onClick={() => setTab(c)} data-testid={`button-tab-${c}`}>
             {c.toUpperCase()}
           </button>
         ))}
