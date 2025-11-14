@@ -55,7 +55,7 @@ export default function RecipeCards() {
 
   const { data: recipesData, isLoading } = useQuery({
     queryKey: ["/api/recipes/cards"],
-    select: (data: any) => data.recipes as Recipe[]
+    select: (data: any) => (Array.isArray(data) ? data : data.recipes) as Recipe[]
   });
 
   // Image upload mutation
