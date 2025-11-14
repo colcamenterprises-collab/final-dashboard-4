@@ -451,25 +451,25 @@ export default function RecipeCards() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" style={{ fontFamily: "Poppins, sans-serif" }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Recipe Cards</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-slate-900">Recipe Cards</h1>
+          <p className="text-xs text-slate-600 mt-1">
             Generate professional A4 recipe cards with cost breakdowns and QR codes
           </p>
         </div>
         
         {selectedRecipes.size > 0 && (
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1">
+            <Badge variant="secondary" className="px-3 py-1 text-xs rounded-[4px]">
               {selectedRecipes.size} selected
             </Badge>
             <Button 
               onClick={generateBulkPDF}
               disabled={isGenerating}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]"
               data-testid="button-bulk-download"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -480,16 +480,16 @@ export default function RecipeCards() {
       </div>
 
       {/* Search and Filter Controls */}
-      <Card>
+      <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
                 placeholder="Search recipes by name or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-xs rounded-[4px] border-slate-200"
                 data-testid="input-search-recipes"
               />
             </div>
@@ -497,7 +497,7 @@ export default function RecipeCards() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="px-3 py-2 border border-slate-200 rounded-[4px] text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
               data-testid="select-category-filter"
             >
               {categories.map(category => (
@@ -513,32 +513,32 @@ export default function RecipeCards() {
       {/* Stats */}
       {recipes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
+          <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
             <CardContent className="p-4 flex items-center">
               <Utensils className="w-8 h-8 text-emerald-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-600">Total Recipes</p>
-                <p className="text-2xl font-bold" data-testid="text-total-recipes">{recipes.length}</p>
+                <p className="text-xs text-slate-600">Total Recipes</p>
+                <p className="text-2xl font-bold text-slate-900" data-testid="text-total-recipes">{recipes.length}</p>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
             <CardContent className="p-4 flex items-center">
-              <FileText className="w-8 h-8 text-blue-600 mr-3" />
+              <FileText className="w-8 h-8 text-emerald-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-600">Filtered Results</p>
-                <p className="text-2xl font-bold" data-testid="text-filtered-count">{filteredRecipes.length}</p>
+                <p className="text-xs text-slate-600">Filtered Results</p>
+                <p className="text-2xl font-bold text-slate-900" data-testid="text-filtered-count">{filteredRecipes.length}</p>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
             <CardContent className="p-4 flex items-center">
-              <Download className="w-8 h-8 text-purple-600 mr-3" />
+              <Download className="w-8 h-8 text-emerald-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-600">Selected</p>
-                <p className="text-2xl font-bold" data-testid="text-selected-count">{selectedRecipes.size}</p>
+                <p className="text-xs text-slate-600">Selected</p>
+                <p className="text-2xl font-bold text-slate-900" data-testid="text-selected-count">{selectedRecipes.size}</p>
               </div>
             </CardContent>
           </Card>
@@ -548,7 +548,7 @@ export default function RecipeCards() {
       {/* Recipe Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredRecipes.map((recipe) => (
-          <Card key={recipe.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+          <Card key={recipe.id} className="overflow-hidden hover:shadow-lg transition-shadow border-slate-200" style={{ borderRadius: '4px' }}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -596,7 +596,7 @@ export default function RecipeCards() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 rounded-[4px]"
                         onClick={() => {
                           const input = document.createElement('input');
                           input.type = 'file';
@@ -632,6 +632,7 @@ export default function RecipeCards() {
                         input.click();
                       }}
                       disabled={uploadingImages.has(recipe.id)}
+                      className="text-xs rounded-[4px] border-slate-200"
                       data-testid={`button-upload-image-${recipe.id}`}
                     >
                       <Upload className="w-4 h-4 mr-1" />
@@ -679,7 +680,7 @@ export default function RecipeCards() {
               <Button
                 onClick={() => generatePDFCard(recipe)}
                 disabled={isGenerating}
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]"
                 data-testid={`button-generate-card-${recipe.id}`}
               >
                 <FileText className="w-4 h-4 mr-2" />
@@ -714,7 +715,7 @@ export default function RecipeCards() {
             </p>
             <Button
               onClick={() => window.location.href = '/menu/recipes'}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]"
               data-testid="button-create-first-recipe"
             >
               <Utensils className="w-4 h-4 mr-2" />
