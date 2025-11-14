@@ -229,26 +229,26 @@ export default function IngredientManagement() {
   }
 
   return (
-    <div className="bg-[#f5f7f8] min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">Ingredient Management</h1>
-        <div className="flex gap-3 items-center">
+    <div className="p-4" style={{ fontFamily: "Poppins, sans-serif" }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Ingredient Management</h1>
+        <div className="flex gap-3 items-center flex-wrap">
           <Button 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-[4px]"
           >
             <Crown className="h-4 w-4 mr-2" />
             {syncMutation.isPending ? "Syncing..." : "Sync from God File"}
           </Button>
           <Button 
             onClick={syncToGodFile}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white"
+            className="bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-[4px]"
           >
             <Upload className="h-4 w-4 mr-2" />
             Sync to God File
           </Button>
-          <Button onClick={exportCSV} variant="outline">
+          <Button onClick={exportCSV} variant="outline" className="text-xs rounded-[4px] border-slate-200">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
@@ -256,92 +256,93 @@ export default function IngredientManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Items</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
+            <div className="text-xs text-slate-600">Total Items</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.godItems}</div>
-            <div className="text-sm text-gray-600">God File Items</div>
+            <div className="text-2xl font-bold text-amber-600">{stats.godItems}</div>
+            <div className="text-xs text-slate-600">God File Items</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.manualItems}</div>
-            <div className="text-sm text-gray-600">Manual Items</div>
+            <div className="text-2xl font-bold text-emerald-600">{stats.manualItems}</div>
+            <div className="text-xs text-slate-600">Manual Items</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{stats.categories}</div>
-            <div className="text-sm text-gray-600">Categories</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.categories}</div>
+            <div className="text-xs text-slate-600">Categories</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{stats.suppliers}</div>
-            <div className="text-sm text-gray-600">Suppliers</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.suppliers}</div>
+            <div className="text-xs text-slate-600">Suppliers</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Search and Filter */}
-      <div className="flex gap-4 mb-6 flex-wrap">
+      <div className="flex gap-3 mb-4 flex-wrap">
         <div className="flex-1 min-w-64">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search ingredients, suppliers, brands..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-xs rounded-[4px] border-slate-200"
             />
           </div>
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-48 text-xs rounded-[4px] border-slate-200">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-[4px]">
             {categories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]">
               <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="rounded-[4px]">
             <DialogHeader>
-              <DialogTitle>Add New Ingredient</DialogTitle>
+              <DialogTitle className="text-sm">Add New Ingredient</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
-              <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded">
+              <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-[4px]">
                 Note: Manual items will be marked as 'manual' source. Use "Sync from God File" to reset to foodCostings.ts data.
               </div>
               <Input 
                 placeholder="Ingredient name" 
                 value={newItemForm.name}
                 onChange={(e) => setNewItemForm(prev => ({...prev, name: e.target.value}))}
+                className="text-xs rounded-[4px] border-slate-200"
               />
               <Select 
                 value={newItemForm.category}
                 onValueChange={(value) => setNewItemForm(prev => ({...prev, category: value}))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="text-xs rounded-[4px] border-slate-200">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-[4px]">
                   {categories.filter(c => c !== "All").map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -349,43 +350,48 @@ export default function IngredientManagement() {
                 placeholder="Supplier" 
                 value={newItemForm.supplier}
                 onChange={(e) => setNewItemForm(prev => ({...prev, supplier: e.target.value}))}
+                className="text-xs rounded-[4px] border-slate-200"
               />
               <Input 
                 placeholder="Brand" 
                 value={newItemForm.brand}
                 onChange={(e) => setNewItemForm(prev => ({...prev, brand: e.target.value}))}
+                className="text-xs rounded-[4px] border-slate-200"
               />
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium">Package Size (e.g., 1000g)</label>
+                  <label className="text-xs font-medium text-slate-700">Package Size (e.g., 1000g)</label>
                   <Input 
                     type="text" 
                     name="packageSize" 
                     placeholder="1000g" 
                     value={newItemForm.packageSize}
                     onChange={(e) => setNewItemForm(prev => ({...prev, packageSize: e.target.value}))}
+                    className="text-xs rounded-[4px] border-slate-200 mt-1"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Unit Price (THB)</label>
+                  <label className="text-xs font-medium text-slate-700">Unit Price (THB)</label>
                   <Input 
                     type="number" 
                     name="unitPrice" 
                     placeholder="319" 
                     value={newItemForm.unitPrice}
                     onChange={(e) => setNewItemForm(prev => ({...prev, unitPrice: e.target.value}))}
+                    className="text-xs rounded-[4px] border-slate-200 mt-1"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium">Portion Size</label>
+                <label className="text-xs font-medium text-slate-700">Portion Size</label>
                 <Input 
                   placeholder="e.g., 95g" 
                   value={newItemForm.portion}
                   onChange={(e) => setNewItemForm(prev => ({...prev, portion: e.target.value}))}
+                  className="text-xs rounded-[4px] border-slate-200 mt-1"
                 />
               </div>
-              <p className="text-sm">
+              <p className="text-xs text-slate-700">
                 <strong>Cost per Portion:</strong> {
                   newItemForm.portion && newItemForm.packageSize && newItemForm.unitPrice ? 
                   (parseFloat(newItemForm.portion) / parseFloat(newItemForm.packageSize) * parseFloat(newItemForm.unitPrice)).toFixed(3) + ' THB' : 
@@ -395,12 +401,12 @@ export default function IngredientManagement() {
               <div className="flex gap-3">
                 <Button 
                   onClick={() => setIsAddDialogOpen(false)}
-                  className="flex-1"
+                  className="flex-1 text-xs rounded-[4px]"
                   disabled
                 >
                   Save (Coming Soon)
                 </Button>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="text-xs rounded-[4px] border-slate-200">
                   Cancel
                 </Button>
               </div>
@@ -410,9 +416,9 @@ export default function IngredientManagement() {
       </div>
 
       {/* Ingredients Table */}
-      <Card>
+      <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
         <CardHeader>
-          <CardTitle>
+          <CardTitle className="text-sm font-medium text-slate-900">
             Ingredients ({filteredIngredients.length} of {ingredients.length})
           </CardTitle>
         </CardHeader>
@@ -420,64 +426,65 @@ export default function IngredientManagement() {
           <div className="overflow-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Brand</TableHead>
-                  <TableHead className="text-right">Package Cost</TableHead>
-                  <TableHead>Package Size</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead>Portion Size</TableHead>
-                  <TableHead className="text-right">Cost/Portion</TableHead>
-                  <TableHead>Review</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="border-b border-slate-200">
+                  <TableHead className="text-xs font-medium text-slate-700">Name</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Category</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Supplier</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Brand</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700 text-right">Package Cost</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Package Size</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700 text-right">Unit Price</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Portion Size</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700 text-right">Cost/Portion</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700">Review</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-700 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredIngredients.map((item, index) => (
-                  <TableRow key={item.id} className={index % 2 === 0 ? "bg-gray-50/50" : ""}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.category}</Badge>
+                  <TableRow key={item.id} className="border-b border-slate-200 hover:bg-slate-50">
+                    <TableCell className="text-xs font-medium text-slate-900">{item.name}</TableCell>
+                    <TableCell className="text-xs">
+                      <Badge variant="outline" className="text-xs rounded-[4px] border-slate-200">{item.category}</Badge>
                     </TableCell>
-                    <TableCell>{item.supplier}</TableCell>
-                    <TableCell>{item.brand || "-"}</TableCell>
-                    <TableCell className="text-right font-mono">{item.costDisplay || formatTHB(item.cost)}</TableCell>
-                    <TableCell className="text-sm">{item.packageSize || "-"}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-xs text-slate-700">{item.supplier}</TableCell>
+                    <TableCell className="text-xs text-slate-700">{item.brand || "-"}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-slate-900">{item.costDisplay || formatTHB(item.cost)}</TableCell>
+                    <TableCell className="text-xs text-slate-700">{item.packageSize || "-"}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-slate-700">
                       {item.unitPrice > 0 ? (
                         <div className="space-y-1">
                           <div>{formatUnitPrice(item.unitPrice, item.calculations?.packageSize?.unit || 'unit')}</div>
                           {item.calculations?.calculationNote && (
-                            <div className="text-xs text-gray-500 max-w-32 truncate" title={item.calculations.calculationNote}>
+                            <div className="text-xs text-slate-500 max-w-32 truncate" title={item.calculations.calculationNote}>
                               <Calculator className="h-3 w-3 inline mr-1" />
                               Calculated
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-slate-400">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">{item.portionSize || "-"}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold">
+                    <TableCell className="text-xs text-slate-700">{item.portionSize || "-"}</TableCell>
+                    <TableCell className="text-xs text-right font-mono font-semibold">
                       {item.costPerPortion > 0 ? (
                         <div className="space-y-1">
-                          <div className="text-green-700">{formatTHB(item.costPerPortion)}</div>
-                          <div className="text-xs text-gray-500">per portion</div>
+                          <div className="text-emerald-700">{formatTHB(item.costPerPortion)}</div>
+                          <div className="text-xs text-slate-500 font-normal">per portion</div>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-slate-400">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">{item.lastReview || "-"}</TableCell>
+                    <TableCell className="text-xs text-slate-700">{item.lastReview || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
                         <Button 
                           variant="ghost" 
                           size="sm"
                           disabled
+                          className="text-xs"
                           onClick={() => {
                             setEditingItem(item);
                             setIsEditDialogOpen(true);
@@ -488,20 +495,20 @@ export default function IngredientManagement() {
                         {item.source === 'manual' && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" disabled className="text-red-600 hover:text-red-700">
+                              <Button variant="ghost" size="sm" disabled className="text-xs text-red-600 hover:text-red-700">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="rounded-[4px]">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Ingredient</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogTitle className="text-sm">Delete Ingredient</AlertDialogTitle>
+                                <AlertDialogDescription className="text-xs">
                                   This will permanently delete "{item.name}". This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction disabled>Delete (Coming Soon)</AlertDialogAction>
+                                <AlertDialogCancel className="text-xs rounded-[4px]">Cancel</AlertDialogCancel>
+                                <AlertDialogAction disabled className="text-xs rounded-[4px]">Delete (Coming Soon)</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -514,7 +521,7 @@ export default function IngredientManagement() {
             </Table>
             
             {filteredIngredients.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-xs text-slate-500">
                 No ingredients found matching your search criteria.
               </div>
             )}
@@ -523,19 +530,19 @@ export default function IngredientManagement() {
       </Card>
 
       {/* Info Panel */}
-      <Card className="mt-6">
+      <Card className="mt-4 border-slate-200" style={{ borderRadius: '4px' }}>
         <CardContent className="p-4">
-          <div className="text-sm text-gray-600 space-y-2">
+          <div className="text-xs text-slate-600 space-y-2">
             <div className="flex items-center gap-2">
-              <Crown className="h-4 w-4 text-yellow-600" />
+              <Crown className="h-4 w-4 text-amber-600" />
               <strong>God File Items:</strong> Sourced from foodCostings.ts (66 items). Use "Sync from God File" to reset any changes.
             </div>
             <div className="flex items-center gap-2">
-              <Edit className="h-4 w-4 text-blue-600" />
+              <Edit className="h-4 w-4 text-emerald-600" />
               <strong>Manual Items:</strong> Added via UI. Will persist until manually deleted or god file sync overwrites.
             </div>
             <div className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-green-600" />
+              <RefreshCw className="h-4 w-4 text-emerald-600" />
               <strong>Sync Strategy:</strong> foodCostings.ts is the permanent source of truth. Manual edits supplement but can be reset.
             </div>
           </div>
