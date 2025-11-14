@@ -445,12 +445,12 @@ export default function RecipesUnified() {
   return (
     <div className="min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Recipe Management</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Recipe Management</h1>
         <div className="flex gap-3 items-center">
           <Button 
             onClick={() => setView(view === "cards" ? "calculator" : "cards")}
             variant={view === "calculator" ? "default" : "outline"}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-xs rounded-[4px]"
           >
             {view === "cards" ? <Calculator className="h-4 w-4" /> : <ChefHat className="h-4 w-4" />}
             {view === "cards" ? "Cost Calculator" : "Recipe Cards"}
@@ -462,10 +462,10 @@ export default function RecipesUnified() {
         // ---- RECIPE CARDS VIEW ----
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <div className="text-sm font-medium text-slate-600">
+            <div className="text-xs font-medium text-slate-600">
               {recipes.length} Recipe{recipes.length !== 1 ? 's' : ''} Available
             </div>
-            <Button onClick={() => { resetCalculator(); setView("calculator"); }} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={() => { resetCalculator(); setView("calculator"); }} className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]">
               <Plus className="h-4 w-4 mr-2" />
               Create Recipe
             </Button>
@@ -473,7 +473,7 @@ export default function RecipesUnified() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recipes.map((recipe: Recipe) => (
-              <Card key={recipe.id} className="hover:shadow-lg transition-shadow rounded-[4px]">
+              <Card key={recipe.id} className="hover:shadow-lg transition-shadow border-slate-200" style={{ borderRadius: '4px' }}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-sm font-semibold">{recipe.name}</CardTitle>
@@ -514,7 +514,7 @@ export default function RecipesUnified() {
                       onClick={() => loadRecipeToCalculator(recipe)}
                       variant="outline" 
                       size="sm" 
-                      className="flex-1"
+                      className="flex-1 text-xs rounded-[4px] border-slate-200"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -523,7 +523,7 @@ export default function RecipesUnified() {
                       onClick={() => deleteMutation.mutate(recipe.id)}
                       variant="outline" 
                       size="sm"
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 text-xs rounded-[4px] border-slate-200"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -531,7 +531,7 @@ export default function RecipesUnified() {
                       asChild
                       variant="outline" 
                       size="sm"
-                      className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                      className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-xs rounded-[4px]"
                       title="Generate professional A4 recipe card with QR code"
                       data-testid={`button-generate-card-${recipe.id}`}
                     >
@@ -550,7 +550,7 @@ export default function RecipesUnified() {
               <ChefHat className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-sm font-semibold text-slate-600 mb-2">No Recipes Yet</h3>
               <p className="text-xs text-slate-500 mb-4">Start creating your first recipe with our cost calculator</p>
-              <Button onClick={() => setView("calculator")} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button onClick={() => setView("calculator")} className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]">
                 <Plus className="h-4 w-4 mr-2" />
                 Create First Recipe
               </Button>
@@ -587,10 +587,10 @@ export default function RecipesUnified() {
                   value={recipeName} 
                   onChange={(e) => setRecipeName(e.target.value)} 
                   placeholder="Recipe name" 
-                  className="mt-2" 
+                  className="mt-2 text-xs rounded-[4px] border-slate-200" 
                 />
                 <Select value={recipeCategory} onValueChange={setRecipeCategory}>
-                  <SelectTrigger className="mt-3">
+                  <SelectTrigger className="mt-3 text-xs rounded-[4px] border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -609,7 +609,7 @@ export default function RecipesUnified() {
                       min={1} 
                       value={portions} 
                       onChange={(e) => setPortions(num(e.target.value))} 
-                      className="mt-2" 
+                      className="mt-2 text-xs rounded-[4px] border-slate-200" 
                     />
                   </div>
                   <div>
@@ -620,7 +620,7 @@ export default function RecipesUnified() {
                       max={100} 
                       value={wastePct} 
                       onChange={(e) => setWastePct(num(e.target.value))} 
-                      className="mt-2" 
+                      className="mt-2 text-xs rounded-[4px] border-slate-200" 
                     />
                   </div>
                 </div>
@@ -631,7 +631,7 @@ export default function RecipesUnified() {
                     min={0} 
                     value={menuPrice} 
                     onChange={(e) => setMenuPrice(num(e.target.value))} 
-                    className="mt-2" 
+                    className="mt-2 text-xs rounded-[4px] border-slate-200" 
                   />
                 </div>
               </div>
@@ -644,7 +644,7 @@ export default function RecipesUnified() {
                     value={search} 
                     onChange={(e) => setSearch(e.target.value)} 
                     placeholder="Search ingredients…" 
-                    className="flex-1" 
+                    className="flex-1 text-xs rounded-[4px] border-slate-200" 
                   />
                 </div>
                 {search && (
@@ -695,12 +695,12 @@ export default function RecipesUnified() {
                             min={0} 
                             value={l.qty} 
                             onChange={(e) => updateQty(idx, num(e.target.value))} 
-                            className="w-28 text-right" 
+                            className="w-28 text-right text-xs rounded-[4px] border-slate-200" 
                           />
                         </td>
                         <td className="p-2">
                           <Select value={l.unit} onValueChange={(value: UnitType) => updateUnit(idx, value)}>
-                            <SelectTrigger className="w-20">
+                            <SelectTrigger className="w-20 text-xs rounded-[4px] border-slate-200">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -718,7 +718,7 @@ export default function RecipesUnified() {
                             onClick={() => removeLine(idx)} 
                             variant="ghost" 
                             size="sm"
-                            className="text-rose-600 hover:text-rose-800"
+                            className="text-rose-600 hover:text-rose-800 text-xs"
                           >
                             Remove
                           </Button>
@@ -775,8 +775,8 @@ export default function RecipesUnified() {
           <div className="bg-white rounded-[4px] shadow-sm border border-slate-200">
             <div className="p-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Recipe Description</h3>
-                <Button onClick={generateDescription} className="bg-emerald-600 hover:bg-emerald-700">
+                <h3 className="text-sm font-medium text-slate-900">Recipe Description</h3>
+                <Button onClick={generateDescription} className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]">
                   {chefMode === "ramsay" ? "Ask Chef Ramsay" : "Generate Description"}
                 </Button>
               </div>
@@ -784,7 +784,7 @@ export default function RecipesUnified() {
                 value={recipeDesc} 
                 onChange={(e) => setRecipeDesc(e.target.value)} 
                 placeholder="Recipe description for Grab, ingredients, preparation notes..." 
-                className="mt-4 w-full border border-slate-200 rounded-[4px] px-3 py-2 h-24 resize-none text-xs" 
+                className="mt-4 w-full border border-slate-200 rounded-[4px] px-3 py-2 h-24 resize-none text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" 
               />
             </div>
           </div>
@@ -795,6 +795,7 @@ export default function RecipesUnified() {
               <Button 
                 onClick={() => setView("cards")} 
                 variant="outline"
+                className="text-xs rounded-[4px] border-slate-200"
               >
                 Back to Recipes
               </Button>
@@ -806,6 +807,7 @@ export default function RecipesUnified() {
                     setSelectedRecipe(null);
                   }} 
                   variant="outline"
+                  className="text-xs rounded-[4px] border-slate-200"
                 >
                   Cancel Edit
                 </Button>
@@ -814,7 +816,7 @@ export default function RecipesUnified() {
             <Button 
               onClick={saveRecipe} 
               disabled={!recipeName.trim() || linesWithCosts.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]"
             >
               {isEditing ? "Update Recipe" : "Save Recipe"}
             </Button>
