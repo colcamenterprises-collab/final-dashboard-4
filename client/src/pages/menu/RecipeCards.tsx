@@ -97,7 +97,7 @@ export default function RecipeCards() {
     return matchesSearch && matchesCategory;
   });
 
-  // Generate A4 PDF card for a single recipe
+  // Generate A4 PDF card for a single recipe (OPTIMIZED FOR SINGLE PAGE)
   const generatePDFCard = async (recipe: Recipe) => {
     try {
       setIsGenerating(true);
@@ -112,46 +112,39 @@ export default function RecipeCards() {
       const textColor: [number, number, number] = [31, 41, 55]; // gray-800
       const lightGray: [number, number, number] = [243, 244, 246]; // gray-100
       
-      // Header with restaurant branding
+      // Header with restaurant branding (COMPACT: 15mm)
       pdf.setFillColor(...primaryColor);
-      pdf.rect(0, 0, pageWidth, 25, 'F');
+      pdf.rect(0, 0, pageWidth, 15, 'F');
       
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(18);
+      pdf.setFontSize(14);
       pdf.setTextColor(255, 255, 255);
-      pdf.text('SMASH BROTHERS BURGERS', 15, 17);
+      pdf.text('SMASH BROTHERS BURGERS', 15, 10);
       
-      // Recipe title
+      // Recipe title (COMPACT)
       pdf.setTextColor(...textColor);
-      pdf.setFontSize(24);
+      pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(recipe.name, 15, 40);
+      pdf.text(recipe.name, 15, 25);
       
-      // Version badge
-      pdf.setFillColor(...lightGray);
-      pdf.roundedRect(15, 45, 25, 8, 2, 2, 'F');
-      pdf.setFontSize(10);
+      // Version & Category on same line (COMPACT)
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`v${recipe.version}`, 17, 50);
+      pdf.text(`v${recipe.version} | ${recipe.category}`, 15, 31);
       
-      // Category
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Category: ${recipe.category}`, 50, 50);
-      
-      // Description
+      // Description (COMPACT: max 2 lines, small font)
+      let yPos = 38;
       if (recipe.description) {
-        pdf.setFontSize(11);
+        pdf.setFontSize(8);
         pdf.setFont('helvetica', 'italic');
-        const descLines = pdf.splitTextToSize(recipe.description, 180);
-        pdf.text(descLines, 15, 65);
+        const descLines = pdf.splitTextToSize(recipe.description, 180).slice(0, 2); // Max 2 lines
+        pdf.text(descLines, 15, yPos);
+        yPos += descLines.length * 4;
       }
       
-      // Recipe Image
-      let yPos = recipe.description ? 80 : 65;
+      // Recipe Image (COMPACT: 50mm x 35mm max)
       if (recipe.image_url) {
         try {
-          // Create a promise to load the image
           const img = new Image();
           img.crossOrigin = 'anonymous';
           
@@ -161,36 +154,32 @@ export default function RecipeCards() {
             img.src = recipe.image_url;
           });
           
-          // Add image to PDF (centered, max width 80mm, max height 60mm)
-          const maxWidth = 80;
-          const maxHeight = 60;
-          
-          // Calculate uniform scale to maintain aspect ratio
+          const maxWidth = 50;
+          const maxHeight = 35;
           const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
           const imgWidth = img.width * scale;
           const imgHeight = img.height * scale;
-          const imgX = (pageWidth - imgWidth) / 2; // Center horizontally
+          const imgX = (pageWidth - imgWidth) / 2;
           
           pdf.addImage(img, 'JPEG', imgX, yPos, imgWidth, imgHeight);
-          yPos += imgHeight + 10;
+          yPos += imgHeight + 4;
         } catch (error) {
           console.warn('Could not load recipe image for PDF:', error);
-          // Continue without image
         }
       }
       
-      // Cost information section
+      // Cost information section (COMPACT: single line per item)
       pdf.setFillColor(...primaryColor);
-      pdf.rect(15, yPos, 180, 6, 'F');
+      pdf.rect(15, yPos, 180, 5, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(12);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('COST BREAKDOWN', 17, yPos + 4);
+      pdf.text('COST BREAKDOWN', 17, yPos + 3.5);
       
-      yPos += 12;
+      yPos += 8;
       pdf.setTextColor(...textColor);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(11);
+      pdf.setFontSize(8);
       
       const totalCost = Number(recipe.total_cost ?? 0) || 0;
       const costPerServing = Number(recipe.cost_per_serving ?? 0) || 0;
@@ -198,121 +187,99 @@ export default function RecipeCards() {
       const margin = suggestedPrice - costPerServing;
       const marginPercent = suggestedPrice > 0 ? ((margin / suggestedPrice) * 100).toFixed(1) : '0';
       
-      pdf.text(`Total Cost: ฿${totalCost.toFixed(2)}`, 17, yPos);
-      pdf.text(`Cost Per Serving: ฿${costPerServing.toFixed(2)}`, 17, yPos + 6);
-      pdf.text(`Suggested Price: ฿${suggestedPrice.toFixed(2)}`, 17, yPos + 12);
-      pdf.text(`Profit Margin: ฿${margin.toFixed(2)} (${marginPercent}%)`, 17, yPos + 18);
+      pdf.text(`Total: ฿${totalCost.toFixed(2)} | Per Serving: ฿${costPerServing.toFixed(2)} | Price: ฿${suggestedPrice.toFixed(2)} | Margin: ${marginPercent}%`, 17, yPos);
       
-      // Ingredients section
-      yPos += 30;
+      // Ingredients section (COMPACT: 3mm spacing)
+      yPos += 7;
       pdf.setFillColor(...primaryColor);
-      pdf.rect(15, yPos, 180, 6, 'F');
+      pdf.rect(15, yPos, 180, 5, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(12);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('INGREDIENTS', 17, yPos + 4);
+      pdf.text('INGREDIENTS', 17, yPos + 3.5);
       
-      yPos += 12;
+      yPos += 8;
       pdf.setTextColor(...textColor);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
+      pdf.setFontSize(7);
       
       if (recipe.ingredients && recipe.ingredients.length > 0) {
-        recipe.ingredients.forEach((ingredient, index) => {
-          if (yPos > 250) { // Start new page if needed
-            pdf.addPage();
-            yPos = 20;
-          }
-          
+        recipe.ingredients.forEach((ingredient) => {
           const qty = Number(ingredient.qty ?? 0) || 0;
           const costTHB = Number(ingredient.costTHB ?? 0) || 0;
-          const line = `${qty}${ingredient.unit || ''} ${ingredient.name || ''} - ฿${costTHB.toFixed(2)} (${ingredient.supplier || 'Unknown'})`;
+          const line = `${qty}${ingredient.unit || ''} ${ingredient.name || ''} - ฿${costTHB.toFixed(2)}`;
           pdf.text(line, 17, yPos);
-          yPos += 5;
+          yPos += 3;
         });
       } else {
         pdf.text('No ingredients specified', 17, yPos);
-        yPos += 5;
+        yPos += 3;
       }
       
-      // Instructions section
-      if (recipe.instructions) {
-        yPos += 10;
-        if (yPos > 240) {
-          pdf.addPage();
-          yPos = 20;
-        }
-        
+      // Instructions section (COMPACT: if exists, truncate to fit)
+      if (recipe.instructions && yPos < 260) {
+        yPos += 4;
         pdf.setFillColor(...primaryColor);
-        pdf.rect(15, yPos, 180, 6, 'F');
+        pdf.rect(15, yPos, 180, 5, 'F');
         pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(12);
+        pdf.setFontSize(9);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('INSTRUCTIONS', 17, yPos + 4);
+        pdf.text('INSTRUCTIONS', 17, yPos + 3.5);
         
-        yPos += 12;
+        yPos += 8;
         pdf.setTextColor(...textColor);
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(10);
+        pdf.setFontSize(7);
         
         const instructionLines = pdf.splitTextToSize(recipe.instructions, 180);
-        instructionLines.forEach((line: string) => {
-          if (yPos > 280) {
-            pdf.addPage();
-            yPos = 20;
-          }
+        const maxLines = Math.floor((270 - yPos) / 3); // Calculate remaining space
+        instructionLines.slice(0, maxLines).forEach((line: string) => {
           pdf.text(line, 17, yPos);
-          yPos += 5;
+          yPos += 3;
         });
       }
       
-      // Notes section
-      if (recipe.notes) {
-        yPos += 10;
-        if (yPos > 240) {
-          pdf.addPage();
-          yPos = 20;
-        }
-        
+      // Notes section (COMPACT: only if space available)
+      if (recipe.notes && yPos < 260) {
+        yPos += 4;
         pdf.setFillColor(...lightGray);
-        pdf.rect(15, yPos, 180, 6, 'F');
+        pdf.rect(15, yPos, 180, 5, 'F');
         pdf.setTextColor(...textColor);
-        pdf.setFontSize(12);
+        pdf.setFontSize(9);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('NOTES', 17, yPos + 4);
+        pdf.text('NOTES', 17, yPos + 3.5);
         
-        yPos += 12;
+        yPos += 8;
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(10);
+        pdf.setFontSize(7);
         
         const noteLines = pdf.splitTextToSize(recipe.notes, 180);
-        noteLines.forEach((line: string) => {
-          if (yPos > 280) {
-            pdf.addPage();
-            yPos = 20;
-          }
+        const maxLines = Math.floor((270 - yPos) / 3);
+        noteLines.slice(0, maxLines).forEach((line: string) => {
           pdf.text(line, 17, yPos);
-          yPos += 5;
+          yPos += 3;
         });
       }
       
-      // QR code for digital access (bottom right)
+      // QR code for digital access (bottom right, COMPACT: 25x25mm)
       try {
         const qrCodeUrl = `${window.location.origin}/menu/recipes/${recipe.id}`;
-        const qrDataURL = await QRCode.toDataURL(qrCodeUrl, { width: 256 });
-        pdf.addImage(qrDataURL, 'PNG', 160, 260, 30, 30);
+        const qrDataURL = await QRCode.toDataURL(qrCodeUrl, { width: 200 });
+        pdf.addImage(qrDataURL, 'PNG', 165, 265, 25, 25);
         
-        pdf.setFontSize(8);
+        pdf.setFontSize(7);
         pdf.setFont('helvetica', 'normal');
-        pdf.text('Scan for digital recipe', 160, 275);
+        pdf.setTextColor(128, 128, 128);
+        pdf.text('Scan for', 165, 292);
+        pdf.text('digital recipe', 165, 295);
       } catch (error) {
         console.warn('Could not generate QR code:', error);
       }
       
-      // Footer
-      pdf.setFontSize(8);
+      // Footer (COMPACT)
+      pdf.setFontSize(7);
       pdf.setTextColor(128, 128, 128);
-      pdf.text(`Generated: ${new Date().toLocaleDateString()} | Recipe ID: ${recipe.id}`, 15, 290);
+      pdf.text(`Generated: ${new Date().toLocaleDateString()} | ID: ${recipe.id}`, 15, 292);
       
       // Save the PDF
       pdf.save(`${recipe.name.replace(/[^a-zA-Z0-9]/g, '_')}_Recipe_Card.pdf`);
