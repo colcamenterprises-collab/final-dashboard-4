@@ -230,25 +230,25 @@ export default function IngredientManagement() {
 
   return (
     <div className="p-4" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-baseline md:justify-between">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Ingredient Management</h1>
-        <div className="flex gap-3 items-center flex-wrap">
+        <div className="flex flex-col gap-2 md:flex-row md:gap-3 md:items-center">
           <Button 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className="bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-[4px]"
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-[4px] w-full md:w-auto"
           >
             <Crown className="h-4 w-4 mr-2" />
             {syncMutation.isPending ? "Syncing..." : "Sync from God File"}
           </Button>
           <Button 
             onClick={syncToGodFile}
-            className="bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-[4px]"
+            className="bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-[4px] w-full md:w-auto"
           >
             <Upload className="h-4 w-4 mr-2" />
             Sync to God File
           </Button>
-          <Button onClick={exportCSV} variant="outline" className="text-xs rounded-[4px] border-slate-200">
+          <Button onClick={exportCSV} variant="outline" className="text-xs rounded-[4px] border-slate-200 w-full md:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
@@ -256,7 +256,7 @@ export default function IngredientManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <Card className="border-slate-200" style={{ borderRadius: '4px' }}>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
@@ -290,20 +290,20 @@ export default function IngredientManagement() {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex gap-3 mb-4 flex-wrap">
-        <div className="flex-1 min-w-64">
+      <div className="flex flex-col gap-3 mb-4 md:flex-row">
+        <div className="flex-1">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search ingredients, suppliers, brands..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 text-xs rounded-[4px] border-slate-200"
+              className="pl-10 text-xs rounded-[4px] border-slate-200 w-full"
             />
           </div>
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-48 text-xs rounded-[4px] border-slate-200">
+          <SelectTrigger className="w-full md:w-48 text-xs rounded-[4px] border-slate-200">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="rounded-[4px]">
@@ -314,7 +314,7 @@ export default function IngredientManagement() {
         </Select>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]">
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px] w-full md:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
@@ -423,7 +423,71 @@ export default function IngredientManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-auto">
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-3">
+            {filteredIngredients.map((item) => (
+              <Card key={item.id} className="border-slate-200" style={{ borderRadius: '4px' }}>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">{item.name}</div>
+                      <Badge variant="outline" className="text-xs rounded-[4px] border-slate-200 mt-1">{item.category}</Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        disabled
+                        className="text-xs h-7 w-7 p-0"
+                        onClick={() => {
+                          setEditingItem(item);
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <div className="text-slate-500">Supplier</div>
+                      <div className="text-slate-900">{item.supplier}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Brand</div>
+                      <div className="text-slate-900">{item.brand || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Package Cost</div>
+                      <div className="font-mono text-slate-900">{item.costDisplay || formatTHB(item.cost)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Package Size</div>
+                      <div className="text-slate-900">{item.packageSize || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Portion Size</div>
+                      <div className="text-slate-900">{item.portionSize || "-"}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Cost/Portion</div>
+                      <div className="font-mono font-semibold text-emerald-700">
+                        {item.costPerPortion > 0 ? formatTHB(item.costPerPortion) : "-"}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {filteredIngredients.length === 0 && (
+              <div className="text-center py-8 text-xs text-slate-500">
+                No ingredients found matching your search criteria.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-slate-200">
