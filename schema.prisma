@@ -1580,3 +1580,21 @@ model MissingSkuEvent {
 
   @@unique([channel, kind, sku])
 }
+
+model PurchasingItem {
+  id              Int      @id @default(autoincrement())
+  item            String
+  category        String?
+  supplierName    String?
+  brand           String?
+  supplierSku     String?
+  orderUnit       String?
+  unitDescription String?
+  unitCost        Decimal? @db.Decimal(10, 2)
+  lastReviewDate  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("purchasing_items")
+}

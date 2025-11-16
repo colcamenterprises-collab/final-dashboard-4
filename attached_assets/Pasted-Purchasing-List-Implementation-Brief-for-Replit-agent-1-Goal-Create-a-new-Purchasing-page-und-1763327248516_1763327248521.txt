@@ -1,0 +1,294 @@
+Purchasing List – Implementation Brief (for Replit agent)
+
+1. Goal
+
+Create a new Purchasing page under the Operations section that:
+
+Uses the attached CSV (Purchasing list - Pricing - Supplier List new v1.1.csv) as the single source of truth for purchasable items.
+
+Is not linked to any other workflow yet (no Daily Sales/Stock, no recipes, no emails).
+
+Allows staff/management to:
+
+View all purchasing items.
+
+Edit pricing and other fields.
+
+Add new items.
+
+Delete items.
+
+
+
+This is a pure purchasing master list, nothing to do with portions, recipes, or ingredients.
+
+
+---
+
+2. Data Model (Prisma)
+
+Add a new model to the existing Prisma schema (do not touch the Drizzle/Fort Knox schema):
+
+model PurchasingItem {
+  id              Int      @id @default(autoincrement())
+  item            String
+  category        String?   // from CSV "Category"
+  supplierName    String?   // from CSV "Supplier Name"
+  brand           String?   // from CSV "Brand"
+  supplierSku     String?   // from CSV "Supplier SKU"
+  orderUnit       String?   // from CSV "Order Unit " (note the trailing space in header)
+  unitDescription String?   // from CSV "Unit Description"
+  unitCost        Decimal?  @db.Decimal(10, 2) // from CSV "Unit Cost"
+  lastReviewDate  String?   // store as text for now (e.g. "15/11/2025")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+Mapping from CSV → DB
+
+Use these column mappings:
+
+Item → item
+
+Category → category
+
+Supplier Name → supplierName
+
+Brand → brand
+
+Supplier SKU → supplierSku
+
+Order Unit  (trailing space) → orderUnit
+
+Unit Description → unitDescription
+
+Unit Cost → unitCost (strip "฿" and parse as decimal)
+
+Last Review Date → lastReviewDate (store as string, no parsing needed)
+
+
+Run a Prisma migration to add this table only.
+
+
+---
+
+3. Seed / Import Script
+
+Create a one-off import script, e.g. scripts/seedPurchasingList.ts:
+
+Reads /mnt/data/Purchasing list - Pricing - Supplier List new v1.1.csv (or the project’s equivalent path).
+
+For each row:
+
+Insert or upsert into PurchasingItem using item + supplierName + brand as a natural unique combo (or just insert; no need for dedupe logic if that’s easier).
+
+
+Expose a simple npm script:
+
+
+// package.json
+"scripts": {
+  "seed:purchasing": "ts-node scripts/seedPurchasingList.ts"
+}
+
+Cam (or the agent) can run this once to populate the table.
+
+> Guardrail: Do not overwrite or alter any existing tables. This is an additive table only.
+
+
+
+
+---
+
+4. Backend API
+
+Create a small CRUD API specifically for PurchasingItem. Example routes (adjust pathing to match existing API conventions):
+
+GET /api/purchasing-items
+
+Returns all items ordered by category, then item.
+
+
+POST /api/purchasing-items
+
+Create a new item.
+
+
+PUT /api/purchasing-items/:id
+
+Update an item (primarily unitCost, but all fields should be editable).
+
+
+DELETE /api/purchasing-items/:id
+
+Hard delete is fine for now.
+
+
+
+Important:
+
+No joins, no use of DailySales/DailyStock, no email integration.
+
+This API should only talk to the PurchasingItem table.
+
+
+
+---
+
+5. New “Purchasing” Page (Operations Tab)
+
+Location
+
+Add a new section under the Operations area called Purchasing.
+
+Route example: /operations/purchasing (follow whatever routing pattern the rest of the Operations pages use).
+
+Add a nav link/card in the Operations tab to this new page.
+
+
+Style Guide
+
+Use the existing layout + design system already used in Operations:
+
+Same page wrapper, header style, and card components.
+
+White/light base, dark/charcoal top nav, no emojis or playful icons.
+
+Respect existing font choices and spacing (do not introduce new visual styles).
+
+
+
+Page Layout
+
+Inside the page:
+
+1. Header
+
+Title: “Purchasing List”
+
+Subtext: short line like “Master list of all items we buy. Used for daily purchasing and stock planning.”
+
+
+
+2. Controls
+
+Search box (filters by item, brand, supplierName, category).
+
+Optional dropdown filter by Category.
+
+
+
+3. Table
+
+
+
+Columns (minimum):
+
+Item
+
+Category
+
+Supplier
+
+Brand
+
+Supplier SKU
+
+Order Unit
+
+Unit Description
+
+Unit Cost
+
+Last Review Date
+
+Actions
+
+
+Behaviour:
+
+Unit Cost should be inline editable (click-to-edit, then auto-save or save-on-blur).
+
+Other fields can also be editable (either inline or via row modal).
+
+Unit cost format: show with currency symbol (฿) in UI, but send numeric only to API.
+
+
+4. Add New Item
+
+
+
+Button: “Add Item” (top right above table).
+
+Clicking opens a small form (modal or inline row) with:
+
+Item (required)
+
+Category
+
+Supplier
+
+Brand
+
+Supplier SKU
+
+Order Unit
+
+Unit Description
+
+Unit Cost
+
+
+On submit, call POST /api/purchasing-items and update the table.
+
+
+5. Delete Item
+
+
+
+Each row has a simple “Delete” action (text button is fine).
+
+Confirm dialog before delete.
+
+On confirm, call DELETE /api/purchasing-items/:id and remove from table.
+
+
+
+---
+
+6. Explicit Non-Requirements (Do NOT do yet)
+
+To avoid confusion:
+
+Do not link this list to:
+
+Ingredients table.
+
+Recipes or menu items.
+
+Daily Sales & Stock V2 forms (Form 1 or Form 2).
+
+Daily Review / 9am email.
+
+
+Do not change any existing form fields or workflows.
+
+Do not refactor or rename “ingredients” entities.
+
+Do not introduce new relationships from PurchasingItem to other tables yet.
+
+
+This is a standalone, editable master list only.
+
+
+---
+
+7. Future Link (Context only, no implementation now)
+
+For context only (no action now):
+
+When staff fill Daily Sales & Stock V2 – Form 2, the number they enter next to an item represents the count of purchasing units (e.g. 1 = one “Order Unit / Unit Description” for that item).
+
+Later, we will map those form fields to PurchasingItem records to generate automatic purchasing lists.
+
