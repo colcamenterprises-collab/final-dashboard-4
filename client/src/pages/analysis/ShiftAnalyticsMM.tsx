@@ -91,6 +91,16 @@ export default function ShiftAnalyticsMM() {
   const [tab, setTab] = useState<string>('all');
   const filtered = useMemo(() => tab === 'all' ? items : items.filter(i => i.category === tab), [items, tab]);
 
+  const totals = useMemo(() => {
+    return filtered.reduce((acc, item) => ({
+      qty: acc.qty + (item.qty || 0),
+      patties: acc.patties + (item.patties || 0),
+      beef: acc.beef + ((item.red_meat_g ?? item.redMeatGrams ?? 0) as number),
+      chicken: acc.chicken + ((item.chicken_g ?? item.chickenGrams ?? 0) as number),
+      rolls: acc.rolls + (item.rolls || 0)
+    }), { qty: 0, patties: 0, beef: 0, chicken: 0, rolls: 0 });
+  }, [filtered]);
+
   function exportCSV() {
     const ymd = toYMD(date);
     window.location.href = `/api/analysis/shift/items.csv?date=${ymd}`;
@@ -125,36 +135,28 @@ export default function ShiftAnalyticsMM() {
         <button className="px-4 py-2 rounded-[4px] bg-slate-200 text-xs" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
       </div>
 
-      {rolls && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
-            <div className="text-slate-600">Start</div>
-            <div className="font-bold text-slate-900 mt-1">{rolls.rolls_start}</div>
-          </div>
-          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
-            <div className="text-slate-600">Purchased</div>
-            <div className="font-bold text-slate-900 mt-1">{rolls.rolls_purchased}</div>
-          </div>
-          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
-            <div className="text-slate-600">Burgers Sold</div>
-            <div className="font-bold text-slate-900 mt-1">{rolls.burgers_sold}</div>
-          </div>
-          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
-            <div className="text-slate-600">Estimated End</div>
-            <div className="font-bold text-slate-900 mt-1">{rolls.estimated_rolls_end}</div>
-          </div>
-          <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
-            <div className="text-slate-600">Actual End</div>
-            <div className="font-bold text-slate-900 mt-1">{rolls.actual_rolls_end ?? '—'}</div>
-          </div>
-          <div className={`p-2 border border-slate-200 rounded-[4px] font-bold text-center ${
-            rolls.status === 'OK' ? 'bg-emerald-100 text-emerald-800' :
-            rolls.status === 'ALERT' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-            <div>{rolls.status}</div>
-            {rolls.actual_rolls_end !== null && <div className="text-xs font-normal mt-1">{rolls.variance >= 0 ? '+' : ''}{rolls.variance}</div>}
-          </div>
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+        <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+          <div className="text-slate-600">QTY</div>
+          <div className="font-bold text-slate-900 mt-1">{totals.qty}</div>
         </div>
-      )}
+        <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+          <div className="text-slate-600">Patties</div>
+          <div className="font-bold text-slate-900 mt-1">{totals.patties}</div>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+          <div className="text-slate-600">Beef (g)</div>
+          <div className="font-bold text-slate-900 mt-1">{totals.beef}</div>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+          <div className="text-slate-600">Chicken (g)</div>
+          <div className="font-bold text-slate-900 mt-1">{totals.chicken}</div>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
+          <div className="text-slate-600">Rolls</div>
+          <div className="font-bold text-slate-900 mt-1">{totals.rolls}</div>
+        </div>
+      </div>
 
       <div className="mt-4 flex gap-2 flex-wrap">
         {categories.map(c => (
@@ -191,6 +193,16 @@ export default function ShiftAnalyticsMM() {
                 <td className="px-3 py-2 text-right text-slate-700">{it.rolls ?? 0}</td>
               </tr>
             ))}
+            {filtered.length > 0 && (
+              <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
+                <td className="px-3 py-2 text-slate-700" colSpan={3}>TOTAL</td>
+                <td className="px-3 py-2 text-right text-slate-900">{totals.qty}</td>
+                <td className="px-3 py-2 text-right text-slate-900">{totals.patties}</td>
+                <td className="px-3 py-2 text-right text-slate-900">{totals.beef}</td>
+                <td className="px-3 py-2 text-right text-slate-900">{totals.chicken}</td>
+                <td className="px-3 py-2 text-right text-slate-900">{totals.rolls}</td>
+              </tr>
+            )}
             {!filtered.length && <tr><td colSpan={8} className="px-3 py-3 text-slate-500 text-center">No items</td></tr>}
           </tbody>
         </table>
