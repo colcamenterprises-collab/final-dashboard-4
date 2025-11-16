@@ -25,6 +25,17 @@ type ShiftResp = {
   toISO: string;
   items: ShiftItem[];
   modifiers?: ShiftModifier[];
+  metrics?: {
+    receiptCount: number;
+    totalSales: number;
+    payments: {
+      Cash: number;
+      Grab: number;
+      QR: number;
+      Other: number;
+    };
+    topByCategory: Record<string, Array<{name: string; qty: number}>>;
+  };
 };
 type RollsRow = {
   shift_date: string;
@@ -62,6 +73,7 @@ export default function ShiftAnalyticsMM() {
   const [fresh, setFresh] = useState<Freshness>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [metrics, setMetrics] = useState<ShiftResp['metrics']>(undefined);
 
   async function loadAll() {
     setLoading(true); setError("");
@@ -71,6 +83,7 @@ export default function ShiftAnalyticsMM() {
       setItems(a?.items ?? []); 
       setModifiers(a?.modifiers ?? []);
       setSourceUsed(a?.sourceUsed ?? "");
+      setMetrics(a?.metrics);
 
       const b = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r=>r.json());
       setRolls(b?.row ?? null);
@@ -78,7 +91,7 @@ export default function ShiftAnalyticsMM() {
       const f = await fetch(`/api/analysis/freshness?date=${ymd}`).then(r=>r.json());
       setFresh(f?.freshness ?? null);
     } catch (e:any) {
-      setError(e?.message ?? "Failed to load"); setItems([]); setModifiers([]); setRolls(null); setFresh(null);
+      setError(e?.message ?? "Failed to load"); setItems([]); setModifiers([]); setRolls(null); setFresh(null); setMetrics(undefined);
     } finally { setLoading(false); }
   }
 
@@ -144,6 +157,52 @@ export default function ShiftAnalyticsMM() {
         </button>
         <button className="px-4 py-2 rounded-[4px] bg-slate-200 text-xs" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
       </div>
+
+      {metrics && (
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="p-3 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Receipts</div>
+            <div className="font-bold text-slate-900 mt-1 text-lg">{metrics.receiptCount}</div>
+          </div>
+          <div className="p-3 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Cash</div>
+            <div className="font-bold text-slate-900 mt-1 text-lg">{metrics.payments.Cash}</div>
+          </div>
+          <div className="p-3 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Grab</div>
+            <div className="font-bold text-slate-900 mt-1 text-lg">{metrics.payments.Grab}</div>
+          </div>
+          <div className="p-3 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">QR</div>
+            <div className="font-bold text-slate-900 mt-1 text-lg">{metrics.payments.QR}</div>
+          </div>
+          <div className="p-3 border border-slate-200 rounded-[4px] bg-white">
+            <div className="text-slate-600">Other</div>
+            <div className="font-bold text-slate-900 mt-1 text-lg">{metrics.payments.Other}</div>
+          </div>
+        </div>
+      )}
+
+      {metrics && Object.keys(metrics.topByCategory).length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-sm font-bold text-slate-900 mb-2">Top 5 Items by Category</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.entries(metrics.topByCategory).map(([category, topItems]) => (
+              <div key={category} className="p-3 border border-slate-200 rounded-[4px] bg-white">
+                <h3 className="text-xs font-bold text-emerald-600 mb-2">{category}</h3>
+                <div className="space-y-1">
+                  {topItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-xs">
+                      <span className="text-slate-700 truncate flex-1">{item.name}</span>
+                      <span className="font-bold text-slate-900 ml-2">{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
         <div className="p-2 border border-slate-200 rounded-[4px] bg-white">

@@ -13,6 +13,7 @@ router.get("/analysis/shift/items", async (req, res) => {
     const rawDate = req.query.date as string;
     const shiftDate = normalizeDateParam(rawDate);
     const category = req.query.category as string | undefined;
+    const { fromISO, toISO } = shiftWindow(shiftDate);
 
     const rows = await db.$queryRaw<any[]>`
       SELECT sku, name, category, qty, patties, red_meat_g, chicken_g, rolls
@@ -33,12 +34,78 @@ router.get("/analysis/shift/items", async (req, res) => {
       });
     }
 
+    const receiptsData = await db.$queryRaw<any[]>`
+      SELECT COUNT(*)::int as receipt_count, 
+             SUM(total_amount)::numeric as total_sales
+      FROM lv_receipt
+      WHERE datetime_bkk >= ${fromISO}::timestamptz 
+        AND datetime_bkk < ${toISO}::timestamptz`;
+
+    const paymentsData = await db.$queryRaw<any[]>`
+      SELECT 
+        CASE 
+          WHEN p->>'name' ILIKE '%cash%' THEN 'Cash'
+          WHEN p->>'name' ILIKE '%grab%' THEN 'Grab'
+          WHEN p->>'name' ILIKE '%scan%' OR p->>'name' ILIKE '%qr%' THEN 'QR'
+          ELSE 'Other'
+        END as payment_type,
+        COUNT(*)::int as count
+      FROM lv_receipt r,
+           jsonb_array_elements(r.payment_json) p
+      WHERE r.datetime_bkk >= ${fromISO}::timestamptz 
+        AND r.datetime_bkk < ${toISO}::timestamptz
+      GROUP BY payment_type`;
+
+    const topItemsByCategory = await db.$queryRaw<any[]>`
+      SELECT category, 
+             json_agg(json_build_object('name', name, 'qty', qty) ORDER BY qty DESC) FILTER (WHERE rn <= 5) as top_items
+      FROM (
+        SELECT category, name, qty,
+               ROW_NUMBER() OVER (PARTITION BY category ORDER BY qty DESC) as rn
+        FROM analytics_shift_item 
+        WHERE shift_date = ${shiftDate}::date
+      ) ranked
+      WHERE rn <= 5
+      GROUP BY category`;
+
+    const topModifiers = await db.$queryRaw<any[]>`
+      SELECT name, qty
+      FROM analytics_shift_modifier
+      WHERE shift_date = ${shiftDate}::date
+      ORDER BY qty DESC
+      LIMIT 5`;
+
+    const receiptCount = receiptsData[0]?.receipt_count || 0;
+    const totalSales = receiptsData[0]?.total_sales || 0;
+    
+    const payments = {
+      Cash: 0,
+      Grab: 0,
+      QR: 0,
+      Other: 0
+    };
+    paymentsData.forEach(p => {
+      payments[p.payment_type as keyof typeof payments] = p.count;
+    });
+
+    const topByCategory: Record<string, any[]> = {};
+    topItemsByCategory.forEach(cat => {
+      topByCategory[cat.category] = cat.top_items || [];
+    });
+    topByCategory['Modifiers'] = topModifiers;
+
     res.json({
       ok: true,
       sourceUsed: "cache",
       date: shiftDate,
       items: category ? rows.filter((x) => x.category === category) : rows,
       modifiers: modRows,
+      metrics: {
+        receiptCount,
+        totalSales,
+        payments,
+        topByCategory
+      }
     });
   } catch (error: any) {
     console.error("[shiftAnalysis] items query failed:", error);
