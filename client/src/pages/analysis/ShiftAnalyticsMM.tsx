@@ -167,43 +167,46 @@ export default function ShiftAnalyticsMM() {
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="min-w-[950px] w-full text-xs bg-white rounded-[4px] border border-slate-200">
+        <table className="w-full text-xs bg-white rounded-[4px] border border-slate-200">
           <thead>
             <tr className="text-left border-b border-slate-200 bg-slate-50">
-              <th className="px-3 py-2 font-medium text-slate-700">SKU</th>
-              <th className="px-3 py-2 font-medium text-slate-700">Item</th>
-              <th className="px-3 py-2 font-medium text-slate-700">Category</th>
-              <th className="px-3 py-2 text-right font-medium text-slate-700">Qty</th>
-              <th className="px-3 py-2 text-right font-medium text-slate-700">Patties</th>
-              <th className="px-3 py-2 text-right font-medium text-slate-700">Beef (g)</th>
-              <th className="px-3 py-2 text-right font-medium text-slate-700">Chicken (g)</th>
-              <th className="px-3 py-2 text-right font-medium text-slate-700">Rolls</th>
+              <th className="px-1 py-2 font-medium text-slate-700 hidden sm:table-cell">SKU</th>
+              <th className="px-1 py-2 font-medium text-slate-700">Item</th>
+              <th className="px-1 py-2 font-medium text-slate-700 hidden md:table-cell">Category</th>
+              <th className="px-1 py-2 text-right font-medium text-slate-700">Qty</th>
+              <th className="px-1 py-2 text-right font-medium text-slate-700">Patties</th>
+              <th className="px-1 py-2 text-right font-medium text-slate-700">Beef (g)</th>
+              <th className="px-1 py-2 text-right font-medium text-slate-700">Chicken (g)</th>
+              <th className="px-1 py-2 text-right font-medium text-slate-700">Rolls</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((it, i) => (
               <tr key={i} className="border-b border-slate-200 hover:bg-slate-50">
-                <td className="px-3 py-2 text-slate-700">{it.sku ?? ''}</td>
-                <td className="px-3 py-2 text-slate-900">{it.name}</td>
-                <td className="px-3 py-2 text-slate-700">{it.category}</td>
-                <td className="px-3 py-2 text-right text-slate-900">{it.qty}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{it.patties ?? 0}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{(it.red_meat_g ?? it.redMeatGrams ?? 0) as number}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{(it.chicken_g ?? it.chickenGrams ?? 0) as number}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{it.rolls ?? 0}</td>
+                <td className="px-1 py-2 text-slate-700 hidden sm:table-cell">{it.sku ?? ''}</td>
+                <td className="px-1 py-2 text-slate-900">{it.name}</td>
+                <td className="px-1 py-2 text-slate-700 hidden md:table-cell">{it.category}</td>
+                <td className="px-1 py-2 text-right text-slate-900">{it.qty}</td>
+                <td className="px-1 py-2 text-right text-slate-700">{it.patties ?? 0}</td>
+                <td className="px-1 py-2 text-right text-slate-700">{(it.red_meat_g ?? it.redMeatGrams ?? 0) as number}</td>
+                <td className="px-1 py-2 text-right text-slate-700">{(it.chicken_g ?? it.chickenGrams ?? 0) as number}</td>
+                <td className="px-1 py-2 text-right text-slate-700">{it.rolls ?? 0}</td>
               </tr>
             ))}
             {filtered.length > 0 && (
               <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-                <td className="px-3 py-2 text-slate-700" colSpan={3}>TOTAL</td>
-                <td className="px-3 py-2 text-right text-slate-900">{totals.qty}</td>
-                <td className="px-3 py-2 text-right text-slate-900">{totals.patties}</td>
-                <td className="px-3 py-2 text-right text-slate-900">{totals.beef}</td>
-                <td className="px-3 py-2 text-right text-slate-900">{totals.chicken}</td>
-                <td className="px-3 py-2 text-right text-slate-900">{totals.rolls}</td>
+                <td className="px-1 py-2 text-slate-700 hidden sm:table-cell" colSpan={1}></td>
+                <td className="px-1 py-2 text-slate-700 sm:hidden">TOTAL</td>
+                <td className="px-1 py-2 text-slate-700 hidden sm:table-cell">TOTAL</td>
+                <td className="px-1 py-2 text-slate-700 hidden md:table-cell"></td>
+                <td className="px-1 py-2 text-right text-slate-900">{totals.qty}</td>
+                <td className="px-1 py-2 text-right text-slate-900">{totals.patties}</td>
+                <td className="px-1 py-2 text-right text-slate-900">{totals.beef}</td>
+                <td className="px-1 py-2 text-right text-slate-900">{totals.chicken}</td>
+                <td className="px-1 py-2 text-right text-slate-900">{totals.rolls}</td>
               </tr>
             )}
-            {!filtered.length && <tr><td colSpan={8} className="px-3 py-3 text-slate-500 text-center">No items</td></tr>}
+            {!filtered.length && <tr><td colSpan={8} className="px-1 py-3 text-slate-500 text-center">No items</td></tr>}
           </tbody>
         </table>
       </div>
