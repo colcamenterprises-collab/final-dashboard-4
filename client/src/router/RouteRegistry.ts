@@ -7,6 +7,7 @@ export const ROUTES = {
   DAILY_SALES_LIBRARY: "/operations/daily-sales-v2/library",
   ANALYSIS: "/operations/analysis",
   SHOPPING_LIST: "/operations/shopping-list",
+  PURCHASING: "/operations/purchasing",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
