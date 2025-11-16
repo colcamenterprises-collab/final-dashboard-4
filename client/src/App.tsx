@@ -36,6 +36,7 @@ import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis"; // Hidden - can be re-enabled
+import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
@@ -90,6 +91,7 @@ export default function App() {
                   
                   {/* Purchasing Planner */}
                   <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
+                  <Route path="/operations/purchasing" element={<Guard><PurchasingPage /></Guard>} />
                   
                   {/* Analysis with nested routes */}
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
