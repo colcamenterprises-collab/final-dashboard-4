@@ -19,6 +19,11 @@ router.get("/analysis/shift/items", async (req, res) => {
       FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
       ORDER BY category, name`;
 
+    const modRows = await db.$queryRaw<any[]>`
+      SELECT sku, name, category, qty
+      FROM analytics_shift_modifier WHERE shift_date = ${shiftDate}::date
+      ORDER BY name`;
+
     if ((rows?.length ?? 0) === 0) {
       const out = await computeShiftAll(shiftDate);
       return res.json({
@@ -33,6 +38,7 @@ router.get("/analysis/shift/items", async (req, res) => {
       sourceUsed: "cache",
       date: shiftDate,
       items: category ? rows.filter((x) => x.category === category) : rows,
+      modifiers: modRows,
     });
   } catch (error: any) {
     console.error("[shiftAnalysis] items query failed:", error);

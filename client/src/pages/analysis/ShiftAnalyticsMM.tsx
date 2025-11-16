@@ -11,6 +11,12 @@ type ShiftItem = {
   chicken_g?: number;  chickenGrams?: number;
   rolls?: number;
 };
+type ShiftModifier = {
+  sku: string | null;
+  name: string;
+  category: string;
+  qty: number;
+};
 type ShiftResp = {
   ok: boolean;
   sourceUsed: 'live'|'cache';
@@ -18,6 +24,7 @@ type ShiftResp = {
   fromISO: string;
   toISO: string;
   items: ShiftItem[];
+  modifiers?: ShiftModifier[];
 };
 type RollsRow = {
   shift_date: string;
@@ -48,6 +55,7 @@ const toYMD = (v: string) => {
 export default function ShiftAnalyticsMM() {
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [items, setItems] = useState<ShiftItem[]>([]);
+  const [modifiers, setModifiers] = useState<ShiftModifier[]>([]);
   const [sourceUsed, setSourceUsed] = useState<"live"|"cache"|"">("");
   const [rolls, setRolls] = useState<RollsRow|null>(null);
   const [rollsHistory, setRollsHistory] = useState<RollsRow[]>([]);
@@ -60,7 +68,9 @@ export default function ShiftAnalyticsMM() {
     const ymd = toYMD(date);
     try {
       const a:ShiftResp = await fetch(`/api/analysis/shift/items?date=${ymd}`).then(r=>r.json());
-      setItems(a?.items ?? []); setSourceUsed(a?.sourceUsed ?? "");
+      setItems(a?.items ?? []); 
+      setModifiers(a?.modifiers ?? []);
+      setSourceUsed(a?.sourceUsed ?? "");
 
       const b = await fetch(`/api/analysis/rolls-ledger?date=${ymd}`).then(r=>r.json());
       setRolls(b?.row ?? null);
@@ -68,7 +78,7 @@ export default function ShiftAnalyticsMM() {
       const f = await fetch(`/api/analysis/freshness?date=${ymd}`).then(r=>r.json());
       setFresh(f?.freshness ?? null);
     } catch (e:any) {
-      setError(e?.message ?? "Failed to load"); setItems([]); setRolls(null); setFresh(null);
+      setError(e?.message ?? "Failed to load"); setItems([]); setModifiers([]); setRolls(null); setFresh(null);
     } finally { setLoading(false); }
   }
 
@@ -210,6 +220,34 @@ export default function ShiftAnalyticsMM() {
           </tbody>
         </table>
       </div>
+
+      {modifiers.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Modifiers & Extras</h2>
+          <div className="bg-white rounded-[4px] border border-slate-200 p-4">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left border-b border-slate-200 bg-slate-50">
+                  <th className="px-1 py-2 font-medium text-slate-700">Modifier</th>
+                  <th className="px-1 py-2 text-right font-medium text-slate-700">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modifiers.map((mod, i) => (
+                  <tr key={i} className="border-b border-slate-200">
+                    <td className="px-1 py-2 text-slate-900">{mod.name}</td>
+                    <td className="px-1 py-2 text-right text-slate-900">{mod.qty}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
+                  <td className="px-1 py-2 text-slate-700">TOTAL MODIFIERS</td>
+                  <td className="px-1 py-2 text-right text-slate-900">{modifiers.reduce((sum, m) => sum + m.qty, 0)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {rollsHistory.length > 0 && (
         <div className="mt-8">

@@ -15,7 +15,7 @@ type LvReceipt = {
     quantity: number;
     price?: number;
     sku?: string;
-    modifiers?: Array<{ name: string; quantity?: number; sku?: string }>;
+    line_modifiers?: Array<{ name?: string; option?: string; quantity?: number; sku?: string }>;
   }>;
   payments?: any[];
   employee?: { name?: string };
@@ -104,11 +104,12 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
               raw_json=EXCLUDED.raw_json`;
 
         let modNo = 0;
-        for (const m of li.modifiers ?? []) {
+        for (const m of li.line_modifiers ?? []) {
           modNo++;
+          const modName = m.option ?? m.name ?? "MOD";
           await db.$executeRaw`
             INSERT INTO lv_modifier (receipt_id, line_no, mod_no, sku, name, qty, raw_json)
-            VALUES (${rc.receipt_number}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${m.name ?? "MOD"},
+            VALUES (${rc.receipt_number}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${modName},
                     ${Number(m.quantity || 1)}, ${JSON.stringify(m)}::jsonb)
             ON CONFLICT (receipt_id, line_no, mod_no) DO UPDATE
             SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, raw_json=EXCLUDED.raw_json`;

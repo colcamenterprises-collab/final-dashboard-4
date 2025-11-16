@@ -38,6 +38,7 @@ export async function computeShiftAll(dateISO: string) {
   const excludeKey = new Set(exclusions.map(e=>`${e.receipt_id}#${e.line_no}`));
 
   // 3) Line items (all categories), SKU-first with alias fallback ONLY when sku is NULL
+  // EXCLUDE REFUND receipts
   const lineItems = await db.$queryRaw<{ sku:string|null; name:string; qty:number; receipt_id:string; line_no:number }[]>`
     SELECT COALESCE(li.sku, ia.sku) AS sku,
            li.name,
@@ -48,11 +49,13 @@ export async function computeShiftAll(dateISO: string) {
     JOIN lv_receipt r ON r.receipt_id = li.receipt_id
     LEFT JOIN item_alias ia ON li.sku IS NULL AND ia.alias_name = li.name
     WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
+      AND (r.raw_json->>'receipt_type') != 'REFUND'
     GROUP BY COALESCE(li.sku, ia.sku), li.name, li.receipt_id
   `;
 
   // 4) Modifiers (group by resolved sku/name), keep them separate in analytics_shift_modifier
-  const modifiers = await db.$queryRaw<{ sku:string|null; name:string; qty:number; receipt_id:string }[]>`
+  // EXCLUDE REFUND receipts
+  const rawModifiers = await db.$queryRaw<{ sku:string|null; name:string; qty:number; receipt_id:string }[]>`
     SELECT COALESCE(m.sku, ia.sku) AS sku,
            m.name,
            SUM(m.qty)::int AS qty,
@@ -61,6 +64,7 @@ export async function computeShiftAll(dateISO: string) {
     JOIN lv_receipt r ON r.receipt_id = m.receipt_id
     LEFT JOIN item_alias ia ON m.sku IS NULL AND ia.alias_name = m.name
     WHERE r.datetime_bkk >= ${fromISO}::timestamptz AND r.datetime_bkk < ${toISO}::timestamptz
+      AND (r.raw_json->>'receipt_type') != 'REFUND'
     GROUP BY COALESCE(m.sku, ia.sku), m.name, m.receipt_id
   `;
 
@@ -113,7 +117,7 @@ export async function computeShiftAll(dateISO: string) {
 
   // 7) Aggregate MODIFIERS separately
   const accMods = new Map<string, { sku:string|null; name:string; category:string; qty:number; hits:Set<string> }>();
-  for (const m of modifiers) {
+  for (const m of rawModifiers) {
     const rule = m.sku ? bySku.get(m.sku) ?? null : null;
     const name = rule?.name ?? m.name;
     const key = m.sku ?? name;
@@ -175,7 +179,7 @@ export async function computeShiftAll(dateISO: string) {
     }
   });
 
-  // 9) Response (items only; modifiers can be separate endpoint if preferred)
+  // 9) Response (items + modifiers)
   const items = Array.from(accItems.values()).sort((a,b)=>
     a.category===b.category ? a.name.localeCompare(b.name) : a.category.localeCompare(b.category)
   ).map(v=>({
@@ -183,7 +187,13 @@ export async function computeShiftAll(dateISO: string) {
     patties:v.patties, redMeatGrams:v.red, chickenGrams:v.chick, rolls:v.rolls
   }));
 
-  return { shiftDate, fromISO, toISO, items, sourceUsed:'live' as const };
+  const modifiers = Array.from(accMods.values()).sort((a,b)=>
+    a.name.localeCompare(b.name)
+  ).map(v=>({
+    sku:v.sku, name:v.name, category:v.category, qty:v.qty
+  }));
+
+  return { shiftDate, fromISO, toISO, items, modifiers, sourceUsed:'live' as const };
 }
 
 // Keep old computeShift function for backwards compatibility (can be deprecated later)
