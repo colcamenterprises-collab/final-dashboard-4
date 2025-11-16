@@ -78,7 +78,9 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
       }
 
       const dtBkk = DateTime.fromISO(rc.receipt_date, { zone: "UTC" }).setZone("Asia/Bangkok").toISO();
-      const totalAmount = (rc.total_money?.amount ?? 0) / 100.0;
+      const totalAmount = typeof rc.total_money === 'number' 
+        ? rc.total_money / 100.0 
+        : (rc.total_money?.amount ?? 0) / 100.0;
 
       await db.$executeRaw`
         INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
