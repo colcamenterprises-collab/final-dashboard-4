@@ -100,6 +100,12 @@ export default function DailySales() {
   // Banking state
   const [closingCash, setClosingCash] = useState(0);
   
+  // Manager Sign Off state
+  const [managerNetAmount, setManagerNetAmount] = useState(0);
+  const [registerBalances, setRegisterBalances] = useState<boolean | null>(null);
+  const [varianceNotes, setVarianceNotes] = useState("");
+  const [expensesReview, setExpensesReview] = useState("");
+  
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [shiftId, setShiftId] = useState<string | null>(null);
@@ -177,6 +183,12 @@ export default function DailySales() {
             })));
           }
           
+          // Load Manager Sign Off fields
+          if (p.managerNetAmount !== undefined) setManagerNetAmount(p.managerNetAmount || 0);
+          if (p.registerBalances !== undefined) setRegisterBalances(p.registerBalances);
+          if (p.varianceNotes) setVarianceNotes(p.varianceNotes);
+          if (p.expensesReview) setExpensesReview(p.expensesReview);
+          
           setShiftId(data.record.id);
         } else {
           setError("Failed to load form data");
@@ -206,6 +218,10 @@ export default function DailySales() {
         setQr(draft.qr || 0);
         setGrab(draft.grab || 0);
         setAroi(draft.aroi || 0);
+        if (draft.managerNetAmount !== undefined) setManagerNetAmount(draft.managerNetAmount);
+        if (draft.registerBalances !== undefined) setRegisterBalances(draft.registerBalances);
+        if (draft.varianceNotes) setVarianceNotes(draft.varianceNotes);
+        if (draft.expensesReview) setExpensesReview(draft.expensesReview);
       }
     } catch {}
   }, [isEditMode]);
@@ -230,6 +246,21 @@ export default function DailySales() {
       if (f === 'completedBy') return !value || value.toString().trim() === '';
       return value == null || isNaN(Number(value)) || Number(value) < 0;
     });
+    
+    // Manager Sign Off validation
+    if (managerNetAmount == null || isNaN(Number(managerNetAmount)) || Number(managerNetAmount) < 0) {
+      newErrors.push('managerNetAmount');
+    }
+    if (registerBalances === null) {
+      newErrors.push('registerBalances');
+    }
+    if (registerBalances === false && (!varianceNotes || varianceNotes.trim() === '')) {
+      newErrors.push('varianceNotes');
+    }
+    if (!expensesReview || expensesReview.trim() === '') {
+      newErrors.push('expensesReview');
+    }
+    
     setErrors(newErrors);
     if (newErrors.length) {
       setError(`Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas: ${newErrors.join(', ')}`);
@@ -257,7 +288,11 @@ export default function DailySales() {
         wages: staffWages,
         closingCash,
         shiftDate: dateToSubmit,
-        status: 'submitted'
+        status: 'submitted',
+        managerNetAmount,
+        registerBalances,
+        varianceNotes,
+        expensesReview
       };
 
       // Use update endpoint for edit mode, create endpoint for new forms
@@ -327,7 +362,11 @@ export default function DailySales() {
     aroi,
     shiftExpenses,
     staffWages,
-    closingCash
+    closingCash,
+    managerNetAmount,
+    registerBalances,
+    varianceNotes,
+    expensesReview
   });
 
   const handleSaveDraft = () => {
@@ -680,6 +719,100 @@ export default function DailySales() {
                 const expectedQRBank = qr;
                 return (expectedCashBank + expectedQRBank).toLocaleString();
               })()}</div>
+            </div>
+          </section>
+
+          {/* Manager Sign Off Section */}
+          <section className="rounded-xl border bg-white p-5 mt-6 border-t-4 border-t-emerald-600">
+            <h3 className="mb-4 text-lg font-semibold">Manager Sign Off</h3>
+            
+            {/* Q1: Amount after all expenses (excluding float) */}
+            <div className="mb-5">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
+                Amount after all expenses (excluding float) <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600">฿</span>
+                <input 
+                  type="number" 
+                  value={managerNetAmount} 
+                  onChange={e=>setManagerNetAmount(+e.target.value||0)} 
+                  className={`w-full max-w-xs border rounded-lg px-3 py-2.5 h-10 ${errors.includes('managerNetAmount') ? 'border-red-500 bg-red-50' : ''}`}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              {errors.includes('managerNetAmount') && (
+                <p className="text-red-500 text-xs mt-1">This field is required and must be ≥ 0</p>
+              )}
+            </div>
+
+            {/* Q2: Does the register balance? */}
+            <div className="mb-5">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
+                Does the register balance? <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-4 mb-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="registerBalances" 
+                    checked={registerBalances === true}
+                    onChange={() => setRegisterBalances(true)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="registerBalances" 
+                    checked={registerBalances === false}
+                    onChange={() => setRegisterBalances(false)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">No</span>
+                </label>
+              </div>
+              {errors.includes('registerBalances') && (
+                <p className="text-red-500 text-xs mb-2">Please select Yes or No</p>
+              )}
+              
+              {registerBalances === false && (
+                <div className="mt-3">
+                  <label className="text-sm text-gray-700 block mb-2">
+                    If no, please explain why the register does not balance <span className="text-red-500">*</span>
+                  </label>
+                  <textarea 
+                    value={varianceNotes}
+                    onChange={e => setVarianceNotes(e.target.value)}
+                    className={`w-full border rounded-lg px-3 py-2.5 min-h-[80px] ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
+                    placeholder="Explain the variance (cash shortage/overage, missing receipts, etc.)"
+                  />
+                  {errors.includes('varianceNotes') && (
+                    <p className="text-red-500 text-xs mt-1">Explanation is required when register does not balance</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Q3: Manager review of expenses */}
+            <div className="mb-2">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
+                Manager review of expenses <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Please confirm that all expenses recorded for this shift match the supporting receipts/transactions. Note any issues or discrepancies.
+              </p>
+              <textarea 
+                value={expensesReview}
+                onChange={e => setExpensesReview(e.target.value)}
+                className={`w-full border rounded-lg px-3 py-2.5 min-h-[100px] ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
+                placeholder="I confirm all expenses match receipts and documentation..."
+              />
+              {errors.includes('expensesReview') && (
+                <p className="text-red-500 text-xs mt-1">Manager review confirmation is required</p>
+              )}
             </div>
           </section>
 
