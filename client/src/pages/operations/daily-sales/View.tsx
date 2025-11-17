@@ -277,6 +277,59 @@ export default function ViewDailySales() {
           </div>
         </div>
 
+        {/* Manager Sign Off Section */}
+        <div className="bg-white rounded-lg border border-t-4 border-t-emerald-600 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 font-['Poppins']">Manager Sign Off</h2>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Amount after all expenses (excluding float)</label>
+                <p className="text-lg font-semibold text-gray-900">
+                  {THB(fromRow(salesData, "managerNetAmount"))}
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Register balances</label>
+                <p className="text-lg font-semibold">
+                  {fromRow(salesData, "registerBalances", null) === true ? (
+                    <span className="px-3 py-1 text-sm font-semibold rounded-lg bg-green-100 text-green-700">
+                      YES ✅
+                    </span>
+                  ) : fromRow(salesData, "registerBalances", null) === false ? (
+                    <span className="px-3 py-1 text-sm font-semibold rounded-lg bg-red-100 text-red-700">
+                      NO ❌
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Not provided</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {fromRow(salesData, "registerBalances", null) === false && fromRow(salesData, "varianceNotes", "") && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Variance explanation</label>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {fromRow(salesData, "varianceNotes", "")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Manager review of expenses</label>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                  {fromRow(salesData, "expensesReview", "") || <span className="text-gray-500">Not provided</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Form Data Details */}
         {salesData.formData && (
           <div className="bg-white rounded-lg border p-6">
