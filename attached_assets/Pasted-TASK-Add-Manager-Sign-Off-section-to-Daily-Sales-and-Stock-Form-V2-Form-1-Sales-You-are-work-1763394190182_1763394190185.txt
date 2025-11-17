@@ -1,0 +1,321 @@
+TASK: Add “Manager Sign Off” section to Daily Sales and Stock Form V2 – Form 1 (Sales)
+
+You are working on the Daily Sales and Stock Form V2 in the SBB Dashboard.
+
+Form 1 = Sales form.
+Your task is only to add a new “Manager Sign Off” section at the bottom of Form 1, just above the existing Submit and Save Draft buttons.
+
+
+---
+
+ABSOLUTE RULES – DO NOT BREAK THESE
+
+1. DO NOT change, delete, or reorder any existing fields on Form 1 or Form 2.
+
+
+2. DO NOT change routes, URLs, navigation, or page structure.
+
+
+3. DO NOT change any existing database tables or columns except to add the new fields required for this task, if they do not already exist.
+
+
+4. DO NOT rename or remove any existing types, interfaces, schemas, or API endpoints.
+
+
+5. DO NOT introduce new forms, wizards, or steps.
+
+
+6. DO NOT touch:
+
+The legacy Drizzle-based “Fort Knox” form system.
+
+Any other forms/pages outside Daily Sales and Stock Form V2 – Form 1.
+
+
+
+7. When finished, save all files, ensure build passes, and stop. No “cleanup”, no refactors, no “improvements”.
+
+
+
+You are here to do one small, surgical change and then exit.
+
+
+---
+
+WHAT TO BUILD
+
+New Section: Manager Sign Off
+
+Location:
+
+On Form 1 (Sales) UI, add this section at the very bottom, directly above the existing Submit and Save Draft buttons.
+
+
+Visual structure:
+
+Section heading: Manager Sign Off
+
+A clear separator (e.g., margin/top border) so it’s visually distinct but consistent with existing styling.
+
+
+This section has three question blocks:
+
+
+---
+
+Q1 – Amount after all expenses (excluding float)
+
+Label: Amount after all expenses (excluding float)
+
+Type: Numeric currency input (same style as other money/amount fields on the form).
+
+Purpose: Manager enters the final amount that should remain after all expenses have been deducted, and excluding the float/start cash.
+
+Field name suggestions (backend):
+
+managerNetAmountAfterExpenses (decimal/number).
+
+
+
+Validation:
+
+Required field when the form is submitted (not required for draft).
+
+Must be a valid number ≥ 0.
+
+
+
+---
+
+Q2 – Does the register balance? If not, why not?
+
+This is one logical question block:
+
+Label (main question): Does the register balance?
+
+Control:
+
+A Yes / No selector (radio buttons or dropdown is fine; follow existing UI conventions).
+
+
+If the answer is No, show a required text area:
+
+Label: If no, please explain why the register does not balance
+
+Purpose: Manager must give a reason (cash variance, missing receipts, mistake, etc.).
+
+
+
+Backend field suggestions:
+
+managerRegisterBalances – boolean (true = Yes, false = No).
+
+managerRegisterVarianceNotes – string/text for the explanation.
+
+
+Validation:
+
+managerRegisterBalances required on submit (not required for draft).
+
+If managerRegisterBalances = false, then managerRegisterVarianceNotes is required and must be non-empty.
+
+
+
+---
+
+Q3 – Manager review of expenses
+
+Question: Manager confirms they have reviewed the expenses for the shift.
+
+Label: Manager review of expenses
+
+Helper text (sub-label): Please confirm that all expenses recorded for this shift match the supporting receipts/transactions. Note any issues or discrepancies.
+
+Type: Multi-line text area.
+
+Purpose: Manager writes a short confirmation that:
+
+They have reviewed the shift expenses, and
+
+All expenses match the sheet, or they explain any issues.
+
+
+
+Backend field suggestion:
+
+managerExpensesReviewNotes – string/text.
+
+
+Validation:
+
+Required on submit (not required for draft).
+
+Must be non-empty text.
+
+
+
+---
+
+DATA & STORAGE REQUIREMENTS
+
+1. All three question blocks must be fully saved to the existing database record for Form 1:
+
+When a new Daily Sales Form 1 is submitted.
+
+When an existing draft is saved/loaded.
+
+
+
+2. If the current Prisma/DB model for Form 1 does not yet have these fields:
+
+Add fields (names as above or close equivalents) to the relevant Prisma model for Daily Sales V2 – Form 1.
+
+Run the minimum required migration.
+
+
+
+3. Ensure that these fields:
+
+Are included in any existing API payloads for:
+
+Creating a new Form 1 entry.
+
+Updating/saving a draft.
+
+Fetching a Form 1 entry for editing or review.
+
+
+
+
+4. Do not change or remove any existing fields, columns, or relations.
+
+
+
+
+---
+
+INTEGRATION WITH EXISTING FEATURES
+
+Wherever the full Form 1 data is already surfaced, you must add these new fields but not alter existing behavior:
+
+1. Draft / Resume flow
+
+When a draft is saved, these three manager sign-off fields must save with it.
+
+When a draft is loaded, the values must repopulate correctly in the UI.
+
+
+
+2. Form Library / Internal review pages
+
+Wherever a detailed view of a completed Daily Sales and Stock Form V2 (Form 1) is shown, add a small “Manager Sign Off” section showing:
+
+Amount after all expenses (excluding float)
+
+Does the register balance? (Yes/No)
+
+If no, why not? notes (if applicable)
+
+Manager review of expenses note.
+
+
+
+
+3. PDFs / Emails (if currently generated for this form)
+
+If there is an existing PDF/email summary that includes Form 1 data, append a “Manager Sign Off” block at the end of the Form 1 section with the same fields.
+
+Do not change existing styles or structure; just add this block in a consistent way.
+
+
+
+
+If you cannot easily find the PDF/email generation for this form, do not create new functionality—only wire into existing flows you can clearly identify.
+
+
+---
+
+STYLING & UX
+
+Use the same styling system already in place (components, Tailwind classes, etc.).
+
+The new section must visually match the rest of the form:
+
+Same label typography.
+
+Same spacing between fields.
+
+Same error/validation display patterns.
+
+
+Place the Manager Sign Off block immediately above:
+
+Submit
+
+Save Draft (or equivalent buttons already present).
+
+
+
+
+---
+
+TESTING / ACCEPTANCE CRITERIA
+
+The change is complete when ALL of the following pass:
+
+1. UI:
+
+On Form 1, at the bottom above the buttons, a Manager Sign Off section is visible with:
+
+Currency field: Amount after all expenses (excluding float).
+
+Yes/No question: Does the register balance?
+
+Conditional text area if “No”.
+
+Text area: Manager review of expenses.
+
+
+
+
+2. Validation:
+
+Submitting without filling these fields shows clear validation errors (following existing form patterns).
+
+Saving a draft does not require validation for these fields.
+
+
+
+3. Persistence:
+
+Fill out Form 1 including the new fields.
+
+Save as draft, reload draft: all values must persist.
+
+Submit the form: data is stored in the DB for the corresponding record.
+
+
+
+4. Review / Library:
+
+Open an existing completed record for this form (through whatever internal “view details” page exists).
+
+See the three Manager Sign Off answers displayed.
+
+
+
+5. No regressions:
+
+Form 2 (Stock) remains unchanged and fully functional.
+
+Other dashboard pages and the legacy Drizzle “Fort Knox” forms are untouched.
+
+No new routes, no renamed files, no broken navigation.
+
+
+
+
+When all checks pass, stop work.
+
+
+---
