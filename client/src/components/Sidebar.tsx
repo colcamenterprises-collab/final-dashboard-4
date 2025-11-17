@@ -27,7 +27,12 @@ const groups: Group[] = [
     title: "Operations",
     items: [
       { to: "/operations", label: "Operations" },
-      { to: "/operations/purchasing", label: "Purchasing" },
+    ],
+  },
+  {
+    title: "Purchasing",
+    items: [
+      { to: "/operations/purchasing", label: "Shopping List" },
     ],
   },
   {

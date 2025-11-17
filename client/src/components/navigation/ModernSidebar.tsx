@@ -62,7 +62,15 @@ const navigationGroups: NavGroup[] = [
           { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library" }
         ]
       },
-      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
+      { 
+        to: "/operations/purchasing", 
+        label: "Purchasing", 
+        icon: ShoppingCart, 
+        testId: "nav-purchasing",
+        subItems: [
+          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" }
+        ]
+      },
       { 
         to: "/operations/analysis", 
         label: "Analysis", 
