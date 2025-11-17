@@ -136,6 +136,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const wagesTotal = (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
     const othersTotal = 0;
     
+    // Manager Sign Off fields
+    const managerNetAmount = body.managerNetAmount ?? null;
+    const registerBalances = body.registerBalances ?? null;
+    const varianceNotes = body.varianceNotes ?? "";
+    const expensesReview = body.expensesReview ?? "";
+
     const payload: any = {
       completedBy,
       startingCash: toTHB(startingCash),
@@ -156,6 +162,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       rollsEnd,
       meatEnd,
       drinkStock: finalDrinkStock,
+      managerNetAmount,
+      registerBalances,
+      varianceNotes,
+      expensesReview,
     };
 
     const __bankingAuto = computeBankingAuto({
@@ -234,6 +244,14 @@ export async function createDailySalesV2(req: Request, res: Response) {
             <li><strong>Total to bank: ฿${Number(payload.bankingAuto.expectedTotalBank).toLocaleString()}</strong></li>
           </ul>`
         : '<p style="color:#6b7280">No auto-banking data</p>'}
+
+      <h3>Manager Sign Off</h3>
+      <ul>
+        <li><strong>Amount after expenses (excl. float):</strong> ฿${formatTHB(managerNetAmount || 0)}</li>
+        <li><strong>Register balances:</strong> ${registerBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
+        ${!registerBalances && varianceNotes ? `<li><strong>Variance explanation:</strong> ${varianceNotes}</li>` : ''}
+        <li><strong>Expenses review:</strong> ${expensesReview || 'Not provided'}</li>
+      </ul>
 
       <h3>Stock Levels</h3>
       <ul>
@@ -415,6 +433,14 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
         </li>
         <li>Cash to Bank: ฿${formatTHB(payload.cashBanked || 0)}</li>
         <li>QR to Bank: ฿${formatTHB(payload.qrTransfer || 0)}</li>
+      </ul>
+
+      <h3>Manager Sign Off</h3>
+      <ul>
+        <li><strong>Amount after expenses (excl. float):</strong> ฿${formatTHB(payload.managerNetAmount || 0)}</li>
+        <li><strong>Register balances:</strong> ${payload.registerBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
+        ${!payload.registerBalances && payload.varianceNotes ? `<li><strong>Variance explanation:</strong> ${payload.varianceNotes}</li>` : ''}
+        <li><strong>Expenses review:</strong> ${payload.expensesReview || 'Not provided'}</li>
       </ul>
 
       <h3>Stock Levels</h3>
