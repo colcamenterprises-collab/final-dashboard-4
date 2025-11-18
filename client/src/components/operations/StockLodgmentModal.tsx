@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { X, Plus } from "lucide-react";
+import { convertFromInputDate } from "@/lib/format";
 
 const rollsSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -286,11 +287,18 @@ export function StockLodgmentModal({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-stock-date"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="date"
+                          {...field}
+                          data-testid="input-stock-date"
+                        />
+                        {field.value && (
+                          <p className="text-xs text-gray-600">
+                            Selected: {convertFromInputDate(field.value)}
+                          </p>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -392,11 +400,18 @@ export function StockLodgmentModal({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-stock-date"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="date"
+                          {...field}
+                          data-testid="input-stock-date"
+                        />
+                        {field.value && (
+                          <p className="text-xs text-gray-600">
+                            Selected: {convertFromInputDate(field.value)}
+                          </p>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -506,11 +521,18 @@ export function StockLodgmentModal({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        data-testid="input-stock-date"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="date"
+                          {...field}
+                          data-testid="input-stock-date"
+                        />
+                        {field.value && (
+                          <p className="text-xs text-gray-600">
+                            Selected: {convertFromInputDate(field.value)}
+                          </p>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

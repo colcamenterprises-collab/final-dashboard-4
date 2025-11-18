@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDateDDMMYYYY } from "@/lib/format";
 
 // Client-side supplier detection utility
 function detectSupplier(description: string): string | null {
@@ -935,10 +936,11 @@ export default function Expenses() {
     setParsed(parsed.filter(l => l.id !== id)); 
   }
 
-  // Get purchase tally entries directly
+  // Get purchase tally entries filtered by selected month/year
+  const monthParam = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const { data: purchaseTallyData } = useQuery({
-    queryKey: ["/api/purchase-tally"],
-    queryFn: () => axios.get("/api/purchase-tally").then(res => res.data),
+    queryKey: ["/api/purchase-tally", selectedMonth, selectedYear],
+    queryFn: () => axios.get(`/api/purchase-tally?month=${monthParam}`).then(res => res.data),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1373,9 +1375,9 @@ export default function Expenses() {
       <ShiftExpensesTable month={selectedMonth} year={selectedYear} />
 
       {/* Rolls Table */}
-      <div className="bg-white rounded shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6" data-testid="section-rolls-purchases">
         <h2 className="text-sm font-semibold mb-2">Rolls Purchases</h2>
-        <table className="w-full border text-xs">
+        <table className="w-full border text-xs" data-testid="table-rolls-purchases">
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
@@ -1396,8 +1398,8 @@ export default function Expenses() {
               const paid = "N/A";
               
               return (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-1">{new Date(r.date).toLocaleDateString()}</td>
+                <tr key={i} className="hover:bg-gray-50" data-testid={`row-roll-${r.id}`}>
+                  <td className="border p-1">{formatDateDDMMYYYY(r.date)}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1">{paid}</td>
                   <td className="border p-1 text-right">฿{amount.toLocaleString()}</td>
@@ -1466,9 +1468,9 @@ export default function Expenses() {
       </div>
 
       {/* Meat Table */}
-      <div className="bg-white rounded shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6" data-testid="section-meat-purchases">
         <h2 className="text-sm font-semibold mb-2">Meat Purchases</h2>
-        <table className="w-full border text-xs">
+        <table className="w-full border text-xs" data-testid="table-meat-purchases">
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
@@ -1480,8 +1482,8 @@ export default function Expenses() {
           </thead>
           <tbody>
             {meat.map((m: any, i: number) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="border p-1">{new Date(m.date).toLocaleDateString()}</td>
+              <tr key={i} className="hover:bg-gray-50" data-testid={`row-meat-${m.id}`}>
+                <td className="border p-1">{formatDateDDMMYYYY(m.date)}</td>
                 <td className="border p-1">{m.notes || m.meatType}</td>
                 <td className="border p-1">{m.meatGrams ? (m.meatGrams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
                 <td className="border p-1">{m.supplier || 'Meat Supplier'}</td>
@@ -1548,9 +1550,9 @@ export default function Expenses() {
       </div>
 
       {/* Drinks Table */}
-      <div className="bg-white rounded shadow p-4 mb-6">
+      <div className="bg-white rounded shadow p-4 mb-6" data-testid="section-drinks-purchases">
         <h2 className="text-sm font-semibold mb-2">Drinks Purchases</h2>
-        <table className="w-full border text-xs">
+        <table className="w-full border text-xs" data-testid="table-drinks-purchases">
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
@@ -1574,8 +1576,8 @@ export default function Expenses() {
               }
               
               return (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="border p-1">{new Date(d.date || d.created_at).toLocaleDateString()}</td>
+                <tr key={i} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}`}>
+                  <td className="border p-1">{formatDateDDMMYYYY(d.date || d.created_at)}</td>
                   <td className="border p-1">{drinkType}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1 text-center">
