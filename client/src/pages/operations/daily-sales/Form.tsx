@@ -11,8 +11,130 @@ const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 
 // EXACT Language labels from consolidated patch (inline, no new file)
 const labels = {
-  en: { completedBy: 'Completed By', startingCash: 'Starting Cash', cashSales: 'Cash Sales', qrSales: 'QR Sales', grabSales: 'Grab Sales', otherSales: 'Other Sales' },
-  th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', cashSales: 'ยอดขายเงินสด', qrSales: 'ยอดขาย QR', grabSales: 'ยอดขาย Grab', otherSales: 'ยอดขายอื่นๆ' }
+  en: { 
+    // Header
+    pageTitle: 'Daily Sales & Expenses Form',
+    // Sections
+    shiftInfo: 'Shift Information',
+    expenses: 'Expenses',
+    shiftExpenses: 'Shift Expenses',
+    staffWages: 'Staff Wages',
+    summary: 'Summary',
+    banking: 'Banking',
+    managerSignOff: 'Manager Sign Off',
+    // Fields
+    shiftDate: 'Shift Date',
+    completedBy: 'Completed By',
+    startingCash: 'Starting Cash',
+    cashSales: 'Cash Sales',
+    qrSales: 'QR Sales',
+    grabSales: 'Grab Sales',
+    otherSales: 'Other Sales',
+    item: 'Item',
+    cost: 'Cost (฿)',
+    shopName: 'Shop Name',
+    staffName: 'Staff Name',
+    amount: 'Amount (฿)',
+    type: 'Type',
+    closingCash: 'Closing Cash (฿)',
+    // Summary labels
+    totalSales: 'Total Sales:',
+    totalExpenses: 'Total Expenses:',
+    subtotal: 'Subtotal:',
+    netPosition: 'Net Position:',
+    // Banking labels
+    expectedCashToBank: 'Expected Cash to Bank',
+    expectedQRToBank: 'Expected QR to Bank',
+    expectedTotalToBank: 'Expected Total to Bank',
+    // Manager Sign Off
+    netAmountLabel: 'Amount after all expenses (excluding float)',
+    registerBalanceQ: 'Does the register balance?',
+    expensesReviewQ: 'Manager review of expenses',
+    expensesReviewDesc: 'Please confirm that all expenses recorded for this shift match the supporting receipts/transactions. Note any issues or discrepancies.',
+    varianceExplain: 'If no, please explain why the register does not balance',
+    // Buttons
+    delete: 'Delete',
+    addRow: '+ Add Row',
+    saveDraft: 'Save draft',
+    next: 'Next →',
+    updateForm: 'Update Form',
+    saving: 'Saving...',
+    yes: 'Yes',
+    no: 'No',
+    // Placeholders
+    itemPlaceholder: 'eg: 2 Gas Bottles, 1kg french Fries',
+    shopPlaceholder: 'Makro / Lotus',
+    staffPlaceholder: 'Staff Name',
+    variancePlaceholder: 'Explain the variance (cash shortage/overage, missing receipts, etc.)',
+    expensesReviewPlaceholder: 'I confirm all expenses match receipts and documentation...',
+    // Error messages
+    fieldRequired: 'This field is required and must be ≥ 0',
+    selectYesNo: 'Please select Yes or No',
+    varianceRequired: 'Explanation is required when register does not balance',
+    reviewRequired: 'Manager review confirmation is required'
+  },
+  th: { 
+    // Header
+    pageTitle: 'แบบฟอร์มยอดขายและค่าใช้จ่ายประจำวัน',
+    // Sections
+    shiftInfo: 'ข้อมูลกะ',
+    expenses: 'ค่าใช้จ่าย',
+    shiftExpenses: 'ค่าใช้จ่ายกะ',
+    staffWages: 'ค่าแรงพนักงาน',
+    summary: 'สรุป',
+    banking: 'การธนาคาร',
+    managerSignOff: 'ผู้จัดการเซ็นรับทราบ',
+    // Fields
+    shiftDate: 'วันที่กะ',
+    completedBy: 'กรอกโดย',
+    startingCash: 'เงินสดเริ่มต้น',
+    cashSales: 'ยอดขายเงินสด',
+    qrSales: 'ยอดขาย QR',
+    grabSales: 'ยอดขาย Grab',
+    otherSales: 'ยอดขายอื่นๆ',
+    item: 'รายการ',
+    cost: 'ราคา (฿)',
+    shopName: 'ชื่อร้าน',
+    staffName: 'ชื่อพนักงาน',
+    amount: 'จำนวนเงิน (฿)',
+    type: 'ประเภท',
+    closingCash: 'เงินสดปิดกะ (฿)',
+    // Summary labels
+    totalSales: 'ยอดขายรวม:',
+    totalExpenses: 'ค่าใช้จ่ายรวม:',
+    subtotal: 'รวมย่อย:',
+    netPosition: 'สุทธิ:',
+    // Banking labels
+    expectedCashToBank: 'เงินสดคาดว่าจะฝากธนาคาร',
+    expectedQRToBank: 'QR คาดว่าจะฝากธนาคาร',
+    expectedTotalToBank: 'รวมคาดว่าจะฝากธนาคาร',
+    // Manager Sign Off
+    netAmountLabel: 'ยอดเงินหลังหักค่าใช้จ่ายทั้งหมด (ไม่รวมเงินทอน)',
+    registerBalanceQ: 'เงินในลิ้นชักสมดุลหรือไม่?',
+    expensesReviewQ: 'การตรวจสอบค่าใช้จ่ายของผู้จัดการ',
+    expensesReviewDesc: 'กรุณายืนยันว่าค่าใช้จ่ายทั้งหมดที่บันทึกสำหรับกะนี้ตรงกับใบเสร็จ/ธุรกรรมที่สนับสนุน โปรดระบุปัญหาหรือความแตกต่างใดๆ',
+    varianceExplain: 'หากไม่สมดุล โปรดอธิบายว่าทำไมเงินในลิ้นชักไม่สมดุล',
+    // Buttons
+    delete: 'ลบ',
+    addRow: '+ เพิ่มแถว',
+    saveDraft: 'บันทึกแบบร่าง',
+    next: 'ถัดไป →',
+    updateForm: 'อัปเดตแบบฟอร์ม',
+    saving: 'กำลังบันทึก...',
+    yes: 'ใช่',
+    no: 'ไม่ใช่',
+    // Placeholders
+    itemPlaceholder: 'เช่น: แก๊ส 2 ถัง, มันฝรั่งทอด 1kg',
+    shopPlaceholder: 'มาโคร / โลตัส',
+    staffPlaceholder: 'ชื่อพนักงาน',
+    variancePlaceholder: 'อธิบายความแตกต่าง (เงินสดขาด/เกิน, ใบเสร็จหาย ฯลฯ)',
+    expensesReviewPlaceholder: 'ข้าพเจ้ายืนยันว่าค่าใช้จ่ายทั้งหมดตรงกับใบเสร็จและเอกสาร...',
+    // Error messages
+    fieldRequired: 'ต้องระบุฟิลด์นี้และต้อง ≥ 0',
+    selectYesNo: 'กรุณาเลือกใช่หรือไม่ใช่',
+    varianceRequired: 'ต้องอธิบายเมื่อเงินในลิ้นชักไม่สมดุล',
+    reviewRequired: 'ต้องยืนยันการตรวจสอบของผู้จัดการ'
+  }
 };
 
 // EXACT LanguageToggle as inline component (NO new file) - styled as toggle switch
@@ -416,10 +538,10 @@ export default function DailySales() {
           {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
           
           <section className="rounded-[4px] border bg-white p-4">
-            <h3 className="mb-4 text-sm font-semibold">Shift Information</h3>
+            <h3 className="mb-4 text-sm font-semibold">{labels[lang].shiftInfo}</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
-                <label className="text-sm text-slate-600 block mb-1">Shift Date</label>
+                <label className="text-sm text-slate-600 block mb-1">{labels[lang].shiftDate}</label>
                 {isEditMode ? (
                   <input 
                     type="date"
@@ -509,30 +631,30 @@ export default function DailySales() {
                 />
               </div>
             </div>
-            <div className="mt-3 font-semibold text-right">Total Sales: ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
+            <div className="mt-3 font-semibold text-right">{labels[lang].totalSales} ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
           </section>
 
           {/* Expenses Section */}
           <section className="rounded-[4px] border bg-white p-4 mt-4">
-            <h3 className="mb-4 text-sm font-semibold">Expenses</h3>
+            <h3 className="mb-4 text-sm font-semibold">{labels[lang].expenses}</h3>
             
             {/* Shift Expenses */}
             <div className="mb-4">
-              <h4 className="mb-3 text-sm font-semibold">Shift Expenses</h4>
+              <h4 className="mb-3 text-sm font-semibold">{labels[lang].shiftExpenses}</h4>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
                   <div key={row.id} className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Item</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].item}</label>
                       <input 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.item} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
-                        placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
+                        placeholder={labels[lang].itemPlaceholder} 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Cost (฿)</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].cost}</label>
                       <input 
                         type="number" 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
@@ -541,12 +663,12 @@ export default function DailySales() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Shop Name</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].shopName}</label>
                       <input 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.shop} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value } : r))}
-                        placeholder="Makro / Lotus" 
+                        placeholder={labels[lang].shopPlaceholder} 
                       />
                     </div>
                     <div>
@@ -555,7 +677,7 @@ export default function DailySales() {
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
                         className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
                       >
-                        Delete
+                        {labels[lang].delete}
                       </button>
                     </div>
                   </div>
@@ -567,29 +689,29 @@ export default function DailySales() {
                   className="h-10 px-3 border rounded-[4px] text-xs hover:bg-slate-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
-                  + Add Row
+                  {labels[lang].addRow}
                 </button>
-                <div className="font-semibold">Subtotal: ฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</div>
+                <div className="font-semibold">{labels[lang].subtotal} ฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</div>
               </div>
             </div>
 
             {/* Staff Wages */}
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Staff Wages</h4>
+              <h4 className="mb-3 text-sm font-semibold">{labels[lang].staffWages}</h4>
               <div className="space-y-4">
                 {staffWages.map((row) => (
                   <div key={row.id} className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Staff Name</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].staffName}</label>
                       <input 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.staff} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
-                        placeholder="Staff Name" 
+                        placeholder={labels[lang].staffPlaceholder} 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Amount (฿)</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].amount}</label>
                       <input 
                         type="number" 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
@@ -598,7 +720,7 @@ export default function DailySales() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Type</label>
+                      <label className="text-sm text-slate-600 block mb-1">{labels[lang].type}</label>
                       <select 
                         className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.type} 
@@ -616,7 +738,7 @@ export default function DailySales() {
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
                         className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
                       >
-                        Delete
+                        {labels[lang].delete}
                       </button>
                     </div>
                   </div>
@@ -628,60 +750,60 @@ export default function DailySales() {
                   className="h-10 px-3 border rounded-[4px] text-xs hover:bg-slate-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
-                  + Add Row
+                  {labels[lang].addRow}
                 </button>
-                <div className="font-semibold">Subtotal: ฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</div>
+                <div className="font-semibold">{labels[lang].subtotal} ฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</div>
               </div>
             </div>
 
             <div className="mt-4 pt-4 border-t text-sm text-right font-bold">
-              Total Expenses: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
+              {labels[lang].totalExpenses} ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
 
           {/* Summary Section */}
           <section className="rounded-[4px] border bg-white p-4">
-            <h3 className="mb-4 text-sm font-semibold">Summary</h3>
+            <h3 className="mb-4 text-sm font-semibold">{labels[lang].summary}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
-                <span>Total Sales:</span>
+                <span>{labels[lang].totalSales}</span>
                 <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
               </div>
               <div className="ml-4 space-y-1 text-xs text-slate-600">
                 <div className="flex justify-between">
-                  <span>• Cash Sales:</span>
+                  <span>• {labels[lang].cashSales}:</span>
                   <span>฿{cash.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• QR Sales:</span>
+                  <span>• {labels[lang].qrSales}:</span>
                   <span>฿{qr.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Grab Sales:</span>
+                  <span>• {labels[lang].grabSales}:</span>
                   <span>฿{grab.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Other Sales:</span>
+                  <span>• {labels[lang].otherSales}:</span>
                   <span>฿{aroi.toLocaleString()}</span>
                 </div>
               </div>
               
               <div className="flex justify-between font-medium">
-                <span>Total Expenses:</span>
+                <span>{labels[lang].totalExpenses}</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
               <div className="ml-4 space-y-1 text-xs text-slate-600">
                 <div className="flex justify-between">
-                  <span>• Shift Expenses:</span>
+                  <span>• {labels[lang].shiftExpenses}:</span>
                   <span>฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Staff Wages:</span>
+                  <span>• {labels[lang].staffWages}:</span>
                   <span>฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
               </div>
               <div className="flex justify-between font-bold text-xs border-t pt-2">
-                <span>Net Position:</span>
+                <span>{labels[lang].netPosition}</span>
                 <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
                   ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
                 </span>
@@ -691,10 +813,10 @@ export default function DailySales() {
 
           {/* Banking Section */}
           <section className="rounded-[4px] border bg-white p-4">
-            <h3 className="mb-4 text-sm font-semibold">Banking</h3>
+            <h3 className="mb-4 text-sm font-semibold">{labels[lang].banking}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="text-sm text-slate-600 block mb-1">Closing Cash (฿)</label>
+                <label className="text-sm text-slate-600 block mb-1">{labels[lang].closingCash}</label>
                 <input 
                   type="number" 
                   value={closingCash} 
@@ -704,15 +826,15 @@ export default function DailySales() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-[4px]">
-              <div className="text-xs text-slate-600">Expected Cash to Bank</div>
+              <div className="text-xs text-slate-600">{labels[lang].expectedCashToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
                 return expectedCashBank.toLocaleString();
               })()}</div>
-              <div className="text-xs text-slate-600">Expected QR to Bank</div>
+              <div className="text-xs text-slate-600">{labels[lang].expectedQRToBank}</div>
               <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
-              <div className="text-xs text-slate-600">Expected Total to Bank</div>
+              <div className="text-xs text-slate-600">{labels[lang].expectedTotalToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
@@ -724,12 +846,12 @@ export default function DailySales() {
 
           {/* Manager Sign Off Section */}
           <section className="rounded-[4px] border bg-white p-4 mt-4 border-t-4 border-t-emerald-600">
-            <h3 className="mb-4 text-sm font-semibold">Manager Sign Off</h3>
+            <h3 className="mb-4 text-sm font-semibold">{labels[lang].managerSignOff}</h3>
             
             {/* Q1: Amount after all expenses (excluding float) */}
             <div className="mb-5">
               <label className="text-sm text-slate-600 font-medium block mb-2">
-                Amount after all expenses (excluding float) <span className="text-red-500">*</span>
+                {labels[lang].netAmountLabel} <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-slate-600">฿</span>
@@ -743,14 +865,14 @@ export default function DailySales() {
                 />
               </div>
               {errors.includes('managerNetAmount') && (
-                <p className="text-red-500 text-xs mt-1">This field is required and must be ≥ 0</p>
+                <p className="text-red-500 text-xs mt-1">{labels[lang].fieldRequired}</p>
               )}
             </div>
 
             {/* Q2: Does the register balance? */}
             <div className="mb-5">
               <label className="text-sm text-slate-600 font-medium block mb-2">
-                Does the register balance? <span className="text-red-500">*</span>
+                {labels[lang].registerBalanceQ} <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-3 mb-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -761,7 +883,7 @@ export default function DailySales() {
                     onChange={() => setRegisterBalances(true)}
                     className="w-4 h-4"
                   />
-                  <span className="text-xs">Yes</span>
+                  <span className="text-xs">{labels[lang].yes}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input 
@@ -771,26 +893,26 @@ export default function DailySales() {
                     onChange={() => setRegisterBalances(false)}
                     className="w-4 h-4"
                   />
-                  <span className="text-xs">No</span>
+                  <span className="text-xs">{labels[lang].no}</span>
                 </label>
               </div>
               {errors.includes('registerBalances') && (
-                <p className="text-red-500 text-xs mb-2">Please select Yes or No</p>
+                <p className="text-red-500 text-xs mb-2">{labels[lang].selectYesNo}</p>
               )}
               
               {registerBalances === false && (
                 <div className="mt-3">
                   <label className="text-sm text-slate-600 block mb-2">
-                    If no, please explain why the register does not balance <span className="text-red-500">*</span>
+                    {labels[lang].varianceExplain} <span className="text-red-500">*</span>
                   </label>
                   <textarea 
                     value={varianceNotes}
                     onChange={e => setVarianceNotes(e.target.value)}
                     className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[80px] text-xs ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
-                    placeholder="Explain the variance (cash shortage/overage, missing receipts, etc.)"
+                    placeholder={labels[lang].variancePlaceholder}
                   />
                   {errors.includes('varianceNotes') && (
-                    <p className="text-red-500 text-xs mt-1">Explanation is required when register does not balance</p>
+                    <p className="text-red-500 text-xs mt-1">{labels[lang].varianceRequired}</p>
                   )}
                 </div>
               )}
@@ -799,19 +921,19 @@ export default function DailySales() {
             {/* Q3: Manager review of expenses */}
             <div className="mb-2">
               <label className="text-sm text-slate-600 font-medium block mb-2">
-                Manager review of expenses <span className="text-red-500">*</span>
+                {labels[lang].expensesReviewQ} <span className="text-red-500">*</span>
               </label>
               <p className="text-xs text-slate-600 mb-2">
-                Please confirm that all expenses recorded for this shift match the supporting receipts/transactions. Note any issues or discrepancies.
+                {labels[lang].expensesReviewDesc}
               </p>
               <textarea 
                 value={expensesReview}
                 onChange={e => setExpensesReview(e.target.value)}
                 className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[100px] text-xs ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
-                placeholder="I confirm all expenses match receipts and documentation..."
+                placeholder={labels[lang].expensesReviewPlaceholder}
               />
               {errors.includes('expensesReview') && (
-                <p className="text-red-500 text-xs mt-1">Manager review confirmation is required</p>
+                <p className="text-red-500 text-xs mt-1">{labels[lang].reviewRequired}</p>
               )}
             </div>
           </section>
@@ -829,7 +951,7 @@ export default function DailySales() {
               onClick={handleSaveDraft}
               className="h-10 rounded-[4px] border border-slate-200 px-4 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
-              Save draft
+              {labels[lang].saveDraft}
             </button>
             <button
               type="button"
@@ -837,7 +959,7 @@ export default function DailySales() {
               className="h-10 rounded-[4px] bg-emerald-600 px-5 text-xs font-semibold text-white hover:bg-emerald-700"
               disabled={submitting}
             >
-              {submitting ? 'Saving...' : (isEditMode ? 'Update Form' : 'Next →')}
+              {submitting ? labels[lang].saving : (isEditMode ? labels[lang].updateForm : labels[lang].next)}
             </button>
           </div>
 
