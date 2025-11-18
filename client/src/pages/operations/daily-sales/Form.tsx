@@ -13,7 +13,11 @@ const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 const labels = {
   en: { 
     // Header
-    pageTitle: 'Daily Sales & Expenses Form',
+    pageTitle: 'Daily Sales & Expenses',
+    pageTitleEdit: 'Edit Daily Sales & Expenses',
+    pageSubtitle: 'Step 1 of 2 — complete Sales & Expenses, then you\'ll be redirected to Stock.',
+    pageSubtitleEdit: 'Edit and save changes to this form',
+    back: 'Back',
     // Sections
     shiftInfo: 'Shift Information',
     expenses: 'Expenses',
@@ -75,7 +79,11 @@ const labels = {
   },
   th: { 
     // Header
-    pageTitle: 'แบบฟอร์มยอดขายและค่าใช้จ่ายประจำวัน',
+    pageTitle: 'ยอดขายและค่าใช้จ่ายประจำวัน',
+    pageTitleEdit: 'แก้ไขยอดขายและค่าใช้จ่ายประจำวัน',
+    pageSubtitle: 'ขั้นตอน 1 จาก 2 — กรอกยอดขายและค่าใช้จ่าย จากนั้นจะถูกนำไปหน้าสต็อก',
+    pageSubtitleEdit: 'แก้ไขและบันทึกการเปลี่ยนแปลงในแบบฟอร์มนี้',
+    back: 'กลับ',
     // Sections
     shiftInfo: 'ข้อมูลกะ',
     expenses: 'ค่าใช้จ่าย',
@@ -513,12 +521,10 @@ export default function DailySales() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-semibold">
-              {isEditMode ? 'Edit Daily Sales & Expenses' : 'Daily Sales & Expenses'}
+              {isEditMode ? labels[lang].pageTitleEdit : labels[lang].pageTitle}
             </h1>
             <p className="text-xs text-slate-600 mt-1">
-              {isEditMode 
-                ? 'Edit and save changes to this form' 
-                : 'Step 1 of 2 — complete Sales & Expenses, then you\'ll be redirected to Stock.'}
+              {isEditMode ? labels[lang].pageSubtitleEdit : labels[lang].pageSubtitle}
             </p>
           </div>
           <button
@@ -526,7 +532,7 @@ export default function DailySales() {
             onClick={() => window.history.back()}
             className="h-10 rounded-[4px] border border-slate-200 px-4 text-sm font-semibold hover:bg-slate-50"
           >
-            Back
+            {labels[lang].back}
           </button>
         </div>
 
