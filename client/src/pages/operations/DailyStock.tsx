@@ -28,6 +28,26 @@ type IngredientItem = {
 
 type IngredientsResponse = { list: IngredientItem[] };
 
+// Purchasing item details from master list
+type PurchasingItem = {
+  id: number;
+  item: string;
+  category: string | null;
+  supplierName: string | null;
+  brand: string | null;
+  supplierSku: string | null;
+  orderUnit: string | null;
+  unitDescription: string | null;
+  unitCost: number | null;
+};
+
+type FieldMap = {
+  id: number;
+  fieldKey: string;
+  purchasingItemId: number;
+  purchasingItem: PurchasingItem;
+};
+
 export type CategoryBlock = {
   category: string;
   items: { id: string; label: string; qty: number; unit: string }[];
@@ -59,6 +79,7 @@ const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
 const DailyStock: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
+  const [fieldMaps, setFieldMaps] = useState<Map<string, FieldMap>>(new Map());
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
@@ -97,12 +118,30 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/costing/ingredients");
-        const data: IngredientsResponse = await res.json();
+        // Fetch both ingredients and field mappings in parallel
+        const [ingredientsRes, fieldMapsRes] = await Promise.all([
+          fetch("/api/costing/ingredients"),
+          fetch("/api/purchasing-field-maps"),
+        ]);
+        
+        const ingredientsData: IngredientsResponse = await ingredientsRes.json();
+        const fieldMapsData = await fieldMapsRes.json();
+        
         if (!mounted) return;
-        setIngredients(data.list || []);
+        
+        setIngredients(ingredientsData.list || []);
+        
+        // Build a map of fieldKey -> FieldMap for quick lookup
+        if (fieldMapsData.ok && fieldMapsData.maps) {
+          const mapsMap = new Map<string, FieldMap>();
+          for (const map of fieldMapsData.maps) {
+            mapsMap.set(map.fieldKey, map);
+          }
+          setFieldMaps(mapsMap);
+          console.log(`[DailyStock] Loaded ${mapsMap.size} field mappings`);
+        }
       } catch (e) {
-        console.error("Failed to load ingredients catalog:", e);
+        console.error("Failed to load catalog data:", e);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -121,6 +160,28 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
   const requiredDrinks: string[] = useMemo(() => {
     return drinkItems.map(d => d.name);
   }, [drinkItems]);
+
+  // Helper function to create enhanced label from purchasing item
+  const getEnhancedLabel = (itemName: string): string => {
+    const fieldMap = fieldMaps.get(itemName);
+    if (!fieldMap || !fieldMap.purchasingItem) {
+      return itemName; // Fallback to item name if no mapping
+    }
+    
+    const item = fieldMap.purchasingItem;
+    const parts: string[] = [item.item];
+    
+    // Add brand and unit description if available
+    if (item.brand && item.unitDescription) {
+      parts.push(`(${item.brand}, ${item.unitDescription})`);
+    } else if (item.brand) {
+      parts.push(`(${item.brand})`);
+    } else if (item.unitDescription) {
+      parts.push(`(${item.unitDescription})`);
+    }
+    
+    return parts.join(' ');
+  };
 
   // Group all ingredients by category with custom order (EXCLUDING drinks and meat)
   const blocks: CategoryBlock[] = useMemo(() => {
@@ -151,13 +212,13 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       items: map.get(category)!
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((item) => ({ 
-          id: item.name,  // Use name as ID for consistent lookup
-          label: item.name, 
+          id: item.name,  // Use name as ID for consistent lookup (UNCHANGED)
+          label: getEnhancedLabel(item.name), // Enhanced label with brand and unit
           qty: quantities[item.name] ?? 0,
           unit: item.unit
         })),
     }));
-  }, [ingredients, quantities]);
+  }, [ingredients, quantities, fieldMaps]);
 
   // Helper function for safe integer parsing
   const safeInt = (v: string) => {
