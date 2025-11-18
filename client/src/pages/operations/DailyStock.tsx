@@ -44,14 +44,14 @@ const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
   const [lang, setLang] = useState('en');
   return (
     <div className="mb-4 flex items-center gap-3">
-      <span className={`text-sm font-medium ${lang === 'en' ? 'text-blue-600' : 'text-gray-500'}`}>EN</span>
+      <span className={`text-xs font-medium ${lang === 'en' ? 'text-emerald-600' : 'text-slate-600'}`}>EN</span>
       <button 
-        className={`relative w-12 h-6 rounded-full border-2 transition-all duration-300 ${lang === 'en' ? 'bg-blue-500 border-blue-500' : 'bg-emerald-500 border-emerald-500'}`}
+        className={`relative w-12 h-6 rounded-full border-2 transition-all duration-300 ${lang === 'en' ? 'bg-emerald-500 border-emerald-500' : 'bg-emerald-500 border-emerald-500'}`}
         onClick={() => { const newLang = lang === 'en' ? 'th' : 'en'; setLang(newLang); onChange(newLang); }}
       >
         <div className={`absolute top-0 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${lang === 'en' ? 'left-0' : 'left-6'}`} />
       </button>
-      <span className={`text-sm font-medium ${lang === 'th' ? 'text-emerald-600' : 'text-gray-500'}`}>ไทย</span>
+      <span className={`text-xs font-medium ${lang === 'th' ? 'text-emerald-600' : 'text-slate-600'}`}>ไทย</span>
     </div>
   );
 };
@@ -316,10 +316,10 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     }
   };
 
-  if (loading) return <div className="p-6 text-[14px]">Loading stock…</div>;
+  if (loading) return <div className="p-4 text-xs">Loading stock…</div>;
 
   return (
-    <div className="p-6 space-y-8 text-[14px]">
+    <div className="p-4 space-y-4 text-xs">
       {/* Validation Warning Dialog */}
       <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
         <AlertDialogContent className="max-w-md">
@@ -328,11 +328,11 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
                 <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
-              <AlertDialogTitle className="text-lg font-semibold text-red-900">
+              <AlertDialogTitle className="text-sm font-semibold text-red-900">
                 Incomplete Stock Data
               </AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-[14px] text-gray-700 space-y-3">
+            <AlertDialogDescription className="text-xs text-slate-600 space-y-3">
               <p className="font-medium">Please complete the following required fields:</p>
               <ul className="space-y-2 ml-4">
                 {validationDetails.rolls && (
@@ -354,7 +354,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                       <p className="font-medium mb-1">Missing drink counts:</p>
                       <div className="ml-2 space-y-1">
                         {validationDetails.drinks.map(drink => (
-                          <div key={drink} className="text-[13px] text-gray-600">
+                          <div key={drink} className="text-xs text-slate-600">
                             → {drink}
                           </div>
                         ))}
@@ -363,7 +363,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                   </li>
                 )}
               </ul>
-              <p className="text-[13px] text-gray-600 pt-2 border-t">
+              <p className="text-xs text-slate-600 pt-2 border-t border-slate-200">
                 💡 <strong>Tip:</strong> Enter 0 if any item has zero stock remaining.
               </p>
             </AlertDialogDescription>
@@ -371,7 +371,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
           <AlertDialogFooter>
             <Button
               onClick={() => setShowValidationDialog(false)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-[4px]"
             >
               Got it, I'll fix this
             </Button>
@@ -379,13 +379,13 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Daily Stock</h1>
-        <div className="text-[12px] text-gray-600">
+      <div className="flex flex-col sm:flex-row items-start sm:items-baseline justify-between gap-3">
+        <h1 className="text-3xl font-semibold">Daily Stock</h1>
+        <div className="text-xs text-slate-600">
           {shiftId ? (
-            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1">Linked to shift: {shiftId}</span>
+            <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">Linked to shift: {shiftId}</span>
           ) : (
-            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 bg-amber-50">No shift ID provided</span>
+            <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">No shift ID provided</span>
           )}
         </div>
       </div>
@@ -394,21 +394,21 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       <LanguageToggle onChange={setLang} />
       
       {/* EXACT error display from consolidated patch */}
-      {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+      {errors.length > 0 && <p className="text-red-500 text-xs">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
 
       {/* End-of-Shift Counts */}
-      <section className="space-y-6">
-        <div className="rounded-xl border p-4">
-          <h2 className="text-[14px] font-semibold mb-4">End-of-Shift Counts</h2>
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
+          <h2 className="text-sm font-semibold mb-4">End-of-Shift Counts</h2>
           {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
           {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[14px] mb-1 font-medium">{labels[lang].rollsEnd}</label>
+              <label className="block text-sm mb-1 font-medium">{labels[lang].rollsEnd}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.rollsEnd ? 'border-red-500' : ''}`}
+                className={`w-full border rounded-[4px] px-3 py-2 text-xs text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.rollsEnd ? 'border-red-500' : 'border-slate-200'}`}
                 value={rolls || ''}
                 onChange={(e) => setRolls(safeInt(e.target.value))}
                 placeholder=""
@@ -416,18 +416,18 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
               />
             </div>
             <div>
-              <label className="block text-[14px] mb-1 font-medium">{labels[lang].meatCount}</label>
+              <label className="block text-sm mb-1 font-medium">{labels[lang].meatCount}</label>
               <input
                 type="text"
                 inputMode="numeric"
-                className={`w-full border rounded-md px-3 py-2 text-[14px] text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.meatEnd ? 'border-red-500' : ''}`}
+                className={`w-full border rounded-[4px] px-3 py-2 text-xs text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors?.meatEnd ? 'border-red-500' : 'border-slate-200'}`}
                 value={meatGrams || ''}
                 onChange={(e) => setMeatGrams(safeInt(e.target.value))}
                 placeholder=""
                 aria-label="Meat quantity in grams"
               />
               {meatGrams > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-600 mt-1">
                   {(meatGrams / 1000).toFixed(1)}kg or {meatGrams.toLocaleString()} grams
                 </div>
               )}
@@ -437,24 +437,24 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       </section>
 
       {/* Drinks Stock Count Section */}
-      <section className="space-y-6">
-        <div className="rounded-xl border p-4">
-          <h2 className="text-[14px] font-semibold mb-4">Drinks Stock Count</h2>
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
+          <h2 className="text-sm font-semibold mb-4">Drinks Stock Count</h2>
           {validationErrors?.drinkStock && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.drinkStock}</div>}
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {drinkItems.length === 0 ? (
-              <div className="text-gray-500 text-xs">No drink items available</div>
+              <div className="text-slate-600 text-xs">No drink items available</div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {drinkItems.map((drink) => (
-                  <div key={drink.name} className="rounded-lg border p-3">
-                    <label className="block text-[14px] font-medium mb-2">{drink.name}</label>
+                  <div key={drink.name} className="rounded-[4px] border border-slate-200 p-3">
+                    <label className="block text-sm font-medium mb-2">{drink.name}</label>
                     <input
                       type="number"
                       inputMode="numeric"
                       min="0"
                       step="1"
-                      className="w-full rounded-md border px-3 py-2 text-left text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full rounded-[4px] border border-slate-200 px-3 py-2 text-left text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       value={drinkQuantities[drink.name] ?? 0}
                       onChange={(e) => setDrinkQuantity(drink.name, safeInt(e.target.value))}
                       aria-label={`${drink.name} quantity`}
@@ -468,22 +468,22 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       </section>
 
       {/* Requisition Grid */}
-      <section className="space-y-6">
-        <div className="rounded-xl border p-4">
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
           <div className="flex items-center justify-between mb-4">
             {/* Hide the "Requisition List" title as requested */}
-            <div className="space-x-2">
+            <div className="flex gap-2">
               <button 
                 type="button" 
                 onClick={expandAll}
-                className="px-3 py-1 text-[14px] border rounded hover:bg-gray-50"
+                className="px-3 py-1 text-xs border border-slate-200 rounded-[4px] hover:bg-slate-50"
               >
                 Expand All
               </button>
               <button 
                 type="button" 
                 onClick={collapseAll}
-                className="px-3 py-1 text-[14px] border rounded hover:bg-gray-50"
+                className="px-3 py-1 text-xs border border-slate-200 rounded-[4px] hover:bg-slate-50"
               >
                 Collapse All
               </button>
@@ -494,28 +494,28 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       </section>
       
       {/* Notes Section */}
-      <section className="space-y-6">
-        <div className="rounded-xl border p-4">
-          <h2 className="text-[14px] font-semibold mb-4">Notes</h2>
-          <label className="block text-[14px] mb-2 font-medium">Any items not listed above or special notes...</label>
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
+          <h2 className="text-sm font-semibold mb-4">Notes</h2>
+          <label className="block text-sm mb-2 font-medium">Any items not listed above or special notes...</label>
           <textarea
-            className="w-full border rounded-md px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
             rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             aria-label="Additional notes"
           />
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="text-xs text-slate-600 mt-2">
             Notes will be included in the email report to management.
           </div>
         </div>
       </section>
 
       {/* Submit Button */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="w-full sm:w-auto">
           {message && (
-            <div className={`rounded-lg px-4 py-3 text-[14px] ${
+            <div className={`rounded-[4px] px-4 py-3 text-xs ${
               message.type === "success" 
                 ? "bg-green-50 text-green-800 border border-green-200" 
                 : "bg-red-50 text-red-800 border border-red-200"
@@ -532,7 +532,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
           type="button"
           onClick={onFinalSubmitClick}
           disabled={submitting}
-          className="rounded-md bg-emerald-600 px-5 py-2 text-white text-[14px] hover:bg-emerald-700 disabled:opacity-60"
+          className="w-full sm:w-auto rounded-[4px] bg-emerald-600 px-5 py-2 text-white text-xs hover:bg-emerald-700 disabled:opacity-60"
         >
           {submitting ? "Submitting…" : "Submit All"}
         </button>
