@@ -1,0 +1,291 @@
+Agent Brief – Wire New Purchasing List into Form 2 + Shopping List
+
+0. Non-negotiables
+
+Daily Sales & Stock V2 Form 2 (Stock)
+
+Do not change field structure, field keys, or DB schema for the form.
+
+You may only change the text labels/headings shown next to the input fields.
+
+
+Purchasing List
+
+The new PurchasingItem table (from previous brief) is now the only source of truth for:
+
+Item name
+
+Supplier
+
+Brand
+
+SKU
+
+Order unit / Unit description
+
+Unit cost
+
+
+
+Goal
+
+When staff enter a quantity in Form 2, that number represents how many purchasing units to buy from the new Purchasing list.
+
+The Shopping List uses that quantity × unit cost from PurchasingItem to show an accurate estimate and full item details (including SKU).
+
+
+
+
+---
+
+1. Ensure Purchasing List Exists
+
+If not already done, create the PurchasingItem table (Prisma) and seed from the CSV.
+
+model PurchasingItem {
+  id              Int      @id @default(autoincrement())
+  item            String
+  category        String?
+  supplierName    String?
+  brand           String?
+  supplierSku     String?
+  orderUnit       String?
+  unitDescription String?
+  unitCost        Decimal? @db.Decimal(10, 2)
+  lastReviewDate  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+> This table powers everything for purchasing/pricing/SKU.
+No other list is to be used for these fields.
+
+
+
+
+---
+
+2. Map Form 2 Fields → Purchasing Items (No Form Changes)
+
+We need a separate mapping layer that connects each Form 2 input field to a PurchasingItem.
+
+2.1. New mapping table
+
+Add a small mapping table in Prisma (or equivalent if you’re not using Prisma for this part):
+
+model PurchasingFieldMap {
+  id               Int             @id @default(autoincrement())
+  fieldKey         String          // e.g. "mayoToPurchase", "buns_to_buy"
+  purchasingItemId Int
+  purchasingItem   PurchasingItem  @relation(fields: [purchasingItemId], references: [id])
+
+  @@unique([fieldKey])
+}
+
+fieldKey = the existing key used by Form 2 and its DB record (do not rename/change it).
+
+Each fieldKey maps to exactly one PurchasingItem.
+
+
+Populate this mapping manually in code or via a simple admin seed (e.g., link:
+
+"mayoToPurchase" → PurchasingItem row for Mayonnaise (HEINZ, 1L)
+
+"bunsToBuy" → PurchasingItem row for Burger Buns tray
+
+etc.
+
+
+2.2. Update Form 2 labels (UI only)
+
+For each numeric input in Form 2 (Stock):
+
+1. Keep the same field key and data binding (e.g. still posts mayoToPurchase).
+
+
+2. Use fieldKey to look up PurchasingFieldMap, then PurchasingItem.
+
+
+3. Render the label/headline like:
+
+item
+
+or item (Brand, Unit Description)
+
+Example: Mayonnaise (HEINZ, 1L) or Burger Buns (Tray 30 pcs)
+
+
+
+
+> Important: Only the text changes. Inputs, schema, payload shape, and database remain untouched.
+
+
+
+
+---
+
+3. Shopping List Logic – Use New Purchasing List
+
+The Shopping List must now:
+
+Read quantities from Form 2 submissions.
+
+Join them to PurchasingItem.
+
+Compute total cost and show full purchasing details.
+
+
+Assume we already have a “Shopping List” view/page fed by recent Daily Stock submissions.
+
+3.1. Data pipeline (per Daily Stock submission)
+
+For each Daily Stock submission:
+
+1. Iterate over all Form 2 fields that represent quantities to purchase
+(exact set already exists; do not add/remove fields).
+
+
+2. For each fieldKey:
+
+Read qty from the Daily Stock record (e.g. mayoToPurchase = 4).
+
+If qty <= 0, skip.
+
+Look up PurchasingFieldMap by fieldKey.
+
+Fetch PurchasingItem via purchasingItemId.
+
+
+
+3. Build a line item:
+
+
+
+{
+  item: purchasingItem.item,
+  supplier: purchasingItem.supplierName,
+  brand: purchasingItem.brand,
+  sku: purchasingItem.supplierSku,
+  orderUnit: purchasingItem.orderUnit,
+  unitDescription: purchasingItem.unitDescription,
+  quantity: qty,                      // e.g. 4
+  unitCost: purchasingItem.unitCost,  // e.g. 89
+  lineTotal: qty * unitCost           // e.g. 4 * 89 = 356
+}
+
+3.2. Behaviour example (Mayonnaise)
+
+Staff enter 4 next to the Mayonnaise input in Form 2.
+
+That field key is mapped to the Mayonnaise PurchasingItem (unit cost 89 THB).
+
+Shopping List shows:
+
+Item: Mayonnaise
+
+Qty: 4
+
+Unit Cost: 89 THB
+
+Line Total: 356 THB
+
+SKU: <supplierSku>
+
+Supplier: <supplierName>
+
+Unit: e.g. 1L
+
+
+
+3.3. Shopping List UI
+
+On the Shopping List page:
+
+Columns should include at least:
+
+Item
+
+Supplier
+
+Brand
+
+SKU
+
+Quantity
+
+Order Unit / Unit Description
+
+Unit Cost
+
+Line Total
+
+
+Optionally group by supplierName.
+
+Show:
+
+Per-supplier subtotals.
+
+Overall grand total for the list.
+
+
+
+> All prices and SKUs displayed must come from PurchasingItem – not from any legacy list.
+
+
+
+
+---
+
+4. Source-of-Truth Rules
+
+1. PurchasingItem is now the only list allowed for:
+
+Item name (for purchasing)
+
+SKU
+
+Supplier
+
+Price per purchasing unit
+
+Unit description
+
+
+
+2. Any previous “God list”, ingredient-derived purchasing list, or legacy mapping:
+
+Must no longer be read by Form 2 or Shopping List logic.
+
+Can stay in DB as historical data, but no active code should depend on it.
+
+
+
+
+
+---
+
+5. No Other Changes
+
+Do not:
+
+Modify Daily Sales & Stock V2 form structure.
+
+Rename form fields or DB columns.
+
+Alter Fort Knox/Drizzle tables or legacy DailyStock schemas.
+
+
+Do:
+
+Add the PurchasingFieldMap table.
+
+Use it to power Form 2 labels and Shopping List behaviour.
+
+Use PurchasingItem as the only purchasing/master source.
+
+
+
+
+---
