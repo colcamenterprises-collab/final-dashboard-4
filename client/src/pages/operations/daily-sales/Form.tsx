@@ -462,7 +462,7 @@ export default function DailySales() {
           </section>
 
           <section className="rounded-[4px] border bg-white p-5">
-            <h2 className="text-lg font-bold mb-4">Sales Information</h2>
+            <h2 className="text-sm font-bold mb-4">Sales Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-slate-600 block mb-1">{labels[lang].cashSales}</label>
