@@ -415,9 +415,9 @@ export default function DailySales() {
           {/* EXACT error display from consolidated patch */}
           {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
           
-          <section className="rounded-[4px] border bg-white p-5">
+          <section className="rounded-[4px] border bg-white p-4">
             <h3 className="mb-4 text-sm font-semibold">Shift Information</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
                 <label className="text-sm text-slate-600 block mb-1">Shift Date</label>
                 {isEditMode ? (
@@ -461,9 +461,9 @@ export default function DailySales() {
             <p className="mt-2 text-xs text-slate-600">Auto timestamp: {new Date().toISOString()}</p>
           </section>
 
-          <section className="rounded-[4px] border bg-white p-5">
+          <section className="rounded-[4px] border bg-white p-4">
             <h2 className="text-sm font-bold mb-4">Sales Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="text-sm text-slate-600 block mb-1">{labels[lang].cashSales}</label>
                 <input 
@@ -513,7 +513,7 @@ export default function DailySales() {
           </section>
 
           {/* Expenses Section */}
-          <section className="rounded-[4px] border bg-white p-4 mt-6">
+          <section className="rounded-[4px] border bg-white p-4 mt-4">
             <h3 className="mb-4 text-sm font-semibold">Expenses</h3>
             
             {/* Shift Expenses */}
@@ -521,7 +521,7 @@ export default function DailySales() {
               <h4 className="mb-3 text-sm font-semibold">Shift Expenses</h4>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
-                  <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
+                  <div key={row.id} className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Item</label>
                       <input 
@@ -578,7 +578,7 @@ export default function DailySales() {
               <h4 className="mb-3 text-sm font-semibold">Staff Wages</h4>
               <div className="space-y-4">
                 {staffWages.map((row) => (
-                  <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
+                  <div key={row.id} className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Staff Name</label>
                       <input 
@@ -640,7 +640,7 @@ export default function DailySales() {
           </section>
 
           {/* Summary Section */}
-          <section className="rounded-[4px] border bg-white p-5">
+          <section className="rounded-[4px] border bg-white p-4">
             <h3 className="mb-4 text-sm font-semibold">Summary</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
@@ -690,9 +690,9 @@ export default function DailySales() {
           </section>
 
           {/* Banking Section */}
-          <section className="rounded-[4px] border bg-white p-5">
+          <section className="rounded-[4px] border bg-white p-4">
             <h3 className="mb-4 text-sm font-semibold">Banking</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="text-sm text-slate-600 block mb-1">Closing Cash (฿)</label>
                 <input 
@@ -752,7 +752,7 @@ export default function DailySales() {
               <label className="text-sm text-slate-600 font-medium block mb-2">
                 Does the register balance? <span className="text-red-500">*</span>
               </label>
-              <div className="flex gap-4 mb-3">
+              <div className="flex gap-3 mb-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input 
                     type="radio" 
