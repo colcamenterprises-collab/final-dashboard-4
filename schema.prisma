@@ -1582,7 +1582,7 @@ model MissingSkuEvent {
 }
 
 model PurchasingItem {
-  id              Int                   @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   item            String
   category        String?
   supplierName    String?
@@ -1590,25 +1590,11 @@ model PurchasingItem {
   supplierSku     String?
   orderUnit       String?
   unitDescription String?
-  unitCost        Decimal?              @db.Decimal(10, 2)
+  unitCost        Decimal? @db.Decimal(10, 2)
   lastReviewDate  String?
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  
-  fieldMappings   PurchasingFieldMap[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("purchasing_items")
-}
-
-model PurchasingFieldMap {
-  id               Int             @id @default(autoincrement())
-  fieldKey         String          @unique
-  purchasingItemId Int
-  purchasingItem   PurchasingItem  @relation(fields: [purchasingItemId], references: [id])
-
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-
-  @@map("purchasing_field_maps")
 }

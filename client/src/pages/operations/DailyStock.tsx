@@ -28,26 +28,6 @@ type IngredientItem = {
 
 type IngredientsResponse = { list: IngredientItem[] };
 
-// Purchasing item details from master list
-type PurchasingItem = {
-  id: number;
-  item: string;
-  category: string | null;
-  supplierName: string | null;
-  brand: string | null;
-  supplierSku: string | null;
-  orderUnit: string | null;
-  unitDescription: string | null;
-  unitCost: number | null;
-};
-
-type FieldMap = {
-  id: number;
-  fieldKey: string;
-  purchasingItemId: number;
-  purchasingItem: PurchasingItem;
-};
-
 export type CategoryBlock = {
   category: string;
   items: { id: string; label: string; qty: number; unit: string }[];
@@ -79,7 +59,6 @@ const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
 const DailyStock: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
-  const [fieldMaps, setFieldMaps] = useState<Map<string, FieldMap>>(new Map());
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
@@ -118,30 +97,12 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     let mounted = true;
     (async () => {
       try {
-        // Fetch both ingredients and field mappings in parallel
-        const [ingredientsRes, fieldMapsRes] = await Promise.all([
-          fetch("/api/costing/ingredients"),
-          fetch("/api/purchasing-field-maps"),
-        ]);
-        
-        const ingredientsData: IngredientsResponse = await ingredientsRes.json();
-        const fieldMapsData = await fieldMapsRes.json();
-        
+        const res = await fetch("/api/costing/ingredients");
+        const data: IngredientsResponse = await res.json();
         if (!mounted) return;
-        
-        setIngredients(ingredientsData.list || []);
-        
-        // Build a map of fieldKey -> FieldMap for quick lookup
-        if (fieldMapsData.ok && fieldMapsData.maps) {
-          const mapsMap = new Map<string, FieldMap>();
-          for (const map of fieldMapsData.maps) {
-            mapsMap.set(map.fieldKey, map);
-          }
-          setFieldMaps(mapsMap);
-          console.log(`[DailyStock] Loaded ${mapsMap.size} field mappings`);
-        }
+        setIngredients(data.list || []);
       } catch (e) {
-        console.error("Failed to load catalog data:", e);
+        console.error("Failed to load ingredients catalog:", e);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -191,7 +152,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((item) => ({ 
           id: item.name,  // Use name as ID for consistent lookup
-          label: item.name, // SIMPLE NAME ONLY - no brand, unit, or cost
+          label: item.name, 
           qty: quantities[item.name] ?? 0,
           unit: item.unit
         })),
