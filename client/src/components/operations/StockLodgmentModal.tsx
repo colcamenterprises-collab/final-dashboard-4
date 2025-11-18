@@ -339,7 +339,7 @@ export function StockLodgmentModal({
                         step="0.01"
                         disabled
                         {...field}
-                        value={field.value.toFixed(2)}
+                        value={typeof field.value === 'number' ? field.value.toFixed(2) : field.value}
                       />
                     </FormControl>
                     <FormMessage />
