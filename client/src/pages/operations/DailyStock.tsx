@@ -161,28 +161,6 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     return drinkItems.map(d => d.name);
   }, [drinkItems]);
 
-  // Helper function to create enhanced label from purchasing item
-  const getEnhancedLabel = (itemName: string): string => {
-    const fieldMap = fieldMaps.get(itemName);
-    if (!fieldMap || !fieldMap.purchasingItem) {
-      return itemName; // Fallback to item name if no mapping
-    }
-    
-    const item = fieldMap.purchasingItem;
-    const parts: string[] = [item.item];
-    
-    // Add brand and unit description if available
-    if (item.brand && item.unitDescription) {
-      parts.push(`(${item.brand}, ${item.unitDescription})`);
-    } else if (item.brand) {
-      parts.push(`(${item.brand})`);
-    } else if (item.unitDescription) {
-      parts.push(`(${item.unitDescription})`);
-    }
-    
-    return parts.join(' ');
-  };
-
   // Group all ingredients by category with custom order (EXCLUDING drinks and meat)
   const blocks: CategoryBlock[] = useMemo(() => {
     if (!Array.isArray(ingredients)) return [];
@@ -212,13 +190,13 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       items: map.get(category)!
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((item) => ({ 
-          id: item.name,  // Use name as ID for consistent lookup (UNCHANGED)
-          label: getEnhancedLabel(item.name), // Enhanced label with brand and unit
+          id: item.name,  // Use name as ID for consistent lookup
+          label: item.name, // SIMPLE NAME ONLY - no brand, unit, or cost
           qty: quantities[item.name] ?? 0,
           unit: item.unit
         })),
     }));
-  }, [ingredients, quantities, fieldMaps]);
+  }, [ingredients, quantities]);
 
   // Helper function for safe integer parsing
   const safeInt = (v: string) => {
