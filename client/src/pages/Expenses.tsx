@@ -826,6 +826,8 @@ export default function Expenses() {
   const [uploading, setUploading] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+  const [editingStock, setEditingStock] = useState<any | null>(null);
+  const [showStockModal, setShowStockModal] = useState(false);
   
   // Month/Year selection state - default to current month
   const now = new Date();
@@ -996,7 +998,7 @@ export default function Expenses() {
         />
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Expense Modal */}
       {editingExpense && (
         <ExpenseLodgmentModal 
           isOpen={true}
@@ -1013,6 +1015,26 @@ export default function Expenses() {
             fetchExpenses();
             queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
             setEditingExpense(null);
+          }}
+        />
+      )}
+
+      {/* Edit Stock Modal */}
+      {showStockModal && (
+        <StockLodgmentModal 
+          isOpen={showStockModal}
+          onOpenChange={(open) => {
+            setShowStockModal(open);
+            if (!open) setEditingStock(null);
+          }}
+          initialData={editingStock}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            queryClient.invalidateQueries({ queryKey: ["/api/purchase-tally"] });
+            fetchExpenses();
+            setShowStockModal(false);
+            setEditingStock(null);
           }}
         />
       )}
@@ -1384,8 +1406,19 @@ export default function Expenses() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => console.log('Edit roll:', r)}
+                        onClick={() => {
+                          setEditingStock({
+                            type: 'rolls',
+                            id: r.id,
+                            date: r.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+                            quantity: r.rollsPcs || 0,
+                            cost: r.amountTHB || 0,
+                            paid: false
+                          });
+                          setShowStockModal(true);
+                        }}
                         className="h-7 w-7 p-0"
+                        data-testid={`button-edit-roll-${r.id}`}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
@@ -1457,8 +1490,18 @@ export default function Expenses() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => console.log('Edit meat:', m)}
+                      onClick={() => {
+                        setEditingStock({
+                          type: 'meat',
+                          id: m.id,
+                          date: m.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+                          meatType: m.notes || m.meatType || '',
+                          weightKg: m.meatGrams ? m.meatGrams / 1000 : 0
+                        });
+                        setShowStockModal(true);
+                      }}
                       className="h-7 w-7 p-0"
+                      data-testid={`button-edit-meat-${m.id}`}
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
