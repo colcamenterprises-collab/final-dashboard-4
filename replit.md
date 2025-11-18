@@ -3,9 +3,6 @@
 ## Overview
 This project is a comprehensive restaurant management dashboard designed to streamline operations, enhance efficiency, and boost profitability through AI-powered analytics and real-time insights. It integrates with external POS systems and AI services to provide automated sales analysis, inventory management, and marketing tools. The core vision is to offer a centralized, data-driven platform for restaurant decision-making.
 
-## CRITICAL SECURITY FIX (November 18, 2025)
-**Data Protection Update**: All dangerous `onDelete: Cascade` relationships between DailySales/DailySalesV2 and expense tables (ShoppingPurchase, WageEntry, OtherExpense, DailyStock) have been changed to `onDelete: Restrict`. This prevents accidental deletion of expense data when sales records are modified or deleted. The database now enforces referential integrity, rejecting any deletion attempt that would orphan expense records.
-
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 Code isolation policy: Once functionality is working and tested, isolate it to prevent breaking when updating other sections.

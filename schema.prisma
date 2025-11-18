@@ -53,7 +53,7 @@ model ShoppingPurchase {
   cost      Int        @default(0)
   shop      String
   salesId   String
-  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("shopping_purchases")
 }
@@ -65,7 +65,7 @@ model WageEntry {
   amount    Int        @default(0)
   type      String
   salesId   String
-  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("wage_entries")
 }
@@ -76,7 +76,7 @@ model OtherExpense {
   label     String
   amount    Int        @default(0)
   salesId   String
-  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("other_expenses")
 }
@@ -95,7 +95,7 @@ model DailyStock {
   deletedAt      DateTime?
   bunsCount      Int        @default(0)
   meatGrams      Int        @default(0)
-  sales          DailySales @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales          DailySales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 }
 
 model Restaurant {
@@ -479,7 +479,7 @@ model ShoppingPurchaseV2 {
   cost      Int          @default(0)
   shop      String
   salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("shopping_purchase_v2")
 }
@@ -491,7 +491,7 @@ model WageEntryV2 {
   amount    Int          @default(0)
   type      String
   salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("wage_entry_v2")
 }
@@ -502,7 +502,7 @@ model OtherExpenseV2 {
   label     String
   amount    Int          @default(0)
   salesId   String
-  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales     DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("other_expense_v2")
 }
@@ -517,7 +517,7 @@ model DailyStockV2 {
   purchasingJson Json?
   notes          String?
   deletedAt      DateTime?
-  sales          DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  sales          DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("daily_stock_v2")
 }
