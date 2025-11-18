@@ -402,110 +402,110 @@ export default function DailySales() {
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="h-10 rounded-[4px] border border-slate-200 px-4 text-sm font-semibold hover:bg-slate-50"
+            className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
           >
             Back
           </button>
         </div>
 
-        <form onSubmit={submit} className="mt-4 space-y-4">
+        <form onSubmit={submit} className="mt-6 space-y-6">
           {/* EXACT LanguageToggle from consolidated patch */}
           <LanguageToggle onChange={setLang} />
           
           {/* EXACT error display from consolidated patch */}
           {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
           
-          <section className="rounded-[4px] border bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold">Shift Information</h3>
+          <section className="rounded-xl border bg-white p-5">
+            <h3 className="mb-4 text-lg font-semibold">Shift Information</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label className="text-sm text-slate-600 block mb-1">Shift Date</label>
+                <label className="text-sm text-gray-600 block mb-1">Shift Date</label>
                 {isEditMode ? (
                   <input 
                     type="date"
                     value={shiftDate}
                     onChange={(e) => setShiftDate(e.target.value)}
-                    className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
+                    className="w-full border rounded-xl px-3 py-2.5 h-10 text-base" 
                   />
                 ) : (
                   <input 
                     type="text"
                     value={new Date().toLocaleDateString()}
                     readOnly
-                    className="w-full border rounded-[4px] px-3 py-2.5 h-10 bg-gray-50" 
+                    className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50" 
                   />
                 )}
               </div>
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].completedBy}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].completedBy}</label>
                 <input 
                   placeholder={labels[lang].completedBy}
                   value={completedBy} 
                   onChange={e=>setCompletedBy(e.target.value)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('completedBy') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('completedBy') ? 'border-red-500' : ''}`}
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].startingCash}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].startingCash}</label>
                 <input 
                   type="number" 
                   min="0"
                   placeholder={labels[lang].startingCash}
                   value={cashStart} 
                   onChange={e=>setCashStart(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('startingCash') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('startingCash') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
-            <p className="mt-2 text-xs text-slate-600">Auto timestamp: {new Date().toISOString()}</p>
+            <p className="mt-2 text-xs text-gray-500">Auto timestamp: {new Date().toISOString()}</p>
           </section>
 
-          <section className="rounded-[4px] border bg-white p-5">
+          <section className="rounded-2xl border bg-white p-5">
             <h2 className="text-lg font-bold mb-4">Sales Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].cashSales}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
                 <input 
                   type="number" 
                   min="0"
                   placeholder={labels[lang].cashSales}
                   value={cash} 
                   onChange={e=>setCash(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].qrSales}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrSales}</label>
                 <input 
                   type="number" 
                   min="0"
                   placeholder={labels[lang].qrSales}
                   value={qr} 
                   onChange={e=>setQr(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].grabSales}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabSales}</label>
                 <input 
                   type="number" 
                   min="0"
                   placeholder={labels[lang].grabSales}
                   value={grab} 
                   onChange={e=>setGrab(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-600 block mb-1">{labels[lang].otherSales}</label>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherSales}</label>
                 <input 
                   type="number" 
                   min="0"
                   placeholder={labels[lang].otherSales}
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
@@ -513,37 +513,37 @@ export default function DailySales() {
           </section>
 
           {/* Expenses Section */}
-          <section className="rounded-[4px] border bg-white p-4 mt-6">
-            <h3 className="mb-4 text-sm font-semibold">Expenses</h3>
+          <section className="rounded-xl border bg-white p-6 mt-6">
+            <h3 className="mb-4 text-[14px] font-semibold">Expenses</h3>
             
             {/* Shift Expenses */}
-            <div className="mb-4">
-              <h4 className="mb-3 text-sm font-semibold">Shift Expenses</h4>
+            <div className="mb-8">
+              <h4 className="mb-3 text-[14px] font-semibold">Shift Expenses</h4>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Item</label>
+                      <label className="text-sm text-gray-600 block mb-1">Item</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.item} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
                         placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Cost (฿)</label>
+                      <label className="text-sm text-gray-600 block mb-1">Cost (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.cost} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, cost: Number(e.target.value) } : r))} 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Shop Name</label>
+                      <label className="text-sm text-gray-600 block mb-1">Shop Name</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.shop} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value } : r))}
                         placeholder="Makro / Lotus" 
@@ -553,7 +553,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
                       >
                         Delete
                       </button>
@@ -564,7 +564,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-[4px] hover:bg-slate-50" 
+                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
                   + Add Row
@@ -575,32 +575,32 @@ export default function DailySales() {
 
             {/* Staff Wages */}
             <div>
-              <h4 className="mb-3 text-sm font-semibold">Staff Wages</h4>
+              <h4 className="mb-3 text-[14px] font-semibold">Staff Wages</h4>
               <div className="space-y-4">
                 {staffWages.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Staff Name</label>
+                      <label className="text-sm text-gray-600 block mb-1">Staff Name</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.staff} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
                         placeholder="Staff Name" 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Amount (฿)</label>
+                      <label className="text-sm text-gray-600 block mb-1">Amount (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.amount} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, amount: Number(e.target.value) } : r))} 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-600 block mb-1">Type</label>
+                      <label className="text-sm text-gray-600 block mb-1">Type</label>
                       <select 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.type} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as any } : r))}
                       >
@@ -614,7 +614,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
                       >
                         Delete
                       </button>
@@ -625,7 +625,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-[4px] hover:bg-slate-50" 
+                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
                   + Add Row
@@ -634,20 +634,20 @@ export default function DailySales() {
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t text-sm text-right font-bold">
+            <div className="mt-6 pt-4 border-t text-[14px] text-right font-bold">
               Total Expenses: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
 
           {/* Summary Section */}
-          <section className="rounded-[4px] border bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold">Summary</h3>
+          <section className="rounded-xl border bg-white p-5">
+            <h3 className="mb-4 text-lg font-semibold">Summary</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
                 <span>Total Sales:</span>
                 <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
               </div>
-              <div className="ml-4 space-y-1 text-xs text-slate-600">
+              <div className="ml-4 space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>• Cash Sales:</span>
                   <span>฿{cash.toLocaleString()}</span>
@@ -670,7 +670,7 @@ export default function DailySales() {
                 <span>Total Expenses:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
-              <div className="ml-4 space-y-1 text-xs text-slate-600">
+              <div className="ml-4 space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>• Shift Expenses:</span>
                   <span>฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</span>
@@ -680,7 +680,7 @@ export default function DailySales() {
                   <span>฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
               </div>
-              <div className="flex justify-between font-bold text-xs border-t pt-2">
+              <div className="flex justify-between font-bold text-base border-t pt-2">
                 <span>Net Position:</span>
                 <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
                   ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
@@ -690,29 +690,29 @@ export default function DailySales() {
           </section>
 
           {/* Banking Section */}
-          <section className="rounded-[4px] border bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold">Banking</h3>
+          <section className="rounded-xl border bg-white p-5">
+            <h3 className="mb-4 text-lg font-semibold">Banking</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm text-slate-600 block mb-1">Closing Cash (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
                 <input 
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
-                  className="w-full border rounded-[4px] px-3 py-2.5 h-10"
+                  className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-[4px]">
-              <div className="text-xs text-slate-600">Expected Cash to Bank</div>
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
+              <div className="text-xs text-gray-500">Expected Cash to Bank</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
                 return expectedCashBank.toLocaleString();
               })()}</div>
-              <div className="text-xs text-slate-600">Expected QR to Bank</div>
+              <div className="text-xs text-gray-500">Expected QR to Bank</div>
               <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
-              <div className="text-xs text-slate-600">Expected Total to Bank</div>
+              <div className="text-xs text-gray-500">Expected Total to Bank</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
@@ -723,21 +723,21 @@ export default function DailySales() {
           </section>
 
           {/* Manager Sign Off Section */}
-          <section className="rounded-[4px] border bg-white p-4 mt-4 border-t-4 border-t-emerald-600">
-            <h3 className="mb-4 text-sm font-semibold">Manager Sign Off</h3>
+          <section className="rounded-xl border bg-white p-5 mt-6 border-t-4 border-t-emerald-600">
+            <h3 className="mb-4 text-lg font-semibold">Manager Sign Off</h3>
             
             {/* Q1: Amount after all expenses (excluding float) */}
             <div className="mb-5">
-              <label className="text-sm text-slate-600 font-medium block mb-2">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
                 Amount after all expenses (excluding float) <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-2">
-                <span className="text-slate-600">฿</span>
+                <span className="text-gray-600">฿</span>
                 <input 
                   type="number" 
                   value={managerNetAmount} 
                   onChange={e=>setManagerNetAmount(+e.target.value||0)} 
-                  className={`w-full max-w-xs border rounded-[4px] px-3 py-2.5 h-10 ${errors.includes('managerNetAmount') ? 'border-red-500 bg-red-50' : ''}`}
+                  className={`w-full max-w-xs border rounded-lg px-3 py-2.5 h-10 ${errors.includes('managerNetAmount') ? 'border-red-500 bg-red-50' : ''}`}
                   min="0"
                   step="0.01"
                 />
@@ -749,7 +749,7 @@ export default function DailySales() {
 
             {/* Q2: Does the register balance? */}
             <div className="mb-5">
-              <label className="text-sm text-slate-600 font-medium block mb-2">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
                 Does the register balance? <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-4 mb-3">
@@ -780,13 +780,13 @@ export default function DailySales() {
               
               {registerBalances === false && (
                 <div className="mt-3">
-                  <label className="text-sm text-slate-600 block mb-2">
+                  <label className="text-sm text-gray-700 block mb-2">
                     If no, please explain why the register does not balance <span className="text-red-500">*</span>
                   </label>
                   <textarea 
                     value={varianceNotes}
                     onChange={e => setVarianceNotes(e.target.value)}
-                    className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[80px] ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
+                    className={`w-full border rounded-lg px-3 py-2.5 min-h-[80px] ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
                     placeholder="Explain the variance (cash shortage/overage, missing receipts, etc.)"
                   />
                   {errors.includes('varianceNotes') && (
@@ -798,16 +798,16 @@ export default function DailySales() {
 
             {/* Q3: Manager review of expenses */}
             <div className="mb-2">
-              <label className="text-sm text-slate-600 font-medium block mb-2">
+              <label className="text-sm text-gray-700 font-medium block mb-2">
                 Manager review of expenses <span className="text-red-500">*</span>
               </label>
-              <p className="text-xs text-slate-600 mb-2">
+              <p className="text-xs text-gray-500 mb-2">
                 Please confirm that all expenses recorded for this shift match the supporting receipts/transactions. Note any issues or discrepancies.
               </p>
               <textarea 
                 value={expensesReview}
                 onChange={e => setExpensesReview(e.target.value)}
-                className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[100px] ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
+                className={`w-full border rounded-lg px-3 py-2.5 min-h-[100px] ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
                 placeholder="I confirm all expenses match receipts and documentation..."
               />
               {errors.includes('expensesReview') && (
@@ -817,7 +817,7 @@ export default function DailySales() {
           </section>
 
           {error && (
-            <div className="mb-3 rounded-[4px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -827,14 +827,14 @@ export default function DailySales() {
             <button
               type="button"
               onClick={handleSaveDraft}
-              className="h-10 rounded-[4px] border border-slate-200 px-4 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="h-10 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-700 hover:bg-gray-50"
             >
               Save draft
             </button>
             <button
               type="button"
               onClick={() => submit()}
-              className="h-10 rounded-[4px] bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
               disabled={submitting}
             >
               {submitting ? 'Saving...' : (isEditMode ? 'Update Form' : 'Next →')}
