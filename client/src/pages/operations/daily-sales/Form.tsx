@@ -525,7 +525,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Item</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.item} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
                         placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
@@ -535,7 +535,7 @@ export default function DailySales() {
                       <label className="text-sm text-slate-600 block mb-1">Cost (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.cost} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, cost: Number(e.target.value) } : r))} 
                       />
@@ -543,7 +543,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Shop Name</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.shop} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value } : r))}
                         placeholder="Makro / Lotus" 
@@ -553,7 +553,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
                       >
                         Delete
                       </button>
@@ -564,7 +564,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-[4px] hover:bg-slate-50" 
+                  className="h-10 px-3 border rounded-[4px] text-xs hover:bg-slate-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
                   + Add Row
@@ -582,7 +582,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Staff Name</label>
                       <input 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.staff} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
                         placeholder="Staff Name" 
@@ -592,7 +592,7 @@ export default function DailySales() {
                       <label className="text-sm text-slate-600 block mb-1">Amount (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.amount} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, amount: Number(e.target.value) } : r))} 
                       />
@@ -600,7 +600,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-slate-600 block mb-1">Type</label>
                       <select 
-                        className="w-full border rounded-[4px] px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs" 
                         value={row.type} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as any } : r))}
                       >
@@ -614,7 +614,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-10 rounded-[4px] border border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
                       >
                         Delete
                       </button>
@@ -625,7 +625,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-[4px] hover:bg-slate-50" 
+                  className="h-10 px-3 border rounded-[4px] text-xs hover:bg-slate-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
                   + Add Row
@@ -699,7 +699,7 @@ export default function DailySales() {
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
-                  className="w-full border rounded-[4px] px-3 py-2.5 h-10"
+                  className="w-full border rounded-[4px] px-3 py-2.5 h-10 text-xs"
                 />
               </div>
             </div>
@@ -737,7 +737,7 @@ export default function DailySales() {
                   type="number" 
                   value={managerNetAmount} 
                   onChange={e=>setManagerNetAmount(+e.target.value||0)} 
-                  className={`w-full max-w-xs border rounded-[4px] px-3 py-2.5 h-10 ${errors.includes('managerNetAmount') ? 'border-red-500 bg-red-50' : ''}`}
+                  className={`w-full max-w-xs border rounded-[4px] px-3 py-2.5 h-10 text-xs ${errors.includes('managerNetAmount') ? 'border-red-500 bg-red-50' : ''}`}
                   min="0"
                   step="0.01"
                 />
@@ -761,7 +761,7 @@ export default function DailySales() {
                     onChange={() => setRegisterBalances(true)}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm">Yes</span>
+                  <span className="text-xs">Yes</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input 
@@ -771,7 +771,7 @@ export default function DailySales() {
                     onChange={() => setRegisterBalances(false)}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm">No</span>
+                  <span className="text-xs">No</span>
                 </label>
               </div>
               {errors.includes('registerBalances') && (
@@ -786,7 +786,7 @@ export default function DailySales() {
                   <textarea 
                     value={varianceNotes}
                     onChange={e => setVarianceNotes(e.target.value)}
-                    className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[80px] ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
+                    className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[80px] text-xs ${errors.includes('varianceNotes') ? 'border-red-500 bg-red-50' : ''}`}
                     placeholder="Explain the variance (cash shortage/overage, missing receipts, etc.)"
                   />
                   {errors.includes('varianceNotes') && (
@@ -807,7 +807,7 @@ export default function DailySales() {
               <textarea 
                 value={expensesReview}
                 onChange={e => setExpensesReview(e.target.value)}
-                className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[100px] ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
+                className={`w-full border rounded-[4px] px-3 py-2.5 min-h-[100px] text-xs ${errors.includes('expensesReview') ? 'border-red-500 bg-red-50' : ''}`}
                 placeholder="I confirm all expenses match receipts and documentation..."
               />
               {errors.includes('expensesReview') && (
@@ -827,14 +827,14 @@ export default function DailySales() {
             <button
               type="button"
               onClick={handleSaveDraft}
-              className="h-10 rounded-[4px] border border-slate-200 px-4 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="h-10 rounded-[4px] border border-slate-200 px-4 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
               Save draft
             </button>
             <button
               type="button"
               onClick={() => submit()}
-              className="h-10 rounded-[4px] bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="h-10 rounded-[4px] bg-emerald-600 px-5 text-xs font-semibold text-white hover:bg-emerald-700"
               disabled={submitting}
             >
               {submitting ? 'Saving...' : (isEditMode ? 'Update Form' : 'Next →')}
