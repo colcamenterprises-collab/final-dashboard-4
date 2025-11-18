@@ -3545,7 +3545,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       // Get the most recent daily sales form with requisition data directly from database
       const { pool } = await import('./db');
-      const { prisma } = await import('./lib/prisma');
       
       const formsQuery = await pool.query(`
         SELECT id, "createdAt", payload 
@@ -3576,6 +3575,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const requisitionItems = payload.requisition;
 
       // Fetch all field mappings with purchasing item details via Prisma
+      // Using the prisma instance imported at the top of this file
       const fieldMaps = await prisma.purchasingFieldMap.findMany({
         include: {
           purchasingItem: true,
