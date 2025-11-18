@@ -3545,6 +3545,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       // Get the most recent daily sales form with requisition data directly from database
       const { pool } = await import('./db');
+      const { prisma } = await import('./lib/prisma');
+      
       const formsQuery = await pool.query(`
         SELECT id, "createdAt", payload 
         FROM daily_sales_v2 
@@ -3573,31 +3575,48 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const payload = typeof lastForm.payload === 'string' ? JSON.parse(lastForm.payload) : lastForm.payload;
       const requisitionItems = payload.requisition;
 
-      // Get ingredient cost data for pricing
-      const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand FROM ingredient_v2');
-      const ingredients = ingredientsQuery.rows;
-      
-      const ingredientCosts = ingredients.reduce((acc: any, item) => {
-        acc[item.name.toLowerCase()] = {
-          cost: parseFloat(item.unitCost) || 0,
-          supplier: item.supplier || 'Unknown',
-          brand: item.brand || ''
-        };
-        return acc;
-      }, {});
+      // Fetch all field mappings with purchasing item details via Prisma
+      const fieldMaps = await prisma.purchasingFieldMap.findMany({
+        include: {
+          purchasingItem: true,
+        },
+      });
 
-      // Process requisition items into shopping list format
+      // Create lookup map: fieldKey -> PurchasingItem
+      const fieldMapLookup = new Map();
+      for (const map of fieldMaps) {
+        fieldMapLookup.set(map.fieldKey, map.purchasingItem);
+      }
+
+      console.log(`[ShoppingList] Loaded ${fieldMapLookup.size} field mappings`);
+
+      // Process requisition items into shopping list format using PurchasingItem data
       const shoppingItems = requisitionItems.map((item: any) => {
-        const ingredientKey = item.name.toLowerCase();
-        const ingredientData = ingredientCosts[ingredientKey];
-        const unitCost = ingredientData?.cost || 0;
+        const purchasingItem = fieldMapLookup.get(item.name);
+        
+        let unitCost = 0;
+        let supplier = 'Unknown';
+        let brand = '';
+        let sku = '';
+        let unitDescription = item.unit || 'each';
+        
+        if (purchasingItem) {
+          unitCost = purchasingItem.unitCost || 0;
+          supplier = purchasingItem.supplierName || 'Unknown';
+          brand = purchasingItem.brand || '';
+          sku = purchasingItem.supplierSku || '';
+          unitDescription = purchasingItem.unitDescription || item.unit || 'each';
+        }
+
         const estimatedCost = unitCost * (item.qty || 1);
 
         return {
           itemName: item.name,
           quantity: item.qty || 1,
-          unit: item.unit || 'each',
-          supplier: ingredientData?.supplier || 'Unknown',
+          unit: unitDescription,
+          supplier: supplier,
+          brand: brand,
+          sku: sku,
           pricePerUnit: unitCost.toFixed(2),
           estimatedCost: estimatedCost.toFixed(2),
           priority: 'medium',
@@ -3628,7 +3647,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       res.json({ 
         ok: true, 
-        message: "Shopping list regenerated successfully", 
+        message: "Shopping list regenerated successfully with purchasing item data", 
         itemsGenerated: shoppingItems.length,
         sourceDate: lastForm.createdAt,
         shoppingListId: insertResult.rows[0].id
