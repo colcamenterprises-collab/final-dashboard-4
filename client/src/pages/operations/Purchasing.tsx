@@ -104,6 +104,27 @@ export default function PurchasingPage() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/purchasing-items/sync-to-forms', {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Sync failed');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      alert(`✅ Sync Complete!\n\nSynced ${data.itemsSynced} items to forms\nCreated ${data.mappingsCreated} new mappings\nUpdated ${data.mappingsUpdated} existing mappings\n\nRestarting application to load updated forms...`);
+      // Reload the page to restart the application
+      window.location.reload();
+    },
+    onError: (error: any) => {
+      alert(`❌ Sync Failed:\n\n${error.message}`);
+    },
+  });
+
   const items: PurchasingItem[] = data?.items || [];
 
   const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
@@ -172,6 +193,14 @@ export default function PurchasingPage() {
               <option key={cat} value={cat || ''}>{cat}</option>
             ))}
           </select>
+          <Button
+            data-testid="button-sync-to-forms"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || items.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-[4px] disabled:opacity-50"
+          >
+            {syncMutation.isPending ? 'Syncing...' : 'Sync to Forms'}
+          </Button>
           <Button
             data-testid="button-add-item"
             onClick={() => {
