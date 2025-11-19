@@ -1,6 +1,6 @@
 // server/routes/rollsLedger.ts
 import { Router } from 'express';
-import { computeAndUpsertRollsLedger, getRollsLedgerRange, shiftWindowUTC } from '../services/rollsLedger.js';
+import { computeAndUpsertRollsLedger, getRollsLedgerRange, shiftWindowUTC, updateRollsLedgerManual } from '../services/rollsLedger.js';
 import { normalizeDateParam } from '../utils/normalizeDate.js';
 
 const r = Router();
@@ -86,6 +86,29 @@ r.get('/history', async (req, res) => {
       return dateB - dateA;
     });
     return res.json({ ok: true, start: startKey, end, rows });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
+// POST update manual amendments
+r.post('/update-manual', async (req, res) => {
+  try {
+    const { shiftDate, rollsPurchasedManual, actualRollsEndManual, notes } = req.body;
+    
+    if (!shiftDate) {
+      return res.status(400).json({ ok: false, error: 'shiftDate is required' });
+    }
+    
+    const date = normalizeDateParam(shiftDate);
+    await updateRollsLedgerManual(
+      date,
+      rollsPurchasedManual !== undefined && rollsPurchasedManual !== null ? Number(rollsPurchasedManual) : null,
+      actualRollsEndManual !== undefined && actualRollsEndManual !== null ? Number(actualRollsEndManual) : null,
+      notes || null
+    );
+    
+    return res.json({ ok: true, message: 'Manual amendments saved' });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
   }

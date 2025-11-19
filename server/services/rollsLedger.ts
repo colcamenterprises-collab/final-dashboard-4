@@ -185,9 +185,67 @@ export async function computeAndUpsertRollsLedger(shiftDate: string) {
 
 export async function getRollsLedgerRange(startDate: string, endDate: string) {
   return db.$queryRaw<any[]>`
-    SELECT *
+    SELECT 
+      shift_date,
+      rolls_start,
+      COALESCE(rolls_purchased_manual, rolls_purchased) as rolls_purchased,
+      burgers_sold,
+      estimated_rolls_end,
+      COALESCE(actual_rolls_end_manual, actual_rolls_end) as actual_rolls_end,
+      variance,
+      status,
+      rolls_purchased_manual,
+      actual_rolls_end_manual,
+      notes
     FROM rolls_ledger
     WHERE shift_date >= ${startDate}::date AND shift_date <= ${endDate}::date
     ORDER BY shift_date DESC
   `;
+}
+
+export async function updateRollsLedgerManual(
+  shiftDate: string, 
+  rollsPurchasedManual: number | null,
+  actualRollsEndManual: number | null,
+  notes: string | null
+) {
+  await db.$executeRaw`
+    UPDATE rolls_ledger
+    SET 
+      rolls_purchased_manual = ${rollsPurchasedManual},
+      actual_rolls_end_manual = ${actualRollsEndManual},
+      notes = ${notes},
+      updated_at = now()
+    WHERE shift_date = ${shiftDate}::date
+  `;
+  
+  // Recalculate estimated and variance
+  const row = await db.$queryRaw<any[]>`
+    SELECT 
+      rolls_start,
+      COALESCE(rolls_purchased_manual, rolls_purchased) as rolls_purchased,
+      burgers_sold,
+      COALESCE(actual_rolls_end_manual, actual_rolls_end) as actual_rolls_end
+    FROM rolls_ledger
+    WHERE shift_date = ${shiftDate}::date
+  `;
+  
+  if (row?.length) {
+    const { rolls_start, rolls_purchased, burgers_sold, actual_rolls_end } = row[0];
+    const estimated = rolls_start + rolls_purchased - burgers_sold;
+    const variance = (actual_rolls_end ?? estimated) - estimated;
+    const status = actual_rolls_end == null ? 'PENDING' : (Math.abs(variance) <= WASTE ? 'OK' : 'ALERT');
+    
+    await db.$executeRaw`
+      UPDATE rolls_ledger
+      SET 
+        estimated_rolls_end = ${estimated},
+        variance = ${variance},
+        status = ${status},
+        updated_at = now()
+      WHERE shift_date = ${shiftDate}::date
+    `;
+  }
+  
+  return { success: true };
 }
