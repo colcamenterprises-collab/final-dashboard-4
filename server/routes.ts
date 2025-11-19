@@ -74,6 +74,7 @@ import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
 import { registerAdminMenuRoutes } from "./routes/adminMenu";
 import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 import membershipRouter from "./routes/membership";
+import githubRouter from "./routes/github";
 // Email functionality will be added when needed
 
 
@@ -3179,6 +3180,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/manager-check', managerCheckRouter);
   app.use('/api/shopping-list', shoppingListRouter);
   app.use('/api/membership', membershipRouter);
+  app.use('/api/github', githubRouter);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
