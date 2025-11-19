@@ -77,16 +77,18 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
         console.log(`[ImportV2] Receipt ${fetched}: ${rc.receipt_number} at ${rc.receipt_date}`);
       }
 
-      // FIX: Store the actual receipt_date from Loyverse (UTC) without timezone conversion
-      // The column is named datetime_bkk but actually stores UTC timestamps
-      const receiptDateUTC = rc.receipt_date;
+      // PERMANENT FIX: Store Loyverse UTC time as-is (PostgreSQL handles timezone conversion)
+      // The datetime_bkk column is timestamptz which stores UTC internally
+      // Queries will use Bangkok timezone for shift windows
+      const receiptDateISO = rc.receipt_date;
+      
       const totalAmount = typeof rc.total_money === 'number' 
         ? rc.total_money / 100.0 
         : (rc.total_money?.amount ?? 0) / 100.0;
 
       await db.$executeRaw`
         INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
-        VALUES (${rc.receipt_number}, ${receiptDateUTC}::timestamptz, ${rc.employee?.name ?? null}, ${rc.customer_id ?? null},
+        VALUES (${rc.receipt_number}, ${receiptDateISO}::timestamptz, ${rc.employee?.name ?? null}, ${rc.customer_id ?? null},
                 ${totalAmount}, ${JSON.stringify(rc.payments ?? [])}::jsonb, ${JSON.stringify(rc)}::jsonb)
         ON CONFLICT (receipt_id) DO UPDATE
         SET datetime_bkk=EXCLUDED.datetime_bkk,

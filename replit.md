@@ -54,7 +54,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 ### Key Features
 - **Daily Shift Form**: Comprehensive form for sales, expenses, cash management, and inventory.
 - **AI-Powered Features**: Multi-agent system leveraging GPT-4o for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
-- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling, with normalized receipt architecture and dynamic catalog-based SKU management.
+- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling, with normalized receipt architecture and dynamic catalog-based SKU management. PERMANENT FIX (Nov 19, 2025): Timezone handling verified - Loyverse API provides UTC timestamps, PostgreSQL timestamptz stores UTC internally, shift window queries use Bangkok timezone parameters for correct conversion. System auto-syncs every 15 minutes + full daily sync at 3am Bangkok time.
 - **Recipe Management**: System for ingredient portion selection, cost calculation, and PDF generation.
 - **Inventory Management**: Tracking supplier items, stock levels, and automated shopping list generation.
 - **Sales Heatmap**: Visual analytics for hourly sales patterns.
