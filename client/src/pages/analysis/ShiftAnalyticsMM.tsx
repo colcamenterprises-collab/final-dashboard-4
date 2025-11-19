@@ -63,8 +63,16 @@ const toYMD = (v: string) => {
   try { return new Date(v).toISOString().slice(0,10); } catch { return v; }
 };
 
+// Helper to get the last shift date (yesterday in Bangkok time)
+const getDefaultShiftDate = (): string => {
+  const now = new Date();
+  // Bangkok is UTC+7, subtract 1 day to get yesterday's shift
+  now.setDate(now.getDate() - 1);
+  return now.toISOString().slice(0,10);
+};
+
 export default function ShiftAnalyticsMM() {
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
+  const [date, setDate] = useState<string>(() => getDefaultShiftDate());
   const [items, setItems] = useState<ShiftItem[]>([]);
   const [modifiers, setModifiers] = useState<ShiftModifier[]>([]);
   const [sourceUsed, setSourceUsed] = useState<"live"|"cache"|"">("");
