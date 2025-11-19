@@ -28,8 +28,8 @@ async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<Lv
   
   do {
     const params = new URLSearchParams();
-    params.append('receipt_date_min', fromISO);
-    params.append('receipt_date_max', toISO);
+    params.append('created_at_min', fromISO);
+    params.append('created_at_max', toISO);
     if (cursor) params.append('cursor', cursor);
     
     const url = `${LOYVERSE_API}/receipts?${params.toString()}`;
