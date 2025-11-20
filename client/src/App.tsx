@@ -153,6 +153,7 @@ export default function App() {
                   {/* Hidden - can be re-enabled */}
                   {/* <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} /> */}
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
+                  <Route path="/analysis/rolls-ledger" element={<RollsLedger />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>

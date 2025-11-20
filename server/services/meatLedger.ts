@@ -29,9 +29,9 @@ async function ensureAnalytics(shiftDate: string) {
 async function getPattiesSoldFromAnalytics(shiftDate: string): Promise<number> {
   await ensureAnalytics(shiftDate);
   
-  // Sum meat column from analytics (each burger uses 1 unit of meat)
+  // Sum patties column from analytics
   const rows = await db.$queryRaw<{ n: number }[]>`
-    SELECT COALESCE(SUM(meat),0)::int AS n
+    SELECT COALESCE(SUM(patties),0)::int AS n
     FROM analytics_shift_item
     WHERE shift_date = ${shiftDate}::date
   `;
