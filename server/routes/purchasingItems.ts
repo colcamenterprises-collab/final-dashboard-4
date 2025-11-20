@@ -106,4 +106,36 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Sync purchasing list items to Daily Stock V2 form
+router.post('/sync-to-daily-stock', async (req, res) => {
+  try {
+    console.log('[purchasing/sync] Syncing purchasing items to Daily Stock V2...');
+    
+    // Get all purchasing items from database
+    const purchasingItems = await prisma.purchasingItem.findMany({
+      orderBy: [
+        { category: 'asc' },
+        { item: 'asc' },
+      ],
+    });
+
+    // Transform to match Daily Stock ingredient format (simple names only)
+    const ingredients = purchasingItems.map((item, index) => ({
+      id: `purchasing-${item.id}`, // Unique ID for frontend tracking
+      name: item.item, // Simple name only
+      category: item.category || 'Uncategorized',
+      unit: item.orderUnit || 'unit',
+      cost: item.unitCost ? Number(item.unitCost) : 0,
+      supplier: item.supplierName || 'Unknown',
+      portions: 1 // Default portions for compatibility
+    }));
+
+    console.log(`[purchasing/sync] Synced ${ingredients.length} items from purchasing list`);
+    res.json({ ok: true, list: ingredients });
+  } catch (error) {
+    console.error('[purchasing/sync] Error syncing to Daily Stock:', error);
+    res.status(500).json({ ok: false, error: 'Failed to sync purchasing items' });
+  }
+});
+
 export default router;

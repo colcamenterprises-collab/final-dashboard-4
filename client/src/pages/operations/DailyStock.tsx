@@ -92,6 +92,29 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
 // === END MANAGER QUICK CHECK: state & handlers ===
 
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncFromPurchasing = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data: IngredientsResponse = await res.json();
+      if (data.list) {
+        setIngredients(data.list);
+        setMessage({ type: "success", text: `Synced ${data.list.length} items from Purchasing List` });
+        setTimeout(() => setMessage(null), 3000);
+      }
+    } catch (e) {
+      console.error("Failed to sync from purchasing list:", e);
+      setMessage({ type: "error", text: "Failed to sync from purchasing list" });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -388,6 +411,23 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
             <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">No shift ID provided</span>
           )}
         </div>
+      </div>
+
+      {/* Sync button for updating items from purchasing list */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSyncFromPurchasing}
+          disabled={syncing}
+          data-testid="button-sync-purchasing"
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white text-xs font-medium rounded-[4px] transition-colors"
+        >
+          {syncing ? 'Syncing...' : 'Sync from Purchasing List'}
+        </button>
+        {message && (
+          <div className={`px-3 py-1 rounded-[4px] text-xs ${message.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+            {message.text}
+          </div>
+        )}
       </div>
       
       {/* EXACT LanguageToggle from consolidated patch */}
