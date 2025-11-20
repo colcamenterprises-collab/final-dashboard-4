@@ -136,11 +136,13 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const wagesTotal = (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
     const othersTotal = 0;
     
-    // Manager Sign Off fields
-    const managerNetAmount = body.managerNetAmount ?? null;
-    const registerBalances = body.registerBalances ?? null;
-    const varianceNotes = body.varianceNotes ?? "";
-    const expensesReview = body.expensesReview ?? "";
+    // Manager Sign Off fields (6 questions)
+    const q1CashInRegister = body.q1CashInRegister ?? null;
+    const q2ExpensesMirrorReport = body.q2ExpensesMirrorReport ?? null;
+    const q3CorrectDescriptions = body.q3CorrectDescriptions ?? null;
+    const q4RegisterBalances = body.q4RegisterBalances ?? null;
+    const q5AmountToBanked = body.q5AmountToBanked ?? null;
+    const q6ManagerName = body.q6ManagerName ?? "";
 
     const payload: any = {
       completedBy,
@@ -162,10 +164,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
       rollsEnd,
       meatEnd,
       drinkStock: finalDrinkStock,
-      managerNetAmount,
-      registerBalances,
-      varianceNotes,
-      expensesReview,
+      q1CashInRegister,
+      q2ExpensesMirrorReport,
+      q3CorrectDescriptions,
+      q4RegisterBalances,
+      q5AmountToBanked,
+      q6ManagerName,
     };
 
     const __bankingAuto = computeBankingAuto({
@@ -177,9 +181,17 @@ export async function createDailySalesV2(req: Request, res: Response) {
     payload.bankingAuto = __bankingAuto;
 
     await pool.query(
-      `INSERT INTO daily_sales_v2 (id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, shiftDate, completedBy, createdAt, createdAt, payload]
+      `INSERT INTO daily_sales_v2 (
+        id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload,
+        "q1CashInRegister", "q2ExpensesMirrorReport", "q3CorrectDescriptions",
+        "q4RegisterBalances", "q5AmountToBanked", "q6ManagerName"
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        id, shiftDate, completedBy, createdAt, createdAt, payload,
+        q1CashInRegister, q2ExpensesMirrorReport, q3CorrectDescriptions,
+        q4RegisterBalances, q5AmountToBanked, q6ManagerName
+      ]
     );
 
     // Build shopping list for email
@@ -247,10 +259,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Manager Sign Off</h3>
       <ul>
-        <li><strong>Amount after expenses (excl. float):</strong> ฿${formatTHB(managerNetAmount || 0)}</li>
-        <li><strong>Register balances:</strong> ${registerBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
-        ${!registerBalances && varianceNotes ? `<li><strong>Variance explanation:</strong> ${varianceNotes}</li>` : ''}
-        <li><strong>Expenses review:</strong> ${expensesReview || 'Not provided'}</li>
+        <li><strong>Cash in register after all expenses:</strong> ฿${formatTHB(q1CashInRegister || 0)}</li>
+        <li><strong>Expenses mirror shift report:</strong> ${q2ExpensesMirrorReport ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
+        <li><strong>Correct expense descriptions:</strong> ${q3CorrectDescriptions ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
+        <li><strong>Register balances:</strong> ${q4RegisterBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
+        <li><strong>Amount to be banked (Combined Total):</strong> ฿${formatTHB(q5AmountToBanked || 0)}</li>
+        <li><strong>Manager Name:</strong> ${q6ManagerName || 'Not provided'}</li>
       </ul>
 
       <h3>Stock Levels</h3>

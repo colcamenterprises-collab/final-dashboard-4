@@ -742,10 +742,10 @@ export default function DailySales() {
           <section className="rounded-[4px] border border-slate-200 bg-white p-4 mt-6 border-t-4 border-t-emerald-600">
             <h3 className="mb-4 text-sm font-semibold text-slate-900">Manager Sign Off</h3>
             
-            {/* Q1: Confirm cash in register after expenses */}
+            {/* Confirm cash in register after expenses */}
             <div className="mb-4">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q1. Please confirm the amount of cash in register after all expenses (wages, expenses & exclude starting cash) <span className="text-red-500">*</span>
+                Please confirm the amount of cash in register after all expenses (wages, expenses & exclude starting cash) <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-600">฿</span>
@@ -764,10 +764,10 @@ export default function DailySales() {
               )}
             </div>
 
-            {/* Q2: Do expenses mirror shift report? */}
+            {/* Do expenses mirror shift report? */}
             <div className="mb-4">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q2. Does the expenses listed in the Daily Sheet mirror the shift report? <span className="text-red-500">*</span>
+                Does the expenses listed in the Daily Sheet mirror the shift report? <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -798,10 +798,10 @@ export default function DailySales() {
               )}
             </div>
 
-            {/* Q3: Correct expense descriptions? */}
+            {/* Correct expense descriptions? */}
             <div className="mb-4">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q3. Do all expenses have the correct descriptions (eg Bin Bags)? <span className="text-red-500">*</span>
+                Do all expenses have the correct descriptions (eg Bin Bags)? <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -832,10 +832,10 @@ export default function DailySales() {
               )}
             </div>
 
-            {/* Q4: Does register balance? */}
+            {/* Does register balance? */}
             <div className="mb-4">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q4. Does the Register Balance? <span className="text-red-500">*</span>
+                Does the Register Balance? <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -866,10 +866,10 @@ export default function DailySales() {
               )}
             </div>
 
-            {/* Q5: Confirm amount to be banked */}
+            {/* Confirm amount to be banked */}
             <div className="mb-4">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q5. Please confirm the amount to be banked (Combined Total) <span className="text-red-500">*</span>
+                Please confirm the amount to be banked (Combined Total) <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-600">฿</span>
@@ -888,10 +888,10 @@ export default function DailySales() {
               )}
             </div>
 
-            {/* Q6: Manager name */}
+            {/* Manager name */}
             <div className="mb-2">
               <label className="text-xs text-slate-700 font-medium block mb-2">
-                Q6. Please list your Name <span className="text-red-500">*</span>
+                Please list your Name <span className="text-red-500">*</span>
               </label>
               <input 
                 type="text" 
