@@ -439,32 +439,38 @@ model JussiComparison {
 }
 
 model DailySalesV2 {
-  id             String               @id @default(uuid())
-  createdAt      DateTime             @default(now())
-  shiftDate      String
-  submittedAtISO DateTime
-  completedBy    String
-  startingCash   Int                  @default(0)
-  endingCash     Int                  @default(0)
-  cashBanked     Int                  @default(0)
-  cashSales      Int                  @default(0)
-  qrSales        Int                  @default(0)
-  grabSales      Int                  @default(0)
-  aroiSales      Int                  @default(0)
-  totalSales     Int                  @default(0)
-  shoppingTotal  Int                  @default(0)
-  wagesTotal     Int                  @default(0)
-  othersTotal    Int                  @default(0)
-  totalExpenses  Int                  @default(0)
-  qrTransfer     Int                  @default(0)
-  deletedAt      DateTime?
-  staff          String?
-  shift_date     DateTime?            @db.Date
-  payload        Json?
-  stock          DailyStockV2?
-  others         OtherExpenseV2[]
-  shopping       ShoppingPurchaseV2[]
-  wages          WageEntryV2[]
+  id                     String               @id @default(uuid())
+  createdAt              DateTime             @default(now())
+  shiftDate              String
+  submittedAtISO         DateTime
+  completedBy            String
+  startingCash           Int                  @default(0)
+  endingCash             Int                  @default(0)
+  cashBanked             Int                  @default(0)
+  cashSales              Int                  @default(0)
+  qrSales                Int                  @default(0)
+  grabSales              Int                  @default(0)
+  aroiSales              Int                  @default(0)
+  totalSales             Int                  @default(0)
+  shoppingTotal          Int                  @default(0)
+  wagesTotal             Int                  @default(0)
+  othersTotal            Int                  @default(0)
+  totalExpenses          Int                  @default(0)
+  qrTransfer             Int                  @default(0)
+  deletedAt              DateTime?
+  staff                  String?
+  shift_date             DateTime?            @db.Date
+  payload                Json?
+  q1CashInRegister       Int?
+  q2ExpensesMirrorReport Boolean?
+  q3CorrectDescriptions  Boolean?
+  q4RegisterBalances     Boolean?
+  q5AmountToBanked       Int?
+  q6ManagerName          String?
+  stock                  DailyStockV2?
+  others                 OtherExpenseV2[]
+  shopping               ShoppingPurchaseV2[]
+  wages                  WageEntryV2[]
 
   @@index([completedBy], map: "idx_daily_sales_v2_completed_by")
   @@index([createdAt], map: "idx_daily_sales_v2_created_at")
