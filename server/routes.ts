@@ -1134,6 +1134,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   const rollsLedgerRouter = (await import('./routes/rollsLedger.js')).default;
   app.use('/api/analysis/rolls-ledger', rollsLedgerRouter);
   
+  // Register meat ledger routes BEFORE catch-all :date route
+  const meatLedgerRouter = (await import('./routes/meatLedger.js')).default;
+  app.use('/api/analysis/meat-ledger', meatLedgerRouter);
+  
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
   app.use(freshnessRouter);
