@@ -40,7 +40,6 @@ import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
-import RollsLedger from "./pages/analysis/RollsLedger";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
@@ -101,7 +100,6 @@ export default function App() {
                     {/* <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} /> */}
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                     <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
-                    <Route path="rolls-ledger" element={<Guard><RollsLedger /></Guard>} />
                   </Route>
                   
                   {/* Legacy analysis routes */}
@@ -153,7 +151,6 @@ export default function App() {
                   {/* Hidden - can be re-enabled */}
                   {/* <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} /> */}
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
-                  <Route path="/analysis/rolls-ledger" element={<RollsLedger />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>

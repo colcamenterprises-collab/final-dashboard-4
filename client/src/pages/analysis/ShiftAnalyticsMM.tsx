@@ -52,10 +52,29 @@ type RollsRow = {
   actual_rolls_end_manual: number | null;
   notes: string | null;
 };
+type MeatRow = {
+  shift_date: string;
+  meat_start_g: number;
+  meat_purchased_g: number;
+  patties_sold: number;
+  estimated_meat_end_g: number;
+  actual_meat_end_g: number | null;
+  variance_g: number;
+  status: 'PENDING'|'OK'|'ALERT';
+  meat_purchased_manual_g: number | null;
+  actual_meat_end_manual_g: number | null;
+  notes: string | null;
+};
 type EditState = {
   shiftDate: string;
   rollsPurchasedManual: string;
   actualRollsEndManual: string;
+  notes: string;
+};
+type MeatEditState = {
+  shiftDate: string;
+  meatPurchasedManualG: string;
+  actualMeatEndManualG: string;
   notes: string;
 };
 type Freshness = null | {
@@ -89,12 +108,15 @@ export default function ShiftAnalyticsMM() {
   const [sourceUsed, setSourceUsed] = useState<"live"|"cache"|"">("");
   const [rolls, setRolls] = useState<RollsRow|null>(null);
   const [rollsHistory, setRollsHistory] = useState<RollsRow[]>([]);
+  const [meatHistory, setMeatHistory] = useState<MeatRow[]>([]);
   const [fresh, setFresh] = useState<Freshness>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [metrics, setMetrics] = useState<ShiftResp['metrics']>(undefined);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
+  const [editingMeatRow, setEditingMeatRow] = useState<string | null>(null);
+  const [meatEditState, setMeatEditState] = useState<MeatEditState | null>(null);
   const { toast } = useToast();
 
   async function loadAll() {
@@ -123,6 +145,33 @@ export default function ShiftAnalyticsMM() {
       setRollsHistory(resp?.rows ?? []);
     } catch (e) {
       console.error('Failed to load rolls history:', e);
+    }
+  }
+
+  async function loadMeatHistory() {
+    try {
+      const resp = await fetch('/api/analysis/meat-ledger/history').then(r => r.json());
+      setMeatHistory(resp?.rows ?? []);
+    } catch (e) {
+      console.error('Failed to load meat history:', e);
+    }
+  }
+
+  async function rebuildMeatLedger() {
+    if (!confirm('Rebuild all 14 days of meat ledger?')) return;
+    try {
+      await fetch('/api/analysis/meat-ledger/backfill-14', { method: 'POST' });
+      toast({
+        title: "Success",
+        description: "Meat ledger rebuilt for 14 days",
+      });
+      await loadMeatHistory();
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to rebuild meat ledger",
+        variant: "destructive",
+      });
     }
   }
 
@@ -175,7 +224,56 @@ export default function ShiftAnalyticsMM() {
     }
   }
 
-  useEffect(() => { loadAll(); loadRollsHistory(); }, []);
+  function handleEditMeatRow(row: MeatRow) {
+    setEditingMeatRow(row.shift_date);
+    setMeatEditState({
+      shiftDate: row.shift_date,
+      meatPurchasedManualG: row.meat_purchased_manual_g?.toString() ?? row.meat_purchased_g.toString(),
+      actualMeatEndManualG: row.actual_meat_end_manual_g?.toString() ?? row.actual_meat_end_g?.toString() ?? '',
+      notes: row.notes ?? '',
+    });
+  }
+
+  function handleCancelMeatEdit() {
+    setEditingMeatRow(null);
+    setMeatEditState(null);
+  }
+
+  async function handleSaveMeatEdit() {
+    if (!meatEditState) return;
+
+    try {
+      const response = await fetch('/api/analysis/meat-ledger/update-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftDate: meatEditState.shiftDate,
+          meatPurchasedManualG: meatEditState.meatPurchasedManualG ? Number(meatEditState.meatPurchasedManualG) : null,
+          actualMeatEndManualG: meatEditState.actualMeatEndManualG ? Number(meatEditState.actualMeatEndManualG) : null,
+          notes: meatEditState.notes || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save');
+
+      toast({
+        title: "Saved",
+        description: "Meat ledger amendments saved successfully",
+      });
+
+      await loadMeatHistory();
+      setEditingMeatRow(null);
+      setMeatEditState(null);
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to save meat amendments",
+        variant: "destructive",
+      });
+    }
+  }
+
+  useEffect(() => { loadAll(); loadRollsHistory(); loadMeatHistory(); }, []);
 
   const categories = useMemo(() => {
     const cats = new Set(items.map(x => x.category));
@@ -381,7 +479,9 @@ export default function ShiftAnalyticsMM() {
 
       {rollsHistory.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Rolls Ledger (14 Days)</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-slate-900">Rolls Ledger (14 Days)</h2>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
               <thead>
@@ -506,6 +606,163 @@ export default function ShiftAnalyticsMM() {
                                 placeholder="Optional notes for this amendment..."
                                 className="flex-1 px-3 py-1 border border-slate-300 rounded-[4px] text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 data-testid="input-notes"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {!isEditing && row.notes && (
+                        <tr className="border-b border-slate-200 bg-amber-50">
+                          <td colSpan={9} className="px-3 py-1 text-xs text-amber-800">
+                            <span className="font-medium">Note:</span> {row.notes}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {meatHistory.length > 0 && (
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-slate-900">Meat Ledger (14 Days)</h2>
+            <button
+              onClick={rebuildMeatLedger}
+              className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs hover:bg-emerald-700 transition-colors"
+              data-testid="button-rebuild-meat"
+            >
+              Rebuild All (14 Days)
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">Date</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Start (g)</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Purchased (g)</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Patties Sold</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Est. End (g)</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Actual End (g)</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-700">Variance (g)</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">Status</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meatHistory.map((row) => {
+                  const isEditing = editingMeatRow === row.shift_date;
+                  const hasManualOverrides = row.meat_purchased_manual_g !== null || row.actual_meat_end_manual_g !== null;
+                  
+                  return (
+                    <React.Fragment key={row.shift_date}>
+                      <tr className="border-b border-slate-200 hover:bg-slate-50">
+                        <td className="px-3 py-2 text-slate-900">
+                          {formatDateDDMMYYYY(row.shift_date)}
+                          {hasManualOverrides && (
+                            <span className="ml-1 text-amber-600" title="Has manual amendments">*</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-700">{row.meat_start_g}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={meatEditState?.meatPurchasedManualG ?? ''}
+                              onChange={(e) => setMeatEditState(prev => prev ? {...prev, meatPurchasedManualG: e.target.value} : null)}
+                              className="w-20 px-2 py-1 text-right border border-slate-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              data-testid="input-meat-purchased"
+                            />
+                          ) : (
+                            <span className={hasManualOverrides && row.meat_purchased_manual_g !== null ? 'font-medium text-amber-700' : ''}>
+                              {row.meat_purchased_g}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-700">{row.patties_sold}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{row.estimated_meat_end_g}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={meatEditState?.actualMeatEndManualG ?? ''}
+                              onChange={(e) => setMeatEditState(prev => prev ? {...prev, actualMeatEndManualG: e.target.value} : null)}
+                              className="w-20 px-2 py-1 text-right border border-slate-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              data-testid="input-meat-actual-end"
+                            />
+                          ) : (
+                            <span className={hasManualOverrides && row.actual_meat_end_manual_g !== null ? 'font-medium text-amber-700' : ''}>
+                              {row.actual_meat_end_g ?? '—'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-900">
+                          {row.actual_meat_end_g !== null ? (
+                            <span className={row.variance_g >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                              {row.variance_g >= 0 ? '+' : ''}{row.variance_g}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`inline-block px-2 py-1 rounded-[4px] text-xs font-medium ${
+                            row.status === 'OK' 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : row.status === 'ALERT' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {isEditing ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={handleSaveMeatEdit}
+                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-[4px] transition-colors"
+                                title="Save"
+                                data-testid="button-save-meat-edit"
+                              >
+                                <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelMeatEdit}
+                                className="p-1 text-slate-600 hover:bg-slate-100 rounded-[4px] transition-colors"
+                                title="Cancel"
+                                data-testid="button-cancel-meat-edit"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleEditMeatRow(row)}
+                              className="p-1 text-slate-600 hover:bg-slate-100 rounded-[4px] transition-colors"
+                              title="Edit"
+                              data-testid={`button-edit-meat-${row.shift_date}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {isEditing && (
+                        <tr className="border-b border-slate-200 bg-slate-50">
+                          <td colSpan={9} className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-slate-700 font-medium">Notes:</label>
+                              <input
+                                type="text"
+                                value={meatEditState?.notes ?? ''}
+                                onChange={(e) => setMeatEditState(prev => prev ? {...prev, notes: e.target.value} : null)}
+                                placeholder="Optional notes for this amendment..."
+                                className="flex-1 px-3 py-1 border border-slate-300 rounded-[4px] text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                data-testid="input-meat-notes"
                               />
                             </div>
                           </td>

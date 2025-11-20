@@ -74,6 +74,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and database-driven menu. Admin menu management at `/marketing/menu-admin` inside dashboard for full CRUD operations. Public ordering page at `/order` (standalone route without dashboard layout). Features database persistence via Prisma, API-driven menu loading, real-time price calculations, localStorage cart, and mobile-optimized checkout flow. Menu data flows: Admin UI → Prisma DB → Public API → Customer ordering page.
 - **Membership System**: Complete customer membership platform at `/membership` with digital card generation, barcode support (JsBarcode), spend tracking, and optional Loyverse Customers API integration. Features include two-view interface (Admin Dashboard and Registration Form), member list table, add spend modal, and branded digital cards with barcodes. Backend API provides registration, spend tracking, and member listing with in-memory storage and best-effort Loyverse customer sync.
 - **F&B Analysis Enhanced Metrics**: Shift analytics page displays receipt count, payment type breakdown (Cash/Grab/QR/Other), and top 5 items by category including burgers, sides, modifiers, and all product categories. Real-time data from Loyverse POS with automatic payment classification.
+- **Rolls & Meat Ledger System**: Integrated audit trail for inventory tracking at `/operations/analysis/shift-items`. Rolls Ledger tracks burger rolls (start, purchased, burgers sold, estimated end, actual end, variance). Meat Ledger tracks meat inventory (140g per patty calculation, start, purchased, patties sold, estimated end, actual end, variance). Both support manual amendments with notes, asterisk indicators for overrides, and status badges (PENDING/OK/ALERT). Features rebuild functionality for 14-day historical data, edit capability with pencil icons, and amber highlighting for manual overrides.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
@@ -82,6 +83,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - Normalized POS tables: lv_receipt, lv_line_item, lv_modifier.
 - Item catalog and analytics cache tables: item_catalog, analytics_shift_item, analytics_shift_category_summary.
 - Manager checklist tables: cleaning_tasks, manager_checklists.
+- Inventory ledger tables: rolls_ledger, meat_ledger (with manual amendment support).
 - Online ordering tables: menu_categories_online, menu_items_online, modifier_groups_online, modifier_options_online, orders_online, order_lines_online.
 
 ## External Dependencies
