@@ -316,15 +316,15 @@ export default function ShiftAnalyticsMM() {
         </div>
       )}
 
-      <div className="mt-4 flex items-end gap-3">
-        <div>
+      <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-end gap-3">
+        <div className="w-full sm:w-auto">
           <label className="block text-sm mb-1">Shift date</label>
-          <input type="date" value={keyDate} onChange={e => setDate(e.target.value)} className="border rounded-[4px] p-2 text-xs" />
+          <input type="date" value={keyDate} onChange={e => setDate(e.target.value)} className="w-full sm:w-auto border rounded-[4px] p-2 text-xs" />
         </div>
-        <button className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs disabled:opacity-50" onClick={loadAll} disabled={loading} data-testid="button-load-shift">
+        <button className="w-full sm:w-auto px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs disabled:opacity-50" onClick={loadAll} disabled={loading} data-testid="button-load-shift">
           {loading ? 'Loading…' : 'Load Shift'}
         </button>
-        <button className="px-4 py-2 rounded-[4px] bg-slate-200 text-xs" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
+        <button className="w-full sm:w-auto px-4 py-2 rounded-[4px] bg-slate-200 text-xs" onClick={exportCSV} data-testid="button-export-csv">Export CSV</button>
       </div>
 
       {metrics && (
@@ -404,8 +404,8 @@ export default function ShiftAnalyticsMM() {
         ))}
       </div>
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-xs bg-white rounded-[4px] border border-slate-200">
+      <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <table className="w-full min-w-[640px] text-xs bg-white rounded-[4px] border border-slate-200">
           <thead>
             <tr className="text-left border-b border-slate-200 bg-slate-50">
               <th className="px-1 py-2 font-medium text-slate-700 hidden sm:table-cell">SKU</th>
@@ -452,38 +452,40 @@ export default function ShiftAnalyticsMM() {
       {modifiers.length > 0 && (
         <div className="mt-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-4">Modifiers & Extras</h2>
-          <div className="bg-white rounded-[4px] border border-slate-200 p-4">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left border-b border-slate-200 bg-slate-50">
-                  <th className="px-1 py-2 font-medium text-slate-700">Modifier</th>
-                  <th className="px-1 py-2 text-right font-medium text-slate-700">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {modifiers.map((mod, i) => (
-                  <tr key={i} className="border-b border-slate-200">
-                    <td className="px-1 py-2 text-slate-900">{mod.name}</td>
-                    <td className="px-1 py-2 text-right text-slate-900">{mod.qty}</td>
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="bg-white rounded-[4px] border border-slate-200 p-4 min-w-[320px]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left border-b border-slate-200 bg-slate-50">
+                    <th className="px-1 py-2 font-medium text-slate-700">Modifier</th>
+                    <th className="px-1 py-2 text-right font-medium text-slate-700">Qty</th>
                   </tr>
-                ))}
-                <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-                  <td className="px-1 py-2 text-slate-700">TOTAL MODIFIERS</td>
-                  <td className="px-1 py-2 text-right text-slate-900">{modifiers.reduce((sum, m) => sum + m.qty, 0)}</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {modifiers.map((mod, i) => (
+                    <tr key={i} className="border-b border-slate-200">
+                      <td className="px-1 py-2 text-slate-900">{mod.name}</td>
+                      <td className="px-1 py-2 text-right text-slate-900">{mod.qty}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
+                    <td className="px-1 py-2 text-slate-700">TOTAL MODIFIERS</td>
+                    <td className="px-1 py-2 text-right text-slate-900">{modifiers.reduce((sum, m) => sum + m.qty, 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
       {rollsHistory.length > 0 && (
         <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-2xl font-bold text-slate-900">Rolls Ledger (14 Days)</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[800px] border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
                   <th className="px-3 py-2 text-left font-medium text-slate-700">Date</th>
@@ -629,18 +631,18 @@ export default function ShiftAnalyticsMM() {
 
       {meatHistory.length > 0 && (
         <div className="mt-12">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-2xl font-bold text-slate-900">Meat Ledger (14 Days)</h2>
             <button
               onClick={rebuildMeatLedger}
-              className="px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs hover:bg-emerald-700 transition-colors"
+              className="w-full sm:w-auto px-4 py-2 rounded-[4px] bg-emerald-600 text-white text-xs hover:bg-emerald-700 transition-colors"
               data-testid="button-rebuild-meat"
             >
               Rebuild All (14 Days)
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[800px] border-collapse text-xs bg-white rounded-[4px] border border-slate-200">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
                   <th className="px-3 py-2 text-left font-medium text-slate-700">Date</th>
