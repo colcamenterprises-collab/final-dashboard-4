@@ -94,11 +94,23 @@ router.get("/analysis/shift/items", async (req, res) => {
     });
     topByCategory['Modifiers'] = topModifiers;
 
+    // Map database column names to frontend expected field names
+    const items = rows.map(row => ({
+      sku: row.sku,
+      name: row.name,
+      category: row.category,
+      qty: row.qty,
+      patties: row.patties || 0,
+      redMeatGrams: row.red_meat_g || 0,
+      chickenGrams: row.chicken_g || 0,
+      rolls: row.rolls || 0
+    }));
+
     res.json({
       ok: true,
       sourceUsed: "cache",
       date: shiftDate,
-      items: category ? rows.filter((x) => x.category === category) : rows,
+      items: category ? items.filter((x) => x.category === category) : items,
       modifiers: modRows,
       metrics: {
         receiptCount,
