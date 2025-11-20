@@ -2608,9 +2608,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         LIMIT 5
       `);
       
+      // costCents stores whole THB, not cents - no division needed
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
-        total: Number(row.total || 0) / 100
+        total: Number(row.total || 0)
       }));
 
       res.json({
