@@ -352,27 +352,6 @@ export default function ShiftAnalyticsMM() {
         </div>
       )}
 
-      {metrics && Object.keys(metrics.topByCategory).length > 0 && (
-        <div className="mt-4">
-          <h2 className="text-sm font-bold text-slate-900 mb-2">Top 5 Items by Category</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {Object.entries(metrics.topByCategory).map(([category, topItems]) => (
-              <div key={category} className="p-3 border border-slate-200 rounded-[4px] bg-white">
-                <h3 className="text-xs font-bold text-emerald-600 mb-2">{category}</h3>
-                <div className="space-y-1">
-                  {topItems.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-xs">
-                      <span className="text-slate-700 truncate flex-1">{item.name}</span>
-                      <span className="font-bold text-slate-900 ml-2">{item.qty}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
         <div className="p-2 border border-slate-200 rounded-[4px] bg-white">
           <div className="text-slate-600">QTY</div>
