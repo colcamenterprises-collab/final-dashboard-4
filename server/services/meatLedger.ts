@@ -50,19 +50,16 @@ async function getPattiesSoldFromAnalytics(shiftDate: string): Promise<number> {
   return patties;
 }
 
-// Get meat purchased from expenses (Stock Lodgment)
-async function getMeatPurchased(fromISO: string, toISO: string): Promise<{ grams: number }> {
+// Get meat purchased from purchase_tally table
+async function getMeatPurchased(shiftDate: string): Promise<{ grams: number }> {
   try {
-    // Query expenses table for Stock Lodgment entries with meat
-    // Quantity is stored in meta->'quantity' JSON field (in grams)
+    // Query purchase_tally table for meat purchases on this shift date
+    // Meat purchases are stored with meat_grams column
     const r = await db.$queryRaw<{ qty: number }[]>`
-      SELECT COALESCE(SUM((meta->>'quantity')::int), 0)::int AS qty
-      FROM expenses
-      WHERE (lower(item) LIKE '%meat%' OR lower(item) LIKE '%beef%' OR lower(item) LIKE '%patty%' OR lower(item) LIKE '%pattie%')
-        AND source = 'STOCK_LODGMENT'
-        AND "createdAt" >= ${fromISO}::timestamptz 
-        AND "createdAt" < ${toISO}::timestamptz
-        AND meta->>'quantity' IS NOT NULL
+      SELECT COALESCE(SUM(meat_grams), 0)::int AS qty
+      FROM purchase_tally
+      WHERE meat_grams IS NOT NULL
+        AND date = ${shiftDate}::date
     `;
     return { grams: r?.[0]?.qty ?? 0 };
   } catch (_e) {
@@ -126,7 +123,7 @@ export async function computeAndUpsertMeatLedger(shiftDate: string) {
   const [meat_start_g, patties_sold, purchased, actual] = await Promise.all([
     getMeatStart(shiftDate),
     getPattiesSoldFromAnalytics(shiftDate),
-    getMeatPurchased(fromISO, toISO),
+    getMeatPurchased(shiftDate),
     getActualMeatEnd(shiftDate),
   ]);
 
