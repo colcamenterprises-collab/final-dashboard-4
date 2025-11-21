@@ -412,24 +412,6 @@ export const Analysis = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Stock Review
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 mb-4">
-                Buns, meat & drinks analysis with usage vs recipes variance detection (over 5% flagged).
-              </p>
-              <Link to="/operations/analysis/stock-review">
-                <Button className="w-full" data-testid="button-stock-module">
-                  View Buns, Meat & Drinks
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
         </div>
       )}
 
