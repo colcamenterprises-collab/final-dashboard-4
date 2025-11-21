@@ -22,7 +22,7 @@ import menuOnlineRouter from "./routes/menuOnline";
 import imageUploadRouter from "./routes/imageUpload";
 import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
-import exportRoutes from './routes/exportRoutes.js';
+import exportRoutes from "./routes/exportRoutes";
 
 const prisma = new PrismaClient();
 
