@@ -1,0 +1,147 @@
+
+REPLIT AGENT — CREATE EXPORT SYNC (CORRECT IMPLEMENTATION)
+
+IMPORTANT — STRICT RULES:
+You are NOT allowed to modify, delete, rename, or touch ANY existing files except where instructed.
+Do NOT reformat files.
+Do NOT optimize or reorganize.
+Do NOT modify Prisma schemas.
+Do NOT modify unrelated routes.
+Your task is ONLY to add one route file and mount it.
+
+
+---
+
+STEP 1 — Create the export route file
+
+Create a new file EXACTLY at:
+
+server/routes/exportRoutes.ts
+
+Populate it with this content ONLY:
+
+import { Router } from 'express';
+import { prisma } from '../lib/prisma.js';
+
+const router = Router();
+
+// SECURITY KEY
+const EXPORT_KEY = process.env.EXPORT_KEY;
+
+router.use((req, res, next) => {
+  if (!EXPORT_KEY) {
+    return res.status(500).json({ success: false, error: "EXPORT_KEY not set" });
+  }
+  if (req.query.key !== EXPORT_KEY) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  next();
+});
+
+router.get('/daily-sales-v2', async (req, res) => {
+  try {
+    const data = await prisma.dailySalesV2.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/daily-stock-v2', async (req, res) => {
+  try {
+    const data = await prisma.dailyStockV2.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { sales: true }
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/pos/shift-reports', async (req, res) => {
+  try {
+    const data = await prisma.posShiftReport.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/pos/receipts', async (req, res) => {
+  try {
+    const data = await prisma.posReceipt.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: true,
+        modifiers: true
+      }
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/expenses', async (req, res) => {
+  try {
+    const data = await prisma.expense.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+export default router;
+
+
+---
+
+STEP 2 — Mount the route in the main Express app
+
+Locate the file:
+
+server/index.ts
+
+Inside this file:
+
+1. Add this import at the top with other imports (do NOT modify anything else):
+
+
+
+import exportRoutes from './routes/exportRoutes.js';
+
+2. Mount the route (place with the other app.use() calls):
+
+
+
+app.use('/api/export', exportRoutes);
+
+
+---
+
+FINAL RULES
+
+Do NOT change file paths.
+
+Do NOT switch .ts to .js or vice versa.
+
+Do NOT move files.
+
+Do NOT modify the build pipeline.
+
+Do NOT adjust TypeScript configuration.
+
+Do NOT “fix” any other routes.
+
+
+Stop immediately after adding the file and the two lines.
+
+
+---
