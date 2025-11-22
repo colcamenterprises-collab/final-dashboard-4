@@ -75,6 +75,7 @@ import { registerAdminMenuRoutes } from "./routes/adminMenu";
 import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 import membershipRouter from "./routes/membership";
 import githubRouter from "./routes/github";
+import imageUploadRouter from "./routes/imageUpload";
 // Email functionality will be added when needed
 
 
@@ -1117,6 +1118,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
+
+  // Serve static uploaded menu item images
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (fs.existsSync(uploadsDir)) {
+    app.use("/uploads", express.static(uploadsDir));
+  }
 
   // Serve the online ordering SPA
   if (fs.existsSync(orderingDist)) {
@@ -3942,6 +3949,9 @@ app.use("/api/bank-imports", bankUploadRouter);
   registerOnlineMenuRoutes(app);
   registerAdminMenuRoutes(app);
   registerOnlineOrderRoutes(app);
+  
+  // Register image upload route
+  app.use('/api', imageUploadRouter);
   
   // MEGA V3 PATCH: GET /api/forms/library - properly return payload for library display
   app.get('/api/forms/library', async (req: Request, res: Response) => {
