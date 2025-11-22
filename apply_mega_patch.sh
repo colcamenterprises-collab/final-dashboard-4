@@ -1,0 +1,387 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "== Mega Patch: EnsureShift + ShiftDate Rolls Ledger with runtime column detection =="
+
+mkdir -p prisma/migrations/20251122_ensure_shift_rolls \
+         server/services server/jobs
+
+############################################
+# 1) DB migration: rolls_ledger + runtime-aware recompute + triggers
+############################################
+cat > prisma/migrations/20251122_ensure_shift_rolls/migration.sql <<'SQL'
+-- Keep it minimal and safe.
+CREATE TABLE IF NOT EXISTS rolls_ledger (
+  shift_date date PRIMARY KEY,
+  rolls_start integer NOT NULL DEFAULT 0,
+  rolls_purchased integer NOT NULL DEFAULT 0,
+  burgers_sold integer NOT NULL DEFAULT 0,
+  estimated_rolls_end integer NOT NULL DEFAULT 0,
+  actual_rolls_end integer,
+  waste_allowance integer NOT NULL DEFAULT 4,
+  variance integer,
+  status text NOT NULL DEFAULT 'PENDING',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Helpers to discover real schema/columns (no hard assumptions).
+CREATE OR REPLACE FUNCTION tbl_exists(tbl text)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT EXISTS(SELECT 1 FROM information_schema.tables
+    WHERE table_schema='public' AND table_name=tbl)
+$$;
+
+CREATE OR REPLACE FUNCTION col_exists(tbl text, col text)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name=tbl AND column_name=col)
+$$;
+
+CREATE OR REPLACE FUNCTION first_existing_col(tbl text, cols text[])
+RETURNS text LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE c text;
+BEGIN
+  FOREACH c IN ARRAY cols LOOP
+    IF (SELECT col_exists(tbl, c)) THEN
+      RETURN c;
+    END IF;
+  END LOOP;
+  RETURN NULL;
+END$$;
+
+-- Core recompute strictly by shift_date (yesterday's actual = start, purchased from expenses/roll_purchase,
+-- sold from analytics_shift_item, actual from daily_stock_sales). No time windows.
+CREATE OR REPLACE FUNCTION recompute_rolls_ledger(p_date date)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  v_prev date := (p_date - INTERVAL '1 day')::date;
+
+  stock_tbl text := CASE
+                      WHEN tbl_exists('daily_stock_sales') THEN 'daily_stock_sales'
+                      WHEN tbl_exists('DailyStock') THEN 'DailyStock'
+                      ELSE NULL
+                    END;
+  stock_end_col text;
+  stock_date_col text;
+
+  use_roll_purchase boolean := tbl_exists('roll_purchase');
+  exp_qty_col text; exp_item_col text; exp_date_col text;
+
+  v_start int := 0;
+  v_purchased int := 0;
+  v_sold int := 0;
+  v_est int := 0;
+  v_actual int := NULL;
+  v_waste int := 4;
+  v_var int := NULL;
+
+  sql text;
+BEGIN
+  -- START = yesterday actual (ledger), else Daily Stock prev.
+  SELECT rl.actual_rolls_end INTO v_start
+  FROM rolls_ledger rl WHERE rl.shift_date = v_prev;
+
+  IF v_start IS NULL THEN
+    IF stock_tbl IS NOT NULL THEN
+      stock_end_col := first_existing_col(stock_tbl, ARRAY['burger_buns_stock','rolls_end','buns_end','rolls_actual','buns_stock']);
+      IF stock_end_col IS NOT NULL THEN
+        IF stock_tbl = 'daily_stock_sales' THEN
+          sql := format('SELECT %I FROM %I WHERE shift_date=$1 ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 1',
+                        stock_end_col, stock_tbl);
+          EXECUTE sql USING v_prev INTO v_start;
+        ELSE
+          stock_date_col := CASE WHEN col_exists('DailyStock','shift_date') THEN 'shift_date' ELSE NULL END;
+          IF stock_date_col IS NOT NULL THEN
+            sql := format('SELECT %I FROM "DailyStock" WHERE %I=$1 ORDER BY COALESCE("updatedAt","createdAt") DESC LIMIT 1',
+                          stock_end_col, stock_date_col);
+            EXECUTE sql USING v_prev INTO v_start;
+          ELSE
+            sql := format('SELECT %I FROM "DailyStock"
+                           WHERE DATE(COALESCE("updatedAt","createdAt"))=$1
+                           ORDER BY COALESCE("updatedAt","createdAt") DESC LIMIT 1', stock_end_col);
+            EXECUTE sql USING v_prev INTO v_start;
+          END IF;
+        END IF;
+      END IF;
+    END IF;
+    IF v_start IS NULL THEN v_start := 0; END IF;
+  END IF;
+
+  -- PURCHASED = roll_purchase.quantity OR expenses rows where item contains bun/roll on that shift_date
+  IF use_roll_purchase THEN
+    IF col_exists('roll_purchase','shift_date') THEN
+      EXECUTE 'SELECT COALESCE(SUM(quantity),0)::int FROM roll_purchase WHERE shift_date=$1'
+      USING p_date INTO v_purchased;
+    ELSE
+      EXECUTE 'SELECT COALESCE(SUM(quantity),0)::int FROM roll_purchase WHERE DATE(purchase_ts)=$1'
+      USING p_date INTO v_purchased;
+    END IF;
+  ELSIF tbl_exists('expenses') THEN
+    exp_qty_col  := first_existing_col('expenses', ARRAY['quantity','qty','units','number']);
+    exp_item_col := first_existing_col('expenses', ARRAY['item','name','description','product']);
+    exp_date_col := first_existing_col('expenses', ARRAY['shift_date','date','ts','created_at','createdAt']);
+    IF exp_qty_col IS NOT NULL AND exp_item_col IS NOT NULL AND exp_date_col IS NOT NULL THEN
+      sql := format($SQL$
+        SELECT COALESCE(SUM(%I),0)::int
+        FROM expenses
+        WHERE (lower(%I) LIKE '%%bun%%' OR lower(%I) LIKE '%%roll%%')
+          AND DATE(%I) = $1
+      $SQL$, exp_qty_col, exp_item_col, exp_item_col, exp_date_col);
+      EXECUTE sql USING p_date INTO v_purchased;
+    END IF;
+  END IF;
+
+  -- SOLD = analytics_shift_item for that shift_date (prefer rolls, fallback burgers qty)
+  IF tbl_exists('analytics_shift_item') THEN
+    EXECUTE 'SELECT COALESCE(SUM(rolls),0)::int FROM analytics_shift_item WHERE shift_date=$1'
+    USING p_date INTO v_sold;
+
+    IF v_sold = 0 THEN
+      EXECUTE $$SELECT COALESCE(SUM(qty),0)::int
+               FROM analytics_shift_item
+               WHERE shift_date=$1 AND lower(category)='burger'$$
+      USING p_date INTO v_sold;
+    END IF;
+  END IF;
+
+  -- ACTUAL = Daily Stock for that shift_date (end-of-rolls column auto-detected)
+  IF stock_tbl IS NOT NULL THEN
+    stock_end_col := first_existing_col(stock_tbl, ARRAY['burger_buns_stock','rolls_end','buns_end','rolls_actual','buns_stock']);
+    IF stock_end_col IS NOT NULL THEN
+      IF stock_tbl = 'daily_stock_sales' THEN
+        sql := format('SELECT %I FROM %I WHERE shift_date=$1 ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 1',
+                      stock_end_col, stock_tbl);
+        EXECUTE sql USING p_date INTO v_actual;
+      ELSE
+        stock_date_col := CASE WHEN col_exists('DailyStock','shift_date') THEN 'shift_date' ELSE NULL END;
+        IF stock_date_col IS NOT NULL THEN
+          sql := format('SELECT %I FROM "DailyStock" WHERE %I=$1 ORDER BY COALESCE("updatedAt","createdAt") DESC LIMIT 1',
+                        stock_end_col, stock_date_col);
+          EXECUTE sql USING p_date INTO v_actual;
+        ELSE
+          sql := format('SELECT %I FROM "DailyStock"
+                         WHERE DATE(COALESCE("updatedAt","createdAt"))=$1
+                         ORDER BY COALESCE("updatedAt","createdAt") DESC LIMIT 1', stock_end_col);
+          EXECUTE sql USING p_date INTO v_actual;
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+
+  -- Estimate + status
+  v_est := v_start + v_purchased - v_sold;
+
+  IF v_actual IS NULL THEN
+    INSERT INTO rolls_ledger(shift_date, rolls_start, rolls_purchased, burgers_sold,
+                             estimated_rolls_end, actual_rolls_end, waste_allowance,
+                             variance, status, updated_at)
+    VALUES (p_date, v_start, v_purchased, v_sold, v_est, NULL, 4, NULL, 'PENDING', now())
+    ON CONFLICT (shift_date) DO UPDATE SET
+      rolls_start=EXCLUDED.rolls_start, rolls_purchased=EXCLUDED.rolls_purchased,
+      burgers_sold=EXCLUDED.burgers_sold, estimated_rolls_end=EXCLUDED.estimated_rolls_end,
+      actual_rolls_end=NULL, variance=NULL, status='PENDING', updated_at=now();
+  ELSE
+    v_var := v_actual - v_est;
+    INSERT INTO rolls_ledger(shift_date, rolls_start, rolls_purchased, burgers_sold,
+                             estimated_rolls_end, actual_rolls_end, waste_allowance,
+                             variance, status, updated_at)
+    VALUES (p_date, v_start, v_purchased, v_sold, v_est, v_actual, 4,
+            v_var, CASE WHEN abs(v_var)<=4 THEN 'OK' ELSE 'ALERT' END, now())
+    ON CONFLICT (shift_date) DO UPDATE SET
+      rolls_start=EXCLUDED.rolls_start, rolls_purchased=EXCLUDED.rolls_purchased,
+      burgers_sold=EXCLUDED.burgers_sold, estimated_rolls_end=EXCLUDED.estimated_rolls_end,
+      actual_rolls_end=EXCLUDED.actual_rolls_end, variance=EXCLUDED.variance,
+      status=EXCLUDED.status, updated_at=now();
+  END IF;
+END;
+$$;
+
+-- Triggers: recompute the exact shift_date when relevant data changes.
+DO $$
+BEGIN
+  IF tbl_exists('daily_stock_sales') THEN
+    DROP TRIGGER IF EXISTS trg_rl_recompute_dss ON daily_stock_sales;
+    CREATE TRIGGER trg_rl_recompute_dss
+    AFTER INSERT OR UPDATE OF shift_date, burger_buns_stock, rolls_end, updated_at, created_at
+    ON daily_stock_sales
+    FOR EACH ROW EXECUTE FUNCTION (
+      SELECT (CREATE OR REPLACE FUNCTION _rl_cb_dss() RETURNS trigger AS $F$
+        BEGIN PERFORM recompute_rolls_ledger(NEW.shift_date); RETURN NEW; END
+      $F$ LANGUAGE plpgsql); '_rl_cb_dss'::regproc
+    );
+  END IF;
+END$$;
+
+DO $$
+BEGIN
+  IF tbl_exists('expenses') THEN
+    DROP TRIGGER IF EXISTS trg_rl_recompute_exp ON expenses;
+    CREATE TRIGGER trg_rl_recompute_exp
+    AFTER INSERT OR UPDATE ON expenses
+    FOR EACH ROW EXECUTE FUNCTION (
+      SELECT (CREATE OR REPLACE FUNCTION _rl_cb_exp() RETURNS trigger AS $F$
+        DECLARE d date; itm text; has_sd boolean;
+        BEGIN
+          has_sd := EXISTS(SELECT 1 FROM information_schema.columns
+                           WHERE table_schema='public' AND table_name='expenses' AND column_name='shift_date');
+          IF has_sd THEN d := NEW.shift_date;
+          ELSE
+            BEGIN d := DATE(NEW.ts);
+            EXCEPTION WHEN undefined_column THEN d := DATE(COALESCE(NEW.created_at, NEW."createdAt")); END;
+          END IF;
+
+          BEGIN itm := lower(COALESCE(NEW.item, NEW.name::text, NEW.description, ''));
+          EXCEPTION WHEN undefined_column THEN itm := '';
+          END;
+
+          IF (itm LIKE '%bun%' OR itm LIKE '%roll%') THEN
+            PERFORM recompute_rolls_ledger(d);
+          END IF;
+          RETURN NEW;
+        END
+      $F$ LANGUAGE plpgsql); '_rl_cb_exp'::regproc
+    );
+  END IF;
+END$$;
+
+SQL
+
+############################################
+# 2) Service: rolls ledger recompute (TypeScript wrapper)
+############################################
+cat > server/services/rollsLedgerSimple.ts <<'TS'
+import { PrismaClient } from "@prisma/client";
+const db = new PrismaClient();
+
+export async function recomputeRollsLedgerByShiftDate(shiftDate: string) {
+  await db.$executeRaw`SELECT recompute_rolls_ledger(${shiftDate}::date)`;
+}
+TS
+
+############################################
+# 3) Service: ensureShift (Loyverse → analytics → rolls ledger)
+############################################
+cat > server/services/ensureShift.ts <<'TS'
+import { PrismaClient } from "@prisma/client";
+import { recomputeRollsLedgerByShiftDate } from "./rollsLedgerSimple.js";
+const db = new PrismaClient();
+
+async function importFromLoyverse(shiftDate: string): Promise<number> {
+  try {
+    const mod = await import("../services/loyverseImportV2.js");
+    if (typeof (mod as any).importShift === "function") {
+      const r = await (mod as any).importShift(shiftDate);
+      return Number(r?.receipts ?? r?.imported ?? 0);
+    }
+    if (typeof (mod as any).syncShift === "function") {
+      const r = await (mod as any).syncShift(shiftDate);
+      return Number(r?.receipts ?? r?.imported ?? 0);
+    }
+    if (typeof (mod as any).syncRange === "function") {
+      const r = await (mod as any).syncRange(shiftDate, shiftDate);
+      return Number(r?.receipts ?? r?.imported ?? 0);
+    }
+  } catch { /* importer not available; proceed with DB */ }
+  return 0;
+}
+
+async function cacheHasDate(shiftDate: string): Promise<boolean> {
+  const r:any[] = await db.$queryRaw`
+    SELECT COUNT(*)::int AS n FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
+  `;
+  return Number(r?.[0]?.n ?? 0) > 0;
+}
+
+async function computeShiftAll(shiftDate: string): Promise<void> {
+  const svc = await import("./shiftItems.js");
+  if (typeof (svc as any).computeShiftAll === "function") {
+    await (svc as any).computeShiftAll(shiftDate);
+  }
+}
+
+export async function ensureShift(shiftDate: string): Promise<void> {
+  if (!(await cacheHasDate(shiftDate))) {
+    // Try to ensure raw receipts exist; import if missing.
+    const rc:any[] = await db.$queryRaw`
+      SELECT COUNT(*)::int AS n
+      FROM lv_receipt
+      WHERE (DATE(datetime_bkk AT TIME ZONE 'Asia/Bangkok')) IN (${shiftDate}::date, (${shiftDate}::date + INTERVAL '1 day')::date)
+    `;
+    if (Number(rc?.[0]?.n ?? 0) === 0) {
+      await importFromLoyverse(shiftDate);
+    }
+    await computeShiftAll(shiftDate);
+  }
+  await recomputeRollsLedgerByShiftDate(shiftDate);
+}
+TS
+
+############################################
+# 4) Route patch: call ensureShift on GET /api/analysis/shift/items
+############################################
+ROUTE_FILE="server/routes/shiftAnalysis.ts"
+if [ -f "$ROUTE_FILE" ]; then
+  if ! grep -q "ensureShift" "$ROUTE_FILE"; then
+    sed -i "1 i import { ensureShift } from '../services/ensureShift.js';" "$ROUTE_FILE"
+    # Insert ensure call right after handler signature for the /items route
+    awk '
+      BEGIN{patched=0}
+      /router\.get\(.+\/api\/analysis\/shift\/items/ {print; inroute=1; next}
+      inroute==1 && /\{.*req.*res/ && patched==0 {
+        print;
+        print "  try {";
+        print "    const date = String((req.query.date || \"\")).slice(0,10);";
+        print "    if (date) await ensureShift(date);";
+        print "  } catch (e) { /* ignore ensure errors; normal flow continues */ }";
+        patched=1; inroute=0; next
+      }
+      {print}
+    ' "$ROUTE_FILE" > "$ROUTE_FILE.tmp" && mv "$ROUTE_FILE.tmp" "$ROUTE_FILE"
+    echo "Patched $ROUTE_FILE to call ensureShift() on /api/analysis/shift/items"
+  else
+    echo "Route already references ensureShift(); skipping."
+  fi
+else
+  echo "WARNING: $ROUTE_FILE not found. Agent must add ensureShift call manually in that route."
+fi
+
+############################################
+# 5) Cron @ 03:05 BKK: ensure yesterday shift
+############################################
+cat > server/jobs/cronEnsureShift.ts <<'TS'
+import cron from "node-cron";
+import { ensureShift } from "../services/ensureShift.js";
+
+function yesterdayYMD() {
+  const now = new Date(new Date().toLocaleString("en-US",{ timeZone:"Asia/Bangkok"}));
+  now.setDate(now.getDate() - 1);
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,"0");
+  const d = String(now.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+export function registerEnsureShiftCron() {
+  cron.schedule("5 3 * * *", async () => {
+    try { await ensureShift(yesterdayYMD()); } catch {}
+  }, { timezone: "Asia/Bangkok" });
+}
+TS
+
+# Wire into server/index.ts (idempotent)
+if ! grep -q "registerEnsureShiftCron" server/index.ts 2>/dev/null; then
+  sed -i "1 i import { registerEnsureShiftCron } from './jobs/cronEnsureShift.js';" server/index.ts
+  awk '
+    BEGIN{done=0}
+    /app\.listen/ && done==0 { print; print "  registerEnsureShiftCron();"; done=1; next }
+    {print}
+  ' server/index.ts > server/index.ts.tmp && mv server/index.ts.tmp server/index.ts
+fi
+
+############################################
+# 6) Apply DB changes
+############################################
+npx prisma migrate deploy || npx prisma db push
+
+echo "== Mega Patch complete =="
+echo "Verification steps are printed below."
