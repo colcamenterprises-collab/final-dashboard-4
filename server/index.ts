@@ -1,3 +1,4 @@
+import { registerEnsureShiftCron } from './jobs/cronEnsureShift.js';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { registerRoutes } from "./routes";
