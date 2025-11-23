@@ -601,6 +601,40 @@ export default function DailySales() {
             </div>
           </section>
 
+          {/* Banking Section */}
+          <section className="rounded-xl border bg-white p-5">
+            <h3 className="mb-4 text-lg font-semibold">Cash & Banking</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
+                <input 
+                  type="number" 
+                  value={closingCash} 
+                  onChange={e=>setClosingCash(+e.target.value||0)} 
+                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
+              <div className="text-xs text-gray-500">Expected Cash to Bank</div>
+              <div className="text-right font-semibold">฿{(() => {
+                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
+                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
+                return expectedCashBank.toLocaleString();
+              })()}</div>
+              <div className="text-xs text-gray-500">Expected QR to Bank</div>
+              <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
+              <div className="text-xs text-gray-500">Expected Total to Bank</div>
+              <div className="text-right font-semibold">฿{(() => {
+                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
+                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
+                const expectedQRBank = qr;
+                return (expectedCashBank + expectedQRBank).toLocaleString();
+              })()}</div>
+            </div>
+          </section>
+
           {/* Summary Section */}
           <section className="rounded-xl border bg-white p-5">
             <h3 className="mb-4 text-lg font-semibold">Summary</h3>
@@ -648,39 +682,6 @@ export default function DailySales() {
                   ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
                 </span>
               </div>
-            </div>
-          </section>
-
-          {/* Banking Section */}
-          <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">Banking</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
-                <input 
-                  type="number" 
-                  value={closingCash} 
-                  onChange={e=>setClosingCash(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
-              <div className="text-xs text-gray-500">Expected Cash to Bank</div>
-              <div className="text-right font-semibold">฿{(() => {
-                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
-                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
-                return expectedCashBank.toLocaleString();
-              })()}</div>
-              <div className="text-xs text-gray-500">Expected QR to Bank</div>
-              <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">Expected Total to Bank</div>
-              <div className="text-right font-semibold">฿{(() => {
-                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
-                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
-                const expectedQRBank = qr;
-                return (expectedCashBank + expectedQRBank).toLocaleString();
-              })()}</div>
             </div>
           </section>
 
