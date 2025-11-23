@@ -122,6 +122,106 @@ function KPIGrid() {
   );
 }
 
+// Prime Cost Component
+type PCDaily = { sales:number; wages:number; fnb:number; primeCost:number; primePct:number|null; };
+type PCMtd = { sales:number; wages:number; fnb:number; primeCost:number; primePct:number|null; };
+
+function PrimeCostCards() {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string>("");
+  const [daily, setDaily] = useState<PCDaily|null>(null);
+  const [mtd, setMtd] = useState<PCMtd|null>(null);
+  const [date, setDate] = useState<string>("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/metrics/prime-cost");
+        const j = await r.json();
+        if (!j.ok) { setErr(j.error||"failed"); setLoading(false); return; }
+        setDate(j.date);
+        setDaily(j.daily);
+        setMtd(j.mtd);
+      } catch(e:any) {
+        setErr(e?.message||"failed");
+      } finally { setLoading(false); }
+    })();
+  }, []);
+
+  const pc = (v:number|null) => v==null ? "—" : `${v.toFixed(1)}%`;
+
+  const color = (v:number|null) => {
+    if (v==null) return "bg-slate-200 text-slate-700";
+    if (v <= 55) return "bg-emerald-100 text-emerald-800";
+    if (v <= 60) return "bg-amber-100 text-amber-800";
+    return "bg-rose-100 text-rose-800";
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div className="rounded-lg border p-4 bg-white shadow-sm">
+        <div className="text-sm text-slate-600 font-semibold">Prime Cost — Latest Shift</div>
+        <div className="text-xs text-slate-500 mb-2">Shift date: {date || "—"}</div>
+        {loading ? (
+          <div className="text-slate-500 text-sm">Loading…</div>
+        ) : err ? (
+          <div className="text-rose-600 text-sm">{err}</div>
+        ) : (
+          <>
+            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(daily?.primePct)}`}>
+              {pc(daily?.primePct)}
+            </div>
+            <div className="mt-3 text-xs text-slate-600 space-y-1">
+              <div className="flex justify-between">
+                <span>Sales:</span>
+                <span className="font-medium">฿{(daily?.sales||0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Wages:</span>
+                <span className="font-medium">฿{(daily?.wages||0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Food & Beverage:</span>
+                <span className="font-medium">฿{(daily?.fnb||0).toLocaleString()}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="rounded-lg border p-4 bg-white shadow-sm">
+        <div className="text-sm text-slate-600 font-semibold">Prime Cost — MTD</div>
+        <div className="text-xs text-slate-500 mb-2">Month to date</div>
+        {loading ? (
+          <div className="text-slate-500 text-sm">Loading…</div>
+        ) : err ? (
+          <div className="text-rose-600 text-sm">{err}</div>
+        ) : (
+          <>
+            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(mtd?.primePct)}`}>
+              {pc(mtd?.primePct)}
+            </div>
+            <div className="mt-3 text-xs text-slate-600 space-y-1">
+              <div className="flex justify-between">
+                <span>Sales:</span>
+                <span className="font-medium">฿{(mtd?.sales||0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Wages:</span>
+                <span className="font-medium">฿{(mtd?.wages||0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Food & Beverage:</span>
+                <span className="font-medium">฿{(mtd?.fnb||0).toLocaleString()}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Cash Balance Snapshot Component
 function CashBalanceSnapshot() {
   const [posBalances, setPosBalances] = useState([]);
@@ -171,6 +271,9 @@ export default function Home() {
       
       {/* KPI Grid */}
       <KPIGrid />
+      
+      {/* Prime Cost Cards */}
+      <PrimeCostCards />
       
       {/* Cash Balance Snapshot */}
       <CashBalanceSnapshot />

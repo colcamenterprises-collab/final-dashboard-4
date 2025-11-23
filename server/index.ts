@@ -24,6 +24,7 @@ import imageUploadRouter from "./routes/imageUpload";
 import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
+import primeCostRouter from "./routes/primeCost";
 
 const prisma = new PrismaClient();
 
@@ -196,6 +197,7 @@ async function checkSchema() {
   app.use('/api', menuOnlineRouter);
   app.use('/api', imageUploadRouter);
   app.use('/api/export', exportRoutes);
+  app.use(primeCostRouter);
 
   app.get('/api/daily-stock/:salesFormId', async (req: Request, res: Response) => {
     try {
