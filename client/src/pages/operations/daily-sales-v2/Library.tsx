@@ -46,9 +46,10 @@ type FullRecord = {
   staff: string;
   sales: any;
   expenses: any;
+  wages?: any[];
   banking: any;
   stock: any;
-  shoppingList: { name: string; qty: number; unit: string }[];
+  shoppingList: { name: string; qty: number; unit: string; category?: string }[];
 };
 
 // Drinks Requisition Component with costs from ingredient_v2
@@ -222,6 +223,22 @@ export default function DailySalesV2Library() {
       const record = data.record;
       const p = record.payload || {};
       
+      // Convert drinkStock object to array format for display
+      let drinksArray: { name: string; quantity: number; unit: string }[] = [];
+      if (p.drinkStock) {
+        if (Array.isArray(p.drinkStock)) {
+          // Already an array
+          drinksArray = p.drinkStock;
+        } else if (typeof p.drinkStock === 'object') {
+          // Convert object to array - SHOW ALL DRINKS EVEN IF 0
+          drinksArray = Object.entries(p.drinkStock).map(([name, quantity]) => ({
+            name,
+            quantity: typeof quantity === 'number' ? quantity : 0,
+            unit: 'units'
+          }));
+        }
+      }
+      
       // Transform the data to match expected structure
       const transformedRecord = {
         id: record.id,
@@ -243,9 +260,9 @@ export default function DailySalesV2Library() {
           qrTransfer: p.qrTransfer || 0
         },
         stock: {
-          rolls: p.rollsEnd || 0,
-          meat: p.meatEnd || 0,
-          drinks: p.drinkStock || []
+          rolls: p.rollsEnd ?? 0,
+          meat: p.meatEnd ?? 0,
+          drinks: drinksArray
         },
         shoppingList: p.requisition || []
       };
