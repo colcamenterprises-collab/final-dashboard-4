@@ -65,9 +65,14 @@ type PrimeCostRow = {
 };
 
 export async function getPrimeCostForDate(dateYMD: string): Promise<PrimeCostRow> {
-  // Sales + Wages from daily_sales_v2
+  // Sales + Wages from daily_sales_v2 payload JSONB
   const ds: any[] = await db.$queryRawUnsafe(
-    `SELECT "${DS_SALES_COL}" AS sales, "${DS_WAGES_COL}" AS wages
+    `SELECT 
+       COALESCE((payload->>'totalSales')::numeric, 0) AS sales,
+       COALESCE((
+         SELECT SUM((wage->>'amount')::numeric)
+         FROM jsonb_array_elements(payload->'wages') AS wage
+       ), 0) AS wages
      FROM ${DS_TABLE}
      WHERE "${DS_DATE_COL}" = $1::date
      LIMIT 1`, dateYMD
@@ -107,8 +112,11 @@ export async function getPrimeCostMTD(dateYMD: string) {
 
   const ds: any[] = await db.$queryRawUnsafe(
     `SELECT
-       COALESCE(SUM("${DS_SALES_COL}"),0) AS sales,
-       COALESCE(SUM("${DS_WAGES_COL}"),0) AS wages
+       COALESCE(SUM((payload->>'totalSales')::numeric), 0) AS sales,
+       COALESCE(SUM((
+         SELECT SUM((wage->>'amount')::numeric)
+         FROM jsonb_array_elements(payload->'wages') AS wage
+       )), 0) AS wages
      FROM ${DS_TABLE}
      WHERE "${DS_DATE_COL}" >= $1::date AND "${DS_DATE_COL}" < $2::date`,
      startY, endY
