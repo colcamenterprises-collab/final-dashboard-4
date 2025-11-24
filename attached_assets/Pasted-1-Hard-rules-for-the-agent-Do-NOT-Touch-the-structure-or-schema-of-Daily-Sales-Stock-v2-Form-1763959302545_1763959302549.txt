@@ -1,0 +1,457 @@
+1. Hard rules for the agent
+
+Do NOT:
+
+Touch the structure or schema of Daily Sales & Stock v2 – Form 2.
+
+Delete, truncate, or “reset” any existing data.
+
+Use any old “God lists”, ingredient tables, or hard-coded prices for the Shopping List.
+
+
+Must:
+
+Use PurchasingItem + PurchasingFieldMap as the only source of:
+
+Item name
+
+Brand
+
+SKU
+
+Supplier
+
+Unit description / order unit
+
+Unit cost
+
+
+
+
+---
+
+2. Data model recap (for Shopping List)
+
+We’re assuming the following models already exist (or will exist exactly like this):
+
+model PurchasingItem {
+  id              Int      @id @default(autoincrement())
+  item            String
+  category        String?
+  supplierName    String?
+  brand           String?
+  supplierSku     String?
+  orderUnit       String?
+  unitDescription String?
+  unitCost        Decimal? @db.Decimal(10, 2)
+  lastReviewDate  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PurchasingFieldMap {
+  id               Int             @id @default(autoincrement())
+  fieldKey         String          @unique // e.g. "mayoToPurchase"
+  purchasingItemId Int
+  purchasingItem   PurchasingItem  @relation(fields: [purchasingItemId], references: [id])
+}
+
+And you already have something like:
+
+DailyStockV2 (or daily_stock_v2) for Form 2 submissions.
+
+
+
+---
+
+3. Shopping List logic – business rules
+
+For each Daily Stock Form 2 submission:
+
+1. Read all purchase fields (those that have entries in PurchasingFieldMap).
+
+
+2. For each fieldKey:
+
+Get the numeric value the staff entered (qty).
+
+If qty > 0, include it on the Shopping List.
+
+
+
+3. For each included field:
+
+Join to PurchasingFieldMap + PurchasingItem.
+
+Build a line with:
+
+Item name
+
+Brand
+
+SKU
+
+Supplier
+
+Unit description / order unit
+
+Quantity (from Form 2)
+
+Unit cost (from PurchasingItem)
+
+Line total = quantity × unit cost
+
+
+
+
+4. At the bottom:
+
+Show Grand Total = sum of all line totals.
+
+
+
+
+All data (name, brand, SKU, supplier, unit cost) comes only from PurchasingItem.
+
+
+---
+
+4. Backend endpoint – build Shopping List from Purchasing list
+
+4.1. New endpoint
+
+Create a backend route something like:
+
+GET /api/shopping-list/:dailyStockId
+
+
+It should:
+
+1. Fetch the Daily Stock record (Form 2).
+
+
+2. Fetch all PurchasingFieldMap rows with their PurchasingItem.
+
+
+3. Iterate over the maps and build a list.
+
+
+
+Example TypeScript handler (agent can adapt imports & model names):
+
+// server/routes/shoppingList.ts (or similar)
+
+import express from "express";
+import { prisma } from "../prismaClient"; // adjust to your setup
+
+const router = express.Router();
+
+router.get("/api/shopping-list/:dailyStockId", async (req, res) => {
+  try {
+    const { dailyStockId } = req.params;
+
+    // 1) Load the Daily Stock V2 record
+    const dailyStock = await prisma.dailyStockV2.findUnique({
+      where: { id: dailyStockId },
+    });
+
+    if (!dailyStock) {
+      return res.status(404).json({ error: "Daily stock record not found" });
+    }
+
+    // 2) Load field mappings + purchasing items
+    const fieldMaps = await prisma.purchasingFieldMap.findMany({
+      include: { purchasingItem: true },
+    });
+
+    type ShoppingListLine = {
+      fieldKey: string;
+      quantity: number;
+      item: string;
+      brand: string | null;
+      supplier: string | null;
+      sku: string | null;
+      unitDescription: string | null;
+      unitCost: number;
+      lineTotal: number;
+    };
+
+    const lines: ShoppingListLine[] = [];
+
+    for (const map of fieldMaps) {
+      const fieldKey = map.fieldKey as keyof typeof dailyStock;
+
+      // Ignore unmapped fields that don't exist on the record
+      if (!(fieldKey in dailyStock)) continue;
+
+      const qtyRaw = dailyStock[fieldKey] as unknown;
+      const qty = typeof qtyRaw === "number" ? qtyRaw : Number(qtyRaw ?? 0);
+
+      if (!qty || qty <= 0) continue;
+
+      const p = map.purchasingItem;
+
+      if (!p || p.unitCost === null) {
+        // If no purchasing item or price, skip or include with lineTotal = 0
+        continue;
+      }
+
+      const unitCost = Number(p.unitCost);
+      const lineTotal = qty * unitCost;
+
+      lines.push({
+        fieldKey,
+        quantity: qty,
+        item: p.item,
+        brand: p.brand,
+        supplier: p.supplierName,
+        sku: p.supplierSku,
+        unitDescription: p.unitDescription ?? p.orderUnit ?? null,
+        unitCost,
+        lineTotal,
+      });
+    }
+
+    const grandTotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
+
+    return res.json({
+      dailyStockId,
+      lines,
+      grandTotal,
+    });
+  } catch (err) {
+    console.error("Error building shopping list:", err);
+    return res.status(500).json({ error: "Failed to build shopping list" });
+  }
+});
+
+export default router;
+
+> Agent: wire this router into server/routes.ts or wherever the app registers routes.
+Do NOT modify any existing delete/reset/migrate logic.
+
+
+
+
+---
+
+5. Downloadable Shopping List (CSV export)
+
+Add another endpoint for CSV:
+
+GET /api/shopping-list/:dailyStockId/csv
+
+
+Implementation can simply reuse the logic above and return CSV.
+
+Example:
+
+router.get("/api/shopping-list/:dailyStockId/csv", async (req, res) => {
+  try {
+    const { dailyStockId } = req.params;
+
+    // Reuse the JSON endpoint logic via a helper, or repeat logic here
+    const result = await buildShoppingList(dailyStockId); // extract from previous handler
+    const { lines, grandTotal } = result;
+
+    const header = [
+      "Item",
+      "Brand",
+      "SKU",
+      "Supplier",
+      "Unit description",
+      "Quantity",
+      "Unit cost",
+      "Line total",
+    ];
+
+    const rows = lines.map((l) => [
+      l.item,
+      l.brand ?? "",
+      l.sku ?? "",
+      l.supplier ?? "",
+      l.unitDescription ?? "",
+      l.quantity.toString(),
+      l.unitCost.toFixed(2),
+      l.lineTotal.toFixed(2),
+    ]);
+
+    // Add grand total row
+    rows.push(["", "", "", "", "", "", "GRAND TOTAL", grandTotal.toFixed(2)]);
+
+    const allRows = [header, ...rows];
+
+    const csv = allRows
+      .map((row) =>
+        row
+          .map((field) => {
+            const f = String(field ?? "");
+            // basic CSV escape
+            return `"${f.replace(/"/g, '""')}"`;
+          })
+          .join(",")
+      )
+      .join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="shopping-list-${dailyStockId}.csv"`
+    );
+    return res.send(csv);
+  } catch (err) {
+    console.error("Error exporting shopping list CSV:", err);
+    return res.status(500).json({ error: "Failed to export shopping list CSV" });
+  }
+});
+
+> Agent: you can either extract buildShoppingList from the JSON handler into a shared function or duplicate logic carefully.
+
+
+
+This gives you a downloadable file the second you hit that URL.
+
+
+---
+
+6. Frontend – columns & download button
+
+On the existing Shopping List page:
+
+1. Change the data source to call GET /api/shopping-list/:dailyStockId.
+
+
+2. Render a table with these columns:
+
+Item name
+
+Brand
+
+SKU
+
+Supplier
+
+Unit description / Order unit
+
+Quantity
+
+Unit cost
+
+Line total
+
+
+
+3. At the bottom (or in a summary row):
+
+Display Grand Total from the API.
+
+
+
+4. Add a “Download” button:
+
+On click, either:
+
+window.location.href = /api/shopping-list/:dailyStockId/csv
+
+or use fetch + blob to trigger download.
+
+
+
+
+
+Minimal React pseudo-snippet:
+
+// pages/ShoppingListPage.tsx (example)
+
+const ShoppingListPage: React.FC<{ dailyStockId: string }> = ({ dailyStockId }) => {
+  const [data, setData] = useState<{
+    lines: ShoppingListLine[];
+    grandTotal: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/shopping-list/${dailyStockId}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch((e) => console.error("Failed to load shopping list", e));
+  }, [dailyStockId]);
+
+  const handleDownload = () => {
+    window.location.href = `/api/shopping-list/${dailyStockId}/csv`;
+  };
+
+  if (!data) return <div>Loading…</div>;
+
+  return (
+    <div className="page-wrapper">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-bold">Shopping List</h1>
+        <button onClick={handleDownload} className="btn-primary">
+          Download
+        </button>
+      </div>
+
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Brand</th>
+            <th>SKU</th>
+            <th>Supplier</th>
+            <th>Unit</th>
+            <th>Qty</th>
+            <th>Unit Cost</th>
+            <th>Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.lines.map((line) => (
+            <tr key={line.fieldKey}>
+              <td>{line.item}</td>
+              <td>{line.brand}</td>
+              <td>{line.sku}</td>
+              <td>{line.supplier}</td>
+              <td>{line.unitDescription}</td>
+              <td>{line.quantity}</td>
+              <td>{line.unitCost.toFixed(2)}</td>
+              <td>{line.lineTotal.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={7} className="text-right font-semibold">
+              Total
+            </td>
+            <td className="font-bold">{data.grandTotal.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+};
+
+
+---
+
+7. Quick checklist for you to give the agent
+
+You can literally paste this checklist:
+
+[ ] Confirm PurchasingItem and PurchasingFieldMap tables exist and are populated.
+
+[ ] Implement GET /api/shopping-list/:dailyStockId using DailyStock + PurchasingFieldMap + PurchasingItem.
+
+[ ] Implement GET /api/shopping-list/:dailyStockId/csv for download.
+
+[ ] Update Shopping List page to use new JSON endpoint and render:
+
+Item, Brand, SKU, Supplier, Unit, Qty, Unit Cost, Line Total.
+
+
+[ ] Show Grand Total at bottom.
+
+[ ] Add “Download” button that calls the CSV endpoint.
+
+[ ] Do not modify or delete any existing data or schema outside the new endpoints/tables.
