@@ -28,39 +28,31 @@ function ymd(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-/** 
- * Returns the most recent shift_date based on 5PM-3AM Bangkok time window.
- * 
- * Shift logic:
- * - A shift starts at shift_date + 17:00 (5 PM BKK)
- * - A shift ends at (shift_date + 1 day) + 03:00 (3 AM BKK)
- * 
- * Current time logic:
- * - If now is 00:00-02:59 (before 3 AM) → we're in yesterday's shift
- * - If now is 03:00-16:59 (3 AM to before 5 PM) → latest completed shift is yesterday
- * - If now is 17:00-23:59 (5 PM onwards) → current shift is today
- */
+/** Returns the most recent shift_date from daily_sales_v2. */
 export async function getLatestShiftDate(): Promise<string | null> {
-  // Get current time in Bangkok timezone
-  const rows: any[] = await db.$queryRawUnsafe(
-    `SELECT NOW() AT TIME ZONE 'Asia/Bangkok' AS bkk_now`
+  const result: any[] = await db.$queryRawUnsafe(
+    `SELECT shift_date
+     FROM daily_sales_v2
+     WHERE shift_date IS NOT NULL
+     ORDER BY shift_date DESC
+     LIMIT 1`
   );
-  const bkkNow = new Date(rows?.[0]?.bkk_now);
-  const currentHour = bkkNow.getHours();
+
+  if (result.length === 0) return null;
+
+  const shiftDate = result[0].shift_date;
   
-  // Determine the shift date based on current Bangkok time
-  let shiftDate = new Date(bkkNow);
-  
-  if (currentHour >= 0 && currentHour < 3) {
-    // Between midnight and 3 AM → we're in yesterday's shift
-    shiftDate.setDate(shiftDate.getDate() - 1);
-  } else if (currentHour >= 3 && currentHour < 17) {
-    // Between 3 AM and 5 PM → latest completed shift is yesterday
-    shiftDate.setDate(shiftDate.getDate() - 1);
+  // Handle date conversion
+  if (shiftDate instanceof Date) {
+    return ymd(shiftDate);
   }
-  // else: currentHour >= 17 → current shift is today (no adjustment needed)
   
-  return ymd(shiftDate);
+  // If it's already a string in YYYY-MM-DD format
+  if (typeof shiftDate === 'string') {
+    return shiftDate.split('T')[0];
+  }
+  
+  return null;
 }
 
 type PrimeCostRow = {
