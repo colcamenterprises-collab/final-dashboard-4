@@ -13,6 +13,7 @@ import { Analysis } from "./pages/operations/Analysis";
 // Legacy component moved to archive
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import ShoppingList from "./pages/ShoppingList";
+import PurchasingList from "./pages/operations/PurchasingList";
 import Receipts from "./pages/Receipts";
 import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
@@ -75,6 +76,7 @@ export default function App() {
                   <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
                   <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
                   <Route path={ROUTES.SHOPPING_LIST} element={<Guard><ShoppingList /></Guard>} />
+                  <Route path="/operations/purchasing-list/:id" element={<Guard><PurchasingList /></Guard>} />
                   
                   {/* ---- FORM 1: canonical + aliases ---- */}
                   <Route path="/operations/daily-sales" element={<DailySalesForm />} />
