@@ -1,0 +1,227 @@
+EPLIT AGENT INSTRUCTIONS — PRIME COST SYSTEM
+
+READ THIS CAREFULLY AND DO NOT DEVIATE.
+The Daily Sales V2 system and all existing schema structures are locked.
+You are not permitted to change any form, database table, schema, component, or route except where explicitly stated.
+
+Your task is ONLY to implement or fix the Prime Cost metric system based on the following exact requirements.
+
+
+---
+
+1) Backend — Prime Cost Metric System
+
+You will create (or update, if already present):
+
+A. Service File
+
+server/services/primeCost.ts
+
+Implement the following functions exactly:
+
+1. getLatestShiftDate()
+
+Query daily_sales_v2 for the most recent shift_date.
+
+Return a clean YYYY-MM-DD formatted string.
+
+Ensure explicit cast shift_date::date.
+
+
+
+2. getPrimeCostForDate(date: string)
+
+Inputs: shift date (string).
+
+Output:
+
+sales (baht)
+
+wages (baht)
+
+F&B cost (sum of expenses.costCents / 100)
+
+primeCost = wages + fnb
+
+primePct = (primeCost ÷ sales) × 100 or null if sales = 0
+
+
+
+Do NOT use any other columns or any other tables.
+
+
+3. getPrimeCostMTD(date: string)
+
+MTD range = first day of that month → next month first day.
+
+Same fields as daily, summed for the whole month.
+
+Use explicit PostgreSQL date casts.
+
+
+
+
+
+---
+
+B. API Route
+
+Create file server/routes/primeCost.ts:
+
+GET /api/metrics/prime-cost?date=YYYY-MM-DD
+
+Must:
+
+Auto-select latest shift date if date is not provided.
+
+Return:
+
+{
+  ok: true,
+  date,
+  daily: {...},
+  mtd: {...}
+}
+
+Handle all date conversion errors safely.
+
+
+
+---
+
+C. Register Route
+
+Modify only this line inside server/index.ts:
+
+app.use("/api/metrics/prime-cost", primeCostRouter);
+
+Do not change ports, middleware, or anything else in this file.
+
+
+---
+
+2) Frontend — Dashboard Home Page
+
+Open file:
+
+client/src/pages/Home.tsx
+
+Add TWO cards in the KPI section:
+
+Card 1: Latest Shift – Prime Cost
+
+Fields to display:
+
+Sales
+
+Wages
+
+F&B
+
+Prime Cost
+
+Prime %
+Color-coded:
+
+Green ≤ 55%
+
+Amber 55–60%
+
+Red > 60%
+
+
+Card 2: MTD – Prime Cost
+
+Same fields, but summed for month-to-date.
+
+DO NOT change any other UI components or layout.
+
+
+---
+
+3) Data Source Rules (DO NOT ALTER)
+
+You must use these exact fields ONLY:
+
+Daily Sales V2
+
+table: daily_sales_v2
+shift_date (date)
+totalSales (int/float)
+wagesTotal (int/float)
+
+Expenses
+
+table: expenses
+shiftDate (date)
+expenseType (text)
+costCents (integer)
+
+F&B Expense Matching
+
+Match the following (case-insensitive):
+
+'food', 'f&b', 'fnb', 'ingredients', 'meat', 'rolls', 'burger buns', 'stock', 'purchase'
+
+Do NOT change ANY of the tables or column names.
+
+
+---
+
+4) ABSOLUTE RESTRICTIONS
+
+The agent must NOT:
+
+Modify the Daily Sales V2 schema
+
+Modify the Daily Stock schema
+
+Modify any form
+
+Modify any unrelated routes
+
+Modify UI layout beyond adding the two cards
+
+Change ports
+
+Add new dependencies
+
+Rename any table or column
+
+Create migrations
+
+Refactor code outside the Prime Cost files
+
+
+Any attempt to do so is a violation.
+
+
+---
+
+5) Final Output Required
+
+Once complete, agent must:
+
+Confirm files created:
+
+server/services/primeCost.ts
+
+server/routes/primeCost.ts
+
+Updated server/index.ts
+
+Updated client/src/pages/Home.tsx
+
+
+Confirm API route reachable:
+
+GET /api/metrics/prime-cost
+
+
+Confirm Prime Cost cards render on dashboard
+
+
+And then STOP.
+
+
+---
