@@ -1,146 +1,165 @@
-// server/services/primeCost.ts
-import db from "../db";
-
-//
-// PRIME COST SERVICE (FINAL BAHT VERSION)
-// Expenses are stored in FULL Thai Baht (NOT cents).
-// Remove all divide-by-100 logic permanently.
-// --------------------------------------------------
+import { pool } from "../db";
 
 /**
- * Get the latest recorded shift_date from daily_sales_v2.
- * We always trust the database — NO calculated time logic.
+ * PRIME COST SERVICE
+ * Calculates Prime Cost (Wages + F&B) as percentage of Sales
+ * Data sources:
+ * - Sales/Wages: daily_sales_v2.payload JSONB field
+ * - F&B: expenses table (costCents stored in cents, divided by 100)
  */
-export async function getLatestShiftDate() {
-  const result = await db.query(`
-    SELECT shift_date
-    FROM daily_sales_v2
-    WHERE shift_date IS NOT NULL
-    ORDER BY shift_date DESC
-    LIMIT 1;
-  `);
+
+const EXPENSES_TABLE = "expenses";
+const EXP_DATE_COL = "shiftDate";
+const EXP_CAT_COL = "expenseType";
+const EXP_AMT_COL = "costCents";
+
+const DS_TABLE = "daily_sales_v2";
+const DS_DATE_COL = "shift_date";
+
+// F&B expense category matches
+const FNB_MATCH = [
+  "food & beverage",
+  "food and beverage",
+  "f&b",
+  "food",
+  "beverage",
+  "fnb",
+  "ingredients",
+  "meat",
+  "rolls",
+  "burger buns",
+  "stock",
+  "purchase"
+];
+
+function ymd(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Returns the most recent shift_date from daily_sales_v2. */
+export async function getLatestShiftDate(): Promise<string | null> {
+  const result = await pool.query(
+    `SELECT shift_date
+     FROM ${DS_TABLE}
+     WHERE shift_date IS NOT NULL
+     ORDER BY shift_date DESC
+     LIMIT 1`
+  );
 
   if (result.rows.length === 0) return null;
 
-  const d = result.rows[0].shift_date;
-  return d.toISOString().split("T")[0];
-}
+  const shiftDate = result.rows[0].shift_date;
 
-/**
- * Get all F&B expenses for a specific shift date.
- * costCents is actually BAHT now — do NOT divide.
- */
-async function getFnbForDate(date: string) {
-  const result = await db.query(
-    `
-      SELECT "costCents"
-      FROM expenses
-      WHERE "shiftDate"::date = $1::date
-        AND LOWER("expenseType") IN (
-          'food','f&b','fnb','ingredients','meat','rolls','burger buns','stock','purchase'
-        );
-    `,
-    [date]
-  );
-
-  return result.rows.reduce(
-    (sum, r) => sum + Number(r.costCents || 0),
-    0
-  );
-}
-
-/**
- * Get daily prime cost metrics.
- */
-export async function getPrimeCostForDate(date: string) {
-  const salesRow = await db.query(
-    `
-      SELECT "totalSales", "wagesTotal"
-      FROM daily_sales_v2
-      WHERE "shift_date" = $1::date
-      LIMIT 1;
-    `,
-    [date]
-  );
-
-  if (salesRow.rows.length === 0) {
-    return {
-      date,
-      sales: 0,
-      wages: 0,
-      fnb: 0,
-      primeCost: 0,
-      primePct: null,
-    };
+  // Handle date conversion
+  if (shiftDate instanceof Date) {
+    return ymd(shiftDate);
   }
 
-  const sales = Number(salesRow.rows[0].totalSales || 0);
-  const wages = Number(salesRow.rows[0].wagesTotal || 0);
-  const fnb = await getFnbForDate(date);
+  // If it's already a string in YYYY-MM-DD format
+  if (typeof shiftDate === "string") {
+    return shiftDate.split("T")[0];
+  }
 
-  const primeCost = wages + fnb;
+  return null;
+}
+
+type PrimeCostRow = {
+  date: string;
+  sales: number;
+  wages: number;
+  fnb: number;
+  primeCost: number;
+  primePct: number | null;
+};
+
+export async function getPrimeCostForDate(
+  dateYMD: string
+): Promise<PrimeCostRow> {
+  // Sales + Wages from daily_sales_v2 payload JSONB
+  const ds = await pool.query(
+    `SELECT 
+       COALESCE((payload->>'totalSales')::numeric, 0) AS sales,
+       COALESCE((
+         SELECT SUM((wage->>'amount')::numeric)
+         FROM jsonb_array_elements(payload->'wages') AS wage
+       ), 0) AS wages
+     FROM ${DS_TABLE}
+     WHERE "${DS_DATE_COL}" = $1::date
+     LIMIT 1`,
+    [dateYMD]
+  );
+
+  const sales = Number(ds.rows?.[0]?.sales ?? 0);
+  const wages = Number(ds.rows?.[0]?.wages ?? 0);
+
+  // F&B from Business Expenses modal (costCents in cents, divide by 100)
+  const fnb = await pool.query(
+    `SELECT COALESCE(SUM("${EXP_AMT_COL}"), 0) AS amt
+     FROM ${EXPENSES_TABLE}
+     WHERE DATE("${EXP_DATE_COL}") = $1::date
+       AND LOWER("${EXP_CAT_COL}") IN (${FNB_MATCH.map((_, i) => `$${i + 2}`).join(",")})`,
+    [dateYMD, ...FNB_MATCH]
+  );
+
+  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0) / 100; // Convert cents to baht
+
+  const primeCost = wages + fnbAmt;
   const primePct = sales > 0 ? (primeCost / sales) * 100 : null;
 
   return {
-    date,
+    date: dateYMD,
     sales,
     wages,
-    fnb,
+    fnb: fnbAmt,
     primeCost,
     primePct,
   };
 }
 
-/**
- * Get Month-To-Date prime cost metrics.
- */
-export async function getPrimeCostMTD(date: string) {
-  // Beginning of month (YYYY-MM-01)
-  const start = date.slice(0, 7) + "-01";
+export async function getPrimeCostMTD(dateYMD: string) {
+  const d = new Date(dateYMD + "T00:00:00Z");
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+  const startY = ymd(start),
+    endY = ymd(end);
 
-  const result = await db.query(
-    `
-      SELECT 
-        COALESCE(SUM("totalSales"), 0) AS sales,
-        COALESCE(SUM("wagesTotal"), 0) AS wages
-      FROM daily_sales_v2
-      WHERE "shift_date" >= $1::date
-        AND "shift_date" <= $2::date;
-    `,
-    [start, date]
+  const ds = await pool.query(
+    `SELECT
+       COALESCE(SUM((payload->>'totalSales')::numeric), 0) AS sales,
+       COALESCE(SUM((
+         SELECT SUM((wage->>'amount')::numeric)
+         FROM jsonb_array_elements(payload->'wages') AS wage
+       )), 0) AS wages
+     FROM ${DS_TABLE}
+     WHERE "${DS_DATE_COL}" >= $1::date AND "${DS_DATE_COL}" < $2::date`,
+    [startY, endY]
   );
 
-  const sales = Number(result.rows[0].sales || 0);
-  const wages = Number(result.rows[0].wages || 0);
+  const sales = Number(ds.rows?.[0]?.sales ?? 0);
+  const wages = Number(ds.rows?.[0]?.wages ?? 0);
 
-  // Fetch MTD F&B expenses
-  const fnbRows = await db.query(
-    `
-      SELECT "costCents"
-      FROM expenses
-      WHERE "shiftDate"::date >= $1::date
-        AND "shiftDate"::date <= $2::date
-        AND LOWER("expenseType") IN (
-          'food','f&b','fnb','ingredients','meat','rolls','burger buns','stock','purchase'
-        );
-    `,
-    [start, date]
+  const fnb = await pool.query(
+    `SELECT COALESCE(SUM("${EXP_AMT_COL}"), 0) AS amt
+     FROM ${EXPENSES_TABLE}
+     WHERE DATE("${EXP_DATE_COL}") >= $1::date AND DATE("${EXP_DATE_COL}") < $2::date
+       AND LOWER("${EXP_CAT_COL}") IN (${FNB_MATCH.map((_, i) => `$${i + 3}`).join(",")})`,
+    [startY, endY, ...FNB_MATCH]
   );
 
-  const fnb = fnbRows.rows.reduce(
-    (sum, r) => sum + Number(r.costCents || 0),
-    0
-  );
+  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0) / 100; // Convert cents to baht
 
-  const primeCost = wages + fnb;
+  const primeCost = wages + fnbAmt;
   const primePct = sales > 0 ? (primeCost / sales) * 100 : null;
 
   return {
-    start,
-    end: date,
+    start: startY,
+    end: endY,
     sales,
     wages,
-    fnb,
+    fnb: fnbAmt,
     primeCost,
     primePct,
   };
