@@ -16,20 +16,12 @@ const EXP_AMT_COL = "costCents";
 const DS_TABLE = "daily_sales_v2";
 const DS_DATE_COL = "shift_date";
 
-// F&B expense category matches
+// F&B expense category matches - ONLY daily operating F&B expenses
 const FNB_MATCH = [
   "food & beverage",
   "food and beverage",
   "f&b",
-  "food",
-  "beverage",
-  "fnb",
-  "ingredients",
-  "meat",
-  "rolls",
-  "burger buns",
-  "stock",
-  "purchase"
+  "fnb"
 ];
 
 function ymd(d: Date) {
