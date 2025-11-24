@@ -40,6 +40,7 @@ import ingredientsRoutes from "./routes/ingredients";
 import managerCheckRouter from './routes/managerChecks';
 import shoppingListRouter from './routes/shoppingList';
 import shoppingListNewRouter from './routes/shoppingListNew';
+import purchasingFieldMappingRouter from './routes/purchasingFieldMapping';
 import { estimateShoppingList } from './services/shoppingList';
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
@@ -3193,6 +3194,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/manager-check', managerCheckRouter);
   app.use('/api/shopping-list', shoppingListRouter);
   app.use('/api/purchasing-list', shoppingListNewRouter); // New purchasing list based on PurchasingItem
+  app.use('/api/purchasing-field-mapping', purchasingFieldMappingRouter); // Purchasing field mapping admin UI
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
 
