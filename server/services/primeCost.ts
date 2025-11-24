@@ -5,7 +5,7 @@ import { pool } from "../db";
  * Calculates Prime Cost (Wages + F&B) as percentage of Sales
  * Data sources:
  * - Sales/Wages: daily_sales_v2.payload JSONB field
- * - F&B: expenses table (costCents in cents, divided by 100)
+ * - F&B: expenses table (costCents stores whole THB amounts)
  */
 
 const EXPENSES_TABLE = "expenses";
@@ -95,7 +95,7 @@ export async function getPrimeCostForDate(
   const sales = Number(ds.rows?.[0]?.sales ?? 0);
   const wages = Number(ds.rows?.[0]?.wages ?? 0);
 
-  // F&B from Business Expenses modal (costCents in cents, divide by 100)
+  // F&B from Business Expenses modal (costCents stores whole THB)
   const fnb = await pool.query(
     `SELECT COALESCE(SUM("${EXP_AMT_COL}"), 0) AS amt
      FROM ${EXPENSES_TABLE}
@@ -104,7 +104,7 @@ export async function getPrimeCostForDate(
     [dateYMD, ...FNB_MATCH]
   );
 
-  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0) / 100; // Convert cents to THB
+  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0); // costCents stores whole THB
 
   const primeCost = wages + fnbAmt;
   const primePct = sales > 0 ? (primeCost / sales) * 100 : null;
@@ -149,7 +149,7 @@ export async function getPrimeCostMTD(dateYMD: string) {
     [startY, endY, ...FNB_MATCH]
   );
 
-  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0) / 100; // Convert cents to THB
+  const fnbAmt = Number(fnb.rows?.[0]?.amt ?? 0); // costCents stores whole THB
 
   const primeCost = wages + fnbAmt;
   const primePct = sales > 0 ? (primeCost / sales) * 100 : null;
