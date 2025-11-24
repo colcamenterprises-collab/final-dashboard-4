@@ -1,0 +1,235 @@
+🔒 Safety Rule (put this at the top for the agent)
+
+> DO NOT delete, truncate, or reset any existing data or tables.
+Only:
+
+Read from daily_stock_v2 and purchasing_items
+
+Insert/Update rows in purchasing_field_map
+
+Add new read-only endpoints + admin UI
+
+
+
+
+
+---
+
+Agent Task: Complete Shopping List / Purchasing Mapping With NO User DB Work
+
+You’ve already implemented:
+
+purchasing_items (63 items)
+
+purchasing_field_map
+
+GET /api/purchasing-list/:dailyStockId
+
+GET /api/purchasing-list/:dailyStockId/csv
+
+Frontend PurchasingList page
+
+
+The missing piece is:
+Automatically wiring Daily Stock V2 fields → Purchasing items without Cam touching SQL.
+
+You must build a small admin mapping UI + API and use it to fully wire the system.
+
+
+---
+
+1. Detect all purchase field keys (backend)
+
+1. In the backend, add a helper that queries daily_stock_v2.purchasingJson and extracts all distinct keys:
+
+SQL logic you should run (in code, NOT asking user):
+
+SELECT DISTINCT jsonb_object_keys("purchasingJson") AS "fieldKey"
+FROM daily_stock_v2
+WHERE "purchasingJson" IS NOT NULL;
+
+
+
+2. For each fieldKey, left-join to purchasing_field_map to see if it’s already mapped.
+
+Implement an endpoint, e.g.:
+
+GET /api/purchasing-field-keys
+
+
+Returns JSON like:
+
+[
+  { "fieldKey": "mayoToPurchase", "purchasingItemId": 5, "item": "Mayonnaise 1L", "brand": "Heinz" },
+  { "fieldKey": "bunsToPurchase", "purchasingItemId": null },
+  ...
+]
+
+
+3. Implement mapping CRUD endpoints:
+
+GET /api/purchasing-items
+
+Return ID, item, brand, supplierName, supplierSku, unitDescription, unitCost.
+
+You can reuse existing purchasing list endpoint if it exists, or make a new minimal one.
+
+
+POST /api/purchasing-field-map
+
+Body: { fieldKey: string, purchasingItemId: number }
+
+If a row for fieldKey exists, update it; otherwise insert.
+
+
+
+This is the only table you’re allowed to modify for this task.
+
+
+
+
+---
+
+2. Build a “Purchasing Field Mapper” UI (Operations tab)
+
+Create a new page under Operations called e.g.:
+
+Route: /operations/purchasing-mapping
+
+File: client/src/pages/operations/PurchasingFieldMapping.tsx (follow existing folder conventions).
+
+
+UI behaviour:
+
+1. On load:
+
+Call GET /api/purchasing-field-keys → get list of all fieldKeys + current mapping.
+
+Call GET /api/purchasing-items → get all purchasing items for dropdowns.
+
+
+
+2. Show a table like:
+
+Form Field Key	Mapped Item (dropdown)	Brand	Supplier	SKU	Unit	Unit Cost	Save
+
+mayoToPurchase	[Select: Mayonnaise 1L – Heinz]	...	...	...	...	...	[Save]
+bunsToPurchase	[Select: Burger Buns Tray 30 pcs]	...	...	...	...	...	[Save]
+friesToPurchase	[Select: Fries 2.5kg]	...	...	...	...	[Save]	
+
+
+Left column: raw fieldKey.
+
+Dropdown: all purchasing_items (display item (brand, unitDescription)).
+
+When the dropdown changes and user hits Save:
+
+Call POST /api/purchasing-field-map with { fieldKey, purchasingItemId }.
+
+
+
+
+3. Once mapped, show extra info in read-only columns from the selected item:
+
+Brand
+
+Supplier
+
+SKU
+
+Unit description
+
+Unit cost
+
+
+
+4. Styling:
+
+Use the same layout and styling as existing Operations pages.
+
+No icons/emojis.
+
+
+
+
+Goal:
+From this one page, Cam (or a manager) can map all Form 2 fields to the correct purchasing items without running SQL.
+
+
+---
+
+3. Verify Shopping List is fully wired
+
+After the mapping UI is done:
+
+1. Submit a test Daily Stock V2 Form 2 with non-zero quantities (buns, mayo, fries, etc.).
+
+
+2. Find that record’s ID programmatically (you can show a link on the “Daily Stock submissions” list that points to the new shopping list page):
+
+e.g. link to /operations/purchasing-list/:id where :id is the daily_stock_v2.id.
+
+
+
+3. On /operations/purchasing-list/:id, verify:
+
+Every field with non-zero quantity and a mapping in purchasing_field_map appears as a row.
+
+Each row shows:
+
+Item name (from purchasing_items.item)
+
+Brand
+
+SKU
+
+Supplier
+
+Unit description
+
+Qty (from purchasingJson[fieldKey])
+
+Unit cost (from purchasing_items.unitCost)
+
+Line total (qty × unitCost)
+
+
+The Grand Total at bottom equals the sum of all line totals.
+
+
+
+4. Click Download CSV:
+
+Confirm CSV includes the same rows and a final “GRAND TOTAL” row.
+
+
+
+
+
+---
+
+4. Zero user involvement guarantee
+
+You must not ask Cam to:
+
+Run SQL manually.
+
+Touch psql or shell.
+
+Hand-edit purchasing_field_map.
+
+
+Everything required to make the Shopping List accurate must be achievable from:
+
+The existing Daily Stock Form 2.
+
+The new Purchasing Field Mapping page.
+
+The existing Purchasing List / Shopping List UI.
+
+
+Once you’ve done this, the system is self-service:
+Cam (or a manager) can change suppliers/prices and remap fields in the UI only.
+
+
+---
