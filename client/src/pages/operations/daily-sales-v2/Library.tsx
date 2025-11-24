@@ -519,13 +519,13 @@ export default function DailySalesV2Library() {
                 <h3 className="text-sm font-semibold text-emerald-700 border-b pb-2">Daily Sales (Form 1)</h3>
                 
                 <div className="bg-gray-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Basic Info</h4>
+                  <h4 className="text-sm font-semibold mb-2">Basic Info</h4>
                   <p><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
                   <p><strong>Completed By:</strong> {selected.staff}</p>
                 </div>
 
                 <div className="bg-blue-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Sales Breakdown</h4>
+                  <h4 className="text-sm font-semibold mb-2">Sales Breakdown</h4>
                   <p><strong>Cash Sales:</strong> ฿{selected.sales.cash.toLocaleString()}</p>
                   <p><strong>QR Sales:</strong> ฿{selected.sales.qr.toLocaleString()}</p>
                   <p><strong>Grab Sales:</strong> ฿{selected.sales.grab.toLocaleString()}</p>
@@ -534,12 +534,12 @@ export default function DailySalesV2Library() {
                 </div>
 
                 <div className="bg-red-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Expenses & Wages</h4>
+                  <h4 className="text-sm font-semibold mb-2">Expenses & Wages</h4>
                   
                   {/* Regular Expenses */}
                   {selected.expenses.length > 0 && (
                     <div className="mb-3">
-                      <h5 className="font-medium mb-1">Expenses</h5>
+                      <h5 className="text-xs font-medium mb-1">Expenses</h5>
                       <ul className="space-y-1">
                         {selected.expenses.map((expense, idx) => (
                           <li key={idx} className="flex justify-between">
@@ -554,7 +554,7 @@ export default function DailySalesV2Library() {
                   {/* Staff Wages */}
                   {selected.wages && selected.wages.length > 0 && (
                     <div>
-                      <h5 className="font-medium mb-1">Staff Wages</h5>
+                      <h5 className="text-xs font-medium mb-1">Staff Wages</h5>
                       <ul className="space-y-1">
                         {selected.wages.map((wage, idx) => (
                           <li key={idx} className="flex justify-between">
@@ -578,7 +578,7 @@ export default function DailySalesV2Library() {
                 </div>
 
                 <div className="bg-green-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Banking & Cash</h4>
+                  <h4 className="text-sm font-semibold mb-2">Banking & Cash</h4>
                   <p><strong>Starting Cash:</strong> ฿{selected.banking.startingCash.toLocaleString()}</p>
                   <p><strong>Closing Cash:</strong> ฿{selected.banking.closingCash.toLocaleString()}</p>
                   <p><strong>Cash Banked:</strong> ฿{selected.banking.cashBanked.toLocaleString()}</p>
@@ -598,7 +598,7 @@ export default function DailySalesV2Library() {
                     
                     return (
                       <div className="border-t pt-2 mt-2">
-                        <h5 className="font-medium mb-2">Balance Check</h5>
+                        <h5 className="text-xs font-medium mb-2">Balance Check</h5>
                         <div className="space-y-1">
                           <p>Expected: ฿{startingCash.toLocaleString()} + ฿{cashSales.toLocaleString()} - ฿{totalExpenses.toLocaleString()} - ฿{totalWages.toLocaleString()} - ฿{cashBanked.toLocaleString()}</p>
                           <p><strong>Expected Closing:</strong> ฿{expectedClosing.toLocaleString()}</p>
@@ -619,14 +619,14 @@ export default function DailySalesV2Library() {
                 <h3 className="text-sm font-semibold text-purple-700 border-b pb-2">Stock Management (Form 2)</h3>
                 
                 <div className="bg-purple-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">End Count</h4>
+                  <h4 className="text-sm font-semibold mb-2">End Count</h4>
                   <p><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
                   <p><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
                 </div>
 
                 {/* Drinks Stock Section - ALWAYS SHOW ALL DRINKS EVEN IF 0 */}
                 <div className="bg-blue-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Drinks Count</h4>
+                  <h4 className="text-sm font-semibold mb-2">Drinks Count</h4>
                   {selected.stock.drinks && selected.stock.drinks.length > 0 ? (
                     <div className="space-y-1">
                       {selected.stock.drinks.map((drink, idx) => (
@@ -641,7 +641,7 @@ export default function DailySalesV2Library() {
                 </div>
 
                 <div className="bg-orange-50 p-3 rounded text-xs">
-                  <h4 className="font-semibold mb-2">Shopping List / Requisition</h4>
+                  <h4 className="text-sm font-semibold mb-2">Shopping List / Requisition</h4>
                   {selected.shoppingList.length === 0 ? (
                     <p className="text-gray-500">No items to purchase</p>
                   ) : (
