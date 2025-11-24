@@ -33,6 +33,7 @@ const groups: Group[] = [
     title: "Purchasing",
     items: [
       { to: "/operations/purchasing", label: "Shopping List" },
+      { to: "/operations/purchasing-mapping", label: "Field Mapping" },
     ],
   },
   {
