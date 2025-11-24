@@ -493,39 +493,39 @@ export default function DailySalesV2Library() {
       {/* View Modal */}
       {selected && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-auto p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[95vh]">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold mb-2 sm:mb-3 md:mb-4">Complete Daily Sales & Stock Form</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-auto p-4 md:p-6 overflow-y-auto max-h-[95vh] font-[Poppins]">
+            <h2 className="text-xl font-bold mb-4">Complete Daily Sales & Stock Form</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               {/* FORM 1 - Daily Sales Data */}
-              <div className="space-y-2 sm:space-y-3 md:space-y-4">
-                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-emerald-700 border-b pb-1 sm:pb-2">Daily Sales (Form 1)</h3>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-emerald-700 border-b pb-2">Daily Sales (Form 1)</h3>
                 
-                <div className="bg-gray-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">Basic Info</h4>
+                <div className="bg-gray-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Basic Info</h4>
                   <p><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
                   <p><strong>Completed By:</strong> {selected.staff}</p>
                 </div>
 
-                <div className="bg-blue-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">Sales Breakdown</h4>
+                <div className="bg-blue-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Sales Breakdown</h4>
                   <p><strong>Cash Sales:</strong> ฿{selected.sales.cash.toLocaleString()}</p>
                   <p><strong>QR Sales:</strong> ฿{selected.sales.qr.toLocaleString()}</p>
                   <p><strong>Grab Sales:</strong> ฿{selected.sales.grab.toLocaleString()}</p>
                   <p><strong>Other Sales:</strong> ฿{selected.sales.other.toLocaleString()}</p>
-                  <p className="font-bold border-t pt-1 sm:pt-2 mt-1"><strong>Total Sales:</strong> ฿{selected.sales.total.toLocaleString()}</p>
+                  <p className="font-bold border-t pt-2 mt-1"><strong>Total Sales:</strong> ฿{selected.sales.total.toLocaleString()}</p>
                 </div>
 
-                <div className="bg-red-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">Expenses & Wages</h4>
+                <div className="bg-red-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Expenses & Wages</h4>
                   
                   {/* Regular Expenses */}
                   {selected.expenses.length > 0 && (
-                    <div className="mb-2 sm:mb-3">
-                      <h5 className="font-medium text-xs sm:text-sm mb-1">Expenses</h5>
-                      <ul className="space-y-0.5 sm:space-y-1">
+                    <div className="mb-3">
+                      <h5 className="font-medium mb-1">Expenses</h5>
+                      <ul className="space-y-1">
                         {selected.expenses.map((expense, idx) => (
-                          <li key={idx} className="flex justify-between text-[11px] sm:text-xs">
+                          <li key={idx} className="flex justify-between">
                             <span className="truncate mr-2">{expense.item} ({expense.shop})</span>
                             <span className="whitespace-nowrap">฿{expense.cost.toLocaleString()}</span>
                           </li>
@@ -537,17 +537,17 @@ export default function DailySalesV2Library() {
                   {/* Staff Wages */}
                   {selected.wages && selected.wages.length > 0 && (
                     <div>
-                      <h5 className="font-medium text-xs sm:text-sm mb-1">Staff Wages</h5>
-                      <ul className="space-y-0.5 sm:space-y-1">
+                      <h5 className="font-medium mb-1">Staff Wages</h5>
+                      <ul className="space-y-1">
                         {selected.wages.map((wage, idx) => (
-                          <li key={idx} className="flex justify-between text-[11px] sm:text-xs">
+                          <li key={idx} className="flex justify-between">
                             <span>{wage.staff} (Wages)</span>
                             <span>฿{wage.amount.toLocaleString()}</span>
                           </li>
                         ))}
                       </ul>
-                      <div className="border-t pt-1 sm:pt-2 mt-1 sm:mt-2">
-                        <div className="flex justify-between font-semibold text-xs sm:text-sm">
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between font-semibold">
                           <span>Total Wages:</span>
                           <span>฿{(selected.wages ? selected.wages.reduce((sum, w) => sum + w.amount, 0) : 0).toLocaleString()}</span>
                         </div>
@@ -560,8 +560,8 @@ export default function DailySalesV2Library() {
                   )}
                 </div>
 
-                <div className="bg-green-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">Banking & Cash</h4>
+                <div className="bg-green-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Banking & Cash</h4>
                   <p><strong>Starting Cash:</strong> ฿{selected.banking.startingCash.toLocaleString()}</p>
                   <p><strong>Closing Cash:</strong> ฿{selected.banking.closingCash.toLocaleString()}</p>
                   <p><strong>Cash Banked:</strong> ฿{selected.banking.cashBanked.toLocaleString()}</p>
@@ -575,14 +575,14 @@ export default function DailySalesV2Library() {
                     const cashBanked = selected.banking.cashBanked;
                     const closingCash = selected.banking.closingCash;
                     
-                    const expectedClosing = startingCash + cashSales - totalExpenses - totalWages; // Exclude banked from calculation
+                    const expectedClosing = startingCash + cashSales - totalExpenses - totalWages;
                     const difference = closingCash - expectedClosing;
-                    const isBalanced = Math.abs(difference) <= 0.30; // ±30 THB tolerance
+                    const isBalanced = Math.abs(difference) <= 0.30;
                     
                     return (
                       <div className="border-t pt-2 mt-2">
-                        <h5 className="font-medium text-sm mb-2">Balance Check</h5>
-                        <div className="text-xs space-y-1">
+                        <h5 className="font-medium mb-2">Balance Check</h5>
+                        <div className="space-y-1">
                           <p>Expected: ฿{startingCash.toLocaleString()} + ฿{cashSales.toLocaleString()} - ฿{totalExpenses.toLocaleString()} - ฿{totalWages.toLocaleString()} - ฿{cashBanked.toLocaleString()}</p>
                           <p><strong>Expected Closing:</strong> ฿{expectedClosing.toLocaleString()}</p>
                           <p><strong>Actual Closing:</strong> ฿{closingCash.toLocaleString()}</p>
@@ -598,42 +598,44 @@ export default function DailySalesV2Library() {
               </div>
 
               {/* FORM 2 - Stock Data */}
-              <div className="space-y-2 sm:space-y-3 md:space-y-4">
-                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-purple-700 border-b pb-1 sm:pb-2">Stock Management (Form 2)</h3>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-purple-700 border-b pb-2">Stock Management (Form 2)</h3>
                 
-                <div className="bg-purple-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">End Count</h4>
-                  <p><strong>Rolls:</strong> {selected.stock.rolls} pcs</p>
-                  <p><strong>Meat:</strong> {selected.stock.meat} grams</p>
+                <div className="bg-purple-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">End Count</h4>
+                  <p><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
+                  <p><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
                 </div>
 
-                {/* Drinks Stock Section */}
-                {selected.stock.drinks && selected.stock.drinks.length > 0 && (
-                  <div className="bg-blue-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                    <h4 className="font-semibold mb-1 sm:mb-2">Drinks Count</h4>
-                    <div className="space-y-0.5 sm:space-y-1">
+                {/* Drinks Stock Section - ALWAYS SHOW ALL DRINKS EVEN IF 0 */}
+                <div className="bg-blue-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Drinks Count</h4>
+                  {selected.stock.drinks && selected.stock.drinks.length > 0 ? (
+                    <div className="space-y-1">
                       {selected.stock.drinks.map((drink, idx) => (
-                        <p key={idx} className="text-[11px] sm:text-xs">
-                          <strong>{drink.name}:</strong> {drink.quantity} {drink.unit}
+                        <p key={idx}>
+                          <strong>{drink.name}:</strong> {drink.quantity ?? 0} {drink.unit}
                         </p>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                <div className="bg-orange-50 p-2 sm:p-3 rounded text-xs sm:text-sm">
-                  <h4 className="font-semibold mb-1 sm:mb-2">Shopping List / Requisition</h4>
-                  {selected.shoppingList.length === 0 ? (
-                    <p className="text-gray-500 text-xs">No items to purchase</p>
                   ) : (
-                    <div className="space-y-1 sm:space-y-2">
+                    <p className="text-gray-500">No drinks recorded</p>
+                  )}
+                </div>
+
+                <div className="bg-orange-50 p-3 rounded text-xs">
+                  <h4 className="font-semibold mb-2">Shopping List / Requisition</h4>
+                  {selected.shoppingList.length === 0 ? (
+                    <p className="text-gray-500">No items to purchase</p>
+                  ) : (
+                    <div className="space-y-2">
                       {selected.shoppingList.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white p-1.5 sm:p-2 rounded border text-[11px] sm:text-xs">
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border">
                           <div className="flex-1 min-w-0 mr-2">
                             <span className="font-medium truncate block">{item.name}</span>
-                            <span className="text-[10px] sm:text-xs text-gray-500">({item.category})</span>
+                            <span className="text-gray-500">({item.category})</span>
                           </div>
-                          <span className="font-bold whitespace-nowrap text-xs sm:text-sm">{item.qty} {item.qty === 1 ? 'item' : 'items'}</span>
+                          <span className="font-bold whitespace-nowrap">{item.qty} {item.qty === 1 ? 'item' : 'items'}</span>
                         </div>
                       ))}
                     </div>
@@ -646,18 +648,18 @@ export default function DailySalesV2Library() {
             </div>
 
             {/* Raw Data Section (for debugging) */}
-            <div className="mt-3 sm:mt-4 md:mt-6 border-t pt-2 sm:pt-3 md:pt-4">
+            <div className="mt-4 border-t pt-4">
               <details className="cursor-pointer">
-                <summary className="font-semibold text-gray-600 text-xs sm:text-sm">Raw Data (Debug)</summary>
-                <div className="mt-2 bg-gray-100 p-2 sm:p-3 rounded text-[10px] sm:text-xs overflow-auto">
+                <summary className="font-semibold text-gray-600 text-xs">Raw Data (Debug)</summary>
+                <div className="mt-2 bg-gray-100 p-3 rounded text-xs overflow-auto">
                   <pre>{JSON.stringify(selected, null, 2)}</pre>
                 </div>
               </details>
             </div>
 
-            <div className="mt-3 sm:mt-4 md:mt-6 flex justify-end space-x-2">
+            <div className="mt-4 flex justify-end space-x-2">
               <button
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded text-sm font-medium"
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-[4px] text-xs font-medium"
                 onClick={() => setSelected(null)}
               >
                 Close
