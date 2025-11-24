@@ -1,3 +1,24 @@
+REPLIT AGENT PATCH INSTRUCTIONS — PRIME COST (FINAL BAHT FIX)
+
+READ CAREFULLY AND DO NOT DEVIATE.
+You are not allowed to modify anything except the file listed below.
+
+
+---
+
+✅ TARGET FILE TO REPLACE
+
+Replace the entire contents of:
+
+server/services/primeCost.ts
+
+with the following exact script:
+
+
+---
+
+🟧 FULL FILE CONTENT — OVERWRITE COMPLETELY
+
 // server/services/primeCost.ts
 import db from "../db";
 
@@ -145,3 +166,37 @@ export async function getPrimeCostMTD(date: string) {
     primePct,
   };
 }
+
+
+---
+
+🟥 STRICT RULES FOR THE AGENT
+
+DO NOT modify any other file.
+
+DO NOT rename any variables, functions, or imports.
+
+DO NOT change any routes.
+
+DO NOT add any migrations.
+
+DO NOT touch the frontend.
+
+ONLY replace server/services/primeCost.ts exactly as above.
+
+
+After completion:
+
+1. Restart backend
+
+
+2. Confirm API endpoint works:
+GET /api/metrics/prime-cost
+
+
+3. Stop. Do not touch anything else.
+
+
+
+
+---
