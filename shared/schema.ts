@@ -1531,3 +1531,35 @@ export const insertExternalSkuMapV2Schema = createInsertSchema(externalSkuMapV2)
 export type InsertExternalSkuMapV2 = z.infer<typeof insertExternalSkuMapV2Schema>;
 export type SelectExternalSkuMapV2 = typeof externalSkuMapV2.$inferSelect;
 export type SelectDailyReviewComment = typeof dailyReviewComments.$inferSelect;
+
+// Purchasing Items - Master list of purchasable items with pricing
+export const purchasingItems = pgTable("purchasing_items", {
+  id: serial("id").primaryKey(),
+  item: varchar("item").notNull(),
+  category: varchar("category"),
+  supplierName: varchar("supplierName"),
+  brand: varchar("brand"),
+  supplierSku: varchar("supplierSku"),
+  orderUnit: varchar("orderUnit"),
+  unitDescription: varchar("unitDescription"),
+  unitCost: decimal("unitCost", { precision: 10, scale: 2 }),
+  lastReviewDate: varchar("lastReviewDate"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+// Purchasing Field Map - Maps Daily Stock V2 fields to purchasing items
+export const purchasingFieldMap = pgTable("purchasing_field_map", {
+  id: serial("id").primaryKey(),
+  fieldKey: varchar("fieldKey").notNull().unique(), // e.g. "mayoToPurchase"
+  purchasingItemId: integer("purchasingItemId").notNull().references(() => purchasingItems.id),
+});
+
+// Purchasing Insert Schemas and Types
+export const insertPurchasingItemSchema = createInsertSchema(purchasingItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPurchasingFieldMapSchema = createInsertSchema(purchasingFieldMap).omit({ id: true });
+
+export type PurchasingItem = typeof purchasingItems.$inferSelect;
+export type InsertPurchasingItem = z.infer<typeof insertPurchasingItemSchema>;
+export type PurchasingFieldMap = typeof purchasingFieldMap.$inferSelect;
+export type InsertPurchasingFieldMap = z.infer<typeof insertPurchasingFieldMapSchema>;
