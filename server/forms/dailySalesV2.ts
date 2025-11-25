@@ -390,13 +390,23 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       });
     }
 
-    // Update the existing record with stock data including drinks
+    // Build purchasingJson - keyed by item name with qty for shopping list lookup
+    const purchasingJson: Record<string, number> = {};
+    if (Array.isArray(requisition)) {
+      for (const item of requisition) {
+        if (item.name && item.qty > 0) {
+          purchasingJson[item.name] = item.qty;
+        }
+      }
+    }
+
+    // Update the existing record with stock data including drinks and purchasingJson
     const result = await pool.query(
       `UPDATE daily_sales_v2 
        SET payload = payload || $1
        WHERE id = $2
        RETURNING id, "shiftDate", "completedBy", payload`,
-      [JSON.stringify({ rollsEnd, meatEnd, requisition, drinkStock }), id]
+      [JSON.stringify({ rollsEnd, meatEnd, requisition, drinkStock, purchasingJson }), id]
     );
 
     if (result.rows.length === 0) {
