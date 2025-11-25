@@ -189,72 +189,70 @@ export default function PurchasingPage() {
       {isLoading ? (
         <div className="text-xs text-slate-600">Loading...</div>
       ) : (
-        <Card className="rounded-[4px] border-slate-200">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-slate-200">
-                <TableHead className="text-xs font-medium text-slate-900">Item</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Brand</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">SKU</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Order Unit</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Unit Desc</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900 text-right">Unit Cost</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900">Last Review</TableHead>
-                <TableHead className="text-xs font-medium text-slate-900 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.id} className="border-slate-200" data-testid={`row-item-${item.id}`}>
-                  <TableCell className="text-xs text-slate-900 font-medium">{item.item}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.supplierName || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.brand || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.supplierSku || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.orderUnit || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
-                  <TableCell className="text-xs text-slate-900 font-medium text-right">
-                    {item.unitCost !== null ? thb(item.unitCost) : '-'}
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-600">{item.lastReviewDate || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        data-testid={`button-edit-${item.id}`}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setShowDialog(true);
-                        }}
-                        className="text-xs h-8 px-2 hover:bg-slate-100"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        data-testid={`button-delete-${item.id}`}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleteId(item.id)}
-                        className="text-xs h-8 px-2 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        <Card className="rounded-[4px] border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="border-slate-200">
+                  <TableHead className="text-xs font-medium text-slate-900 sticky left-0 bg-slate-50 z-10">Item</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Brand</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900 text-right">Unit Cost</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Unit Desc</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Last Review</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900 text-center sticky right-0 bg-slate-50 z-10 border-l border-slate-200">Actions</TableHead>
                 </TableRow>
-              ))}
-              {filteredItems.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-xs text-slate-600 py-8">
-                    No items found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => (
+                  <TableRow key={item.id} className="border-slate-200" data-testid={`row-item-${item.id}`}>
+                    <TableCell className="text-xs text-slate-900 font-medium sticky left-0 bg-white z-10">{item.item}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.supplierName || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.brand || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-900 font-medium text-right">
+                      {item.unitCost !== null ? thb(item.unitCost) : '-'}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.lastReviewDate || '-'}</TableCell>
+                    <TableCell className="sticky right-0 bg-white z-10 border-l border-slate-200">
+                      <div className="flex gap-1 justify-center">
+                        <Button
+                          data-testid={`button-edit-${item.id}`}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingItem(item);
+                            setShowDialog(true);
+                          }}
+                          className="text-xs h-8 px-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          data-testid={`button-delete-${item.id}`}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteId(item.id)}
+                          className="text-xs h-8 px-2 border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-xs text-slate-600 py-8">
+                      No items found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
 
