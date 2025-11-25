@@ -1,0 +1,91 @@
+CURRENT TASK – SHOPPING LIST + PURCHASING (OVERRIDES ALL PREVIOUS BRIEFS)
+
+> Goal:
+When V2 Form 2 is submitted:
+
+Every purchase field quantity goes into a Shopping List.
+
+All item details (name, brand, SKU, supplier, unit, price) come from the Purchasing List.
+
+The Shopping List shows all requested items + cost estimate + grand total and can be downloaded.
+
+
+Rules (non-negotiable):
+
+1. Single source of truth for prices & item data
+
+All item name / brand / SKU / supplier / unit / unitCost must come only from purchasing_items.
+
+Remove/disable any hard-coded pricing / ingredient cost arrays currently used by the Shopping List.
+
+
+
+2. Form 2 → purchasingJson
+
+Identify all “purchase” fields from Daily Sales & Stock V2 – Form 2.
+
+On submit, write those values into a JSON/JSONB column on daily_stock_v2 (e.g. purchasingJson), keyed by field name.
+
+Do not change the existing form schema or field names; this is an additive column only.
+
+
+
+3. Field mapping is your responsibility
+
+Use purchasing_field_map to map each Form 2 purchase fieldKey → purchasing_items.id.
+
+You must populate this mapping yourself so the system works without Cam doing any SQL.
+
+Optionally keep the mapping UI so it can be changed later, but the initial mapping must be done by you.
+
+
+
+4. Shopping List must use purchasing_items + mapping only
+
+Pick the Shopping List route Cam will actually use (one page only).
+Back it with /api/purchasing-list/:dailyStockId or equivalent.
+
+Logic for that endpoint:
+
+Read purchasingJson from daily_stock_v2.
+
+For each key with qty > 0:
+
+Look up purchasing_field_map → purchasing_items.
+
+Build line: Item, Brand, SKU, Supplier, Unit, Qty, UnitCost, LineTotal (qty × unitCost).
+
+
+Return grandTotal as sum of LineTotals.
+
+
+The frontend Shopping List page must display those columns + Grand Total and expose a Download button calling the CSV endpoint.
+
+
+
+5. Clean up old Shopping List logic
+
+Remove or completely bypass the old Shopping List implementation that uses hard-coded prices.
+
+After your changes, there must be one Shopping List behaviour:
+
+Quantities from V2 Form 2,
+
+Item details and prices from purchasing_items via purchasing_field_map.
+
+
+
+
+6. No user DB work
+
+Do not ask Cam to run SQL or map fields manually.
+
+All wiring (purchasingJson, mapping table population, endpoint use) must be completed by you.
+
+
+
+
+
+
+
+---
