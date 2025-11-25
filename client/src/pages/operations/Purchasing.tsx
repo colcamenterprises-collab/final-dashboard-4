@@ -191,15 +191,17 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[1100px]">
               <TableHeader>
                 <TableRow className="border-slate-200">
                   <TableHead className="text-xs font-medium text-slate-900 sticky left-0 bg-slate-50 z-10">Item</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Brand</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900 text-right">Unit Cost</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">SKU</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900">Order Unit</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Unit Desc</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900 text-right">Unit Cost</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Last Review</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900 text-center sticky right-0 bg-slate-50 z-10 border-l border-slate-200">Actions</TableHead>
                 </TableRow>
@@ -211,10 +213,12 @@ export default function PurchasingPage() {
                     <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.supplierName || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.brand || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.supplierSku || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.orderUnit || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-900 font-medium text-right">
                       {item.unitCost !== null ? thb(item.unitCost) : '-'}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.lastReviewDate || '-'}</TableCell>
                     <TableCell className="sticky right-0 bg-white z-10 border-l border-slate-200">
                       <div className="flex gap-1 justify-center">
@@ -245,7 +249,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-xs text-slate-600 py-8">
+                    <TableCell colSpan={10} className="text-center text-xs text-slate-600 py-8">
                       No items found
                     </TableCell>
                   </TableRow>
