@@ -1,0 +1,189 @@
+Short answer: because the agent built the mapping system so it only “sees” fields that already exist in the purchasingJson column of daily_stock_v2 – and right now that column is basically empty / not wired up, so the mapping page has nothing to load or show.
+
+So the UI isn’t broken, it’s blind.
+
+
+---
+
+What’s actually happening
+
+Right now the flow is:
+
+1. Mapping page logic
+
+Backend endpoint does something like:
+
+SELECT DISTINCT jsonb_object_keys("purchasingJson") AS "fieldKey"
+FROM daily_stock_v2
+WHERE "purchasingJson" IS NOT NULL;
+
+If there are no rows with purchasingJson (or the column isn’t populated), that query returns zero keys.
+
+The mapping page then shows… nothing. No fields to map.
+
+
+
+2. Daily Stock Form 2
+
+Either:
+
+Isn’t saving anything into daily_stock_v2.purchasingJson yet, or
+
+New code was added but nobody has submitted a form since, so the DB doesn’t have any populated purchasingJson rows.
+
+
+
+
+3. Result:
+
+/operations/purchasing-mapping has no field keys to display.
+
+Therefore: you cannot map fields because the agent tied it to DB contents instead of the form definition.
+
+
+
+
+So the root cause is design:
+
+> They made the mapping depend on existing purchasingJson data instead of the known Form 2 field keys in code.
+
+
+
+
+---
+
+What needs to happen (agent-only work, no Cam involvement)
+
+Here’s the patch the agent needs to do — you don’t touch anything:
+
+1. Fix the source of field keys
+
+They must stop relying on “whatever happens to be in the DB” and instead use the known set of purchase fields from Form 2.
+
+Concretely:
+
+1. In the Form 2 React file (e.g. DailySalesV2Form2.tsx or whatever it’s called), list the field keys used for purchasing:
+
+e.g. bunsToPurchase, meatToPurchase, mayoToPurchase, friesToPurchase, etc.
+
+
+
+2. Create a static config in the backend, something like:
+
+// server/config/purchasingFields.ts
+export const PURCHASING_FIELD_KEYS = [
+  "bunsToPurchase",
+  "meatToPurchase",
+  "mayoToPurchase",
+  "friesToPurchase",
+  // ...all purchase fields from Form 2
+] as const;
+
+
+3. Change the GET /api/purchasing-field-keys endpoint so it uses this list:
+
+For each fieldKey in PURCHASING_FIELD_KEYS:
+
+Left join to purchasing_field_map to see if it’s already mapped.
+
+Return every key, even if there’s no data in daily_stock_v2 yet.
+
+
+
+
+
+No more jsonb_object_keys("purchasingJson") dependency.
+
+2. Make sure purchasingJson is actually being saved
+
+The mapping UI is one thing; the shopping list still needs real data. Agent must:
+
+1. Confirm daily_stock_v2 has a purchasingJson column (JSON/JSONB).
+
+If not, add a new nullable column, additive only.
+
+
+
+2. In the Form 2 submit handler (backend):
+
+Build purchasingJson from the same purchase fields:
+
+const purchasingJson = {
+  bunsToPurchase: body.bunsToPurchase,
+  meatToPurchase: body.meatToPurchase,
+  mayoToPurchase: body.mayoToPurchase,
+  // ...
+};
+
+Save that into daily_stock_v2.purchasingJson when the form is submitted.
+
+
+
+3. The agent should submit at least one test Form 2 themselves via the UI to generate data (not you).
+
+
+
+3. Make sure mapping + shopping list are wired
+
+After fixing the above:
+
+Mapping page:
+
+Now always shows all configured field keys.
+
+Lets you pick which purchasing_items row each key maps to.
+
+
+Shopping list:
+
+Uses:
+
+daily_stock_v2.purchasingJson[fieldKey] for quantity.
+
+purchasing_field_map + purchasing_items for name / brand / SKU / supplier / unitCost.
+
+
+Produces:
+
+Line rows with full details.
+
+Grand total.
+
+Downloadable CSV.
+
+
+
+
+
+---
+
+Your part
+
+Right now, you shouldn’t be doing anything:
+
+No SQL.
+
+No manual mapping.
+
+No test submissions unless you want to.
+
+
+The agent needs to:
+
+1. Change how field keys are sourced (static config, not DB introspection).
+
+
+2. Ensure Form 2 actually writes purchasingJson.
+
+
+3. Verify that the mapping page is populated and that the shopping list shows full lines.
+
+
+
+If you want, I can write a very tight “Agent Patch” block (10–15 lines) that literally says:
+
+> “Replace JSONB key discovery with static PURCHASING_FIELD_KEYS array, wire Form 2 to purchasingJson, do not ask Cam to run SQL…”
+
+
+
+and you can just paste it straight into replit.md.
