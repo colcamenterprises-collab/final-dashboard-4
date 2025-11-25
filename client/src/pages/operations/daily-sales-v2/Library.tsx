@@ -73,14 +73,14 @@ function DrinksRequisitionSection({ requisition }: { requisition: any[] }) {
   }
 
   return (
-    <div className="bg-blue-50 p-3 rounded">
-      <h4 className="font-semibold mb-2">Drinks Requisition</h4>
-      <table className="w-full text-sm">
+    <div className="bg-blue-50 p-3 rounded text-xs">
+      <h4 className="text-sm font-semibold mb-2">Drinks Requisition</h4>
+      <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
-            <th className="text-left p-1">Item</th>
-            <th className="text-right p-1">Qty</th>
-            <th className="text-right p-1">Cost</th>
+            <th className="text-left p-1 text-xs">Item</th>
+            <th className="text-right p-1 text-xs">Qty</th>
+            <th className="text-right p-1 text-xs">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -88,10 +88,10 @@ function DrinksRequisitionSection({ requisition }: { requisition: any[] }) {
             const ingredient = ingredients.data.find(i => i.id === r.id || i.name.toLowerCase() === r.name.toLowerCase());
             const cost = r.qty * (ingredient?.unitCost || 0);
             return (
-              <tr key={idx}>
-                <td className="p-1">{ingredient?.name || r.name}</td>
-                <td className="text-right p-1">{r.qty}</td>
-                <td className="text-right p-1 font-semibold">{thb(cost)}</td>
+              <tr key={idx} className="text-xs">
+                <td className="p-1 text-xs">{ingredient?.name || r.name}</td>
+                <td className="text-right p-1 text-xs">{r.qty}</td>
+                <td className="text-right p-1 text-xs font-semibold">{thb(cost)}</td>
               </tr>
             );
           })}
@@ -645,14 +645,14 @@ export default function DailySalesV2Library() {
                   {selected.shoppingList.length === 0 ? (
                     <p className="text-gray-500">No items to purchase</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {selected.shoppingList.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border">
+                        <div key={idx} className="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200 text-xs">
                           <div className="flex-1 min-w-0 mr-2">
-                            <span className="font-medium truncate block">{item.name}</span>
-                            <span className="text-gray-500">({item.category})</span>
+                            <span className="text-xs font-medium truncate block">{item.name}</span>
+                            <span className="text-xs text-gray-500">({item.category})</span>
                           </div>
-                          <span className="font-bold whitespace-nowrap">{item.qty} {item.qty === 1 ? 'item' : 'items'}</span>
+                          <span className="text-xs font-bold whitespace-nowrap">{item.qty} {item.qty === 1 ? 'item' : 'items'}</span>
                         </div>
                       ))}
                     </div>
