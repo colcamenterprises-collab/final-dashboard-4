@@ -296,31 +296,53 @@ export default function ShoppingList() {
     }).format(amount);
   };
 
-  // Helper function for rendering grouped shopping list
+  // Calculate category totals for estimated pricing
+  const calculateCategoryTotal = (items: any[]) => {
+    return items.reduce((sum: number, it: any) => sum + (Number(it.estCost) || 0), 0);
+  };
+
+  // Calculate grand total for all categories
+  const grandTotal = Object.values(groupedList || {}).reduce((sum: number, items: any[]) => {
+    return sum + calculateCategoryTotal(items);
+  }, 0);
+
+  // Helper function for rendering grouped shopping list with estimated pricing
   const renderGroupedList = () => (
-    Object.entries(groupedList || {}).map(([category, items]: [string, any[]]) => (
-      <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-4 py-2 bg-gray-50 font-semibold text-gray-900">{category}</div>
-        <div className="overflow-x-auto md:overflow-visible">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-3/4">Item</th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase w-1/4">Qty</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {items.map((it: any, idx: number) => (
-                <tr key={idx}>
-                  <td className="px-4 py-2 text-sm text-gray-900 truncate">{it.name}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 text-center">{it.qty}</td>
+    Object.entries(groupedList || {}).map(([category, items]: [string, any[]]) => {
+      const categoryTotal = calculateCategoryTotal(items);
+      return (
+        <div key={category} className="border border-slate-200 rounded-[4px] overflow-hidden mb-4">
+          <div className="px-4 py-2 bg-slate-50 flex justify-between items-center">
+            <span className="font-semibold text-xs text-slate-900">{category}</span>
+            <span className="text-xs font-medium text-emerald-600">
+              Est: ฿{categoryTotal.toLocaleString('en-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-600 uppercase">Item</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium text-slate-600 uppercase w-16">Qty</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-slate-600 uppercase w-24">Est. Cost</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {items.map((it: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="px-3 py-2 text-xs text-slate-900">{it.name}</td>
+                    <td className="px-3 py-2 text-xs text-slate-900 text-center font-medium">{it.qty}</td>
+                    <td className="px-3 py-2 text-xs text-emerald-600 text-right font-medium">
+                      {it.estCost ? `฿${Number(it.estCost).toLocaleString('en-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    ))
+      );
+    })
   );
 
   if (isLoading) {
@@ -400,19 +422,29 @@ export default function ShoppingList() {
             {/* Current Shopping List */}
             <div className="lg:col-span-2">
               <Card className="restaurant-card">
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardTitle className="text-lg font-semibold text-slate-900">
                       Shopping List
-                      <span className="ml-2 text-sm font-normal text-blue-600">
-                        Total Items: {totalItems}
+                      <span className="ml-2 text-xs font-normal text-slate-600">
+                        {totalItems} items
                       </span>
                     </CardTitle>
-                    <Button variant="ghost" className="text-primary hover:text-primary-dark text-sm font-medium">
+                    <Button variant="ghost" className="text-emerald-600 hover:text-emerald-700 text-xs font-medium">
                       <Plus className="mr-1 h-4 w-4" />
                       Add Item
                     </Button>
                   </div>
+                  {grandTotal > 0 && (
+                    <div className="mt-2 p-3 bg-emerald-50 rounded-[4px] border border-emerald-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-700">Estimated Total</span>
+                        <span className="text-lg font-bold text-emerald-600">
+                          ฿{grandTotal.toLocaleString('en-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
