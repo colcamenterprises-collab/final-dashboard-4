@@ -68,8 +68,7 @@ const navigationGroups: NavGroup[] = [
         icon: ShoppingCart, 
         testId: "nav-purchasing",
         subItems: [
-          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-          { to: "/operations/purchasing-mapping", label: "Field Mapping", icon: Settings, testId: "nav-field-mapping" }
+          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" }
         ]
       },
       { 
