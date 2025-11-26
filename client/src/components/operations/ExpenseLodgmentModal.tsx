@@ -25,6 +25,8 @@ type ExpenseLodgmentForm = z.infer<typeof expenseLodgmentSchema>;
 interface ExpenseLodgmentModalProps {
   onSuccess?: () => void;
   triggerClassName?: string;
+  triggerText?: string;
+  triggerIcon?: React.ReactNode;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   initialData?: {
@@ -80,7 +82,9 @@ const SUPPLIERS = [
 
 export function ExpenseLodgmentModal({ 
   onSuccess, 
-  triggerClassName, 
+  triggerClassName,
+  triggerText = "Lodge Business Expense",
+  triggerIcon,
   isOpen: controlledOpen, 
   onOpenChange: controlledOnOpenChange,
   initialData,
@@ -184,8 +188,8 @@ export function ExpenseLodgmentModal({
         <Button 
           className={triggerClassName || "bg-black text-white hover:bg-gray-800"}
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Lodge Business Expense
+          {triggerIcon || <Plus className="h-4 w-4 mr-2" />}
+          {triggerText}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">

@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
+import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { 
@@ -21,7 +22,7 @@ import {
 
 // Balance Hero Component
 function BalanceHero() {
-  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const { data: financeSummary } = useQuery({
     queryKey: ['/api/finance/summary/today'],
   });
@@ -49,13 +50,15 @@ function BalanceHero() {
             triggerIcon={<Package className="h-4 w-4 mr-2" />}
             onSuccess={() => {}}
           />
-          <ModernButton 
-            onClick={() => setLocation('/finance/expenses')}
-            className="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Business Expense
-          </ModernButton>
+          <ExpenseLodgmentModal
+            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
+            triggerText="Add Business Expense"
+            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+              queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            }}
+          />
         </div>
       </div>
     </div>
