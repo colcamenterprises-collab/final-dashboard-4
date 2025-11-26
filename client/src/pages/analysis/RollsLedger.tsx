@@ -12,6 +12,7 @@ type RollsRow = {
   actual_rolls_end: number | null;
   variance: number;
   status: 'PENDING' | 'OK' | 'ALERT';
+  approved: boolean;
   rolls_purchased_manual: number | null;
   actual_rolls_end_manual: number | null;
   notes: string | null;
@@ -26,6 +27,7 @@ type MeatRow = {
   actual_meat_end_g: number | null;
   variance_g: number;
   status: 'PENDING' | 'OK' | 'ALERT';
+  approved: boolean;
   meat_purchased_manual_g: number | null;
   actual_meat_end_manual_g: number | null;
   notes: string | null;
@@ -130,6 +132,36 @@ export default function RollsLedger() {
     }
   }
 
+  async function handleToggleApproval(shiftDate: string, currentApproved: boolean) {
+    try {
+      const response = await fetch('/api/analysis/rolls-ledger/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftDate,
+          approved: !currentApproved,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update approval');
+
+      toast({
+        title: !currentApproved ? "Approved" : "Reverted to Review",
+        description: `Entry for ${formatDateDDMMYYYY(shiftDate)} ${!currentApproved ? 'approved' : 'set back to review'}`,
+      });
+
+      // Refresh data
+      const resp = await fetch('/api/analysis/rolls-ledger/history').then(r=>r.json());
+      setRows(resp?.rows ?? []);
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to update approval status",
+        variant: "destructive",
+      });
+    }
+  }
+
   // Meat Ledger Functions
   async function handleRebuildMeat() {
     if (!confirm('Rebuild all 14 days of meat ledger?')) return;
@@ -191,6 +223,36 @@ export default function RollsLedger() {
     }
   }
 
+  async function handleToggleMeatApproval(shiftDate: string, currentApproved: boolean) {
+    try {
+      const response = await fetch('/api/analysis/meat-ledger/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftDate,
+          approved: !currentApproved,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update approval');
+
+      toast({
+        title: !currentApproved ? "Approved" : "Reverted to Review",
+        description: `Meat entry for ${formatDateDDMMYYYY(shiftDate)} ${!currentApproved ? 'approved' : 'set back to review'}`,
+      });
+
+      // Refresh data
+      const resp = await fetch('/api/analysis/meat-ledger/history').then(r=>r.json());
+      setMeatRows(resp?.rows ?? []);
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to update approval status",
+        variant: "destructive",
+      });
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -224,8 +286,8 @@ export default function RollsLedger() {
               <th className="px-3 py-2 text-right font-medium text-slate-700">Est. End</th>
               <th className="px-3 py-2 text-right font-medium text-slate-700">Actual End</th>
               <th className="px-3 py-2 text-right font-medium text-slate-700">Variance</th>
-              <th className="px-3 py-2 text-center font-medium text-slate-700">Status</th>
-              <th className="px-3 py-2 text-center font-medium text-slate-700">Actions</th>
+              <th className="px-3 py-2 text-center font-medium text-slate-700">Approve</th>
+              <th className="px-3 py-2 text-center font-medium text-slate-700">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -283,15 +345,17 @@ export default function RollsLedger() {
                       ) : '—'}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`inline-block px-2 py-1 rounded-[4px] text-xs font-medium ${
-                        row.status === 'OK' 
-                          ? 'bg-emerald-100 text-emerald-800' 
-                          : row.status === 'ALERT' 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {row.status}
-                      </span>
+                      <button
+                        onClick={() => handleToggleApproval(row.shift_date, row.approved)}
+                        className={`inline-block px-3 py-1 rounded-[4px] text-xs font-medium transition-colors cursor-pointer min-w-[80px] ${
+                          row.approved 
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
+                            : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        }`}
+                        data-testid={`button-approve-${row.shift_date}`}
+                      >
+                        {row.approved ? 'Approved' : 'Review'}
+                      </button>
                     </td>
                     <td className="px-3 py-2 text-center">
                       {isEditing ? (
@@ -385,8 +449,8 @@ export default function RollsLedger() {
               <th className="px-3 py-2 text-right font-medium text-slate-700">Est. End (g)</th>
               <th className="px-3 py-2 text-right font-medium text-slate-700">Actual End (g)</th>
               <th className="px-3 py-2 text-right font-medium text-slate-700">Variance (g)</th>
-              <th className="px-3 py-2 text-center font-medium text-slate-700">Status</th>
-              <th className="px-3 py-2 text-center font-medium text-slate-700">Actions</th>
+              <th className="px-3 py-2 text-center font-medium text-slate-700">Approve</th>
+              <th className="px-3 py-2 text-center font-medium text-slate-700">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -444,15 +508,17 @@ export default function RollsLedger() {
                       ) : '—'}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`inline-block px-2 py-1 rounded-[4px] text-xs font-medium ${
-                        row.status === 'OK' 
-                          ? 'bg-emerald-100 text-emerald-800' 
-                          : row.status === 'ALERT' 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {row.status}
-                      </span>
+                      <button
+                        onClick={() => handleToggleMeatApproval(row.shift_date, row.approved)}
+                        className={`inline-block px-3 py-1 rounded-[4px] text-xs font-medium transition-colors cursor-pointer min-w-[80px] ${
+                          row.approved 
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
+                            : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        }`}
+                        data-testid={`button-approve-meat-${row.shift_date}`}
+                      >
+                        {row.approved ? 'Approved' : 'Review'}
+                      </button>
                     </td>
                     <td className="px-3 py-2 text-center">
                       {isEditing ? (

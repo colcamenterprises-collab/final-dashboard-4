@@ -194,6 +194,7 @@ export async function getRollsLedgerRange(startDate: string, endDate: string) {
       COALESCE(actual_rolls_end_manual, actual_rolls_end) as actual_rolls_end,
       variance,
       status,
+      COALESCE(approved, false) as approved,
       rolls_purchased_manual,
       actual_rolls_end_manual,
       notes

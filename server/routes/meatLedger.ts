@@ -114,4 +114,29 @@ r.post('/update-manual', async (req, res) => {
   }
 });
 
+// POST toggle approval status
+r.post('/approve', async (req, res) => {
+  try {
+    const { shiftDate, approved } = req.body;
+    
+    if (!shiftDate) {
+      return res.status(400).json({ ok: false, error: 'shiftDate is required' });
+    }
+    
+    const date = normalizeDateParam(shiftDate);
+    const { db } = await import('../db.js');
+    const { sql } = await import('drizzle-orm');
+    
+    await db.execute(sql`
+      UPDATE meat_ledger 
+      SET approved = ${approved === true}, updated_at = NOW()
+      WHERE shift_date = ${date}
+    `);
+    
+    return res.json({ ok: true, approved: approved === true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
+  }
+});
+
 export default r;

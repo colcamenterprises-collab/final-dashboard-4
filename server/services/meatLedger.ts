@@ -182,6 +182,7 @@ export async function getMeatLedgerRange(startDate: string, endDate: string) {
       COALESCE(actual_meat_end_manual_g, actual_meat_end_g) as actual_meat_end_g,
       variance_g,
       status,
+      COALESCE(approved, false) as approved,
       meat_purchased_manual_g,
       actual_meat_end_manual_g,
       notes

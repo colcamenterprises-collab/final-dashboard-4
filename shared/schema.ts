@@ -1502,6 +1502,7 @@ export const rollsLedger = pgTable("rolls_ledger", {
   wasteAllowance: integer("waste_allowance"),
   variance: integer("variance").notNull().default(0),
   status: text("status").notNull().default('PENDING'),
+  approved: boolean("approved").notNull().default(false),
   sourceStockId: text("source_stock_id"),
   sourceExpenseId: text("source_expense_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
