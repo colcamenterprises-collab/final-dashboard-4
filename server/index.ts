@@ -162,8 +162,8 @@ async function checkSchema() {
 }
 
 (async () => {
-  // Check schema on startup
-  await checkSchema();
+  // Check schema on startup (non-blocking - don't delay server start)
+  checkSchema().catch(err => console.warn('Schema check warning:', err));
   
   // Mount the POS upload router FIRST to avoid conflicts
   app.use("/api/pos", posUploadRouter);
@@ -398,32 +398,6 @@ async function checkSchema() {
   
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
-  // Start the scheduler service for daily 4am tasks
-  schedulerService.start();
-
-  // Start the email cron service for daily 8am management reports
-  const { cronEmailService } = await import('./services/cronEmailService');
-  cronEmailService.startEmailCron();
-
-  // 🚨 Jussi Daily Cron (3AM BKK)
-  setInterval(async () => {
-    const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
-    const time = bkkNow.slice(11,16);
-    if (time === "03:00") {
-      try {
-        const { generateJussiReport } = await import('./services/summaryGenerator.js');
-        const today = bkkNow.slice(0,10);
-        await generateJussiReport(today);
-        console.log(`🚨 Jussi Daily Report generated for ${today}`);
-      } catch (error) {
-        console.error('🚨 Jussi Daily Cron failed:', error);
-      }
-    }
-  }, 60*1000);
-
-  // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
-  await import('./jobs/cron.js');
-
   // Error guard middleware - must be LAST
   app.use(errorGuard);
 
@@ -447,16 +421,53 @@ async function checkSchema() {
   }, async () => {
     log(`serving on port ${port}`);
     
-    // Auto-seed ingredients from foodCostings.ts god file
-    try {
-      const seedResult = await autoSeedOnStartup();
-      if (seedResult.error) {
-        console.error('❌ Auto-seed failed:', seedResult.error);
-      } else if (seedResult.seeded > 0 || seedResult.updated > 0) {
-        console.log(`🌱 Auto-seeded ingredients: ${seedResult.seeded} new, ${seedResult.updated} updated`);
+    // === DEFERRED STARTUP: Run heavy operations AFTER port is open ===
+    // This ensures Autoscale health checks pass before background jobs start
+    
+    setImmediate(async () => {
+      try {
+        // Auto-seed ingredients from foodCostings.ts god file
+        try {
+          const seedResult = await autoSeedOnStartup();
+          if (seedResult.error) {
+            console.error('❌ Auto-seed failed:', seedResult.error);
+          } else if (seedResult.seeded > 0 || seedResult.updated > 0) {
+            console.log(`🌱 Auto-seeded ingredients: ${seedResult.seeded} new, ${seedResult.updated} updated`);
+          }
+        } catch (error) {
+          console.error('❌ Auto-seed error:', error);
+        }
+
+        // Start the scheduler service for daily 4am tasks
+        schedulerService.start();
+
+        // Start the email cron service for daily 8am management reports
+        const { cronEmailService } = await import('./services/cronEmailService');
+        cronEmailService.startEmailCron();
+
+        // 🚨 Jussi Daily Cron (3AM BKK)
+        setInterval(async () => {
+          const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+          const time = bkkNow.slice(11,16);
+          if (time === "03:00") {
+            try {
+              const { generateJussiReport } = await import('./services/summaryGenerator.js');
+              const today = bkkNow.slice(0,10);
+              await generateJussiReport(today);
+              console.log(`🚨 Jussi Daily Report generated for ${today}`);
+            } catch (error) {
+              console.error('🚨 Jussi Daily Cron failed:', error);
+            }
+          }
+        }, 60*1000);
+
+        // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
+        await import('./jobs/cron.js');
+        
+        console.log('✅ All background services started successfully');
+      } catch (err) {
+        console.error('❌ Error starting background services:', err);
       }
-    } catch (error) {
-      console.error('❌ Auto-seed error:', error);
-    }
+    });
   });
 })();
