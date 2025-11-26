@@ -16,7 +16,7 @@ localPort = 5000
 externalPort = 5000
 
 [[ports]]
-localPort = 33971
+localPort = 5000
 externalPort = 80
 
 [[ports]]
@@ -50,8 +50,3 @@ waitForPort = 5000
 
 [agent]
 integrations = ["github:1.0.0"]
-
-[userenv]
-
-[userenv.production]
-PORT = "33971"
