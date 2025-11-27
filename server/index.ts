@@ -162,9 +162,6 @@ async function checkSchema() {
 }
 
 (async () => {
-  // Check schema on startup (non-blocking - don't delay server start)
-  checkSchema().catch(err => console.warn('Schema check warning:', err));
-  
   // Mount the POS upload router FIRST to avoid conflicts
   app.use("/api/pos", posUploadRouter);
   
@@ -415,64 +412,69 @@ async function checkSchema() {
     serveStatic(app);
   }
 
-  // For Autoscale: use port 8080 in production (fresh port triggers auto-bind to external 80)
-  // Development uses 5000 as usual
-  const isProduction = process.env.NODE_ENV === 'production';
-  const port = isProduction ? 8080 : 5000;
+  // Always use port 5000 to match port forwarding configuration
+  const port = 5000;
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, async () => {
+  }, () => {
+    // Log immediately - no async operations here
     log(`serving on port ${port}`);
     
-    // === DEFERRED STARTUP: Run heavy operations AFTER port is open ===
-    // This ensures Autoscale health checks pass before background jobs start
-    
-    setImmediate(async () => {
-      try {
-        // Auto-seed ingredients from foodCostings.ts god file
+    // === DEFERRED STARTUP: Run ALL heavy operations AFTER port is open ===
+    // This ensures health checks pass before background jobs start
+    setImmediate(() => {
+      // Wrap in async IIFE but don't block the callback
+      (async () => {
         try {
-          const seedResult = await autoSeedOnStartup();
-          if (seedResult.error) {
-            console.error('❌ Auto-seed failed:', seedResult.error);
-          } else if (seedResult.seeded > 0 || seedResult.updated > 0) {
-            console.log(`🌱 Auto-seeded ingredients: ${seedResult.seeded} new, ${seedResult.updated} updated`);
-          }
-        } catch (error) {
-          console.error('❌ Auto-seed error:', error);
-        }
-
-        // Start the scheduler service for daily 4am tasks
-        schedulerService.start();
-
-        // Start the email cron service for daily 8am management reports
-        const { cronEmailService } = await import('./services/cronEmailService');
-        cronEmailService.startEmailCron();
-
-        // 🚨 Jussi Daily Cron (3AM BKK)
-        setInterval(async () => {
-          const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
-          const time = bkkNow.slice(11,16);
-          if (time === "03:00") {
-            try {
-              const { generateJussiReport } = await import('./services/summaryGenerator.js');
-              const today = bkkNow.slice(0,10);
-              await generateJussiReport(today);
-              console.log(`🚨 Jussi Daily Report generated for ${today}`);
-            } catch (error) {
-              console.error('🚨 Jussi Daily Cron failed:', error);
+          // Check schema (moved from before server start)
+          checkSchema().catch(err => console.warn('Schema check warning:', err));
+          
+          // Auto-seed ingredients from foodCostings.ts god file
+          try {
+            const seedResult = await autoSeedOnStartup();
+            if (seedResult.error) {
+              console.error('❌ Auto-seed failed:', seedResult.error);
+            } else if (seedResult.seeded > 0 || seedResult.updated > 0) {
+              console.log(`🌱 Auto-seeded ingredients: ${seedResult.seeded} new, ${seedResult.updated} updated`);
             }
+          } catch (error) {
+            console.error('❌ Auto-seed error:', error);
           }
-        }, 60*1000);
 
-        // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
-        await import('./jobs/cron.js');
-        
-        console.log('✅ All background services started successfully');
-      } catch (err) {
-        console.error('❌ Error starting background services:', err);
-      }
+          // Start the scheduler service for daily 4am tasks
+          schedulerService.start();
+
+          // Start the email cron service for daily 8am management reports
+          const { cronEmailService } = await import('./services/cronEmailService');
+          cronEmailService.startEmailCron();
+
+          // 🚨 Jussi Daily Cron (3AM BKK)
+          setInterval(async () => {
+            const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+            const time = bkkNow.slice(11,16);
+            if (time === "03:00") {
+              try {
+                const { generateJussiReport } = await import('./services/summaryGenerator.js');
+                const today = bkkNow.slice(0,10);
+                await generateJussiReport(today);
+                console.log(`🚨 Jussi Daily Report generated for ${today}`);
+              } catch (error) {
+                console.error('🚨 Jussi Daily Cron failed:', error);
+              }
+            }
+          }, 60*1000);
+
+          // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
+          await import('./jobs/cron.js');
+          
+          console.log('✅ All background services started successfully');
+        } catch (err) {
+          console.error('❌ Error starting background services:', err);
+        }
+      })();
     });
   });
 })();
