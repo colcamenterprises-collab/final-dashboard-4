@@ -410,9 +410,10 @@ async function checkSchema() {
     serveStatic(app);
   }
 
-  // Use PORT env variable for production deployments, fallback to 5000 for development
-  // Autoscale deployments may set PORT to match the configured localPort
-  const port = parseInt(process.env.PORT || '5000', 10);
+  // For Autoscale: use port 8080 in production (fresh port triggers auto-bind to external 80)
+  // Development uses 5000 as usual
+  const isProduction = process.env.NODE_ENV === 'production';
+  const port = isProduction ? 8080 : 5000;
   server.listen({
     port,
     host: "0.0.0.0",
