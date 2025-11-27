@@ -1533,6 +1533,20 @@ export type InsertExternalSkuMapV2 = z.infer<typeof insertExternalSkuMapV2Schema
 export type SelectExternalSkuMapV2 = typeof externalSkuMapV2.$inferSelect;
 export type SelectDailyReviewComment = typeof dailyReviewComments.$inferSelect;
 
+// Purchasing Shift Items - Normalized log of quantities per shift per item
+export const purchasingShiftItems = pgTable("purchasing_shift_items", {
+  id: serial("id").primaryKey(),
+  dailyStockId: text("dailyStockId").notNull(),
+  purchasingItemId: integer("purchasingItemId").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default('0'),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export const insertPurchasingShiftItemSchema = createInsertSchema(purchasingShiftItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type PurchasingShiftItem = typeof purchasingShiftItems.$inferSelect;
+export type InsertPurchasingShiftItem = z.infer<typeof insertPurchasingShiftItemSchema>;
+
 // Purchasing Items - Master list of purchasable items with pricing
 export const purchasingItems = pgTable("purchasing_items", {
   id: serial("id").primaryKey(),

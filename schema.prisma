@@ -514,18 +514,35 @@ model OtherExpenseV2 {
 }
 
 model DailyStockV2 {
-  id             String       @id @default(uuid())
-  createdAt      DateTime     @default(now())
-  salesId        String       @unique
-  burgerBuns     Int          @default(0)
-  meatWeightG    Int          @default(0)
-  drinksJson     Json?
-  purchasingJson Json?
-  notes          String?
-  deletedAt      DateTime?
-  sales          DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  id                    String                  @id @default(uuid())
+  createdAt             DateTime                @default(now())
+  salesId               String                  @unique
+  burgerBuns            Int                     @default(0)
+  meatWeightG           Int                     @default(0)
+  drinksJson            Json?
+  purchasingJson        Json?
+  notes                 String?
+  deletedAt             DateTime?
+  sales                 DailySalesV2            @relation(fields: [salesId], references: [id], onDelete: Restrict)
+  purchasingShiftItems  PurchasingShiftItem[]
 
   @@map("daily_stock_v2")
+}
+
+model PurchasingShiftItem {
+  id               Int          @id @default(autoincrement())
+  dailyStockId     String
+  purchasingItemId Int
+  quantity         Decimal      @default(0) @db.Decimal(10, 2)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  
+  dailyStock       DailyStockV2 @relation(fields: [dailyStockId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyStockId, purchasingItemId])
+  @@index([dailyStockId])
+  @@index([purchasingItemId])
+  @@map("purchasing_shift_items")
 }
 
 model IngredientV2 {

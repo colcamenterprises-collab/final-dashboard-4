@@ -1,0 +1,301 @@
+ONE-SHOT PATCH – “Purchasing Shift Log” (for Replit agent)
+
+> Goal:
+Track, per shift, how many units of each Purchasing Item were ordered via the Daily Sales & Stock v2/v3 form, and display it as a matrix:
+
+Rows = shift dates
+
+Columns = purchasing items (from purchasing_items)
+
+Cells = quantities staff entered
+
+New items added to purchasing_items automatically appear as new columns in the UI (no schema change).
+
+
+
+
+0. Safety Rules
+
+Do NOT:
+
+Drop, truncate, or reset any existing tables.
+
+Change the schema of daily_stock_v2 / daily_stock_v3 beyond additive columns if absolutely necessary.
+
+
+You MAY:
+
+Add new tables.
+
+Add new endpoints.
+
+Add new pages in the Operations section.
+
+
+Treat this as read-mostly: we are logging from existing form submissions, not changing how they work.
+
+
+
+---
+
+1. New Table: purchasing_shift_items
+
+Instead of 63+ columns that constantly change, create a normalized log table and we’ll pivot it in the UI.
+
+> This table will store one row per (shift, item).
+The UI will render it as a matrix with items as columns.
+
+
+
+1.1. SQL schema (adjust to your DB/ORM)
+
+Create a new table:
+
+CREATE TABLE IF NOT EXISTS purchasing_shift_items (
+  id SERIAL PRIMARY KEY,
+  "dailyStockId" INTEGER NOT NULL REFERENCES daily_stock_v2(id), -- or v3 if that is the active form table
+  "purchasingItemId" INTEGER NOT NULL REFERENCES purchasing_items(id),
+  quantity NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Ensure one row per (shift, item)
+CREATE UNIQUE INDEX IF NOT EXISTS purchasing_shift_items_unique
+ON purchasing_shift_items("dailyStockId", "purchasingItemId");
+
+CREATE INDEX IF NOT EXISTS purchasing_shift_items_daily_idx
+ON purchasing_shift_items("dailyStockId");
+
+CREATE INDEX IF NOT EXISTS purchasing_shift_items_item_idx
+ON purchasing_shift_items("purchasingItemId");
+
+> If your main Daily Stock table is daily_stock_v3 now, wire the FK to that instead of v2.
+Use whichever table backs the current Daily Sales & Stock form.
+
+
+
+
+---
+
+2. Wiring: populate purchasing_shift_items on form submit
+
+We already have:
+
+purchasing_items – master purchasing list (63 items).
+
+purchasing_field_map – maps form field keys → purchasing_item IDs.
+
+daily_stock_v2 – stores form data; there should already be a purchasingJson or similar.
+
+
+2.1. After saving a Daily Stock form
+
+In the backend handler that saves Daily Sales & Stock v2/v3 – Form 2:
+
+1. After you save/update the daily_stock_v2/v3 row and get dailyStockId, call a helper like:
+
+await syncPurchasingShiftItems(dailyStockId, purchasingJson);
+
+
+2. Implement syncPurchasingShiftItems as:
+
+Load all purchasing_field_map rows into a map:
+fieldKey → purchasingItemId.
+
+For each key in purchasingJson:
+
+qty = Number(purchasingJson[fieldKey] || 0).
+
+If qty <= 0, skip.
+
+If fieldKey not in purchasing_field_map, skip (unmapped / not a purchasing item).
+
+
+For each valid (fieldKey, qty):
+
+Upsert into purchasing_shift_items on unique (dailyStockId, purchasingItemId):
+
+INSERT INTO purchasing_shift_items ("dailyStockId", "purchasingItemId", quantity)
+VALUES ($1, $2, $3)
+ON CONFLICT ("dailyStockId", "purchasingItemId")
+DO UPDATE SET quantity = EXCLUDED.quantity,
+              "updatedAt" = NOW();
+
+
+
+
+
+> This means every time a form submission is created/updated, the log table stays in sync.
+
+
+
+No manual SQL for Cam. You build this into the backend.
+
+
+---
+
+3. Auto-include new purchasing items
+
+We do not add new columns when a new sauce is added.
+Instead:
+
+New item is added to purchasing_items via the Purchasing page.
+
+When you later map a Form 2 field to that new item in purchasing_field_map and staff enter a quantity:
+
+syncPurchasingShiftItems will insert rows for that new purchasingItemId.
+
+
+The reporting endpoint + UI will always fetch the current list of purchasing_items, so new items automatically appear as new columns in the matrix.
+
+
+No schema change required; the “auto update” behaviour is achieved at query/UI level, not DB columns.
+
+
+---
+
+4. Reporting Endpoint: shift × item matrix
+
+Create a new endpoint, e.g.:
+
+GET /api/purchasing-shift-matrix?from=YYYY-MM-DD&to=YYYY-MM-DD
+
+
+4.1. Backend logic
+
+1. Determine the date range (from, to); default to last 30 days if not provided.
+
+
+2. Query all relevant shifts:
+
+SELECT id, "shiftDate"
+FROM daily_stock_v2
+WHERE "shiftDate" BETWEEN $from AND $to
+ORDER BY "shiftDate" DESC;
+
+(Use whatever date field you have representing the shift date.)
+
+
+3. Query all purchasing_items (current list):
+
+SELECT id, item, "brand", "supplierName", "supplierSku", "unitDescription"
+FROM purchasing_items
+ORDER BY item;
+
+
+4. Query the logged quantities for these shifts:
+
+SELECT "dailyStockId", "purchasingItemId", quantity
+FROM purchasing_shift_items
+WHERE "dailyStockId" IN (...ids from step 2);
+
+
+5. Return JSON like:
+
+{
+  "items": [
+    { "id": 1, "item": "Tomatoes", "brand": "XYZ", "supplierName": "Makro", "supplierSku": "123", "unitDescription": "1kg" },
+    ...
+  ],
+  "shifts": [
+    { "id": 101, "shiftDate": "2025-11-26" },
+    { "id": 102, "shiftDate": "2025-11-25" }
+  ],
+  "entries": [
+    { "dailyStockId": 101, "purchasingItemId": 1, "quantity": 2 },
+    { "dailyStockId": 101, "purchasingItemId": 5, "quantity": 4 }
+    // etc
+  ]
+}
+
+
+
+Front-end will pivot this into the 63-column table.
+
+
+---
+
+5. Frontend: “Purchasing Shift Log” matrix page
+
+Create a new page under Operations, e.g.:
+
+Route: /operations/purchasing-shift-log
+
+File: client/src/pages/operations/PurchasingShiftLog.tsx
+
+
+5.1. Behaviour
+
+1. On load:
+
+Call GET /api/purchasing-shift-matrix (last 30 days by default).
+
+
+
+2. Build a grid:
+
+Columns:
+
+First column: Shift Date (and maybe a link to that Daily Stock record).
+
+Then one column per items entry (Tomatoes, Buns, Mayo, etc. from purchasing_items).
+
+
+Rows:
+
+One per shifts entry (each shift date).
+
+
+Cells:
+
+For each (shift, item), look up entries to find a matching record.
+
+Show quantity or 0 if no entry.
+
+
+
+
+
+So visually you get exactly what you described:
+
+Row labelled 2025-11-26 with:
+
+Tomatoes = 2
+
+Buns = 4
+
+etc.
+
+
+Row per shift, column per purchasing item.
+
+If you add a new sauce to purchasing_items, this page shows it as a new column automatically (even if all rows are zero to start with).
+
+
+5.2. Extra
+
+Add date filter controls (from–to) at the top.
+
+Add CSV export button if you want to download this matrix.
+
+
+
+---
+
+6. Why this is better than physically 63 columns
+
+Your UI still looks like “row per shift, column per item”.
+
+But the database does not need 63 columns that change every time you add/remove items.
+
+New items just appear because:
+
+They exist in purchasing_items.
+
+They get used in forms and logged into purchasing_shift_items.
+
+
+
+
+---
