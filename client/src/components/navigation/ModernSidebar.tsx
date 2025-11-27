@@ -12,7 +12,8 @@ import {
   ChevronDown,
   X,
   ShoppingBag,
-  Users
+  Users,
+  Package
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ModernButton } from "@/components/ui";
@@ -68,7 +69,8 @@ const navigationGroups: NavGroup[] = [
         icon: ShoppingCart, 
         testId: "nav-purchasing",
         subItems: [
-          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" }
+          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
+          { to: "/operations/purchasing-shift-log", label: "Shift Log", icon: Package, testId: "nav-purchasing-shift-log" }
         ]
       },
       { 

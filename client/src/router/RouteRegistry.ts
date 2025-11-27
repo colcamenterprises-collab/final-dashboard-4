@@ -9,6 +9,7 @@ export const ROUTES = {
   SHOPPING_LIST: "/operations/shopping-list",
   PURCHASING: "/operations/purchasing",
   PURCHASING_MAPPING: "/operations/purchasing-mapping",
+  PURCHASING_SHIFT_LOG: "/operations/purchasing-shift-log",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
