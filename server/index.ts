@@ -194,6 +194,11 @@ async function checkSchema() {
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);
   app.use('/api/purchasing-items', purchasingItemsRouter);
+  
+  // Mount Purchasing Shift Log routes
+  const purchasingShiftLogRouter = (await import('./routes/purchasingShiftLog')).default;
+  app.use('/api', purchasingShiftLogRouter);
+  
   app.use('/api', menuOnlineRouter);
   app.use('/api', imageUploadRouter);
   app.use('/api/export', exportRoutes);

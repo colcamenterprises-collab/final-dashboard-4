@@ -1,5 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { syncPurchasingShiftItems } from '../services/purchasingShiftSync';
 import { db } from '../lib/prisma';
 
 const router = express.Router();
@@ -108,6 +109,14 @@ export async function saveDailyStock(req: express.Request, res: express.Response
       });
 
       console.log('[daily-stock] Successfully saved to database:', stockRecord.id);
+
+      // Sync purchasing shift items for the matrix view
+      try {
+        const syncResult = await syncPurchasingShiftItems(stockRecord.id, items);
+        console.log('[daily-stock] Purchasing shift sync:', syncResult);
+      } catch (syncError) {
+        console.error('[daily-stock] Purchasing shift sync failed (non-blocking):', syncError);
+      }
 
       res.json({
         ok: true,
