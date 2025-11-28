@@ -412,16 +412,16 @@ async function checkSchema() {
     serveStatic(app);
   }
 
-  // Always use port 5000 to match port forwarding configuration
-  const port = 5000;
+  // Use PORT env var for Autoscale compatibility, fallback to 3000
+  const PORT = process.env.PORT || 3000;
   
   server.listen({
-    port,
+    port: Number(PORT),
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     // Log immediately - no async operations here
-    log(`serving on port ${port}`);
+    console.log(`Server running on port ${PORT}`);
     
     // === DEFERRED STARTUP: Run ALL heavy operations AFTER port is open ===
     // This ensures health checks pass before background jobs start

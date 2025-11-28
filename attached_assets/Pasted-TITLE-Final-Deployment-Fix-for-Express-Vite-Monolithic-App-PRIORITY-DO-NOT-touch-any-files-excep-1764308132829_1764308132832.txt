@@ -1,0 +1,119 @@
+TITLE: Final Deployment Fix for Express + Vite Monolithic App
+PRIORITY: DO NOT touch any files except those listed.
+
+Your task is to make this full-stack app deploy cleanly on Replit Autoscale.
+
+────────────────────────────────────────
+STEP 1 — Fix server port logic (server/index.ts)
+────────────────────────────────────────
+Open: server/index.ts
+
+Make these changes:
+
+1. Replace ANY hardcoded port values (5000, 8080, etc.) with:
+
+   const PORT = process.env.PORT || 3000;
+
+2. Move ALL heavy startup tasks INSIDE the server.listen callback:
+
+   server.listen(PORT, () => {
+     console.log(`Server running on port ${PORT}`);
+     startScheduler();
+     startCronJobs();
+     autoSeedIfNeeded();
+     startAIAgents(); // ONLY if needed in production
+   });
+
+Important:
+- server.listen(PORT) MUST trigger immediately before ANY heavy tasks run.
+- No async tasks, imports, or blocking operations may run before server.listen.
+
+3. In production mode (process.env.NODE_ENV === "production"):
+   - DO NOT run Vite dev server
+   - DO serve the built frontend from "dist":
+
+     app.use(express.static(path.join(__dirname, "../dist")));
+
+4. ADD this SPA fallback right after the express.static line:
+
+   // SPA fallback for Vite
+   app.get("*", (req, res) => {
+     res.sendFile(path.join(__dirname, "../dist/index.html"));
+   });
+
+This prevents 404s when refreshing URLs in the browser.
+
+────────────────────────────────────────
+STEP 2 — Fix Vite integration (server/vite.ts)
+────────────────────────────────────────
+In production:
+- Ensure Vite dev server is NOT started.
+- Express must only serve static files from dist.
+
+In development:
+- Vite dev server is fine.
+
+Do NOT modify anything outside this logic.
+
+────────────────────────────────────────
+STEP 3 — Fix package.json scripts
+────────────────────────────────────────
+Open: package.json
+
+Ensure scripts include:
+
+  "build": "vite build",
+  "start": "NODE_ENV=production tsx server/index.ts",
+  "dev": "vite dev & nodemon server/index.ts"
+
+Notes:
+- Use tsx instead of ts-node for production. If missing, install it.
+- DO NOT change any other scripts.
+
+────────────────────────────────────────
+STEP 4 — Fix .replit configuration
+────────────────────────────────────────
+Open: .replit
+
+Ensure the run command is:
+
+run = "npm run start"
+
+Remove all explicit port configs in this file.
+
+Replit Autoscale ignores .replit for Autoscale, but we keep it clean for local dev.
+
+────────────────────────────────────────
+STEP 5 — Production build + Deployment settings
+────────────────────────────────────────
+Set the Autoscale Deployment settings manually to:
+
+Build command:
+  npm ci && npm run build
+
+Run command:
+  npm run start
+
+This guarantees the Vite dist folder exists in production.
+
+────────────────────────────────────────
+STEP 6 — Do NOT touch anything else
+────────────────────────────────────────
+Forbidden:
+- Any database schema files
+- Shared/schema.ts or Prisma tables
+- UI / React / components
+- API Routes
+- Services or utilities
+- Ingredients, forms, receipts logic
+- ANY dependency updates
+
+Only implement exactly what is described above.
+
+────────────────────────────────────────
+After completing the tasks:
+1. Run: npm run build
+2. Redeploy using Autoscale.
+3. Confirm that the app boots instantly and passes the health check.
+
+Notify me of the results.
