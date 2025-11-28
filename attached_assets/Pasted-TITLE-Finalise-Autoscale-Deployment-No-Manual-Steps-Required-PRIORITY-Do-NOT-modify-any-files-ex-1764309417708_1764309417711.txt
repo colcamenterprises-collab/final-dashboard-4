@@ -1,0 +1,83 @@
+TITLE: Finalise Autoscale Deployment – No Manual Steps Required
+PRIORITY: Do NOT modify any files except those explicitly listed.
+
+Your task is to fully complete deployment setup for this monolithic Express + Vite app WITHOUT requiring any manual actions by the user.
+
+────────────────────────────────────────
+STEP 1 — Update `.replit`
+────────────────────────────────────────
+Open or create `.replit`.
+
+Replace the entire file content with EXACTLY:
+
+run = "npm run start"
+
+[env]
+NODE_ENV = "production"
+
+[deploy]
+run = ["npm", "run", "start"]
+build = ["npm", "ci", "&&", "npm", "run", "build"]
+restart = "always"
+
+Do not add anything else.
+
+────────────────────────────────────────
+STEP 2 — Create or update `replit.json` (Autoscale config)
+────────────────────────────────────────
+Create or edit `replit.json` in the project root with EXACTLY:
+
+{
+  "run": "npm run start",
+  "build": "npm ci && npm run build",
+  "deployment": {
+    "target": "autoscale",
+    "entrypoint": "dist/index.js"
+  }
+}
+
+This file is read directly by Replit Autoscale and overrides dashboard settings.
+
+────────────────────────────────────────
+STEP 3 — Verify production entry file
+────────────────────────────────────────
+Check that the bundled server output exists at:
+
+dist/index.js
+
+If missing, run:
+npm run build
+
+────────────────────────────────────────
+STEP 4 — Confirm start script works in production
+────────────────────────────────────────
+Open package.json and ensure the following script exists:
+
+"start": "NODE_ENV=production tsx server/index.ts"
+
+If tsx is not installed, install it with:
+npm install tsx
+
+Do NOT modify any other scripts or dependencies.
+
+────────────────────────────────────────
+STEP 5 — Force deployment refresh
+────────────────────────────────────────
+Run the following commands automatically:
+
+npm ci
+npm run build
+
+Then trigger a programmatic autoscale restart by touching the deployment-bundle marker:
+
+touch .replit-deploy
+
+────────────────────────────────────────
+RULES:
+- Do NOT modify UI, React files, services, routes, prisma, schema, or business logic.
+- Only adjust deployment-related config and build/start behavior.
+- No refactors, no upgrades, no dependency changes except tsx if needed.
+
+────────────────────────────────────────
+
+When complete, summarise actions taken and confirm the app is ready for Autoscale deployment.
