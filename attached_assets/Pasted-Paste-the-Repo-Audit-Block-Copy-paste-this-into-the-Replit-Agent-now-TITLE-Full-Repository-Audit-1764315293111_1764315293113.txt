@@ -1,0 +1,118 @@
+Paste the Repo Audit Block
+
+Copy/paste this into the Replit Agent now:
+
+TITLE: Full Repository Audit Against Master Checklist
+PRIORITY: This is a READ-ONLY task. You must NOT modify, add, or delete ANY files.
+
+Your task is to scan the entire project file tree and compare it against the required production checklist below.
+
+────────────────────────────────────────
+REQUIRED FILE CHECKLIST
+────────────────────────────────────────
+
+ROOT:
+- package.json
+- tsconfig.json
+- vite.config.ts
+- README.md
+- .replit
+- replit.json
+- .gitignore
+- .env.example (optional)
+
+SERVER (must exist):
+server/
+  index.ts
+  vite.ts
+  db.ts
+  routes.ts
+  storage.ts
+
+SERVER ROUTES (must exist):
+server/routes/
+  analytics.ts
+  balance.ts
+  bankImport.ts
+  chef.ts
+  costing.ts
+  dailySalesLibrary.ts
+  dailyStock.ts
+  expenses.ts
+  forms.ts
+  github.ts
+  ingredients.ts
+  loyverseEnhanced.ts
+  managerChecks.ts
+  membership.ts
+  menu.ts
+  purchaseTally.ts
+  recipes.ts
+  shoppingList.ts
+  uploads.ts
+  adminMenu.ts
+  onlineMenu.ts
+  onlineOrders.ts
+
+FRONTEND:
+client/
+  index.html
+  src/
+    main.tsx
+    App.tsx
+    index.css
+    pages/
+      Dashboard.tsx
+      Expenses.tsx
+      CostCalculator.tsx
+      ShoppingList.tsx
+      DailySales.tsx
+      DailyStock.tsx
+      ManagerChecks.tsx
+      Reports.tsx
+      Analysis.tsx
+      AdminMenu.tsx
+      OnlineOrders.tsx
+      Membership.tsx
+    components/
+
+SHARED:
+shared/
+  schema.ts
+  utils.ts (if present)
+
+PRISMA (if used):
+prisma/
+  schema.prisma
+  migrations/
+
+OPTIONAL:
+dist/
+test_data/
+seed_data/
+
+SHOULD NOT BE PRESENT:
+- node_modules/
+- .local/
+- agent_state_*.bin
+- temp zip backups
+
+────────────────────────────────────────
+INSTRUCTIONS:
+────────────────────────────────────────
+1. Recursively scan the full directory tree.
+2. Compare each section to the checklist.
+3. DO NOT modify anything. REPORT ONLY.
+4. Produce a structured output:
+
+   - REQUIRED FILES PRESENT:
+   - MISSING CRITICAL FILES:
+   - OPTIONAL FILES FOUND:
+   - FILES THAT SHOULD NOT BE PRESENT:
+   - OVERALL STATUS:
+
+5. End with this exact line:
+“REPO AUDIT COMPLETE — NO CHANGES MADE.”
+
+
+---
