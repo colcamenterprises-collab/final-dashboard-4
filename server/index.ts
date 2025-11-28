@@ -412,8 +412,10 @@ async function checkSchema() {
     serveStatic(app);
   }
 
-  // Use PORT env var for Autoscale compatibility, fallback to 3000
-  const PORT = process.env.PORT || 3000;
+  // Use PORT env var for Autoscale compatibility
+  // Development: use 5000 (Replit's expected port)
+  // Production: use PORT env var (Autoscale sets this)
+  const PORT = process.env.PORT || 5000;
   
   server.listen({
     port: Number(PORT),
