@@ -2252,6 +2252,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         // Unpaid rolls = just inventory tracking, not a business expense
         if (paid) {
           const expenseId = crypto.randomUUID();
+          // Note: costCents column stores whole THB, not cents (despite the column name)
           const expenseResult = await db.execute(sql`
             INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
             VALUES (
@@ -2259,7 +2260,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
               ${'cmes916fj0000pio20tvofd44'},
               NOW(),
               ${'Bakery'},
-              ${Math.round(Number(cost) * 100)},
+              ${Number(cost)},
               ${'Rolls'},
               ${'Food & Beverage'},
               ${JSON.stringify({quantity: quantity, type: 'rolls', tallyId: tallyResult.rows[0]?.id})},
