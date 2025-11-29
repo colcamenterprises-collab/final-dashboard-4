@@ -2232,7 +2232,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         const { date, quantity, cost, paid } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
-        // Insert into purchase_tally for rolls count
+        // Insert into purchase_tally for rolls count (always - this tracks inventory)
         const tallyResult = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, rolls_pcs)
           VALUES (
@@ -2241,32 +2241,15 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             ${purchaseDate}::date,
             NULL,
             ${'Bakery'},
-            ${Number(cost)},
-            ${'Rolls purchase'},
+            ${paid ? Number(cost) : 0},
+            ${paid ? 'Rolls purchase (paid)' : 'Rolls pickup (unpaid)'},
             ${Number(quantity)}
           )
           RETURNING id, created_at, date, rolls_pcs, notes as item
         `);
-        
-        // Always create stock lodgment record in expenses
-        const stockLodgmentId = crypto.randomUUID();
-        await db.execute(sql`
-          INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
-          VALUES (
-            ${stockLodgmentId},
-            ${'cmes916fj0000pio20tvofd44'},
-            NOW(),
-            ${'Bakery'},
-            ${Math.round(Number(cost) * 100)},
-            ${'Rolls Stock Lodgment'},
-            ${'Stock'},
-            ${JSON.stringify({quantity: quantity, paid: paid, type: 'rolls'})},
-            ${'STOCK_LODGMENT'},
-            NOW()
-          )
-        `);
 
-        // Conditionally create expense if paid
+        // ONLY create expense entry if rolls are actually PAID
+        // Unpaid rolls = just inventory tracking, not a business expense
         if (paid) {
           const expenseId = crypto.randomUUID();
           const expenseResult = await db.execute(sql`
@@ -2279,16 +2262,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
               ${Math.round(Number(cost) * 100)},
               ${'Rolls'},
               ${'Food & Beverage'},
-              ${JSON.stringify({quantity: quantity, relatedLodgment: stockLodgmentId})},
+              ${JSON.stringify({quantity: quantity, type: 'rolls', tallyId: tallyResult.rows[0]?.id})},
               ${'DIRECT'},
               NOW()
             )
             RETURNING id, "shiftDate" as date, supplier, "costCents" as amount, item as description, "expenseType" as category
           `);
-          return res.json({ ok: true, expense: expenseResult.rows[0], tally: tallyResult.rows[0] });
+          return res.json({ ok: true, expense: expenseResult.rows[0], tally: tallyResult.rows[0], paid: true });
         }
         
-        return res.json({ ok: true, message: "Rolls lodgment recorded", tally: tallyResult.rows[0] });
+        // Unpaid: only tally recorded, NO expense entry
+        return res.json({ ok: true, message: "Rolls pickup recorded (unpaid - no expense created)", tally: tallyResult.rows[0], paid: false });
       }
 
       if (req.body.type === "meat") {
