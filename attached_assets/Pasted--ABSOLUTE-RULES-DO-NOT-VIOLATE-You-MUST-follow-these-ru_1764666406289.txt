@@ -1,0 +1,349 @@
+🔒 ABSOLUTE RULES (DO NOT VIOLATE)
+
+You MUST follow these rules:
+
+1. Modify ONLY the files listed below.
+
+
+2. Do NOT rename, delete, refactor, optimize, or “clean up” ANY file.
+
+
+3. Do NOT modify ANY logic in:
+
+email
+
+pdf
+
+ingredient management
+
+receipts
+
+shift report
+
+daily sales V2
+
+daily stock V1
+
+legacy routes
+
+
+
+4. Do NOT auto-format the entire file.
+
+
+5. Do NOT restructure folders.
+
+
+6. Do NOT merge or move files.
+
+
+7. Do NOT install dependencies.
+
+
+8. Stop immediately if a file is missing and ask Cam.
+
+
+
+If you are unsure at ANY point → STOP.
+
+
+---
+
+✅ FILES YOU ARE ALLOWED TO MODIFY
+
+The Replit agent may ONLY touch these 4 files:
+
+1. shared/schema.ts
+
+
+2. server/routes/forms.ts
+
+
+3. server/routes/shoppingList.ts
+
+
+4. client/src/pages/operations/shopping-list/index.tsx
+
+
+
+No other files may be changed.
+
+
+---
+
+✨ GOAL OF THIS PATCH
+
+Make the Shopping List V2 system fully operational, meaning:
+
+Daily Stock V2 → creates/updates shopping_list_v2
+
+Database schema includes new tables
+
+API returns the shopping list
+
+Frontend displays the shopping list
+
+
+PDF and email will be completed later.
+
+
+---
+
+🟩 START APPLYING THE PATCH BELOW
+
+
+---
+
+1. 🔧 Modify shared/schema.ts
+
+Add these EXACT definitions at the bottom of the file:
+
+// -----------------------------------------------------------------------------
+// Shopping List V2 & Purchase Analytics V2
+// -----------------------------------------------------------------------------
+
+export const purchaseAnalyticsV2Source = pgEnum('purchase_analytics_v2_source', [
+  'requisition',
+  'shopping_purchase',
+  'stock_logic',
+]);
+
+export const shoppingListV2 = pgTable('shopping_list_v2', {
+  id: serial('id').primaryKey(),
+  shiftDate: text('shiftDate').notNull(),
+  dailySalesV2Id: text('daily_sales_v2_id'),
+  dailyStockV2Id: text('daily_stock_v2_id'),
+  itemsJson: jsonb('items_json'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
+  id: serial('id').primaryKey(),
+  date: date('date'),
+  ingredientId: integer('ingredient_id').references(() => ingredients.id),
+  itemName: text('item_name'),
+  qty: decimal('qty', { precision: 10, scale: 2 }),
+  unit: text('unit'),
+  source: purchaseAnalyticsV2Source('source'),
+  cost: decimal('cost', { precision: 10, scale: 2 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+
+---
+
+2. 🔧 Modify server/routes/forms.ts
+
+Step 1 — Add import at top of the file:
+
+import { shoppingListV2 } from "../../shared/schema";
+
+Step 2 — Inside the /daily-stock POST route,
+
+AFTER the stock data is saved, insert this EXACT block:
+
+// -------------------------------------------------------------------------
+// Auto-generate Shopping List V2
+// -------------------------------------------------------------------------
+try {
+  const [salesRecord] = await drizzleDb
+    .select()
+    .from(dailySalesV2)
+    .where(sql`id = ${salesId}`)
+    .limit(1);
+
+  const shiftDate = (salesRecord as any)?.shiftDate || null;
+
+  const stockRequisition: any[] = Array.isArray(requisition)
+    ? requisition.filter((r: any) => (r?.qty || 0) > 0)
+    : [];
+
+  const itemsToSave = [...stockRequisition];
+
+  if (shiftDate) {
+    const existingListRes: any = await drizzleDb
+      .select()
+      .from(shoppingListV2)
+      .where(sql`"shiftDate" = ${shiftDate}`)
+      .limit(1);
+
+    const existingList = (existingListRes as any)[0];
+
+    if (existingList) {
+      await drizzleDb
+        .update(shoppingListV2)
+        .set({
+          itemsJson: itemsToSave,
+          dailySalesV2Id: salesId,
+          updatedAt: new Date(),
+        })
+        .where(sql`id = ${existingList.id}`);
+    } else {
+      await drizzleDb.insert(shoppingListV2).values({
+        shiftDate,
+        dailySalesV2Id: salesId,
+        itemsJson: itemsToSave,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    console.log(
+      `[POST /api/forms/daily-stock] shopping_list_v2 generated for ${shiftDate} with ${itemsToSave.length} items`
+    );
+  } else {
+    console.warn(
+      `[POST /api/forms/daily-stock] Unable to determine shiftDate for salesId ${salesId}; shopping_list_v2 not generated`
+    );
+  }
+} catch (err) {
+  console.error("Error generating shopping_list_v2:", err);
+}
+
+
+---
+
+3. 🔧 Modify server/routes/shoppingList.ts
+
+Replace entire file with:
+
+import { Router } from 'express';
+import { estimateShoppingList } from '../services/shoppingList';
+import { db as drizzleDb } from '../db';
+import { sql } from 'drizzle-orm';
+import { shoppingListV2 } from '../../shared/schema';
+
+const router = Router();
+
+// KEEP EXISTING ESTIMATE ROUTE
+router.get('/:id/estimate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const estimate = await estimateShoppingList(Number(id));
+    res.json({ data: estimate });
+  } catch (error: any) {
+    console.error('shopping-list.estimate error', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// NEW: Latest shopping list
+router.get('/latest', async (_req, res) => {
+  try {
+    const [row] = await drizzleDb
+      .select()
+      .from(shoppingListV2)
+      .orderBy(sql`"created_at" DESC`)
+      .limit(1);
+
+    if (!row) return res.json({ date: null, items: [] });
+
+    res.json({
+      date: (row as any).shiftDate,
+      items: (row as any).itemsJson || [],
+    });
+  } catch (err) {
+    console.error('shopping-list.latest error', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// NEW: List by date
+router.get('/by-date', async (req, res) => {
+  try {
+    const { date } = req.query as { date?: string };
+    if (!date) return res.status(400).json({ error: 'date is required' });
+
+    const [row] = await drizzleDb
+      .select()
+      .from(shoppingListV2)
+      .where(sql`"shiftDate" = ${date}`)
+      .limit(1);
+
+    if (!row)
+      return res.status(404).json({ error: 'Shopping list not found for this date' });
+
+    res.json({
+      date,
+      items: (row as any).itemsJson || [],
+    });
+  } catch (err) {
+    console.error('shopping-list.by-date error', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+export default router;
+
+
+---
+
+4. 🔧 Modify client/src/pages/operations/shopping-list/index.tsx
+
+Replace the entire file with:
+
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+
+export default function ShoppingListPage() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['shopping-list-latest'],
+    queryFn: async () => {
+      const res = await axios.get('/api/shopping-list/latest');
+      return res.data;
+    },
+  });
+
+  const items: any[] = Array.isArray(data?.items) ? data.items : [];
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-extrabold font-[Poppins] mb-4">Shopping List</h1>
+
+      {isLoading && <p>Loading...</p>}
+      {error && <p className="text-red-500">Failed to load shopping list.</p>}
+
+      {!isLoading && !error && (
+        items.length === 0 ? (
+          <p>No shopping list generated yet.</p>
+        ) : (
+          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead>
+              <tr className="bg-gray-100 text-left text-sm font-semibold font-[Poppins]">
+                <th className="p-2 border-b">Name</th>
+                <th className="p-2 border-b">Qty</th>
+                <th className="p-2 border-b">Unit</th>
+                <th className="p-2 border-b">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item: any, idx: number) => (
+                <tr key={idx} className="text-sm font-[Poppins]">
+                  <td className="p-2 border-b">{item.name || item.itemName || ''}</td>
+                  <td className="p-2 border-b">{item.qty || item.quantity || ''}</td>
+                  <td className="p-2 border-b">{item.unit || ''}</td>
+                  <td className="p-2 border-b">{item.notes || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      )}
+    </div>
+  );
+}
+
+
+---
+
+✅ REPLIT AGENT FINAL INSTRUCTION
+
+After applying the above patch:
+
+Complete the implementation and confirm no other files were modified. 
+Once finished, respond “PATCH COMPLETE AND CLEAN”.
+
+
+---

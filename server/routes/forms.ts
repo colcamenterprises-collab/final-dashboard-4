@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { db as drizzleDb } from "../db"; // MEGA PATCH V3: Import Drizzle for payload support
-import { dailySalesV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema
+import { dailySalesV2, shoppingListV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema
 import { sql } from "drizzle-orm"; // MEGA V3: For SQL operations
 import { buildDailyReportPDF } from "../lib/pdf";
 import { sendDailyReportEmail } from "../lib/email";
@@ -170,6 +170,64 @@ router.post("/daily-stock", async (req, res) => {
     }
     
     console.log(`[POST /api/forms/daily-stock] Stock saved: rolls=${rollsEnd}, meat=${meatEnd}, drinks=${Object.keys(drinkStock).length}`);
+
+    // -------------------------------------------------------------------------
+    // Auto-generate Shopping List V2
+    // -------------------------------------------------------------------------
+    try {
+      const [salesRecord] = await drizzleDb
+        .select()
+        .from(dailySalesV2)
+        .where(sql`id = ${salesId}`)
+        .limit(1);
+
+      const shiftDate = (salesRecord as any)?.shiftDate || null;
+
+      const stockRequisition: any[] = Array.isArray(requisition)
+        ? requisition.filter((r: any) => (r?.qty || 0) > 0)
+        : [];
+
+      const itemsToSave = [...stockRequisition];
+
+      if (shiftDate) {
+        const existingListRes: any = await drizzleDb
+          .select()
+          .from(shoppingListV2)
+          .where(sql`"shiftDate" = ${shiftDate}`)
+          .limit(1);
+
+        const existingList = (existingListRes as any)[0];
+
+        if (existingList) {
+          await drizzleDb
+            .update(shoppingListV2)
+            .set({
+              itemsJson: itemsToSave,
+              dailySalesV2Id: salesId,
+              updatedAt: new Date(),
+            })
+            .where(sql`id = ${existingList.id}`);
+        } else {
+          await drizzleDb.insert(shoppingListV2).values({
+            shiftDate,
+            dailySalesV2Id: salesId,
+            itemsJson: itemsToSave,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        console.log(
+          `[POST /api/forms/daily-stock] shopping_list_v2 generated for ${shiftDate} with ${itemsToSave.length} items`
+        );
+      } else {
+        console.warn(
+          `[POST /api/forms/daily-stock] Unable to determine shiftDate for salesId ${salesId}; shopping_list_v2 not generated`
+        );
+      }
+    } catch (err) {
+      console.error("Error generating shopping_list_v2:", err);
+    }
     
     res.json({ 
       ok: true, 

@@ -1578,3 +1578,36 @@ export type PurchasingItem = typeof purchasingItems.$inferSelect;
 export type InsertPurchasingItem = z.infer<typeof insertPurchasingItemSchema>;
 export type PurchasingFieldMap = typeof purchasingFieldMap.$inferSelect;
 export type InsertPurchasingFieldMap = z.infer<typeof insertPurchasingFieldMapSchema>;
+
+// -----------------------------------------------------------------------------
+// Shopping List V2 & Purchase Analytics V2
+// -----------------------------------------------------------------------------
+
+export const purchaseAnalyticsV2Source = pgEnum('purchase_analytics_v2_source', [
+  'requisition',
+  'shopping_purchase',
+  'stock_logic',
+]);
+
+export const shoppingListV2 = pgTable('shopping_list_v2', {
+  id: serial('id').primaryKey(),
+  shiftDate: text('shiftDate').notNull(),
+  dailySalesV2Id: text('daily_sales_v2_id'),
+  dailyStockV2Id: text('daily_stock_v2_id'),
+  itemsJson: jsonb('items_json'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
+  id: serial('id').primaryKey(),
+  date: date('date'),
+  ingredientId: integer('ingredient_id').references(() => ingredients.id),
+  itemName: text('item_name'),
+  qty: decimal('qty', { precision: 10, scale: 2 }),
+  unit: text('unit'),
+  source: purchaseAnalyticsV2Source('source'),
+  cost: decimal('cost', { precision: 10, scale: 2 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
