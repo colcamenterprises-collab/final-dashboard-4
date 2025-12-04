@@ -36,8 +36,8 @@ async function run() {
     totalSales: 3000
   });
 
-  assert(salesResp.data.salesId, "SalesV2 did not return salesId");
-  const salesId = salesResp.data.salesId;
+  assert(salesResp.data.id, "SalesV2 did not return id");
+  const salesId = salesResp.data.id;
   console.log("✓ Daily Sales V2 submitted:", salesId);
 
   // -------------------------------------------------------------
