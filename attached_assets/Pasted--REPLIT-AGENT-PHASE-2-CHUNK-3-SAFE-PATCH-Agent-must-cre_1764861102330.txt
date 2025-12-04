@@ -1,0 +1,156 @@
+🔒 REPLIT AGENT — PHASE 2 CHUNK 3 (SAFE PATCH)
+
+⚠️ Agent must create ONLY these files — nothing else.
+⚠️ No modifications to any existing file unless explicitly instructed.
+
+
+---
+
+✅ FILE 1 — CREATE
+
+server/lib/dailyReportEmailV2.ts
+
+/**
+ * DAILY REPORT EMAIL V2
+ * Sends the neobrutalist A4 PDF daily report to management.
+ */
+
+import nodemailer from "nodemailer";
+
+export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: string) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.SBB_EMAIL_USER,
+      pass: process.env.SBB_EMAIL_PASS,
+    },
+  });
+
+  const mail = {
+    from: process.env.SBB_EMAIL_USER,
+    to: process.env.SBB_MANAGEMENT_EMAIL ?? "smashbrothersburgersth@gmail.com",
+    subject: `SBB Daily Report — ${shiftDate}`,
+    text: `Attached is the SBB Daily Report for ${shiftDate}.`,
+    attachments: [
+      {
+        filename: `SBB-Daily-Report-${shiftDate}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  };
+
+  await transporter.sendMail(mail);
+}
+
+
+---
+
+✅ FILE 2 — CREATE
+
+server/routes/reportsV2.ts
+
+/**
+ * DAILY REPORT V2 ROUTES
+ * Generate → Save → (Optional) Email the neobrutalist PDF
+ */
+
+import { Router } from "express";
+import { compileDailyReportV2, saveDailyReportV2 } from "../services/dailyReportV2";
+import { buildDailyReportPDF } from "../pdf/dailyReportV2.pdf";
+import { sendDailyReportEmailV2 } from "../lib/dailyReportEmailV2";
+
+const router = Router();
+
+/**
+ * POST /api/reports/daily/generate
+ * ?date=YYYY-MM-DD
+ * ?sendEmail=true|false
+ */
+router.post("/daily/generate", async (req, res) => {
+  try {
+    const shiftDate = String(req.query.date);
+    const sendEmail = req.query.sendEmail === "true";
+
+    if (!shiftDate) {
+      return res.status(400).json({ error: "Missing ?date=YYYY-MM-DD" });
+    }
+
+    // 1. Compile JSON
+    const reportJson = await compileDailyReportV2(shiftDate);
+    if (reportJson.error) {
+      return res.status(404).json({ error: reportJson.error });
+    }
+
+    // 2. Create PDF
+    const pdf = await buildDailyReportPDF(reportJson);
+
+    // 3. Save report to DB
+    const reportId = await saveDailyReportV2(reportJson);
+
+    // 4. Optionally email it
+    if (sendEmail) {
+      await sendDailyReportEmailV2(pdf, shiftDate);
+    }
+
+    return res.json({
+      ok: true,
+      reportId,
+      date: shiftDate,
+      emailed: sendEmail,
+    });
+  } catch (err) {
+    console.error("daily/generate error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /api/reports/daily/:date/pdf
+ * Returns PDF directly
+ */
+router.get("/daily/:date/pdf", async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    const reportJson = await compileDailyReportV2(date);
+    if (reportJson.error) {
+      return res.status(404).json({ error: reportJson.error });
+    }
+
+    const pdf = await buildDailyReportPDF(reportJson);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="SBB-Daily-${date}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error("daily/:date/pdf error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+export default router;
+
+
+---
+
+❗ FILE 3 — MODIFY EXISTING FILE
+
+Add the new route to Express.
+
+Modify ONLY this file:
+
+server/index.ts
+
+Add the following line near the other route imports:
+
+import reportsV2Router from "./routes/reportsV2";
+
+Then register the route:
+
+app.use("/api/reports", reportsV2Router);
+
+⚠️ Do not modify any other code in this file.
+Just add exactly these two lines in the appropriate sections.
+
+
+---

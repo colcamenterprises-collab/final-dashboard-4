@@ -25,6 +25,7 @@ import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
+import reportsV2Router from "./routes/reportsV2";
 
 const prisma = new PrismaClient();
 
@@ -397,6 +398,7 @@ async function checkSchema() {
   // Add admin sync route
   const adminSyncRouter = (await import('./routes/adminSync.js')).default;
   app.use('/api', adminSyncRouter);
+  app.use("/api/reports", reportsV2Router);
   
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 

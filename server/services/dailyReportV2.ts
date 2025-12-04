@@ -17,11 +17,11 @@
 
 import { db as drizzleDb } from "../db";
 import { sql } from "drizzle-orm";
-import { dailySalesV2, dailyStockV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
+import { dailySalesV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
 
 export async function compileDailyReportV2(shiftDate: string) {
   // -------------------------------------------------------------
-  // Fetch Sales V2
+  // Fetch Sales V2 (stock data is stored in the payload)
   // -------------------------------------------------------------
   const [sales] = await drizzleDb
     .select()
@@ -34,13 +34,14 @@ export async function compileDailyReportV2(shiftDate: string) {
   }
 
   // -------------------------------------------------------------
-  // Fetch Stock V2
+  // Extract Stock from Sales Payload
   // -------------------------------------------------------------
-  const [stock] = await drizzleDb
-    .select()
-    .from(dailyStockV2)
-    .where(sql`"salesId" = ${sales.id}`)
-    .limit(1);
+  const payload = (sales as any).payload ?? {};
+  const stock = {
+    rollsEnd: payload.rollsEnd ?? null,
+    meatEnd: payload.meatEnd ?? null,
+    drinkStock: payload.drinkStock ?? {},
+  };
 
   // -------------------------------------------------------------
   // Fetch Shopping List V2
@@ -54,13 +55,11 @@ export async function compileDailyReportV2(shiftDate: string) {
   // -------------------------------------------------------------
   // Build Variance Summary
   // -------------------------------------------------------------
-  const variance = stock
-    ? {
-        rollsEnd: stock.rollsEnd ?? null,
-        meatEnd: stock.meatEnd ?? null,
-        drinks: stock.drinkStock ?? {},
-      }
-    : null;
+  const variance = {
+    rollsEnd: stock.rollsEnd,
+    meatEnd: stock.meatEnd,
+    drinks: stock.drinkStock,
+  };
 
   // -------------------------------------------------------------
   // Construct Final JSON Bundle
