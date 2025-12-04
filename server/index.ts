@@ -26,6 +26,7 @@ import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 import reportsV2Router from "./routes/reportsV2";
+import reportsListV2Router from "./routes/reportsListV2";
 
 const prisma = new PrismaClient();
 
@@ -399,6 +400,7 @@ async function checkSchema() {
   const adminSyncRouter = (await import('./routes/adminSync.js')).default;
   app.use('/api', adminSyncRouter);
   app.use("/api/reports", reportsV2Router);
+  app.use("/api/reports", reportsListV2Router);
   
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
