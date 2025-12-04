@@ -1,0 +1,156 @@
+🔒 REPLIT AGENT — SHOPPING LIST V2 SMOKE TEST
+
+Do NOT modify any files. Only run the commands below.
+
+You MUST NOT edit or change any code.
+You MUST NOT apply unrelated fixes.
+You MUST NOT format or refactor anything.
+You MUST ONLY run the tests listed below exactly as written.
+
+
+---
+
+✅ STEP 1 — Submit a Test Daily Sales V2 Form
+
+Run this EXACT curl command:
+
+curl -X POST http://localhost:5000/api/forms/daily-sales \
+  -H "Content-Type: application/json" \
+  -d '{
+        "shiftDate": "2025-12-01",
+        "startingCash": 1000,
+        "cashSales": 2000,
+        "qrSales": 1200,
+        "grabSales": 1800,
+        "aroiDeeSales": 0,
+        "shopping": [],
+        "wages": [],
+        "notes": "Test sales data"
+      }'
+
+Expected:
+
+Returns a JSON response
+
+Contains salesId or similar identifier
+
+
+
+---
+
+✅ STEP 2 — Submit a Test Daily Stock V2 Form
+
+Use the SAME shiftDate as above.
+
+Run:
+
+curl -X POST http://localhost:5000/api/forms/daily-stock \
+  -H "Content-Type: application/json" \
+  -d '{
+        "salesId": 1,
+        "rolls": 120,
+        "meatWeight": 3000,
+        "drinks": [],
+        "requisition": [
+          { "name": "Burger Buns", "qty": 20, "unit": "pcs", "notes": "urgent" },
+          { "name": "Cheese Slices", "qty": 50, "unit": "slices" }
+        ]
+      }'
+
+If the real salesId is different, REPLIT AGENT must:
+
+GET the last sales ID with this command:
+curl -s http://localhost:5000/api/forms/daily-sales/latest | jq
+
+Use that ID.
+
+
+Expected:
+
+Returns success
+
+Auto-generates shopping_list_v2
+
+
+
+---
+
+✅ STEP 3 — Fetch the Latest Shopping List
+
+Run:
+
+curl -s http://localhost:5000/api/shopping-list/latest | jq
+
+Expected output:
+
+{
+  "date": "2025-12-01",
+  "items": [
+    {
+      "name": "Burger Buns",
+      "qty": 20,
+      "unit": "pcs",
+      "notes": "urgent"
+    },
+    {
+      "name": "Cheese Slices",
+      "qty": 50,
+      "unit": "slices"
+    }
+  ]
+}
+
+
+---
+
+✅ STEP 4 — Fetch the Shopping List by Date
+
+curl -s "http://localhost:5000/api/shopping-list/by-date?date=2025-12-01" | jq
+
+Expected:
+Same list as above.
+
+
+---
+
+✅ STEP 5 — Replit Agent UI Check
+
+Tell the agent to open:
+
+/operations/shopping-list
+
+Expected:
+A simple read-only table:
+
+Name	Qty	Unit	Notes
+
+Burger Buns	20	pcs	urgent
+Cheese Slices	50	slices	
+
+
+
+---
+
+🟢 IF ALL TESTS PASS
+
+Respond:
+
+ALL TESTS PASSED — SHOPPING LIST V2 OPERATIONAL
+
+
+---
+
+🔥 READY FOR PHASE 2
+
+If the test succeeds, Cam will approve the Daily Report Engine V2 Golden Patch next.
+
+
+---
+
+END OF REPLIT AGENT TEST SCRIPT
+
+Do NOT modify code.
+ONLY run the commands exactly as given.
+
+
+---
