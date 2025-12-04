@@ -181,7 +181,7 @@ router.post("/daily-stock", async (req, res) => {
         .where(sql`id = ${salesId}`)
         .limit(1);
 
-      const shiftDate = (salesRecord as any)?.shiftDate || null;
+      const shiftDate = (salesRecord as any)?.shiftDate ?? (salesRecord as any)?.payload?.shiftDate ?? null;
 
       const stockRequisition: any[] = Array.isArray(requisition)
         ? requisition.filter((r: any) => (r?.qty || 0) > 0)
