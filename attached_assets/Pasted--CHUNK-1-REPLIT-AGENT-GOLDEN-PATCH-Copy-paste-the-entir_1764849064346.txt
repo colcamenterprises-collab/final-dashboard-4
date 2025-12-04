@@ -1,0 +1,168 @@
+🔒 CHUNK 1 — REPLIT AGENT GOLDEN PATCH
+
+(Copy/paste the entire block into the Replit agent)
+
+
+---
+
+🚨 REPLIT AGENT — PHASE 2 CHUNK 1 (SAFE PATCH)
+
+You must follow these instructions exactly.
+Do NOT modify any files except the ones listed.
+Do NOT refactor or format anything globally.
+Do NOT change any existing logic in unrelated modules.
+
+
+---
+
+✅ FILE 1 — Modify shared/schema.ts
+
+Add the following table EXACTLY at the bottom of the file:
+
+// -----------------------------------------------------------------------------
+// Daily Reports V2 — stores the compiled daily report (JSON + reference IDs)
+// -----------------------------------------------------------------------------
+export const dailyReportsV2 = pgTable('daily_reports_v2', {
+  id: serial('id').primaryKey(),
+  date: text('date').notNull(),                    // shiftDate e.g. 2025-12-08
+  salesId: text('sales_id'),                       // FK to dailySalesV2.id
+  stockId: text('stock_id'),                       // FK to dailyStockV2.id
+  shoppingListId: integer('shopping_list_id'),     // FK to shopping_list_v2.id
+  json: jsonb('json').notNull(),                   // full compiled daily summary
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+NO changes to other schema tables.
+NO renaming anything.
+NO automatic formatting.
+
+
+---
+
+✅ FILE 2 — Create new service
+
+Create file:
+
+server/services/dailyReportV2.ts
+
+Insert EXACT content:
+
+/**
+ * DAILY REPORT V2 — Aggregated Daily Summary
+ *
+ * This service compiles:
+ * - Daily Sales V2
+ * - Daily Stock V2
+ * - Shopping List V2
+ * - Variances (rolls/meat/drinks)
+ * - Expenses summary
+ *
+ * Output:
+ * A clean JSON structure used for:
+ * - PDF generation
+ * - Email summary
+ * - Dashboard report viewer
+ */
+
+import { db as drizzleDb } from "../db";
+import { sql } from "drizzle-orm";
+import { dailySalesV2, dailyStockV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
+
+export async function compileDailyReportV2(shiftDate: string) {
+  // -------------------------------------------------------------
+  // Fetch Sales V2
+  // -------------------------------------------------------------
+  const [sales] = await drizzleDb
+    .select()
+    .from(dailySalesV2)
+    .where(sql`"shiftDate" = ${shiftDate}`)
+    .limit(1);
+
+  if (!sales) {
+    return { error: "No Daily Sales V2 found for " + shiftDate };
+  }
+
+  // -------------------------------------------------------------
+  // Fetch Stock V2
+  // -------------------------------------------------------------
+  const [stock] = await drizzleDb
+    .select()
+    .from(dailyStockV2)
+    .where(sql`"salesId" = ${sales.id}`)
+    .limit(1);
+
+  // -------------------------------------------------------------
+  // Fetch Shopping List V2
+  // -------------------------------------------------------------
+  const [shopping] = await drizzleDb
+    .select()
+    .from(shoppingListV2)
+    .where(sql`"shiftDate" = ${shiftDate}`)
+    .limit(1);
+
+  // -------------------------------------------------------------
+  // Build Variance Summary
+  // -------------------------------------------------------------
+  const variance = stock
+    ? {
+        rollsEnd: stock.rollsEnd ?? null,
+        meatEnd: stock.meatEnd ?? null,
+        drinks: stock.drinkStock ?? {},
+      }
+    : null;
+
+  // -------------------------------------------------------------
+  // Construct Final JSON Bundle
+  // -------------------------------------------------------------
+  const report = {
+    shiftDate,
+    sales,
+    stock,
+    shoppingList: shopping ?? null,
+    variance,
+  };
+
+  return report;
+}
+
+/**
+ * Saves the compiled report into daily_reports_v2 table
+ */
+export async function saveDailyReportV2(reportJson: any) {
+  const shiftDate = reportJson.shiftDate;
+
+  // Check if report already exists
+  const [existing] = await drizzleDb
+    .select()
+    .from(dailyReportsV2)
+    .where(sql`"date" = ${shiftDate}`)
+    .limit(1);
+
+  if (existing) {
+    await drizzleDb
+      .update(dailyReportsV2)
+      .set({ json: reportJson })
+      .where(sql`id = ${existing.id}`);
+
+    return existing.id;
+  }
+
+  // Insert new report
+  const inserted = await drizzleDb
+    .insert(dailyReportsV2)
+    .values({
+      date: shiftDate,
+      salesId: reportJson.sales?.id ?? null,
+      stockId: reportJson.stock?.id ?? null,
+      shoppingListId: reportJson.shoppingList?.id ?? null,
+      json: reportJson,
+    })
+    .returning({ id: dailyReportsV2.id });
+
+  return inserted[0].id;
+}
+
+Do NOT modify any other file.
+
+
+---

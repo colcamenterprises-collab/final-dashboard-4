@@ -1611,3 +1611,16 @@ export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// Daily Reports V2 — stores the compiled daily report (JSON + reference IDs)
+// -----------------------------------------------------------------------------
+export const dailyReportsV2 = pgTable('daily_reports_v2', {
+  id: serial('id').primaryKey(),
+  date: text('date').notNull(),                    // shiftDate e.g. 2025-12-08
+  salesId: text('sales_id'),                       // FK to dailySalesV2.id
+  stockId: text('stock_id'),                       // FK to dailyStockV2.id
+  shoppingListId: integer('shopping_list_id'),     // FK to shopping_list_v2.id
+  json: jsonb('json').notNull(),                   // full compiled daily summary
+  createdAt: timestamp('created_at').defaultNow(),
+});
