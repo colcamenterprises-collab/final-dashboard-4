@@ -1,0 +1,245 @@
+🔒 REPLIT AGENT — PHASE 2 CHUNK 2 (PDF BUILDER)
+
+You must follow these instructions exactly.
+Create ONLY the specified files.
+Do NOT modify or refactor any other file.
+
+
+---
+
+✅ FILE 1 — CREATE
+
+server/pdf/pdfStyles.ts
+
+/**
+ * Shared PDF Styles for Neobrutalist SBB Reports
+ * A4 Portrait Layout
+ */
+
+import PDFDocument from "pdfkit";
+
+export function applyNeobrutalistHeader(
+  doc: PDFKit.PDFDocument,
+  title: string,
+  logoBuffer?: Buffer
+) {
+  // Yellow banner
+  doc.save();
+  doc.rect(0, 0, doc.page.width, 80).fill("#FFD500");
+  doc.restore();
+
+  // Logo (if supplied)
+  if (logoBuffer) {
+    try {
+      doc.image(logoBuffer, 40, 20, { width: 40 });
+    } catch (e) {
+      console.warn("Could not load logo image:", e);
+    }
+  }
+
+  // Title
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(26)
+    .fill("#000000")
+    .text(title, 100, 28, { align: "left" });
+}
+
+export function sectionBox(
+  doc: PDFKit.PDFDocument,
+  title: string,
+  startY: number
+) {
+  // Yellow section header
+  doc.save();
+  doc.rect(40, startY, doc.page.width - 80, 30).fill("#FFD500");
+  doc.restore();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .fill("#000000")
+    .text(title, 50, startY + 7);
+
+  return startY + 40;
+}
+
+export function tableHeader(
+  doc: PDFKit.PDFDocument,
+  headers: string[],
+  y: number
+) {
+  doc.save();
+  doc.rect(40, y, doc.page.width - 80, 25).fill("#FFD500");
+  doc.restore();
+
+  doc.font("Helvetica-Bold").fontSize(12).fill("#000000");
+
+  let x = 50;
+  headers.forEach((h) => {
+    doc.text(h, x, y + 7);
+    x += 150;
+  });
+
+  return y + 30;
+}
+
+export function tableRow(
+  doc: PDFKit.PDFDocument,
+  values: any[],
+  y: number
+) {
+  doc.font("Helvetica").fontSize(11).fill("#000000");
+
+  let x = 50;
+  values.forEach((v) => {
+    doc.text(String(v ?? ""), x, y);
+    x += 150;
+  });
+
+  return y + 20;
+}
+
+
+---
+
+✅ FILE 2 — CREATE
+
+server/pdf/dailyReportV2.pdf.ts
+
+/**
+ * DAILY REPORT V2 — NEOBRUTALIST PDF BUILDER
+ * A4 Portrait Layout
+ */
+
+import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+import {
+  applyNeobrutalistHeader,
+  sectionBox,
+  tableHeader,
+  tableRow,
+} from "./pdfStyles";
+
+export async function buildDailyReportPDF(reportJson: any): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: "A4",
+        margin: 40,
+      });
+
+      const chunks: Buffer[] = [];
+      doc.on("data", (c) => chunks.push(c));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+
+      // Load logo (optional)
+      let logo: Buffer | undefined = undefined;
+      const logoPath = path.join(
+        process.cwd(),
+        "server",
+        "assets",
+        "sbb-logo-yellow.png"
+      );
+
+      if (fs.existsSync(logoPath)) {
+        logo = fs.readFileSync(logoPath);
+      }
+
+      // ------------------------------------------------------------
+      // HEADER
+      // ------------------------------------------------------------
+      applyNeobrutalistHeader(doc, "Daily Report", logo);
+
+      let y = 120;
+
+      // ------------------------------------------------------------
+      // SALES SUMMARY
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Sales Summary", y);
+
+      const sales = reportJson.sales ?? {};
+      y = tableHeader(doc, ["Field", "Value"], y);
+
+      const salesRows = [
+        ["Cash Sales", sales.cashSales],
+        ["QR Sales", sales.qrSales],
+        ["Grab Sales", sales.grabSales],
+        ["Other Sales", sales.otherSales],
+        ["Total Sales", sales.totalSales],
+      ];
+
+      salesRows.forEach((row) => (y = tableRow(doc, row, y)));
+
+      // ------------------------------------------------------------
+      // STOCK SUMMARY
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Stock Summary", y + 20);
+
+      const stock = reportJson.stock ?? {};
+      y = tableHeader(doc, ["Item", "End Count"], y);
+
+      const stockRows = [
+        ["Rolls", stock.rollsEnd],
+        ["Meat (g)", stock.meatEnd],
+      ];
+
+      stockRows.forEach((row) => (y = tableRow(doc, row, y)));
+
+      // Drinks as dynamic rows
+      const drinkStock = stock.drinkStock ?? {};
+      Object.keys(drinkStock).forEach((k) => {
+        y = tableRow(doc, [k, drinkStock[k]], y);
+      });
+
+      // ------------------------------------------------------------
+      // SHOPPING LIST
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Shopping List", y + 20);
+
+      const list = reportJson.shoppingList?.itemsJson ?? [];
+      if (list.length > 0) {
+        y = tableHeader(doc, ["Item", "Qty", "Unit", "Notes"], y);
+        list.forEach((item: any) => {
+          y = tableRow(
+            doc,
+            [item.name, item.qty, item.unit, item.notes ?? ""],
+            y
+          );
+        });
+      } else {
+        doc.font("Helvetica").fontSize(12).text("No items requested.", 50, y + 5);
+        y += 25;
+      }
+
+      // ------------------------------------------------------------
+      // MANAGER NOTES
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Notes", y + 20);
+
+      const notes = reportJson.sales?.notes ?? "No notes provided.";
+      doc.font("Helvetica").fontSize(12).text(notes, 50, y);
+
+      // ------------------------------------------------------------
+      // FOOTER
+      // ------------------------------------------------------------
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("black")
+        .text(
+          "Generated automatically by SBB Dashboard v4",
+          40,
+          doc.page.height - 40
+        );
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+
+---
