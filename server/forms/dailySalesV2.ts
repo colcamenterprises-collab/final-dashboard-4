@@ -104,7 +104,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     } = body;
 
     const id = uuidv4();
-    const shiftDate = new Date().toISOString().split("T")[0];
+    const shiftDate = body.shiftDate || new Date().toISOString().split("T")[0];
     const createdAt = new Date().toISOString();
 
     // Totals (whole THB, no cents)
