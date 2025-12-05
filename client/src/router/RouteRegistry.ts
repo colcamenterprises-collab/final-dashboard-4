@@ -20,6 +20,7 @@ export const ROUTES = {
   STOCK_REVIEW: "/operations/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
+  DAILY_REPORTS: "/operations/daily-reports",
 
   // Finance
   FINANCE: "/finance",

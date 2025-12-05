@@ -50,6 +50,7 @@ import PurchasingLive from "./pages/ops/PurchasingLive";
 import MembershipApp from "./pages/membership/MembershipApp";
 import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
+import DailySummaryReportsPage from "./pages/operations/daily-reports";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -97,6 +98,9 @@ export default function App() {
                   {/* Purchasing Planner */}
                   <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
                   <Route path="/operations/purchasing" element={<Guard><PurchasingPage /></Guard>} />
+                  
+                  {/* Daily Summary Reports */}
+                  <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
                   
                   {/* Analysis with nested routes */}
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
