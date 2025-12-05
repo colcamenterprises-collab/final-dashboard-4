@@ -27,6 +27,7 @@ import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 import reportsV2Router from "./routes/reportsV2";
 import reportsListV2Router from "./routes/reportsListV2";
+import { registerDailyReportCron } from "./cron/dailyReportCron";
 
 const prisma = new PrismaClient();
 
@@ -475,6 +476,9 @@ async function checkSchema() {
 
           // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
           await import('./jobs/cron.js');
+          
+          // Register Daily Report V2 cron (3AM Bangkok)
+          registerDailyReportCron();
           
           console.log('✅ All background services started successfully');
         } catch (err) {
