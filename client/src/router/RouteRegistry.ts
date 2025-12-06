@@ -21,6 +21,7 @@ export const ROUTES = {
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
+  SYSTEM_HEALTH: "/operations/system-health",
 
   // Finance
   FINANCE: "/finance",

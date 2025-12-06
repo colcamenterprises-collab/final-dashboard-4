@@ -1,0 +1,239 @@
+⚠️ REPLIT AGENT — FOLLOW EXACTLY
+
+Modify only the files listed.
+Create new files where indicated.
+Do not refactor anything else.
+
+
+---
+
+=========================================
+
+✅ PATCH START — COPY EVERYTHING BELOW
+
+=========================================
+
+###############################################################
+# FILE 1 — CREATE BACKEND ROUTE
+# server/routes/systemHealth.ts
+###############################################################
++ import { Router } from "express";
++ import { db as drizzleDb } from "../db";
++ import axios from "axios";
++ import { dailyReportsV2, dailySalesV2 } from "../../shared/schema";
++ import { sql } from "drizzle-orm";
++
++ const router = Router();
++
++ /**
++  * System Health Test Runner
++  * Auto-runs the full daily report pipeline in-memory.
++  * Does NOT touch real production data except generating a real report.
++  */
++ router.get("/run", async (_req, res) => {
++   const BASE_URL = `http://localhost:${process.env.PORT || 5000}`;
++   const today = new Date().toISOString().split("T")[0];
++   const results: any = {
++     salesCreated: false,
++     stockCreated: false,
++     shoppingListGenerated: false,
++     reportGenerated: false,
++     jsonValid: false,
++     pdfValid: false,
++     listValid: false,
++     errors: []
++   };
++
++   try {
++     // 1. Create Daily Sales V2
++     const salesResp = await axios.post(`${BASE_URL}/api/forms/daily-sales/v3`, {
++       shiftDate: today,
++       completedBy: "SystemHealthTest",
++       startingCash: 111,
++       cashSales: 222,
++       qrSales: 333,
++       grabSales: 444,
++       otherSales: 0,
++       closingCash: 444,
++       cashBanked: 0,
++       qrTransfer: 0,
++       totalSales: 1110
++     });
++
++     const salesId = salesResp.data.id;
++     results.salesCreated = true;
++
++     // 2. Submit Stock V2
++     await axios.post(`${BASE_URL}/api/forms/daily-stock`, {
++       salesId,
++       rollsEnd: 100,
++       meatEnd: 2000,
++       drinkStock: { Coke: 10 },
++       requisition: [
++         { name: "Burger Buns", qty: 10, unit: "pcs" }
++       ]
++     });
++     results.stockCreated = true;
++     results.shoppingListGenerated = true;
++
++     // 3. Generate Report
++     const genResp = await axios.post(
++       `${BASE_URL}/api/reports/daily/generate?date=${today}&sendEmail=false`
++     );
++
++     const reportId = genResp.data.reportId;
++     results.reportGenerated = true;
++
++     // 4. JSON Valid?
++     const jsonResp = await axios.get(`${BASE_URL}/api/reports/${reportId}/json`);
++     if (jsonResp.data.report.sales && jsonResp.data.report.shoppingList) {
++       results.jsonValid = true;
++     }
++
++     // 5. PDF Valid?
++     const pdfResp = await axios.get(
++       `${BASE_URL}/api/reports/${reportId}/pdf`,
++       { responseType: "arraybuffer" }
++     );
++     if (pdfResp.data.byteLength > 200) {
++       results.pdfValid = true;
++     }
++
++     // 6. Report listed?
++     const listResp = await axios.get(`${BASE_URL}/api/reports/list`);
++     const found = listResp.data.reports.find((r: any) => r.id === reportId);
++     if (found) results.listValid = true;
++
++     res.json({ ok: true, results, reportId });
++   } catch (err: any) {
++     results.errors.push(err?.message || "Unknown error");
++     return res.json({ ok: false, results });
++   }
++ });
++
++ export default router;
+
+
+---
+
+###############################################################
+# FILE 2 — REGISTER ROUTE IN BACKEND
+# server/index.ts
+###############################################################
+@@
+ import systemHealth from "./routes/systemHealth";
+ 
+ app.use("/api/system-health", systemHealth);
+
+(Place exactly where other routes are registered.)
+
+
+---
+
+###############################################################
+# FILE 3 — CREATE FRONTEND PAGE
+# client/src/pages/operations/system-health/index.tsx
+###############################################################
++ import { useEffect, useState } from "react";
++ import axios from "axios";
++
++ export default function SystemHealthPage() {
++   const [loading, setLoading] = useState(true);
++   const [data, setData] = useState<any>(null);
++
++   useEffect(() => {
++     axios.get("/api/system-health/run")
++       .then(res => setData(res.data))
++       .finally(() => setLoading(false));
++   }, []);
++
++   const Status = ({ pass }: { pass: boolean }) => (
++     <span
++       className={
++         "px-2 py-1 text-sm font-bold rounded " +
++         (pass ? "bg-green-500 text-black" : "bg-red-500 text-white")
++       }
++     >
++       {pass ? "PASS" : "FAIL"}
++     </span>
++   );
++
++   if (loading) return <div className="p-6">Running system health test…</div>;
++
++   if (!data) return <div className="p-6">No data returned</div>;
++
++   const r = data.results;
++
++   return (
++     <div className="p-6 font-[Poppins]">
++       <h1 className="text-3xl font-extrabold mb-4">System Health Test</h1>
++
++       <div className="grid grid-cols-1 gap-4">
++         <div className="p-4 border-4 border-black bg-yellow-300 shadow-lg">
++           <h2 className="text-xl font-bold mb-3">Pipeline Status</h2>
++
++           <ul className="space-y-2 text-lg">
++             <li>Daily Sales Created: <Status pass={r.salesCreated} /></li>
++             <li>Daily Stock Submitted: <Status pass={r.stockCreated} /></li>
++             <li>Shopping List Generated: <Status pass={r.shoppingListGenerated} /></li>
++             <li>Report Compiled: <Status pass={r.reportGenerated} /></li>
++             <li>JSON Valid: <Status pass={r.jsonValid} /></li>
++             <li>PDF Valid: <Status pass={r.pdfValid} /></li>
++             <li>Report Listed: <Status pass={r.listValid} /></li>
++           </ul>
++         </div>
++
++         {r.errors?.length > 0 && (
++           <div className="p-4 border-4 border-red-600 bg-red-200 shadow-lg">
++             <h2 className="text-xl font-bold mb-3">Errors</h2>
++             <pre>{JSON.stringify(r.errors, null, 2)}</pre>
++           </div>
++         )}
++
++         <div className="p-4 border-4 border-black bg-white shadow-lg">
++           <h2 className="text-xl font-bold mb-3">Report ID</h2>
++           <p>{data.reportId}</p>
++           <a
++             className="mt-3 inline-block px-4 py-2 bg-black text-yellow-300 font-bold"
++             href={`/api/reports/${data.reportId}/pdf`}
++             target="_blank"
++           >
++             View PDF
++           </a>
++         </div>
++       </div>
++     </div>
++   );
++ }
+
+
+---
+
+###############################################################
+# FILE 4 — ADD ROUTE TO FRONTEND NAVIGATION
+# client/src/App.tsx
+###############################################################
+@@
+   {
+     path: "/operations/system-health",
+     element: <SystemHealthPage />
+   },
+
+(Place inside Operations section routes.)
+
+
+---
+
+###############################################################
+# FILE 5 — IMPORT THE PAGE IN App.tsx
+###############################################################
++ import SystemHealthPage from "./pages/operations/system-health";
+
+
+---
+
+=========================================
+
+✅ PATCH END
+
+=========================================

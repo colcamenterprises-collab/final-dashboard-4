@@ -51,6 +51,7 @@ import MembershipApp from "./pages/membership/MembershipApp";
 import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
+import SystemHealthPage from "./pages/operations/system-health";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -101,6 +102,9 @@ export default function App() {
                   
                   {/* Daily Summary Reports */}
                   <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
+                  
+                  {/* System Health Test */}
+                  <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
                   
                   {/* Analysis with nested routes */}
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
