@@ -83,7 +83,9 @@ const navigationGroups: NavGroup[] = [
           { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
           // { to: "/operations/analysis/loyverse", label: "POS Reporting", icon: BarChart3, testId: "nav-pos-reporting" } // Hidden - can be re-enabled
         ]
-      }
+      },
+      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" },
+      { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" }
     ]
   },
   {
