@@ -1,3 +1,59 @@
+You’re not being a pain at all, this is exactly the time to lock in the look now that the engine is solid.
+
+Given what I can see in your screenshots:
+
+The existing app style = clean, modern, light UI (white background, subtle yellow accents, thin borders, no heavy black blocks).
+
+The new bits I added (PDF + System Health page) are in that heavier neobrutalist style you’re not happy with.
+
+
+So here’s a safe patch for the Replit agent that:
+
+1. Restyles the System Health Test page to match the existing Operations pages.
+
+
+2. Softens the Daily Report PDF styles to look more like your Shopping List / Daily Summary style (still black/yellow, but more professional, less blokey).
+
+
+
+I’m not touching any logic or routes. Only CSS/visuals.
+
+
+---
+
+⚠️ Replit Agent Instructions
+
+> Agent, you must:
+
+Modify only the two files listed below.
+
+Replace their contents exactly with the versions provided.
+
+Do not refactor other files or styles.
+
+Do not change any routes, schemas, or business logic.
+
+
+
+
+Files to update:
+
+1. client/src/pages/operations/system-health/index.tsx
+
+
+2. server/pdf/pdfStyles.ts
+
+
+
+
+---
+
+1) Frontend: Restyle System Health page
+
+File to replace completely:
+
+client/src/pages/operations/system-health/index.tsx
+
 // client/src/pages/operations/system-health/index.tsx
 // System Health Test page — styled to match existing Operations pages
 // (clean, modern, white background with yellow as an accent)
@@ -253,3 +309,199 @@ export default function SystemHealthPage() {
     </div>
   );
 }
+
+This keeps all logic the same, just brings the look in line with your Daily Summary Reports and Shopping List pages.
+
+
+---
+
+2) Backend: Soften PDF styling
+
+File to replace completely:
+
+server/pdf/pdfStyles.ts
+
+This assumes your dailyReportV2.pdf.ts uses a pdfStyles object with keys like page, headerBar, sectionHeader, table, etc. We’re keeping the structure simple and professional: white background, black text, yellow as an accent in headers only.
+
+// server/pdf/pdfStyles.ts
+// Professional, clean styling for the Daily Report PDF.
+// White background, black text, yellow as a highlight (not huge blocks).
+
+import { StyleSheet } from "@react-pdf/renderer";
+
+export const pdfStyles = StyleSheet.create({
+  page: {
+    paddingTop: 32,
+    paddingHorizontal: 32,
+    fontSize: 10,
+    fontFamily: "Helvetica",
+    color: "#111827", // gray-900
+    backgroundColor: "#ffffff",
+  },
+
+  // Top "Daily Report" title
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "left",
+    color: "#111827",
+  },
+
+  // Thin yellow underline below the title
+  titleUnderline: {
+    height: 3,
+    width: "30%",
+    backgroundColor: "#facc15", // soft yellow
+    marginBottom: 16,
+  },
+
+  // Generic section container
+  section: {
+    marginBottom: 18,
+  },
+
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: "bold",
+    marginBottom: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    backgroundColor: "#facc15",
+    color: "#111827",
+  },
+
+  // Table wrapper
+  table: {
+    width: "100%",
+    borderWidth: 0.5,
+    borderColor: "#e5e7eb", // gray-200
+    borderStyle: "solid",
+  },
+
+  tableHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: "#facc15",
+  },
+
+  tableHeaderCell: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    fontSize: 10,
+    fontWeight: "bold",
+    borderRightWidth: 0.5,
+    borderRightColor: "#e5e7eb",
+  },
+
+  tableRow: {
+    flexDirection: "row",
+    borderTopWidth: 0.5,
+    borderTopColor: "#e5e7eb",
+  },
+
+  tableCell: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    fontSize: 10,
+  },
+
+  tableCellLabel: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+
+  tableCellValue: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    fontSize: 10,
+    textAlign: "right",
+  },
+
+  // Spacer between sections
+  spacer: {
+    height: 12,
+  },
+
+  // Small footer text if needed
+  footer: {
+    marginTop: 24,
+    fontSize: 8,
+    color: "#6b7280", // gray-500
+    textAlign: "center",
+  },
+});
+
+As long as the PDF builder uses these sort of style keys (title, sectionHeader, tableHeaderRow, etc.), this will immediately give you a much cleaner, more “dashboard-like” PDF: white page, yellow only in slim bands, no giant blocks.
+
+If your builder uses slightly different keys (e.g. headerBar instead of titleUnderline), the Replit agent can easily wire those up by mapping:
+
+Old headerBar → title + titleUnderline
+
+Old sectionTitle → sectionHeader
+
+Old tableHeader → tableHeaderRow + tableHeaderCell
+
+
+…but the visual language is now the one you want.
+
+
+---
+
+What’s not changed (yet)
+
+I have not changed the email template in this patch because I don’t have its exact structure, and I don’t want to accidentally break sending.
+
+Once you’re ready, you can:
+
+1. Ask the Replit agent:
+
+> “Show me server/lib/dailyReportEmailV2.ts”
+
+
+
+
+2. Paste the contents here.
+
+
+3. I’ll give you a safe replacement for the HTML only that matches this same clean style (white, black, soft yellow heading), without touching the email sending logic.
+
+
+
+
+---
+
+Quick sanity checks after patch
+
+After the Replit agent applies the patch:
+
+1. Go to System Health Test
+
+URL: /operations/system-health
+
+Confirm the page now looks like your other Operations pages (no thick black borders, subtle cards, yellow header strip only).
+
+
+
+2. Go to Daily Summary Reports and click Download PDF
+
+Confirm the PDF has:
+
+White background
+
+Black text
+
+Yellow for section headers and table headers only
+
+No huge full-page yellow blocks.
+
+
+
+
+
+If anything still feels “off” visually (font size, spacing, etc.), tell me what you’d like tweaked and I’ll give you another tiny, safe styling-only patch.
