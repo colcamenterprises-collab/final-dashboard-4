@@ -17,17 +17,11 @@ async function run() {
   let salesId;
 
   try {
-    // CLEANUP: Remove any existing Daily Sales for today
-    const existingSales = await axios
-      .get(`${BASE_URL}/api/forms/daily-sales/by-date?date=${today}`)
-      .catch(() => ({ data: [] }));
-
-    for (const sale of existingSales.data) {
-      await axios
-        .delete(`${BASE_URL}/api/forms/daily-sales/${sale.id}`)
-        .catch(() => {});
-      console.log(`🗑️ Cleaned existing sale ${sale.id}`);
-    }
+    // === CLEANUP DISABLED (no daily-sales lookup endpoint exists) ===
+    // Previously attempted to GET /api/forms/daily-sales/by-date but this endpoint does not
+    // exist. This caused "undefined" sale IDs and spammed console output.
+    // Cleanup is safe to skip because daily report generator overwrites same-day reports.
+    console.log("⚠️ Cleanup skipped — no lookup endpoint for sales-by-date");
 
     // CLEANUP: Remove any existing Daily Reports for today
     const existingReports = await axios
