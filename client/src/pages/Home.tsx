@@ -6,6 +6,7 @@ import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentMod
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DoughnutChart } from "@/components/health";
+import { VarianceWidget } from "@/components/widgets/VarianceWidget";
 import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
@@ -283,6 +284,11 @@ export default function Home() {
       
       {/* System Health Section (CHUNK 5) */}
       <SystemHealthSection />
+      
+      {/* Variance Widget (CHUNK 6) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <VarianceWidget />
+      </div>
       
       {/* Cash Balance Snapshot */}
       <CashBalanceSnapshot />

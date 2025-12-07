@@ -18,6 +18,7 @@
 import { db as drizzleDb } from "../db";
 import { sql } from "drizzle-orm";
 import { dailySalesV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
+import { calculateVarianceV2 } from "./varianceEngineV2";
 
 export async function compileDailyReportV2(shiftDate: string) {
   // -------------------------------------------------------------
@@ -61,14 +62,31 @@ export async function compileDailyReportV2(shiftDate: string) {
     .where(sql`"shiftDate" = ${shiftDate}`)
     .limit(1);
 
-  // -------------------------------------------------------------
-  // Build Variance Summary
-  // -------------------------------------------------------------
-  const variance = {
-    rollsEnd: stock.rollsEnd,
-    meatEnd: stock.meatEnd,
-    drinks: stock.drinkStock,
+  // Add sales breakdown for variance calculation
+  const salesData = (sales as any);
+  
+  // Build proper stock structure for variance calc
+  const stockForVariance = {
+    rollsStart: payload.rollsStart || 0,
+    rollsEnd: payload.rollsEnd || 0,
+    meatStartGrams: payload.meatStartGrams || 0,
+    meatEndGrams: payload.meatEndGrams || 0,
+    drinkStockStart: payload.drinkStockStart || {},
+    drinkStockEnd: payload.drinkStockEnd || {}
   };
+
+  const purchasedStockForVariance = {
+    rolls: payload.rollsPurchased || 0,
+    meatGrams: payload.meatPurchasedGrams || 0,
+    drinks: payload.drinksPurchased || {}
+  };
+
+  // Calculate variance
+  const variance = calculateVarianceV2({
+    sales: salesData,
+    stock: stockForVariance,
+    purchasedStock: purchasedStockForVariance,
+  });
 
   // -------------------------------------------------------------
   // Construct Final JSON Bundle

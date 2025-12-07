@@ -5,6 +5,7 @@ import { dailyReportsV2, dailySalesV2, dailyStockV2, rollPurchasesV2, meatPurcha
 import { sql } from "drizzle-orm";
 import { compileDailyReportV2 } from "../services/dailyReportV2";
 import { buildDailyReportPDF } from "../pdf/dailyReportV2.pdf";
+import { calculateVarianceV2 } from "../services/varianceEngineV2";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.get("/run", async (_req, res) => {
     shoppingList: false,
     reportJson: false,
     reportPdf: false,
+    variance: false,
     errors: [] as string[]
   };
 
@@ -98,7 +100,12 @@ router.get("/run", async (_req, res) => {
       results.reportJson = true;
     }
 
-    // 8. Build PDF
+    // 8. Validate Variance
+    if (reportJson && reportJson.variance && reportJson.variance.rolls && reportJson.variance.meat) {
+      results.variance = true;
+    }
+
+    // 9. Build PDF
     try {
       const pdfBytes = await buildDailyReportPDF(reportJson);
       if (pdfBytes && pdfBytes.length > 1000) {

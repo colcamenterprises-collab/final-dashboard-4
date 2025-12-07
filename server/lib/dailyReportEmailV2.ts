@@ -15,6 +15,7 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
   });
 
   const purchasedStock = reportJson?.purchasedStock ?? { rolls: 0, meatKg: "0.0", drinks: {} };
+  const variance = reportJson?.variance ?? {};
 
   const htmlContent = `
     <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Purchased Stock</h2>
@@ -25,6 +26,18 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
       ${
         Object.entries(purchasedStock.drinks || {})
           .map(([sku, qty]) => `<li>${sku}: ${qty}</li>`)
+          .join("")
+      }
+    </ul>
+
+    <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Variance Summary</h2>
+    <ul>
+      <li><strong>Rolls:</strong> ${variance.rolls?.diff || 0}</li>
+      <li><strong>Meat:</strong> ${variance.meat?.diffKg || "0.00"} kg</li>
+      <li><strong>Drinks:</strong></li>
+      ${
+        Object.entries(variance.drinks || {})
+          .map(([sku, obj]: any) => `<li>${sku}: ${obj.diff || 0}</li>`)
           .join("")
       }
     </ul>

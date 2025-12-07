@@ -106,6 +106,27 @@ export async function buildDailyReportPDF(reportJson: any): Promise<Buffer> {
       });
 
       // ------------------------------------------------------------
+      // VARIANCE SUMMARY
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Variance Summary", y + 20);
+
+      const v = reportJson.variance ?? {};
+      const varianceRows = [
+        ["Rolls", v.rolls?.expected || 0, v.rolls?.actual || 0, v.rolls?.diff || 0],
+        ["Meat (kg)", v.meat?.expectedKg || "0.00", v.meat?.actualKg || "0.00", v.meat?.diffKg || "0.00"],
+      ];
+
+      y = tableHeader(doc, ["Category", "Expected", "Actual", "Variance"], y);
+      varianceRows.forEach((row) => (y = tableRow(doc, row, y)));
+
+      // Drinks variance as dynamic rows
+      const drinksVariance = v.drinks ?? {};
+      Object.keys(drinksVariance).forEach((k) => {
+        const d = drinksVariance[k];
+        y = tableRow(doc, [k, d.expected || 0, d.actual || 0, d.diff || 0], y);
+      });
+
+      // ------------------------------------------------------------
       // SHOPPING LIST
       // ------------------------------------------------------------
       y = sectionBox(doc, "Shopping List", y + 20);

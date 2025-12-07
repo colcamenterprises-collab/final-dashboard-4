@@ -1,0 +1,189 @@
+---
+
+🔒 REPLIT AGENT INSTRUCTIONS — DO NOT FREESTYLE
+
+The agent must:
+
+1. Modify only the files explicitly listed.
+
+
+2. Apply only the code blocks provided.
+
+
+3. Do not make assumptions, refactors, or restructure code.
+
+
+4. Do not change other files.
+
+
+5. Do not rename variables.
+
+
+6. Do not attempt optimizations.
+
+
+7. Apply the patch exactly as written.
+
+
+
+
+---
+
+📦 FILES TO MODIFY / CREATE
+
+1. server/services/varianceEngineV2.ts (create new file)
+
+Contains all variance logic:
+
+Rolls Expected = RollsStart + RollsPurchased − RollsSold
+
+Rolls Variance = RollsExpected − RollsEnd
+
+Meat Expected (grams) = MeatStart(g) + MeatPurchased(g) − MeatUsed(g)
+
+Meat Variance = MeatExpected − MeatEnd
+
+Drinks Expected per SKU = Start + Purchased − Sold
+
+Drinks Variance per SKU = Expected − End
+
+
+Variance thresholds:
+
+Rolls: ±5
+
+Meat: ±500g
+
+Drinks: ±3 units
+
+
+2. server/services/dailyReportV2.ts (modify)
+
+Insert:
+
+import { calculateVarianceV2 } from "./varianceEngineV2";
+
+Inside the report builder, after stock and before shopping list:
+
+const variance = calculateVarianceV2({
+   sales,
+   stock,
+   purchasedStock,
+});
+reportJson.variance = variance;
+
+3. server/pdf/dailyReportV2.pdf.ts (modify)
+
+Add a new section before “Shopping List”:
+
+pdf.addSectionTitle("Variance Summary");
+pdf.addTable([
+  ["Category", "Expected", "Actual", "Variance"],
+  ["Rolls", v.rolls.expected, v.rolls.actual, v.rolls.diff],
+  ["Meat (kg)", v.meat.expectedKg, v.meat.actualKg, v.meat.diffKg],
+  ...drinks rows...
+]);
+
+4. server/lib/dailyReportEmailV2.ts (modify)
+
+Add this block before shopping list HTML:
+
+<h2>Variance Summary</h2>
+<ul>
+  <li><strong>Rolls:</strong> ${v.rolls.diff}</li>
+  <li><strong>Meat:</strong> ${v.meat.diffKg} kg</li>
+  <li><strong>Drinks:</strong></li>
+  ${Object.entries(v.drinks).map(([sku, obj]) => `<li>${sku}: ${obj.diff}</li>`).join("")}
+</ul>
+
+5. client/src/pages/operations/reportsV2/view.tsx (modify)
+
+Add UI section:
+
+<Section title="Variance Summary">
+  <div className="bg-white shadow p-4 rounded">
+    <Table...>
+     Rolls, Meat, Drinks rows
+    </Table>
+  </div>
+</Section>
+
+6. client/src/pages/home/index.tsx (modify)
+
+Add variance widget:
+
+<VarianceWidget data={health.variance} />
+
+7. client/src/components/widgets/VarianceWidget.tsx (new file)
+
+Doughnut chart using Chart.js
+Green = within tolerance
+Red = outside tolerance
+
+
+---
+
+📌 BACKEND: varianceEngineV2.ts CONTENT
+
+export function calculateVarianceV2({ sales, stock, purchasedStock }) {
+  const rollsSold = sales?.salesBreakdown?.burgersSold || 0;
+  const rollsExpected = (stock.rollsStart || 0) + (purchasedStock.rolls || 0) - rollsSold;
+  const rollsDiff = rollsExpected - (stock.rollsEnd || 0);
+
+  const meatSoldGrams = rollsSold * 90;
+  const meatExpected = (stock.meatStartGrams || 0) +
+                       (purchasedStock.meatGrams || 0) -
+                       meatSoldGrams;
+  const meatDiff = meatExpected - (stock.meatEndGrams || 0);
+
+  const drinksVariance = {};
+  for (const sku of Object.keys(stock.drinkStockStart||{})) {
+    const expected = (stock.drinkStockStart[sku]||0) +
+                     (purchasedStock.drinks?.[sku]||0) -
+                     (sales.drinksSold?.[sku]||0);
+    const diff = expected - (stock.drinkStockEnd[sku]||0);
+    drinksVariance[sku] = {
+      expected,
+      actual: stock.drinkStockEnd[sku]||0,
+      diff,
+    };
+  }
+
+  return {
+    rolls: { expected: rollsExpected, actual: stock.rollsEnd, diff: rollsDiff },
+    meat: { expectedGrams: meatExpected, actualGrams: stock.meatEndGrams, diff: meatDiff },
+    drinks: drinksVariance,
+  };
+}
+
+
+---
+
+📌 SYSTEM HEALTH UPDATE
+
+Modify:
+server/routes/system-health.ts
+
+Add after all existing checks:
+
+results.variance = variance && variance.rolls && variance.meat;
+
+
+---
+
+🟢 That is the FULL CHUNK 6 PATCH SPEC (Replit-agent ready)
+
+Paste the entire message above into Replit Agent, and it will:
+
+✔ create the variance engine
+✔ update backend
+✔ update PDF
+✔ update email
+✔ update daily reports UI
+✔ update dashboard home widgets
+✔ update system health
+✔ do so safely
+✔ without breaking existing logic
+
+
+---
