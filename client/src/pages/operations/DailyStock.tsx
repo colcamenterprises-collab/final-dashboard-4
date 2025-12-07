@@ -62,6 +62,12 @@ const DailyStock: React.FC = () => {
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
+  
+  // Purchased stock state (CHUNK 2)
+  const [rollsPurchased, setRollsPurchased] = useState<number>(0);
+  const [meatPurchasedValue, setMeatPurchasedValue] = useState<number>(0);
+  const [meatPurchasedUnit, setMeatPurchasedUnit] = useState<string>("kg");
+  const [drinksPurchased, setDrinksPurchased] = useState<Record<string, number>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
@@ -293,13 +299,29 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       drinkStockObj[drink] = drinkQuantities[drink] || 0;
     }
     
+    // Convert meat purchased to grams
+    const meatPurchasedGrams = meatPurchasedUnit === 'kg' 
+      ? Math.round(meatPurchasedValue * 1000) 
+      : Math.round(meatPurchasedValue);
+
+    // Build drinksPurchased as object
+    const drinksPurchasedObj: Record<string, number> = {};
+    for (const drink of drinkItems) {
+      drinksPurchasedObj[drink.name] = drinksPurchased[drink.name] || 0;
+    }
+
     // Update the existing Form 1 record with stock data
     const payload = {
       rollsEnd: rolls,
       meatEnd: meatGrams,
       drinkStock: drinkStockObj,
       requisition: requisitionItems,
-      notes: notes.trim()
+      notes: notes.trim(),
+      // Purchased stock fields (CHUNK 2)
+      rollsPurchased: rollsPurchased,
+      meatPurchasedGrams: meatPurchasedGrams,
+      meatPurchasedUnit: meatPurchasedUnit,
+      drinksPurchased: drinksPurchasedObj
     };
 
     try {
@@ -435,6 +457,84 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       
       {/* EXACT error display from consolidated patch */}
       {errors.length > 0 && <p className="text-red-500 text-xs">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+
+      {/* Purchased Stock Section — CHUNK 2 */}
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 bg-white shadow-sm">
+          <div className="bg-yellow-300 px-4 py-3 rounded-t-[4px]">
+            <h2 className="text-sm font-bold text-gray-900">Purchased Stock</h2>
+          </div>
+          <div className="p-4 space-y-6">
+            {/* Rolls Purchased */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Rolls Purchased (units)
+              </label>
+              <input
+                type="number"
+                value={rollsPurchased || ''}
+                onChange={(e) => setRollsPurchased(safeInt(e.target.value))}
+                className="w-full rounded-[4px] border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="e.g. 140"
+                min="0"
+              />
+            </div>
+
+            {/* Meat Purchased */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Meat Purchased
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={meatPurchasedValue || ''}
+                  onChange={(e) => setMeatPurchasedValue(parseFloat(e.target.value) || 0)}
+                  className="flex-1 rounded-[4px] border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="e.g. 3"
+                  min="0"
+                />
+                <select
+                  value={meatPurchasedUnit}
+                  onChange={(e) => setMeatPurchasedUnit(e.target.value)}
+                  className="w-24 rounded-[4px] border border-slate-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Enter weight and choose unit. System converts everything to grams.
+              </p>
+            </div>
+
+            {/* Drinks Purchased */}
+            {drinkItems.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Drinks Purchased (per SKU)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {drinkItems.map((drink) => (
+                    <div key={drink.name} className="rounded-[4px] border border-slate-200 p-3">
+                      <label className="block text-sm font-medium mb-2">{drink.name}</label>
+                      <input
+                        type="number"
+                        value={drinksPurchased[drink.name] ?? 0}
+                        onChange={(e) => setDrinksPurchased(prev => ({ ...prev, [drink.name]: safeInt(e.target.value) }))}
+                        className="w-full rounded-[4px] border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* End-of-Shift Counts */}
       <section className="space-y-4">
