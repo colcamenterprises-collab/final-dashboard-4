@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { db as drizzleDb } from "../db"; // MEGA PATCH V3: Import Drizzle for payload support
-import { dailySalesV2, shoppingListV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema
+import { dailySalesV2, shoppingListV2, dailyStockV2, rollPurchasesV2, meatPurchasesV2, drinkPurchasesV2 } from "../../shared/schema"; // MEGA PATCH V3: Import schema + CHUNK 3 ledger tables
 import { sql } from "drizzle-orm"; // MEGA V3: For SQL operations
 import { buildDailyReportPDF } from "../lib/pdf";
 import { sendDailyReportEmail } from "../lib/email";
@@ -117,7 +117,21 @@ router.post("/daily-sales", (req, res) => {
 // MEGA V3 PATCH: POST /api/forms/daily-stock with drinkStock object support
 router.post("/daily-stock", async (req, res) => {
   try {
-    const { salesId, rollsEnd, meatEnd, drinkStock, requisition } = req.body;
+    const { 
+      salesId, 
+      rollsEnd, 
+      meatEnd, 
+      drinkStock, 
+      requisition,
+      // CHUNK 3: Purchased stock fields
+      rollsPurchased,
+      meatPurchasedGrams: rawMeatPurchasedGrams,
+      meatPurchasedUnit,
+      drinksPurchased = {}
+    } = req.body;
+    
+    // CHUNK 3: Ensure meatPurchasedGrams is a number
+    const meatPurchasedGrams = Number(rawMeatPurchasedGrams) || 0;
     
     // Strong validation
     const errors = [];
@@ -227,6 +241,65 @@ router.post("/daily-stock", async (req, res) => {
       }
     } catch (err) {
       console.error("Error generating shopping_list_v2:", err);
+    }
+    
+    // =============================================================
+    // CHUNK 3: RECORD PURCHASE LEDGER ENTRIES
+    // =============================================================
+    try {
+      // Get shiftDate for ledger entries
+      const [salesRecord] = await drizzleDb
+        .select()
+        .from(dailySalesV2)
+        .where(sql`id = ${salesId}`)
+        .limit(1);
+      
+      const ledgerShiftDate = (salesRecord as any)?.shiftDate ?? null;
+      
+      if (ledgerShiftDate) {
+        // 1. Roll Purchase Ledger
+        if (rollsPurchased && Number(rollsPurchased) > 0) {
+          await drizzleDb.insert(rollPurchasesV2).values({
+            shiftDate: ledgerShiftDate,
+            salesId,
+            quantity: Number(rollsPurchased),
+            createdAt: new Date(),
+          });
+          console.log(`[CHUNK 3] Roll purchase recorded: ${rollsPurchased} units`);
+        }
+
+        // 2. Meat Purchase Ledger
+        if (meatPurchasedGrams > 0) {
+          await drizzleDb.insert(meatPurchasesV2).values({
+            shiftDate: ledgerShiftDate,
+            salesId,
+            quantityGrams: meatPurchasedGrams,
+            unit: meatPurchasedUnit || 'g',
+            createdAt: new Date(),
+          });
+          console.log(`[CHUNK 3] Meat purchase recorded: ${meatPurchasedGrams}g`);
+        }
+
+        // 3. Drink Purchases Ledger (per SKU)
+        if (drinksPurchased && typeof drinksPurchased === "object") {
+          for (const sku of Object.keys(drinksPurchased)) {
+            const qty = Number(drinksPurchased[sku] || 0);
+            if (qty > 0) {
+              await drizzleDb.insert(drinkPurchasesV2).values({
+                shiftDate: ledgerShiftDate,
+                salesId,
+                sku,
+                quantity: qty,
+                createdAt: new Date(),
+              });
+              console.log(`[CHUNK 3] Drink purchase recorded: ${sku} x${qty}`);
+            }
+          }
+        }
+      }
+    } catch (ledgerErr) {
+      console.error("Error writing purchase ledger entries:", ledgerErr);
+      // Non-fatal - don't fail the whole request
     }
     
     res.json({ 

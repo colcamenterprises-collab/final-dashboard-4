@@ -1,0 +1,130 @@
+✅ CHUNK 3 — Scope
+
+Modify ONLY:
+
+server/routes/forms.ts
+
+Specifically the POST /daily-stock handler.
+
+Add purchased stock persistence:
+
+✔ rollsPurchased → daily_stock_v2 & roll_purchases_v2
+
+✔ meatPurchased (value + unit) → standardise to grams → write to both
+
+✔ drinksPurchasedJson → write each SKU to drink_purchases_v2
+
+NO other logic touched.
+NO interference with shopping list logic.
+No changes to sales form.
+Safe, isolated, well-structured.
+
+
+---
+
+🚀 CHUNK 3 — REPLIT AGENT PATCH
+
+Agent — apply EXACTLY as written.
+
+
+---
+
+🔧 PATCH START
+
+Paste into Replit Agent:
+
+--- MODIFY FILE: server/routes/forms.ts
++++ ADD PURCHASED STOCK HANDLING & LEDGER WRITING
+
+@@ router.post("/daily-stock", async (req, res) => {
+
+-  const { salesId, rollsEnd, meatEndKg, drinkStock, requisition } = req.body;
++  const { 
++    salesId, 
++    rollsEnd, 
++    meatEndKg, 
++    drinkStock, 
++    requisition,
++    rollsPurchased,
++    meatPurchasedValue,
++    meatPurchasedUnit,
++    drinksPurchased = {}
++  } = req.body;
+
+
++  // Convert meat purchased to grams
++  let meatPurchasedGrams = 0;
++  if (meatPurchasedValue && Number(meatPurchasedValue) > 0) {
++    if (meatPurchasedUnit === "kg") {
++      meatPurchasedGrams = Math.round(Number(meatPurchasedValue) * 1000);
++    } else {
++      meatPurchasedGrams = Math.round(Number(meatPurchasedValue));
++    }
++  }
+
+@@
+   // Save daily stock V2
+   const stock = await drizzleDb.insert(dailyStockV2).values({
+     salesId,
+     shiftDate,
+     rollsEnd,
+     meatEndKg,
+     drinkStockJson: drinkStock,
+
++    // NEW FIELDS
++    rollsPurchased: rollsPurchased || 0,
++    meatPurchasedGrams,
++    meatPurchasedUnit: meatPurchasedUnit || null,
++    drinksPurchasedJson: drinksPurchased,
+
+     createdAt: new Date(),
+     updatedAt: new Date()
+   }).returning();
+
++  // =============================================================
++  // RECORD PURCHASE LEDGER ENTRIES
++  // =============================================================
+
++  // 1. Roll Purchase Ledger
++  if (rollsPurchased && Number(rollsPurchased) > 0) {
++    await drizzleDb.insert(rollPurchasesV2).values({
++      shiftDate,
++      salesId,
++      quantity: Number(rollsPurchased),
++      createdAt: new Date(),
++    });
++  }
+
++  // 2. Meat Purchase Ledger
++  if (meatPurchasedGrams > 0) {
++    await drizzleDb.insert(meatPurchasesV2).values({
++      shiftDate,
++      salesId,
++      quantityGrams: meatPurchasedGrams,
++      unit: meatPurchasedUnit,
++      createdAt: new Date(),
++    });
++  }
+
++  // 3. Drink Purchases Ledger (per SKU)
++  if (drinksPurchased && typeof drinksPurchased === "object") {
++    for (const sku of Object.keys(drinksPurchased)) {
++      const qty = Number(drinksPurchased[sku] || 0);
++      if (qty > 0) {
++        await drizzleDb.insert(drinkPurchasesV2).values({
++          shiftDate,
++          salesId,
++          sku,
++          quantity: qty,
++          createdAt: new Date(),
++        });
++      }
++    }
++  }
+
+   // Existing response continues below
+
+🔧 PATCH END
+
+
+---
