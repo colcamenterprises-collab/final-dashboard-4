@@ -38,7 +38,7 @@ router.post("/daily/generate", async (req, res) => {
 
     // 4. Optionally email it
     if (sendEmail) {
-      await sendDailyReportEmailV2(pdf, shiftDate);
+      await sendDailyReportEmailV2(pdf, shiftDate, reportJson);
     }
 
     return res.json({
@@ -64,6 +64,11 @@ router.get("/daily/:date/pdf", async (req, res) => {
     const reportJson = await compileDailyReportV2(date);
     if (reportJson.error) {
       return res.status(404).json({ error: reportJson.error });
+    }
+
+    // Ensure purchasedStock is present
+    if (!reportJson.purchasedStock) {
+      reportJson.purchasedStock = { rolls: 0, meatKg: "0.0", drinks: {} };
     }
 
     const pdf = await buildDailyReportPDF(reportJson);

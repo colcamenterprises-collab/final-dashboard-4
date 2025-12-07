@@ -43,6 +43,15 @@ export async function compileDailyReportV2(shiftDate: string) {
     drinkStock: payload.drinkStock ?? {},
   };
 
+  // Purchased Stock (from daily_stock_v2)
+  const purchasedStock = {
+    rolls: payload.rollsPurchased || 0,
+    meatKg: payload.meatPurchasedGrams
+      ? Number(payload.meatPurchasedGrams / 1000).toFixed(1)
+      : "0.0",
+    drinks: payload.drinksPurchased || {}
+  };
+
   // -------------------------------------------------------------
   // Fetch Shopping List V2
   // -------------------------------------------------------------
@@ -70,6 +79,7 @@ export async function compileDailyReportV2(shiftDate: string) {
     stock,
     shoppingList: shopping ?? null,
     variance,
+    purchasedStock,
   };
 
   return report;

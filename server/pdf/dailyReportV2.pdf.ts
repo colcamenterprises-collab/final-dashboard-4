@@ -85,6 +85,27 @@ export async function buildDailyReportPDF(reportJson: any): Promise<Buffer> {
       });
 
       // ------------------------------------------------------------
+      // PURCHASED STOCK
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Purchased Stock", y + 20);
+
+      const purchasedStock = reportJson.purchasedStock ?? { rolls: 0, meatKg: "0.0", drinks: {} };
+      y = tableHeader(doc, ["Item", "Quantity"], y);
+
+      const purchasedRows = [
+        ["Rolls", `${purchasedStock.rolls} units`],
+        ["Meat", `${purchasedStock.meatKg} kg`],
+      ];
+
+      purchasedRows.forEach((row) => (y = tableRow(doc, row, y)));
+
+      // Purchased drinks as dynamic rows
+      const purchasedDrinks = purchasedStock.drinks ?? {};
+      Object.keys(purchasedDrinks).forEach((k) => {
+        y = tableRow(doc, [k, purchasedDrinks[k]], y);
+      });
+
+      // ------------------------------------------------------------
       // SHOPPING LIST
       // ------------------------------------------------------------
       y = sectionBox(doc, "Shopping List", y + 20);

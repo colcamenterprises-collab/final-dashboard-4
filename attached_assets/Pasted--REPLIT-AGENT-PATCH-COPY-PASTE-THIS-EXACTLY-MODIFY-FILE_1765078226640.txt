@@ -1,0 +1,115 @@
+🔧 REPLIT AGENT PATCH — COPY/PASTE THIS EXACTLY
+
+--- MODIFY FILE: server/services/dailyReportV2.ts
++++ ADD PURCHASED STOCK TO REPORT JSON
+
+@@
+  // existing: load salesRecord, stockRecord, shoppingList, etc.
+
++  // PURCHASED STOCK (from daily_stock_v2)
++  const purchasedStock = {
++    rolls: stockRecord?.rollsPurchased || 0,
++    meatKg: stockRecord?.meatPurchasedGrams
++      ? Number(stockRecord.meatPurchasedGrams / 1000).toFixed(1)
++      : "0.0",
++    drinks: stockRecord?.drinksPurchasedJson || {}
++  };
+
+@@ return {
+     stock: stockSummary,
+     shoppingList: shoppingListFormatted,
++    purchasedStock,
+   };
+}
+
+
+---
+
+--- MODIFY FILE: server/routes/reportsV2.ts
++++ INCLUDE purchasedStock SECTION IN REPORT RESPONSE
+
+@@ router.get("/:id/json", async (req, res) => {
+   const report = JSON.parse(reportRow.report_json);
+
++  // ensure purchased stock is present
++  if (!report.purchasedStock) {
++    report.purchasedStock = { rolls: 0, meatKg: "0.0", drinks: {} };
++  }
+
+   res.json({ ok: true, report });
+});
+
+
+---
+
+--- MODIFY FILE: server/pdf/dailyReportV2.pdf.ts
++++ ADD PURCHASED STOCK SECTION TO PDF
+
+@@ buildDailyReportPdf(data)
+   content: [
+     headerBlock,
+     salesBlock,
+     stockBlock,
+     shoppingBlock,
+
++    {
++      text: "Purchased Stock",
++      style: "sectionHeader",
++      margin: [0, 20, 0, 10]
++    },
++    {
++      columns: [
++        {
++          width: "33%",
++          stack: [
++            { text: "Rolls", style: "subHeader" },
++            { text: `Purchased: ${data.purchasedStock.rolls} units` }
++          ]
++        },
++        {
++          width: "33%",
++          stack: [
++            { text: "Meat", style: "subHeader" },
++            { text: `Purchased: ${data.purchasedStock.meatKg} kg` }
++          ]
++        },
++        {
++          width: "34%",
++          stack: [
++            { text: "Drinks", style: "subHeader" },
++            ...Object.entries(data.purchasedStock.drinks).map(
++              ([sku, qty]: [string, any]) => ({
++                text: `${sku}: ${qty}`
++              })
++            )
++          ]
++        }
++      ]
++    },
+
+     footerBlock
+   ],
+
+
+---
+
+--- MODIFY FILE: server/lib/dailyReportEmailV2.ts
++++ INCLUDE PURCHASED STOCK IN EMAIL BODY
+
+@@ generateDailyEmail(report)
+   <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Purchased Stock</h2>
+
+   <p><strong>Rolls Purchased:</strong> ${report.purchasedStock.rolls} units</p>
+   <p><strong>Meat Purchased:</strong> ${report.purchasedStock.meatKg} kg</p>
+
+   <p><strong>Drinks Purchased:</strong></p>
+   <ul>
+     ${
+       Object.entries(report.purchasedStock.drinks || {})
+         .map(([sku, qty]) => `<li>${sku}: ${qty}</li>`)
+         .join("")
+     }
+   </ul>
+
+🔧 PATCH END
+

@@ -5,7 +5,7 @@
 
 import nodemailer from "nodemailer";
 
-export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: string) {
+export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: string, reportJson?: any) {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -14,11 +14,35 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
     },
   });
 
+  const purchasedStock = reportJson?.purchasedStock ?? { rolls: 0, meatKg: "0.0", drinks: {} };
+
+  const htmlContent = `
+    <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Purchased Stock</h2>
+    <p><strong>Rolls Purchased:</strong> ${purchasedStock.rolls} units</p>
+    <p><strong>Meat Purchased:</strong> ${purchasedStock.meatKg} kg</p>
+    <p><strong>Drinks Purchased:</strong></p>
+    <ul>
+      ${
+        Object.entries(purchasedStock.drinks || {})
+          .map(([sku, qty]) => `<li>${sku}: ${qty}</li>`)
+          .join("")
+      }
+    </ul>
+  `;
+
   const mail = {
     from: process.env.SBB_EMAIL_USER,
     to: process.env.SBB_MANAGEMENT_EMAIL ?? "smashbrothersburgersth@gmail.com",
     subject: `SBB Daily Report — ${shiftDate}`,
-    text: `Attached is the SBB Daily Report for ${shiftDate}.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px;">
+        <p>Daily Report for ${shiftDate}</p>
+        ${htmlContent}
+        <p style="margin-top: 30px; color: #666; font-size: 12px;">
+          Please see the attached PDF for the complete report.
+        </p>
+      </div>
+    `,
     attachments: [
       {
         filename: `SBB-Daily-Report-${shiftDate}.pdf`,
