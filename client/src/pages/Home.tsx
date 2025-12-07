@@ -271,8 +271,38 @@ function CashBalanceSnapshot() {
 export default function Home() {
   const [, setLocation] = useLocation();
   
+  // Load recent reports
+  const { data: reportsData } = useQuery({
+    queryKey: ["daily-reports-list"],
+    queryFn: async () => {
+      const res = await axios.get("/api/reports/list");
+      return res.data.reports ?? [];
+    },
+  });
+
+  const recentReports = Array.isArray(reportsData) ? reportsData : [];
+  
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8 p-2 sm:p-0">
+      {/* Recent Reports Quick Links */}
+      {recentReports.length > 0 && (
+        <div className="bg-white p-4 shadow rounded">
+          <h3 className="text-sm font-bold mb-3 text-slate-700">Recent Reports</h3>
+          <ul className="space-y-2">
+            {recentReports.slice(0, 5).map((r: any) => (
+              <li key={r.id}>
+                <a 
+                  href={`/operations/daily-reports?open=${r.id}`}
+                  className="text-emerald-600 hover:text-emerald-700 underline text-xs"
+                >
+                  {r.date} — {new Date(r.createdAt).toLocaleTimeString("en-GB")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
       {/* Balance Hero */}
       <BalanceHero />
       

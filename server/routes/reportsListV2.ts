@@ -12,6 +12,7 @@ import { db as drizzleDb } from "../db";
 import { sql } from "drizzle-orm";
 import { dailyReportsV2 } from "../../shared/schema";
 import { buildDailyReportPDF } from "../pdf/dailyReportV2.pdf";
+import JSZip from "jszip";
 
 const router = Router();
 
@@ -91,6 +92,61 @@ router.get("/:id/pdf", async (req, res) => {
     return res.send(pdf);
   } catch (err) {
     console.error("reports/:id/pdf error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /api/reports/search
+ * Search reports by date or variance flags
+ */
+router.get("/search", async (req, res) => {
+  try {
+    const q = (req.query.q || "").toString();
+    const list = await drizzleDb
+      .select()
+      .from(dailyReportsV2);
+    
+    const filtered = list.filter(r =>
+      r.date.includes(q) ||
+      JSON.stringify(r.variance || "").toLowerCase().includes(q.toLowerCase())
+    );
+    
+    return res.json({ ok: true, reports: filtered });
+  } catch (err) {
+    console.error("reports/search error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /api/reports/export-range
+ * Export reports in a date range as ZIP
+ */
+router.get("/export-range", async (req, res) => {
+  try {
+    const start = (req.query.start || "").toString();
+    const end = (req.query.end || "").toString();
+    
+    const rows = await drizzleDb
+      .select()
+      .from(dailyReportsV2);
+    
+    const range = rows.filter(r => r.date >= start && r.date <= end);
+
+    const zip = new JSZip();
+    for (const r of range) {
+      const pdf = await buildDailyReportPDF(r.json);
+      zip.file(`${r.date}.pdf`, pdf);
+    }
+    
+    const content = await zip.generateAsync({ type: "nodebuffer" });
+    
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", "attachment; filename=reports.zip");
+    return res.send(content);
+  } catch (err) {
+    console.error("reports/export-range error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

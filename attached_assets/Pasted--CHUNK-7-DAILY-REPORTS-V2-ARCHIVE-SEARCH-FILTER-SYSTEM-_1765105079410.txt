@@ -1,0 +1,193 @@
+⭐ CHUNK 7 — DAILY REPORTS V2: ARCHIVE, SEARCH & FILTER SYSTEM
+
+This chunk adds:
+
+✔ Historical report archive
+
+✔ Search by date
+
+✔ Filter by variance severity
+
+✔ Quick-jump to recent reports
+
+✔ PDF & JSON preview inside modal
+
+✔ Export range (ZIP) endpoint
+
+✔ Cleaner SBB Professional UI
+
+✔ No schema changes required
+
+This is a MASSIVE UX upgrade to the Daily Reports workflow.
+
+
+---
+
+🔒 REPLIT AGENT INSTRUCTIONS (copy/paste this part)
+
+Agent — follow these instructions exactly:
+
+Modify ONLY the files listed
+
+Apply ONLY the changes below
+
+Do NOT refactor unrelated code
+
+Do NOT rename variables or functions
+
+Do NOT restructure folders
+
+Apply each patch in order
+
+Stop immediately if any error occurs
+
+
+Proceed with the changes exactly as written.
+
+
+---
+
+📦 FILES TO CREATE / MODIFY
+
+✅ 1. client/src/pages/operations/daily-reports/index.tsx (MODIFY)
+
+Add:
+
+A) Search Bar
+
+Above the reports table:
+
+const [search, setSearch] = useState("");
+const filtered = reports.filter(r => 
+   r.date.includes(search) ||
+   (r.variance?.flags || "").toLowerCase().includes(search.toLowerCase())
+);
+
+Add search UI:
+
+<input 
+  type="text"
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+  placeholder="Search by date or variance..."
+  className="mb-4 p-2 border rounded w-full"
+/>
+
+B) Filter Buttons
+
+Add:
+
+const [filter, setFilter] = useState("all");
+
+const visible = filtered.filter(r => {
+  if (filter === "clean") return r.variance?.errorCount === 0;
+  if (filter === "warnings") return r.variance?.errorCount > 0;
+  return true;
+});
+
+Add UI buttons:
+
+<div className="flex gap-2 mb-4">
+  <button onClick={() => setFilter("all")} className="btn">All</button>
+  <button onClick={() => setFilter("clean")} className="btn">Clean</button>
+  <button onClick={() => setFilter("warnings")} className="btn">Warnings</button>
+</div>
+
+C) JSON/PDF Modal Preview
+
+Add:
+
+const [preview, setPreview] = useState(null);
+
+// in table
+<button onClick={() => setPreview(r)}>View</button>
+
+Add modal at bottom:
+
+{preview && (
+  <Modal>
+    <h2>{preview.date} Report</h2>
+    <pre>{JSON.stringify(preview, null, 2)}</pre>
+    <a href={`/api/reports/${preview.id}/pdf`} target="_blank">Download PDF</a>
+    <button onClick={() => setPreview(null)}>Close</button>
+  </Modal>
+)}
+
+
+---
+
+✅ 2. server/routes/reportsListV2.ts (MODIFY)
+
+Add support for:
+
+A) Search
+
+Add route:
+
+router.get("/search", async (req, res) => {
+  const q = req.query.q || "";
+  const list = await db.select().from(dailyReportsV2);
+  const filtered = list.filter(r =>
+    r.date.includes(q) ||
+    JSON.stringify(r.variance || "").toLowerCase().includes(q.toLowerCase())
+  );
+  res.json({ ok: true, reports: filtered });
+});
+
+B) Date Range Export
+
+Add route:
+
+router.get("/export-range", async (req, res) => {
+  const { start, end } = req.query;
+  const rows = await db.select().from(dailyReportsV2);
+  const range = rows.filter(r => r.date >= start && r.date <= end);
+
+  // build zip of PDFs
+  const zip = new JSZip();
+  for (const r of range) {
+    const pdf = await getPdfForReport(r.id); 
+    zip.file(`${r.date}.pdf`, pdf);
+  }
+  const content = await zip.generateAsync({ type: "nodebuffer" });
+  
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", "attachment; filename=reports.zip");
+  res.send(content);
+});
+
+
+---
+
+✅ 3. client/src/pages/home/index.tsx (MODIFY)
+
+Add “Quick Links” for last 5 reports:
+
+<div className="bg-white p-4 shadow rounded mb-6">
+  <h3>Recent Reports</h3>
+  <ul>
+    {reports.slice(0, 5).map(r => (
+       <li><a href={`/operations/daily-reports?open=${r.id}`}>{r.date}</a></li>
+    ))}
+  </ul>
+</div>
+
+
+---
+
+✅ 4. client/src/components/Modal.tsx (CREATE)
+
+A simple modal:
+
+export default function Modal({ children }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+      <div className="bg-white p-6 rounded shadow-xl max-h-[80vh] overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+---
