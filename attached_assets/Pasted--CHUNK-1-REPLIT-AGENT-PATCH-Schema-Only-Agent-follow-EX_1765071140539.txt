@@ -1,0 +1,105 @@
+---
+
+✅ CHUNK 1 — REPLIT AGENT PATCH (Schema Only)
+
+Agent — follow EXACTLY:
+
+Modify ONLY shared/schema.ts
+
+Insert the new models exactly where shown
+
+Do NOT remove or refactor anything else
+
+Do NOT rename anything
+
+
+
+---
+
+🔧 PATCH START
+
+Copy/paste directly into Replit Agent:
+
+--- MODIFY FILE: shared/schema.ts
++++ UPDATED WITH STOCK PURCHASE FIELDS & LEDGER TABLES
+
+@@
+ // ===========================
+ // DAILY STOCK V2 (ADD PURCHASE FIELDS)
+ // ===========================
+
+ export const dailyStockV2 = pgTable("daily_stock_v2", {
+   id: serial("id").primaryKey(),
+   salesId: text("sales_id"),
+   shiftDate: text("shift_date"),
+
+   // Existing fields
+   rollsEnd: integer("rolls_end"),
+   meatEndKg: decimal("meat_end_kg", { precision: 10, scale: 2 }),
+   drinkStockJson: jsonb("drink_stock_json"),
+
++  // NEW FIELDS — PURCHASED STOCK (CHUNK 1)
++  rollsPurchased: integer("rolls_purchased"),                // units
++  meatPurchasedGrams: integer("meat_purchased_grams"),       // stored in grams
++  meatPurchasedUnit: text("meat_purchased_unit"),            // "kg" or "g"
++  drinksPurchasedJson: jsonb("drinks_purchased_json"),       // { Coke: 24, Sprite: 12, ... }
+
+   createdAt: timestamp("created_at").defaultNow(),
+   updatedAt: timestamp("updated_at").defaultNow(),
+ });
+
+
++// ============================================================
++// NEW LEDGER TABLE 1: ROLL PURCHASES
++// ============================================================
++export const rollPurchasesV2 = pgTable("roll_purchases_v2", {
++  id: serial("id").primaryKey(),
++  shiftDate: text("shift_date"),
++  salesId: text("sales_id"),
++  quantity: integer("quantity"),             // units
++  createdAt: timestamp("created_at").defaultNow(),
++});
+
+
++// ============================================================
++// NEW LEDGER TABLE 2: MEAT PURCHASES
++// ============================================================
++export const meatPurchasesV2 = pgTable("meat_purchases_v2", {
++  id: serial("id").primaryKey(),
++  shiftDate: text("shift_date"),
++  salesId: text("sales_id"),
++  quantityGrams: integer("quantity_grams"),  // stored as grams
++  unit: text("unit"),                        // "kg" or "g"
++  createdAt: timestamp("created_at").defaultNow(),
++});
+
+
++// ============================================================
++// NEW LEDGER TABLE 3: DRINK PURCHASES
++// ============================================================
++export const drinkPurchasesV2 = pgTable("drink_purchases_v2", {
++  id: serial("id").primaryKey(),
++  shiftDate: text("shift_date"),
++  salesId: text("sales_id"),
++  sku: text("sku"),                          // "Coke", "Sprite", etc.
++  quantity: integer("quantity"),             // units purchased for that SKU
++  createdAt: timestamp("created_at").defaultNow(),
++});
+
+🔧 PATCH END
+
+
+---
+
+🧪 AFTER APPLYING CHUNK 1
+
+Tell the Replit agent:
+
+> Run npm run db:push -- --force
+
+
+
+This will safely create the new columns and tables.
+
+
+---

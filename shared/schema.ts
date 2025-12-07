@@ -1624,3 +1624,61 @@ export const dailyReportsV2 = pgTable('daily_reports_v2', {
   json: jsonb('json').notNull(),                   // full compiled daily summary
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// Daily Stock V2 — stores end-of-shift stock counts + purchased stock
+// -----------------------------------------------------------------------------
+export const dailyStockV2 = pgTable('daily_stock_v2', {
+  id: serial('id').primaryKey(),
+  salesId: text('sales_id'),
+  shiftDate: text('shift_date'),
+
+  // Existing fields — end counts
+  rollsEnd: integer('rolls_end'),
+  meatEndKg: decimal('meat_end_kg', { precision: 10, scale: 2 }),
+  drinkStockJson: jsonb('drink_stock_json'),
+
+  // Purchased stock fields (CHUNK 1)
+  rollsPurchased: integer('rolls_purchased'),                // units
+  meatPurchasedGrams: integer('meat_purchased_grams'),       // stored in grams
+  meatPurchasedUnit: text('meat_purchased_unit'),            // "kg" or "g"
+  drinksPurchasedJson: jsonb('drinks_purchased_json'),       // { Coke: 24, Sprite: 12, ... }
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// NEW LEDGER TABLE 1: ROLL PURCHASES V2
+// -----------------------------------------------------------------------------
+export const rollPurchasesV2 = pgTable('roll_purchases_v2', {
+  id: serial('id').primaryKey(),
+  shiftDate: text('shift_date'),
+  salesId: text('sales_id'),
+  quantity: integer('quantity'),             // units
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// NEW LEDGER TABLE 2: MEAT PURCHASES V2
+// -----------------------------------------------------------------------------
+export const meatPurchasesV2 = pgTable('meat_purchases_v2', {
+  id: serial('id').primaryKey(),
+  shiftDate: text('shift_date'),
+  salesId: text('sales_id'),
+  quantityGrams: integer('quantity_grams'),  // stored as grams
+  unit: text('unit'),                        // "kg" or "g"
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// NEW LEDGER TABLE 3: DRINK PURCHASES V2
+// -----------------------------------------------------------------------------
+export const drinkPurchasesV2 = pgTable('drink_purchases_v2', {
+  id: serial('id').primaryKey(),
+  shiftDate: text('shift_date'),
+  salesId: text('sales_id'),
+  sku: text('sku'),                          // "Coke", "Sprite", etc.
+  quantity: integer('quantity'),             // units purchased for that SKU
+  createdAt: timestamp('created_at').defaultNow(),
+});
