@@ -1,0 +1,219 @@
+
+⭐ CHUNK 8 — FULL AI INSIGHT ENGINE SPEC (Replit-agent ready)
+
+Copy/paste this directly into the Replit agent.
+This is not the patch, but the patch specification the agent will execute safely.
+
+
+---
+
+🔒 REPLIT AGENT — FOLLOW THESE RULES
+
+Agent must:
+
+1. Modify ONLY the files listed.
+
+
+2. Create ONLY the files listed.
+
+
+3. Never modify anything else.
+
+
+4. Never rename files or functions.
+
+
+5. Never restructure directories.
+
+
+6. Apply code exactly as written.
+
+
+7. Stop immediately if any dependency error appears.
+
+
+
+
+---
+
+📦 FILES TO CREATE / MODIFY
+
+
+---
+
+✅ 1. Create: server/services/insightsEngineV2.ts
+
+This file generates anomalies + insight categories.
+
+Add the base engine:
+
+export function generateInsightsV2({ sales, stock, purchasedStock, variance, shoppingList }) {
+  const insights = [];
+  const flags = [];
+
+  // Rolls Theft/Anomaly
+  if (Math.abs(variance.rolls.diff) > 5) {
+    flags.push("ROLLS_VARIANCE");
+    insights.push({
+      type: "rolls",
+      severity: Math.abs(variance.rolls.diff) > 20 ? "high" : "medium",
+      message: `Rolls variance is ${variance.rolls.diff}. Expected ${variance.rolls.expected}, actual ${variance.rolls.actual}.`
+    });
+  }
+
+  // Meat anomaly
+  if (Math.abs(variance.meat.diffGrams) > 500) {
+    flags.push("MEAT_VARIANCE");
+    insights.push({
+      type: "meat",
+      severity: Math.abs(variance.meat.diffGrams) > 1500 ? "high" : "medium",
+      message: `Meat variance is ${variance.meat.diffKg} kg.`
+    });
+  }
+
+  // Drinks anomaly per SKU
+  Object.entries(variance.drinks).forEach(([sku, d]) => {
+    if (Math.abs(d.diff) > 3) {
+      flags.push("DRINK_VARIANCE");
+      insights.push({
+        type: "drinks",
+        severity: Math.abs(d.diff) > 10 ? "high" : "medium",
+        message: `Drink variance on ${sku}: expected ${d.expected}, actual ${d.actual} (diff ${d.diff}).`
+      });
+    }
+  });
+
+  // Shopping List anomaly
+  if ((shoppingList?.length || 0) === 0) {
+    flags.push("NO_SHOPPING_LIST");
+    insights.push({
+      type: "shoppingList",
+      severity: "medium",
+      message: "No shopping list generated for this shift."
+    });
+  }
+
+  // Total risk score (0-100)
+  const riskScore = Math.min(100, flags.length * 20);
+
+  return { riskScore, insights, flags };
+}
+
+
+---
+
+✅ 2. Modify: server/services/dailyReportV2.ts
+
+Add:
+
+import { generateInsightsV2 } from "./insightsEngineV2";
+
+After variance integration:
+
+const insights = generateInsightsV2({
+  sales,
+  stock,
+  purchasedStock,
+  variance,
+  shoppingList: reportJson.shoppingList
+});
+
+reportJson.insights = insights;
+
+
+---
+
+✅ 3. Create: server/routes/insightsV2.ts
+
+New endpoints:
+
+router.get("/:reportId/live", async (req, res) => {
+  const reportId = Number(req.params.reportId);
+  const report = await db.select().from(dailyReportsV2).where(eq(dailyReportsV2.id, reportId));
+
+  if (!report[0]) return res.status(404).json({ error: "Not found" });
+
+  // Rebuild insights live
+  const sales = JSON.parse(report[0].salesJson);
+  const stock = JSON.parse(report[0].stockJson);
+  const variance = JSON.parse(report[0].varianceJson);
+  const purchasedStock = JSON.parse(report[0].purchasedStockJson);
+  const shoppingList = JSON.parse(report[0].shoppingListJson);
+
+  const insights = generateInsightsV2({ sales, stock, purchasedStock, variance, shoppingList });
+
+  res.json({ ok: true, insights });
+});
+
+
+---
+
+✅ 4. Modify: server/index.ts
+
+Register the route:
+
+import insightsV2 from "./routes/insightsV2";
+app.use("/api/insights", insightsV2);
+
+
+---
+
+✅ 5. Modify: client/src/pages/operations/daily-reports/view.tsx
+
+Add “Insights Panel” under variance:
+
+<Section title="AI Insights (Jussi)">
+  <div className="bg-white shadow p-4 rounded">
+    {report.insights?.insights?.map((i, idx) => (
+      <div key={idx} className="border-b py-2">
+         <div className="font-semibold text-lg">{i.type.toUpperCase()}</div>
+         <div className={i.severity === "high" ? "text-red-600" : "text-yellow-600"}>
+            {i.message}
+         </div>
+      </div>
+    ))}
+  </div>
+
+  <button 
+    className="mt-4 px-4 py-2 bg-black text-white rounded"
+    onClick={refreshInsights}
+  >
+    Refresh Insights
+  </button>
+</Section>
+
+Add refresh function:
+
+async function refreshInsights() {
+  const res = await axios.get(`/api/insights/${report.id}/live`);
+  setReport({ ...report, insights: res.data.insights });
+}
+
+
+---
+
+✅ 6. Modify: server/pdf/dailyReportV2.pdf.ts
+
+Add "AI Insights" section:
+
+pdf.addSectionTitle("AI Insights");
+pdf.addLine(`Risk Score: ${insights.riskScore}/100`);
+insights.insights.forEach(i => {
+  pdf.addBullet(`${i.type.toUpperCase()}: ${i.message}`);
+});
+
+
+---
+
+✅ 7. Modify: server/lib/dailyReportEmailV2.ts
+
+Add Jussi section:
+
+<h2>AI Insights</h2>
+<p><strong>Risk Score:</strong> ${insights.riskScore}/100</p>
+<ul>
+  ${insights.insights.map(i => `<li>${i.type.toUpperCase()}: ${i.message}</li>`).join("")}
+</ul>
+
+
+---

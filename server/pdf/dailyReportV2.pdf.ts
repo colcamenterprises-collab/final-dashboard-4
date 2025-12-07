@@ -127,6 +127,25 @@ export async function buildDailyReportPDF(reportJson: any): Promise<Buffer> {
       });
 
       // ------------------------------------------------------------
+      // AI INSIGHTS
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "AI Insights", y + 20);
+
+      const insights = reportJson.insights ?? {};
+      doc.font("Helvetica").fontSize(12).text(`Risk Score: ${insights.riskScore || 0}/100`, 50, y);
+      y += 25;
+
+      if (insights.insights && insights.insights.length > 0) {
+        insights.insights.forEach((i: any) => {
+          doc.font("Helvetica").fontSize(11).text(`• ${i.type.toUpperCase()}: ${i.message}`, 50, y);
+          y += 20;
+        });
+      } else {
+        doc.font("Helvetica").fontSize(12).text("No insights generated.", 50, y);
+        y += 25;
+      }
+
+      // ------------------------------------------------------------
       // SHOPPING LIST
       // ------------------------------------------------------------
       y = sectionBox(doc, "Shopping List", y + 20);

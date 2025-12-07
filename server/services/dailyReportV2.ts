@@ -19,6 +19,7 @@ import { db as drizzleDb } from "../db";
 import { sql } from "drizzle-orm";
 import { dailySalesV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
 import { calculateVarianceV2 } from "./varianceEngineV2";
+import { generateInsightsV2 } from "./insightsEngineV2";
 
 export async function compileDailyReportV2(shiftDate: string) {
   // -------------------------------------------------------------
@@ -88,6 +89,15 @@ export async function compileDailyReportV2(shiftDate: string) {
     purchasedStock: purchasedStockForVariance,
   });
 
+  // Generate insights
+  const insights = generateInsightsV2({
+    sales: salesData,
+    stock,
+    purchasedStock,
+    variance,
+    shoppingList: shopping?.itemsJson || []
+  });
+
   // -------------------------------------------------------------
   // Construct Final JSON Bundle
   // -------------------------------------------------------------
@@ -98,6 +108,7 @@ export async function compileDailyReportV2(shiftDate: string) {
     shoppingList: shopping ?? null,
     variance,
     purchasedStock,
+    insights,
   };
 
   return report;

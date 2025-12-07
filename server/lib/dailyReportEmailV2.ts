@@ -16,8 +16,19 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
 
   const purchasedStock = reportJson?.purchasedStock ?? { rolls: 0, meatKg: "0.0", drinks: {} };
   const variance = reportJson?.variance ?? {};
+  const insights = reportJson?.insights ?? {};
 
   const htmlContent = `
+    <h2 style="font-size:18px;font-weight:700;margin-top:30px;">AI Insights</h2>
+    <p><strong>Risk Score:</strong> ${insights.riskScore || 0}/100</p>
+    <ul>
+      ${
+        insights.insights && insights.insights.length > 0
+          ? insights.insights.map((i: any) => `<li>${i.type.toUpperCase()}: ${i.message}</li>`).join("")
+          : "<li>No insights generated.</li>"
+      }
+    </ul>
+
     <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Purchased Stock</h2>
     <p><strong>Rolls Purchased:</strong> ${purchasedStock.rolls} units</p>
     <p><strong>Meat Purchased:</strong> ${purchasedStock.meatKg} kg</p>
