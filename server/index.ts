@@ -28,6 +28,7 @@ import primeCostRouter from "./routes/primeCost";
 import reportsV2Router from "./routes/reportsV2";
 import reportsListV2Router from "./routes/reportsListV2";
 import insightsV2Router from "./routes/insightsV2";
+import securityV2Router from "./routes/securityV2";
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 
@@ -405,6 +406,7 @@ async function checkSchema() {
   app.use("/api/reports", reportsV2Router);
   app.use("/api/reports", reportsListV2Router);
   app.use("/api/insights", insightsV2Router);
+  app.use("/api/security", securityV2Router);
   
   // System Health Test route
   const systemHealthRouter = (await import('./routes/systemHealth')).default;

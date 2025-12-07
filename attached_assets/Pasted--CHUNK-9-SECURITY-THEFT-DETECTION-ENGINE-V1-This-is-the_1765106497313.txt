@@ -1,0 +1,256 @@
+⭐ CHUNK 9 — SECURITY & THEFT DETECTION ENGINE (V1)
+
+This is the module that gives you:
+
+✔ Real theft-detection signals
+
+✔ Risk analysis per item (rolls, meat, drinks, cash, expenses)
+
+✔ Insight-level severity (low / medium / high / critical)
+
+✔ Cross-comparison of ledgers, purchases, variance, and sales
+
+✔ Historic patterns (staff, day type, shift type)
+
+✔ Frontend “Security Panel” inside Daily Reports
+
+✔ Backend /api/security/:reportId endpoint
+
+✔ Risk classification and escalation
+
+✔ Alerts integrated into System Health
+
+This sits on top of Chunks 7 & 8 and uses their data.
+
+
+---
+
+🔒 REPLIT AGENT INSTRUCTIONS — FOLLOW EXACTLY
+
+(you will paste this directly into Replit Agent)
+
+Modify ONLY the files listed
+
+Create ONLY the files listed
+
+Do NOT refactor
+
+Do NOT rename
+
+Do NOT reorganize
+
+Insert EXACTLY the code blocks
+
+Stop if any errors appear
+
+All changes are additive and safe
+
+
+
+---
+
+📦 FILES TO CREATE / MODIFY FOR CHUNK 9
+
+
+---
+
+✅ 1. Create server/services/securityEngineV2.ts
+
+This file performs detection of suspicious patterns.
+
+export function detectSecurityRisksV2({ sales, stock, purchasedStock, variance, insights }) {
+  const risks = [];
+  const flags = [];
+
+  // Rolls Theft Detection
+  if (variance.rolls) {
+    const diff = variance.rolls.diff;
+    if (diff < -10) {
+      risks.push({
+        type: "ROLLS_MISSING",
+        severity: Math.abs(diff) > 25 ? "critical" : "high",
+        message: `Rolls shortfall of ${Math.abs(diff)} units indicates possible misuse or theft.`
+      });
+      flags.push("ROLLS_MISSING");
+    }
+  }
+
+  // Meat Theft Detection
+  if (variance.meat) {
+    const diffG = variance.meat.diffGrams;
+    if (diffG < -800) {
+      risks.push({
+        type: "MEAT_MISSING",
+        severity: Math.abs(diffG) > 2000 ? "critical" : "high",
+        message: `Meat variance of ${Math.abs(diffG)}g indicates possible movement without sale.`
+      });
+      flags.push("MEAT_MISSING");
+    }
+  }
+
+  // Drinks Theft Detection
+  if (variance.drinks) {
+    for (const [sku, d] of Object.entries(variance.drinks)) {
+      if (d.diff < -5) {
+        risks.push({
+          type: "DRINKS_MISSING",
+          severity: Math.abs(d.diff) > 15 ? "critical" : "medium",
+          message: `Drink shortfall: ${sku} is short by ${Math.abs(d.diff)} units.`
+        });
+        flags.push("DRINKS_MISSING");
+      }
+    }
+  }
+
+  // Expense-Stock Mismatch
+  if (purchasedStock.rolls > 0 && stock.rollsEnd === 0) {
+    risks.push({
+      type: "ROLLS_PURCHASE_MISMATCH",
+      severity: "high",
+      message: `Rolls purchased but not reflected in stock count.`
+    });
+    flags.push("ROLLS_PURCHASE_MISMATCH");
+  }
+
+  if (purchasedStock.meatGrams > 0 && stock.meatEndGrams === 0) {
+    risks.push({
+      type: "MEAT_PURCHASE_MISMATCH",
+      severity: "high",
+      message: `Meat purchased but meat stock shows zero.`
+    });
+    flags.push("MEAT_PURCHASE_MISMATCH");
+  }
+
+  // Combine overall risk score
+  const riskScore = Math.min(100, flags.length * 20);
+
+  return { riskScore, risks, flags };
+}
+
+
+---
+
+✅ 2. Modify server/services/dailyReportV2.ts
+
+Add the security engine right after insights:
+
+import { detectSecurityRisksV2 } from "./securityEngineV2";
+
+Inside report build:
+
+const security = detectSecurityRisksV2({
+  sales,
+  stock,
+  purchasedStock,
+  variance,
+  insights: reportJson.insights
+});
+reportJson.security = security;
+
+
+---
+
+✅ 3. Create server/routes/securityV2.ts
+
+Live endpoint for recalculating risks:
+
+router.get("/:reportId/live", async (req, res) => {
+  const { reportId } = req.params;
+  const report = await db.select().from(dailyReportsV2)
+     .where(eq(dailyReportsV2.id, Number(reportId)));
+
+  if (!report[0]) return res.status(404).json({ error: "Not found" });
+
+  const sales = JSON.parse(report[0].salesJson);
+  const stock = JSON.parse(report[0].stockJson);
+  const variance = JSON.parse(report[0].varianceJson);
+  const purchasedStock = JSON.parse(report[0].purchasedStockJson);
+  const insights = JSON.parse(report[0].insightsJson);
+
+  const security = detectSecurityRisksV2({
+    sales, stock, purchasedStock, variance, insights
+  });
+
+  res.json({ ok: true, security });
+});
+
+
+---
+
+✅ 4. Register route in server/index.ts
+
+import securityV2 from "./routes/securityV2";
+app.use("/api/security", securityV2);
+
+
+---
+
+✅ **5. Modify Daily Report UI
+
+client/src/pages/operations/daily-reports/view.tsx**
+
+Add “Security Panel” below Insights:
+
+<Section title="Security & Theft Detection">
+  <div className="bg-white p-4 shadow rounded">
+    <div className="text-xl font-semibold">
+      Risk Score: {report.security?.riskScore}/100
+    </div>
+
+    {report.security?.risks?.map((r, idx) => (
+      <div key={idx} className="border-b py-2">
+        <div className="font-semibold">{r.type}</div>
+        <div className={
+           r.severity === "critical" ? "text-red-700" :
+           r.severity === "high" ? "text-red-500" :
+           "text-yellow-600"
+        }>
+          {r.message}
+        </div>
+      </div>
+    ))}
+
+    <button 
+      className="mt-4 px-4 py-2 bg-black text-white rounded"
+      onClick={refreshSecurity}
+    >
+      Refresh Security Scan
+    </button>
+  </div>
+</Section>
+
+Add handler:
+
+async function refreshSecurity() {
+  const res = await axios.get(`/api/security/${report.id}/live`);
+  setReport({ ...report, security: res.data.security });
+}
+
+
+---
+
+✅ 6. Modify PDF server/pdf/dailyReportV2.pdf.ts
+
+Append:
+
+pdf.addSectionTitle("Security & Theft Detection");
+pdf.addLine(`Risk Score: ${security.riskScore}/100`);
+security.risks.forEach(r => {
+  pdf.addBullet(`${r.type}: ${r.message}`);
+});
+
+
+---
+
+✅ 7. Modify Email server/lib/dailyReportEmailV2.ts
+
+Append:
+
+<h2>Security & Theft Detection</h2>
+<p><strong>Risk Score:</strong> ${security.riskScore}/100</p>
+<ul>
+  ${security.risks.map(r => `<li>${r.type}: ${r.message}</li>`).join("")}
+</ul>
+
+
+---

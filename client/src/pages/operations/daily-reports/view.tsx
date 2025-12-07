@@ -44,6 +44,15 @@ export default function ViewReportPage() {
     }
   }
 
+  async function refreshSecurity() {
+    if (!selectedReportId) return;
+    const res = await axios.get(`/api/security/${selectedReportId}/live`);
+    // Update the report security
+    if (report) {
+      report.security = res.data.security;
+    }
+  }
+
   if (!selectedReportId) {
     return (
       <div className="p-6">
@@ -176,6 +185,44 @@ export default function ViewReportPage() {
           </div>
         </div>
       )}
+
+      {/* Security & Theft Detection */}
+      <div className="bg-white shadow p-4 rounded mb-6">
+        <h2 className="text-lg font-bold mb-4">Security & Theft Detection</h2>
+        <div className="text-xl font-semibold mb-4">
+          Risk Score: {report.security?.riskScore || 0}/100
+        </div>
+
+        {report.security?.risks && report.security.risks.length > 0 ? (
+          <div className="space-y-3">
+            {report.security.risks.map((r: any, idx: number) => (
+              <div key={idx} className="border-b py-2">
+                <div className="font-semibold text-sm">{r.type}</div>
+                <div
+                  className={`text-sm ${
+                    r.severity === "critical"
+                      ? "text-red-700"
+                      : r.severity === "high"
+                      ? "text-red-500"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {r.message}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">No security risks detected.</p>
+        )}
+
+        <button
+          className="mt-4 px-4 py-2 bg-black text-white rounded text-sm"
+          onClick={refreshSecurity}
+        >
+          Refresh Security Scan
+        </button>
+      </div>
 
       {/* Actions */}
       <div className="flex gap-3">

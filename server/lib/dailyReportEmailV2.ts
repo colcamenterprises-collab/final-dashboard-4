@@ -17,6 +17,7 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
   const purchasedStock = reportJson?.purchasedStock ?? { rolls: 0, meatKg: "0.0", drinks: {} };
   const variance = reportJson?.variance ?? {};
   const insights = reportJson?.insights ?? {};
+  const security = reportJson?.security ?? {};
 
   const htmlContent = `
     <h2 style="font-size:18px;font-weight:700;margin-top:30px;">AI Insights</h2>
@@ -50,6 +51,16 @@ export async function sendDailyReportEmailV2(pdfBuffer: Buffer, shiftDate: strin
         Object.entries(variance.drinks || {})
           .map(([sku, obj]: any) => `<li>${sku}: ${obj.diff || 0}</li>`)
           .join("")
+      }
+    </ul>
+
+    <h2 style="font-size:18px;font-weight:700;margin-top:30px;">Security & Theft Detection</h2>
+    <p><strong>Risk Score:</strong> ${security.riskScore || 0}/100</p>
+    <ul>
+      ${
+        security.risks && security.risks.length > 0
+          ? security.risks.map((r: any) => `<li>${r.type}: ${r.message}</li>`).join("")
+          : "<li>No security risks detected.</li>"
       }
     </ul>
   `;

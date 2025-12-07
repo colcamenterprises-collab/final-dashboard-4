@@ -20,6 +20,7 @@ import { sql } from "drizzle-orm";
 import { dailySalesV2, shoppingListV2, dailyReportsV2 } from "../../shared/schema";
 import { calculateVarianceV2 } from "./varianceEngineV2";
 import { generateInsightsV2 } from "./insightsEngineV2";
+import { detectSecurityRisksV2 } from "./securityEngineV2";
 
 export async function compileDailyReportV2(shiftDate: string) {
   // -------------------------------------------------------------
@@ -98,6 +99,15 @@ export async function compileDailyReportV2(shiftDate: string) {
     shoppingList: shopping?.itemsJson || []
   });
 
+  // Generate security risks
+  const security = detectSecurityRisksV2({
+    sales: salesData,
+    stock,
+    purchasedStock,
+    variance,
+    insights
+  });
+
   // -------------------------------------------------------------
   // Construct Final JSON Bundle
   // -------------------------------------------------------------
@@ -109,6 +119,7 @@ export async function compileDailyReportV2(shiftDate: string) {
     variance,
     purchasedStock,
     insights,
+    security,
   };
 
   return report;

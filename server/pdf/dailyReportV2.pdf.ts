@@ -146,6 +146,25 @@ export async function buildDailyReportPDF(reportJson: any): Promise<Buffer> {
       }
 
       // ------------------------------------------------------------
+      // SECURITY & THEFT DETECTION
+      // ------------------------------------------------------------
+      y = sectionBox(doc, "Security & Theft Detection", y + 20);
+
+      const security = reportJson.security ?? {};
+      doc.font("Helvetica").fontSize(12).text(`Risk Score: ${security.riskScore || 0}/100`, 50, y);
+      y += 25;
+
+      if (security.risks && security.risks.length > 0) {
+        security.risks.forEach((r: any) => {
+          doc.font("Helvetica").fontSize(11).text(`• ${r.type}: ${r.message}`, 50, y);
+          y += 20;
+        });
+      } else {
+        doc.font("Helvetica").fontSize(12).text("No security risks detected.", 50, y);
+        y += 25;
+      }
+
+      // ------------------------------------------------------------
       // SHOPPING LIST
       // ------------------------------------------------------------
       y = sectionBox(doc, "Shopping List", y + 20);
