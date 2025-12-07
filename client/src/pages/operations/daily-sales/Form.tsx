@@ -11,8 +11,120 @@ const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 
 // EXACT Language labels from consolidated patch (inline, no new file)
 const labels = {
-  en: { completedBy: 'Completed By', startingCash: 'Starting Cash', cashSales: 'Cash Sales', qrSales: 'QR Sales', grabSales: 'Grab Sales', otherSales: 'Other Sales' },
-  th: { completedBy: 'กรอกโดย', startingCash: 'เงินสดเริ่มต้น', cashSales: 'ยอดขายเงินสด', qrSales: 'ยอดขาย QR', grabSales: 'ยอดขาย Grab', otherSales: 'ยอดขายอื่นๆ' }
+  en: {
+    pageTitle: 'Daily Sales & Expenses',
+    pageTitleEdit: 'Edit Daily Sales & Expenses',
+    pageSubtitle: 'Step 1 of 2 — complete Sales & Expenses, then you\'ll be redirected to Stock.',
+    pageSubtitleEdit: 'Edit and save changes to this form',
+    back: 'Back',
+    shiftInfo: 'Shift Information',
+    shiftDate: 'Shift Date',
+    completedBy: 'Completed By',
+    startingCash: 'Starting Cash',
+    salesInfo: 'Sales Information',
+    cashSales: 'Cash Sales',
+    qrSales: 'QR Sales',
+    grabSales: 'Grab Sales',
+    otherSales: 'Other Sales',
+    totalSales: 'Total Sales',
+    expenses: 'Expenses',
+    shiftExpenses: 'Shift Expenses',
+    item: 'Item',
+    cost: 'Cost',
+    shopName: 'Shop Name',
+    delete: 'Delete',
+    addRow: '+ Add Row',
+    subtotal: 'Subtotal',
+    staffWages: 'Staff Wages',
+    staffName: 'Staff Name',
+    amount: 'Amount',
+    type: 'Type',
+    wages: 'Wages',
+    overtime: 'Overtime',
+    bonus: 'Bonus',
+    reimbursement: 'Reimbursement',
+    totalExpenses: 'Total Expenses',
+    cashBanking: 'Cash & Banking',
+    closingCash: 'Closing Cash',
+    closingCashHint: 'Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)',
+    expectedCashToBank: 'Expected Cash to Bank',
+    expectedQrToBank: 'Expected QR to Bank',
+    expectedTotalToBank: 'Expected Total to Bank',
+    summary: 'Summary',
+    netPosition: 'Net Position',
+    saveDraft: 'Save draft',
+    next: 'Next →',
+    updateForm: 'Update Form',
+    saving: 'Saving...',
+    loading: 'Loading form data...',
+    formSubmitted: 'Form submitted 🎉',
+    dailySalesSaved: 'Daily Sales has been saved successfully.',
+    continueToStock: 'Continue to',
+    formStock: 'Form 2 (Stock)',
+    inSeconds: 'in',
+    seconds: 'sec…',
+    goToStock: 'Go to Stock now',
+    stayHere: 'Stay here',
+    validationError: 'Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.',
+    autoTimestamp: 'Auto timestamp'
+  },
+  th: {
+    pageTitle: 'ยอดขายและค่าใช้จ่ายประจำวัน',
+    pageTitleEdit: 'แก้ไขยอดขายและค่าใช้จ่ายประจำวัน',
+    pageSubtitle: 'ขั้นตอนที่ 1 จาก 2 — กรอกยอดขายและค่าใช้จ่าย จากนั้นจะไปยังหน้าสต๊อก',
+    pageSubtitleEdit: 'แก้ไขและบันทึกการเปลี่ยนแปลงแบบฟอร์มนี้',
+    back: 'กลับ',
+    shiftInfo: 'ข้อมูลกะ',
+    shiftDate: 'วันที่กะ',
+    completedBy: 'กรอกโดย',
+    startingCash: 'เงินสดเริ่มต้น',
+    salesInfo: 'ข้อมูลยอดขาย',
+    cashSales: 'ยอดขายเงินสด',
+    qrSales: 'ยอดขาย QR',
+    grabSales: 'ยอดขาย Grab',
+    otherSales: 'ยอดขายอื่นๆ',
+    totalSales: 'ยอดขายรวม',
+    expenses: 'ค่าใช้จ่าย',
+    shiftExpenses: 'ค่าใช้จ่ายกะ',
+    item: 'รายการ',
+    cost: 'ราคา',
+    shopName: 'ชื่อร้าน',
+    delete: 'ลบ',
+    addRow: '+ เพิ่มแถว',
+    subtotal: 'รวมย่อย',
+    staffWages: 'ค่าจ้างพนักงาน',
+    staffName: 'ชื่อพนักงาน',
+    amount: 'จำนวนเงิน',
+    type: 'ประเภท',
+    wages: 'ค่าจ้าง',
+    overtime: 'ล่วงเวลา',
+    bonus: 'โบนัส',
+    reimbursement: 'เบิกคืน',
+    totalExpenses: 'ค่าใช้จ่ายรวม',
+    cashBanking: 'เงินสดและธนาคาร',
+    closingCash: 'เงินสดปิดยอด',
+    closingCashHint: 'ใส่จำนวนเงินสดที่เหลือในลิ้นชักหลังหักค่าใช้จ่าย รวมเงินสดเริ่มต้นด้วย',
+    expectedCashToBank: 'เงินสดที่ต้องนำส่งธนาคาร',
+    expectedQrToBank: 'ยอด QR ที่ต้องนำส่งธนาคาร',
+    expectedTotalToBank: 'ยอดรวมที่ต้องนำส่งธนาคาร',
+    summary: 'สรุป',
+    netPosition: 'ยอดสุทธิ',
+    saveDraft: 'บันทึกร่าง',
+    next: 'ถัดไป →',
+    updateForm: 'อัปเดตแบบฟอร์ม',
+    saving: 'กำลังบันทึก...',
+    loading: 'กำลังโหลดข้อมูล...',
+    formSubmitted: 'ส่งแบบฟอร์มแล้ว 🎉',
+    dailySalesSaved: 'บันทึกยอดขายประจำวันเรียบร้อยแล้ว',
+    continueToStock: 'ไปต่อที่',
+    formStock: 'แบบฟอร์ม 2 (สต๊อก)',
+    inSeconds: 'ใน',
+    seconds: 'วินาที…',
+    goToStock: 'ไปหน้าสต๊อกเลย',
+    stayHere: 'อยู่ที่นี่',
+    validationError: 'ไม่สามารถดำเนินการต่อได้: ฟิลด์ไม่ครบ/ไม่ถูกต้อง กรุณาแก้ไขช่องที่ไฮไลท์',
+    autoTimestamp: 'บันทึกเวลาอัตโนมัติ'
+  }
 };
 
 // EXACT LanguageToggle as inline component (NO new file) - styled as toggle switch
@@ -37,24 +149,27 @@ function SuccessModal({
   open,
   onClose,
   onGo,
-  countdown
+  countdown,
+  lang
 }: {
   open: boolean;
   onClose: () => void;
   onGo: () => void;
   countdown: number;
+  lang: 'en' | 'th';
 }) {
   if (!open) return null;
+  const L = labels[lang];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md rounded-[4px] bg-white p-4 shadow-xl">
-        <h3 className="text-sm font-semibold">Form submitted 🎉</h3>
+        <h3 className="text-sm font-semibold">{L.formSubmitted}</h3>
         <p className="mt-2 text-xs text-slate-600">
-          Daily Sales has been saved successfully.
+          {L.dailySalesSaved}
         </p>
         <p className="mt-2 text-xs">
-          Continue to <span className="font-medium">Form 2 (Stock)</span> in{" "}
-          <span className="font-semibold">{countdown}</span> sec…
+          {L.continueToStock} <span className="font-medium">{L.formStock}</span> {L.inSeconds}{" "}
+          <span className="font-semibold">{countdown}</span> {L.seconds}
         </p>
 
         <div className="mt-4 flex gap-3">
@@ -62,13 +177,13 @@ function SuccessModal({
             onClick={onGo}
             className="inline-flex h-10 items-center justify-center rounded-[4px] bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700"
           >
-            Go to Stock now
+            {L.goToStock}
           </button>
           <button
             onClick={onClose}
             className="inline-flex h-10 items-center justify-center rounded-[4px] border border-slate-200 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50"
           >
-            Stay here
+            {L.stayHere}
           </button>
         </div>
       </div>
@@ -336,12 +451,15 @@ export default function DailySales() {
     localStorage.setItem("daily_sales_draft", JSON.stringify(draft));
   };
 
+  // Create a shorthand for current language labels
+  const L = labels[lang];
+
   if (loading) {
     return (
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="bg-white rounded-[4px] shadow p-4 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-xs text-slate-600">Loading form data...</p>
+          <p className="text-xs text-slate-600">{L.loading}</p>
         </div>
       </div>
     );
@@ -353,12 +471,10 @@ export default function DailySales() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-semibold">
-              {isEditMode ? 'Edit Daily Sales & Expenses' : 'Daily Sales & Expenses'}
+              {isEditMode ? L.pageTitleEdit : L.pageTitle}
             </h1>
             <p className="text-xs text-slate-600 mt-1">
-              {isEditMode 
-                ? 'Edit and save changes to this form' 
-                : 'Step 1 of 2 — complete Sales & Expenses, then you\'ll be redirected to Stock.'}
+              {isEditMode ? L.pageSubtitleEdit : L.pageSubtitle}
             </p>
           </div>
           <button
@@ -366,7 +482,7 @@ export default function DailySales() {
             onClick={() => window.history.back()}
             className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
           >
-            Back
+            {L.back}
           </button>
         </div>
 
@@ -375,13 +491,13 @@ export default function DailySales() {
           <LanguageToggle onChange={setLang} />
           
           {/* EXACT error display from consolidated patch */}
-          {errors.length > 0 && <p className="text-red-500 text-sm">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+          {errors.length > 0 && <p className="text-red-500 text-sm">{L.validationError}</p>}
           
           <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">Shift Information</h3>
+            <h3 className="mb-4 text-lg font-semibold">{L.shiftInfo}</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Shift Date</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.shiftDate}</label>
                 {isEditMode ? (
                   <input 
                     type="date"
@@ -420,11 +536,11 @@ export default function DailySales() {
                 />
               </div>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Auto timestamp: {new Date().toISOString()}</p>
+            <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
           </section>
 
           <section className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-bold mb-4">Sales Information</h2>
+            <h2 className="text-lg font-bold mb-4">{L.salesInfo}</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
@@ -471,21 +587,21 @@ export default function DailySales() {
                 />
               </div>
             </div>
-            <div className="mt-3 font-semibold text-right">Total Sales: ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
+            <div className="mt-3 font-semibold text-right">{L.totalSales}: ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
           </section>
 
           {/* Expenses Section */}
           <section className="rounded-xl border bg-white p-6 mt-6">
-            <h3 className="mb-4 text-[14px] font-semibold">Expenses</h3>
+            <h3 className="mb-4 text-[14px] font-semibold">{L.expenses}</h3>
             
             {/* Shift Expenses */}
             <div className="mb-8">
-              <h4 className="mb-3 text-[14px] font-semibold">Shift Expenses</h4>
+              <h4 className="mb-3 text-[14px] font-semibold">{L.shiftExpenses}</h4>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Item</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.item}</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.item} 
@@ -494,7 +610,7 @@ export default function DailySales() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Cost (฿)</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.cost} (฿)</label>
                       <input 
                         type="number" 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -503,7 +619,7 @@ export default function DailySales() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Shop Name</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.shopName}</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.shop} 
@@ -517,7 +633,7 @@ export default function DailySales() {
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
                         className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
                       >
-                        Delete
+                        {L.delete}
                       </button>
                     </div>
                   </div>
@@ -529,29 +645,29 @@ export default function DailySales() {
                   className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
-                  + Add Row
+                  {L.addRow}
                 </button>
-                <div className="font-semibold">Subtotal: ฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</div>
+                <div className="font-semibold">{L.subtotal}: ฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</div>
               </div>
             </div>
 
             {/* Staff Wages */}
             <div>
-              <h4 className="mb-3 text-[14px] font-semibold">Staff Wages</h4>
+              <h4 className="mb-3 text-[14px] font-semibold">{L.staffWages}</h4>
               <div className="space-y-4">
                 {staffWages.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Staff Name</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.staffName}</label>
                       <input 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.staff} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
-                        placeholder="Staff Name" 
+                        placeholder={L.staffName} 
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Amount (฿)</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.amount} (฿)</label>
                       <input 
                         type="number" 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
@@ -560,16 +676,16 @@ export default function DailySales() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">Type</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.type}</label>
                       <select 
                         className="w-full border rounded-xl px-3 py-2.5 h-10" 
                         value={row.type} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as any } : r))}
                       >
-                        <option value="WAGES">Wages</option>
-                        <option value="OVERTIME">Overtime</option>
-                        <option value="BONUS">Bonus</option>
-                        <option value="REIMBURSEMENT">Reimbursement</option>
+                        <option value="WAGES">{L.wages}</option>
+                        <option value="OVERTIME">{L.overtime}</option>
+                        <option value="BONUS">{L.bonus}</option>
+                        <option value="REIMBURSEMENT">{L.reimbursement}</option>
                       </select>
                     </div>
                     <div>
@@ -578,7 +694,7 @@ export default function DailySales() {
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
                         className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
                       >
-                        Delete
+                        {L.delete}
                       </button>
                     </div>
                   </div>
@@ -590,42 +706,42 @@ export default function DailySales() {
                   className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
-                  + Add Row
+                  {L.addRow}
                 </button>
-                <div className="font-semibold">Subtotal: ฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</div>
+                <div className="font-semibold">{L.subtotal}: ฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</div>
               </div>
             </div>
 
             <div className="mt-6 pt-4 border-t text-[14px] text-right font-bold">
-              Total Expenses: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
+              {L.totalExpenses}: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
 
           {/* Banking Section */}
           <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">Cash & Banking</h3>
+            <h3 className="mb-4 text-lg font-semibold">{L.cashBanking}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Closing Cash (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.closingCash} (฿)</label>
                 <input 
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
                   className="w-full border rounded-xl px-3 py-2.5 h-10"
                 />
-                <p className="text-xs text-gray-500 mt-1">Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)</p>
+                <p className="text-xs text-gray-500 mt-1">{L.closingCashHint}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
-              <div className="text-xs text-gray-500">Expected Cash to Bank</div>
+              <div className="text-xs text-gray-500">{L.expectedCashToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
                 return expectedCashBank.toLocaleString();
               })()}</div>
-              <div className="text-xs text-gray-500">Expected QR to Bank</div>
+              <div className="text-xs text-gray-500">{L.expectedQrToBank}</div>
               <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">Expected Total to Bank</div>
+              <div className="text-xs text-gray-500">{L.expectedTotalToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
                 const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
@@ -637,47 +753,47 @@ export default function DailySales() {
 
           {/* Summary Section */}
           <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">Summary</h3>
+            <h3 className="mb-4 text-lg font-semibold">{L.summary}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
-                <span>Total Sales:</span>
+                <span>{L.totalSales}:</span>
                 <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
               </div>
               <div className="ml-4 space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
-                  <span>• Cash Sales:</span>
+                  <span>• {L.cashSales}:</span>
                   <span>฿{cash.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• QR Sales:</span>
+                  <span>• {L.qrSales}:</span>
                   <span>฿{qr.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Grab Sales:</span>
+                  <span>• {L.grabSales}:</span>
                   <span>฿{grab.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Other Sales:</span>
+                  <span>• {L.otherSales}:</span>
                   <span>฿{aroi.toLocaleString()}</span>
                 </div>
               </div>
               
               <div className="flex justify-between font-medium">
-                <span>Total Expenses:</span>
+                <span>{L.totalExpenses}:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
               <div className="ml-4 space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
-                  <span>• Shift Expenses:</span>
+                  <span>• {L.shiftExpenses}:</span>
                   <span>฿{shiftExpenses.reduce((sum, r) => sum + r.cost, 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>• Staff Wages:</span>
+                  <span>• {L.staffWages}:</span>
                   <span>฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
               </div>
               <div className="flex justify-between font-bold text-base border-t pt-2">
-                <span>Net Position:</span>
+                <span>{L.netPosition}:</span>
                 <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
                   ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
                 </span>
@@ -698,7 +814,7 @@ export default function DailySales() {
               onClick={handleSaveDraft}
               className="h-10 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-700 hover:bg-gray-50"
             >
-              Save draft
+              {L.saveDraft}
             </button>
             <button
               type="button"
@@ -706,7 +822,7 @@ export default function DailySales() {
               className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
               disabled={submitting}
             >
-              {submitting ? 'Saving...' : (isEditMode ? 'Update Form' : 'Next →')}
+              {submitting ? L.saving : (isEditMode ? L.updateForm : L.next)}
             </button>
           </div>
 
@@ -718,6 +834,7 @@ export default function DailySales() {
         countdown={countdown}
         onClose={() => setShowSuccess(false)}
         onGo={() => shiftId && navigate(`${FORM2_PATH}?shift=${shiftId}`)}
+        lang={lang}
       />
     </>
   );

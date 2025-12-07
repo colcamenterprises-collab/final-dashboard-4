@@ -35,8 +35,90 @@ export type CategoryBlock = {
 
 // EXACT labels from consolidated patch (same as Daily Sales)  
 const labels = {
-  en: { rollsEnd: 'Rolls (pcs)', meatCount: 'Meat (grams)', drinksEnd: 'Drinks Count', requisition: 'Requisition Items' },
-  th: { rollsEnd: 'โรล (ชิ้น)', meatCount: 'เนื้อ (กรัม)', drinksEnd: 'เครื่องดื่ม', requisition: 'รายการสั่งซื้อ' }
+  en: {
+    pageTitle: 'Daily Stock',
+    linkedToShift: 'Linked to shift',
+    noShiftId: 'No shift ID provided',
+    syncFromPurchasing: 'Sync from Purchasing List',
+    syncing: 'Syncing...',
+    syncSuccess: 'Synced {count} items from Purchasing List',
+    syncFailed: 'Failed to sync from purchasing list',
+    purchasedStock: 'Purchased Stock',
+    rollsPurchased: 'Rolls Purchased (units)',
+    meatPurchased: 'Meat Purchased',
+    drinksPurchased: 'Drinks Purchased (per SKU)',
+    meatPurchasedHint: 'Enter weight and choose unit. System converts everything to grams.',
+    endOfShiftCounts: 'End-of-Shift Counts',
+    rollsEnd: 'Rolls (pcs)',
+    meatCount: 'Meat (grams)',
+    drinksEnd: 'Drinks Count',
+    drinkStock: 'Drink Stock',
+    requisition: 'Requisition Items',
+    requisitionHint: 'Enter quantity needed for tomorrow',
+    notes: 'Notes',
+    notesPlaceholder: 'Additional notes for the shift...',
+    submitStock: 'Submit Stock Form',
+    submitting: 'Submitting...',
+    stockSaved: 'Stock data saved successfully! Redirecting to library...',
+    submitFailed: 'Submit failed.',
+    loading: 'Loading stock…',
+    incompleteData: 'Incomplete Stock Data',
+    completeFields: 'Please complete the following required fields:',
+    missingRolls: 'Burger rolls count is missing or invalid',
+    missingMeat: 'Meat count (grams) is missing or invalid',
+    missingDrinks: 'Missing drink counts:',
+    validationTip: 'Enter 0 if any item has zero stock remaining.',
+    gotIt: 'Got it, I\'ll fix this',
+    validationError: 'Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.',
+    rollsRequired: 'Rolls count is required (0 allowed).',
+    meatRequired: 'Meat count (grams) is required (0 allowed).',
+    expandAll: 'Expand All',
+    collapseAll: 'Collapse All',
+    kg: 'kg',
+    g: 'g'
+  },
+  th: {
+    pageTitle: 'สต๊อกประจำวัน',
+    linkedToShift: 'เชื่อมต่อกับกะ',
+    noShiftId: 'ไม่มีรหัสกะ',
+    syncFromPurchasing: 'ซิงค์จากรายการซื้อ',
+    syncing: 'กำลังซิงค์...',
+    syncSuccess: 'ซิงค์แล้ว {count} รายการจากรายการซื้อ',
+    syncFailed: 'ซิงค์จากรายการซื้อไม่สำเร็จ',
+    purchasedStock: 'สต๊อกที่ซื้อ',
+    rollsPurchased: 'โรลที่ซื้อ (ชิ้น)',
+    meatPurchased: 'เนื้อที่ซื้อ',
+    drinksPurchased: 'เครื่องดื่มที่ซื้อ (ต่อ SKU)',
+    meatPurchasedHint: 'ใส่น้ำหนักและเลือกหน่วย ระบบจะแปลงเป็นกรัม',
+    endOfShiftCounts: 'จำนวนปิดกะ',
+    rollsEnd: 'โรล (ชิ้น)',
+    meatCount: 'เนื้อ (กรัม)',
+    drinksEnd: 'จำนวนเครื่องดื่ม',
+    drinkStock: 'สต๊อกเครื่องดื่ม',
+    requisition: 'รายการสั่งซื้อ',
+    requisitionHint: 'ใส่จำนวนที่ต้องการสำหรับพรุ่งนี้',
+    notes: 'หมายเหตุ',
+    notesPlaceholder: 'หมายเหตุเพิ่มเติมสำหรับกะ...',
+    submitStock: 'ส่งแบบฟอร์มสต๊อก',
+    submitting: 'กำลังส่ง...',
+    stockSaved: 'บันทึกข้อมูลสต๊อกแล้ว! กำลังไปยังรายการ...',
+    submitFailed: 'ส่งไม่สำเร็จ',
+    loading: 'กำลังโหลดสต๊อก…',
+    incompleteData: 'ข้อมูลสต๊อกไม่ครบ',
+    completeFields: 'กรุณากรอกข้อมูลที่จำเป็น:',
+    missingRolls: 'จำนวนโรลขาดหายหรือไม่ถูกต้อง',
+    missingMeat: 'จำนวนเนื้อ (กรัม) ขาดหายหรือไม่ถูกต้อง',
+    missingDrinks: 'จำนวนเครื่องดื่มที่ขาด:',
+    validationTip: 'ใส่ 0 ถ้าสินค้าหมด',
+    gotIt: 'เข้าใจแล้ว ฉันจะแก้ไข',
+    validationError: 'ไม่สามารถดำเนินการต่อได้: ฟิลด์ไม่ครบ/ไม่ถูกต้อง กรุณาแก้ไขช่องที่ไฮไลท์',
+    rollsRequired: 'ต้องระบุจำนวนโรล (ใส่ 0 ได้)',
+    meatRequired: 'ต้องระบุจำนวนเนื้อเป็นกรัม (ใส่ 0 ได้)',
+    expandAll: 'ขยายทั้งหมด',
+    collapseAll: 'ยุบทั้งหมด',
+    kg: 'กก.',
+    g: 'ก.'
+  }
 };
 
 // EXACT LanguageToggle as inline component (NO new file) - styled as toggle switch
@@ -361,7 +443,10 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     }
   };
 
-  if (loading) return <div className="p-4 text-xs">Loading stock…</div>;
+  // Create a shorthand for current language labels
+  const L = labels[lang];
+
+  if (loading) return <div className="p-4 text-xs">{L.loading}</div>;
 
   return (
     <div className="p-4 space-y-4 text-xs">
@@ -374,29 +459,29 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                 <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
               <AlertDialogTitle className="text-sm font-semibold text-red-900">
-                Incomplete Stock Data
+                {L.incompleteData}
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-xs text-slate-600 space-y-3">
-              <p className="font-medium">Please complete the following required fields:</p>
+              <p className="font-medium">{L.completeFields}</p>
               <ul className="space-y-2 ml-4">
                 {validationDetails.rolls && (
                   <li className="flex items-start gap-2">
                     <span className="text-red-500 mt-0.5">•</span>
-                    <span>{validationDetails.rolls}</span>
+                    <span>{L.missingRolls}</span>
                   </li>
                 )}
                 {validationDetails.meat && (
                   <li className="flex items-start gap-2">
                     <span className="text-red-500 mt-0.5">•</span>
-                    <span>{validationDetails.meat}</span>
+                    <span>{L.missingMeat}</span>
                   </li>
                 )}
                 {validationDetails.drinks && validationDetails.drinks.length > 0 && (
                   <li className="flex items-start gap-2">
                     <span className="text-red-500 mt-0.5">•</span>
                     <div>
-                      <p className="font-medium mb-1">Missing drink counts:</p>
+                      <p className="font-medium mb-1">{L.missingDrinks}</p>
                       <div className="ml-2 space-y-1">
                         {validationDetails.drinks.map(drink => (
                           <div key={drink} className="text-xs text-slate-600">
@@ -409,7 +494,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                 )}
               </ul>
               <p className="text-xs text-slate-600 pt-2 border-t border-slate-200">
-                💡 <strong>Tip:</strong> Enter 0 if any item has zero stock remaining.
+                💡 <strong>Tip:</strong> {L.validationTip}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -418,19 +503,19 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
               onClick={() => setShowValidationDialog(false)}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-[4px]"
             >
-              Got it, I'll fix this
+              {L.gotIt}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-baseline justify-between gap-3">
-        <h1 className="text-3xl font-semibold">Daily Stock</h1>
+        <h1 className="text-3xl font-semibold">{L.pageTitle}</h1>
         <div className="text-xs text-slate-600">
           {shiftId ? (
-            <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">Linked to shift: {shiftId}</span>
+            <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">{L.linkedToShift}: {shiftId}</span>
           ) : (
-            <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">No shift ID provided</span>
+            <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">{L.noShiftId}</span>
           )}
         </div>
       </div>
@@ -443,7 +528,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
           data-testid="button-sync-purchasing"
           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white text-xs font-medium rounded-[4px] transition-colors"
         >
-          {syncing ? 'Syncing...' : 'Sync from Purchasing List'}
+          {syncing ? L.syncing : L.syncFromPurchasing}
         </button>
         {message && (
           <div className={`px-3 py-1 rounded-[4px] text-xs ${message.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
@@ -456,19 +541,19 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       <LanguageToggle onChange={setLang} />
       
       {/* EXACT error display from consolidated patch */}
-      {errors.length > 0 && <p className="text-red-500 text-xs">Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.</p>}
+      {errors.length > 0 && <p className="text-red-500 text-xs">{L.validationError}</p>}
 
       {/* Purchased Stock Section — CHUNK 2 */}
       <section className="space-y-4">
         <div className="rounded-[4px] border border-slate-200 bg-white shadow-sm">
           <div className="bg-yellow-300 px-4 py-3 rounded-t-[4px]">
-            <h2 className="text-sm font-bold text-gray-900">Purchased Stock</h2>
+            <h2 className="text-sm font-bold text-gray-900">{L.purchasedStock}</h2>
           </div>
           <div className="p-4 space-y-6">
             {/* Rolls Purchased */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Rolls Purchased (units)
+                {L.rollsPurchased}
               </label>
               <input
                 type="number"
@@ -483,7 +568,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
             {/* Meat Purchased */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Meat Purchased
+                {L.meatPurchased}
               </label>
               <div className="flex gap-3">
                 <input
@@ -500,12 +585,12 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                   onChange={(e) => setMeatPurchasedUnit(e.target.value)}
                   className="w-24 rounded-[4px] border border-slate-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="kg">kg</option>
-                  <option value="g">g</option>
+                  <option value="kg">{L.kg}</option>
+                  <option value="g">{L.g}</option>
                 </select>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Enter weight and choose unit. System converts everything to grams.
+                {L.meatPurchasedHint}
               </p>
             </div>
 
@@ -513,7 +598,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
             {drinkItems.length > 0 && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Drinks Purchased (per SKU)
+                  {L.drinksPurchased}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {drinkItems.map((drink) => (
@@ -539,12 +624,12 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       {/* End-of-Shift Counts */}
       <section className="space-y-4">
         <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
-          <h2 className="text-sm font-semibold mb-4">End-of-Shift Counts</h2>
+          <h2 className="text-sm font-semibold mb-4">{L.endOfShiftCounts}</h2>
           {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
           {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm mb-1 font-medium">{labels[lang].rollsEnd}</label>
+              <label className="block text-sm mb-1 font-medium">{L.rollsEnd}</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -556,7 +641,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
               />
             </div>
             <div>
-              <label className="block text-sm mb-1 font-medium">{labels[lang].meatCount}</label>
+              <label className="block text-sm mb-1 font-medium">{L.meatCount}</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -568,7 +653,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
               />
               {meatGrams > 0 && (
                 <div className="text-xs text-slate-600 mt-1">
-                  {(meatGrams / 1000).toFixed(1)}kg or {meatGrams.toLocaleString()} grams
+                  {(meatGrams / 1000).toFixed(1)}{L.kg} or {meatGrams.toLocaleString()} {L.g}
                 </div>
               )}
             </div>
@@ -579,7 +664,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       {/* Drinks Stock Count Section */}
       <section className="space-y-4">
         <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
-          <h2 className="text-sm font-semibold mb-4">Drinks Stock Count</h2>
+          <h2 className="text-sm font-semibold mb-4">{L.drinkStock}</h2>
           {validationErrors?.drinkStock && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.drinkStock}</div>}
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {drinkItems.length === 0 ? (
@@ -618,14 +703,14 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                 onClick={expandAll}
                 className="px-3 py-1 text-xs border border-slate-200 rounded-[4px] hover:bg-slate-50"
               >
-                Expand All
+                {L.expandAll}
               </button>
               <button 
                 type="button" 
                 onClick={collapseAll}
                 className="px-3 py-1 text-xs border border-slate-200 rounded-[4px] hover:bg-slate-50"
               >
-                Collapse All
+                {L.collapseAll}
               </button>
             </div>
           </div>
@@ -636,8 +721,8 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       {/* Notes Section */}
       <section className="space-y-4">
         <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
-          <h2 className="text-sm font-semibold mb-4">Notes</h2>
-          <label className="block text-sm mb-2 font-medium">Any items not listed above or special notes...</label>
+          <h2 className="text-sm font-semibold mb-4">{L.notes}</h2>
+          <label className="block text-sm mb-2 font-medium">{L.notesPlaceholder}</label>
           <textarea
             className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
             rows={4}
@@ -646,7 +731,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
             aria-label="Additional notes"
           />
           <div className="text-xs text-slate-600 mt-2">
-            Notes will be included in the email report to management.
+            {L.requisitionHint}
           </div>
         </div>
       </section>
@@ -674,7 +759,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
           disabled={submitting}
           className="w-full sm:w-auto rounded-[4px] bg-emerald-600 px-5 py-2 text-white text-xs hover:bg-emerald-700 disabled:opacity-60"
         >
-          {submitting ? "Submitting…" : "Submit All"}
+          {submitting ? L.submitting : L.submitStock}
         </button>
       </div>
 
