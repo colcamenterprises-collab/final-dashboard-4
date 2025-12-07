@@ -5,6 +5,8 @@ import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { DoughnutChart } from "@/components/health";
+import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -19,6 +21,7 @@ import {
   Globe,
   Package
 } from "lucide-react";
+import axios from "axios";
 
 // Balance Hero Component
 function BalanceHero() {
@@ -171,8 +174,8 @@ function PrimeCostCards() {
           <div className="text-rose-600 text-sm">{err}</div>
         ) : (
           <>
-            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(daily?.primePct)}`}>
-              {pc(daily?.primePct)}
+            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(daily?.primePct ?? null)}`}>
+              {pc(daily?.primePct ?? null)}
             </div>
             <div className="mt-3 text-xs text-slate-600 space-y-1">
               <div className="flex justify-between">
@@ -201,8 +204,8 @@ function PrimeCostCards() {
           <div className="text-rose-600 text-sm">{err}</div>
         ) : (
           <>
-            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(mtd?.primePct)}`}>
-              {pc(mtd?.primePct)}
+            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(mtd?.primePct ?? null)}`}>
+              {pc(mtd?.primePct ?? null)}
             </div>
             <div className="mt-3 text-xs text-slate-600 space-y-1">
               <div className="flex justify-between">
@@ -278,8 +281,101 @@ export default function Home() {
       {/* Prime Cost Cards */}
       <PrimeCostCards />
       
+      {/* System Health Section (CHUNK 5) */}
+      <SystemHealthSection />
+      
       {/* Cash Balance Snapshot */}
       <CashBalanceSnapshot />
+    </div>
+  );
+}
+
+// System Health Section Component (CHUNK 5)
+function SystemHealthSection() {
+  const [health, setHealth] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function runTest() {
+    setLoading(true);
+    try {
+      const res = await axios.get("/api/system-health/run");
+      setHealth(res.data);
+    } catch (err) {
+      console.error("Health test failed:", err);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    runTest();
+  }, []);
+
+  const total = 8;
+  const passed = health
+    ? Object.values(health.results || {}).filter((v) => v === true).length
+    : 0;
+
+  const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-[4px] shadow-sm">
+      <div className="bg-yellow-300 px-4 py-3 rounded-t-[4px]">
+        <h2 className="text-sm font-bold text-gray-900">
+          System Health
+        </h2>
+      </div>
+
+      <div className="p-4 flex flex-col md:flex-row gap-6">
+        {/* DOUGHNUT GRAPH */}
+        <div className="w-full md:w-1/3 flex items-center justify-center">
+          <DoughnutChart results={health?.results} />
+        </div>
+
+        {/* SUMMARY */}
+        <div className="flex-1 flex flex-col justify-center">
+          <p className="text-xl font-bold text-emerald-600">
+            {passed} / {total} checks passed
+          </p>
+          <p className="text-xs text-slate-600 mt-1">
+            {passRate}% operational
+          </p>
+          
+          {health?.timestamp && (
+            <p className="text-xs text-slate-500 mt-3">
+              Last checked: {new Date(health.timestamp).toLocaleTimeString()}
+            </p>
+          )}
+
+          {health?.durationMs && (
+            <p className="text-xs text-slate-500">
+              Duration: {health.durationMs}ms
+            </p>
+          )}
+
+          <Button
+            className="mt-4 bg-black text-white hover:bg-gray-800 text-xs font-medium rounded-[4px] w-fit"
+            onClick={runTest}
+            disabled={loading}
+            data-testid="button-run-health-test"
+          >
+            {loading ? "Running..." : "Run Health Test"}
+          </Button>
+        </div>
+      </div>
+
+      {/* ERROR DISPLAY */}
+      {health?.results?.errors && health.results.errors.length > 0 && (
+        <div className="border-t border-slate-200 p-4">
+          <h3 className="text-xs font-semibold text-red-600 mb-2">Errors</h3>
+          <ul className="space-y-1">
+            {health.results.errors.map((err: string, i: number) => (
+              <li key={i} className="text-xs text-red-600">
+                • {err}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

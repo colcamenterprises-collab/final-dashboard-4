@@ -27,6 +27,7 @@ import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 import reportsV2Router from "./routes/reportsV2";
 import reportsListV2Router from "./routes/reportsListV2";
+import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 
 const prisma = new PrismaClient();
