@@ -1,4 +1,4 @@
-// PATCH 1 & 3 — Shopping List Display Pipeline with PDF Export
+// PATCH 1, 3, 4B — Shopping List Display Pipeline with PDF Export & Date Range
 // STRICT: This file alone. No modifications elsewhere.
 
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +28,41 @@ export default function ShoppingListPage() {
       >
         Download PDF
       </button>
+
+      <div className="mb-4 p-3 border rounded">
+        <h2 className="font-semibold mb-2">Export Range</h2>
+        <div className="flex space-x-2">
+          <input
+            type="date"
+            id="startDate"
+            className="border p-2"
+            data-testid="input-start-date"
+          />
+          <input
+            type="date"
+            id="endDate"
+            className="border p-2"
+            data-testid="input-end-date"
+          />
+          <button
+            className="px-4 py-2 bg-black text-white rounded"
+            data-testid="button-export-zip"
+            onClick={() => {
+              const start = (document.getElementById("startDate") as HTMLInputElement).value;
+              const end = (document.getElementById("endDate") as HTMLInputElement).value;
+
+              if (!start || !end) {
+                alert("Please select a start and end date.");
+                return;
+              }
+
+              window.open(`/api/shopping-list/pdf/range?start=${start}&end=${end}`, "_blank");
+            }}
+          >
+            Export ZIP
+          </button>
+        </div>
+      </div>
 
       {isLoading && <p>Loading...</p>}
       {error && <p className="text-red-500">Failed to load shopping list.</p>}
