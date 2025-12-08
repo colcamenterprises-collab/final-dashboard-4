@@ -324,97 +324,92 @@ function SystemHealthSection() {
   ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-      <div className="bg-yellow-300 rounded-t-lg px-4 py-3 text-lg font-bold text-gray-800 flex items-center gap-2">
-        <Activity className="h-4 w-4" />
-        System Health
-      </div>
+    <div className="bg-white rounded-xl p-6 shadow-sm">
+      <h2 className="text-xl font-extrabold text-gray-800 mb-6">System Health</h2>
 
-      <div className="p-4 sm:p-5 space-y-5">
-        {/* Overall Health Donut */}
-        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-          <div className="flex-shrink-0">
-            <DoughnutChart 
-              checks={health?.checks} 
-              checksPassed={checksPassed} 
-              totalChecks={totalChecks} 
-            />
-          </div>
-
-          <div className="flex-1 w-full text-center md:text-left">
-            <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-              <status.icon className={`h-5 w-5 text-${status.color}-600`} />
-              <span className={`text-lg font-bold text-${status.color}-600`}>
-                {status.label}
-              </span>
-            </div>
-            
-            <p className="text-sm text-slate-700 font-medium">
-              {checksPassed} / {totalChecks} checks passed
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              {passRate}% operational
-            </p>
-            
-            {health?.timestamp && (
-              <p className="text-xs text-slate-400 mt-3">
-                Last checked: {new Date(health.timestamp).toLocaleTimeString()}
-              </p>
-            )}
-          </div>
+      {/* Overall Health Donut */}
+      <div className="flex flex-col md:flex-row gap-6 items-center md:items-start mb-6">
+        <div className="flex-shrink-0">
+          <DoughnutChart 
+            checks={health?.checks} 
+            checksPassed={checksPassed} 
+            totalChecks={totalChecks} 
+          />
         </div>
 
-        {/* Mini Donut Graphs for Categories */}
-        {health?.checks && health.checks.length > 0 && (
-          <div className="border-t border-slate-100 pt-5">
-            <p className="text-xs font-semibold text-slate-600 mb-3">Component Status</p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-              {categories.map((cat) => {
-                const check = health.checks.find(c => c.name.includes(cat.name));
-                return check ? (
-                  <div key={cat.label} className="flex flex-col items-center gap-2">
-                    <div className="relative w-20 h-20">
-                      <DoughnutChart 
-                        mini 
-                        check={check}
-                        size="sm"
-                      />
-                    </div>
-                    <p className="text-xs font-medium text-slate-700 text-center">{cat.label}</p>
-                    <p className={`text-[10px] ${check.ok ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {check.ok ? "✓ OK" : "✗ Error"}
-                    </p>
-                  </div>
-                ) : null;
-              })}
-            </div>
+        <div className="flex-1 w-full text-center md:text-left">
+          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+            <status.icon className={`h-5 w-5 text-${status.color}-600`} />
+            <span className={`text-lg font-bold text-${status.color}-600`}>
+              {status.label}
+            </span>
           </div>
-        )}
-
-        {/* Individual Checks List */}
-        {health?.checks && health.checks.length > 0 && (
-          <div className="border-t border-slate-100 pt-5">
-            <p className="text-xs font-semibold text-slate-600 mb-3">All Checks</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {health.checks.map((check, i) => (
-                <div 
-                  key={i} 
-                  className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
-                    check.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                  }`}
-                >
-                  {check.ok ? (
-                    <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                  )}
-                  <span className="truncate">{check.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          
+          <p className="text-sm text-slate-700 font-medium">
+            {checksPassed} / {totalChecks} checks passed
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {passRate}% operational
+          </p>
+          
+          {health?.timestamp && (
+            <p className="text-xs text-slate-400 mt-3">
+              Last checked: {new Date(health.timestamp).toLocaleTimeString()}
+            </p>
+          )}
+        </div>
       </div>
+
+      {/* Mini Donut Graphs for Categories */}
+      {health?.checks && health.checks.length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-slate-600 mb-4">Component Status</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+            {categories.map((cat) => {
+              const check = health.checks.find(c => c.name.includes(cat.name));
+              return check ? (
+                <div key={cat.label} className="flex flex-col items-center gap-2">
+                  <div className="relative w-20 h-20">
+                    <DoughnutChart 
+                      mini 
+                      check={check}
+                      size="sm"
+                    />
+                  </div>
+                  <p className="text-xs font-medium text-slate-700 text-center">{cat.label}</p>
+                  <p className={`text-[10px] ${check.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {check.ok ? "✓ OK" : "✗ Error"}
+                  </p>
+                </div>
+              ) : null;
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Individual Checks List */}
+      {health?.checks && health.checks.length > 0 && (
+        <div className="border-t border-slate-100 pt-6">
+          <p className="text-xs font-semibold text-slate-600 mb-3">All Checks</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {health.checks.map((check, i) => (
+              <div 
+                key={i} 
+                className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
+                  check.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                }`}
+              >
+                {check.ok ? (
+                  <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                )}
+                <span className="truncate">{check.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
