@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
-import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -40,45 +39,36 @@ function BalanceHero() {
   const month = (financeSummary as any)?.month || '';
 
   return (
-    <div className="space-y-3">
-      <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
-        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
-        <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
+    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
+      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
+      <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
+      
+      <div className="relative">
+        <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
+          ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </h1>
         
-        <div className="relative">
-          <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
-            ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h1>
-          
-          <div className="flex flex-col sm:flex-row gap-3">
-            <StockLodgmentModal
-              triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-              triggerText="Lodge Stock Purchase"
-              triggerIcon={<Package className="h-4 w-4 mr-2" />}
-              onSuccess={() => {}}
-            />
-            <ExpenseLodgmentModal
-              triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-              triggerText="Add Business Expense"
-              triggerIcon={<Plus className="h-4 w-4 mr-2" />}
-              onSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
-                queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-              }}
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => setLocation('/reports/latest')}
+            className="bg-white/15 hover:bg-white/25 active:bg-white/35 text-white border border-white/20 w-full sm:w-auto text-xs font-medium py-2 px-3 rounded transition-colors flex items-center justify-center gap-2"
+            data-testid="button-view-latest-report"
+          >
+            <FileText className="h-4 w-4" />
+            View Latest Report
+          </button>
+          <ExpenseLodgmentModal
+            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
+            triggerText="Add Business Expense"
+            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+              queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+            }}
+          />
         </div>
       </div>
-
-      <button
-        onClick={() => setLocation('/reports/latest')}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
-        data-testid="button-view-latest-shift-report"
-      >
-        <FileText className="h-4 w-4" />
-        View Latest Shift Report
-      </button>
     </div>
   );
 }
@@ -325,12 +315,6 @@ function SystemHealthSection() {
 
   const status = getOverallStatus();
 
-  // Get specific checks by name
-  const getCategoryStatus = (checkName: string): boolean => {
-    const check = health?.checks?.find(c => c.name.includes(checkName));
-    return check?.ok ?? false;
-  };
-
   const categories = [
     { label: "DB", name: "Database" },
     { label: "APIs", name: "API" },
@@ -341,11 +325,9 @@ function SystemHealthSection() {
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-      <div className="bg-yellow-300 px-4 py-3">
-        <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-          <Activity className="h-4 w-4" />
-          System Health
-        </h2>
+      <div className="bg-yellow-300 rounded-t-lg px-4 py-3 text-lg font-bold text-gray-800 flex items-center gap-2">
+        <Activity className="h-4 w-4" />
+        System Health
       </div>
 
       <div className="p-4 sm:p-5 space-y-5">
@@ -386,7 +368,7 @@ function SystemHealthSection() {
         {health?.checks && health.checks.length > 0 && (
           <div className="border-t border-slate-100 pt-5">
             <p className="text-xs font-semibold text-slate-600 mb-3">Component Status</p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
               {categories.map((cat) => {
                 const check = health.checks.find(c => c.name.includes(cat.name));
                 return check ? (

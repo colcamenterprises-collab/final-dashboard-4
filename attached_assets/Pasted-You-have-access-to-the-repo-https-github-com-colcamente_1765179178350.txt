@@ -1,0 +1,68 @@
+You have access to the repo:
+https://github.com/colcamenterprises-collab/restaurant-management-system
+
+Apply ONLY the following corrections. Do NOT modify any business logic, database, backend routes, or unrelated components.
+
+===========================================================
+A) FIX SYSTEM HEALTH HEADER STYLING
+===========================================================
+File: client/src/pages/Home.tsx
+
+Correct the yellow "System Health" header styling:
+- Remove any padding or margin above it.
+- Ensure it is placed INSIDE the card header container.
+- Apply consistent card-header classes:
+  className="bg-yellow-300 rounded-t-xl px-4 py-3 text-lg font-bold text-gray-800"
+
+===========================================================
+B) FIX SYSTEM HEALTH MINI GRAPHS LAYOUT
+===========================================================
+All mini donut graphs must be displayed in a grid:
+
+<div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
+  {miniGraphs...}
+</div>
+
+Rules:
+- Keep them as visual-only donuts (no text inside the graph)
+- Label appears BELOW each donut
+- Tight spacing, tablet-optimised layout
+
+===========================================================
+C) REPLACE THE STOCK PURCHASE BUTTON WITH “VIEW LATEST REPORT”
+===========================================================
+File: client/src/pages/Home.tsx
+
+Inside the Monthly Expenses card:
+
+1. Delete the existing "Lodge Stock Purchase" button.
+2. Replace it with:
+   - Text: "View Latest Report"
+   - Same green card-button styling
+   - Icon: document-text icon
+   - OnClick → navigate("/reports/latest")
+
+3. Keep the “Add Business Expense” button directly below it.
+
+No new buttons should be added anywhere else.
+
+===========================================================
+D) REMOVE THE RECENT REPORTS BLOCK IF STILL PRESENT
+===========================================================
+- Remove any remaining "Recent Reports" blocks or components from the Home Page.
+- These are now only on the Reports Page.
+
+===========================================================
+E) NO CHANGES TO BACKEND OR HEALTH CHECK LOGIC
+===========================================================
+This patch is strictly UI: Home Page, buttons, layout, styling.
+
+===========================================================
+F) BEFORE COMMITTING, SHOW ME:
+===========================================================
+- Modified files list
+- A screenshot or JSX preview of:
+  • Monthly Expenses Card with new button
+  • System Health with correct header + donut row
+
+Wait for my approval before pushing to GitHub.
