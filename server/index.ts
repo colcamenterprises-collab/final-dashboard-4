@@ -493,22 +493,29 @@ async function checkSchema() {
           // Register Daily Report V2 cron (3AM Bangkok)
           registerDailyReportCron();
           
-          // PATCH 6 — AUTO GENERATE SHIFT REPORT AT 03:10AM DAILY (BANGKOK TIME)
+          // PATCH 6+7 — AUTO GENERATE SHIFT REPORT AT 03:10AM DAILY (BANGKOK TIME) + EMAIL
           const { buildShiftReport } = await import('./services/shiftReportBuilder');
+          const { sendShiftReportEmail } = await import('./services/shiftReportEmail');
           const nodeCron = await import('node-cron');
           nodeCron.default.schedule("10 3 * * *", async () => {
             try {
               const now = new Date();
               console.log("[SCHEDULER] Auto-generating shift report for", now);
-              await buildShiftReport(now);
+              const report = await buildShiftReport(now);
               console.log("[SCHEDULER] Shift report generated successfully.");
+              
+              // PATCH 7 — SEND EMAIL SUMMARY
+              if (report?.id) {
+                await sendShiftReportEmail(report.id);
+                console.log("[SCHEDULER] Shift report email sent.");
+              }
             } catch (err) {
               console.error("[SCHEDULER] Shift report generation failed:", err);
             }
           }, {
             timezone: "Asia/Bangkok"
           });
-          console.log("📊 Shift Report V2 auto-generation scheduled for 3:10am Bangkok time");
+          console.log("📊 Shift Report V2 auto-generation + email scheduled for 3:10am Bangkok time");
           
           console.log('✅ All background services started successfully');
         } catch (err) {

@@ -4,6 +4,7 @@ import BalanceCard from "@/components/BalanceCard";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { Link } from "react-router-dom";
 import { DoughnutChart } from "@/components/health";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,107 @@ import {
   Package,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
 import axios from "axios";
+
+// PATCH 7 — SHIFT ALERT BANNER
+function ShiftAlertBanner() {
+  const { data: report } = useQuery({
+    queryKey: ["shift-report-latest-dashboard"],
+    queryFn: async () => {
+      const res = await axios.get("/api/shift-report/latest");
+      return res.data;
+    },
+  });
+
+  if (!report) return null;
+
+  const v = (report.variances as any) || {};
+
+  if (v.level === "GREEN") return null;
+
+  return (
+    <div className="mb-4 p-4 border-l-4 border-red-600 bg-red-50 rounded flex items-center gap-3" data-testid="shift-alert-banner">
+      <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+      <div className="flex-1">
+        <p className="font-semibold text-red-800 text-sm">Issues detected in the last shift — Review now.</p>
+        <Link
+          to={`/reports/shift-report/view/${report.id}`}
+          className="text-red-700 underline text-xs"
+        >
+          Open Shift Report
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// PATCH 7 — SHIFT HEALTH TILE
+function ShiftHealthTile() {
+  const { data: report, isLoading } = useQuery({
+    queryKey: ["shift-report-latest-dashboard"],
+    queryFn: async () => {
+      const res = await axios.get("/api/shift-report/latest");
+      return res.data;
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="border p-4 rounded bg-white shadow-sm">
+        <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+        <div className="text-slate-400 text-xs">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!report) {
+    return (
+      <div className="border p-4 rounded bg-white shadow-sm">
+        <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+        <div className="text-slate-400 text-xs">No shift report available.</div>
+      </div>
+    );
+  }
+
+  const v = (report.variances as any) || {};
+
+  const severityColor =
+    v.level === "RED" ? "text-red-600"
+    : v.level === "YELLOW" ? "text-amber-600"
+    : "text-emerald-600";
+
+  const severityBg =
+    v.level === "RED" ? "bg-red-50"
+    : v.level === "YELLOW" ? "bg-amber-50"
+    : "bg-emerald-50";
+
+  return (
+    <div className={`border p-4 rounded shadow-sm ${severityBg}`} data-testid="shift-health-tile">
+      <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+
+      <div className={`text-lg font-bold ${severityColor}`}>
+        {v.level || "UNKNOWN"}
+      </div>
+
+      <div className="mt-2 text-xs text-slate-600 space-y-1">
+        <div>Cash: {v.cashVariance ?? "N/A"}</div>
+        <div>QR: {v.qrVariance ?? "N/A"}</div>
+        <div>Grab: {v.grabVariance ?? "N/A"}</div>
+      </div>
+
+      <Link
+        to={`/reports/shift-report/view/${report.id}`}
+        className="inline-block mt-3 px-3 py-1.5 bg-slate-800 text-white rounded text-xs"
+        data-testid="button-view-shift-report"
+      >
+        View Report
+      </Link>
+    </div>
+  );
+}
 
 // Balance Hero Component
 function BalanceHero() {
@@ -417,17 +516,20 @@ function SystemHealthSection() {
 export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8">
+      <ShiftAlertBanner />
+      
       <BalanceHero />
       
       <KPIGrid />
       
       <PrimeCostCards />
       
-      <SystemHealthSection />
-      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ShiftHealthTile />
         <VarianceWidget />
       </div>
+      
+      <SystemHealthSection />
       
       <CashBalanceSnapshot />
     </div>

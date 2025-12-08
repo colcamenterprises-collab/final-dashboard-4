@@ -1,0 +1,235 @@
+🚨 REPLIT AGENT — STRICT RULES FOR PATCH 7
+
+DO
+
+Add ONLY the code below
+
+Touch ONLY the specified files
+
+Save and exit
+
+
+DO NOT
+
+Modify Fort Knox modules
+
+Modify Daily Sales V2 or Stock V2
+
+Modify variance engine
+
+Modify shift builder logic
+
+Install dependencies
+
+Auto-format the project
+
+“Improve” unrelated files
+
+
+
+---
+
+🔧 PATCH 7 — FULL CUT-AND-PASTE IMPLEMENTATION
+
+
+---
+
+1. Backend — Add Email Summary Sender
+
+Create file:
+
+server/services/shiftReportEmail.ts
+
+// PATCH 7 — SHIFT REPORT EMAIL SUMMARY
+import prisma from "../prismaClient";
+import transporter from "../email/transporter"; // uses existing email setup
+
+export async function sendShiftReportEmail(reportId: string) {
+  const report = await prisma.shift_report_v2.findUnique({
+    where: { id: reportId }
+  });
+
+  if (!report) return;
+
+  const v = report.variances || {};
+  const date = new Date(report.shiftDate).toLocaleString("en-TH", {
+    timeZone: "Asia/Bangkok"
+  });
+
+  const subject = `Shift Report — ${date} — Severity: ${v.level || "UNKNOWN"}`;
+
+  const body = `
+Shift Report Summary
+Shift Date: ${date}
+Severity: ${v.level}
+
+Cash Variance: ${v.cashVariance}
+QR Variance: ${v.qrVariance}
+QR Settlement Variance: ${v.qrSettlementVariance}
+Grab Variance: ${v.grabVariance}
+Total Sales Variance: ${v.totalSalesVariance}
+
+Warnings:
+${(v.warnings || []).join("\n") || "None"}
+
+Errors:
+${(v.errors || []).join("\n") || "None"}
+
+View Detailed Report:
+https://your-dashboard-domain/reports/shift-report/view/${report.id}
+
+Download PDF:
+https://your-dashboard-domain/api/shift-report/pdf/${report.id}
+`;
+
+  await transporter.sendMail({
+    from: "Shift Reports <no-reply@sbb-dashboard>",
+    to: "smashbrothersburgersth@gmail.com",
+    subject,
+    text: body
+  });
+
+  return true;
+}
+
+
+---
+
+2. Inject Email Sending Into Shift Scheduler
+
+Modify: server/index.ts
+Add this inside the cron scheduler AFTER buildShiftReport:
+
+import { sendShiftReportEmail } from "./services/shiftReportEmail";
+
+// SEND EMAIL SUMMARY
+if (report?.id) {
+  await sendShiftReportEmail(report.id);
+  console.log("[SCHEDULER] Shift report email sent.");
+}
+
+Modify the cron function signature:
+
+const report = await buildShiftReport(now);
+
+
+---
+
+3. Frontend — Add Dashboard Tile for Shift Health
+
+File:
+client/src/pages/dashboard/index.tsx
+(Add this card to the dashboard grid)
+
+// PATCH 7 — SHIFT REPORT DASHBOARD TILE
+import { useEffect, useState } from "react";
+import axios from "../../utils/axiosInstance";
+import { Link } from "react-router-dom";
+
+export function ShiftHealthTile() {
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    axios.get("/shift-report/latest").then((res) => setReport(res.data));
+  }, []);
+
+  if (!report) {
+    return (
+      <div className="border p-4 rounded">
+        <h2 className="font-semibold">Shift Health</h2>
+        <div>No shift report available.</div>
+      </div>
+    );
+  }
+
+  const v = report.variances || {};
+
+  const severityColor =
+    v.level === "RED" ? "text-red-600"
+    : v.level === "YELLOW" ? "text-yellow-600"
+    : "text-green-600";
+
+  return (
+    <div className="border p-4 rounded">
+      <h2 className="font-semibold">Shift Health</h2>
+
+      <div className={`mt-2 ${severityColor}`}>
+        Severity: {v.level}
+      </div>
+
+      <div className="mt-2 text-sm">
+        Cash: {v.cashVariance}
+        <br />
+        QR: {v.qrVariance}
+        <br />
+        Grab: {v.grabVariance}
+      </div>
+
+      <Link
+        to={`/reports/shift-report/view/${report.id}`}
+        className="inline-block mt-3 px-4 py-2 bg-black text-white rounded"
+      >
+        View Report
+      </Link>
+    </div>
+  );
+}
+
+
+---
+
+4. Frontend — Add Alert Banner
+
+Still inside dashboard/index.tsx, add:
+
+export function ShiftAlertBanner() {
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    axios.get("/shift-report/latest").then((res) => setReport(res.data));
+  }, []);
+
+  if (!report) return null;
+
+  const v = report.variances || {};
+
+  if (v.level === "GREEN") return null;
+
+  return (
+    <div className="mb-4 p-4 border-l-4 border-red-600 bg-red-50">
+      <p className="font-semibold">Issues detected in the last shift — Review now.</p>
+      <Link
+        to={`/reports/shift-report/view/${report.id}`}
+        className="underline"
+      >
+        Open Shift Report
+      </Link>
+    </div>
+  );
+}
+
+Then include both components in the dashboard layout:
+
+<ShiftAlertBanner />
+<ShiftHealthTile />
+
+Place them before or within your existing dashboard grid.
+
+
+---
+
+🎉 PATCH 7 COMPLETE
+
+Once the agent applies it:
+
+Your system now has:
+
+Automated email summaries every night after shift
+
+Live dashboard shift health indicator
+
+Warning banner for RED/YELLOW shifts
+
+Direct PDF + report links in email
+
+Enterprise-ready shift visibility
