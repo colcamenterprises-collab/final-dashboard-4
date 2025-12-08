@@ -4,6 +4,7 @@
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { buildShiftReport } from "../services/shiftReportBuilder";
+import { generateShiftReportPDF } from "../services/shiftReportPDF";
 
 const router = Router();
 
@@ -68,6 +69,30 @@ router.get("/view/:id", async (req, res) => {
   } catch (err) {
     console.error("Fetch report error:", err);
     res.status(500).json({ error: "Failed to fetch report" });
+  }
+});
+
+// PDF Export
+router.get("/pdf/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pdfStream = await generateShiftReportPDF(id);
+
+    if (!pdfStream) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=shift-report-${id}.pdf`
+    );
+
+    pdfStream.pipe(res);
+  } catch (err) {
+    console.error("Shift Report PDF error:", err);
+    res.status(500).json({ error: "Failed to generate PDF" });
   }
 });
 

@@ -1,0 +1,241 @@
+🔥 PATCH 5 — SHIFT REPORT PDF EXPORT (Manager-Grade, Enterprise Layout)
+
+This patch creates:
+
+What PATCH 5 Delivers
+
+A clean, branded PDF of each shift report
+
+Manager-friendly layout with clear hierarchy
+
+Variance blocks (Cash, QR, Grab, Total Sales)
+
+Severity colour mapping (GREEN, YELLOW, RED)
+
+POS summary
+
+Daily Sales summary
+
+Stock summary
+
+Errors & warnings section
+
+Reusable branded template ("Smash Brothers Burgers")
+
+New backend route:
+/api/shift-report/pdf/:id
+
+Download button added to Shift Report Detail page
+
+
+This PDF becomes the official daily management document.
+
+
+---
+
+🚨 REPLIT AGENT — STRICT RULES
+
+DO:
+
+Paste exactly the provided code
+
+Modify ONLY the files listed
+
+Save and exit
+
+
+DO NOT:
+
+Modify any variance logic
+
+Modify Daily Sales V2 or Daily Stock V2
+
+Modify shift report builder
+
+Modify unrelated routes
+
+Add new dependencies (PDFKit already in use)
+
+Refactor anything
+
+Reformat files
+
+
+
+---
+
+✅ PATCH 5 — FULL CUT-AND-PASTE CODE
+
+
+---
+
+1. Create PDF Generator Service
+
+Create file:
+server/services/shiftReportPDF.ts
+
+// PATCH 5 — SHIFT REPORT PDF EXPORT
+// STRICT: No modification to other modules.
+
+import PDFDocument from "pdfkit";
+import prisma from "../prismaClient";
+import { Readable } from "stream";
+
+function sectionHeader(doc: any, label: string) {
+  doc.moveDown(0.6);
+  doc.fontSize(14).fillColor("#000000").text(label);
+  doc.moveDown(0.3);
+  doc.moveTo(40, doc.y).lineTo(550, doc.y).stroke("#ff6a00");
+  doc.moveDown(0.6);
+}
+
+export async function generateShiftReportPDF(id: string) {
+  const report = await prisma.shift_report_v2.findUnique({
+    where: { id },
+  });
+
+  if (!report) return null;
+
+  const doc = new PDFDocument({ margin: 40 });
+
+  const stream = new Readable({
+    read() {},
+  });
+
+  doc.on("data", (chunk) => stream.push(chunk));
+  doc.on("end", () => stream.push(null));
+
+  // HEADER
+  doc.fontSize(22).fillColor("#000000").text("Smash Brothers Burgers");
+  doc.moveDown(0.3);
+  doc.fontSize(16).fillColor("#333333").text("Shift Report");
+  doc.moveDown(0.5);
+
+  doc
+    .fontSize(10)
+    .fillColor("#555555")
+    .text(
+      `Shift Date: ${new Date(report.shiftDate).toLocaleString("en-TH", {
+        timeZone: "Asia/Bangkok",
+      })}`
+    );
+
+  // VARIANCES
+  sectionHeader(doc, "Variance Summary");
+
+  const v = report.variances || {};
+
+  doc.fontSize(12).fillColor("#000000");
+  doc.text(`Cash Variance: ${v.cashVariance} (Level: ${v.cashVarianceLevel})`);
+  doc.text(`QR Variance: ${v.qrVariance}`);
+  doc.text(`QR Settlement Variance: ${v.qrSettlementVariance}`);
+  doc.text(`Grab Variance: ${v.grabVariance}`);
+  doc.text(`Total Sales Variance: ${v.totalSalesVariance}`);
+  doc.moveDown(0.5);
+
+  // WARNINGS & ERRORS
+  sectionHeader(doc, "Warnings & Errors");
+
+  const errors = v.errors || [];
+  const warnings = v.warnings || [];
+
+  if (errors.length === 0 && warnings.length === 0) {
+    doc.text("No warnings or errors detected.");
+  } else {
+    errors.forEach((e: string) => doc.text(`ERROR: ${e}`, { fillColor: "red" }));
+    warnings.forEach((w: string) =>
+      doc.text(`WARNING: ${w}`, { fillColor: "#cc8800" })
+    );
+  }
+
+  // SALES DATA
+  sectionHeader(doc, "Daily Sales Summary");
+  doc.fontSize(10).fillColor("#000000");
+  doc.text(JSON.stringify(report.salesData, null, 2));
+
+  // STOCK DATA
+  sectionHeader(doc, "Daily Stock Summary");
+  doc.fontSize(10).fillColor("#000000");
+  doc.text(JSON.stringify(report.stockData, null, 2));
+
+  // POS DATA
+  sectionHeader(doc, "POS Shift Report Summary");
+  doc.fontSize(10).fillColor("#000000");
+  doc.text(JSON.stringify(report.posData, null, 2));
+
+  doc.end();
+  return stream;
+}
+
+
+---
+
+2. Add PDF Route
+
+Modify file:
+server/routes/shiftReportRoutes.ts
+(Add this block at bottom)
+
+import { generateShiftReportPDF } from "../services/shiftReportPDF";
+
+router.get("/pdf/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pdfStream = await generateShiftReportPDF(id);
+
+    if (!pdfStream) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=shift-report-${id}.pdf`
+    );
+
+    pdfStream.pipe(res);
+  } catch (err) {
+    console.error("Shift Report PDF error:", err);
+    res.status(500).json({ error: "Failed to generate PDF" });
+  }
+});
+
+
+---
+
+3. Add Download Button to Shift Report Detail Page
+
+Modify file:
+client/src/pages/reports/shift-report/view/ShiftReportDetail.tsx
+(Add JUST the button below <h1>)
+
+<button
+  onClick={() => window.open(`/api/shift-report/pdf/${id}`, "_blank")}
+  className="mb-4 px-4 py-2 bg-black text-white rounded"
+>
+  Download PDF
+</button>
+
+
+---
+
+🎉 PATCH 5 COMPLETE
+
+Once applied:
+
+You now have:
+
+Full, branded Shift Report PDF generator
+
+Highly readable manager report
+
+Accurate variance blocks
+
+Data audit sections
+
+Download button in UI
+
+
+This becomes the daily record your staff and management team rely on.
+

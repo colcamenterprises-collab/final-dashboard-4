@@ -22,6 +22,14 @@ export default function ShiftReportDetail() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Shift Report Details</h1>
 
+      <button
+        onClick={() => window.open(`/api/shift-report/pdf/${id}`, "_blank")}
+        className="mb-4 px-4 py-2 bg-black text-white rounded"
+        data-testid="button-download-pdf"
+      >
+        Download PDF
+      </button>
+
       <div className="border rounded p-4 mb-4">
         <strong>Shift Date:</strong>{" "}
         {new Date(report.shiftDate).toLocaleString("en-TH", {
