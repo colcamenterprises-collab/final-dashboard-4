@@ -30,6 +30,8 @@ import axios from "axios";
 // Balance Hero Component
 function BalanceHero() {
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  
   const { data: financeSummary } = useQuery({
     queryKey: ['/api/finance/summary/today'],
   });
@@ -38,34 +40,45 @@ function BalanceHero() {
   const month = (financeSummary as any)?.month || '';
 
   return (
-    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
-      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
-      <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
-      
-      <div className="relative">
-        <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
-          ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </h1>
+    <div className="space-y-3">
+      <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
+        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
+        <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
         
-        <div className="flex flex-col sm:flex-row gap-3">
-          <StockLodgmentModal
-            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-            triggerText="Lodge Stock Purchase"
-            triggerIcon={<Package className="h-4 w-4 mr-2" />}
-            onSuccess={() => {}}
-          />
-          <ExpenseLodgmentModal
-            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-            triggerText="Add Business Expense"
-            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
-              queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-            }}
-          />
+        <div className="relative">
+          <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
+            ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </h1>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <StockLodgmentModal
+              triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
+              triggerText="Lodge Stock Purchase"
+              triggerIcon={<Package className="h-4 w-4 mr-2" />}
+              onSuccess={() => {}}
+            />
+            <ExpenseLodgmentModal
+              triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
+              triggerText="Add Business Expense"
+              triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+                queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+              }}
+            />
+          </div>
         </div>
       </div>
+
+      <button
+        onClick={() => setLocation('/reports/latest')}
+        className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
+        data-testid="button-view-latest-shift-report"
+      >
+        <FileText className="h-4 w-4" />
+        View Latest Shift Report
+      </button>
     </div>
   );
 }
@@ -269,70 +282,6 @@ function CashBalanceSnapshot() {
   );
 }
 
-// Recent Reports Card Component
-function RecentReportsSection() {
-  const [, setLocation] = useLocation();
-  
-  const { data: reportsData, isLoading } = useQuery({
-    queryKey: ["daily-reports-list"],
-    queryFn: async () => {
-      const res = await axios.get("/api/reports/list");
-      return res.data.reports ?? [];
-    },
-  });
-
-  const recentReports = Array.isArray(reportsData) ? reportsData : [];
-  
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-4">
-        <h3 className="text-sm font-bold mb-4 text-slate-700">Recent Reports</h3>
-        <div className="text-slate-500 text-sm">Loading reports...</div>
-      </div>
-    );
-  }
-
-  if (recentReports.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-4 sm:p-5">
-      <h3 className="text-sm font-bold mb-4 text-slate-700 flex items-center gap-2">
-        <FileText className="h-4 w-4 text-emerald-600" />
-        Recent Reports
-      </h3>
-      <div className="space-y-3 md:space-y-4">
-        {recentReports.slice(0, 5).map((r: any) => (
-          <a
-            key={r.id}
-            href={`/operations/daily-reports?open=${r.id}`}
-            className="block bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 active:bg-emerald-50 transition-all duration-200 overflow-hidden"
-            data-testid={`report-card-${r.id}`}
-          >
-            <div className="flex items-stretch">
-              <div className="w-1.5 bg-emerald-500 flex-shrink-0" />
-              <div className="flex-1 px-4 py-3 sm:py-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm sm:text-base font-semibold text-emerald-600 truncate">
-                      {r.date}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Created at {new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                </div>
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // System Health Section Component
 interface HealthCheck {
   name: string;
@@ -349,17 +298,15 @@ function SystemHealthSection() {
     durationMs?: number;
     timestamp?: string;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function runTest() {
-    setLoading(true);
     try {
       const res = await axios.get("/api/system-health/run");
       setHealth(res.data);
     } catch (err) {
       console.error("Health test failed:", err);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -378,6 +325,20 @@ function SystemHealthSection() {
 
   const status = getOverallStatus();
 
+  // Get specific checks by name
+  const getCategoryStatus = (checkName: string): boolean => {
+    const check = health?.checks?.find(c => c.name.includes(checkName));
+    return check?.ok ?? false;
+  };
+
+  const categories = [
+    { label: "DB", name: "Database" },
+    { label: "APIs", name: "API" },
+    { label: "Email", name: "Email" },
+    { label: "PDF", name: "PDF" },
+    { label: "Ingredients", name: "Ingredients" }
+  ];
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
       <div className="bg-yellow-300 px-4 py-3">
@@ -387,8 +348,9 @@ function SystemHealthSection() {
         </h2>
       </div>
 
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-col md:flex-row gap-6 items-center">
+      <div className="p-4 sm:p-5 space-y-5">
+        {/* Overall Health Donut */}
+        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
           <div className="flex-shrink-0">
             <DoughnutChart 
               checks={health?.checks} 
@@ -397,8 +359,8 @@ function SystemHealthSection() {
             />
           </div>
 
-          <div className="flex-1 w-full">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="flex-1 w-full text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
               <status.icon className={`h-5 w-5 text-${status.color}-600`} />
               <span className={`text-lg font-bold text-${status.color}-600`}>
                 {status.label}
@@ -417,17 +379,40 @@ function SystemHealthSection() {
                 Last checked: {new Date(health.timestamp).toLocaleTimeString()}
               </p>
             )}
-
-            {health?.durationMs && (
-              <p className="text-xs text-slate-400">
-                Duration: {health.durationMs}ms
-              </p>
-            )}
           </div>
         </div>
 
+        {/* Mini Donut Graphs for Categories */}
         {health?.checks && health.checks.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
+          <div className="border-t border-slate-100 pt-5">
+            <p className="text-xs font-semibold text-slate-600 mb-3">Component Status</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {categories.map((cat) => {
+                const check = health.checks.find(c => c.name.includes(cat.name));
+                return check ? (
+                  <div key={cat.label} className="flex flex-col items-center gap-2">
+                    <div className="relative w-20 h-20">
+                      <DoughnutChart 
+                        mini 
+                        check={check}
+                        size="sm"
+                      />
+                    </div>
+                    <p className="text-xs font-medium text-slate-700 text-center">{cat.label}</p>
+                    <p className={`text-[10px] ${check.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {check.ok ? "✓ OK" : "✗ Error"}
+                    </p>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Individual Checks List */}
+        {health?.checks && health.checks.length > 0 && (
+          <div className="border-t border-slate-100 pt-5">
+            <p className="text-xs font-semibold text-slate-600 mb-3">All Checks</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {health.checks.map((check, i) => (
                 <div 
@@ -447,15 +432,6 @@ function SystemHealthSection() {
             </div>
           </div>
         )}
-
-        <Button
-          className="mt-4 bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium rounded w-full sm:w-auto"
-          onClick={runTest}
-          disabled={loading}
-          data-testid="button-run-health-test"
-        >
-          {loading ? "Running..." : "Run Health Test"}
-        </Button>
       </div>
     </div>
   );
@@ -464,8 +440,6 @@ function SystemHealthSection() {
 export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8">
-      <RecentReportsSection />
-      
       <BalanceHero />
       
       <KPIGrid />

@@ -1,0 +1,77 @@
+You have access to the repo:
+https://github.com/colcamenterprises-collab/restaurant-management-system
+
+Implement the following changes on the HOME PAGE and SYSTEM HEALTH component. These are styling + UI + read-only checks only. Do NOT modify business logic or workflow.
+
+===========================================================
+A) REMOVE "Recent Reports" FROM HOME PAGE
+===========================================================
+- Delete the "Recent Reports" block entirely from Home.tsx.
+- This historical data should NOT appear on the home page.
+- Ensure no spacing gaps are left behind.
+
+===========================================================
+B) ADD NEW GREEN BUTTON:
+===========================================================
+Under the monthly expenses card, add a full-width button:
+
+Text: "View Latest Shift Report"
+Style:
+- Same green as existing
+- Rounded
+- Centered icon on left (document-text icon)
+On click:
+- Navigate to `/reports/latest`
+
+===========================================================
+C) SYSTEM HEALTH — COMPLETE UI REBUILD
+===========================================================
+Replace the current single donut chart with:
+
+1. A large “Overall Health” donut at the top.
+2. A row of 4–5 MINI DONUT GRAPHS:
+
+   • DB  
+   • APIs  
+   • Email  
+   • PDF  
+   • Ingredients  
+
+Requirements:
+- Each mini graph rendered using the existing chart library (Recharts or the existing donut component)
+- No text inside the mini graphs
+- On tap → show small tooltip with "OK" or error message
+- Layout is one row on tablet, two rows on mobile
+
+===========================================================
+D) HEALTH CHECK SHOULD AUTO-RUN ON PAGE LOAD
+===========================================================
+Remove the need to press “Run Health Test”.
+
+Automatically fetch `/api/system-health`.
+
+===========================================================
+E) BACKEND — FIX HEALTH CHECK FAILURE
+===========================================================
+Fix the error:
+“null value in column 'id' of relation 'daily_sales_v2' violates not-null constraint”
+
+Cause:
+The health check function is performing a query that expects a valid daily_sales_v2 record.
+
+Fix:
+- Change health check to READ-ONLY:
+    • Check if latest daily_sales_v2 exists (SELECT latest only)
+    • If none exists → return ok: false with message “No data yet”
+- Never insert or update during health check
+
+===========================================================
+F) DELIVERABLES
+===========================================================
+Before committing:
+1. Show me the modified files and diff.
+2. Provide screenshots/render previews of:
+   - Home page without Recent Reports
+   - New “View Latest Shift Report” button
+   - New System Health (large donut + mini donuts)
+3. Wait for approval before pushing to GitHub.
