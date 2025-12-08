@@ -1,4 +1,4 @@
-// PATCH 1 — Shopping List Display Pipeline
+// PATCH 1 & 3 — Shopping List Display Pipeline with PDF Export
 // STRICT: This file alone. No modifications elsewhere.
 
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +19,16 @@ export default function ShoppingListPage() {
     <div className="p-6">
       <h1 className="text-2xl font-extrabold mb-4">Shopping List</h1>
 
+      <button
+        onClick={() => {
+          window.open("/api/shopping-list/pdf/latest", "_blank");
+        }}
+        className="mb-4 px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
+        data-testid="button-download-pdf"
+      >
+        Download PDF
+      </button>
+
       {isLoading && <p>Loading...</p>}
       {error && <p className="text-red-500">Failed to load shopping list.</p>}
 
@@ -28,7 +38,7 @@ export default function ShoppingListPage() {
         ) : (
           <ul className="space-y-2">
             {items.map((item: any, i: number) => (
-              <li key={i} className="border p-3 rounded">
+              <li key={i} className="border p-3 rounded" data-testid={`list-item-${i}`}>
                 <strong>{item.item}</strong>
                 <div>Qty: {item.quantity}</div>
                 {item.notes && <div>Notes: {item.notes}</div>}

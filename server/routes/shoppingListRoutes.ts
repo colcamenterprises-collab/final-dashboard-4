@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import { db } from "../lib/prisma";
+import { generateShoppingListPDF } from "../services/shoppingListPDF";
 
 const router = Router();
 
@@ -29,6 +30,27 @@ router.get("/latest", async (req, res) => {
   } catch (err) {
     console.error("ShoppingList fetch error:", err);
     res.status(500).json({ error: "Failed to fetch shopping list" });
+  }
+});
+
+router.get("/pdf/latest", async (req, res) => {
+  try {
+    const pdfStream = await generateShoppingListPDF();
+
+    if (!pdfStream) {
+      return res.status(404).json({ error: "No shopping list available." });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=shopping-list.pdf"
+    );
+
+    pdfStream.pipe(res);
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    res.status(500).json({ error: "Failed to generate PDF" });
   }
 });
 
