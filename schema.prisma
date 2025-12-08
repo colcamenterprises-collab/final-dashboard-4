@@ -1636,3 +1636,17 @@ model shift_report_v2 {
   createdAt    DateTime @default(now())
 
 }
+
+
+// PATCH — EXPENSES V2
+model expenses_v2 {
+  id          String   @id @default(cuid())
+  date        DateTime
+  category    String
+  subcategory String?
+  description String?
+  amount      Float
+  paymentType String?
+  vendor      String?
+  createdAt   DateTime @default(now())
+}

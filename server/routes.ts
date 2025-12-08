@@ -80,6 +80,7 @@ import membershipRouter from "./routes/membership";
 import githubRouter from "./routes/github";
 import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
+import expensesV2Routes from "./routes/expensesV2Routes";
 // Email functionality will be added when needed
 
 
@@ -3187,6 +3188,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-field-mapping', purchasingFieldMappingRouter); // Purchasing field mapping admin UI
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
+  app.use('/api/expenses-v2', expensesV2Routes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

@@ -60,6 +60,35 @@ function ShiftAlertBanner() {
   );
 }
 
+// PATCH 7 — EXPENSES V2 TILE
+function ExpensesV2Tile() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/expenses-v2/summary"],
+    queryFn: async () => {
+      const res = await axios.get("/api/expenses-v2/summary");
+      return res.data;
+    },
+  });
+
+  const [, setLocation] = useLocation();
+
+  return (
+    <div className="border p-4 rounded bg-white shadow-sm" data-testid="expenses-v2-tile">
+      <h2 className="font-semibold text-slate-700 text-sm mb-2">Monthly Expenses (V2)</h2>
+      <div className="text-lg font-bold text-slate-800">
+        {isLoading ? "—" : `${(data?.monthlyTotal || 0).toLocaleString()} THB`}
+      </div>
+      <button
+        onClick={() => setLocation("/finance/expenses-v2")}
+        className="text-emerald-600 underline text-xs mt-2"
+        data-testid="link-view-expenses-v2"
+      >
+        View Expenses
+      </button>
+    </div>
+  );
+}
+
 // PATCH 7 — SHIFT HEALTH TILE
 function ShiftHealthTile() {
   const { data: report, isLoading } = useQuery({
@@ -526,6 +555,7 @@ export default function Home() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ShiftHealthTile />
+        <ExpensesV2Tile />
         <VarianceWidget />
       </div>
       

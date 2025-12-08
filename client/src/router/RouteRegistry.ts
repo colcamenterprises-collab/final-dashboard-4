@@ -28,6 +28,7 @@ export const ROUTES = {
   PROFIT_LOSS: "/finance/profit-loss",
   FINANCE_EXPENSES: "/finance/expenses",
   EXPENSES_IMPORT: "/finance/expenses-import",
+  EXPENSES_V2: "/finance/expenses-v2",
 
   // Menu Mgmt
   RECIPES: "/menu/recipes",
