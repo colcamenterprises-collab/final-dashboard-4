@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell } from "recharts";
 
 interface HealthCheck {
   name: string;
@@ -32,28 +32,25 @@ export function DoughnutChart({
     ];
     
     return (
-      <div className="relative w-16 h-16">
-        <Tooltip content={check.ok ? "✓ OK" : `✗ ${check.error || "Failed"}`} />
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              cx="50%"
-              cy="50%"
-              innerRadius={16}
-              outerRadius={28}
-              paddingAngle={2}
-              startAngle={90}
-              endAngle={-270}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <PieChart width={80} height={80}>
+          <Pie
+            data={data}
+            dataKey="value"
+            cx={40}
+            cy={40}
+            innerRadius={16}
+            outerRadius={28}
+            paddingAngle={2}
+            startAngle={90}
+            endAngle={-270}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+        </PieChart>
+      </svg>
     );
   }
 
@@ -79,20 +76,25 @@ export function DoughnutChart({
     return "text-red-600";
   };
 
-  const sizeClass = size === "lg" ? "w-40 h-40" : "w-32 h-32";
+  const width = size === "lg" ? 160 : 128;
+  const height = size === "lg" ? 160 : 128;
+  const cx = width / 2;
+  const cy = height / 2;
+  const innerRadius = size === "lg" ? 45 : 32;
+  const outerRadius = size === "lg" ? 70 : 55;
 
   return (
     <div className="relative flex flex-col items-center justify-center">
-      <div className={`relative ${sizeClass}`}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+      <div className="relative" style={{ width: `${width}px`, height: `${height}px` }}>
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+          <PieChart width={width} height={height}>
             <Pie
               data={data}
               dataKey="value"
-              cx="50%"
-              cy="50%"
-              innerRadius={size === "lg" ? 45 : 32}
-              outerRadius={size === "lg" ? 70 : 55}
+              cx={cx}
+              cy={cy}
+              innerRadius={innerRadius}
+              outerRadius={outerRadius}
               paddingAngle={2}
               startAngle={90}
               endAngle={-270}
@@ -102,7 +104,7 @@ export function DoughnutChart({
               ))}
             </Pie>
           </PieChart>
-        </ResponsiveContainer>
+        </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`${size === "lg" ? "text-2xl" : "text-xl"} font-bold ${getStatusColor()}`}>{passRate}%</span>
           <span className={`${size === "lg" ? "text-xs" : "text-[10px]"} text-slate-500`}>Health</span>
