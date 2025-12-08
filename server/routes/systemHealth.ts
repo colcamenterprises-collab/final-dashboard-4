@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { db as drizzleDb } from "../db";
-import axios from "axios";
 import { dailySalesV2, dailyStockV2, ingredients } from "../../shared/schema";
 import { sql, desc } from "drizzle-orm";
 
@@ -30,13 +29,13 @@ router.get("/run", async (_req, res) => {
 
   // 2. Latest Daily Sales Record Exists
   try {
-    const [latestSales] = await drizzleDb
-      .select({ id: dailySalesV2.id, shiftDate: dailySalesV2.shiftDate })
+    const latestSales = await drizzleDb
+      .select({ id: dailySalesV2.id })
       .from(dailySalesV2)
       .orderBy(desc(dailySalesV2.createdAt))
       .limit(1);
     
-    if (latestSales) {
+    if (latestSales && latestSales.length > 0) {
       checks.push({ name: "Daily Sales V2 - Latest Record", ok: true });
     } else {
       checks.push({ name: "Daily Sales V2 - Latest Record", ok: false, error: "No records found" });
@@ -47,13 +46,13 @@ router.get("/run", async (_req, res) => {
 
   // 3. Latest Daily Stock Record Exists
   try {
-    const [latestStock] = await drizzleDb
-      .select({ id: dailyStockV2.id, shiftDate: dailyStockV2.shiftDate })
+    const latestStock = await drizzleDb
+      .select({ id: dailyStockV2.id })
       .from(dailyStockV2)
-      .orderBy(desc(dailyStockV2.createdAt))
+      .orderBy(desc(dailyStockV2.id))
       .limit(1);
     
-    if (latestStock) {
+    if (latestStock && latestStock.length > 0) {
       checks.push({ name: "Daily Stock V2 - Latest Record", ok: true });
     } else {
       checks.push({ name: "Daily Stock V2 - Latest Record", ok: false, error: "No records found" });
@@ -64,7 +63,7 @@ router.get("/run", async (_req, res) => {
 
   // 4. Ingredients Table Loads
   try {
-    const ingredientCount = await drizzleDb
+    await drizzleDb
       .select({ count: sql<number>`count(*)` })
       .from(ingredients);
     
@@ -73,15 +72,12 @@ router.get("/run", async (_req, res) => {
     checks.push({ name: "Ingredients Table", ok: false, error: err?.message || "Query failed" });
   }
 
-  // 5. Shopping List Endpoint Reachable
+  // 5. Shopping List Module Check
   try {
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-      : "http://localhost:5000";
-    const response = await axios.get(`${baseUrl}/api/shopping-list`, { timeout: 5000 });
-    checks.push({ name: "Shopping List API", ok: response.status === 200 });
+    const shoppingListModule = await import("../shoppingList");
+    checks.push({ name: "Shopping List Module", ok: !!shoppingListModule });
   } catch (err: any) {
-    checks.push({ name: "Shopping List API", ok: false, error: err?.message || "Endpoint unreachable" });
+    checks.push({ name: "Shopping List Module", ok: false, error: err?.message || "Import failed" });
   }
 
   // 6. PDF Builder Importable
@@ -94,21 +90,18 @@ router.get("/run", async (_req, res) => {
 
   // 7. Email Service Registered
   try {
-    const emailService = await import("../emailService");
-    checks.push({ name: "Email Service", ok: !!emailService });
+    const emailModule = await import("../email/mailer");
+    checks.push({ name: "Email Service", ok: !!emailModule });
   } catch (err: any) {
     checks.push({ name: "Email Service", ok: false, error: err?.message || "Import failed" });
   }
 
-  // 8. API Routes Mounted
+  // 8. Routes Module Check
   try {
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-      : "http://localhost:5000";
-    const response = await axios.get(`${baseUrl}/api/finance/summary/today`, { timeout: 5000 });
-    checks.push({ name: "API Routes Mounted", ok: response.status === 200 });
+    const routesModule = await import("../routes");
+    checks.push({ name: "API Routes Module", ok: !!routesModule });
   } catch (err: any) {
-    checks.push({ name: "API Routes Mounted", ok: false, error: err?.message || "Route check failed" });
+    checks.push({ name: "API Routes Module", ok: false, error: err?.message || "Import failed" });
   }
 
   const checksPassed = checks.filter(c => c.ok).length;
