@@ -79,6 +79,7 @@ import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 import membershipRouter from "./routes/membership";
 import githubRouter from "./routes/github";
 import imageUploadRouter from "./routes/imageUpload";
+import shiftReportRoutes from "./routes/shiftReportRoutes";
 // Email functionality will be added when needed
 
 
@@ -1087,6 +1088,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);
+
+  // Shift Report V2
+  app.use("/api/shift-report", shiftReportRoutes);
 
   // Online Ordering API (namespaced to avoid conflicts)
   app.get("/api/ordering/menu", (_, res) => {

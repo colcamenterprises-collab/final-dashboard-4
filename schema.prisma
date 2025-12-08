@@ -1621,3 +1621,18 @@ model PurchasingItem {
 
   @@map("purchasing_items")
 }
+
+// PATCH 1 — SHIFT REPORT REBUILD MODULE
+model shift_report_v2 {
+  id           String   @id @default(cuid())
+  shiftDate    DateTime
+  salesId      String?
+  stockId      String?
+  posData      Json?
+  salesData    Json?
+  stockData    Json?
+  variances    Json?
+  aiInsights   String?
+  createdAt    DateTime @default(now())
+
+}

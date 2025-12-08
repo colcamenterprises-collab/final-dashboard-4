@@ -1,0 +1,231 @@
+🚨 REPLIT AGENT — STRICT RULES FOR THIS PATCH
+
+DO ONLY THE FOLLOWING:
+
+Apply the code EXACTLY as provided
+
+Only in the files listed below
+
+Save the changes and exit
+
+
+DO NOT:
+
+Do NOT modify Daily Sales V2
+
+Do NOT modify Daily Stock V2
+
+Do NOT modify Drizzle tables
+
+Do NOT modify any existing Fort Knox modules
+
+Do NOT modify shopping list logic
+
+Do NOT restructure or refactor
+
+Do NOT rename imports or auto-format the project
+
+Do NOT add new dependencies
+
+
+Agent: Paste EXACTLY the code below. Nothing else.
+
+
+---
+
+✅ PATCH 1 — SHIFT REPORT V2 FOUNDATION
+
+
+---
+
+1. Add Prisma Table: shift_report_v2
+
+File: server/prisma/schema.prisma
+(Add this block at the bottom WITH NO changes to existing models)
+
+// PATCH 1 — SHIFT REPORT REBUILD MODULE
+model shift_report_v2 {
+  id           String   @id @default(cuid())
+  shiftDate    DateTime
+  salesId      String?
+  stockId      String?
+  posData      Json?
+  salesData    Json?
+  stockData    Json?
+  variances    Json?
+  aiInsights   String?
+  createdAt    DateTime @default(now())
+
+  // Optional relations
+  DailySalesV2 dailySalesV2 @relation(fields: [salesId], references: [id])
+  DailyStockV2 dailyStockV2 @relation(fields: [stockId], references: [salesId])
+}
+
+
+---
+
+2. Create Backend Service Skeleton
+
+Create file:
+server/services/shiftReportBuilder.ts
+
+// PATCH 1 — SHIFT REPORT BUILDER SKELETON
+// STRICT: No business logic yet. No modification of other modules.
+
+import prisma from "../prismaClient";
+
+export async function buildShiftReport(shiftDate: Date) {
+  try {
+    // Placeholder — will be completed in Patch 2
+    console.log("Shift Report Builder triggered for:", shiftDate);
+
+    const report = await prisma.shift_report_v2.create({
+      data: {
+        shiftDate,
+        // Empty skeleton fields — to be filled later
+        posData: {},
+        salesData: {},
+        stockData: {},
+        variances: {},
+        aiInsights: "",
+      },
+    });
+
+    return report;
+  } catch (err) {
+    console.error("Shift Report Builder error:", err);
+    return null;
+  }
+}
+
+
+---
+
+3. Create Shift Report Routes Skeleton
+
+Create file:
+server/routes/shiftReportRoutes.ts
+
+// PATCH 1 — SHIFT REPORT ROUTES SKELETON
+// STRICT: No business logic yet.
+
+import { Router } from "express";
+import prisma from "../prismaClient";
+import { buildShiftReport } from "../services/shiftReportBuilder";
+
+const router = Router();
+
+// Generate manually (later auto-scheduled)
+router.post("/generate", async (req, res) => {
+  try {
+    const { shiftDate } = req.body;
+
+    if (!shiftDate) {
+      return res.status(400).json({ error: "shiftDate is required" });
+    }
+
+    const report = await buildShiftReport(new Date(shiftDate));
+    return res.json({ success: true, report });
+  } catch (err) {
+    console.error("Shift Report generation error:", err);
+    res.status(500).json({ error: "Failed to generate shift report" });
+  }
+});
+
+// Fetch latest shift report
+router.get("/latest", async (req, res) => {
+  try {
+    const report = await prisma.shift_report_v2.findFirst({
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(report || null);
+  } catch (err) {
+    console.error("Fetch latest shift report error:", err);
+    res.status(500).json({ error: "Failed to fetch latest shift report" });
+  }
+});
+
+// Fetch history
+router.get("/history", async (req, res) => {
+  try {
+    const list = await prisma.shift_report_v2.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ reports: list });
+  } catch (err) {
+    console.error("Fetch shift report history error:", err);
+    res.status(500).json({ error: "Failed to fetch report history" });
+  }
+});
+
+// Fetch by ID
+router.get("/view/:id", async (req, res) => {
+  try {
+    const report = await prisma.shift_report_v2.findUnique({
+      where: { id: req.params.id },
+    });
+
+    res.json(report || null);
+  } catch (err) {
+    console.error("Fetch report error:", err);
+    res.status(500).json({ error: "Failed to fetch report" });
+  }
+});
+
+export default router;
+
+
+---
+
+4. Register the New Routes
+
+File: server/routes.ts
+(Add this line within the existing route registrations)
+
+import shiftReportRoutes from "./routes/shiftReportRoutes";
+app.use("/api/shift-report", shiftReportRoutes);
+
+No other modifications.
+
+
+---
+
+5. (Optional for Agent) Run Prisma Migration
+
+If required, the agent may run:
+
+npx prisma migrate dev --name shift_report_v2_init
+
+Agent: ONLY run this if necessary for schema update.
+
+
+---
+
+🎉 PATCH 1 COMPLETE
+
+This successfully sets up:
+
+Database table
+
+Service layer
+
+API routes
+
+Safe foundation for Shift Report logic
+
+
+No business logic is added yet — that comes in Patch 2, where we begin merging:
+
+Daily Sales V2
+
+Daily Stock V2
+
+POS Shift Report
+
+Variance calculation
+
+
+
+---
