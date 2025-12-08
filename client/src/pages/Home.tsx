@@ -51,7 +51,7 @@ function BalanceHero() {
         
         <div className="flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => setLocation('/reports/latest')}
+            onClick={() => setLocation('/operations/daily-reports')}
             className="bg-white/15 hover:bg-white/25 active:bg-white/35 text-white border border-white/20 w-full sm:w-auto text-xs font-medium py-2 px-3 rounded transition-colors flex items-center justify-center gap-2"
             data-testid="button-view-latest-report"
           >
