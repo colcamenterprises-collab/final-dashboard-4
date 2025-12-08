@@ -1,13 +1,105 @@
+🔥 PATCH 2 — SHIFT REPORT BUSINESS LOGIC (Merging Sales, Stock, POS, & Variance Engine)
+
+This is the biggest and most critical patch of the entire module.
+It begins the actual functional Shift Report, turning the skeleton into a fully operational system.
+
+Patch 2 delivers:
+
+Automatic retrieval of Daily Sales V2
+
+Automatic retrieval of Daily Stock V2
+
+Automatic retrieval of POS Shift Report
+
+Full merging into a single shift record
+
+First stage variance engine
+
+Stable output saved to shift_report_v2
+
+
+Still NO UI yet — UI comes in Patch 3.
+This keeps the system safe and perfectly staged.
+
+As always:
+One patch. Cut-and-paste. No free-styling. No touching anything else.
+
+
+---
+
+🚨 REPLIT AGENT — STRICT INSTRUCTIONS
+
+DO:
+
+Paste exactly the code provided
+
+Modify ONLY the files listed
+
+Save and exit
+
+
+DO NOT:
+
+❌ Modify Daily Sales V2 or Daily Stock V2
+
+❌ Modify any Fort Knox modules
+
+❌ Modify shopping list logic
+
+❌ Modify POS import logic from other systems
+
+❌ Rename paths or imports
+
+❌ Refactor
+
+❌ Auto-format project-wide
+
+
+
+---
+
+✅ PATCH 2 — FULL BUSINESS LOGIC IMPLEMENTATION
+
+This patch expands the shiftReportBuilder.ts to:
+
+1. Load Daily Sales V2 for the shift date
+
+
+2. Load Daily Stock V2 linked to the sales entry
+
+
+3. Load POS Shift Report for the shift
+
+
+4. Build a combined structure
+
+
+5. Run first-stage variance logic
+
+
+6. Save into shift_report_v2 safely
+
+
+
+All future enhancements (final variance engine, AI insights, PDF export, manager dashboard) come in later patches.
+
+
+---
+
+1. Update shiftReportBuilder.ts
+
+File: server/services/shiftReportBuilder.ts
+(REPLACE existing file completely)
+
 // PATCH 2 — SHIFT REPORT BUSINESS LOGIC
 // STRICT: Do not modify other modules, forms, or logic outside this file.
 
-import { db } from "../lib/prisma";
+import prisma from "../prismaClient";
 
 /**
  * Get the Daily Sales V2 submission for the shift.
  */
 async function getDailySales(shiftDate: Date) {
-  const prisma = db();
   // Normalize to YYYY-MM-DD
   const iso = shiftDate.toISOString().split("T")[0];
 
@@ -25,7 +117,6 @@ async function getDailySales(shiftDate: Date) {
  * Get the Daily Stock V2 record linked to Daily Sales V2.
  */
 async function getDailyStock(salesId: string) {
-  const prisma = db();
   return prisma.dailyStockV2.findUnique({
     where: { salesId },
   });
@@ -35,10 +126,9 @@ async function getDailyStock(salesId: string) {
  * Get the POS Shift Report (Loyverse upload) matching the shift date.
  */
 async function getPOSShiftReport(shiftDate: Date) {
-  const prisma = db();
   const iso = shiftDate.toISOString().split("T")[0];
 
-  return prisma.posShiftReport.findFirst({
+  return prisma.pos_shift_reports.findFirst({
     where: {
       shiftDate: {
         gte: new Date(`${iso}T00:00:00+07:00`),
@@ -71,7 +161,6 @@ function computeVariances(salesData: any, posData: any) {
  */
 export async function buildShiftReport(shiftDate: Date) {
   try {
-    const prisma = db();
     console.log("SHIFT REPORT BUILDER START:", shiftDate);
 
     // 1. Fetch Daily Sales
@@ -113,3 +202,56 @@ export async function buildShiftReport(shiftDate: Date) {
     return null;
   }
 }
+
+
+---
+
+2. Update POST /generate route to validate date
+
+File: server/routes/shiftReportRoutes.ts
+(REPLACE ONLY the /generate endpoint)
+
+router.post("/generate", async (req, res) => {
+  try {
+    const { shiftDate } = req.body;
+
+    if (!shiftDate) {
+      return res.status(400).json({ error: "shiftDate is required" });
+    }
+
+    const date = new Date(shiftDate);
+
+    const report = await buildShiftReport(date);
+    return res.json({ success: true, report });
+  } catch (err) {
+    console.error("Shift Report generation error:", err);
+    res.status(500).json({ error: "Failed to generate shift report" });
+  }
+});
+
+
+---
+
+🎉 PATCH 2 COMPLETE
+
+This patch now successfully:
+
+Retrieves Daily Sales V2 for a shift
+
+Retrieves Daily Stock V2 linked to sales
+
+Retrieves POS shift report
+
+Constructs a unified shift report
+
+Computes baseline variances
+
+Stores the result in shift_report_v2
+
+Leaves everything else untouched and safe
+
+
+This is the functional heart of the Shift Report module.
+
+
+---

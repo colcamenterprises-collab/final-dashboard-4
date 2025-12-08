@@ -1,5 +1,5 @@
-// PATCH 1 — SHIFT REPORT ROUTES SKELETON
-// STRICT: No business logic yet.
+// PATCH 1+2 — SHIFT REPORT ROUTES
+// Business logic added in Patch 2.
 
 import { Router } from "express";
 import { db } from "../lib/prisma";
@@ -16,7 +16,9 @@ router.post("/generate", async (req, res) => {
       return res.status(400).json({ error: "shiftDate is required" });
     }
 
-    const report = await buildShiftReport(new Date(shiftDate));
+    const date = new Date(shiftDate);
+
+    const report = await buildShiftReport(date);
     return res.json({ success: true, report });
   } catch (err) {
     console.error("Shift Report generation error:", err);
