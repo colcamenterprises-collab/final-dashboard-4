@@ -328,8 +328,8 @@ function SystemHealthSection() {
       <h2 className="text-xl font-extrabold text-gray-800 mb-6">System Health</h2>
 
       {/* Overall Health Donut */}
-      <div className="flex flex-col md:flex-row gap-6 items-center md:items-start mb-6">
-        <div className="flex-shrink-0">
+      <div className="flex flex-col md:flex-row gap-8 items-center md:items-start mb-6">
+        <div className="flex-shrink-0 w-48 h-48">
           <DoughnutChart 
             checks={health?.checks} 
             checksPassed={checksPassed} 
@@ -337,7 +337,7 @@ function SystemHealthSection() {
           />
         </div>
 
-        <div className="flex-1 w-full text-center md:text-left">
+        <div className="flex-1 min-w-0 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
             <status.icon className={`h-5 w-5 text-${status.color}-600`} />
             <span className={`text-lg font-bold text-${status.color}-600`}>
