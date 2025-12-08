@@ -1,14 +1,27 @@
-// PATCH 1 — Shopping List Fetch Route
-// STRICT: New file only, do not modify existing logic.
+// PATCH 2 — SHOPPING LIST PROTECTION & TRIPWIRES
+// ONLY retrieval is allowed via this route.
+// Mutation is strictly forbidden.
 
 import { Router } from "express";
 import { db } from "../lib/prisma";
 
 const router = Router();
 
+// Tripwire — Block all non-GET methods
+router.use((req, res, next) => {
+  if (req.method !== "GET") {
+    console.error("BLOCKED: Unauthorized shopping list mutation attempt.");
+    return res.status(403).json({
+      error: "Shopping List is protected. Only GET operations are permitted.",
+    });
+  }
+  next();
+});
+
 router.get("/latest", async (req, res) => {
   try {
-    const latest = await db().shoppingListV2.findFirst({
+    const prisma = db();
+    const latest = await prisma.shoppingListV2.findFirst({
       orderBy: { createdAt: "desc" },
     });
 

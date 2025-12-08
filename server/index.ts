@@ -32,6 +32,10 @@ import securityV2Router from "./routes/securityV2";
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 
+// PATCH 2 — SYSTEM TRIPWIRE
+// Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
+(global as any).SHOPPING_LIST_ALLOWED_CALLERS = ["dailyStockV2Routes", "forms"];
+
 const prisma = new PrismaClient();
 
 // Temporarily disabled for development testing

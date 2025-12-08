@@ -1,0 +1,225 @@
+🚨 PATCH 2 — FORT KNOX LOCKDOWN FOR SHOPPING LIST PIPELINE
+
+This patch is purely protection & enforcement.
+
+It ensures:
+
+No other part of the system can accidentally manipulate the shopping list
+
+Daily Sales V2 cannot contaminate the list
+
+Daily Stock V2 is the ONLY authoritative trigger
+
+Shopping List V2 table cannot be overwritten incorrectly
+
+Replit agent cannot "helpfully refactor" anything
+
+Tripwires stop any future agent from touching forbidden files
+
+Validation prevents malformed data entering DB
+
+
+This is a hardening patch, no UI or workflow changes.
+
+Delivered as a single, direct, cut-and-paste patch with strict agent boundaries.
+
+
+---
+
+🚨 REPLIT AGENT — DO NOT VIOLATE THESE RULES
+
+DO
+
+1. Apply ONLY the code exactly shown.
+
+
+2. Modify ONLY the specified files.
+
+
+3. Save and exit — no refactoring anywhere else.
+
+
+
+DO NOT
+
+❌ Do NOT modify Daily Sales V2 or its schema
+
+❌ Do NOT modify any forms
+
+❌ Do NOT modify any unrelated routes
+
+❌ Do NOT modify any Drizzle or Fort Knox code
+
+❌ Do NOT change imports to “fix” formatting
+
+❌ Do NOT move files or touch folder structure
+
+❌ Do NOT rename files or variables
+
+❌ Do NOT auto-format entire project
+
+
+Agent: Paste the code EXACTLY as provided. Nothing else.
+
+
+---
+
+✅ PATCH 2 — FULL CONTENT
+
+
+---
+
+1. Add Validation & Guard Layer to Shopping List Builder
+
+File: server/services/shoppingListBuilder.ts
+(REPLACE the entire file with the below)
+
+// PATCH 2 — FORT KNOX LOCKDOWN FOR SHOPPING LIST PIPELINE
+// STRICT: Do NOT modify any unrelated logic. 
+// Do NOT allow ANY shopping list logic outside this file.
+
+import prisma from "../prismaClient";
+
+/**
+ * Input sanitizer — prevents malformed, blank, or tampered items.
+ */
+function normalizeItem(item: any) {
+  if (!item) return null;
+  if (!item.item || typeof item.item !== "string") return null;
+
+  return {
+    item: item.item.trim(),
+    quantity: Number(item.quantity || 1),
+    notes: item.notes?.trim() || "",
+  };
+}
+
+/**
+ * Build the shopping list strictly from:
+ * - Daily Stock V2 requisition fields (authoritative)
+ * - Optional shopping items from Sales (only if non-empty)
+ *
+ * NO OTHER SOURCE IS PERMITTED.
+ */
+export async function buildShoppingList(salesId: string) {
+  // Enforce linkage
+  if (!salesId) {
+    console.error("Blocked attempt: Missing salesId.");
+    return null;
+  }
+
+  // Load Daily Stock V2 (mandatory)
+  const stock = await prisma.dailyStockV2.findUnique({
+    where: { salesId },
+  });
+
+  if (!stock) {
+    console.error(
+      "Blocked attempt: Shopping list cannot generate without Daily Stock V2."
+    );
+    return null;
+  }
+
+  // Mandatory source — requisition_items
+  const requisition = Array.isArray(stock.requisition_items)
+    ? stock.requisition_items
+    : [];
+
+  // Safe optional inclusion from sales
+  const sales = await prisma.dailySalesV2.findUnique({
+    where: { id: salesId },
+  });
+
+  const salesShopping =
+    sales?.shopping_items?.filter((x: any) => x?.item?.trim()) || [];
+
+  // Normalize & clean
+  const combinedRaw = [...requisition, ...salesShopping];
+  const combined = combinedRaw
+    .map((i) => normalizeItem(i))
+    .filter((i) => i !== null);
+
+  // Tripwire: Empty lists are allowed but must be intentional
+  if (!combined.length) {
+    console.warn(
+      "Shopping list generated but empty — check staff input (not an error)."
+    );
+  }
+
+  // Upsert = overwrite only THIS shift — never others
+  const result = await prisma.shoppingListV2.upsert({
+    where: { salesId },
+    update: { items: combined },
+    create: { salesId, items: combined },
+  });
+
+  console.log("Shopping List locked & saved for shift:", salesId);
+  return result;
+}
+
+
+---
+
+2. Add Tripwire Middleware to Prevent Unauthorized Modification
+
+File: server/routes/shoppingListRoutes.ts
+(REPLACE with the following)
+
+// PATCH 2 — SHOPPING LIST PROTECTION & TRIPWIRES
+// ONLY retrieval is allowed via this route.
+// Mutation is strictly forbidden.
+
+import { Router } from "express";
+import prisma from "../prismaClient";
+
+const router = Router();
+
+// Tripwire — Block all non-GET methods
+router.use((req, res, next) => {
+  if (req.method !== "GET") {
+    console.error("BLOCKED: Unauthorized shopping list mutation attempt.");
+    return res.status(403).json({
+      error: "Shopping List is protected. Only GET operations are permitted.",
+    });
+  }
+  next();
+});
+
+router.get("/latest", async (req, res) => {
+  try {
+    const latest = await prisma.shoppingListV2.findFirst({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json(latest || { items: [] });
+  } catch (err) {
+    console.error("ShoppingList fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch shopping list" });
+  }
+});
+
+export default router;
+
+
+---
+
+3. Add Backend Tripwire to Prevent Other Modules from Calling Builder
+
+File: server/index.ts
+(ADD this near the top — Agent: do NOT move or refactor imports)
+
+// PATCH 2 — SYSTEM TRIPWIRE
+// Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
+(global as any).SHOPPING_LIST_ALLOWED_CALLERS = ["dailyStockV2Routes"];
+
+Then in shoppingListBuilder.ts, ADD this at the top of buildShoppingList after the salesId check:
+
+// Caller validation — hard block unknown entry points
+const caller = (new Error().stack || "").toString();
+if (!caller.includes("dailyStockV2Routes")) {
+  console.error("BLOCKED: Unauthorized module attempted to build shopping list.");
+  return null;
+}
+
+
+---
