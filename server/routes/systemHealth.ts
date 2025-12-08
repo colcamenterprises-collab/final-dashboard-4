@@ -1,136 +1,127 @@
 import { Router } from "express";
 import { db as drizzleDb } from "../db";
 import axios from "axios";
-import { dailyReportsV2, dailySalesV2, dailyStockV2, rollPurchasesV2, meatPurchasesV2, drinkPurchasesV2 } from "../../shared/schema";
-import { sql } from "drizzle-orm";
-import { compileDailyReportV2 } from "../services/dailyReportV2";
-import { buildDailyReportPDF } from "../pdf/dailyReportV2.pdf";
-import { calculateVarianceV2 } from "../services/varianceEngineV2";
+import { dailySalesV2, dailyStockV2, ingredients } from "../../shared/schema";
+import { sql, desc } from "drizzle-orm";
 
 const router = Router();
 
+interface HealthCheck {
+  name: string;
+  ok: boolean;
+  error?: string;
+}
+
 /**
  * System Health Test Runner
- * Full pipeline validation including purchased stock
+ * READ-ONLY checks to validate system components
  */
 router.get("/run", async (_req, res) => {
   const start = Date.now();
-  const today = new Date().toISOString().split("T")[0];
+  const checks: HealthCheck[] = [];
 
-  let results = {
-    salesCreated: false,
-    stockCreated: false,
-    purchasedRolls: false,
-    purchasedMeat: false,
-    purchasedDrinks: false,
-    shoppingList: false,
-    reportJson: false,
-    reportPdf: false,
-    variance: false,
-    errors: [] as string[]
-  };
-
+  // 1. Database Connection
   try {
-    // 1. Create Daily Sales V2
-    const [sales] = await drizzleDb
-      .insert(dailySalesV2)
-      .values({
-        shiftDate: today,
-        completedBy: "system-test",
-        startingCash: 0,
-        cashSales: 1000,
-        qrSales: 500,
-        grabSales: 300,
-        otherSales: 0,
-        totalSales: 1800,
-        createdAt: new Date()
-      })
-      .returning();
-
-    const salesId = sales.id;
-    results.salesCreated = true;
-
-    // 2. Create Daily Stock V2 with Purchased Stock
-    const [stock] = await drizzleDb
-      .insert(dailyStockV2)
-      .values({
-        salesId,
-        shiftDate: today,
-        rollsEnd: 80,
-        meatEndKg: 2,
-        drinkStockJson: { Coke: 12, Sprite: 4 },
-        rollsPurchased: 140,
-        meatPurchasedGrams: 3000,
-        meatPurchasedUnit: "g",
-        drinksPurchasedJson: { Coke: 24, Sprite: 12 },
-        createdAt: new Date()
-      })
-      .returning();
-
-    results.stockCreated = true;
-
-    // 3. Validate Purchased Rolls Ledger
-    const rollRecs = await drizzleDb
-      .select()
-      .from(rollPurchasesV2)
-      .where(sql`"shiftDate" = ${today}`);
-    results.purchasedRolls = rollRecs.length > 0;
-
-    // 4. Validate Purchased Meat Ledger
-    const meatRecs = await drizzleDb
-      .select()
-      .from(meatPurchasesV2)
-      .where(sql`"shiftDate" = ${today}`);
-    results.purchasedMeat = meatRecs.length > 0;
-
-    // 5. Validate Purchased Drinks Ledger
-    const drinkRecs = await drizzleDb
-      .select()
-      .from(drinkPurchasesV2)
-      .where(sql`"shiftDate" = ${today}`);
-    results.purchasedDrinks = drinkRecs.length > 0;
-
-    // 6. Check Shopping List (may or may not exist - not critical)
-    // Just flag as true if the workflow completed without error
-    results.shoppingList = true;
-
-    // 7. Build Report JSON
-    const reportJson = await compileDailyReportV2(today);
-    if (reportJson && reportJson.purchasedStock) {
-      results.reportJson = true;
-    }
-
-    // 8. Validate Variance
-    if (reportJson && reportJson.variance && reportJson.variance.rolls && reportJson.variance.meat) {
-      results.variance = true;
-    }
-
-    // 9. Build PDF
-    try {
-      const pdfBytes = await buildDailyReportPDF(reportJson);
-      if (pdfBytes && pdfBytes.length > 1000) {
-        results.reportPdf = true;
-      }
-    } catch (pdfErr) {
-      console.warn("PDF build warning:", pdfErr);
-      // Don't fail the whole test - PDF is nice-to-have
-    }
-
-    res.json({
-      ok: true,
-      results,
-      durationMs: Date.now() - start,
-      timestamp: new Date().toISOString()
-    });
+    await drizzleDb.execute(sql`SELECT 1`);
+    checks.push({ name: "Database Connection", ok: true });
   } catch (err: any) {
-    results.errors.push(err?.message || "Unknown error");
-    res.json({
-      ok: false,
-      results,
-      durationMs: Date.now() - start,
-      timestamp: new Date().toISOString()
-    });
+    checks.push({ name: "Database Connection", ok: false, error: err?.message || "Connection failed" });
   }
+
+  // 2. Latest Daily Sales Record Exists
+  try {
+    const [latestSales] = await drizzleDb
+      .select({ id: dailySalesV2.id, shiftDate: dailySalesV2.shiftDate })
+      .from(dailySalesV2)
+      .orderBy(desc(dailySalesV2.createdAt))
+      .limit(1);
+    
+    if (latestSales) {
+      checks.push({ name: "Daily Sales V2 - Latest Record", ok: true });
+    } else {
+      checks.push({ name: "Daily Sales V2 - Latest Record", ok: false, error: "No records found" });
+    }
+  } catch (err: any) {
+    checks.push({ name: "Daily Sales V2 - Latest Record", ok: false, error: err?.message || "Query failed" });
+  }
+
+  // 3. Latest Daily Stock Record Exists
+  try {
+    const [latestStock] = await drizzleDb
+      .select({ id: dailyStockV2.id, shiftDate: dailyStockV2.shiftDate })
+      .from(dailyStockV2)
+      .orderBy(desc(dailyStockV2.createdAt))
+      .limit(1);
+    
+    if (latestStock) {
+      checks.push({ name: "Daily Stock V2 - Latest Record", ok: true });
+    } else {
+      checks.push({ name: "Daily Stock V2 - Latest Record", ok: false, error: "No records found" });
+    }
+  } catch (err: any) {
+    checks.push({ name: "Daily Stock V2 - Latest Record", ok: false, error: err?.message || "Query failed" });
+  }
+
+  // 4. Ingredients Table Loads
+  try {
+    const ingredientCount = await drizzleDb
+      .select({ count: sql<number>`count(*)` })
+      .from(ingredients);
+    
+    checks.push({ name: "Ingredients Table", ok: true });
+  } catch (err: any) {
+    checks.push({ name: "Ingredients Table", ok: false, error: err?.message || "Query failed" });
+  }
+
+  // 5. Shopping List Endpoint Reachable
+  try {
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : "http://localhost:5000";
+    const response = await axios.get(`${baseUrl}/api/shopping-list`, { timeout: 5000 });
+    checks.push({ name: "Shopping List API", ok: response.status === 200 });
+  } catch (err: any) {
+    checks.push({ name: "Shopping List API", ok: false, error: err?.message || "Endpoint unreachable" });
+  }
+
+  // 6. PDF Builder Importable
+  try {
+    const { buildDailyReportPDF } = await import("../pdf/dailyReportV2.pdf");
+    checks.push({ name: "PDF Builder Module", ok: typeof buildDailyReportPDF === "function" });
+  } catch (err: any) {
+    checks.push({ name: "PDF Builder Module", ok: false, error: err?.message || "Import failed" });
+  }
+
+  // 7. Email Service Registered
+  try {
+    const emailService = await import("../emailService");
+    checks.push({ name: "Email Service", ok: !!emailService });
+  } catch (err: any) {
+    checks.push({ name: "Email Service", ok: false, error: err?.message || "Import failed" });
+  }
+
+  // 8. API Routes Mounted
+  try {
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : "http://localhost:5000";
+    const response = await axios.get(`${baseUrl}/api/finance/summary/today`, { timeout: 5000 });
+    checks.push({ name: "API Routes Mounted", ok: response.status === 200 });
+  } catch (err: any) {
+    checks.push({ name: "API Routes Mounted", ok: false, error: err?.message || "Route check failed" });
+  }
+
+  const checksPassed = checks.filter(c => c.ok).length;
+  const totalChecks = checks.length;
+
+  res.json({
+    ok: checksPassed === totalChecks,
+    checksPassed,
+    totalChecks,
+    checks,
+    durationMs: Date.now() - start,
+    timestamp: new Date().toISOString()
+  });
 });
 
 export default router;

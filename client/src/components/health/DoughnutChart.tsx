@@ -1,53 +1,66 @@
-import { PieChart, Pie, Cell } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
-interface DoughnutChartProps {
-  results?: Record<string, boolean>;
+interface HealthCheck {
+  name: string;
+  ok: boolean;
+  error?: string;
 }
 
-export function DoughnutChart({ results }: DoughnutChartProps) {
-  if (!results) {
+interface DoughnutChartProps {
+  checks?: HealthCheck[];
+  checksPassed?: number;
+  totalChecks?: number;
+}
+
+export function DoughnutChart({ checks, checksPassed = 0, totalChecks = 0 }: DoughnutChartProps) {
+  if (!checks || checks.length === 0) {
     return (
-      <div className="w-64 h-64 flex items-center justify-center text-slate-500 text-sm">
+      <div className="w-48 h-48 flex items-center justify-center text-slate-500 text-sm">
         Loading health data...
       </div>
     );
   }
 
+  const passRate = totalChecks > 0 ? Math.round((checksPassed / totalChecks) * 100) : 0;
+
   const data = [
-    { name: "Sales", value: results.salesCreated ? 1 : 0 },
-    { name: "Stock", value: results.stockCreated ? 1 : 0 },
-    { name: "Purchased Rolls", value: results.purchasedRolls ? 1 : 0 },
-    { name: "Purchased Meat", value: results.purchasedMeat ? 1 : 0 },
-    { name: "Purchased Drinks", value: results.purchasedDrinks ? 1 : 0 },
-    { name: "Shopping List", value: results.shoppingList ? 1 : 0 },
-    { name: "Report JSON", value: results.reportJson ? 1 : 0 },
-    { name: "Report PDF", value: results.reportPdf ? 1 : 0 }
+    { name: "Passed", value: checksPassed, color: "#10b981" },
+    { name: "Failed", value: totalChecks - checksPassed, color: "#ef4444" }
   ];
 
-  const COLORS = ["#10b981", "#ef4444"]; // green for passed, red for failed
+  const getStatusColor = () => {
+    if (passRate >= 80) return "text-emerald-600";
+    if (passRate >= 50) return "text-amber-600";
+    return "text-red-600";
+  };
 
   return (
-    <div className="flex justify-center">
-      <PieChart width={260} height={260}>
-        <Pie
-          data={data}
-          dataKey="value"
-          cx="50%"
-          cy="50%"
-          innerRadius={70}
-          outerRadius={110}
-          paddingAngle={2}
-          startAngle={90}
-          endAngle={-270}
-        >
-          {data.map((entry, index) => (
-            <Cell
-              key={`cell-${index}`}
-              fill={entry.value === 1 ? COLORS[0] : COLORS[1]}
-            />
-          ))}
-        </Pie>
-      </PieChart>
+    <div className="relative flex flex-col items-center justify-center">
+      <div className="relative w-40 h-40">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              cx="50%"
+              cy="50%"
+              innerRadius={45}
+              outerRadius={70}
+              paddingAngle={2}
+              startAngle={90}
+              endAngle={-270}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-2xl font-bold ${getStatusColor()}`}>{passRate}%</span>
+          <span className="text-xs text-slate-500">Health</span>
+        </div>
+      </div>
     </div>
   );
 }

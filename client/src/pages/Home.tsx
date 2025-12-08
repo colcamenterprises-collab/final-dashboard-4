@@ -20,7 +20,10 @@ import {
   ArrowDownLeft,
   FileText,
   Globe,
-  Package
+  Package,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import axios from "axios";
 
@@ -36,7 +39,6 @@ function BalanceHero() {
 
   return (
     <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
-      {/* Background decoration */}
       <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
       <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
       
@@ -46,7 +48,6 @@ function BalanceHero() {
           ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h1>
         
-        {/* Quick Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
           <StockLodgmentModal
             triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
@@ -165,7 +166,7 @@ function PrimeCostCards() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="rounded-lg border p-4 bg-white shadow-sm">
         <div className="text-sm text-slate-600 font-semibold">Prime Cost — Latest Shift</div>
         <div className="text-xs text-slate-500 mb-2">Shift date: {date || "—"}</div>
@@ -268,11 +269,11 @@ function CashBalanceSnapshot() {
   );
 }
 
-export default function Home() {
+// Recent Reports Card Component
+function RecentReportsSection() {
   const [, setLocation] = useLocation();
   
-  // Load recent reports
-  const { data: reportsData } = useQuery({
+  const { data: reportsData, isLoading } = useQuery({
     queryKey: ["daily-reports-list"],
     queryFn: async () => {
       const res = await axios.get("/api/reports/list");
@@ -282,53 +283,72 @@ export default function Home() {
 
   const recentReports = Array.isArray(reportsData) ? reportsData : [];
   
-  return (
-    <div className="space-y-4 sm:space-y-6 md:space-y-8 p-2 sm:p-0">
-      {/* Recent Reports Quick Links */}
-      {recentReports.length > 0 && (
-        <div className="bg-white p-4 shadow rounded">
-          <h3 className="text-sm font-bold mb-3 text-slate-700">Recent Reports</h3>
-          <ul className="space-y-2">
-            {recentReports.slice(0, 5).map((r: any) => (
-              <li key={r.id}>
-                <a 
-                  href={`/operations/daily-reports?open=${r.id}`}
-                  className="text-emerald-600 hover:text-emerald-700 underline text-xs"
-                >
-                  {r.date} — {new Date(r.createdAt).toLocaleTimeString("en-GB")}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      
-      {/* Balance Hero */}
-      <BalanceHero />
-      
-      {/* KPI Grid */}
-      <KPIGrid />
-      
-      {/* Prime Cost Cards */}
-      <PrimeCostCards />
-      
-      {/* System Health Section (CHUNK 5) */}
-      <SystemHealthSection />
-      
-      {/* Variance Widget (CHUNK 6) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <VarianceWidget />
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-4">
+        <h3 className="text-sm font-bold mb-4 text-slate-700">Recent Reports</h3>
+        <div className="text-slate-500 text-sm">Loading reports...</div>
       </div>
-      
-      {/* Cash Balance Snapshot */}
-      <CashBalanceSnapshot />
+    );
+  }
+
+  if (recentReports.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-4 sm:p-5">
+      <h3 className="text-sm font-bold mb-4 text-slate-700 flex items-center gap-2">
+        <FileText className="h-4 w-4 text-emerald-600" />
+        Recent Reports
+      </h3>
+      <div className="space-y-3 md:space-y-4">
+        {recentReports.slice(0, 5).map((r: any) => (
+          <a
+            key={r.id}
+            href={`/operations/daily-reports?open=${r.id}`}
+            className="block bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 active:bg-emerald-50 transition-all duration-200 overflow-hidden"
+            data-testid={`report-card-${r.id}`}
+          >
+            <div className="flex items-stretch">
+              <div className="w-1.5 bg-emerald-500 flex-shrink-0" />
+              <div className="flex-1 px-4 py-3 sm:py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm sm:text-base font-semibold text-emerald-600 truncate">
+                      {r.date}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Created at {new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                </div>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
 
-// System Health Section Component (CHUNK 5)
+// System Health Section Component
+interface HealthCheck {
+  name: string;
+  ok: boolean;
+  error?: string;
+}
+
 function SystemHealthSection() {
-  const [health, setHealth] = useState<any>(null);
+  const [health, setHealth] = useState<{
+    ok: boolean;
+    checksPassed: number;
+    totalChecks: number;
+    checks: HealthCheck[];
+    durationMs?: number;
+    timestamp?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function runTest() {
@@ -346,72 +366,119 @@ function SystemHealthSection() {
     runTest();
   }, []);
 
-  const total = 8;
-  const passed = health
-    ? Object.values(health.results || {}).filter((v) => v === true).length
-    : 0;
+  const checksPassed = health?.checksPassed ?? 0;
+  const totalChecks = health?.totalChecks ?? 0;
+  const passRate = totalChecks > 0 ? Math.round((checksPassed / totalChecks) * 100) : 0;
 
-  const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+  const getOverallStatus = () => {
+    if (passRate >= 80) return { color: "emerald", icon: CheckCircle, label: "Healthy" };
+    if (passRate >= 50) return { color: "amber", icon: AlertCircle, label: "Warning" };
+    return { color: "red", icon: XCircle, label: "Critical" };
+  };
+
+  const status = getOverallStatus();
 
   return (
-    <div className="bg-white border border-slate-200 rounded-[4px] shadow-sm">
-      <div className="bg-yellow-300 px-4 py-3 rounded-t-[4px]">
-        <h2 className="text-sm font-bold text-gray-900">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-yellow-300 px-4 py-3">
+        <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <Activity className="h-4 w-4" />
           System Health
         </h2>
       </div>
 
-      <div className="p-4 flex flex-col md:flex-row gap-6">
-        {/* DOUGHNUT GRAPH */}
-        <div className="w-full md:w-1/3 flex items-center justify-center">
-          <DoughnutChart results={health?.results} />
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-col md:flex-row gap-6 items-center">
+          <div className="flex-shrink-0">
+            <DoughnutChart 
+              checks={health?.checks} 
+              checksPassed={checksPassed} 
+              totalChecks={totalChecks} 
+            />
+          </div>
+
+          <div className="flex-1 w-full">
+            <div className="flex items-center gap-2 mb-2">
+              <status.icon className={`h-5 w-5 text-${status.color}-600`} />
+              <span className={`text-lg font-bold text-${status.color}-600`}>
+                {status.label}
+              </span>
+            </div>
+            
+            <p className="text-sm text-slate-700 font-medium">
+              {checksPassed} / {totalChecks} checks passed
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {passRate}% operational
+            </p>
+            
+            {health?.timestamp && (
+              <p className="text-xs text-slate-400 mt-3">
+                Last checked: {new Date(health.timestamp).toLocaleTimeString()}
+              </p>
+            )}
+
+            {health?.durationMs && (
+              <p className="text-xs text-slate-400">
+                Duration: {health.durationMs}ms
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* SUMMARY */}
-        <div className="flex-1 flex flex-col justify-center">
-          <p className="text-xl font-bold text-emerald-600">
-            {passed} / {total} checks passed
-          </p>
-          <p className="text-xs text-slate-600 mt-1">
-            {passRate}% operational
-          </p>
-          
-          {health?.timestamp && (
-            <p className="text-xs text-slate-500 mt-3">
-              Last checked: {new Date(health.timestamp).toLocaleTimeString()}
-            </p>
-          )}
+        {health?.checks && health.checks.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {health.checks.map((check, i) => (
+                <div 
+                  key={i} 
+                  className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
+                    check.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {check.ok ? (
+                    <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{check.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-          {health?.durationMs && (
-            <p className="text-xs text-slate-500">
-              Duration: {health.durationMs}ms
-            </p>
-          )}
-
-          <Button
-            className="mt-4 bg-black text-white hover:bg-gray-800 text-xs font-medium rounded-[4px] w-fit"
-            onClick={runTest}
-            disabled={loading}
-            data-testid="button-run-health-test"
-          >
-            {loading ? "Running..." : "Run Health Test"}
-          </Button>
-        </div>
+        <Button
+          className="mt-4 bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium rounded w-full sm:w-auto"
+          onClick={runTest}
+          disabled={loading}
+          data-testid="button-run-health-test"
+        >
+          {loading ? "Running..." : "Run Health Test"}
+        </Button>
       </div>
+    </div>
+  );
+}
 
-      {/* ERROR DISPLAY */}
-      {health?.results?.errors && health.results.errors.length > 0 && (
-        <div className="border-t border-slate-200 p-4">
-          <h3 className="text-xs font-semibold text-red-600 mb-2">Errors</h3>
-          <ul className="space-y-1">
-            {health.results.errors.map((err: string, i: number) => (
-              <li key={i} className="text-xs text-red-600">
-                • {err}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+export default function Home() {
+  return (
+    <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8">
+      <RecentReportsSection />
+      
+      <BalanceHero />
+      
+      <KPIGrid />
+      
+      <PrimeCostCards />
+      
+      <SystemHealthSection />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <VarianceWidget />
+      </div>
+      
+      <CashBalanceSnapshot />
     </div>
   );
 }
