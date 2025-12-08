@@ -1,0 +1,232 @@
+---
+
+PATCH 1 — SHOPPING LIST PIPELINE (FULL CUT-AND-PASTE)
+
+This patch fixes and locks the full flow:
+
+Shopping List must generate ONLY from Daily Stock V2 requisition fields
+
+Optional (safe) inclusion of Daily Sales V2 shopping fields
+
+Combined & normalized list stored in database
+
+Display pipeline updated to read from correct source
+
+Zero modifications to Daily Sales V2 logic, UI, or schema
+
+Zero changes to any other modules
+
+Correct file paths only
+
+All code guarded to prevent crashes if forms are missing or drafts exist.
+
+
+
+---
+
+🚨 STRICT DO / DO NOT FOR REPLIT AGENT (MUST FOLLOW EXACTLY)
+
+DO
+
+1. ONLY modify the exact files listed below.
+
+
+2. ONLY paste the code exactly as provided.
+
+
+3. ONLY implement the Shopping List Pipeline as described—nothing beyond it.
+
+
+4. Save files and exit — no refactoring, no improvements, no other edits.
+
+
+
+DO NOT
+
+❌ Do NOT touch any other forms or logic
+
+❌ Do NOT modify Daily Sales V2
+
+❌ Do NOT modify Drizzle-based “Fort Knox” system
+
+❌ Do NOT rename files
+
+❌ Do NOT create new folders
+
+❌ Do NOT update schema
+
+❌ Do NOT auto-format entire project
+
+❌ Do NOT “fix” or “optimize” anything
+
+❌ Do NOT apply prettier/eslint project-wide
+
+
+Agent: Paste only what is between the patch fences.
+
+
+---
+
+✅ PATCH CONTENT
+
+
+---
+
+1. SERVER — Add Shopping List Builder
+
+File: server/services/shoppingListBuilder.ts
+
+// PATCH 1 — Shopping List Pipeline
+// STRICT: DO NOT modify other files or structures without explicit instruction.
+
+import prisma from "../prismaClient";
+
+/**
+ * Build the shopping list strictly from:
+ * - Daily Stock V2 requisition fields
+ * - (Optional, safe) Daily Sales V2 added shopping items
+ */
+export async function buildShoppingList(salesId: string) {
+  // Load Daily Stock V2 (Form 2)
+  const stock = await prisma.dailyStockV2.findUnique({
+    where: { salesId },
+  });
+
+  if (!stock) {
+    console.log("No DailyStockV2 found — skipping shopping list build.");
+    return null;
+  }
+
+  // Extract requisition (items requested by staff)
+  const requisition = stock.requisition_items || [];
+
+  // Load Daily Sales V2 (safe optional inclusion ONLY of shoppingFields)
+  const sales = await prisma.dailySalesV2.findUnique({
+    where: { id: salesId },
+  });
+
+  const salesShopping =
+    sales?.shopping_items?.filter((x: any) => x?.item?.trim()) || [];
+
+  // Combine & normalize
+  const combined = [...requisition, ...salesShopping].map((item: any) => ({
+    item: item.item,
+    quantity: Number(item.quantity || 1),
+    notes: item.notes || "",
+  }));
+
+  // Save to DB (overwrite existing for this shift)
+  const result = await prisma.shoppingListV2.upsert({
+    where: { salesId },
+    update: { items: combined },
+    create: { salesId, items: combined },
+  });
+
+  console.log("Shopping List saved:", result);
+  return result;
+}
+
+
+---
+
+2. SERVER — Call builder after Daily Stock V2 submit
+
+File: server/routes/dailyStockV2Routes.ts
+
+Search for the submit handler and replace it with this:
+
+// PATCH 1 — Inject Shopping List After Submission
+import { buildShoppingList } from "../../services/shoppingListBuilder";
+
+router.post("/submit", async (req, res) => {
+  try {
+    const data = req.body;
+
+    const saved = await prisma.dailyStockV2.create({
+      data,
+    });
+
+    // Generate shopping list
+    await buildShoppingList(saved.salesId);
+
+    return res.status(200).json({ success: true, saved });
+  } catch (err) {
+    console.error("DailyStockV2 submit error:", err);
+    res.status(500).json({ error: "Failed to save Daily Stock V2" });
+  }
+});
+
+
+---
+
+3. SERVER — Add API to fetch the list
+
+File: server/routes/shoppingListRoutes.ts
+
+// PATCH 1 — Shopping List Fetch Route
+// STRICT: New file only, do not modify existing logic.
+
+import { Router } from "express";
+import prisma from "../prismaClient";
+
+const router = Router();
+
+router.get("/latest", async (req, res) => {
+  try {
+    const latest = await prisma.shoppingListV2.findFirst({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json(latest || { items: [] });
+  } catch (err) {
+    console.error("ShoppingList fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch shopping list" });
+  }
+});
+
+export default router;
+
+
+---
+
+4. FRONTEND — Display the list correctly
+
+File: client/src/pages/operations/shopping-list/index.tsx
+(The correct file — NOT the extracted_dashboard copy)
+
+// PATCH 1 — Shopping List Display Pipeline
+// STRICT: This file alone. No modifications elsewhere.
+
+import { useEffect, useState } from "react";
+import axios from "../../../utils/axiosInstance";
+
+export default function ShoppingListPage() {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    axios.get("/shopping-list/latest").then((res) => {
+      setItems(res.data?.items || []);
+    });
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shopping List</h1>
+
+      {items.length === 0 && <p>No items found.</p>}
+
+      <ul className="space-y-2">
+        {items.map((item: any, i: number) => (
+          <li key={i} className="border p-3 rounded">
+            <strong>{item.item}</strong>
+            <div>Qty: {item.quantity}</div>
+            {item.notes && <div>Notes: {item.notes}</div>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+
+---

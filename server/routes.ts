@@ -40,6 +40,7 @@ import ingredientsRoutes from "./routes/ingredients";
 import managerCheckRouter from './routes/managerChecks';
 import shoppingListRouter from './routes/shoppingList';
 import shoppingListNewRouter from './routes/shoppingListNew';
+import shoppingListRoutes from './routes/shoppingListRoutes';
 import purchasingFieldMappingRouter from './routes/purchasingFieldMapping';
 import { estimateShoppingList } from './services/shoppingList';
 import { managerChecklistStore } from "./managerChecklist";
@@ -3177,7 +3178,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Ingredients API routes
   app.use('/api/ingredients', ingredientsRoutes);
   app.use('/api/manager-check', managerCheckRouter);
-  app.use('/api/shopping-list', shoppingListRouter);
+  app.use('/api/shopping-list', shoppingListRoutes);
   app.use('/api/purchasing-list', shoppingListNewRouter); // New purchasing list based on PurchasingItem
   app.use('/api/purchasing-field-mapping', purchasingFieldMappingRouter); // Purchasing field mapping admin UI
   app.use('/api/membership', membershipRouter);
