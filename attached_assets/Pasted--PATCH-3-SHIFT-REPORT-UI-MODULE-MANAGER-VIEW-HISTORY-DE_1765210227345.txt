@@ -1,0 +1,281 @@
+🔥 PATCH 3 — SHIFT REPORT UI MODULE (MANAGER VIEW + HISTORY + DETAIL PAGE)
+
+This patch introduces the frontend interface for Shift Reports:
+
+WHAT PATCH 3 DELIVERS
+
+New Shift Report Dashboard page
+
+New Shift Report History page
+
+New Shift Report Detail View page
+
+Endpoints wired to the backend routes created in Patch 1
+
+Clean layout, manager-ready
+
+Zero interference with existing systems
+
+SAFE, isolated, UI-only patch
+
+
+This patch does not modify:
+
+Daily Sales V2
+
+Daily Stock V2
+
+POS systems
+
+Variance logic
+
+Database schema
+
+Shopping List flows
+
+Any Fort Knox modules
+
+
+This patch simply renders the shift report data already created by Patch 2.
+
+
+---
+
+🚨 REPLIT AGENT — STRICT RULES
+
+DO:
+
+Create the files exactly as below
+
+Only edit the files listed
+
+Paste code exactly
+
+Save & exit
+
+
+DO NOT:
+
+Do not modify existing forms
+
+Do not modify shiftReportBuilder logic
+
+Do not refactor layout components
+
+Do not move files or rename them
+
+Do not alter Drizzle/Prisma schemas
+
+Do not “improve” anything
+
+
+
+---
+
+🚀 PATCH 3 – FULL CUT-AND-PASTE CODE
+
+
+---
+
+1. Create New Page: Shift Report Dashboard
+
+File:
+client/src/pages/reports/shift-report/index.tsx
+
+// PATCH 3 — SHIFT REPORT DASHBOARD UI
+import { useEffect, useState } from "react";
+import axios from "../../../utils/axiosInstance";
+import { Link } from "react-router-dom";
+
+export default function ShiftReportDashboard() {
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    axios.get("/shift-report/latest").then((res) => {
+      setReport(res.data);
+    });
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Latest Shift Report</h1>
+
+      {!report && <p>No shift report available.</p>}
+
+      {report && (
+        <div className="border rounded p-4 mb-4">
+          <strong>Shift Date:</strong>{" "}
+          {new Date(report.shiftDate).toLocaleString("en-TH", {
+            timeZone: "Asia/Bangkok",
+          })}
+
+          <div className="mt-2">
+            <strong>Cash Variance:</strong> {report.variances?.cashVariance}
+          </div>
+          <div>
+            <strong>QR Variance:</strong> {report.variances?.qrVariance}
+          </div>
+          <div>
+            <strong>Grab Variance:</strong> {report.variances?.grabVariance}
+          </div>
+          <div>
+            <strong>Total Sales Variance:</strong>{" "}
+            {report.variances?.totalSalesVariance}
+          </div>
+
+          <div className="mt-4">
+            <Link
+              to={`/reports/shift-report/view/${report.id}`}
+              className="px-4 py-2 bg-black text-white rounded"
+            >
+              View Full Report
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <Link
+        to="/reports/shift-report/history"
+        className="px-4 py-2 bg-gray-700 text-white rounded"
+      >
+        View History
+      </Link>
+    </div>
+  );
+}
+
+
+---
+
+2. Create New Page: Shift Report History
+
+File:
+client/src/pages/reports/shift-report/history.tsx
+
+// PATCH 3 — SHIFT REPORT HISTORY PAGE
+import { useEffect, useState } from "react";
+import axios from "../../../utils/axiosInstance";
+import { Link } from "react-router-dom";
+
+export default function ShiftReportHistory() {
+  const [reports, setReports] = useState([]);
+
+  useEffect(() => {
+    axios.get("/shift-report/history").then((res) => {
+      setReports(res.data.reports);
+    });
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shift Report History</h1>
+
+      {reports.length === 0 && <p>No shift reports found.</p>}
+
+      <ul className="space-y-3">
+        {reports.map((r) => (
+          <li key={r.id} className="border rounded p-4">
+            <strong>
+              {new Date(r.shiftDate).toLocaleString("en-TH", {
+                timeZone: "Asia/Bangkok",
+              })}
+            </strong>
+
+            <div className="mt-2">
+              <Link
+                to={`/reports/shift-report/view/${r.id}`}
+                className="px-3 py-1 bg-black text-white rounded"
+              >
+                View Report
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+
+---
+
+3. Create New Page: Shift Report Detail View
+
+File:
+client/src/pages/reports/shift-report/view/[id].tsx
+(Your structure may use params differently — agent must follow existing router conventions exactly.)
+
+// PATCH 3 — SHIFT REPORT DETAIL VIEW
+import { useEffect, useState } from "react";
+import axios from "../../../../utils/axiosInstance";
+import { useParams } from "react-router-dom";
+
+export default function ShiftReportDetail() {
+  const { id } = useParams();
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    axios.get(`/shift-report/view/${id}`).then((res) => {
+      setReport(res.data);
+    });
+  }, [id]);
+
+  if (!report) return <p className="p-6">Loading report...</p>;
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Shift Report Details</h1>
+
+      <div className="border rounded p-4 mb-4">
+        <strong>Shift Date:</strong>{" "}
+        {new Date(report.shiftDate).toLocaleString("en-TH", {
+          timeZone: "Asia/Bangkok",
+        })}
+      </div>
+
+      <div className="border rounded p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">Variances</h2>
+        <div>Cash Variance: {report.variances?.cashVariance}</div>
+        <div>QR Variance: {report.variances?.qrVariance}</div>
+        <div>Grab Variance: {report.variances?.grabVariance}</div>
+        <div>Total Sales Variance: {report.variances?.totalSalesVariance}</div>
+      </div>
+
+      <div className="border rounded p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">Sales Data</h2>
+        <pre className="bg-gray-100 p-2 rounded text-sm">
+          {JSON.stringify(report.salesData, null, 2)}
+        </pre>
+      </div>
+
+      <div className="border rounded p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">Stock Data</h2>
+        <pre className="bg-gray-100 p-2 rounded text-sm">
+          {JSON.stringify(report.stockData, null, 2)}
+        </pre>
+      </div>
+
+      <div className="border rounded p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">POS Data</h2>
+        <pre className="bg-gray-100 p-2 rounded text-sm">
+          {JSON.stringify(report.posData, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+
+---
+
+4. Register Routes in Frontend Router
+
+File: client/src/App.tsx or router index
+(Add these routes)
+
+<Route path="/reports/shift-report" element={<ShiftReportDashboard />} />
+<Route path="/reports/shift-report/history" element={<ShiftReportHistory />} />
+<Route path="/reports/shift-report/view/:id" element={<ShiftReportDetail />} />
+
+
+---

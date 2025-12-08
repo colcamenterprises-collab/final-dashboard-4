@@ -52,6 +52,9 @@ import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
 import SystemHealthPage from "./pages/operations/system-health";
+import ShiftReportDashboard from "./pages/reports/shift-report";
+import ShiftReportHistory from "./pages/reports/shift-report/history";
+import ShiftReportDetail from "./pages/reports/shift-report/view/ShiftReportDetail";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -129,6 +132,11 @@ export default function App() {
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
                   <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
                   <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
+
+                  {/* Shift Report V2 */}
+                  <Route path="/reports/shift-report" element={<Guard><ShiftReportDashboard /></Guard>} />
+                  <Route path="/reports/shift-report/history" element={<Guard><ShiftReportHistory /></Guard>} />
+                  <Route path="/reports/shift-report/view/:id" element={<Guard><ShiftReportDetail /></Guard>} />
 
                   {/* Finance */}
                   <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
