@@ -1,0 +1,99 @@
+You have access to the repository:
+
+https://github.com/colcamenterprises-collab/restaurant-management-system
+
+Implement the following UI and backend fixes. This task is safe, self-contained, and DOES NOT modify core business logic such as forms or workflow. It only updates styling and health-check correctness.
+
+===========================================================
+A) RECENT REPORTS — CARD STYLE (OPTION A)
+===========================================================
+Convert the "Recent Reports" section on the Home Page into card-style clickable rows.
+
+Requirements:
+- White card container for each report entry
+- Rounded corners (md or lg radius)
+- Shadow-sm or shadow-md consistent with other dashboard cards
+- Padding: 12–16px
+- Left-side green accent bar OR green icon (choose the cleaner option)
+- Text styling:
+    - Report date in GREEN (#38a169 or the project’s standard green)
+    - Smaller grey subtitle text if needed
+- Full-width tappable area
+- Hover + active states
+- Tablet spacing: 1.25–1.5rem vertical gaps
+
+Update only the relevant Home Page component:
+client/src/pages/Home.tsx (or equivalent — locate it)
+
+===========================================================
+B) SYSTEM HEALTH — UI REBUILD
+===========================================================
+Fix the System Health panel.
+
+Frontend requirements:
+- Add proper padding around the entire card
+- Add a title area with bold “System Health”
+- Integrate a donut chart or heat-meter component
+- Chart reflects % of checks passed
+- Automatically calculate checks WITHOUT needing to press a button
+- Move the manual “Run Health Test” button BELOW the chart
+- Remove excessive white space
+- Add green/amber/red state indicators
+
+Use existing chart library in the repo (recharts) unless another small internal component already exists.
+
+===========================================================
+C) SYSTEM HEALTH — BACKEND FIX
+===========================================================
+Fix the backend health check route.
+
+The current route throws:
+
+“null value in column 'id' of relation 'daily_sales_v2' violates not-null constraint”
+
+Fixes required:
+- Ensure the health-check route performs READ-ONLY checks
+- Do not write, create, or validate new daily_sales_v2 records
+- Validate only:
+    - DB connection
+    - daily_sales_v2 latest record exists
+    - daily_stock_v2 latest record exists
+    - ingredients table loads
+    - shopping list endpoint reachable
+    - PDF builder importable
+    - Email service registered
+    - API routes mounted correctly
+- Return a structured JSON:
+    {
+      checksPassed: number,
+      totalChecks: number,
+      checks: [
+         { name: string, ok: boolean, error?: string }
+      ]
+    }
+
+===========================================================
+D) HOME PAGE LAYOUT IMPROVEMENTS
+===========================================================
+Fix spacing/layout issues on the home page:
+- Ensure consistent spacing between sections (24px–32px)
+- Prevent vertical overflow or blank regions
+- Ensure tablet responsiveness (landscape + portrait)
+- Confirm bottom navigation stays fixed and does not overlap cards
+
+===========================================================
+DELIVERABLES
+===========================================================
+
+Show me:
+
+1. Files you modified (paths)
+2. Diffs of ALL changes before committing
+3. Screenshots or DOM preview from your end showing:
+   - Card-style “Recent Reports”
+   - Rebuilt System Health widget
+   - Revised Home layout
+
+DO NOT commit until I approve the changes.
+
+Begin.
