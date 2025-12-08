@@ -1,7 +1,131 @@
+
+🚀 PATCH 4 DELIVERS
+
+This patch upgrades the Shift Report Builder to perform full variance analysis:
+
+1. Cash Reconciliation Engine
+
+Expected Cash = POS Cash Sales + Opening Float − Expenses
+
+Calculates:
+
+Cash Over/Short
+
+Banked vs Expected
+
+Unbanked remainder
+
+
+
+2. QR Reconciliation Engine
+
+Compares QR payment recorded in Daily Sales V2
+
+Against POS QR payment totals
+
+Against actual QR Transfer amount entered by staff
+
+
+Flags mismatches beyond tolerance.
+
+3. GrabFood Reconciliation
+
+Ensures Grab sales recorded match POS Grab totals
+
+Flags missing entries, staff under-reporting or POS anomalies
+
+
+4. Total Sales Reconciliation
+
+Compares total daily sales (staff form)
+
+With POS net sales
+
+Flags discrepancies
+
+
+5. Void & Discount Guardrails
+
+Validates POS void count
+
+Validates discount totals
+
+Flags if out of expected pattern
+
+
+6. ABSENCE DETECTION
+
+Missing Daily Sales V2 → flag
+
+Missing Daily Stock V2 → flag
+
+Missing POS Shift Report → flag
+
+
+7. Variance Severity Levels
+
+Will be used in Patch 6 for AI analysis:
+
+GREEN (within tolerance)
+
+YELLOW (suspicious but explainable)
+
+RED (clear discrepancy)
+
+
+
+---
+
+🚨 REPLIT AGENT — STRICT RULES
+
+DO ONLY THE FOLLOWING:
+
+Replace ONLY the file sections shown
+
+Paste EXACT code
+
+Do not alter other modules
+
+Do not rename or refactor anything
+
+Do not change routes, schema, UI
+
+Save and exit
+
+
+DO NOT:
+
+Modify Daily Sales V2
+
+Modify Daily Stock V2
+
+Modify POS import logic
+
+Modify UI pages
+
+Modify Fort Knox or ingredients systems
+
+Auto-format or restructure project
+
+
+
+---
+
+🔧 PATCH 4 — FULL CUT-AND-PASTE IMPLEMENTATION
+
+
+---
+
+1. Update the Shift Report Builder with full variance engine
+
+File:
+server/services/shiftReportBuilder.ts
+(REPLACE ENTIRE FILE)
+
 // PATCH 4 — ADVANCED VARIANCE ENGINE
 // STRICT: Do not modify any other modules.
 
-import { db } from "../lib/prisma";
+import prisma from "../prismaClient";
 
 /**
  * Utility: Normalize date to YYYY-MM-DD local Bangkok.
@@ -14,7 +138,6 @@ function normalizeToISO(date: Date) {
  * Fetch the Daily Sales V2 record for the shift.
  */
 async function getDailySales(shiftDate: Date) {
-  const prisma = db();
   const iso = normalizeToISO(shiftDate);
 
   return prisma.dailySalesV2.findFirst({
@@ -31,7 +154,6 @@ async function getDailySales(shiftDate: Date) {
  * Fetch matching Daily Stock V2.
  */
 async function getDailyStock(salesId: string) {
-  const prisma = db();
   return prisma.dailyStockV2.findUnique({
     where: { salesId },
   });
@@ -41,10 +163,9 @@ async function getDailyStock(salesId: string) {
  * Fetch POS Shift Report for the date.
  */
 async function getPOSShiftReport(shiftDate: Date) {
-  const prisma = db();
   const iso = normalizeToISO(shiftDate);
 
-  return prisma.posShiftReport.findFirst({
+  return prisma.pos_shift_reports.findFirst({
     where: {
       shiftDate: {
         gte: new Date(`${iso}T00:00:00+07:00`),
@@ -138,7 +259,6 @@ function computeAdvancedVariances(sales: any, pos: any) {
  */
 export async function buildShiftReport(shiftDate: Date) {
   try {
-    const prisma = db();
     console.log("SHIFT REPORT BUILD START:", shiftDate);
 
     // SALES
@@ -200,3 +320,6 @@ export async function buildShiftReport(shiftDate: Date) {
     return null;
   }
 }
+
+
+---
