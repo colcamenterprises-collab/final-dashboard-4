@@ -66,6 +66,13 @@ export default function ShiftReportDetail() {
         </pre>
       </div>
 
+      <div className="border rounded p-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">AI Insights</h2>
+        <pre className="bg-gray-100 p-2 rounded text-sm whitespace-pre-wrap">
+          {report.aiInsights || "No insights available."}
+        </pre>
+      </div>
+
       <div className="mt-4 space-x-2">
         <Link
           to="/reports/shift-report"

@@ -1,7 +1,8 @@
-// PATCH 4 — ADVANCED VARIANCE ENGINE
+// PATCH 4+6 — ADVANCED VARIANCE ENGINE + AI INSIGHTS
 // STRICT: Do not modify any other modules.
 
 import { db } from "../lib/prisma";
+import { generateAIInsights } from "./shiftReportInsights";
 
 /**
  * Utility: Normalize date to YYYY-MM-DD local Bangkok.
@@ -144,14 +145,15 @@ export async function buildShiftReport(shiftDate: Date) {
     // SALES
     const sales = await getDailySales(shiftDate);
     if (!sales) {
+      const missingSalesVariances = { level: "RED", errors: ["Missing Daily Sales V2"] };
       return prisma.shift_report_v2.create({
         data: {
           shiftDate,
           salesData: {},
           stockData: {},
           posData: {},
-          variances: { level: "RED", errors: ["Missing Daily Sales V2"] },
-          aiInsights: "",
+          variances: missingSalesVariances,
+          aiInsights: generateAIInsights({ variances: missingSalesVariances }),
         },
       });
     }
@@ -162,6 +164,7 @@ export async function buildShiftReport(shiftDate: Date) {
     // POS
     const pos = await getPOSShiftReport(shiftDate);
     if (!pos) {
+      const missingPOSVariances = { level: "RED", errors: ["Missing POS shift report"] };
       return prisma.shift_report_v2.create({
         data: {
           shiftDate,
@@ -170,14 +173,22 @@ export async function buildShiftReport(shiftDate: Date) {
           salesData: sales,
           stockData: stock || {},
           posData: {},
-          variances: { level: "RED", errors: ["Missing POS shift report"] },
-          aiInsights: "",
+          variances: missingPOSVariances,
+          aiInsights: generateAIInsights({ variances: missingPOSVariances }),
         },
       });
     }
 
     // Variance engine
     const variances = computeAdvancedVariances(sales, pos);
+
+    // Generate AI insights
+    const aiInsights = generateAIInsights({
+      salesData: sales,
+      stockData: stock,
+      posData: pos,
+      variances,
+    });
 
     // Assemble final shift report
     const report = await prisma.shift_report_v2.create({
@@ -189,7 +200,7 @@ export async function buildShiftReport(shiftDate: Date) {
         stockData: stock || {},
         posData: pos,
         variances,
-        aiInsights: "",
+        aiInsights,
       },
     });
 
