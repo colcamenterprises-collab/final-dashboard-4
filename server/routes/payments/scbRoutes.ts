@@ -1,13 +1,19 @@
 // PATCH O5 — SCB QR PAYMENT WEBHOOK
+// PATCH O6 — SIGNATURE VERIFICATION
 import { Router } from "express";
 import { db } from "../../lib/prisma";
 import { matchSCBPayment } from "../../services/scbPaymentMatcher";
+import { verifySCBSignature } from "../../services/scbSignature";
 
 const router = Router();
 
 // SCB sends POST → /api/payments/scb/webhook
 router.post("/webhook", async (req, res) => {
   try {
+    if (!verifySCBSignature(req.headers, req.body)) {
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+
     const prisma = db();
     const body = req.body;
 

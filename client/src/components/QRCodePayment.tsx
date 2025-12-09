@@ -1,27 +1,32 @@
-// PATCH O4 — LIVE QR DISPLAY COMPONENT
-// PATCH O5 — ACCEPTS ORDER NUMBER FOR SCB REFERENCE
+// PATCH O6 — FRONTEND QR (DYNAMIC QR BACKEND)
+import axios from "axios";
 import { useEffect, useState } from "react";
-import axios from "../utils/axiosInstance";
 
-type Props = {
-  amount: number;
-  orderNumber?: string;
-};
-
-export default function QRCodePayment({ amount, orderNumber }: Props) {
-  const [qr, setQr] = useState("");
+export default function QRCodePayment({ amount, orderNumber }: { amount: number; orderNumber?: string }) {
+  const [qr, setQr] = useState<any>(null);
 
   useEffect(() => {
-    const ref = orderNumber || "";
     axios
-      .get(`/payments-qr/generate?amount=${amount}&ref=${ref}`)
-      .then((res) => setQr(res.data.qrImage));
+      .get(`/api/payments/qr/dynamic?amount=${amount}&ref=${orderNumber}`)
+      .then((res) => setQr(res.data))
+      .catch(() => setQr(null));
   }, [amount, orderNumber]);
 
+  if (!qr) return <div>Loading QR...</div>;
+
   return (
-    <div className="text-center">
-      <h2 className="font-bold mb-2">Scan to Pay</h2>
-      {qr && <img src={qr} alt="QR Code" className="mx-auto w-64" data-testid="img-qr-code" />}
+    <div>
+      <img
+        src={qr.qrImage || "/placeholder_qr.png"}
+        alt="QR Code"
+        style={{ width: 260, height: 260 }}
+        data-testid="img-qr-code"
+      />
+      <div className="mt-2 text-center">
+        Reference: <b>{qr.ref}</b>
+        <br />
+        Mode: <b>{qr.mode}</b>
+      </div>
     </div>
   );
 }

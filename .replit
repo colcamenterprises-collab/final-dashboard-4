@@ -102,3 +102,6 @@ integrations = ["github:1.0.0"]
 [userenv]
 
 [userenv.production]
+
+[userenv.shared]
+SCB_MODE = "dry"
