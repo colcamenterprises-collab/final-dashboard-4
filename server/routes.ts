@@ -91,6 +91,7 @@ import partnerBarRoutes from "./routes/partners/partnerRoutes";
 import partnerAnalyticsRoutes from "./routes/partners/partnerAnalyticsRoutes";
 import deliveryRoutes from "./routes/delivery/deliveryRoutes";
 import kdsRoutes from "./routes/kds/kdsRoutes";
+import menuV3Routes from "./routes/menu/menuV3Routes";
 // Email functionality will be added when needed
 
 
@@ -3209,6 +3210,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/partners', partnerAnalyticsRoutes);
   app.use('/api/delivery', deliveryRoutes);
   app.use('/api/kds', kdsRoutes);
+  app.use('/api/menu-v3', menuV3Routes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {
