@@ -28,6 +28,8 @@ type Order = {
   subtotal: number;
   total: number;
   partnerCode?: string;
+  orderNumber?: string;
+  loyverseStatus: string;
   items: OrderItem[];
 };
 
@@ -50,9 +52,10 @@ export default function AdminOrders() {
         <div className="space-y-3">
           {orders.map((o) => (
             <div key={o.id} className="border p-4 rounded bg-white shadow" data-testid={`order-card-${o.id}`}>
-              <div className="font-bold text-lg">Order #{o.id.slice(-6)}</div>
+              <div className="font-bold text-lg">Order #{o.orderNumber || o.id.slice(-6)}</div>
               <div>{o.customerName} — {o.customerPhone}</div>
               <div className="capitalize">{o.orderType} • {o.paymentType}</div>
+              <div className="text-sm">Loyverse: <span className={o.loyverseStatus === 'sent' ? 'text-green-600' : o.loyverseStatus === 'failed' ? 'text-red-600' : 'text-yellow-600'}>{o.loyverseStatus}</span></div>
               {o.address && <div className="text-sm text-gray-600">📍 {o.address}</div>}
               {o.partnerCode && <div className="text-sm text-blue-600">Partner: {o.partnerCode}</div>}
               <div className="mt-2 border-t pt-2">

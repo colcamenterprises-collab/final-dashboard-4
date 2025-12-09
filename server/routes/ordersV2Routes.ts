@@ -1,7 +1,9 @@
 // PATCH O2 — ORDER SUBMISSION & CHECKOUT
+// PATCH O3 — ORDER NUMBERS + LOYVERSE INTEGRATION
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { calculateDistanceKm } from "../utils/distance.js";
+import { getNextOrderNumber } from "../services/orderNumber.js";
 
 const router = Router();
 
@@ -86,7 +88,14 @@ router.post("/create", async (req, res) => {
       }
     }
 
-    res.json({ success: true, orderId: order.id });
+    // PATCH O3 — Generate sequential order number
+    const orderNumber = await getNextOrderNumber();
+    await prisma.orders_v2.update({
+      where: { id: order.id },
+      data: { orderNumber },
+    });
+
+    res.json({ success: true, orderId: order.id, orderNumber });
   } catch (error) {
     console.error("ORDER CREATE ERROR:", error);
     res.status(500).json({ error: "Failed to create order" });

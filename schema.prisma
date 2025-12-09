@@ -1675,6 +1675,8 @@ model orders_v2 {
 
   loyverseStatus  String   @default("pending")
 
+  orderNumber     String?
+
   items           order_items_v2[]
 }
 
@@ -1698,4 +1700,20 @@ model order_modifiers_v2 {
 
   name        String
   price       Float
+}
+
+// PATCH O3 — ORDER NUMBER SEQUENCE
+model order_counters {
+  id      String @id @default(cuid())
+  key     String @unique
+  value   Int
+}
+
+// PATCH O3 — LOYVERSE MAPPING TABLE
+model loyverse_map_v2 {
+  id                String @id @default(cuid())
+  menuItemId        String?
+  loyverseItemId    String?
+  modifierName      String?
+  loyverseModifierId String?
 }

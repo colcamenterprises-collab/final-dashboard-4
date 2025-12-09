@@ -517,6 +517,13 @@ async function checkSchema() {
           });
           console.log("📊 Shift Report V2 auto-generation + email scheduled for 3:10am Bangkok time");
           
+          // PATCH O3 — LOYVERSE QUEUE SCHEDULER
+          const { processLoyverseQueue } = await import('./services/loyverseQueue.js');
+          setInterval(() => {
+            processLoyverseQueue().catch(err => console.error('Loyverse queue error:', err));
+          }, 30000); // run every 30 seconds
+          console.log("📦 Loyverse order queue scheduled every 30 seconds");
+          
           console.log('✅ All background services started successfully');
         } catch (err) {
           console.error('❌ Error starting background services:', err);

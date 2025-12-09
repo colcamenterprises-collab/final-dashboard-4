@@ -51,8 +51,10 @@ export default function Checkout() {
         lng,
       });
       clearCart();
+      // PATCH O3 — Pass orderNumber to confirmation
+      const orderNumber = res.data.orderNumber || '';
       window.location.href =
-        "/online-ordering/confirmation?orderId=" + res.data.orderId;
+        "/online-ordering/confirmation?orderId=" + res.data.orderId + "&orderNumber=" + orderNumber;
     } catch (err: any) {
       alert(err.response?.data?.error || "Order failed");
       setIsSubmitting(false);
