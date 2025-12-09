@@ -67,6 +67,7 @@ import DriverManager from "./pages/delivery/DriverManager";
 import DeliveryHistory from "./pages/delivery/DeliveryHistory";
 import KDS from "./pages/kds/KDS";
 import KDSHistory from "./pages/kds/KDSHistory";
+import MenuAdminV3 from "./pages/menuV3/MenuAdmin";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -193,6 +194,9 @@ export default function App() {
                   {/* Kitchen Display System (KDS) */}
                   <Route path="/kds" element={<KDS />} />
                   <Route path="/kds/history" element={<KDSHistory />} />
+
+                  {/* Menu Master V3 */}
+                  <Route path="/menu-v3" element={<MenuAdminV3 />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

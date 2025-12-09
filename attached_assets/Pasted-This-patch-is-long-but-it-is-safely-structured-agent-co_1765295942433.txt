@@ -1,0 +1,495 @@
+This patch is long, but it is safely structured, agent-compatible, copy/paste ready, and follows every Fort-Knox rule you’ve set.
+
+No refactoring.
+No touching unrelated systems.
+No overwriting existing menu pages.
+This becomes a brand new standalone Menu V3 Admin module.
+
+
+---
+
+⚠️ REPLIT AGENT — STRICT RULES
+
+Agent must:
+
+1. Create exactly the files listed.
+
+
+2. Insert exactly the code, no auto-corrections.
+
+
+3. Do NOT modify any other menu files (v1/v2).
+
+
+4. Do NOT “optimize”, rename, or restructure folders.
+
+
+5. Save, run, and stop.
+
+
+
+
+---
+
+🚀 PATCH O10-B — MENU MASTER ADMIN UI (Frontend)
+
+This patch creates the full UI for categories, items, modifiers, and recipes.
+
+
+---
+
+📁 1. CREATE FOLDER
+
+client/src/pages/menuV3/
+
+Inside it, create 4 UI modules:
+
+MenuAdmin.tsx
+
+CategoriesEditor.tsx
+
+ItemsEditor.tsx
+
+ModifiersEditor.tsx
+
+RecipeEditor.tsx
+
+
+
+---
+
+📄 FILE 1 — MenuAdmin.tsx (Main Admin Hub)
+
+import React, { useState } from "react";
+import CategoriesEditor from "./CategoriesEditor";
+import ItemsEditor from "./ItemsEditor";
+import ModifiersEditor from "./ModifiersEditor";
+import RecipeEditor from "./RecipeEditor";
+
+export default function MenuAdmin() {
+  const [view, setView] = useState("categories");
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  return (
+    <div style={{ padding: "24px" }}>
+      <h1 style={{ fontSize: "32px", marginBottom: "20px" }}>Menu Master V3</h1>
+
+      {/* Navigation */}
+      <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
+        <button onClick={() => setView("categories")}>Categories</button>
+        <button onClick={() => setView("items")}>Items</button>
+        <button onClick={() => setView("modifiers")}>Modifiers</button>
+        <button
+          disabled={!selectedItem}
+          onClick={() => setView("recipes")}
+        >
+          Recipes
+        </button>
+      </div>
+
+      {/* Views */}
+      {view === "categories" && <CategoriesEditor />}
+      {view === "items" && (
+        <ItemsEditor onSelectItem={(item) => {
+          setSelectedItem(item);
+          setView("recipes");
+        }} />
+      )}
+      {view === "modifiers" && <ModifiersEditor />}
+      {view === "recipes" && selectedItem && (
+        <RecipeEditor item={selectedItem} />
+      )}
+    </div>
+  );
+}
+
+
+---
+
+📄 FILE 2 — CategoriesEditor.tsx
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function CategoriesEditor() {
+  const [categories, setCategories] = useState([]);
+  const [newName, setNewName] = useState("");
+
+  async function load() {
+    const res = await axios.get("/api/menu-v3/categories");
+    setCategories(res.data);
+  }
+
+  async function create() {
+    await axios.post("/api/menu-v3/categories/create", { name: newName });
+    setNewName("");
+    load();
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div>
+      <h2>Categories</h2>
+
+      {/* Create */}
+      <div style={{ marginBottom: "20px" }}>
+        <input
+          placeholder="Category name"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+        />
+        <button onClick={create}>Add</button>
+      </div>
+
+      {/* List */}
+      {categories.map((cat) => (
+        <div
+          key={cat.id}
+          style={{
+            padding: "12px",
+            border: "1px solid #ccc",
+            marginBottom: "8px",
+            borderRadius: "6px",
+          }}
+        >
+          <strong>{cat.name}</strong>
+          <div>POS: {cat.visiblePOS ? "Yes" : "No"}</div>
+          <div>Online: {cat.visibleOnline ? "Yes" : "No"}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+---
+
+📄 FILE 3 — ItemsEditor.tsx
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function ItemsEditor({ onSelectItem }) {
+  const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+
+  const [form, setForm] = useState({
+    name: "",
+    basePrice: "",
+    categoryId: "",
+    kitchenStation: "prep"
+  });
+
+  async function load() {
+    const res = await axios.get("/api/menu-v3/items");
+    setItems(res.data);
+
+    const cats = await axios.get("/api/menu-v3/categories");
+    setCategories(cats.data);
+  }
+
+  async function create() {
+    await axios.post("/api/menu-v3/items/create", {
+      name: form.name,
+      basePrice: parseFloat(form.basePrice),
+      categoryId: form.categoryId,
+      kitchenStation: form.kitchenStation
+    });
+    load();
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div>
+      <h2>Items</h2>
+
+      {/* Create */}
+      <div style={{ marginBottom: "20px" }}>
+        <input
+          placeholder="Name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+
+        <input
+          placeholder="Price"
+          value={form.basePrice}
+          onChange={(e) =>
+            setForm({ ...form, basePrice: e.target.value })
+          }
+        />
+
+        <select
+          value={form.categoryId}
+          onChange={(e) =>
+            setForm({ ...form, categoryId: e.target.value })
+          }
+        >
+          <option value="">Select Category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={form.kitchenStation}
+          onChange={(e) =>
+            setForm({ ...form, kitchenStation: e.target.value })
+          }
+        >
+          <option value="prep">Prep</option>
+          <option value="grill">Grill</option>
+          <option value="fry">Fry</option>
+          <option value="drink">Drink</option>
+        </select>
+
+        <button onClick={create}>Create</button>
+      </div>
+
+      {/* List */}
+      {items.map((item) => (
+        <div
+          key={item.id}
+          style={{
+            padding: "12px",
+            border: "1px solid #ccc",
+            marginBottom: "8px",
+            borderRadius: "6px",
+          }}
+        >
+          <strong>{item.name}</strong> — ฿{item.basePrice}
+          <div>Category: {item.category?.name}</div>
+          <div>Kitchen: {item.kitchenStation}</div>
+          <button onClick={() => onSelectItem(item)}>
+            Edit Recipe
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+---
+
+📄 FILE 4 — ModifiersEditor.tsx
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function ModifiersEditor() {
+  const [groups, setGroups] = useState([]);
+  const [newGroupName, setNewGroupName] = useState("");
+
+  const [newModifier, setNewModifier] = useState({
+    name: "",
+    price: "",
+    groupId: ""
+  });
+
+  async function load() {
+    const res = await axios.get("/api/menu-v3/modifiers/groups");
+    setGroups(res.data);
+  }
+
+  async function createGroup() {
+    await axios.post("/api/menu-v3/modifiers/groups/create", {
+      name: newGroupName
+    });
+    setNewGroupName("");
+    load();
+  }
+
+  async function addModifier() {
+    await axios.post("/api/menu-v3/modifiers/create", {
+      groupId: newModifier.groupId,
+      name: newModifier.name,
+      price: parseFloat(newModifier.price)
+    });
+    load();
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div>
+      <h2>Modifiers</h2>
+
+      {/* Group create */}
+      <div style={{ marginBottom: "20px" }}>
+        <input
+          placeholder="Group name"
+          value={newGroupName}
+          onChange={(e) => setNewGroupName(e.target.value)}
+        />
+        <button onClick={createGroup}>Add Group</button>
+      </div>
+
+      {/* Modifier create */}
+      <div style={{ marginBottom: "20px" }}>
+        <select
+          value={newModifier.groupId}
+          onChange={(e) =>
+            setNewModifier({ ...newModifier, groupId: e.target.value })
+          }
+        >
+          <option value="">Select Group</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
+
+        <input
+          placeholder="Modifier name"
+          value={newModifier.name}
+          onChange={(e) =>
+            setNewModifier({ ...newModifier, name: e.target.value })
+          }
+        />
+
+        <input
+          placeholder="Price"
+          value={newModifier.price}
+          onChange={(e) =>
+            setNewModifier({ ...newModifier, price: e.target.value })
+          }
+        />
+
+        <button onClick={addModifier}>Add Modifier</button>
+      </div>
+
+      {/* List */}
+      {groups.map((g) => (
+        <div key={g.id} style={{ marginBottom: "20px" }}>
+          <h3>{g.name}</h3>
+          <ul>
+            {g.modifiers.map((m) => (
+              <li key={m.id}>
+                {m.name} — ฿{m.price}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+---
+
+📄 FILE 5 — RecipeEditor.tsx
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function RecipeEditor({ item }) {
+  const [recipe, setRecipe] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
+
+  const [form, setForm] = useState({
+    ingredientId: "",
+    quantityUsed: "",
+    unit: "g"
+  });
+
+  async function load() {
+    const res = await axios.get("/api/menu-v3/recipes/" + item.id);
+    setRecipe(res.data);
+
+    const ing = await axios.get("/api/ingredients");
+    setIngredients(ing.data);
+  }
+
+  async function save() {
+    await axios.post("/api/menu-v3/recipes/set", {
+      itemId: item.id,
+      recipe
+    });
+    load();
+  }
+
+  function addToRecipe() {
+    setRecipe([
+      ...recipe,
+      {
+        ingredientId: form.ingredientId,
+        quantityUsed: parseFloat(form.quantityUsed),
+        unit: form.unit
+      }
+    ]);
+  }
+
+  useEffect(() => { load(); }, [item.id]);
+
+  return (
+    <div>
+      <h2>Recipe for: {item.name}</h2>
+
+      {/* Add ingredient */}
+      <div>
+        <select
+          value={form.ingredientId}
+          onChange={(e) =>
+            setForm({ ...form, ingredientId: e.target.value })
+          }
+        >
+          <option value="">Select Ingredient</option>
+          {ingredients.map((i) => (
+            <option key={i.id} value={i.id}>{i.name}</option>
+          ))}
+        </select>
+
+        <input
+          placeholder="Qty"
+          value={form.quantityUsed}
+          onChange={(e) =>
+            setForm({ ...form, quantityUsed: e.target.value })
+          }
+        />
+
+        <select
+          value={form.unit}
+          onChange={(e) =>
+            setForm({ ...form, unit: e.target.value })
+          }
+        >
+          <option value="g">Grams</option>
+          <option value="ml">Milliliters</option>
+          <option value="unit">Units</option>
+        </select>
+
+        <button onClick={addToRecipe}>Add</button>
+      </div>
+
+      <h3>Current Recipe</h3>
+      <ul>
+        {recipe.map((r, i) => (
+          <li key={i}>
+            {r.ingredientId} — {r.quantityUsed}{r.unit}
+          </li>
+        ))}
+      </ul>
+
+      <button onClick={save}>Save Recipe</button>
+    </div>
+  );
+}
+
+
+---
+
+📁 6. Modify client/src/App.tsx
+
+Add import:
+
+import MenuAdmin from "./pages/menuV3/MenuAdmin";
+
+Add route:
+
+<Route path="/menu-v3" element={<MenuAdmin />} />
+
+
+---
