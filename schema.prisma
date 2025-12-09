@@ -1758,3 +1758,47 @@ model partner_activity_v1 {
 
   partner partner_bars_v1 @relation(fields: [partnerId], references: [id])
 }
+
+// PATCH O8 — DELIVERY ENGINE BACKEND CORE
+
+model drivers_v1 {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions driver_sessions_v1[]
+  deliveries deliveries_v1[]
+}
+
+model driver_sessions_v1 {
+  id        String   @id @default(cuid())
+  driverId  String
+  online    Boolean  @default(true)
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  driver drivers_v1 @relation(fields: [driverId], references: [id])
+}
+
+model deliveries_v1 {
+  id            String   @id @default(cuid())
+  orderId       String
+  driverId      String?
+  status        String   @default("pending") 
+  // pending → assigned → picked_up → on_the_way → delivered → cancelled
+
+  address       String?
+  lat           Float?
+  lng           Float?
+  deliveryType  String   @default("delivery") // delivery | pickup | partner
+  fee           Float    @default(0)
+  assignedAt    DateTime?
+  pickedUpAt    DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  driver drivers_v1? @relation(fields: [driverId], references: [id])
+}

@@ -1,0 +1,313 @@
+
+🚨 REPLIT AGENT INSTRUCTIONS
+
+Do NOT modify anything except the files listed.
+Do NOT refactor.
+Paste EXACTLY the code provided.
+Save and exit.
+
+
+---
+
+======================================================================
+
+🟧 PATCH O8-A — DELIVERY ENGINE (BACKEND CORE)
+
+======================================================================
+
+⭐ STEP 1 — PRISMA SCHEMA (DATABASE MODELS)
+
+Modify schema.prisma by APPENDING the following models:
+
+// PATCH O8 — DELIVERY ENGINE BACKEND CORE
+
+model drivers_v1 {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions driver_sessions_v1[]
+  deliveries deliveries_v1[]
+}
+
+model driver_sessions_v1 {
+  id        String   @id @default(cuid())
+  driverId  String
+  online    Boolean  @default(true)
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  driver drivers_v1 @relation(fields: [driverId], references: [id])
+}
+
+model deliveries_v1 {
+  id            String   @id @default(cuid())
+  orderId       String
+  driverId      String?
+  status        String   @default("pending") 
+  // pending → assigned → picked_up → on_the_way → delivered → cancelled
+
+  address       String?
+  lat           Float?
+  lng           Float?
+  deliveryType  String   @default("delivery") // delivery | pickup | partner
+  fee           Float    @default(0)
+  assignedAt    DateTime?
+  pickedUpAt    DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  driver drivers_v1? @relation(fields: [driverId], references: [id])
+}
+
+Run Prisma migrate.
+
+
+---
+
+⭐ STEP 2 — BACKEND SERVICES
+
+Create file:
+
+server/services/deliveryService.ts
+
+// PATCH O8 — DELIVERY SERVICE CORE
+import prisma from "../prismaClient";
+
+export async function createDelivery(orderId: string, payload: any) {
+  const { address, lat, lng, deliveryType, fee } = payload;
+
+  return prisma.deliveries_v1.create({
+    data: {
+      orderId,
+      address: address || null,
+      lat: lat || null,
+      lng: lng || null,
+      deliveryType: deliveryType || "delivery",
+      fee: fee || 0
+    }
+  });
+}
+
+export async function assignDriver(deliveryId: string, driverId: string) {
+  return prisma.deliveries_v1.update({
+    where: { id: deliveryId },
+    data: {
+      driverId,
+      status: "assigned",
+      assignedAt: new Date()
+    }
+  });
+}
+
+export async function updateDeliveryStatus(deliveryId: string, status: string) {
+  const timestamps: any = {};
+
+  if (status === "picked_up") timestamps.pickedUpAt = new Date();
+  if (status === "delivered") timestamps.deliveredAt = new Date();
+
+  return prisma.deliveries_v1.update({
+    where: { id: deliveryId },
+    data: {
+      status,
+      ...timestamps
+    }
+  });
+}
+
+export async function getActiveDeliveries() {
+  return prisma.deliveries_v1.findMany({
+    where: {
+      NOT: { status: "delivered" }
+    },
+    include: {
+      driver: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function getDeliveryHistory() {
+  return prisma.deliveries_v1.findMany({
+    where: { status: "delivered" },
+    include: { driver: true },
+    orderBy: { deliveredAt: "desc" }
+  });
+}
+
+
+---
+
+⭐ STEP 3 — DRIVER MANAGEMENT SERVICE
+
+Create file:
+
+server/services/driverService.ts
+
+// PATCH O8 — DRIVER MANAGEMENT
+import prisma from "../prismaClient";
+
+export async function addDriver(name: string, phone?: string) {
+  return prisma.drivers_v1.create({
+    data: { name, phone }
+  });
+}
+
+export async function getDrivers() {
+  return prisma.drivers_v1.findMany({
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function setDriverStatus(driverId: string, active: boolean) {
+  return prisma.drivers_v1.update({
+    where: { id: driverId },
+    data: { active }
+  });
+}
+
+
+---
+
+⭐ STEP 4 — DELIVERY ROUTES
+
+Create file:
+
+server/routes/delivery/deliveryRoutes.ts
+
+// PATCH O8 — DELIVERY API
+import { Router } from "express";
+import { createDelivery, assignDriver, updateDeliveryStatus, getActiveDeliveries, getDeliveryHistory } from "../../services/deliveryService";
+import { addDriver, getDrivers, setDriverStatus } from "../../services/driverService";
+
+const router = Router();
+
+// CREATE DELIVERY FOR ORDER
+router.post("/create", async (req, res) => {
+  try {
+    const { orderId, deliveryData } = req.body;
+    const d = await createDelivery(orderId, deliveryData);
+    res.json(d);
+  } catch (err) {
+    console.error("Delivery create error:", err);
+    res.status(500).json({ error: "Failed to create delivery" });
+  }
+});
+
+// ASSIGN DRIVER
+router.post("/assign", async (req, res) => {
+  const { deliveryId, driverId } = req.body;
+  const d = await assignDriver(deliveryId, driverId);
+  res.json(d);
+});
+
+// UPDATE STATUS
+router.post("/update-status", async (req, res) => {
+  const { deliveryId, status } = req.body;
+  const d = await updateDeliveryStatus(deliveryId, status);
+  res.json(d);
+});
+
+// ACTIVE DELIVERIES
+router.get("/active", async (_req, res) => {
+  res.json(await getActiveDeliveries());
+});
+
+// HISTORY
+router.get("/history", async (_req, res) => {
+  res.json(await getDeliveryHistory());
+});
+
+// DRIVER MANAGEMENT
+router.post("/drivers/add", async (req, res) => {
+  const { name, phone } = req.body;
+  res.json(await addDriver(name, phone));
+});
+
+router.post("/drivers/status", async (req, res) => {
+  const { driverId, active } = req.body;
+  res.json(await setDriverStatus(driverId, active));
+});
+
+router.get("/drivers", async (_req, res) => {
+  res.json(await getDrivers());
+});
+
+export default router;
+
+
+---
+
+⭐ STEP 5 — REGISTER DELIVERY ROUTES
+
+Modify server/routes.ts:
+
+import deliveryRoutes from "./routes/delivery/deliveryRoutes";
+app.use("/api/delivery", deliveryRoutes);
+
+
+---
+
+⭐ STEP 6 — MODIFY ORDER CREATION FOR DELIVERY TYPE
+
+Modify server/routes/ordersV2Routes.ts:
+
+Find order creation POST, and after order is created:
+
+// PATCH O8 — HANDLE DELIVERY DETAILS
+const del = req.body.deliveryData;
+if (del && del.deliveryType !== "pickup") {
+  await createDelivery(order.id, del);
+}
+
+Add import:
+
+import { createDelivery } from "../services/deliveryService";
+
+
+---
+
+⭐ STEP 7 — SHIFT REPORT HOOKS (BACKEND ONLY)
+
+Modify shiftReportBuilder.ts:
+
+Add summary fields:
+
+// PATCH O8 — DELIVERY SUMMARY
+const deliveryStats = await prisma.deliveries_v1.findMany({
+  where: { status: "delivered", orderId: { in: orders.map(o => o.id) } }
+});
+
+const totalDeliveries = deliveryStats.length;
+const totalDeliveryFees = deliveryStats.reduce((t, d) => t + (d.fee || 0), 0);
+
+report.deliverySummary = {
+  totalDeliveries,
+  totalDeliveryFees
+};
+
+
+---
+
+🟩 PATCH O8-A (BACKEND) — COMPLETE
+
+You now have:
+
+✔ Delivery engine backend
+
+✔ Driver management backend
+
+✔ Delivery assignment API
+
+✔ Delivery job lifecycle
+
+✔ Delivery stats feeding shift reports
+
+✔ Isolated patch — no breakage
+
+✔ Ready for full UI/frontend integration (Patch O8-B)
+
+This is the full backend foundation for your delivery service.

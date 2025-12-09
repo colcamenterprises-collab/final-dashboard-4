@@ -2,12 +2,14 @@
 // PATCH O3 — ORDER NUMBERS + LOYVERSE INTEGRATION
 // PATCH O4 — DELIVERY TIME ENGINE
 // PATCH O7 — HYBRID REFERRAL DETECTION
+// PATCH O8 — DELIVERY ENGINE INTEGRATION
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { calculateDistanceKm } from "../utils/distance.js";
 import { getNextOrderNumber } from "../services/orderNumber.js";
 import { estimateTimes } from "../services/deliveryTime.js";
 import { assignPartnerToOrder, manualPartnerSelection } from "../services/partnerTracker.js";
+import { createDelivery } from "../services/deliveryService.js";
 
 const router = Router();
 
@@ -101,6 +103,18 @@ router.post("/create", async (req, res) => {
 
     // PATCH O7 — Hybrid referral detection
     await assignPartnerToOrder(partnerCode, order.id);
+
+    // PATCH O8 — Handle delivery details
+    const deliveryData = req.body.deliveryData;
+    if (deliveryData && orderType !== "pickup") {
+      await createDelivery(order.id, {
+        address,
+        lat,
+        lng,
+        deliveryType: orderType,
+        fee: deliveryData.fee || 0
+      });
+    }
 
     // PATCH O4 — Delivery time estimation
     const eta = estimateTimes(distanceKm || 0);
