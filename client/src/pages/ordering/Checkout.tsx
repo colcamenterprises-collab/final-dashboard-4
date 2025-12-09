@@ -1,9 +1,12 @@
 // PATCH O2 — CHECKOUT PAGE
 // PATCH O4 — QR PAYMENT COMPONENT
-import { useState } from "react";
+// PATCH O7 — HYBRID REFERRAL + MANUAL PARTNER SELECTOR
+import { useState, useEffect } from "react";
 import axios from "../../utils/axiosInstance";
 import { useCart } from "../../lib/cartStore";
 import QRCodePayment from "../../components/QRCodePayment";
+
+type Partner = { id: string; name: string; code: string };
 
 export default function Checkout() {
   const { items, clearCart } = useCart();
@@ -12,10 +15,18 @@ export default function Checkout() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [orderType, setOrderType] = useState("pickup");
   const [address, setAddress] = useState("");
-  const [partnerCode, setPartnerCode] = useState("");
+  // PATCH O7 — Get partner code from session storage first
+  const [partnerCode, setPartnerCode] = useState(() => localStorage.getItem("partnerCode") || "");
+  const [manualPartner, setManualPartner] = useState("");
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("cash");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // PATCH O7 — Load partner list for manual selection
+  useEffect(() => {
+    axios.get("/partners/all").then((res) => setPartners(res.data)).catch(() => {});
+  }, []);
 
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const total = subtotal;
@@ -52,6 +63,14 @@ export default function Checkout() {
         lat,
         lng,
       });
+      // PATCH O7 — If manual partner selected, call manual-partner endpoint
+      if (manualPartner && res.data.orderId) {
+        await axios.post("/orders-v2/manual-partner", {
+          orderId: res.data.orderId,
+          partnerId: manualPartner,
+        });
+      }
+
       clearCart();
       // PATCH O3 — Pass orderNumber to confirmation
       // PATCH O4 — Pass ETA to confirmation
@@ -139,6 +158,19 @@ export default function Checkout() {
           onChange={(e) => setPartnerCode(e.target.value)}
           data-testid="input-partner-code"
         />
+
+        {/* PATCH O7 — Manual Partner Selector (Fallback) */}
+        <select
+          className="border p-2 rounded w-full"
+          value={manualPartner}
+          onChange={(e) => setManualPartner(e.target.value)}
+          data-testid="select-partner"
+        >
+          <option value="">Not a partner order</option>
+          {partners.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
 
         <textarea
           className="border p-2 rounded w-full"

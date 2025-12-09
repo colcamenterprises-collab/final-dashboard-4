@@ -181,6 +181,15 @@ const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
+  // PATCH O7 — CAPTURE PARTNER CODE FROM URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const partner = params.get("partner");
+    if (partner) {
+      localStorage.setItem("partnerCode", partner.toUpperCase());
+    }
+  }, []);
+
   // PATCH O1 — Fetch menu from menu-ordering API
   const { data: menuData, isLoading: menuLoading } = useQuery<Array<any>>({
     queryKey: ["/api/menu-ordering/full"],

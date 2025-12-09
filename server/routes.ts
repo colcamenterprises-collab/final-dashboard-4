@@ -88,6 +88,7 @@ import qrRoutes from "./routes/qrRoutes";
 import scbRoutes from "./routes/payments/scbRoutes";
 import qrDynamicRoutes from "./routes/payments/qrRoutes";
 import partnerBarRoutes from "./routes/partners/partnerRoutes";
+import partnerAnalyticsRoutes from "./routes/partners/partnerAnalyticsRoutes";
 // Email functionality will be added when needed
 
 
@@ -3203,6 +3204,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/payments/scb', scbRoutes);
   app.use('/api/payments/qr', qrDynamicRoutes);
   app.use('/api/partners', partnerBarRoutes);
+  app.use('/api/partners', partnerAnalyticsRoutes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

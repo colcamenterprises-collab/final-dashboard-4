@@ -1753,6 +1753,7 @@ model partner_activity_v1 {
   partnerId   String
   orderId     String?
   amount      Float
+  channel     String   // "qr" | "manual" | "direct"
   createdAt   DateTime @default(now())
 
   partner partner_bars_v1 @relation(fields: [partnerId], references: [id])

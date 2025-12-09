@@ -1,11 +1,13 @@
 // PATCH O2 — ORDER SUBMISSION & CHECKOUT
 // PATCH O3 — ORDER NUMBERS + LOYVERSE INTEGRATION
 // PATCH O4 — DELIVERY TIME ENGINE
+// PATCH O7 — HYBRID REFERRAL DETECTION
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { calculateDistanceKm } from "../utils/distance.js";
 import { getNextOrderNumber } from "../services/orderNumber.js";
 import { estimateTimes } from "../services/deliveryTime.js";
+import { assignPartnerToOrder, manualPartnerSelection } from "../services/partnerTracker.js";
 
 const router = Router();
 
@@ -97,6 +99,9 @@ router.post("/create", async (req, res) => {
       data: { orderNumber },
     });
 
+    // PATCH O7 — Hybrid referral detection
+    await assignPartnerToOrder(partnerCode, order.id);
+
     // PATCH O4 — Delivery time estimation
     const eta = estimateTimes(distanceKm || 0);
 
@@ -136,6 +141,18 @@ router.get("/status", async (req, res) => {
   } catch (error) {
     console.error("ORDER STATUS ERROR:", error);
     res.status(500).json({ error: "Failed to fetch order status" });
+  }
+});
+
+// PATCH O7 — MANUAL PARTNER SELECTION
+router.post("/manual-partner", async (req, res) => {
+  try {
+    const { orderId, partnerId } = req.body;
+    await manualPartnerSelection(partnerId, orderId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("MANUAL PARTNER ERROR:", error);
+    res.status(500).json({ error: "Failed to assign partner" });
   }
 });
 
