@@ -65,6 +65,8 @@ import PartnerAnalytics from "./pages/partners/PartnerAnalytics";
 import DeliveryAdmin from "./pages/delivery/DeliveryAdmin";
 import DriverManager from "./pages/delivery/DriverManager";
 import DeliveryHistory from "./pages/delivery/DeliveryHistory";
+import KDS from "./pages/kds/KDS";
+import KDSHistory from "./pages/kds/KDSHistory";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -187,6 +189,10 @@ export default function App() {
                   <Route path="/delivery/admin" element={<Guard><DeliveryAdmin /></Guard>} />
                   <Route path="/delivery/drivers" element={<Guard><DriverManager /></Guard>} />
                   <Route path="/delivery/history" element={<Guard><DeliveryHistory /></Guard>} />
+
+                  {/* Kitchen Display System (KDS) */}
+                  <Route path="/kds" element={<KDS />} />
+                  <Route path="/kds/history" element={<KDSHistory />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
