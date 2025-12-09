@@ -1672,6 +1672,8 @@ model orders_v2 {
   deliveryAllowed Boolean?
 
   partnerCode     String?
+  partnerId       String?
+  partner         partner_bars_v1? @relation(fields: [partnerId], references: [id])
 
   loyverseStatus  String   @default("pending")
 
@@ -1729,4 +1731,29 @@ model scb_transactions_v1 {
   orderId       String?
 
   webhookPayload Json
+}
+
+// PATCH O7 — PARTNER BAR REFERRAL ENGINE
+model partner_bars_v1 {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique  // e.g., "RAWAI123"
+  contactName String?
+  phone       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relationship
+  orders orders_v2[]
+  activity partner_activity_v1[]
+}
+
+model partner_activity_v1 {
+  id          String   @id @default(cuid())
+  partnerId   String
+  orderId     String?
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  partner partner_bars_v1 @relation(fields: [partnerId], references: [id])
 }

@@ -87,6 +87,7 @@ import loyverseMapRoutes from "./routes/loyverseMapRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import scbRoutes from "./routes/payments/scbRoutes";
 import qrDynamicRoutes from "./routes/payments/qrRoutes";
+import partnerBarRoutes from "./routes/partners/partnerRoutes";
 // Email functionality will be added when needed
 
 
@@ -3201,6 +3202,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/payments-qr', qrRoutes);
   app.use('/api/payments/scb', scbRoutes);
   app.use('/api/payments/qr', qrDynamicRoutes);
+  app.use('/api/partners', partnerBarRoutes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

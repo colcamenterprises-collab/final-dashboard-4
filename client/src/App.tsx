@@ -60,6 +60,7 @@ import Checkout from "./pages/ordering/Checkout";
 import OrderConfirmation from "./pages/ordering/OrderConfirmation";
 import AdminOrders from "./pages/ordering/AdminOrders";
 import LoyverseMappingConsole from "./pages/loyverse/LoyverseMappingConsole";
+import PartnerBars from "./pages/partners/PartnerBars";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -173,6 +174,9 @@ export default function App() {
                   <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
                   <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
                   <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
+
+                  {/* Partners */}
+                  <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

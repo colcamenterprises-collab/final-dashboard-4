@@ -1,0 +1,215 @@
+🔥 PATCH O7 — PART 1
+
+“Partner Bar Database + Referral Linking”
+
+This patch does zero to ordering logic yet.
+It only lays the foundation safely:
+
+Database tables
+
+API for partners
+
+API for generating referral codes
+
+Admin pages
+
+ZERO modifications to online ordering
+(Those come in Part 2 & 3)
+
+
+
+---
+
+🚨 REPLIT AGENT INSTRUCTIONS
+
+Do not modify anything except the files listed.
+Do not refactor.
+Paste exactly as provided.
+Save and exit.
+
+
+---
+
+⭐ PATCH O7-1 — DATABASE MODELS
+
+Modify your schema.prisma by APPENDING this block:
+
+// PATCH O7 — PARTNER BAR REFERRAL ENGINE
+model partner_bars_v1 {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique  // e.g., "RAWAI123"
+  contactName String?
+  phone       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relationship
+  orders orders_v2[]
+}
+
+model partner_activity_v1 {
+  id          String   @id @default(cuid())
+  partnerId   String
+  orderId     String?
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  partner partner_bars_v1 @relation(fields: [partnerId], references: [id])
+}
+
+Run migration.
+
+
+---
+
+⭐ PATCH O7-2 — BACKEND ROUTES
+
+Create file:
+
+server/routes/partners/partnerRoutes.ts
+
+// PATCH O7 — PARTNER BAR ADMIN API (FOUNDATION)
+import { Router } from "express";
+import prisma from "../../prismaClient";
+
+const router = Router();
+
+// CREATE PARTNER BAR
+router.post("/create", async (req, res) => {
+  try {
+    const { name, contactName, phone } = req.body;
+
+    // Auto-generate code: removes spaces + random 3 digits
+    const code = (name.replace(/\s+/g, "").toUpperCase() + Math.floor(Math.random() * 900 + 100)).slice(0, 12);
+
+    const partner = await prisma.partner_bars_v1.create({
+      data: { name, contactName, phone, code },
+    });
+
+    res.json(partner);
+  } catch (err) {
+    console.error("Partner create error:", err);
+    res.status(500).json({ error: "Failed to create partner" });
+  }
+});
+
+// LIST PARTNER BARS
+router.get("/all", async (_req, res) => {
+  const bars = await prisma.partner_bars_v1.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(bars);
+});
+
+// GET SINGLE BAR
+router.get("/:partnerId", async (req, res) => {
+  const bar = await prisma.partner_bars_v1.findUnique({
+    where: { id: String(req.params.partnerId) },
+  });
+  res.json(bar);
+});
+
+export default router;
+
+
+---
+
+⭐ PATCH O7-3 — REGISTER ROUTES
+
+Modify server/routes.ts:
+
+import partnerBarRoutes from "./routes/partners/partnerRoutes";
+app.use("/api/partners", partnerBarRoutes);
+
+
+---
+
+⭐ PATCH O7-4 — FRONTEND ADMIN PAGE
+
+Create file:
+
+client/src/pages/partners/PartnerBars.tsx
+
+// PATCH O7 — PARTNER BAR ADMIN PAGE
+import axios from "axios";
+import { useEffect, useState } from "react";
+
+export default function PartnerBars() {
+  const [bars, setBars] = useState([]);
+  const [name, setName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    axios.get("/api/partners/all").then((res) => setBars(res.data));
+  }, []);
+
+  const createBar = () => {
+    axios
+      .post("/api/partners/create", { name, contactName, phone })
+      .then(() => axios.get("/api/partners/all").then((res) => setBars(res.data)));
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>Partner Bars</h1>
+
+      <div style={{ marginBottom: 20 }}>
+        <h3>Create Partner Bar</h3>
+        <input placeholder="Bar Name" onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Contact Name" onChange={(e) => setContactName(e.target.value)} />
+        <input placeholder="Phone" onChange={(e) => setPhone(e.target.value)} />
+        <button onClick={createBar}>Create</button>
+      </div>
+
+      <h3>Existing Partners</h3>
+      {bars.map((b) => (
+        <div key={b.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
+          <b>{b.name}</b><br />
+          Code: {b.code}<br />
+          Contact: {b.contactName || "—"}<br />
+          Phone: {b.phone || "—"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+---
+
+⭐ PATCH O7-5 — ROUTING
+
+Modify client/src/App.tsx
+Add route:
+
+<Route path="/partners" element={<PartnerBars />} />
+
+Import at top:
+
+import PartnerBars from "./pages/partners/PartnerBars";
+
+
+---
+
+🎉 PATCH O7 PART 1 COMPLETE
+
+You now have:
+
+✔ Partner Bar Database
+
+✔ Partner Referral Codes
+
+✔ Partner Admin Panel
+
+✔ Referral model groundwork
+
+✔ Fully isolated — no risk to ordering or payments
+
+✔ Zero changes to existing modules
+
+✔ Safe to build further functionality
+
+
+---
