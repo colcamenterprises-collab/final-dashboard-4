@@ -82,6 +82,7 @@ import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
 import expensesV2Routes from "./routes/expensesV2Routes";
 import menuOrderingRoutes from "./routes/menuOrderingRoutes";
+import ordersV2Routes from "./routes/ordersV2Routes";
 // Email functionality will be added when needed
 
 
@@ -3191,6 +3192,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);
   app.use('/api/menu-ordering', menuOrderingRoutes);
+  app.use('/api/orders-v2', ordersV2Routes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

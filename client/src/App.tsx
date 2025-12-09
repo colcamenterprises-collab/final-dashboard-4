@@ -56,6 +56,9 @@ import SystemHealthPage from "./pages/operations/system-health";
 import ShiftReportDashboard from "./pages/reports/shift-report";
 import ShiftReportHistory from "./pages/reports/shift-report/history";
 import ShiftReportDetail from "./pages/reports/shift-report/view/ShiftReportDetail";
+import Checkout from "./pages/ordering/Checkout";
+import OrderConfirmation from "./pages/ordering/OrderConfirmation";
+import AdminOrders from "./pages/ordering/AdminOrders";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -71,8 +74,10 @@ export default function App() {
         <BrowserRouter>
           <Suspense fallback={<div className="p-6">Loading…</div>}>
             <Routes>
-              {/* Standalone Ordering page — NO SIDEBAR/HEADER */}
+              {/* Standalone Ordering pages — NO SIDEBAR/HEADER */}
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
+              <Route path={ROUTES.ORDER_CHECKOUT} element={<Checkout />} />
+              <Route path={ROUTES.ORDER_CONFIRMATION} element={<OrderConfirmation />} />
 
               {/* Everything else uses the dashboard layout */}
               <Route element={<PageShell />}>
@@ -165,6 +170,7 @@ export default function App() {
                   {/* Marketing */}
                   <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
                   <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
+                  <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

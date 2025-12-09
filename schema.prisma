@@ -1650,3 +1650,52 @@ model expenses_v2 {
   vendor      String?
   createdAt   DateTime @default(now())
 }
+
+// PATCH O2 — ONLINE ORDERING
+model orders_v2 {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+
+  customerName    String
+  customerPhone   String
+  orderType       String   // pickup | delivery | instore
+  address         String?
+  notes           String?
+
+  paymentType     String   // cash | qr | pickup-cash
+  paidStatus      String   @default("unverified")
+
+  subtotal        Float
+  total           Float
+
+  distanceKm      Float?
+  deliveryAllowed Boolean?
+
+  partnerCode     String?
+
+  loyverseStatus  String   @default("pending")
+
+  items           order_items_v2[]
+}
+
+model order_items_v2 {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       orders_v2 @relation(fields: [orderId], references: [id])
+
+  itemId      String
+  itemName    String
+  qty         Int
+  basePrice   Float
+
+  modifiers   order_modifiers_v2[]
+}
+
+model order_modifiers_v2 {
+  id          String   @id @default(cuid())
+  orderItemId String
+  orderItem   order_items_v2 @relation(fields: [orderItemId], references: [id])
+
+  name        String
+  price       Float
+}

@@ -49,6 +49,9 @@ export const ROUTES = {
   ONLINE_ORDERING: "/marketing/online-ordering",
   MENU_ADMIN: "/marketing/menu-admin",
   ORDER: "/order",
+  ORDER_CHECKOUT: "/online-ordering/checkout",
+  ORDER_CONFIRMATION: "/online-ordering/confirmation",
+  ADMIN_ORDERS: "/admin/orders",
 
   // Membership
   MEMBERSHIP: "/membership",

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import CartBar from "../components/CartBar";
 
 // SBB — Online Ordering (VEV exact replica)
 // Spec:
@@ -710,6 +711,9 @@ export default function OnlineOrderingPage() {
           Edit Menu
         </button>
       )}
+
+      {/* PATCH O2 — Cart Bar */}
+      <CartBar />
     </div>
   );
 }
