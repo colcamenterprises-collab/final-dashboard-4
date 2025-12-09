@@ -1,9 +1,11 @@
 // PATCH O2 — ORDER SUBMISSION & CHECKOUT
 // PATCH O3 — ORDER NUMBERS + LOYVERSE INTEGRATION
+// PATCH O4 — DELIVERY TIME ENGINE
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { calculateDistanceKm } from "../utils/distance.js";
 import { getNextOrderNumber } from "../services/orderNumber.js";
+import { estimateTimes } from "../services/deliveryTime.js";
 
 const router = Router();
 
@@ -95,7 +97,10 @@ router.post("/create", async (req, res) => {
       data: { orderNumber },
     });
 
-    res.json({ success: true, orderId: order.id, orderNumber });
+    // PATCH O4 — Delivery time estimation
+    const eta = estimateTimes(distanceKm || 0);
+
+    res.json({ success: true, orderId: order.id, orderNumber, eta });
   } catch (error) {
     console.error("ORDER CREATE ERROR:", error);
     res.status(500).json({ error: "Failed to create order" });

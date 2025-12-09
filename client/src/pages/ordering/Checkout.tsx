@@ -1,7 +1,9 @@
 // PATCH O2 — CHECKOUT PAGE
+// PATCH O4 — QR PAYMENT COMPONENT
 import { useState } from "react";
 import axios from "../../utils/axiosInstance";
 import { useCart } from "../../lib/cartStore";
+import QRCodePayment from "../../components/QRCodePayment";
 
 export default function Checkout() {
   const { items, clearCart } = useCart();
@@ -52,9 +54,11 @@ export default function Checkout() {
       });
       clearCart();
       // PATCH O3 — Pass orderNumber to confirmation
+      // PATCH O4 — Pass ETA to confirmation
       const orderNumber = res.data.orderNumber || '';
+      const etaJSON = encodeURIComponent(JSON.stringify(res.data.eta || {}));
       window.location.href =
-        "/online-ordering/confirmation?orderId=" + res.data.orderId + "&orderNumber=" + orderNumber;
+        "/online-ordering/confirmation?orderId=" + res.data.orderId + "&orderNumber=" + orderNumber + "&etaJSON=" + etaJSON;
     } catch (err: any) {
       alert(err.response?.data?.error || "Order failed");
       setIsSubmitting(false);
@@ -154,6 +158,8 @@ export default function Checkout() {
           <option value="qr">QR Payment</option>
           <option value="pickup-cash">Pay on Pickup</option>
         </select>
+
+        {paymentType === "qr" && <QRCodePayment amount={total} />}
 
         <button
           onClick={submitOrder}

@@ -83,6 +83,8 @@ import shiftReportRoutes from "./routes/shiftReportRoutes";
 import expensesV2Routes from "./routes/expensesV2Routes";
 import menuOrderingRoutes from "./routes/menuOrderingRoutes";
 import ordersV2Routes from "./routes/ordersV2Routes";
+import loyverseMapRoutes from "./routes/loyverseMapRoutes";
+import qrRoutes from "./routes/qrRoutes";
 // Email functionality will be added when needed
 
 
@@ -3193,6 +3195,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/expenses-v2', expensesV2Routes);
   app.use('/api/menu-ordering', menuOrderingRoutes);
   app.use('/api/orders-v2', ordersV2Routes);
+  app.use('/api/loyverse-map', loyverseMapRoutes);
+  app.use('/api/payments-qr', qrRoutes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

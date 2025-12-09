@@ -52,6 +52,7 @@ export const ROUTES = {
   ORDER_CHECKOUT: "/online-ordering/checkout",
   ORDER_CONFIRMATION: "/online-ordering/confirmation",
   ADMIN_ORDERS: "/admin/orders",
+  LOYVERSE_MAPPING: "/admin/loyverse-mapping",
 
   // Membership
   MEMBERSHIP: "/membership",
