@@ -62,6 +62,9 @@ import AdminOrders from "./pages/ordering/AdminOrders";
 import LoyverseMappingConsole from "./pages/loyverse/LoyverseMappingConsole";
 import PartnerBars from "./pages/partners/PartnerBars";
 import PartnerAnalytics from "./pages/partners/PartnerAnalytics";
+import DeliveryAdmin from "./pages/delivery/DeliveryAdmin";
+import DriverManager from "./pages/delivery/DriverManager";
+import DeliveryHistory from "./pages/delivery/DeliveryHistory";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -179,6 +182,11 @@ export default function App() {
                   {/* Partners */}
                   <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
                   <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />
+
+                  {/* Delivery */}
+                  <Route path="/delivery/admin" element={<Guard><DeliveryAdmin /></Guard>} />
+                  <Route path="/delivery/drivers" element={<Guard><DriverManager /></Guard>} />
+                  <Route path="/delivery/history" element={<Guard><DeliveryHistory /></Guard>} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

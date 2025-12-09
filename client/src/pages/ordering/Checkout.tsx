@@ -1,6 +1,7 @@
 // PATCH O2 — CHECKOUT PAGE
 // PATCH O4 — QR PAYMENT COMPONENT
 // PATCH O7 — HYBRID REFERRAL + MANUAL PARTNER SELECTOR
+// PATCH O8 — DELIVERY TYPE INTEGRATION
 import { useState, useEffect } from "react";
 import axios from "../../utils/axiosInstance";
 import { useCart } from "../../lib/cartStore";
@@ -22,10 +23,18 @@ export default function Checkout() {
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("cash");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // PATCH O8 — Partner delivery detection
+  const [partnerDelivery, setPartnerDelivery] = useState(false);
 
   // PATCH O7 — Load partner list for manual selection
   useEffect(() => {
     axios.get("/partners/all").then((res) => setPartners(res.data)).catch(() => {});
+  }, []);
+
+  // PATCH O8 — Detect partner delivery
+  useEffect(() => {
+    const pc = localStorage.getItem("partnerCode");
+    if (pc) setPartnerDelivery(true);
   }, []);
 
   const subtotal = items.reduce((s, i) => s + i.total, 0);
@@ -48,6 +57,13 @@ export default function Checkout() {
     const lat = 7.78;
     const lng = 98.32;
 
+    // PATCH O8 — Delivery data payload
+    const deliveryData = {
+      deliveryType: orderType,
+      address,
+      fee: orderType === "delivery" ? 20 : 0
+    };
+
     try {
       const res = await axios.post("/orders-v2/create", {
         customerName,
@@ -62,6 +78,7 @@ export default function Checkout() {
         total,
         lat,
         lng,
+        deliveryData,
       });
       // PATCH O7 — If manual partner selected, call manual-partner endpoint
       if (manualPartner && res.data.orderId) {
@@ -130,6 +147,7 @@ export default function Checkout() {
           data-testid="input-customer-phone"
         />
 
+        {/* PATCH O8 — Enhanced Order Type with Partner Delivery */}
         <select
           className="border p-2 rounded w-full"
           value={orderType}
@@ -138,16 +156,19 @@ export default function Checkout() {
         >
           <option value="pickup">Pickup</option>
           <option value="delivery">Delivery</option>
+          {partnerDelivery && <option value="partner">Partner Delivery</option>}
           <option value="instore">In Store</option>
         </select>
 
-        {orderType === "delivery" && (
-          <input
+        {/* PATCH O8 — Address for delivery/partner */}
+        {(orderType === "delivery" || orderType === "partner") && (
+          <textarea
             className="border p-2 rounded w-full"
-            placeholder="Delivery Address *"
+            placeholder={orderType === "partner" ? "Partner bar address (auto-applied)" : "Delivery Address *"}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             data-testid="input-address"
+            rows={2}
           />
         )}
 
