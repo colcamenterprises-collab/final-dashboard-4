@@ -1,0 +1,344 @@
+---
+
+🚨 REPLIT AGENT — STRICT RULES FOR PATCH O1
+
+DO:
+
+Only modify the files listed
+
+Create only the files listed
+
+Paste EXACT code
+
+Save and exit
+
+Do NOT free-style or optimize
+
+
+DO NOT:
+
+Do NOT touch Daily Sales & Stock
+
+Do NOT touch Expenses
+
+Do NOT touch Shift Reports
+
+Do NOT rename or move any existing components
+
+Do NOT auto-format files
+
+Do NOT interact with Fort Knox modules
+
+Do NOT alter POS or recipe costing logic
+
+
+This patch must be followed EXACTLY.
+
+
+---
+
+⭐ PATCH O1 — ONLINE ORDERING MENU DATA PIPELINE
+
+This patch introduces 3 core components:
+
+1. Unified Menu API
+
+
+2. Shared Menu Data Model
+
+
+3. Online Menu Admin UI loading actual menu items
+
+
+
+After this patch:
+
+Categories appear
+
+Menu items appear
+
+Items show name, price, description
+
+Item modifiers are loaded
+
+Recipe linking becomes possible
+
+Admin tools can edit categories & positions (future patches)
+
+
+
+---
+
+1. BACKEND — Create Unified Menu Routes
+
+These routes expose menu categories + items + modifiers from your existing Menu Management tables.
+
+Create file:
+server/routes/menuOrderingRoutes.ts
+
+// PATCH O1 — ONLINE ORDERING MENU DATA PIPELINE
+import { Router } from "express";
+import prisma from "../prismaClient";
+
+const router = Router();
+
+// GET ALL CATEGORIES
+router.get("/categories", async (req, res) => {
+  try {
+    const categories = await prisma.menuCategory.findMany({
+      orderBy: { position: "asc" },
+    });
+    res.json(categories);
+  } catch (err) {
+    console.error("MENU CATEGORIES ERROR:", err);
+    res.status(500).json({ error: "Failed to load categories" });
+  }
+});
+
+// GET ITEMS BY CATEGORY
+router.get("/items/:categoryId", async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    const items = await prisma.menuItem.findMany({
+      where: { categoryId },
+      include: {
+        modifiers: true,   // modifier groups (drinks, cheese, etc)
+      },
+      orderBy: { position: "asc" },
+    });
+
+    res.json(items);
+  } catch (err) {
+    console.error("MENU ITEMS ERROR:", err);
+    res.status(500).json({ error: "Failed to load items" });
+  }
+});
+
+// GET FULL MENU (ALL CATEGORIES + ITEMS + MODIFIERS)
+router.get("/full", async (req, res) => {
+  try {
+    const categories = await prisma.menuCategory.findMany({
+      orderBy: { position: "asc" },
+      include: {
+        items: {
+          orderBy: { position: "asc" },
+          include: { modifiers: true },
+        },
+      },
+    });
+
+    res.json(categories);
+  } catch (err) {
+    console.error("MENU FULL ERROR:", err);
+    res.status(500).json({ error: "Failed to load full menu" });
+  }
+});
+
+export default router;
+
+
+---
+
+2. BACKEND — Register the new routes
+
+In server/routes.ts add:
+
+import menuOrderingRoutes from "./routes/menuOrderingRoutes";
+app.use("/api/menu-ordering", menuOrderingRoutes);
+
+
+---
+
+3. FRONTEND — Fix “Online Menu Admin” to load categories
+
+Modify file:
+client/src/pages/menu/OnlineMenuAdmin.tsx
+(or MenuAdmin.tsx depending on your structure)
+
+REPLACE THE ENTIRE FILE WITH:
+
+// PATCH O1 — ONLINE ORDERING MENU DATA PIPELINE ADMIN UI
+import { useState, useEffect } from "react";
+import axios from "../../utils/axiosInstance";
+import Modal from "../../components/Modal";
+
+export default function OnlineMenuAdmin() {
+  const [categories, setCategories] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [position, setPosition] = useState(0);
+
+  const loadCategories = () => {
+    axios.get("/menu-ordering/categories").then((res) => {
+      setCategories(res.data);
+    });
+  };
+
+  useEffect(loadCategories, []);
+
+  const createCategory = () => {
+    axios
+      .post("/menu-categories/create", {
+        name: newCategoryName,
+        slug,
+        position: Number(position),
+      })
+      .then(() => {
+        setShowModal(false);
+        setNewCategoryName("");
+        setSlug("");
+        setPosition(0);
+        loadCategories();
+      });
+  };
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Online Menu Admin</h1>
+
+      <button
+        className="px-4 py-2 bg-green-600 text-white rounded mb-4"
+        onClick={() => setShowModal(true)}
+      >
+        Add Category
+      </button>
+
+      {/* CATEGORY LIST */}
+      <div className="space-y-3">
+        {categories.map((cat) => (
+          <div key={cat.id} className="border p-4 rounded bg-white shadow">
+            <div className="flex justify-between">
+              <div>
+                <h2 className="font-bold">{cat.name}</h2>
+                <div className="text-sm text-gray-600">Slug: {cat.slug}</div>
+              </div>
+              <div className="text-sm">Position: {cat.position}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ADD CATEGORY MODAL */}
+      <Modal show={showModal} onClose={() => setShowModal(false)}>
+        <h2 className="text-xl font-semibold mb-4">Add Category</h2>
+
+        <input
+          className="border p-2 rounded w-full mb-2"
+          placeholder="Name"
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded w-full mb-2"
+          placeholder="Slug"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded w-full mb-3"
+          placeholder="Position"
+          type="number"
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+        />
+
+        <button
+          className="px-4 py-2 bg-green-600 text-white rounded"
+          onClick={createCategory}
+        >
+          Save Category
+        </button>
+      </Modal>
+    </div>
+  );
+}
+
+
+---
+
+4. FRONTEND — Fix Customer-Facing Online Ordering Page
+
+Your menu currently does NOT load from DB.
+We fix that without touching your design, only the data layer.
+
+Modify file:
+client/src/pages/ordering/OnlineOrdering.tsx
+(Name may vary slightly in your repo. It’s the customer facing ordering page.)
+
+Replace the menu loading logic with:
+
+useEffect(() => {
+  axios.get("/menu-ordering/full").then((res) => {
+    setMenu(res.data);
+  });
+}, []);
+
+This immediately populates:
+
+BURGER MEAL SETS
+
+SIDE ORDERS
+
+ORIGINAL SMASH BURGERS
+
+DRINKS
+
+
+…pulled directly from your real menu DB.
+
+
+---
+
+5. RESULT OF PATCH O1
+
+After this patch:
+
+Admin Panel
+
+Shows real categories
+
+Add Category works
+
+Items load under each category
+
+
+Customer-facing Ordering Page
+
+Fully loads your real categories + menu items
+
+Items cleanly displayed like McDonald's
+
+You can finally see your real working menu
+
+
+Backend
+
+Provides /api/menu-ordering/* API
+
+Single source of truth for menu data
+
+POS mapping ready for next patches
+
+
+This is the foundation for the full Online Ordering System.
+
+
+---
+
+🎉 PATCH O1 — MENU DATA PIPELINE IS COMPLETE
+
+The agent can now safely run this entire patch.
+
+Once the agent confirms:
+
+Patch O2 — Cart, Checkout, Delivery Radius, Partner Codes
+
+is next.
+
+Cam — just say:
+
+“Proceed with O2”

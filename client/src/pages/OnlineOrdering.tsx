@@ -180,18 +180,18 @@ const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
-  // Fetch menu from API
-  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories: Array<any> }>({
-    queryKey: ["/api/menu"],
+  // PATCH O1 — Fetch menu from menu-ordering API
+  const { data: menuData, isLoading: menuLoading } = useQuery<Array<any>>({
+    queryKey: ["/api/menu-ordering/full"],
     enabled: !getParam("admin"), // Only fetch if NOT in admin mode
   });
 
-  // Transform API menu to flat structure
+  // PATCH O1 — Transform API menu to flat structure (from /api/menu-ordering/full)
   const apiMenu: MenuData = useMemo(() => {
-    if (!menuData?.categories) return DEFAULT_MENU;
+    if (!menuData || !Array.isArray(menuData) || menuData.length === 0) return DEFAULT_MENU;
     const items: MenuItem[] = [];
-    menuData.categories.forEach((cat: any) => {
-      cat.items.forEach((item: any) => {
+    menuData.forEach((cat: any) => {
+      (cat.items || []).forEach((item: any) => {
         items.push({
           id: item.id,
           sku: item.sku,
@@ -205,7 +205,7 @@ export default function OnlineOrderingPage() {
             name: g.name,
             type: g.type as "single" | "multi",
             required: g.required,
-            maxSelections: g.maxSelections,
+            maxSelections: g.maxSel,
             options: g.options?.map((o: any) => ({
               id: o.id || uid("opt"),
               name: o.name,
