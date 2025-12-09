@@ -1717,3 +1717,16 @@ model loyverse_map_v2 {
   modifierName      String?
   loyverseModifierId String?
 }
+
+// PATCH O5 — SCB TRANSACTION LOG
+model scb_transactions_v1 {
+  id            String   @id @default(cuid())
+  scbTxnId      String?
+  amount        Float
+  ref           String?
+  timestamp     DateTime @default(now())
+  matched       Boolean  @default(false)
+  orderId       String?
+
+  webhookPayload Json
+}

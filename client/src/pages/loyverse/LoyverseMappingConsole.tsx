@@ -1,6 +1,6 @@
 // PATCH O4 — LOYVERSE MAPPING UI
 import { useEffect, useState } from "react";
-import axios from "../../lib/axiosInstance";
+import axios from "../../utils/axiosInstance";
 
 type MenuItem = {
   id: string;

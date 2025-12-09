@@ -55,6 +55,9 @@ export default function AdminOrders() {
               <div className="font-bold text-lg">Order #{o.orderNumber || o.id.slice(-6)}</div>
               <div>{o.customerName} — {o.customerPhone}</div>
               <div className="capitalize">{o.orderType} • {o.paymentType}</div>
+              <div className="text-sm">
+                Payment: <span className={o.paidStatus === 'paid' ? 'text-green-600 font-bold' : 'text-yellow-600'}>{o.paidStatus === 'paid' ? 'PAID' : 'Pending'}</span>
+              </div>
               <div className="text-sm">Loyverse: <span className={o.loyverseStatus === 'sent' ? 'text-green-600' : o.loyverseStatus === 'failed' ? 'text-red-600' : 'text-yellow-600'}>{o.loyverseStatus}</span></div>
               {o.address && <div className="text-sm text-gray-600">📍 {o.address}</div>}
               {o.partnerCode && <div className="text-sm text-blue-600">Partner: {o.partnerCode}</div>}

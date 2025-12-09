@@ -1,19 +1,22 @@
 // PATCH O4 — LIVE QR DISPLAY COMPONENT
+// PATCH O5 — ACCEPTS ORDER NUMBER FOR SCB REFERENCE
 import { useEffect, useState } from "react";
-import axios from "../lib/axiosInstance";
+import axios from "../utils/axiosInstance";
 
 type Props = {
   amount: number;
+  orderNumber?: string;
 };
 
-export default function QRCodePayment({ amount }: Props) {
+export default function QRCodePayment({ amount, orderNumber }: Props) {
   const [qr, setQr] = useState("");
 
   useEffect(() => {
+    const ref = orderNumber || "";
     axios
-      .get("/payments-qr/generate?amount=" + amount)
+      .get(`/payments-qr/generate?amount=${amount}&ref=${ref}`)
       .then((res) => setQr(res.data.qrImage));
-  }, [amount]);
+  }, [amount, orderNumber]);
 
   return (
     <div className="text-center">

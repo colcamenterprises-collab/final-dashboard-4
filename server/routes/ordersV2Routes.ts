@@ -126,4 +126,17 @@ router.get("/all", async (req, res) => {
   }
 });
 
+// PATCH O5 — GET ORDER STATUS (for confirmation page polling)
+router.get("/status", async (req, res) => {
+  try {
+    const prisma = db();
+    const { orderId } = req.query;
+    const o = await prisma.orders_v2.findUnique({ where: { id: String(orderId) } });
+    res.json({ paidStatus: o?.paidStatus || "pending" });
+  } catch (error) {
+    console.error("ORDER STATUS ERROR:", error);
+    res.status(500).json({ error: "Failed to fetch order status" });
+  }
+});
+
 export default router;
