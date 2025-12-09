@@ -1679,6 +1679,10 @@ model orders_v2 {
 
   orderNumber     String?
 
+  // KDS FIELDS
+  kdsStatus       String   @default("new")
+  kdsUpdatedAt    DateTime @updatedAt
+
   items           order_items_v2[]
 }
 

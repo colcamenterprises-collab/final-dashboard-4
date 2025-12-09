@@ -1,0 +1,214 @@
+🚀 PATCH O9-A — KITCHEN DISPLAY SYSTEM (BACKEND CORE)
+
+Below is the complete backend patch for the KDS.
+You can paste this entire patch directly to the Replit agent.
+
+
+---
+
+⚠️ REPLIT AGENT INSTRUCTIONS (DO NOT LET THE AGENT DEVIATE)
+
+Agent — DO EXACTLY THIS AND NOTHING ELSE:
+
+1. Create the listed files exactly as shown.
+
+
+2. Modify only the listed files in exactly the edited sections.
+
+
+3. Do NOT rename any folders, files, routes, or functions.
+
+
+4. Do NOT touch POS, ordering, partner modules, or any unrelated systems.
+
+
+5. Do NOT attempt UI work. Backend only.
+
+
+6. Do NOT auto-fix, refactor, simplify or optimize anything.
+
+
+7. Save all files, run server, confirm no errors. Leave the system.
+
+
+
+
+---
+
+📁 1. Create: server/services/kdsService.ts
+
+// server/services/kdsService.ts
+import db from "../../lib/db";
+
+export async function getActiveKDSOrders() {
+  return await db.orders_v2.findMany({
+    where: {
+      kdsStatus: { not: "completed" }
+    },
+    orderBy: { createdAt: "asc" },
+    include: {
+      items: {
+        include: { modifiers: true }
+      },
+      delivery: true,
+      partner: true
+    }
+  });
+}
+
+export async function updateKDSStatus(orderId: string, status: string) {
+  return await db.orders_v2.update({
+    where: { id: orderId },
+    data: { kdsStatus: status }
+  });
+}
+
+export async function getKDSHistory() {
+  return await db.orders_v2.findMany({
+    where: { kdsStatus: "completed" },
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+}
+
+
+---
+
+📁 2. Modify Prisma Schema (schema.prisma)
+
+⚠️ Agent must insert the following fields into the existing orders_v2 model ONLY:
+Do not modify anything else.
+
+model orders_v2 {
+  id            String   @id @default(cuid())
+  orderNumber   String?
+  orderType     String?
+  customerName  String?
+  customerPhone String?
+  deliveryData  Json?
+  partnerId     String?
+  createdAt     DateTime @default(now())
+
+  // KDS FIELDS
+  kdsStatus     String   @default("new")
+  kdsUpdatedAt  DateTime @updatedAt
+
+  items         order_items_v2[]
+  modifiers     order_modifiers_v2[]
+  delivery      deliveries_v1?
+  partner       partner_bars_v1? @relation(fields: [partnerId], references: [id])
+}
+
+
+---
+
+📁 3. Create: server/routes/kds/kdsRoutes.ts
+
+// server/routes/kds/kdsRoutes.ts
+import express from "express";
+import { getActiveKDSOrders, updateKDSStatus, getKDSHistory } from "../../services/kdsService";
+
+const router = express.Router();
+
+// Get all active KDS orders
+router.get("/active", async (req, res) => {
+  try {
+    const orders = await getActiveKDSOrders();
+    return res.json({ success: true, orders });
+  } catch (err) {
+    console.error("KDS Active Error:", err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+// Update order KDS status
+router.post("/update-status", async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    const updated = await updateKDSStatus(orderId, status);
+    return res.json({ success: true, updated });
+  } catch (err) {
+    console.error("KDS Status Error:", err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+// KDS history archive
+router.get("/history", async (req, res) => {
+  try {
+    const history = await getKDSHistory();
+    return res.json({ success: true, history });
+  } catch (err) {
+    console.error("KDS History Error:", err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+export default router;
+
+
+---
+
+📁 4. Register KDS routes in server/routes.ts
+
+⚠️ Agent — insert EXACTLY THIS near the other route registrations:
+
+import kdsRoutes from "./routes/kds/kdsRoutes";
+
+app.use("/api/kds", kdsRoutes);
+
+
+---
+
+📁 5. Modify order creation to initialize KDS status
+
+In server/routes/ordersV2Routes.ts, inside the order creation logic, add:
+
+kdsStatus: "new",
+
+This ensures every order automatically appears on the kitchen screen.
+
+
+---
+
+📁 6. KDS Status Lifecycle (do not modify)
+
+These are the only allowed statuses:
+
+"new"
+"cooking"
+"ready"
+"picked_up"
+"delivered"
+"completed"
+
+
+---
+
+📁 7. Auto-Complete Rule (Backend Only)
+
+Create a small update in server/services/kdsService.ts:
+
+export async function autoCompleteOldOrders() {
+  return await db.orders_v2.updateMany({
+    where: {
+      kdsStatus: "delivered",
+      createdAt: {
+        lt: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes
+      }
+    },
+    data: { kdsStatus: "completed" }
+  });
+}
+
+And call it from a scheduler in server/index.ts:
+
+import { autoCompleteOldOrders } from "./services/kdsService";
+
+cron.schedule("*/2 * * * *", async () => {
+  console.log("KDS Auto-Cleanup Running");
+  await autoCompleteOldOrders();
+});
+
+
+---

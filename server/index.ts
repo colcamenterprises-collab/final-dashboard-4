@@ -523,6 +523,14 @@ async function checkSchema() {
             processLoyverseQueue().catch(err => console.error('Loyverse queue error:', err));
           }, 30000); // run every 30 seconds
           console.log("📦 Loyverse order queue scheduled every 30 seconds");
+
+          // PATCH O9 — KDS Auto-Complete Cron (every 2 minutes)
+          const { autoCompleteOldOrders } = await import('./services/kdsService');
+          nodeCron.default.schedule("*/2 * * * *", async () => {
+            console.log("[KDS] Auto-cleanup running");
+            await autoCompleteOldOrders().catch((err: any) => console.error("[KDS] Auto-complete error:", err));
+          });
+          console.log("🍳 KDS auto-complete scheduled every 2 minutes");
           
           console.log('✅ All background services started successfully');
         } catch (err) {

@@ -67,6 +67,7 @@ router.post("/create", async (req, res) => {
         total,
         distanceKm,
         deliveryAllowed,
+        kdsStatus: "new", // PATCH O9 — Initialize KDS status
       },
     });
 
