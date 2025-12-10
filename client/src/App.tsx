@@ -73,6 +73,7 @@ import POS from "./pages/pos/POS";
 import POSRegisterStatus from "./pages/pos/POSRegisterStatus";
 import POSCheckout from "./pages/pos/POSCheckout";
 import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
+import LiveStock from "./pages/stock/LiveStock";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -209,6 +210,9 @@ export default function App() {
                   <Route path="/pos-register" element={<POSRegisterStatus />} />
                   <Route path="/pos-checkout" element={<POSCheckout />} />
                   <Route path="/pos-receipt" element={<POSReceiptPreview />} />
+
+                  {/* Stock Live Dashboard */}
+                  <Route path="/stock-live" element={<LiveStock />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
