@@ -74,6 +74,7 @@ import POSRegisterStatus from "./pages/pos/POSRegisterStatus";
 import POSCheckout from "./pages/pos/POSCheckout";
 import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
 import LiveStock from "./pages/stock/LiveStock";
+import IngredientUsage from "./pages/analysis/IngredientUsage";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -213,6 +214,9 @@ export default function App() {
 
                   {/* Stock Live Dashboard */}
                   <Route path="/stock-live" element={<LiveStock />} />
+
+                  {/* Ingredient Usage Analytics */}
+                  <Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

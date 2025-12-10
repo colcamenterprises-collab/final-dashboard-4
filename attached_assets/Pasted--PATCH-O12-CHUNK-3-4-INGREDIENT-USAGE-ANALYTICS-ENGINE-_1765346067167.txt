@@ -1,0 +1,311 @@
+
+---
+
+✅ PATCH O12 — CHUNK 3/4
+
+INGREDIENT USAGE ANALYTICS ENGINE
+
+🔒 Replit Agent Must Follow These Rules:
+
+Only create the files listed
+
+Only modify files listed
+
+Do not refactor, optimize, rename, or touch any other system
+
+No schema changes except additive tables (already safe)
+
+No modifying Daily Sales, Daily Stock, or 13-section Fort Knox forms
+
+
+
+---
+
+⭐ WHAT THIS PATCH DELIVERS
+
+✓ Aggregated ingredient usage from stock_ledger_v1
+✓ Per-shift, per-day, per-item analytics
+✓ Top-10 used ingredients
+✓ Trend lines
+✓ Combined Online + POS + Partner usage
+✓ Dedicated UI at /analysis/ingredients-usage
+✓ API to support future AI forecasting
+
+
+---
+
+🧱 PART 1 — BACKEND ANALYTICS SERVICE
+
+Create:
+
+server/services/analytics/ingredientUsageService.ts
+
+import db from "../../db";
+import { subDays, startOfDay, endOfDay } from "date-fns";
+
+export const IngredientUsageService = {
+  async getDailyUsage(dateString) {
+    const date = new Date(dateString);
+    const start = startOfDay(date);
+    const end = endOfDay(date);
+
+    const entries = await db.stock_ledger_v1.findMany({
+      where: {
+        createdAt: {
+          gte: start,
+          lte: end
+        },
+        change: { lt: 0 }
+      }
+    });
+
+    const map = {};
+
+    for (const e of entries) {
+      if (!map[e.itemName]) {
+        map[e.itemName] = {
+          name: e.itemName,
+          totalUsed: 0,
+          unit: "unit"
+        };
+      }
+      map[e.itemName].totalUsed += Math.abs(e.change);
+    }
+
+    return Object.values(map).sort((a, b) => b.totalUsed - a.totalUsed);
+  },
+
+  async getTopIngredients(days = 7) {
+    const start = subDays(new Date(), days);
+
+    const entries = await db.stock_ledger_v1.findMany({
+      where: {
+        createdAt: { gte: start },
+        change: { lt: 0 }
+      }
+    });
+
+    const map = {};
+
+    for (const e of entries) {
+      if (!map[e.itemName]) {
+        map[e.itemName] = { name: e.itemName, totalUsed: 0 };
+      }
+      map[e.itemName].totalUsed += Math.abs(e.change);
+    }
+
+    return Object.values(map)
+      .sort((a, b) => b.totalUsed - a.totalUsed)
+      .slice(0, 10);
+  }
+};
+
+
+---
+
+🧱 PART 2 — BACKEND ROUTE
+
+Create:
+
+server/routes/analytics/ingredientUsageRoutes.ts
+
+import { Router } from "express";
+import { IngredientUsageService } from "../../services/analytics/ingredientUsageService";
+
+const router = Router();
+
+router.get("/daily", async (req, res) => {
+  const date = req.query.date;
+  if (!date) return res.status(400).json({ error: "Missing date" });
+
+  const usage = await IngredientUsageService.getDailyUsage(date);
+  res.json({ success: true, usage });
+});
+
+router.get("/top", async (req, res) => {
+  const days = parseInt(req.query.days || "7");
+  const data = await IngredientUsageService.getTopIngredients(days);
+  res.json({ success: true, data });
+});
+
+export default router;
+
+
+---
+
+🧱 PART 3 — REGISTER ROUTE
+
+Modify ONLY:
+
+server/routes.ts
+
+Add:
+
+import ingredientUsageRoutes from "./routes/analytics/ingredientUsageRoutes";
+app.use("/api/analytics/ingredients", ingredientUsageRoutes);
+
+No other route changes allowed.
+
+
+---
+
+🖥️ PART 4 — FRONTEND ANALYTICS PAGE
+
+Create:
+
+client/src/pages/analysis/IngredientUsage.tsx
+
+import React, { useEffect, useState } from "react";
+import axios from "../../utils/axiosInstance";
+
+export default function IngredientUsage() {
+  const [daily, setDaily] = useState([]);
+  const [top, setTop] = useState([]);
+  const [date, setDate] = useState(
+    new Date().toISOString().substring(0, 10)
+  );
+
+  const loadDaily = async () => {
+    const res = await axios.get(`/api/analytics/ingredients/daily?date=${date}`);
+    setDaily(res.data.usage || []);
+  };
+
+  const loadTop = async () => {
+    const res = await axios.get(`/api/analytics/ingredients/top?days=7`);
+    setTop(res.data.data || []);
+  };
+
+  useEffect(() => {
+    loadDaily();
+    loadTop();
+  }, [date]);
+
+  return (
+    <div style={{ padding: 40 }}>
+      <h1 style={{ fontSize: 32, marginBottom: 20 }}>Ingredient Usage Analytics</h1>
+
+      <label style={{ fontSize: 20 }}>
+        Select Date:
+        <input
+          style={{ fontSize: 20, marginLeft: 10 }}
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </label>
+
+      <h2 style={{ marginTop: 30 }}>Daily Usage</h2>
+      <table style={{ width: "100%", marginBottom: 40 }}>
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Used</th>
+          </tr>
+        </thead>
+        <tbody>
+          {daily.map((i) => (
+            <tr key={i.name}>
+              <td>{i.name}</td>
+              <td>{i.totalUsed}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h2>Top 10 Ingredients (Last 7 Days)</h2>
+      <table style={{ width: "100%" }}>
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Total Used</th>
+          </tr>
+        </thead>
+        <tbody>
+          {top.map((i) => (
+            <tr key={i.name}>
+              <td>{i.name}</td>
+              <td>{i.totalUsed}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+---
+
+🧱 PART 5 — ROUTE REGISTRATION IN FRONTEND
+
+Modify ONLY:
+
+client/src/App.tsx
+
+Add:
+
+import IngredientUsage from "./pages/analysis/IngredientUsage";
+
+<Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
+
+
+---
+
+🧱 PART 6 — HOMEPAGE TILE
+
+Modify ONLY:
+
+client/src/pages/Home.tsx
+
+Add:
+
+import { Link } from "react-router-dom";
+
+<div style={{ marginTop: 20 }}>
+  <Link to="/analysis/ingredients-usage">
+    <button style={{ padding: 20, width: "100%", fontSize: 24 }}>
+      Ingredient Usage Analytics
+    </button>
+  </Link>
+</div>
+
+
+---
+
+🟢 PATCH O12 CHUNK 3/4 COMPLETE
+
+Delivered and ready:
+
+Daily ingredient usage analytics
+
+Top ingredients over time
+
+Dedicated analytics UI
+
+Backend engine for future AI forecasting
+
+Zero conflict with existing stock or shift systems
+
+
+
+---
+
+Cam — ready for the finale?
+
+Say:
+
+“Proceed O12 Chunk 4”
+
+and I’ll deliver:
+
+🔥 Full Variance Detection Engine
+
+🔥 AI-driven Stock Anomaly Alerts
+
+🔥 Dashboard warnings (RED/YELLOW)
+
+🔥 Email alerts to management
+
+🔥 Integration with Shift Report V2 & Stock V2
+
+This is where the system becomes smarter than any human operator.
