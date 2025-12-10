@@ -1575,6 +1575,28 @@ enum SkuKind {
   BUNDLE
 }
 
+// PATCH O14 Chunk 5 — Multi-Gateway Payment Provider Enum
+enum PaymentGateway {
+  stripe
+  scb
+  cash
+  custom1
+  custom2
+}
+
+// PATCH O14 Chunk 5 — Restaurant Payment Providers (SaaS)
+model restaurant_payment_providers_v1 {
+  id             String          @id @default(cuid())
+  restaurantId   String
+  provider       PaymentGateway
+  status         Boolean         @default(false)
+  credentials    Json?
+  createdAt      DateTime        @default(now())
+
+  @@unique([restaurantId, provider])
+  @@index([restaurantId])
+}
+
 model ExternalSkuMap {
   id          String   @id @default(cuid())
   channel     String   @db.VarChar(20) // 'grab' | 'pos'

@@ -36,6 +36,8 @@ import { tenantResolver } from "./middleware/tenantResolver";
 import { TenantScoped } from "./services/tenant/tenantScopedService";
 import { AuthService } from "./services/auth/authService";
 import authRoutes from "./routes/auth/authRoutes";
+import providerRoutes from "./routes/payments/providerRoutes";
+import paymentProcessRoutes from "./routes/payments/processRoutes";
 
 // PATCH 2 — SYSTEM TRIPWIRE
 // Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
@@ -424,6 +426,10 @@ async function checkSchema() {
   
   // PATCH O14 — Auth routes
   app.use("/api/auth", authRoutes);
+  
+  // PATCH O14 Chunk 5 — Payment provider routes
+  app.use("/api/payment-providers", providerRoutes);
+  app.use("/api/payments", paymentProcessRoutes);
   
   // System Health Test route
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
