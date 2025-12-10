@@ -78,6 +78,7 @@ import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
 import SaaSAdmin from "./pages/saas/SaaSAdmin";
 import Login from "./pages/auth/Login";
+import TenantSwitcher from "./pages/settings/TenantSwitcher";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -227,6 +228,7 @@ export default function App() {
 
                   {/* SaaS Admin */}
                   <Route path="/saas" element={<SaaSAdmin />} />
+                  <Route path="/settings/tenant" element={<TenantSwitcher />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

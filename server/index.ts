@@ -32,6 +32,7 @@ import securityV2Router from "./routes/securityV2";
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 import { tenantContext } from "./middleware/tenantContext";
+import { tenantResolver } from "./middleware/tenantResolver";
 import { TenantScoped } from "./services/tenant/tenantScopedService";
 import { AuthService } from "./services/auth/authService";
 import authRoutes from "./routes/auth/authRoutes";
@@ -52,6 +53,8 @@ app.use(reqId);
 app.use(timing);
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
+// PATCH O14 Chunk 3+4 — Tenant resolver middleware
+app.use(tenantResolver);
 // Temporarily disabled for development testing
 // app.use(readonlyGuard);
 
