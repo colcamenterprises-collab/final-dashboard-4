@@ -68,6 +68,11 @@ import DeliveryHistory from "./pages/delivery/DeliveryHistory";
 import KDS from "./pages/kds/KDS";
 import KDSHistory from "./pages/kds/KDSHistory";
 import MenuAdminV3 from "./pages/menuV3/MenuAdmin";
+import POSLogin from "./pages/pos/POSLogin";
+import POS from "./pages/pos/POS";
+import POSRegisterStatus from "./pages/pos/POSRegisterStatus";
+import POSCheckout from "./pages/pos/POSCheckout";
+import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -197,6 +202,13 @@ export default function App() {
 
                   {/* Menu Master V3 */}
                   <Route path="/menu-v3" element={<MenuAdminV3 />} />
+
+                  {/* POS Terminal */}
+                  <Route path="/pos-login" element={<POSLogin />} />
+                  <Route path="/pos" element={<POS />} />
+                  <Route path="/pos-register" element={<POSRegisterStatus />} />
+                  <Route path="/pos-checkout" element={<POSCheckout />} />
+                  <Route path="/pos-receipt" element={<POSReceiptPreview />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
