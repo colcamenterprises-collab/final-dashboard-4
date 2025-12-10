@@ -1,0 +1,238 @@
+
+✅ PATCH O11-B — POS TERMINAL UI (FRONTEND)
+
+REPLIT AGENT — DO NOT DEVIATE FROM THESE STEPS
+
+Follow the steps exactly, do not create extra files, do not modify anything not explicitly listed, and do not “improve” anything.
+
+
+---
+
+🔧 FILES THE AGENT IS ALLOWED TO CREATE
+
+The agent must create exactly these files and no others:
+
+client/src/pages/pos/POS.tsx
+client/src/pages/pos/POSLogin.tsx
+client/src/pages/pos/POSRegisterStatus.tsx
+client/src/pages/pos/POSCheckout.tsx
+client/src/pages/pos/POSReceiptPreview.tsx
+client/src/pages/pos/components/POSCategoryBar.tsx
+client/src/pages/pos/components/POSItemGrid.tsx
+client/src/pages/pos/components/POSModifierSheet.tsx
+client/src/pages/pos/components/POSCart.tsx
+
+
+---
+
+✏️ FILES THE AGENT MUST MODIFY (NO OTHER FILES!)
+
+Modify ONLY:
+
+client/src/App.tsx
+client/src/pages/Home.tsx
+
+Nothing else.
+
+
+---
+
+📌 WHAT THIS PATCH ADDS
+
+The full POS terminal:
+
+✔ Staff PIN login
+
+4-digit PIN
+
+Validated against fixed list (hardcoded safe mode)
+
+
+✔ Register status view
+
+Shows OPEN or CLOSED
+
+Buttons: Open Register, Close Register
+
+
+✔ POS Home (Tablet UI)
+
+Large category bar
+
+Item grid (big buttons, finger-friendly)
+
+Modifier sheet (slide-up modal)
+
+Cart drawer
+
+Quantity selector
+
+Remove item
+
+Notes (optional)
+
+
+✔ Checkout workflow
+
+Payment selection: Cash, QR, SCB, Card
+
+Sends data to O11-A backend
+
+Auto-pushes order to KDS
+
+Redirect to Receipt Preview
+
+
+✔ Receipt preview
+
+Order number
+
+Items & modifiers
+
+Total
+
+Button: “Send to KDS” (disabled if already sent)
+
+
+
+---
+
+🌈 UI RULES FOR THE AGENT
+
+Use white background, black text, orange accents (SBB brand).
+
+Use Poppins font (already system-wide).
+
+Buttons must be large, simple, rectangular.
+
+No icons, no emojis.
+
+Design must match McDonald’s POS aesthetic — clean, bold, simple.
+
+
+
+---
+
+🗂️ REPLIT AGENT PATCH CONTENT
+
+Agent must paste the following EXACT CODE into new files.
+No alterations. No structural changes.
+
+
+---
+
+1️⃣ Create: client/src/pages/pos/POSLogin.tsx
+
+import React, { useState } from "react";
+import axios from "../../utils/axiosInstance";
+
+const VALID_PINS = ["1111", "2222", "3333"];
+
+export default function POSLogin() {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = () => {
+    if (VALID_PINS.includes(pin)) {
+      localStorage.setItem("pos_logged_in", "true");
+      window.location.href = "/pos";
+    } else {
+      setError("Invalid PIN");
+    }
+  };
+
+  return (
+    <div style={{ padding: 40 }}>
+      <h1>POS Login</h1>
+      <input
+        type="password"
+        value={pin}
+        onChange={(e) => setPin(e.target.value)}
+        placeholder="Enter PIN"
+        style={{ fontSize: 24, padding: 10, width: "60%" }}
+      />
+      <br /><br />
+      <button onClick={handleLogin} style={{ fontSize: 24, padding: 10 }}>
+        Login
+      </button>
+      {error && <p style={{ color: "red" }}>{error}</p>}
+    </div>
+  );
+}
+
+
+---
+
+2️⃣ Create: client/src/pages/pos/POSRegisterStatus.tsx
+
+(Shows OPEN/CLOSED + open/close buttons)
+
+import React, { useEffect, useState } from "react";
+import axios from "../../utils/axiosInstance";
+
+export default function POSRegisterStatus() {
+  const [status, setStatus] = useState("checking");
+
+  const load = async () => {
+    const res = await axios.get("/api/pos/register/status");
+    setStatus(res.data.status);
+  };
+
+  const openRegister = async () => {
+    await axios.post("/api/pos/register/open");
+    load();
+  };
+
+  const closeRegister = async () => {
+    await axios.post("/api/pos/register/close");
+    load();
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <div style={{ padding: 40 }}>
+      <h1>Register Status</h1>
+      <h2>Current: {status}</h2>
+
+      {status === "closed" && (
+        <button onClick={openRegister} style={{ fontSize: 22, padding: 10 }}>
+          Open Register
+        </button>
+      )}
+
+      {status === "open" && (
+        <button onClick={closeRegister} style={{ fontSize: 22, padding: 10 }}>
+          Close Register
+        </button>
+      )}
+    </div>
+  );
+}
+
+
+---
+
+3️⃣ Create: client/src/pages/pos/POS.tsx
+
+(Main POS screen with categories + items + cart)
+
+NOTE: The full code is too long to fit in this message block.
+To avoid exceeding token limits, I will deliver PATCH O11-B in three consecutive chunks exactly as per your rules.
+
+✔ Chunk 1 (Login + Register Status) — Delivered
+
+⏳ Chunk 2 (POS Main UI + Components) — Ready
+
+⏳ Chunk 3 (Checkout + Receipt + App.tsx route mods) — Ready
+
+
+---
+
+Cam — Please say:
+
+“Proceed O11-B Chunk 2”
+
+…and I’ll drop the full POS UI code, ready for the agent to paste.
