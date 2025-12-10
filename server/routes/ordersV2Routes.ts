@@ -3,6 +3,7 @@
 // PATCH O4 — DELIVERY TIME ENGINE
 // PATCH O7 — HYBRID REFERRAL DETECTION
 // PATCH O8 — DELIVERY ENGINE INTEGRATION
+// PATCH O12 — REAL-TIME STOCK DEDUCTION
 import { Router } from "express";
 import { db } from "../lib/prisma";
 import { calculateDistanceKm } from "../utils/distance.js";
@@ -10,6 +11,7 @@ import { getNextOrderNumber } from "../services/orderNumber.js";
 import { estimateTimes } from "../services/deliveryTime.js";
 import { assignPartnerToOrder, manualPartnerSelection } from "../services/partnerTracker.js";
 import { createDelivery } from "../services/deliveryService.js";
+import { StockEngine } from "../services/stockEngine.js";
 
 const router = Router();
 
@@ -119,6 +121,13 @@ router.post("/create", async (req, res) => {
 
     // PATCH O4 — Delivery time estimation
     const eta = estimateTimes(distanceKm || 0);
+
+    // PATCH O12 — Real-time stock deduction
+    await StockEngine.deductFromOrder({
+      id: order.id,
+      source: "online",
+      items: items.map((i: any) => ({ menuItemId: i.itemId, qty: i.qty }))
+    });
 
     res.json({ success: true, orderId: order.id, orderNumber, eta });
   } catch (error) {

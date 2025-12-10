@@ -1884,3 +1884,33 @@ model menu_item_recipes_v3 {
 
   item           menu_items_v3 @relation(fields: [itemId], references: [id])
 }
+
+// PATCH O12 — REAL-TIME STOCK & INGREDIENT DEDUCTION ENGINE
+
+model stock_ledger_v1 {
+  id          String   @id @default(cuid())
+  itemId      String
+  itemName    String
+  change      Float
+  reason      String
+  source      String
+  orderId     String?
+  createdAt   DateTime @default(now())
+}
+
+model stock_item_live_v1 {
+  id        String   @id @default(cuid())
+  name      String
+  unit      String
+  qty       Float    @default(0)
+  updatedAt DateTime @default(now())
+}
+
+model recipe_portions_v1 {
+  id             String   @id @default(cuid())
+  menuItemId     String
+  ingredientId   String
+  ingredientName String
+  qty            Float
+  unit           String
+}
