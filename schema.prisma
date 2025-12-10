@@ -1914,3 +1914,37 @@ model recipe_portions_v1 {
   qty            Float
   unit           String
 }
+
+// PATCH O14 — MULTI-TENANT SAAS FOUNDATION
+
+model saas_tenants {
+  id          Int       @id @default(autoincrement())
+  name        String
+  domain      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+  users       saas_tenant_users[]
+  settings    saas_tenant_settings?
+}
+
+model saas_tenant_users {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int
+  email         String
+  role          String
+  createdAt     DateTime  @default(now())
+
+  tenant        saas_tenants @relation(fields: [tenantId], references: [id])
+}
+
+model saas_tenant_settings {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int       @unique
+  timezone      String    @default("Asia/Bangkok")
+  currency      String    @default("THB")
+  locale        String    @default("en")
+  logoUrl       String?
+  colorPrimary  String?
+
+  tenant        saas_tenants @relation(fields: [tenantId], references: [id])
+}

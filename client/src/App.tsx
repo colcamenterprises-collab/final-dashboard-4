@@ -76,6 +76,7 @@ import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
 import LiveStock from "./pages/stock/LiveStock";
 import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
+import SaaSAdmin from "./pages/saas/SaaSAdmin";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -221,6 +222,9 @@ export default function App() {
 
                   {/* Stock Variance Analysis */}
                   <Route path="/analysis/stock-variance" element={<StockVariance />} />
+
+                  {/* SaaS Admin */}
+                  <Route path="/saas" element={<SaaSAdmin />} />
 
                   {/* Membership */}
                   <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />

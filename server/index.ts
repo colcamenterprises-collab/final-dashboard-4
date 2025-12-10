@@ -31,6 +31,8 @@ import insightsV2Router from "./routes/insightsV2";
 import securityV2Router from "./routes/securityV2";
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
+import { tenantContext } from "./middleware/tenantContext";
+import { TenantScoped } from "./services/tenant/tenantScopedService";
 
 // PATCH 2 — SYSTEM TRIPWIRE
 // Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
@@ -101,6 +103,9 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Serve tablet cache clear page
 app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
+
+// PATCH O14 — Tenant context middleware (SaaS foundation)
+app.use(tenantContext);
 
 // Special tablet reload routes
 app.get('/tablet-reload', (req, res) => {
@@ -531,6 +536,10 @@ async function checkSchema() {
             await autoCompleteOldOrders().catch((err: any) => console.error("[KDS] Auto-complete error:", err));
           });
           console.log("🍳 KDS auto-complete scheduled every 2 minutes");
+          
+          // PATCH O14 — Ensure default SaaS tenant exists
+          await TenantScoped.ensureRestaurantExists();
+          console.log("🏢 SaaS tenant layer initialized");
           
           console.log('✅ All background services started successfully');
         } catch (err) {
