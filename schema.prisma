@@ -1634,7 +1634,7 @@ model shift_report_v2 {
   variances    Json?
   aiInsights   String?
   createdAt    DateTime @default(now())
-
+  restaurantId String?
 }
 
 
@@ -1684,6 +1684,7 @@ model orders_v2 {
   kdsUpdatedAt    DateTime @updatedAt
 
   items           order_items_v2[]
+  restaurantId    String?
 }
 
 model order_items_v2 {
@@ -1746,6 +1747,7 @@ model partner_bars_v1 {
   phone       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  restaurantId String?
 
   // relationship
   orders orders_v2[]
@@ -1772,6 +1774,7 @@ model drivers_v1 {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  restaurantId String?
 
   sessions driver_sessions_v1[]
   deliveries deliveries_v1[]
@@ -1803,6 +1806,7 @@ model deliveries_v1 {
   pickedUpAt    DateTime?
   deliveredAt   DateTime?
   createdAt     DateTime @default(now())
+  restaurantId  String?
 
   driver drivers_v1? @relation(fields: [driverId], references: [id])
 }
@@ -1820,6 +1824,7 @@ model menu_categories_v3 {
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  restaurantId   String?
 
   items          menu_items_v3[]
 }
@@ -1839,6 +1844,7 @@ model menu_items_v3 {
   isActive       Boolean    @default(true)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+  restaurantId   String?
 
   category       menu_categories_v3 @relation(fields: [categoryId], references: [id])
   modifiers      menu_modifiers_group_v3[] @relation("ItemToModifierGroup")
@@ -1855,6 +1861,7 @@ model menu_modifiers_group_v3 {
   isActive       Boolean    @default(true)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+  restaurantId   String?
 
   modifiers      menu_modifiers_v3[]
   appliesToItems menu_items_v3[] @relation("ItemToModifierGroup")
@@ -1869,6 +1876,7 @@ model menu_modifiers_v3 {
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  restaurantId   String?
 
   group          menu_modifiers_group_v3 @relation(fields: [groupId], references: [id])
 }
@@ -1881,6 +1889,7 @@ model menu_item_recipes_v3 {
   unit           String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  restaurantId   String?
 
   item           menu_items_v3 @relation(fields: [itemId], references: [id])
 }
@@ -1896,6 +1905,7 @@ model stock_ledger_v1 {
   source      String
   orderId     String?
   createdAt   DateTime @default(now())
+  restaurantId String?
 }
 
 model stock_item_live_v1 {
@@ -1904,6 +1914,7 @@ model stock_item_live_v1 {
   unit      String
   qty       Float    @default(0)
   updatedAt DateTime @default(now())
+  restaurantId String?
 }
 
 model recipe_portions_v1 {
@@ -1913,6 +1924,7 @@ model recipe_portions_v1 {
   ingredientName String
   qty            Float
   unit           String
+  restaurantId   String?
 }
 
 // PATCH O14 — MULTI-TENANT SAAS FOUNDATION
