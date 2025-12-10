@@ -77,6 +77,7 @@ import LiveStock from "./pages/stock/LiveStock";
 import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
 import SaaSAdmin from "./pages/saas/SaaSAdmin";
+import Login from "./pages/auth/Login";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -92,7 +93,8 @@ export default function App() {
         <BrowserRouter>
           <Suspense fallback={<div className="p-6">Loading…</div>}>
             <Routes>
-              {/* Standalone Ordering pages — NO SIDEBAR/HEADER */}
+              {/* Standalone pages — NO SIDEBAR/HEADER */}
+              <Route path="/login" element={<Login />} />
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
               <Route path={ROUTES.ORDER_CHECKOUT} element={<Checkout />} />
               <Route path={ROUTES.ORDER_CONFIRMATION} element={<OrderConfirmation />} />

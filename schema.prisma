@@ -1930,8 +1930,9 @@ model saas_tenants {
 model saas_tenant_users {
   id            Int       @id @default(autoincrement())
   tenantId      Int
-  email         String
-  role          String
+  email         String    @unique
+  passwordHash  String
+  role          String    // owner, manager, staff, pos
   createdAt     DateTime  @default(now())
 
   tenant        saas_tenants @relation(fields: [tenantId], references: [id])

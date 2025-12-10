@@ -33,6 +33,8 @@ import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 import { tenantContext } from "./middleware/tenantContext";
 import { TenantScoped } from "./services/tenant/tenantScopedService";
+import { AuthService } from "./services/auth/authService";
+import authRoutes from "./routes/auth/authRoutes";
 
 // PATCH 2 — SYSTEM TRIPWIRE
 // Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
@@ -417,6 +419,9 @@ async function checkSchema() {
   app.use("/api/insights", insightsV2Router);
   app.use("/api/security", securityV2Router);
   
+  // PATCH O14 — Auth routes
+  app.use("/api/auth", authRoutes);
+  
   // System Health Test route
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
@@ -540,6 +545,22 @@ async function checkSchema() {
           // PATCH O14 — Ensure default SaaS tenant exists
           await TenantScoped.ensureRestaurantExists();
           console.log("🏢 SaaS tenant layer initialized");
+          
+          // PATCH O14 Chunk 2 — Seed default admin user
+          const { db } = await import('./lib/prisma');
+          const prisma = db();
+          const existingAdmin = await prisma.saas_tenant_users.findFirst({
+            where: { email: "admin@sbb.com" }
+          });
+          if (!existingAdmin) {
+            await AuthService.register({
+              email: "admin@sbb.com",
+              password: "sbb123",
+              role: "owner",
+              tenantId: 1
+            });
+            console.log("👤 Default admin created: admin@sbb.com (password: sbb123)");
+          }
           
           console.log('✅ All background services started successfully');
         } catch (err) {
