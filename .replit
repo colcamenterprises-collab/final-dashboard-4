@@ -19,62 +19,6 @@ externalPort = 4200
 localPort = 5000
 externalPort = 5000
 
-[[ports]]
-localPort = 32947
-externalPort = 6800
-
-[[ports]]
-localPort = 33071
-externalPort = 9000
-
-[[ports]]
-localPort = 33971
-externalPort = 80
-
-[[ports]]
-localPort = 34137
-externalPort = 6000
-
-[[ports]]
-localPort = 36295
-externalPort = 8099
-
-[[ports]]
-localPort = 38189
-externalPort = 5173
-
-[[ports]]
-localPort = 39251
-externalPort = 8081
-
-[[ports]]
-localPort = 40907
-externalPort = 8080
-
-[[ports]]
-localPort = 41635
-externalPort = 3002
-
-[[ports]]
-localPort = 41731
-externalPort = 8008
-
-[[ports]]
-localPort = 42159
-externalPort = 3000
-
-[[ports]]
-localPort = 42309
-externalPort = 3003
-
-[[ports]]
-localPort = 42381
-externalPort = 8000
-
-[[ports]]
-localPort = 46365
-externalPort = 3001
-
 [workflows]
 runButton = "Project"
 
@@ -105,3 +49,6 @@ integrations = ["github:1.0.0"]
 
 [userenv.shared]
 SCB_MODE = "dry"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-15fcea80-c978-4e01-b412-ee68cb3a05ad"

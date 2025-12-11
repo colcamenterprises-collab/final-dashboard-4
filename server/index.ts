@@ -434,8 +434,6 @@ async function checkSchema() {
   // System Health Test route
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
-  
-  app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   // Error guard middleware - must be LAST
   app.use(errorGuard);
