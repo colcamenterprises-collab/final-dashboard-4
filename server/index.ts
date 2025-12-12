@@ -38,6 +38,7 @@ import { AuthService } from "./services/auth/authService";
 import authRoutes from "./routes/auth/authRoutes";
 import providerRoutes from "./routes/payments/providerRoutes";
 import paymentProcessRoutes from "./routes/payments/processRoutes";
+import legacyBridgeRoutes from "./routes/legacyBridge";
 
 // PATCH 2 — SYSTEM TRIPWIRE
 // Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
@@ -430,6 +431,9 @@ async function checkSchema() {
   // PATCH O14 Chunk 5 — Payment provider routes
   app.use("/api/payment-providers", providerRoutes);
   app.use("/api/payments", paymentProcessRoutes);
+  
+  // PATCH L0 — Legacy Read Bridge routes
+  app.use("/api/legacy-bridge", legacyBridgeRoutes);
   
   // System Health Test route
   const systemHealthRouter = (await import('./routes/systemHealth')).default;

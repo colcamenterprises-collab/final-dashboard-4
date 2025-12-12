@@ -1,0 +1,223 @@
+🟩 PATCH L0 — GLOBAL LEGACY READ BRIDGE
+
+(READ-ONLY · SAFE · REVERSIBLE · REQUIRED)
+
+🎯 Goal
+
+Restore ALL historical data visibility across the system
+without migrating, mutating, or risking production data
+
+
+---
+
+🔒 HARD RULES (ABSOLUTE)
+
+❌ No schema changes
+
+❌ No migrations
+
+❌ No deletes
+
+❌ No writes to legacy tables
+
+❌ No background jobs
+
+❌ No data copying
+
+
+✅ READ-ONLY FALLBACK ONLY
+
+
+---
+
+🧩 AFFECTED MODULES (ALL OF THESE)
+
+Module	Status
+
+Daily Sales	❌ Broken
+Daily Stock	❌ Broken
+Shopping List	❌ Broken
+Purchases (Rolls/Meat/Drinks)	❌ Broken
+Expenses	❌ Broken
+Ingredients	❌ Broken
+Recipes	❌ Broken
+Menu	❌ Broken
+Suppliers	❌ Broken
+
+
+
+---
+
+🧠 STRATEGY (SYSTEM-WIDE)
+
+> If V2 / V3 table is empty → READ from legacy table
+
+
+
+No exceptions.
+
+
+---
+
+🛠️ IMPLEMENTATION (FOR REPLIT AGENT)
+
+1️⃣ Create ONE Core Bridge Service
+
+File:
+
+server/services/legacyReadBridge.ts
+
+Pattern (generic, reused everywhere):
+
+export async function readWithFallback({
+  prisma,
+  primary,
+  legacy,
+  query = {}
+}) {
+  const primaryRows = await prisma[primary].findMany(query);
+
+  if (primaryRows.length > 0) {
+    return { source: 'v2', rows: primaryRows };
+  }
+
+  const legacyRows = await prisma[legacy].findMany(query);
+
+  return { source: 'legacy', rows: legacyRows };
+}
+
+
+---
+
+2️⃣ Apply Bridge to ALL Read Routes
+
+Replace direct reads in:
+
+dailySales*
+
+dailyStock*
+
+shoppingList*
+
+expenses*
+
+purchases*
+
+ingredients*
+
+recipes*
+
+menu*
+
+suppliers*
+
+
+Example:
+
+readWithFallback({
+  prisma,
+  primary: 'expenses_v2',
+  legacy: 'expenses'
+})
+
+🚫 DO NOT create new endpoints
+🚫 DO NOT change URLs
+🚫 DO NOT rename responses
+
+
+---
+
+3️⃣ Frontend: Global Legacy Indicator
+
+Add once (reused everywhere):
+
+{data.source === 'legacy' && (
+  <Alert variant="warning">
+    Legacy Data (Read-Only) — Pre-Upgrade Records
+  </Alert>
+)}
+
+
+---
+
+4️⃣ Frontend: Disable Mutations for Legacy Data
+
+If source === 'legacy':
+
+Disable:
+
+Edit
+
+Delete
+
+Sync
+
+Recalculate
+
+
+Tooltip:
+
+> “Legacy record — read-only”
+
+
+
+
+
+---
+
+✅ SUCCESS CRITERIA (YOU SHOULD SEE THIS)
+
+After deploy:
+
+✅ All historical sales visible
+
+✅ All purchases visible
+
+✅ Shopping lists reappear
+
+✅ Ingredients populate
+
+✅ Recipes populate
+
+✅ Menu items visible
+
+✅ Expenses show up
+
+✅ No data duplication
+
+✅ No write access to legacy data
+
+
+
+---
+
+🧠 WHY THIS IS THE CORRECT SaaS MOVE
+
+This gives you:
+
+Clean enterprise schema going forward
+
+Zero-risk visibility backwards
+
+A controlled migration path (L2)
+
+Investor-safe architecture
+
+Multi-tenant ready foundation
+
+
+This is exactly how Stripe, Shopify, Square handle legacy transitions.
+
+
+---
+
+📌 FINAL COPY-PASTE FOR AGENT
+
+> “Implement PATCH L0 — Global Legacy Read Bridge.
+All read endpoints must fallback to legacy tables if V2/V3 tables are empty.
+Read-only only. No schema changes. No migrations. No deletes.”
+
+
+
+
+---
