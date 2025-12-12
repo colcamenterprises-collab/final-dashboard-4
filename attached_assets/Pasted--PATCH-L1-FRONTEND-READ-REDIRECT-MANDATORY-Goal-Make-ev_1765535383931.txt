@@ -1,0 +1,157 @@
+🟦 PATCH L1 — FRONTEND READ REDIRECT (MANDATORY)
+
+🎯 Goal
+
+Make every existing UI screen automatically read from:
+
+V2/V3 data if present
+
+Legacy data if not
+
+
+WITHOUT:
+
+changing URLs
+
+breaking routes
+
+duplicating components
+
+
+
+---
+
+🧠 STRATEGY (IMPORTANT)
+
+We do not rewrite every page manually.
+
+We patch the API layer abstraction once.
+
+
+---
+
+🛠️ IMPLEMENTATION (FOR AGENT)
+
+1️⃣ Patch the frontend API client (ONE FILE)
+
+Locate (or create):
+
+client/src/lib/api.ts
+
+Add a helper:
+
+async function fetchWithLegacyFallback(primaryUrl: string, legacyUrl: string) {
+  const res = await fetch(primaryUrl);
+  const data = await res.json();
+
+  if (Array.isArray(data) && data.length > 0) return data;
+  if (data?.rows?.length > 0) return data;
+
+  const legacyRes = await fetch(legacyUrl);
+  return legacyRes.json();
+}
+
+
+---
+
+2️⃣ Apply to ALL READS (NO EXCEPTIONS)
+
+Examples:
+
+Daily Sales
+
+fetchWithLegacyFallback(
+  '/api/daily-sales',
+  '/api/legacy-bridge/daily-sales'
+)
+
+Expenses
+
+fetchWithLegacyFallback(
+  '/api/expenses',
+  '/api/legacy-bridge/expenses'
+)
+
+Shopping List
+
+fetchWithLegacyFallback(
+  '/api/shopping-list',
+  '/api/legacy-bridge/shopping-list'
+)
+
+Ingredients
+
+fetchWithLegacyFallback(
+  '/api/ingredients',
+  '/api/legacy-bridge/ingredients'
+)
+
+Menu
+
+fetchWithLegacyFallback(
+  '/api/menu-v3/items',
+  '/api/legacy-bridge/menu-items'
+)
+
+🚫 Do NOT rename components
+🚫 Do NOT touch UI layout
+🚫 Do NOT add new routes
+
+
+---
+
+3️⃣ Enable the Legacy Banner (Already Done)
+
+You already added:
+
+<LegacyDataAlert source={data.source} />
+
+Once L1 is wired:
+
+Legacy data will visibly appear
+
+Banner will auto-trigger
+
+
+
+---
+
+✅ SUCCESS CRITERIA (THIS IS WHAT YOU’LL SEE)
+
+After PATCH L1 deploy:
+
+✅ Daily Sales Library fully populated
+
+✅ Shopping List shows historical items
+
+✅ Purchases visible
+
+✅ Ingredients list fills
+
+✅ Recipes visible
+
+✅ Menu items appear
+
+✅ Expense history restored
+
+✅ Zero duplication
+
+✅ Zero write risk
+
+
+At that point, the system is stable again.
+
+
+---
+
+🔒 WHAT WE DO NOT DO YET
+
+❌ No migrations
+❌ No data copying
+❌ No deletions
+❌ No “sync legacy → v2” buttons
+
+That is PATCH L2 and only after confirmation.
+
+
+---
