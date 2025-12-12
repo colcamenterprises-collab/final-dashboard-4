@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Save, Edit, X, Upload, RefreshCw } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { fetchWithLegacyFallback } from '@/lib/api';
+import { LegacyDataAlert } from '@/components/ui/legacy-data-alert';
 import type { Ingredient } from '@shared/schema';
 
 interface EditableIngredient extends Ingredient {
@@ -22,11 +24,13 @@ export default function IngredientsTable() {
   const [stockItems, setStockItems] = useState<EditableIngredient[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Queries
-  const { data: fetchedIngredients = [], isLoading } = useQuery<Ingredient[]>({
-    queryKey: ['/api/ingredients'],
-    queryFn: () => apiRequest('/api/ingredients'),
+  // Queries with legacy fallback
+  const { data: ingredientsResult, isLoading } = useQuery({
+    queryKey: ['/api/ingredients', 'with-legacy'],
+    queryFn: () => fetchWithLegacyFallback('/api/ingredients', '/api/legacy-bridge/ingredients'),
   });
+  const fetchedIngredients = (ingredientsResult?.rows || []) as Ingredient[];
+  const dataSource = ingredientsResult?.source || 'v2';
 
   // Update ingredients state when query data changes
   React.useEffect(() => {

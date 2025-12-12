@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Edit, Trash2, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { fetchWithLegacyFallback } from "@/lib/api";
+import { LegacyDataAlert } from "@/components/ui/legacy-data-alert";
 
 interface Supplier {
   id: number;
@@ -46,9 +48,12 @@ const SupplierManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: suppliers = [], isLoading } = useQuery({
-    queryKey: ['/api/suppliers'],
+  const { data: suppliersResult, isLoading } = useQuery({
+    queryKey: ['/api/suppliers', 'with-legacy'],
+    queryFn: () => fetchWithLegacyFallback('/api/suppliers', '/api/legacy-bridge/suppliers'),
   });
+  const suppliers = suppliersResult?.rows || [];
+  const dataSource = suppliersResult?.source || 'v2';
 
   const addMutation = useMutation({
     mutationFn: (data: Omit<Supplier, 'id'>) => apiRequest('/api/suppliers', 'POST', data),

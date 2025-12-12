@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { fetchWithLegacyFallback } from '@/lib/api';
+import { LegacyDataAlert } from '@/components/ui/legacy-data-alert';
 
 type Expense = {
   id: string; expenseDate: string; type: 'PURCHASE'|'GENERAL'|'WAGE';
@@ -12,13 +14,17 @@ export default function ExpensesList() {
   const [rows, setRows] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string|null>(null);
+  const [source, setSource] = useState<'v2' | 'legacy'>('v2');
 
   useEffect(()=>{(async()=>{
     try{
       setErr(null); setLoading(true);
-      const res = await fetch('/api/expensesV2', { headers: {Accept:'application/json'} });
-      if(!res.ok) throw new Error('Failed to load expenses');
-      setRows(await res.json());
+      const result = await fetchWithLegacyFallback<Expense>(
+        '/api/expensesV2',
+        '/api/legacy-bridge/expenses'
+      );
+      setRows(result.rows);
+      setSource(result.source);
     }catch(e:any){setErr(e.message)}finally{setLoading(false)}
   })()},[]);
 
@@ -29,6 +35,7 @@ export default function ExpensesList() {
         <a href="/finance/expenses/new" className="rounded-lg bg-gray-900 text-white text-sm px-4 py-2">+ New Purchase</a>
       </div>
       {err ? <div className="rounded border bg-rose-50 p-4 text-rose-700">{err}</div> : null}
+      <LegacyDataAlert source={source} />
       <div className="rounded-2xl border border-gray-200 bg-white shadow-[0_2px_16px_rgba(16,24,40,.06)]">
         <table className="w-full text-sm">
           <thead>

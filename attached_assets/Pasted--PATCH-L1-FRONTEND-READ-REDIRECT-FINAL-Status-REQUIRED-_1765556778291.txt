@@ -1,0 +1,191 @@
+✅ PATCH L1 — FRONTEND READ REDIRECT (FINAL)
+
+Status: REQUIRED
+Risk: LOW
+Writes: ❌ NONE (read-only)
+Purpose: Restore ALL historical data visibility in the UI by transparently falling back to legacy sources.
+
+This patch does not touch schemas, data, or migrations.
+It only fixes where the frontend reads from.
+
+
+---
+
+🎯 PROBLEM (CONFIRMED)
+
+Backend L0 bridge is working
+
+Legacy data exists
+
+UI still calls only new endpoints
+
+Result: empty screens after publish
+
+
+L1 fixes this permanently.
+
+
+---
+
+🧱 ARCHITECTURE DECISION (LOCKED)
+
+We introduce ONE shared fetch helper and route ALL read calls through it.
+
+No component rewrites
+No duplicated logic
+No new pages
+
+
+---
+
+🛠️ IMPLEMENTATION — EXACT STEPS FOR AGENT
+
+
+---
+
+1️⃣ CREATE / UPDATE API HELPER (ONE FILE)
+
+📄 File
+
+client/src/lib/api.ts
+
+✅ FULL CONTENT (PASTE ALL)
+
+export async function fetchWithLegacyFallback<T>(
+  primaryUrl: string,
+  legacyUrl: string
+): Promise<{ data: T; source: 'primary' | 'legacy' }> {
+  try {
+    const primaryRes = await fetch(primaryUrl);
+    const primaryData = await primaryRes.json();
+
+    const hasData =
+      Array.isArray(primaryData)
+        ? primaryData.length > 0
+        : primaryData?.rows?.length > 0 ||
+          Object.keys(primaryData || {}).length > 0;
+
+    if (hasData) {
+      return { data: primaryData, source: 'primary' };
+    }
+  } catch (e) {
+    console.warn('Primary fetch failed:', primaryUrl);
+  }
+
+  const legacyRes = await fetch(legacyUrl);
+  const legacyData = await legacyRes.json();
+
+  return { data: legacyData, source: 'legacy' };
+}
+
+🚫 Do NOT add logging
+🚫 Do NOT throw errors
+🚫 Do NOT mutate response
+
+
+---
+
+2️⃣ PATCH ALL READ SCREENS (SEARCH & REPLACE PATTERN)
+
+Wherever you see:
+
+fetch('/api/XYZ')
+
+Replace with:
+
+fetchWithLegacyFallback(
+  '/api/XYZ',
+  '/api/legacy-bridge/XYZ'
+)
+
+
+---
+
+3️⃣ EXACT MAPPINGS (NO DEVIATION)
+
+UI Screen	Primary	Legacy
+
+Daily Sales Library	/api/daily-sales	/api/legacy-bridge/daily-sales
+Expenses	/api/expenses	/api/legacy-bridge/expenses
+Shopping List	/api/shopping-list	/api/legacy-bridge/shopping-list
+Ingredients	/api/ingredients	/api/legacy-bridge/ingredients
+Recipes	/api/recipes	/api/legacy-bridge/recipes
+Suppliers	/api/suppliers	/api/legacy-bridge/suppliers
+Menu Admin	/api/menu-v3/items	/api/legacy-bridge/menu-items
+
+
+🚫 Do NOT invent new endpoints
+🚫 Do NOT rename components
+🚫 Do NOT touch POST/PUT/DELETE
+
+
+---
+
+4️⃣ FRONTEND LEGACY BANNER (ALREADY INSTALLED)
+
+You already added:
+
+<LegacyDataAlert source={source} />
+
+Just ensure each screen passes through:
+
+const { data, source } = await fetchWithLegacyFallback(...)
+
+No further UI work required.
+
+
+---
+
+5️⃣ BUILD & DEPLOY (MANDATORY)
+
+npm run build
+npm run start
+
+Then Replit → Deploy → Publish
+
+
+---
+
+✅ EXPECTED RESULTS (CHECKLIST)
+
+After publish, you MUST see:
+
+✅ Daily Sales Library fully populated
+
+✅ Shopping List shows historical items
+
+✅ Expenses visible
+
+✅ Ingredients restored
+
+✅ Recipes visible
+
+✅ Menu items appear
+
+✅ Legacy banner appears where applicable
+
+✅ New data still works as normal
+
+
+If any of the above is missing → agent did not wire all reads.
+
+
+---
+
+🔒 WHAT THIS PATCH DOES NOT DO (ON PURPOSE)
+
+❌ No data migration
+❌ No syncing
+❌ No deletes
+❌ No schema changes
+
+That is PATCH L2, only after confirmation.
+
+
+---
+
+📌 FINAL AGENT COMMAND (COPY / PASTE)
+
+> Implement PATCH L1 — Frontend Read Redirect.
+All frontend GET requests must use fetchWithLegacyFallback() and fallback to /api/legacy-bridge/*.
+Read-only only. No schema, no UI changes. Then build and publish.

@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone, Package, Search, Users, Filter } from "lucide-react";
 import { IngredientForm } from "@/components/IngredientForm";
 import { z } from "zod";
+import { fetchWithLegacyFallback } from "@/lib/api";
+import { LegacyDataAlert } from "@/components/ui/legacy-data-alert";
 
 const recipeFormSchema = insertRecipeSchema.extend({
   category: z.string().min(1, "Category is required"),
@@ -65,14 +67,20 @@ export default function RecipeManagement() {
     'Packaging Items'
   ];
 
-  // Queries
-  const { data: recipes = [], isLoading: recipesLoading } = useQuery({
-    queryKey: ['/api/recipes'],
+  // Queries with legacy fallback
+  const { data: recipesResult, isLoading: recipesLoading } = useQuery({
+    queryKey: ['/api/recipes', 'with-legacy'],
+    queryFn: () => fetchWithLegacyFallback('/api/recipes', '/api/legacy-bridge/recipes'),
   });
+  const recipes = recipesResult?.rows || [];
+  const recipesSource = recipesResult?.source || 'v2';
 
-  const { data: ingredients = [], isLoading: ingredientsLoading } = useQuery({
-    queryKey: ['/api/ingredients'],
+  const { data: ingredientsResult, isLoading: ingredientsLoading } = useQuery({
+    queryKey: ['/api/ingredients', 'with-legacy'],
+    queryFn: () => fetchWithLegacyFallback('/api/ingredients', '/api/legacy-bridge/ingredients'),
   });
+  const ingredients = ingredientsResult?.rows || [];
+  const ingredientsSource = ingredientsResult?.source || 'v2';
 
   const { data: recipeIngredients = [], isLoading: recipeIngredientsLoading, refetch: refetchRecipeIngredients } = useQuery({
     queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'],

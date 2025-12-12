@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/lib/queryClient";
+import { fetchWithLegacyFallback } from "@/lib/api";
+import { LegacyDataAlert } from "@/components/ui/legacy-data-alert";
 import { useToast } from "@/hooks/use-toast";
 import { Printer, Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,10 +55,13 @@ export default function Ingredients() {
     },
   });
 
-  // Get ingredients from the actual ingredients API that has all the data
-  const { data: ingredients, isLoading } = useQuery({
-    queryKey: ["/api/ingredients"],
+  // Get ingredients from the actual ingredients API that has all the data (with legacy fallback)
+  const { data: ingredientsResult, isLoading } = useQuery({
+    queryKey: ["/api/ingredients", "with-legacy"],
+    queryFn: () => fetchWithLegacyFallback('/api/ingredients', '/api/legacy-bridge/ingredients'),
   });
+  const ingredients = ingredientsResult?.rows || [];
+  const dataSource = ingredientsResult?.source || 'v2';
 
   // Keep the CSV import functionality for the costing system
   const { data: costingIngredientsData } = useQuery({
