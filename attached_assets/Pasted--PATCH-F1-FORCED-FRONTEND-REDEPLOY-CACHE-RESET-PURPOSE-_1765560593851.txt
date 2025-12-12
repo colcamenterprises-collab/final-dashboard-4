@@ -1,0 +1,175 @@
+🔧 PATCH F1 — FORCED FRONTEND REDEPLOY (CACHE RESET)
+
+PURPOSE
+
+Force Replit to discard the old frontend bundle and deploy the new UI (Menu V3, POS, KDS, Legacy Bridge UI).
+
+This patch does NOT touch backend logic or database.
+
+
+---
+
+⚠️ NON-NEGOTIABLE RULES FOR AGENT
+
+❌ Do NOT modify any frontend code
+
+❌ Do NOT modify routes, schemas, or services
+
+❌ Do NOT optimize, refactor, or “improve” anything
+
+✅ ONLY execute the steps below, in order
+
+✅ STOP when complete
+
+
+
+---
+
+STEP 1 — DELETE OLD BUILD ARTIFACTS (CRITICAL)
+
+From project root, run:
+
+rm -rf dist
+
+Verify deletion (must return empty / error):
+
+ls dist
+
+If dist still exists → STOP and delete again.
+
+
+---
+
+STEP 2 — CLEAN VITE CACHE
+
+Run:
+
+rm -rf node_modules/.vite
+
+
+---
+
+STEP 3 — FRESH BUILD (NO SHORTCUTS)
+
+Run exactly:
+
+npm run build
+
+
+---
+
+STEP 4 — VERIFY NEW FRONTEND OUTPUT
+
+All of the following MUST be true:
+
+ls dist/public
+
+Expected:
+
+index.html
+
+assets/ folder
+
+
+Then verify timestamps (must be NEW):
+
+ls -lah dist/public/assets
+
+Files must have current timestamps, not older ones.
+
+
+---
+
+STEP 5 — VERIFY CONTENT IS NEW UI
+
+Run:
+
+cat dist/public/index.html | head -20
+
+Confirm:
+
+Built by Vite
+
+No legacy paths
+
+No old branding strings
+
+
+
+---
+
+STEP 6 — VERIFY SERVER STATIC PATH (READ ONLY)
+
+Open (DO NOT MODIFY unless broken):
+
+server/index.ts
+
+Confirm it serves ONLY:
+
+dist/public
+
+If correct → DO NOTHING.
+
+
+---
+
+STEP 7 — PUBLISH (FINAL STEP)
+
+1. Go to Replit → Deploy
+
+
+2. Click Publish
+
+
+3. Wait for green success
+
+
+
+
+---
+
+✅ POST-DEPLOY VERIFICATION (MANDATORY)
+
+After publish, manually confirm in browser:
+
+/menu-v3 → Menu Master V3 UI loads
+
+POS route → POS UI visible
+
+KDS route → Kitchen Display visible
+
+Legacy banner appears on empty data pages
+
+
+If any of the above fail, STOP and report.
+
+
+---
+
+🚨 WHAT THIS PATCH FIXES
+
+❌ Old frontend bundle still being served
+
+❌ New UI not visible
+
+❌ False “no data” perception
+
+❌ Cache poisoning from prior deploys
+
+
+
+---
+
+🧠 IMPORTANT CONTEXT (DO NOT SKIP)
+
+This is not a data issue yet.
+This is a static asset mismatch.
+
+Once this patch completes successfully:
+
+The new UI WILL appear
+
+Legacy Bridge UI WILL show banners
+
+Then we proceed to data recovery / migration
+
