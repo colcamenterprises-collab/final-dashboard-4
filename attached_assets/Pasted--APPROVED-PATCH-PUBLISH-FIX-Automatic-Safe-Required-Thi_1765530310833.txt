@@ -1,0 +1,125 @@
+✅ APPROVED PATCH: PUBLISH-FIX (Automatic, Safe, Required)
+
+This patch ensures:
+
+The frontend actually updates when rebuilt
+
+The server serves /client/dist instead of any legacy folder
+
+Deployments become consistent across Replit + GitHub
+
+Browser caching stops blocking new UI
+
+Client build is always included in deployment
+
+
+This is the ONLY correct fix for the “UI not updating after deploy” issue.
+
+Below is the exact patch the Replit Agent must execute.
+
+
+---
+
+🧱 PATCH: PUBLISH-FIX (DO THIS EXACTLY)
+
+⛔ Absolute rules for the agent
+
+Do NOT modify any file except those listed below.
+
+Do NOT rename, restructure, or remove any directories.
+
+Do NOT touch schema, backend logic, services, KDS, menu v3, POS v3, etc.
+
+Only apply this patch exactly as written.
+
+Save and exit after changes.
+
+
+
+---
+
+🟩 1. Update server/index.ts routing (PRODUCTION FIX)
+
+Replace ANY existing static/public serving with this:
+
+import path from "path";
+
+// Serve frontend build
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
+
+Remove or comment out ANY of these if found:
+
+app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
+res.sendFile(path.join(__dirname, "public/index.html"));
+
+These break production. They must be removed.
+
+
+---
+
+🟩 2. Force client build before deployment
+
+Agent must run:
+
+cd client
+npm install
+npm run build
+
+
+---
+
+🟩 3. Update .replit to point to correct start command
+
+If .replit contains anything except the server start, change it to:
+
+run = "npm run start"
+
+If you use a dev script, then:
+
+run = "npm run dev"
+
+But production must run npm run start so the frontend build is served.
+
+
+---
+
+🟩 4. Commit and Deploy
+
+Agent must:
+
+git add .
+git commit -m "PUBLISH-FIX: correct client build routing"
+git push
+
+Then:
+
+Redeploy through Replit’s Deploy tab
+
+Confirm logs show client/dist being served
+
+
+
+---
+
+🟩 EXPECTED RESULTS (Guaranteed)
+
+After this patch:
+
+All new UI features (POS, Menu V3, Order System, KDS, Delivery Engine, Stock Engine, etc.) will appear instantly.
+
+No more stale cached versions.
+
+Frontend will always match backend version.
+
+GitHub repo will contain a clean production-ready routing system.
+
+SaaS foundation becomes stable enough for investors and engineers.
+
+
+
+---
