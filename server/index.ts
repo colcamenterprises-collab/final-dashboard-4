@@ -451,18 +451,17 @@ async function checkSchema() {
     serveStatic(app);
   }
 
-  // Use PORT env var for Autoscale compatibility
-  // Development: use 5000 (Replit's expected port)
-  // Production: use PORT env var (Autoscale sets this)
-  const PORT = process.env.PORT || 5000;
+  // Use PORT env var for Cloud Run / Autoscale compatibility
+  // Cloud Run sets PORT env var, defaults to 8080
+  const PORT = Number(process.env.PORT) || 8080;
   
   server.listen({
-    port: Number(PORT),
+    port: PORT,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     // Log immediately - no async operations here
-    console.log(`Server running on port ${PORT}`);
+    console.log(`✅ Server listening on port ${PORT}`);
     
     // === DEFERRED STARTUP: Run ALL heavy operations AFTER port is open ===
     // This ensures health checks pass before background jobs start

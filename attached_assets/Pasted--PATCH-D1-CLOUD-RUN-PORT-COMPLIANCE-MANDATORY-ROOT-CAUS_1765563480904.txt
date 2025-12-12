@@ -1,0 +1,206 @@
+🔧 PATCH D1 — CLOUD RUN PORT COMPLIANCE (MANDATORY)
+
+ROOT CAUSE (FACTS)
+
+Cloud Run only allows ONE HTTP port, exposed as external port 80.
+
+Your app currently violates this because:
+
+Server listens on 3000
+
+Replit forwards 3000 → 4200
+
+Another service still references 5000
+
+Cloud Run expects ONE process listening on $PORT, mapped to 80
+
+
+This causes health check failure even though the app “runs”.
+
+
+---
+
+✅ CORRECT CLOUD RUN RULE (NON-NEGOTIABLE)
+
+Your server must:
+
+Listen on process.env.PORT
+
+Default to 8080 (Cloud Run standard)
+
+Expose ONE port only
+
+Replit must forward that port → external 80
+
+
+
+---
+
+🛠️ EXACT FIX — AGENT INSTRUCTIONS
+
+Copy-paste verbatim to the Replit agent.
+
+
+---
+
+🔒 RULES
+
+❌ Do NOT change frontend
+
+❌ Do NOT add ports
+
+❌ Do NOT run background services before server starts
+
+✅ ONLY do what’s listed
+
+
+
+---
+
+STEP 1 — FIX SERVER PORT (CRITICAL)
+
+Open:
+
+server/index.ts
+
+Find any app.listen(...).
+
+Replace with exactly this:
+
+const PORT = Number(process.env.PORT) || 8080;
+
+app.listen(PORT, () => {
+  console.log(`✅ Server listening on port ${PORT}`);
+});
+
+❗ Remove all other hardcoded ports (3000, 5000, etc.)
+
+
+---
+
+STEP 2 — VERIFY NO SECOND LISTENER EXISTS
+
+Run:
+
+grep -R "listen(" -n server
+
+Expected result:
+
+ONE app.listen
+
+If more → STOP and remove extras
+
+
+
+---
+
+STEP 3 — FIX .replit PORT FORWARDING
+
+Open:
+
+.replit
+
+You MUST have exactly one port mapping:
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+❌ Remove:
+
+Any port 3000
+
+Any port 4200
+
+Any port 5000
+
+Any second [[ports]] block
+
+
+
+---
+
+STEP 4 — ENSURE START COMMAND IS CLEAN
+
+Verify package.json:
+
+"scripts": {
+  "build": "vite build",
+  "start": "node dist/index.js"
+}
+
+❌ No concurrently ❌ No dev servers ❌ No secondary processes
+
+
+---
+
+STEP 5 — REBUILD (REQUIRED)
+
+rm -rf dist
+npm run build
+
+Verify:
+
+ls dist/public/index.html
+
+
+---
+
+STEP 6 — DEPLOY
+
+1. Replit → Deploy
+
+
+2. Click Publish
+
+
+3. Wait for green success
+
+
+
+
+---
+
+✅ EXPECTED RESULT
+
+After this patch:
+
+Cloud Run health checks PASS
+
+App responds on external port 80
+
+Frontend loads correctly
+
+POS / Menu / Dashboard routes work
+
+
+
+---
+
+🚨 WHY THIS MUST BE DONE THIS WAY
+
+Cloud Run does not care what Replit “runs successfully”.
+
+It ONLY checks:
+
+Is HTTP responding on port 80
+
+From one process
+
+On one port
+
+
+Right now you violate all three.
+
+This patch fixes all three, permanently.
+
+
+---
+
+AFTER DEPLOY — TELL ME:
+
+Reply with one line only:
+
+> “Deploy passed / still failed”
+
+
