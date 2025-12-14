@@ -111,6 +111,15 @@ const navigationGroups: NavGroup[] = [
   //   ]
   // },
   {
+    title: "POS & Kitchen",
+    defaultOpen: true,
+    items: [
+      { to: "/pos", label: "POS Terminal", icon: Receipt, testId: "nav-pos" },
+      { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" },
+      { to: "/menu-v3", label: "Menu Master V3", icon: Settings, testId: "nav-menu-v3" }
+    ]
+  },
+  {
     title: "Sales & Ordering",
     defaultOpen: true,
     items: [
