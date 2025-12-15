@@ -95,6 +95,7 @@ import menuV3Routes from "./routes/menu/menuV3Routes";
 import stockRoutes from "./routes/stock/stockRoutes";
 import varianceRoutes from "./routes/stock/varianceRoutes";
 import ingredientUsageRoutes from "./routes/analytics/ingredientUsageRoutes";
+import loyverseMenuImportRouter from "./routes/loyverseMenuImport";
 // Email functionality will be added when needed
 
 
@@ -3217,6 +3218,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/stock', stockRoutes);
   app.use('/api/stock/variance', varianceRoutes);
   app.use('/api/analytics/ingredients', ingredientUsageRoutes);
+  app.use('/api/admin/import', loyverseMenuImportRouter);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

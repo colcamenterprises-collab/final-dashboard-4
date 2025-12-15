@@ -1983,3 +1983,26 @@ model saas_tenant_settings {
 
   tenant        saas_tenants @relation(fields: [tenantId], references: [id])
 }
+
+// PATCH L2.1 — MIGRATION REPORTS FOR AUDIT TRAIL
+model migration_reports_v1 {
+  id            String   @id @default(cuid())
+  type          String   // 'loyverse_menu_import'
+  dryRun        Boolean  @default(false)
+  status        String   @default("pending") // pending | success | failed
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+  categoriesFound    Int @default(0)
+  categoriesCreated  Int @default(0)
+  categoriesSkipped  Int @default(0)
+  itemsFound         Int @default(0)
+  itemsCreated       Int @default(0)
+  itemsSkipped       Int @default(0)
+  modifiersFound     Int @default(0)
+  modifiersCreated   Int @default(0)
+  modifiersSkipped   Int @default(0)
+  conflicts     Json?
+  errors        Json?
+  report        Json?
+  restaurantId  String?
+}
