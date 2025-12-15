@@ -1,0 +1,396 @@
+Follow this exactly. Do not deviate.”
+
+
+
+
+---
+
+🟨 SBB / CUSTOMLI RESTAURANT HUB 4.0
+
+GOLDEN ARCHITECTURE BRIEF + AGENT EXECUTION CHECKLIST
+
+Authoritative Version – No Interpretation Allowed
+
+
+---
+
+1. CORE PRINCIPLE (NON-NEGOTIABLE)
+
+> NO DATA LOSS. EVER.
+
+
+
+This system intentionally runs in a HYBRID STATE:
+
+Legacy data (pre-upgrade)
+
+New V2 / V3 enterprise tables (post-upgrade)
+
+
+Missing UI data ≠ deleted data
+
+No agent is allowed to:
+
+Drop legacy tables
+
+Migrate data automatically
+
+“Clean up” old schemas
+
+Reset databases
+
+Seed over production
+
+
+
+---
+
+2. CURRENT SYSTEM ARCHITECTURE (FACTUAL)
+
+2.1 Backend Layers
+
+A. Legacy Tables (READ-ONLY)
+
+Examples:
+
+daily_stock_sales
+
+shopping_list
+
+expenses
+
+ingredients
+
+recipes
+
+suppliers
+
+menu_items
+
+
+These tables contain historical truth.
+
+B. New Enterprise Tables (WRITE TARGETS)
+
+Examples:
+
+daily_sales_v2
+
+expenses_v2
+
+menu_categories_v3
+
+menu_items_v3
+
+orders_v2
+
+stock_ledger_v1
+
+partner_bars_v1
+
+
+These tables are future state.
+
+
+---
+
+2.2 Legacy Read Bridge (PATCH L0)
+
+File:
+server/services/legacyReadBridge.ts
+
+Purpose:
+If a V2/V3 table is empty → read from legacy instead.
+
+This bridge:
+
+Is READ-ONLY
+
+Does NOT copy or mutate data
+
+Is the only allowed way to access legacy data
+
+
+
+---
+
+2.3 Frontend Read Redirect (PATCH L1)
+
+File:
+client/src/lib/api.ts
+
+Rule:
+All frontend GET requests must use:
+
+fetchWithLegacyFallback(primary, legacy)
+
+This ensures:
+
+New data shows if it exists
+
+Old data shows if new tables are empty
+
+
+
+---
+
+3. WHY DATA IS “MISSING” IN THE UI (EXPLAINED)
+
+This is EXPECTED behavior if:
+
+New tables are empty
+
+Legacy data exists
+
+UI is not wired to fallback for that screen
+
+
+This is NOT:
+
+A deployment bug
+
+A database wipe
+
+A React issue
+
+
+It is a coverage gap.
+
+
+---
+
+4. REQUIRED UI COVERAGE (ABSOLUTE CHECKLIST)
+
+The following screens MUST show legacy data if V2/V3 is empty.
+
+The agent must confirm EACH item.
+
+4.1 Operations
+
+[ ] Daily Sales Library
+
+[ ] Daily Stock Counts
+
+[ ] Shopping / Purchasing List
+
+[ ] Roll / Meat / Drink purchases
+
+[ ] Variance history
+
+
+4.2 Finance
+
+[ ] Expenses history
+
+[ ] Expense categories
+
+[ ] Wage entries
+
+[ ] Supplier-linked expenses
+
+
+4.3 Menu & Recipes
+
+[ ] Menu items visible (legacy fallback)
+
+[ ] Recipes visible
+
+[ ] Ingredients visible
+
+[ ] Ingredient costs visible
+
+
+4.4 Partners
+
+[ ] Partner bars list
+
+[ ] Historical partner referrals
+
+[ ] Orders linked to partners
+
+[ ] Partner analytics totals
+
+
+4.5 Orders
+
+[ ] Historical orders (pre-POS)
+
+[ ] Delivery history
+
+[ ] Partner orders
+
+
+
+---
+
+5. AGENT EXECUTION CHECKLIST (NO DEVIATION)
+
+STEP 1 — VERIFY DATABASE CONTENT (READ ONLY)
+
+Run counts for:
+
+Legacy tables
+
+V2/V3 tables
+
+
+If legacy > 0 and V2/V3 = 0 → this is OK
+
+
+---
+
+STEP 2 — VERIFY LEGACY BRIDGE ENDPOINTS
+
+Each of these must return data if legacy exists:
+
+/api/legacy-bridge/daily-sales
+/api/legacy-bridge/shopping-list
+/api/legacy-bridge/expenses
+/api/legacy-bridge/ingredients
+/api/legacy-bridge/recipes
+/api/legacy-bridge/suppliers
+/api/legacy-bridge/menu-items
+/api/legacy-bridge/partners
+
+If any endpoint returns empty but legacy DB has rows → STOP AND FIX BRIDGE.
+
+
+---
+
+STEP 3 — VERIFY FRONTEND WIRING (CRITICAL)
+
+For EACH UI page:
+
+Confirm it uses fetchWithLegacyFallback
+
+Confirm correct legacy endpoint
+
+Confirm response shape is handled
+
+Confirm legacy banner renders
+
+
+If a page uses fetch() directly → BUG.
+
+
+---
+
+STEP 4 — UI VISIBILITY RULE
+
+If data source = legacy:
+
+Show banner: “Legacy Data – Read Only”
+
+Disable edit/delete buttons
+
+Allow view/export only
+
+
+
+---
+
+STEP 5 — DO NOT MIGRATE
+
+❌ No data copying
+❌ No syncing
+❌ No background jobs
+❌ No Prisma migrate reset
+
+Migration is a separate, explicit phase (L2).
+
+
+---
+
+6. WHAT THE “GOLDEN PATCH” ACTUALLY IS
+
+The Golden Patch is NOT a single code file.
+
+It is the combination of:
+
+1. Legacy Read Bridge (L0)
+
+
+2. Frontend Read Redirect (L1)
+
+
+3. UI coverage completion
+
+
+4. Visibility + confidence
+
+
+
+Once complete:
+
+Smash Brothers Burgers becomes Tenant #1
+
+Customli Restaurant Hub becomes SaaS-ready
+
+Investor demos make sense
+
+No historical data is lost or hidden
+
+
+
+---
+
+7. WHAT THE AGENT IS NOT ALLOWED TO DO
+
+❌ “Clean up unused tables”
+
+❌ “Standardize schemas”
+
+❌ “Move legacy data”
+
+❌ “Seed demo data”
+
+❌ “Fix by migration”
+
+
+Any of the above = immediate stop.
+
+
+---
+
+8. SUCCESS DEFINITION (CLEAR)
+
+The task is complete when:
+
+You can open the app
+
+You see old data everywhere it should exist
+
+New features work alongside old data
+
+Nothing was deleted
+
+Nothing was auto-migrated
+
+
+
+---
+
+9. NEXT PHASE (NOT NOW)
+
+Only AFTER you confirm visibility:
+
+L2 — Controlled Migration (Opt-in, Audited)
+
+Multi-Tenant Layer
+
+Billing (Stripe)
+
+MRR Model
+
+Investor Deck
+
+
+
+---
+
+FINAL INSTRUCTION TO AGENT
+
+> “Your job is NOT to build new features.
+Your job is to make ALL EXISTING DATA VISIBLE in the new UI WITHOUT MOVING IT.”
+
+
