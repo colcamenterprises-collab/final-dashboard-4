@@ -65,6 +65,7 @@ export const LEGACY_URLS = {
   recipes: { primary: '/api/recipes', legacy: '/api/legacy-bridge/recipes' },
   suppliers: { primary: '/api/suppliers', legacy: '/api/legacy-bridge/suppliers' },
   menuItems: { primary: '/api/menu-v3/items', legacy: '/api/legacy-bridge/menu-items' },
+  partners: { primary: '/api/partners', legacy: '/api/legacy-bridge/partners' },
 } as const;
 
 export interface KPIData {

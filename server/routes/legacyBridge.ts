@@ -52,7 +52,7 @@ router.get("/daily-sales", async (req, res) => {
   try {
     const prisma = db();
     
-    const v2Sales = await prisma.DailySalesV2.findMany({
+    const v2Sales = await prisma.dailySalesV2.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 500
@@ -99,7 +99,7 @@ router.get("/shopping-list", async (req, res) => {
   try {
     const prisma = db();
     
-    const v2Lists = await prisma.ShoppingPurchaseV2.findMany({
+    const v2Lists = await prisma.shoppingPurchaseV2.findMany({
       orderBy: { createdAt: "desc" },
       take: 100
     });
@@ -217,7 +217,7 @@ router.get("/menu-items", async (req, res) => {
     
     // Try V3 menu items first
     const v3Items = await prisma.menu_items_v3.findMany({
-      where: { active: true },
+      where: { isActive: true },
       orderBy: { sortOrder: "asc" }
     });
 
@@ -230,9 +230,7 @@ router.get("/menu-items", async (req, res) => {
     }
 
     // Fallback to legacy MenuItem table
-    const legacyItems = await prisma.menuItem.findMany({
-      where: { visible: true }
-    });
+    const legacyItems = await prisma.menuItem.findMany({});
 
     if (legacyItems.length > 0) {
       return res.json({
@@ -250,6 +248,39 @@ router.get("/menu-items", async (req, res) => {
   } catch (error) {
     console.error("[LegacyBridge] Menu items error:", error);
     res.status(500).json({ error: "Failed to fetch menu items" });
+  }
+});
+
+/**
+ * GET /api/legacy-bridge/partners
+ * Returns partner bars with V1 → legacy fallback
+ */
+router.get("/partners", async (req, res) => {
+  try {
+    const prisma = db();
+    
+    // Try V1 partner bars first
+    const v1Partners = await prisma.partner_bars_v1.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (v1Partners.length > 0) {
+      return res.json({
+        source: "v2",
+        rows: v1Partners,
+        count: v1Partners.length
+      });
+    }
+
+    // No legacy partner table exists, return empty
+    return res.json({
+      source: "v2",
+      rows: [],
+      count: 0
+    });
+  } catch (error) {
+    console.error("[LegacyBridge] Partners error:", error);
+    res.status(500).json({ error: "Failed to fetch partners" });
   }
 });
 
@@ -272,12 +303,13 @@ router.get("/status", async (req, res) => {
     
     const status = {
       expenses_v2: await safeCount(prisma.expenses_v2),
-      DailySalesV2: await safeCount(prisma.DailySalesV2),
-      ShoppingPurchaseV2: await safeCount(prisma.ShoppingPurchaseV2),
+      dailySalesV2: await safeCount(prisma.dailySalesV2),
+      shoppingPurchaseV2: await safeCount(prisma.shoppingPurchaseV2),
       ingredients: await safeCount(prisma.ingredients),
       recipes: await safeCount(prisma.recipes),
       suppliers: await safeCount(prisma.suppliers),
       menu_items_v3: await safeCount(prisma.menu_items_v3),
+      partner_bars_v1: await safeCount(prisma.partner_bars_v1),
       legacy: {
         daily_stock_sales: await safeCount(prisma.daily_stock_sales),
         shopping_list: await safeCount(prisma.shopping_list)
