@@ -251,3 +251,168 @@ export class LoyverseService {
 }
 
 export const loyverseService = new LoyverseService();
+
+// ============================================
+// PATCH L2.1 — LOYVERSE MENU IMPORT TYPES & SERVICE
+// ============================================
+
+export interface LoyverseItem {
+  id: string;
+  handle: string | null;
+  item_name: string;
+  reference_id: string | null;
+  category_id: string | null;
+  track_stock: boolean;
+  sold_by_weight: boolean;
+  is_composite: boolean;
+  use_production: boolean;
+  primary_supplier_id: string | null;
+  tax_ids: string[];
+  modifier_ids: string[];
+  form: string;
+  color: string | null;
+  image_url: string | null;
+  option1_name: string | null;
+  option2_name: string | null;
+  option3_name: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  variants: LoyverseVariant[];
+}
+
+export interface LoyverseVariant {
+  variant_id: string;
+  item_id: string;
+  sku: string | null;
+  reference_variant_id: string | null;
+  option1_value: string | null;
+  option2_value: string | null;
+  option3_value: string | null;
+  barcode: string | null;
+  cost: number;
+  default_pricing_type: string;
+  default_price: number;
+  stores: any[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface LoyverseCategory {
+  id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface LoyverseModifier {
+  id: string;
+  name: string;
+  option1_name: string;
+  option2_name: string | null;
+  option3_name: string | null;
+  option4_name: string | null;
+  option5_name: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  options: LoyverseModifierOption[];
+}
+
+export interface LoyverseModifierOption {
+  modifier_option_id: string;
+  modifier_id: string;
+  option1_value: string;
+  option2_value: string | null;
+  option3_value: string | null;
+  option4_value: string | null;
+  option5_value: string | null;
+  price: number;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface LoyverseMenuData {
+  items: LoyverseItem[];
+  categories: LoyverseCategory[];
+  modifiers: LoyverseModifier[];
+}
+
+export class LoyverseMenuImportService {
+  private config: LoyverseConfig;
+
+  constructor() {
+    this.config = {
+      accessToken: process.env.LOYVERSE_ACCESS_TOKEN || '42137934ef75406bb54427c6815e5e79',
+      baseUrl: 'https://api.loyverse.com/v1.0'
+    };
+  }
+
+  private async fetchWithAuth(endpoint: string): Promise<any> {
+    const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.config.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Loyverse API error ${response.status}:`, errorText);
+      throw new Error(`Loyverse API error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async fetchItems(): Promise<LoyverseItem[]> {
+    try {
+      const data = await this.fetchWithAuth('/items');
+      console.log(`[LoyverseMenuImport] Fetched ${data.items?.length || 0} items`);
+      return (data.items || []).filter((item: LoyverseItem) => !item.deleted_at);
+    } catch (error) {
+      console.error('[LoyverseMenuImport] Failed to fetch items:', error);
+      throw error;
+    }
+  }
+
+  async fetchCategories(): Promise<LoyverseCategory[]> {
+    try {
+      const data = await this.fetchWithAuth('/categories');
+      console.log(`[LoyverseMenuImport] Fetched ${data.categories?.length || 0} categories`);
+      return (data.categories || []).filter((cat: LoyverseCategory) => !cat.deleted_at);
+    } catch (error) {
+      console.error('[LoyverseMenuImport] Failed to fetch categories:', error);
+      throw error;
+    }
+  }
+
+  async fetchModifiers(): Promise<LoyverseModifier[]> {
+    try {
+      const data = await this.fetchWithAuth('/modifiers');
+      console.log(`[LoyverseMenuImport] Fetched ${data.modifiers?.length || 0} modifiers`);
+      return (data.modifiers || []).filter((mod: LoyverseModifier) => !mod.deleted_at);
+    } catch (error) {
+      console.error('[LoyverseMenuImport] Failed to fetch modifiers:', error);
+      throw error;
+    }
+  }
+
+  async fetchAllMenuData(): Promise<LoyverseMenuData> {
+    const [items, categories, modifiers] = await Promise.all([
+      this.fetchItems(),
+      this.fetchCategories(),
+      this.fetchModifiers()
+    ]);
+
+    return { items, categories, modifiers };
+  }
+}
+
+export const loyverseMenuImportService = new LoyverseMenuImportService();

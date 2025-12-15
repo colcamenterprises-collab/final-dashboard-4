@@ -1,0 +1,257 @@
+
+🎯 GOAL (CLEAR & CORRECT)
+
+> Mirror Loyverse 1:1 inside our POS first
+Then evolve recipes, costing, intelligence after continuity is guaranteed.
+
+
+
+This achieves:
+
+Zero operational disruption
+
+Immediate staff familiarity
+
+Trust from current team
+
+Clean foundation for recipes, stock, AI, SaaS
+
+
+
+---
+
+🧠 WHY THIS IS THE RIGHT MOVE (NO THEORY)
+
+Loyverse already contains:
+
+Proven menu structure
+
+Correct modifiers
+
+Correct pricing
+
+Correct naming
+
+Correct tax logic
+
+Real-world usage data
+
+
+Trying to “rebuild menu logic first” is how POS systems fail.
+
+We import reality first. Then we improve it.
+
+
+---
+
+🟦 PATCH L2.1 — LOYVERSE MENU CANONICAL IMPORT
+
+(POS Ground Truth Alignment)
+
+This patch is READ + CREATE ONLY, no deletes, no overwrites.
+
+
+---
+
+🔒 NON-NEGOTIABLE RULES
+
+❌ Do NOT delete any Menu V3 records
+
+❌ Do NOT overwrite manually created items
+
+❌ Do NOT touch recipes yet
+
+❌ Do NOT auto-link ingredients
+
+❌ Do NOT change pricing logic
+
+
+✅ Import-only
+✅ Idempotent
+✅ Re-runnable
+✅ Audited
+
+
+---
+
+🧩 WHAT WE IMPORT FROM LOYVERSE (EXACT SCOPE)
+
+1️⃣ Items (Sale Items)
+
+From Loyverse:
+
+Item name
+
+Price
+
+SKU / ID
+
+Category
+
+Tax settings
+
+Visibility
+
+
+Into:
+
+menu_items_v3
+
+
+With metadata:
+
+source: 'loyverse'
+externalSystem: 'loyverse'
+externalId: loyverseItemId
+importedAt
+
+
+---
+
+2️⃣ Categories
+
+From Loyverse:
+
+Category name
+
+Ordering / position
+
+
+Into:
+
+menu_categories_v3
+
+
+⚠️ Do not merge with existing categories automatically
+⚠️ Match by name only if exact
+
+
+---
+
+3️⃣ Modifiers & Modifier Groups
+
+From Loyverse:
+
+Modifier group name
+
+Required / optional
+
+Min / max selections
+
+Modifier prices
+
+
+Into:
+
+menu_modifiers_group_v3
+
+menu_modifiers_v3
+
+Item ↔ modifier group relationships
+
+
+
+---
+
+4️⃣ Mapping Table (CRITICAL)
+
+Create / populate:
+
+loyverse_map_v2
+
+Purpose:
+
+Map Loyverse IDs → internal Menu V3 IDs
+
+Enable:
+
+POS sync
+
+Order pushback
+
+Stock deduction later
+
+
+
+
+---
+
+🛠️ IMPLEMENTATION DETAILS (AGENT MUST FOLLOW)
+
+Step 1 — Fetch Loyverse Data
+
+Use existing Loyverse API credentials.
+
+Endpoints (example):
+
+/items
+
+/categories
+
+/modifiers
+
+
+⚠️ Pull all active items only
+
+
+---
+
+Step 2 — Dry Run First
+
+Endpoint:
+
+POST /api/admin/import/loyverse/menu?dryRun=true
+
+Response must show:
+
+Items found
+
+Items to be created
+
+Items skipped (already exist)
+
+Modifier groups found
+
+Modifiers found
+
+
+No writes.
+
+
+---
+
+Step 3 — Import Execution
+
+POST /api/admin/import/loyverse/menu
+
+Rules:
+
+If item exists with same externalId → skip
+
+If exists by name but no externalId → skip + report
+
+Never overwrite price
+
+
+
+---
+
+Step 4 — Reporting
+
+Store report in:
+
+migration_reports_v1
+
+Include:
+
+Counts
+
+Skipped items
+
+Conflicts
+
+Errors
+
+
+
+---
