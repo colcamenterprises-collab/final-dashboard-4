@@ -68,7 +68,19 @@
 
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="pre-react-loader" style="padding: 40px; font-family: sans-serif;">
+        <h1 style="color: blue;">HTML LOADED - Waiting for React...</h1>
+        <p>If you see this for more than 3 seconds, React failed to mount.</p>
+      </div>
+    </div>
+    <script>
+      console.log("🟡 index.html: Inline script running");
+      window.addEventListener('error', function(e) {
+        console.error("🔴 Window error:", e.message);
+        document.getElementById('root').innerHTML = '<h1 style="color:red;padding:40px;">JS ERROR: ' + e.message + '</h1>';
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>

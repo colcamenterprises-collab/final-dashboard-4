@@ -1,16 +1,17 @@
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import PageShell from "./layouts/PageShell";
 import NotFound from "./pages/NotFound";
+
+console.log("🟢 App.tsx: MODULE LOADED");
 
 // Pages
 import Home from "./pages/Home";
 import { Analysis } from "./pages/operations/Analysis";
-// Legacy component moved to archive
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import ShoppingList from "./pages/ShoppingList";
 import PurchasingList from "./pages/operations/PurchasingList";
@@ -39,7 +40,7 @@ import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
-import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis"; // Hidden - can be re-enabled
+import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
 import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
@@ -81,6 +82,7 @@ import Login from "./pages/auth/Login";
 import TenantSwitcher from "./pages/settings/TenantSwitcher";
 import PaymentProviders from "./pages/settings/PaymentProviders";
 import DataSafety from "./pages/admin/DataSafety";
+import DebugPage from "./pages/admin/DebugPage";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -89,13 +91,23 @@ function Guard({ children }: { children: JSX.Element }) {
   return isAllowedPath(pathname) ? children : <NotFound />;
 }
 
+console.log("🟢 App.tsx: IMPORTS COMPLETE");
+
 export default function App() {
+  console.log("🟢 App: RENDER START");
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <Suspense fallback={<div className="p-6">Loading…</div>}>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <BrowserRouter>
             <Routes>
+              {/* DEBUG ROUTE - NO GUARDS, NO LAYOUT */}
+              <Route path="/debug" element={<DebugPage />} />
+              
+              {/* DATA SAFETY - DIRECT MOUNT, NO GUARD */}
+              <Route path="/admin/data-safety-direct" element={<DataSafety />} />
+              
               {/* Standalone pages — NO SIDEBAR/HEADER */}
               <Route path="/login" element={<Login />} />
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
@@ -124,9 +136,6 @@ export default function App() {
 
                   {/* ---- FORM 2: canonical + aliases ---- */}
                   <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
-                  {/* Comment out duplicates to avoid conflicts */}
-                  {/* <Route path="/operations/stock" element={<Guard><DailyStock /></Guard>} /> */}
-                  {/* <Route path="/operations/form2" element={<Navigate to="/operations/stock" replace />} /> */}
                   
                   {/* Purchasing Planner */}
                   <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
@@ -142,8 +151,6 @@ export default function App() {
                   <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                     <Route index element={null} />
                     <Route path="loyverse" element={<LoyverseReports />} />
-                    {/* Hidden - can be re-enabled */}
-                    {/* <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} /> */}
                     <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                     <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
                   </Route>
@@ -155,7 +162,6 @@ export default function App() {
                   {/* Legacy direct routes */}
                   <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
                   <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
-                  {/* Redirect old burger counts to new MM v1.0 page */}
                   <Route path={ROUTES.RECEIPTS_BURGERS} element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
                   <Route path="/receipts-burger-counts" element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
                   <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
@@ -240,17 +246,15 @@ export default function App() {
                   <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
                   {/* All Analysis Pages */}
-                  {/* Hidden - can be re-enabled */}
-                  {/* <Route path="/analysis/daily-shift" element={<DailyShiftAnalysis />} /> */}
                   <Route path="/analysis/daily-review" element={<DailyReview />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
-          </Suspense>
-          <Toaster />
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+            <Toaster />
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
