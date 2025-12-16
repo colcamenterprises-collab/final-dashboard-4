@@ -1,0 +1,160 @@
+🔧 STEP 1 — RESTORE FULL APP (IMMEDIATE)
+
+The bare-metal test did its job.
+We now restore the real application.
+
+Agent instruction (directive):
+
+Revert main.tsx to normal app bootstrap
+
+Restore:
+
+Router
+
+Providers
+
+Layout
+
+
+Remove debug-only JSX
+
+Keep ErrorBoundary in place
+
+
+This returns the app to full functionality.
+
+
+---
+
+📊 STEP 2 — VERIFY REAL UI IN REAL BROWSER (NOT PLAYWRIGHT)
+
+This is critical.
+
+You (or the agent) must verify using:
+
+Replit “Open in new tab”
+
+Or the deployed production URL
+
+
+Ignore Playwright for UI validation.
+
+Acceptance criteria:
+
+Sidebar visible
+
+Dashboard visible
+
+Navigation works
+
+Pages load (even if empty)
+
+
+
+---
+
+🔐 STEP 3 — DATA SAFETY UI CONFIRMATION (MANDATORY)
+
+Once UI is visible:
+
+Go to /admin/data-safety
+
+Confirm:
+
+Backup status visible
+
+“Run Backup Now” button works
+
+Timestamp updates
+
+
+Trigger one manual backup
+
+Confirm file appears in Google Drive
+
+
+This completes Phase 1 (Data Safety Lock).
+
+
+---
+
+📜 STEP 4 — LOYVERSE IMPORT EXECUTION
+
+Only after backup UI is confirmed:
+
+Run Loyverse historical import
+
+Range: July 1st 2025 → today
+
+Confirm:
+
+Imported rows > 0
+
+Executive metrics endpoint returns non-zero values
+
+
+
+
+---
+
+📈 STEP 5 — DASHBOARD COMES ALIVE
+
+With imported data:
+
+Dashboard must show:
+
+Total orders
+
+Total revenue
+
+Avg order value
+
+Orders today
+
+
+If these are non-zero → we are operational again.
+
+
+---
+
+🧠 IMPORTANT RESET IN HOW WE TEST GOING FORWARD
+
+New rule (effective immediately):
+
+❌ Do NOT rely on Playwright / Replit preview text for UI validation
+
+✅ Validate via real browser + production URL
+
+✅ APIs via curl
+
+✅ UI via human-visible checks
+
+
+This avoids another false panic like today.
+
+
+---
+
+FINAL WORD (IMPORTANT)
+
+Cam, you were absolutely right to push hard here.
+
+What happened was not incompetence, and not recklessness — it was a tooling blind spot combined with a major architectural transition.
+
+You now have:
+
+A recoverable system
+
+A canonical data source (Loyverse)
+
+A locked reset point (July 1st)
+
+A path to real dashboards, fast
+
+A SaaS-grade data safety direction
+
+
+The hardest uncertainty is now gone.
+
+
+---

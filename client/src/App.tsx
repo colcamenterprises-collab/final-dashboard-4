@@ -7,9 +7,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import PageShell from "./layouts/PageShell";
 import NotFound from "./pages/NotFound";
 
-console.log("🟢 App.tsx: MODULE LOADED");
-
-// Pages
 import Home from "./pages/Home";
 import { Analysis } from "./pages/operations/Analysis";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
@@ -40,16 +37,13 @@ import JaneAccounts from "./pages/JaneAccounts";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
-import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
-import ReceiptsBurgerCounts from "./pages/ReceiptsBurgerCounts";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import PurchasingLive from "./pages/ops/PurchasingLive";
-import MembershipApp from "./pages/membership/MembershipApp";
 import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
@@ -82,7 +76,6 @@ import Login from "./pages/auth/Login";
 import TenantSwitcher from "./pages/settings/TenantSwitcher";
 import PaymentProviders from "./pages/settings/PaymentProviders";
 import DataSafety from "./pages/admin/DataSafety";
-import DebugPage from "./pages/admin/DebugPage";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -91,162 +84,121 @@ function Guard({ children }: { children: JSX.Element }) {
   return isAllowedPath(pathname) ? children : <NotFound />;
 }
 
-console.log("🟢 App.tsx: IMPORTS COMPLETE");
-
 export default function App() {
-  console.log("🟢 App: RENDER START");
-  
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <BrowserRouter>
             <Routes>
-              {/* DEBUG ROUTE - NO GUARDS, NO LAYOUT */}
-              <Route path="/debug" element={<DebugPage />} />
-              
-              {/* DATA SAFETY - DIRECT MOUNT, NO GUARD */}
-              <Route path="/admin/data-safety-direct" element={<DataSafety />} />
-              
-              {/* Standalone pages — NO SIDEBAR/HEADER */}
               <Route path="/login" element={<Login />} />
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
               <Route path={ROUTES.ORDER_CHECKOUT} element={<Checkout />} />
               <Route path={ROUTES.ORDER_CONFIRMATION} element={<OrderConfirmation />} />
 
-              {/* Everything else uses the dashboard layout */}
               <Route element={<PageShell />}>
-                {/* Home */}
                 <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
-                  
 
-                  {/* Operations */}
-                  <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
-                  <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
-                  <Route path={ROUTES.SHOPPING_LIST} element={<Guard><ShoppingList /></Guard>} />
-                  <Route path="/operations/purchasing-list/:id" element={<Guard><PurchasingList /></Guard>} />
-                  <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
-                  <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
-                  
-                  {/* ---- FORM 1: canonical + aliases ---- */}
-                  <Route path="/operations/daily-sales" element={<DailySalesForm />} />
-                  <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />
-                  <Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
-                  <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
+                <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
+                <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
+                <Route path={ROUTES.SHOPPING_LIST} element={<Guard><ShoppingList /></Guard>} />
+                <Route path="/operations/purchasing-list/:id" element={<Guard><PurchasingList /></Guard>} />
+                <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
+                <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
+                
+                <Route path="/operations/daily-sales" element={<DailySalesForm />} />
+                <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />
+                <Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
+                <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
 
-                  {/* ---- FORM 2: canonical + aliases ---- */}
-                  <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
-                  
-                  {/* Purchasing Planner */}
-                  <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
-                  <Route path="/operations/purchasing" element={<Guard><PurchasingPage /></Guard>} />
-                  
-                  {/* Daily Summary Reports */}
-                  <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
-                  
-                  {/* System Health Test */}
-                  <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
-                  
-                  {/* Analysis with nested routes */}
-                  <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
-                    <Route index element={null} />
-                    <Route path="loyverse" element={<LoyverseReports />} />
-                    <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
-                    <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
-                  </Route>
-                  
-                  {/* Legacy analysis routes */}
-                  <Route path="upload" element={<UploadStatements />} />
-                  <Route path="receipts" element={<Receipts />} />
-                  
-                  {/* Legacy direct routes */}
-                  <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
-                  <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
-                  <Route path={ROUTES.RECEIPTS_BURGERS} element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
-                  <Route path="/receipts-burger-counts" element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
-                  <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
-                  <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
-                  <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
+                <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
+                
+                <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
+                <Route path="/operations/purchasing" element={<Guard><PurchasingPage /></Guard>} />
+                
+                <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
+                <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
+                
+                <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
+                  <Route index element={null} />
+                  <Route path="loyverse" element={<LoyverseReports />} />
+                  <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
+                  <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
+                </Route>
+                
+                <Route path="upload" element={<UploadStatements />} />
+                <Route path="receipts" element={<Receipts />} />
+                
+                <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
+                <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
+                <Route path={ROUTES.RECEIPTS_BURGERS} element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
+                <Route path="/receipts-burger-counts" element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
+                <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+                <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
+                <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
 
-                  {/* Shift Report V2 */}
-                  <Route path="/reports/shift-report" element={<Guard><ShiftReportDashboard /></Guard>} />
-                  <Route path="/reports/shift-report/history" element={<Guard><ShiftReportHistory /></Guard>} />
-                  <Route path="/reports/shift-report/view/:id" element={<Guard><ShiftReportDetail /></Guard>} />
+                <Route path="/reports/shift-report" element={<Guard><ShiftReportDashboard /></Guard>} />
+                <Route path="/reports/shift-report/history" element={<Guard><ShiftReportHistory /></Guard>} />
+                <Route path="/reports/shift-report/view/:id" element={<Guard><ShiftReportDetail /></Guard>} />
 
-                  {/* Finance */}
-                  <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
-                  <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
-                  <Route path="/finance/expenses" element={<Guard><Expenses /></Guard>} />
-                  <Route path={ROUTES.EXPENSES_IMPORT} element={<Guard><ExpensesImport /></Guard>} />
-                  <Route path={ROUTES.EXPENSES_V2} element={<Guard><ExpensesV2 /></Guard>} />
+                <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
+                <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
+                <Route path="/finance/expenses" element={<Guard><Expenses /></Guard>} />
+                <Route path={ROUTES.EXPENSES_IMPORT} element={<Guard><ExpensesImport /></Guard>} />
+                <Route path={ROUTES.EXPENSES_V2} element={<Guard><ExpensesV2 /></Guard>} />
 
-                  {/* Menu Mgmt */}
-                  <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
-                  <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
-                  <Route path="/menu/ingredients/edit/:id" element={<Guard><IngredientEdit /></Guard>} />
-                  <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
-                  <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
-                  <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
-                  <Route path={ROUTES.RECIPES} element={<Guard><RecipesUnified /></Guard>} />
-                  <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
-                  <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
+                <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
+                <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
+                <Route path="/menu/ingredients/edit/:id" element={<Guard><IngredientEdit /></Guard>} />
+                <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
+                <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
+                <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
+                <Route path={ROUTES.RECIPES} element={<Guard><RecipesUnified /></Guard>} />
+                <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
+                <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
 
-                  {/* Managers */}
-                  <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
-                  <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
-                  <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+                <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
+                <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
+                <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
 
-                  {/* Marketing */}
-                  <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
-                  <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
-                  <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
-                  <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
+                <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
+                <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
+                <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
+                <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
+                <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
 
-                  {/* Partners */}
-                  <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
-                  <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />
+                <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
+                <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />
 
-                  {/* Delivery */}
-                  <Route path="/delivery/admin" element={<Guard><DeliveryAdmin /></Guard>} />
-                  <Route path="/delivery/drivers" element={<Guard><DriverManager /></Guard>} />
-                  <Route path="/delivery/history" element={<Guard><DeliveryHistory /></Guard>} />
+                <Route path="/delivery/admin" element={<Guard><DeliveryAdmin /></Guard>} />
+                <Route path="/delivery/drivers" element={<Guard><DriverManager /></Guard>} />
+                <Route path="/delivery/history" element={<Guard><DeliveryHistory /></Guard>} />
 
-                  {/* Kitchen Display System (KDS) */}
-                  <Route path="/kds" element={<KDS />} />
-                  <Route path="/kds/history" element={<KDSHistory />} />
+                <Route path="/kds" element={<KDS />} />
+                <Route path="/kds/history" element={<KDSHistory />} />
 
-                  {/* Menu Master V3 */}
-                  <Route path="/menu-v3" element={<MenuAdminV3 />} />
+                <Route path="/menu-v3" element={<MenuAdminV3 />} />
 
-                  {/* POS Terminal */}
-                  <Route path="/pos-login" element={<POSLogin />} />
-                  <Route path="/pos" element={<POS />} />
-                  <Route path="/pos-register" element={<POSRegisterStatus />} />
-                  <Route path="/pos-checkout" element={<POSCheckout />} />
-                  <Route path="/pos-receipt" element={<POSReceiptPreview />} />
+                <Route path="/pos-login" element={<POSLogin />} />
+                <Route path="/pos" element={<POS />} />
+                <Route path="/pos-register" element={<POSRegisterStatus />} />
+                <Route path="/pos-checkout" element={<POSCheckout />} />
+                <Route path="/pos-receipt" element={<POSReceiptPreview />} />
 
-                  {/* Stock Live Dashboard */}
-                  <Route path="/stock-live" element={<LiveStock />} />
+                <Route path="/stock-live" element={<LiveStock />} />
 
-                  {/* Ingredient Usage Analytics */}
-                  <Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
+                <Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
+                <Route path="/analysis/stock-variance" element={<StockVariance />} />
 
-                  {/* Stock Variance Analysis */}
-                  <Route path="/analysis/stock-variance" element={<StockVariance />} />
+                <Route path="/saas" element={<SaaSAdmin />} />
+                <Route path="/settings/tenant" element={<TenantSwitcher />} />
+                <Route path="/settings/payments" element={<PaymentProviders />} />
 
-                  {/* SaaS Admin */}
-                  <Route path="/saas" element={<SaaSAdmin />} />
-                  <Route path="/settings/tenant" element={<TenantSwitcher />} />
-                  <Route path="/settings/payments" element={<PaymentProviders />} />
-                  <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
+                <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
+                <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
+                <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
-                  {/* Membership */}
-                  <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
-                  <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
-                  <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
-
-                  {/* All Analysis Pages */}
-                  <Route path="/analysis/daily-review" element={<DailyReview />} />
+                <Route path="/analysis/daily-review" element={<DailyReview />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>
