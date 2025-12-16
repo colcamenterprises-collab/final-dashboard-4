@@ -1984,6 +1984,58 @@ model saas_tenant_settings {
   tenant        saas_tenants @relation(fields: [tenantId], references: [id])
 }
 
+// PATCH DS-LY-DB — DATA SAFETY + LOYVERSE HISTORICAL IMPORT
+
+model backup_logs_v1 {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  status        String   @default("pending") // pending | success | failed
+  type          String   // full | daily | manual
+  sqlDumpPath   String?
+  csvZipPath    String?
+  tableCounts   Json?    // { table_name: count }
+  sizeBytes     Int?
+  durationMs    Int?
+  errorMessage  String?
+  triggeredBy   String?  // system | manual | scheduled
+}
+
+model historical_shifts_v1 {
+  id            String   @id @default(cuid())
+  shiftDate     String
+  businessDate  DateTime @db.Date
+  source        String   @default("loyverse_import")
+  importedAt    DateTime @default(now())
+  totalReceipts Int      @default(0)
+  totalRevenue  Float    @default(0)
+  totalOrders   Int      @default(0)
+  cashAmount    Float    @default(0)
+  cardAmount    Float    @default(0)
+  qrAmount      Float    @default(0)
+  otherAmount   Float    @default(0)
+  topItems      Json?
+  rawData       Json?
+
+  @@unique([shiftDate, source])
+}
+
+model historical_sales_v1 {
+  id            String   @id @default(cuid())
+  shiftDate     String
+  businessDate  DateTime @db.Date
+  source        String   @default("loyverse_import")
+  importedAt    DateTime @default(now())
+  itemId        String
+  itemName      String
+  categoryName  String?
+  quantitySold  Int      @default(0)
+  grossSales    Float    @default(0)
+  netSales      Float    @default(0)
+  
+  @@index([businessDate])
+  @@index([itemName])
+}
+
 // PATCH L2.1 — MIGRATION REPORTS FOR AUDIT TRAIL
 model migration_reports_v1 {
   id            String   @id @default(cuid())

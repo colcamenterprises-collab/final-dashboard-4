@@ -1,0 +1,261 @@
+🚨 GOLDEN PATCH — DS-LY-DB (DATA SAFETY + LOYVERSE HISTORY + REAL DASHBOARD)
+
+NON-NEGOTIABLE RULES (READ FIRST)
+
+❌ NO schema deletions
+
+❌ NO table drops
+
+❌ NO data overwrites
+
+❌ NO resets until backups are verified
+
+✅ ADDITIVE ONLY
+
+✅ READ-ONLY imports
+
+✅ EVERYTHING visible in UI
+
+
+If any step cannot be completed safely → STOP and REPORT.
+
+
+---
+
+PHASE 1 — DATA SAFETY LOCK (DS-1) 🔐 DO FIRST
+
+1. Create Immutable Backup System (PRODUCTION)
+
+Backend
+
+Implement a backup service that:
+
+Exports full PostgreSQL SQL dump
+
+Exports CSV for every table
+
+Zips exports with timestamp
+
+
+Store backups in Google Drive (already configured)
+
+Schedule:
+
+Daily automatic backup
+
+Weekly full archive
+
+
+Add manual endpoint:
+
+POST /api/admin/backup/run
+
+
+Verification
+
+Log backup success/failure
+
+Persist last backup timestamp
+
+
+
+---
+
+2. Admin UI — Backup Visibility (MANDATORY)
+
+Add to Settings / Admin:
+
+“Last Successful Backup”
+
+“Backup Status: OK / FAILED”
+
+“Run Backup Now” button
+
+
+If this UI is not visible → patch is incomplete.
+
+
+---
+
+PHASE 2 — LOYVERSE HISTORICAL IMPORT (LY-1) 📜
+
+CANONICAL RULE
+
+Historical truth source: Loyverse
+
+Import range: July 1st 2025 → today
+
+Imported data is READ-ONLY
+
+
+
+---
+
+3. Import Loyverse Data (Additive)
+
+Create importer that pulls and stores:
+
+Shift reports (daily totals)
+
+Orders (aggregated)
+
+Payments (by type)
+
+Menu categories
+
+Menu items
+
+Modifiers
+
+
+All rows must include:
+
+source = 'loyverse_import'
+importedAt = timestamp
+
+❌ Do NOT overwrite existing rows
+❌ Do NOT touch forms or emails
+
+
+---
+
+4. Data Model (Additive Only)
+
+If needed, create:
+
+historical_sales
+
+historical_shifts
+
+historical_menu_items
+
+
+These tables are:
+
+Read-only
+
+Never edited by UI
+
+Used for reporting only
+
+
+
+---
+
+PHASE 3 — DASHBOARD THAT ACTUALLY SHOWS BUSINESS DATA (DB-1) 📊
+
+5. Executive Metrics (TOP OF DASHBOARD)
+
+MUST display immediately after import:
+
+Total Orders (since July 1)
+
+Total Revenue
+
+Average Order Value
+
+Orders Today
+
+Orders by Channel (POS / Online / Partner)
+
+
+If these numbers are zero after import → FAIL PATCH.
+
+
+---
+
+6. Operations Intelligence Table (CRITICAL)
+
+Create table:
+
+“Cumulative Purchasing Demand”
+
+Derived from:
+
+Stock requests
+
+Loyverse sales
+
+Roll purchase CSV (when added)
+
+
+Columns:
+
+Item Name
+
+Requested Qty (7d / 30d / All-time)
+
+Purchased Qty
+
+Variance
+
+Status (OVER / UNDER / OK)
+
+
+This table MUST be visible in dashboard UI.
+
+This is not optional.
+
+
+---
+
+PHASE 4 — HARD TESTING & VISIBILITY RULE 🧪
+
+7. Seed & Verify
+
+Agent MUST:
+
+Seed test data if real data unavailable
+
+Provide:
+
+Screenshot locations
+
+Navigation path
+
+Before / after description
+
+
+
+No screenshots = not complete.
+
+
+---
+
+FINAL ACCEPTANCE CRITERIA ✅
+
+Patch is ONLY complete if ALL are true:
+
+✅ Backups running & visible in UI
+
+✅ Loyverse history visible (non-zero)
+
+✅ Dashboard shows real numbers
+
+✅ No legacy data deleted
+
+✅ No schema destruction
+
+✅ No silent failures
+
+
+
+---
+
+WHY THIS PATCH MATTERS (DO NOT SKIP)
+
+This patch:
+
+Makes data loss impossible
+
+Makes the dashboard demonstrable
+
+Creates investor-safe architecture
+
+Stops invisible patch hell
+
+Converts the project into a real SaaS foundation
+
+
+
+---
